@@ -115,15 +115,12 @@ impl<'db> FieldMetadata<'db> {
     /// ```py
     /// field: int = Field(default=0, alias="field_alias")
     /// ```
-    fn collect_from_rhs_type(
-        &mut self,
-        db: &'db dyn Db,
-        rhs_type: Option<Type<'db>>,
-        specialization: Option<Specialization<'db>>,
-    ) {
+    fn collect_from_rhs_type(&mut self, db: &'db dyn Db, rhs_type: Option<Type<'db>>) {
         match rhs_type {
             Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
-                self.merge_field(db, field, specialization);
+                // `own_fields_inner` has already specialized the right-hand side, including
+                // the default value inside a field specifier.
+                self.merge_field(db, field, None);
             }
             Some(rhs_type) => self.default_ty = Some(rhs_type),
             None => {}
@@ -339,7 +336,7 @@ pub(in crate::types) fn field_metadata<'db>(
     if let Some(definition) = definition {
         metadata.collect_from_annotation(db, definition, specialization);
     }
-    metadata.collect_from_rhs_type(db, rhs_type, specialization);
+    metadata.collect_from_rhs_type(db, rhs_type);
     metadata
 }
 

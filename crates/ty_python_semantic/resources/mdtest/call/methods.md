@@ -212,13 +212,9 @@ intersection:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: (bound method U@generic_bounds.f() -> list[U@generic_bounds]) | (bound method U@generic_bounds.f() -> list[U@generic_bounds])
+    # revealed: (bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]) | (bound method (U@generic_bounds & E2).f() -> list[U@generic_bounds & E2])
     reveal_type(union.f)
-    # TODO: This call should be accepted without errors. Pyright and mypy reveal `list[E1] | list[E2]` here, but
-    # `list[U@generic_bounds]` seems more accurate.
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E2` of type variable `Self`"
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1] | list[U@generic_bounds & E2]
 
     # revealed: (bound method I@generic_bounds.f() -> list[I@generic_bounds]) & (bound method I@generic_bounds.f() -> list[I@generic_bounds])
     reveal_type(intersection.f)
@@ -350,13 +346,11 @@ intersection:
 
 ```py
 def generic_bounds[U: E1 | E2, I: E1 & E2](union: U, intersection: I):
-    # revealed: bound method U@generic_bounds.f() -> list[U@generic_bounds]
+    # revealed: bound method (U@generic_bounds & E1).f() -> list[U@generic_bounds & E1]
     # error: [unresolved-attribute]
     reveal_type(union.f)
-    # TODO: Ideally, this would not emit the `invalid-argument-type` error and reveal `list[U@generic_bounds]`
-    # error: [invalid-argument-type] "`U@generic_bounds` does not satisfy upper bound `E1` of type variable `Self`"
     # error: [unresolved-attribute]
-    reveal_type(union.f())  # revealed: list[Unknown]
+    reveal_type(union.f())  # revealed: list[U@generic_bounds & E1]
 
     # revealed: bound method I@generic_bounds.f() -> list[I@generic_bounds]
     reveal_type(intersection.f)
@@ -494,6 +488,170 @@ class Variadic(Protocol):
 
 def check_variadic(value: Variadic) -> None:
     value.method()  # error: [invalid-argument-type]
+```
+
+## Bound methods without a positional receiver
+
+A method can be retrieved from an instance even when it cannot accept the implicit receiver (has
+zero parameters):
+
+```py
+from typing import Callable, Protocol
+
+class NoReceiver:
+    def method() -> int:
+        return 1
+
+bound_method = NoReceiver().method
+```
+
+However, this method cannot be called:
+
+```py
+bound_method()  # error: [too-many-positional-arguments]
+```
+
+This method also cannot be assigned to a callable that expects no positional arguments:
+
+```py
+c1: Callable[[], int] = bound_method  # error: [invalid-assignment]
+```
+
+When accessed on the class, `method` can be called and can be assigned to a callable that expects no
+positional arguments:
+
+```py
+NoReceiver.method()
+c2: Callable[[], int] = NoReceiver.method
+```
+
+The bound method cannot be assigned to a protocol with a method that expects a receiver in this
+position, so this assignment fails:
+
+```py
+class HasMethod(Protocol):
+    def method(self) -> int: ...
+
+# snapshot: invalid-assignment
+m: HasMethod = NoReceiver()
+```
+
+Our error message here could be better:
+
+```snapshot
+error[invalid-assignment]: Object of type `NoReceiver` is not assignable to `HasMethod`
+  --> src/mdtest_snippet.py:16:16
+   |
+16 | m: HasMethod = NoReceiver()
+   |    ---------   ^^^^^^^^^^^^ Incompatible value of type `NoReceiver`
+   |    |
+   |    Declared type
+info: type `NoReceiver` is not assignable to protocol `HasMethod`
+info: └── protocol member `method` is incompatible
+```
+
+## Bound methods with various shapes of receivers
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+All of these are valid ways to define a receiver for a method:
+
+```py
+from typing import Callable, Protocol, Self
+
+class Valid:
+    def named(self) -> int:
+        return 1
+
+    def differently_named(receiver) -> int:
+        return 1
+
+    def positional_only(self, /) -> int:
+        return 1
+
+    def variadic(*args) -> int:
+        return 1
+
+    def unpacked(*args: *tuple[Self]) -> int:
+        return 1
+
+reveal_type(Valid().named())  # revealed: int
+reveal_type(Valid().differently_named())  # revealed: int
+reveal_type(Valid().positional_only())  # revealed: int
+reveal_type(Valid().variadic())  # revealed: int
+reveal_type(Valid().unpacked())  # revealed: int
+```
+
+On the other hand, these are all invalid:
+
+```py
+from typing import Protocol
+
+class Invalid:
+    def wrong_type(self: int) -> int:
+        return 1
+
+    def keyword_only(*, self) -> int:
+        return 1
+
+    def keyword_variadic(**kwargs: int) -> int:
+        return 1
+
+    def variadic_wrong_type(*args: int) -> int:
+        return 1
+
+    def unpacked_wrong_type(*args: *tuple[int]) -> int:
+        return 1
+
+    def unpacked_empty(*args: *tuple[()]) -> int:
+        return 1
+
+# error: [invalid-argument-type]
+Invalid().wrong_type()
+
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Invalid().keyword_only()
+
+# error: [too-many-positional-arguments]
+Invalid().keyword_variadic()
+
+# error: [invalid-argument-type]
+Invalid().variadic_wrong_type()
+
+# error: [invalid-argument-type]
+Invalid().unpacked_wrong_type()
+
+# error: [too-many-positional-arguments]
+Invalid().unpacked_empty()
+```
+
+## `Self` in unpacked bound-method parameters
+
+Binding a receiver consumes the first element of a fixed unpacked tuple:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class C:
+    def method(*args: *tuple[Self, int, Self]) -> None: ...
+    @classmethod
+    def class_method(*args: *tuple[type[Self], int, Self]) -> None: ...
+
+C().method(1, C())
+C.class_method(1, C())
+
+base: Callable[[int, C], None] = C().method
+class_base: Callable[[int, C], None] = C.class_method
 ```
 
 ## Method calls on `KnownInstance` types
@@ -817,13 +975,13 @@ on a derived class.
 
 ```py
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Generator
 from typing_extensions import Self
 
 class Base:
     @classmethod
     @contextmanager
-    def create(cls) -> Iterator[Self]:
+    def create(cls) -> Generator[Self, None, None]:
         yield cls()
 
 class Child(Base): ...
@@ -1361,12 +1519,12 @@ bind `self`:
 
 ```py
 from contextlib import contextmanager
-from collections.abc import Iterator
+from collections.abc import Generator
 
 class D:
     @staticmethod
     @contextmanager
-    def ctx(num: int) -> Iterator[int]:
+    def ctx(num: int) -> Generator[int, None, None]:
         yield num
 
     def use_ctx(self) -> None:

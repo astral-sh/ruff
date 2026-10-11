@@ -743,6 +743,39 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Immediate literal forwarding
+
+A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
+checks their individual types and argument count.
+
+```py
+from typing import Callable
+
+def forward[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def target(x: int, y: int) -> int:
+    return x + y
+
+reveal_type(forward(target, *[1, 2]))  # revealed: int
+reveal_type(forward(target, **{"x": 1, "y": 2}))  # revealed: int
+forward(target, *[1])  # error: [missing-argument]
+forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
+own parameter and forwards only the remaining keys.
+
+```py
+def forward_prefix[**P, R](callback: Callable[P, R], prefix: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed: int
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
+forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
+forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
 ### Preserve an unpacked required suffix
 
 A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic
@@ -2363,4 +2396,78 @@ def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int
     return ctr("", *args, **kwargs)
 
 call_factory(my_factory)
+```
+
+## Calling methods on a union of `ParamSpec` specializations
+
+A caller's parameter list can be shared by the receivers while the return type preserves the
+relationship between each receiver and its other type argument.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Box[**P, T]:
+    value: T
+
+    def invoke(self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward[T, **P](
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    box = a if cond else b
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1)
+    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    # revealed: tuple[Box[P@forward, str], str] | tuple[Box[P@forward, T@forward], T@forward]
+    reveal_type(result)
+    return result  # no diagnostic
+
+def reverse[T, **P](
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    invoke = b.invoke if cond else a.invoke
+    return invoke(callback, *args, **kwargs)  # no diagnostic
+```
+
+## Calling a union of methods with a `ParamSpec`
+
+The caller's `ParamSpec` remains fixed while each method is specialized for its own receiver.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def invoke[**P](self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward[T, **P](
+    a: Box[str], b: Box[T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    # revealed: tuple[Box[str], str] | tuple[Box[T@forward], T@forward]
+    reveal_type(result)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1)
+    return result  # no diagnostic
+
+def callback(x: int, *, label: str) -> None: ...
+def concrete(a: Box[str], b: Box[int], cond: bool):
+    box = a if cond else b
+    reveal_type(box.invoke(callback, 1, label="ok"))  # revealed: tuple[Box[str], str] | tuple[Box[int], int]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1, label=1)
+    # error: [missing-argument]
+    # error: [missing-argument]
+    box.invoke(callback, 1)
 ```

@@ -23,8 +23,8 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    OwnedConstraintSet, Solutions,
+    CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
+    IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -352,9 +352,10 @@ impl<'db> CallableSignature<'db> {
                         extras: SignatureExtras::new(
                             self_signature.source_overload_index_raw(),
                             self_signature.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                            self_signature.is_paramspec_value(),
                         ),
                         parameters,
-                        return_ty: if self_signature.is_paramspec_value {
+                        return_ty: if self_signature.is_paramspec_value() {
                             self_signature.return_ty
                         } else {
                             self_signature.return_ty.apply_type_mapping_impl(
@@ -364,7 +365,6 @@ impl<'db> CallableSignature<'db> {
                                 visitor,
                             )
                         },
-                        is_paramspec_value: self_signature.is_paramspec_value,
                     }))
                 }
                 Type::Callable(callable)
@@ -383,26 +383,30 @@ impl<'db> CallableSignature<'db> {
                             // Keep the enclosing method's definition for binding `Self` and
                             // other receiver type variables after specializing its parameters.
                             definition: self_signature.definition,
-                            extras: SignatureExtras::new(signature.source_overload_index_raw(), {
-                                let mapped = self_signature.map_receiver_constraints(
-                                    db,
-                                    type_mapping,
-                                    tcx,
-                                    visitor,
-                                );
-                                merge_receiver_constraints(
-                                    db,
-                                    env,
-                                    signature.receiver_constraints(),
-                                    mapped.as_ref(),
-                                )
-                            }),
+                            extras: SignatureExtras::new(
+                                signature.source_overload_index_raw(),
+                                {
+                                    let mapped = self_signature.map_receiver_constraints(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    );
+                                    merge_receiver_constraints(
+                                        db,
+                                        env,
+                                        signature.receiver_constraints(),
+                                        mapped.as_ref(),
+                                    )
+                                },
+                                self_signature.is_paramspec_value(),
+                            ),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                                 }),
                             ),
-                            return_ty: if self_signature.is_paramspec_value {
+                            return_ty: if self_signature.is_paramspec_value() {
                                 self_signature.return_ty
                             } else {
                                 self_signature.return_ty.apply_type_mapping_impl(
@@ -412,7 +416,6 @@ impl<'db> CallableSignature<'db> {
                                     visitor,
                                 )
                             },
-                            is_paramspec_value: self_signature.is_paramspec_value,
                         }),
                     ))
                 }
@@ -668,18 +671,9 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
-
-    /// Whether this signature is part of the value assigned to a `ParamSpec`.
-    ///
-    /// `ParamSpecs` only match the parameter list of a callable, so the values assigned to them to
-    /// not "have" return types. We store the return type as `Unknown`, since that is usually the
-    /// correct interpretation when _forced_ to consider the non-existent return type. But many
-    /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
-    /// instance, when visiting, mapping, or comparing types.
-    is_paramspec_value: bool,
 }
 
-/// Additional signature data needed for overload diagnostics or receiver binding.
+/// Signature data needed only for overload diagnostics, receiver binding, or `ParamSpec` values.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 struct SignatureExtras<'db> {
     /// Position of this overload in the original function definition.
@@ -690,19 +684,31 @@ struct SignatureExtras<'db> {
 
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
     receiver_constraints: Option<OwnedConstraintSet<'db>>,
+
+    /// Whether this signature is part of the value assigned to a `ParamSpec`.
+    ///
+    /// `ParamSpecs` only match the parameter list of a callable, so the values assigned to them do
+    /// not "have" return types. We store the return type as `Unknown`, since that is usually the
+    /// correct interpretation when _forced_ to consider the non-existent return type. But many
+    /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
+    /// instance, when visiting, mapping, or comparing types.
+    is_paramspec_value: bool,
 }
 
 impl<'db> SignatureExtras<'db> {
     fn new(
         source_overload_index: Option<NonZeroU32>,
         receiver_constraints: Option<OwnedConstraintSet<'db>>,
+        is_paramspec_value: bool,
     ) -> Option<Box<Self>> {
-        (source_overload_index.is_some() || receiver_constraints.is_some()).then(|| {
-            Box::new(Self {
-                source_overload_index,
-                receiver_constraints,
+        (source_overload_index.is_some() || receiver_constraints.is_some() || is_paramspec_value)
+            .then(|| {
+                Box::new(Self {
+                    source_overload_index,
+                    receiver_constraints,
+                    is_paramspec_value,
+                })
             })
-        })
     }
 }
 
@@ -768,7 +774,7 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     for parameter in &signature.parameters {
         visitor.visit_type(db, parameter.annotated_type());
     }
-    if !signature.is_paramspec_value {
+    if !signature.is_paramspec_value() {
         visitor.visit_type(db, signature.return_ty);
     }
 }
@@ -834,7 +840,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
@@ -849,14 +854,23 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
     pub(super) fn into_paramspec_value(mut self) -> Self {
         self.return_ty = Type::unknown();
-        self.is_paramspec_value = true;
+        if let Some(extras) = self.extras.as_mut() {
+            extras.is_paramspec_value = true;
+        } else {
+            self.extras = SignatureExtras::new(None, None, true);
+        }
         self
+    }
+
+    fn is_paramspec_value(&self) -> bool {
+        self.extras
+            .as_ref()
+            .is_some_and(|extras| extras.is_paramspec_value)
     }
 
     /// Return a signature for a dynamic callable
@@ -867,7 +881,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
-            is_paramspec_value: false,
         }
     }
 
@@ -921,7 +934,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
@@ -1015,7 +1027,6 @@ impl<'db> Signature<'db> {
             extras: self.extras.clone(),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1047,7 +1058,6 @@ impl<'db> Signature<'db> {
             extras: self.extras.clone(),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         })
     }
 
@@ -1067,17 +1077,17 @@ impl<'db> Signature<'db> {
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),
                 self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                self.is_paramspec_value(),
             ),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: if self.is_paramspec_value {
+            return_ty: if self.is_paramspec_value() {
                 self.return_ty
             } else {
                 self.return_ty
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1236,60 +1246,87 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
-        let explicit_receiver = self
-            .parameters
-            .get(0)
-            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation);
-
-        // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
-        // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        let mut parameters = if removed_receiver {
-            self.parameters.without_first()
+        // A fixed unpacked tuple has a known first positional argument, even though it is
+        // declared with `*args`. Expand it before consuming the receiver.
+        let binding_parameters = if self.parameters.get(0).is_some_and(|parameter| {
+            parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && parameter
+                    .annotated_type()
+                    .exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
+        }) {
+            self.parameters.expand_starred_variadic_annotations(db)
         } else {
             self.parameters.clone()
         };
+        let removed_receiver = binding_parameters
+            .get(0)
+            .is_some_and(Parameter::is_positional);
+        let first_parameter = binding_parameters.get(0);
+        let explicit_receiver = first_parameter.filter(|parameter| {
+            (parameter.is_positional()
+                || (parameter.is_variadic() && !parameter.has_starred_annotation()))
+                && !parameter.inferred_annotation
+        });
+        let impossible_receiver = binding_parameters.is_standard()
+            && !removed_receiver
+            && !first_parameter.is_some_and(Parameter::is_variadic);
+
+        // TODO: Binding a receiver through a variable-length unpacked tuple needs to account for
+        // its possible positional prefixes and suffixes.
+        let mut parameters = if removed_receiver {
+            binding_parameters.without_first()
+        } else {
+            binding_parameters.clone()
+        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_constraint = explicit_receiver.map(|parameter| {
-            let receiver = receiver_type.unwrap_or_else(|| {
-                Type::TypeVar(BoundTypeVarInstance::synthetic_self(
-                    db,
-                    Type::object(),
-                    BindingContext::Synthetic(env.program(db)),
-                ))
-            });
-            let annotation = if let Some(typing_self_type) = typing_self_type {
-                let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                    db,
-                    env,
-                    typing_self_type,
-                    binding_context,
-                ));
-                parameter.annotated_type().apply_type_mapping(
-                    db,
-                    env,
-                    &mapping,
-                    TypeContext::default(),
-                )
-            } else {
-                parameter.annotated_type()
-            };
-            // TODO: Also intersect nested receiver type variables, such as the `T` in
-            // `self: list[T]`, with their valid specializations when constructing or solving the
-            // receiver constraint set.
-            let receiver_typevar = match annotation {
-                Type::TypeVar(typevar) => Some(typevar),
-                Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
-                _ => None,
-            };
-            if receiver_typevar.is_some_and(|typevar| {
-                Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
-            }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
-            }
-            receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
-        });
+        let receiver_constraint = if impossible_receiver {
+            // Keep the signature for bound-method diagnostics, but make it incompatible with
+            // callable contracts: no parameter can receive the implicit positional argument.
+            Some(std::borrow::Cow::Owned(OwnedConstraintSet::default()))
+        } else {
+            explicit_receiver.map(|parameter| {
+                let receiver = receiver_type.unwrap_or_else(|| {
+                    Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                        db,
+                        Type::object(),
+                        BindingContext::Synthetic(env.program(db)),
+                    ))
+                });
+                let annotation = if let Some(typing_self_type) = typing_self_type {
+                    let mapping = TypeMapping::BindSelf(SelfBinding::new(
+                        db,
+                        env,
+                        typing_self_type,
+                        binding_context,
+                    ));
+                    parameter.annotated_type().apply_type_mapping(
+                        db,
+                        env,
+                        &mapping,
+                        TypeContext::default(),
+                    )
+                } else {
+                    parameter.annotated_type()
+                };
+                // TODO: Also intersect nested receiver type variables, such as the `T` in
+                // `self: list[T]`, with their valid specializations when constructing or solving the
+                // receiver constraint set.
+                let receiver_typevar = match annotation {
+                    Type::TypeVar(typevar) => Some(typevar),
+                    Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
+                    _ => None,
+                };
+                if receiver_typevar.is_some_and(|typevar| {
+                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
+                }) {
+                    return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                }
+                receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+            })
+        };
         let receiver_constraints = merge_receiver_constraints(
             db,
             env,
@@ -1297,7 +1334,7 @@ impl<'db> Signature<'db> {
             receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
-            && self.needs_self_mapping(db, env, removed_receiver)
+            && self.needs_self_mapping(db, env, parameters.as_slice())
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
@@ -1315,10 +1352,13 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
-            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                receiver_constraints,
+                self.is_paramspec_value(),
+            ),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1507,15 +1547,10 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
+        let inferable = self.inferable_typevars(db);
         self_type
-            .when_assignable_to(
-                db,
-                env,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_always_satisfied(db, env)
+            .when_assignable_to(db, env, expected_self_ty, &constraints, inferable)
+            .is_always_satisfied(db, env, inferable)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1591,11 +1626,11 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
-        let receiver = self.parameters.get(0)?;
+        let (receiver, parameters) = self.parameters.as_slice().split_first()?;
 
         // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
         // would be unsound.
-        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, parameters) {
             return None;
         }
 
@@ -1672,6 +1707,7 @@ impl<'db> Signature<'db> {
             TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
         let receiver_visitor = ApplyTypeMappingVisitor::new(env);
         let self_visitor = ApplyTypeMappingVisitor::new(env);
+        let inferable = self.inferable_typevars(db);
         let receiver_constraints = self
             .map_receiver_constraints(
                 db,
@@ -1689,13 +1725,16 @@ impl<'db> Signature<'db> {
                 )
             })
             .filter(|constraints| {
-                !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db, env))
+                !constraints.query(|_builder, constraints| {
+                    constraints.is_always_satisfied(db, env, inferable)
+                })
             });
-        if !self.needs_self_mapping(db, env, false) {
+        if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
                     self.source_overload_index_raw(),
                     receiver_constraints,
+                    self.is_paramspec_value(),
                 ),
                 ..self.clone()
             };
@@ -1716,10 +1755,13 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                receiver_constraints,
+                self.is_paramspec_value(),
+            ),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1731,7 +1773,9 @@ impl<'db> Signature<'db> {
         let Some(constraints) = self.receiver_constraints() else {
             return checker.always();
         };
-        checker.constraints.load(db, checker.env, constraints)
+        checker
+            .constraints
+            .load_with_provenance(db, checker.env, constraints, checker.provenance)
     }
 
     fn map_receiver_constraints(
@@ -1743,8 +1787,9 @@ impl<'db> Signature<'db> {
     ) -> Option<OwnedConstraintSet<'db>> {
         let constraints =
             Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
-        (!constraints
-            .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
+        (!constraints.query(|_builder, constraints| {
+            constraints.is_always_satisfied(db, visitor.env, self.inferable_typevars(db))
+        }))
         .then_some(constraints)
     }
 
@@ -1929,15 +1974,12 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        receiver_is_removed: bool,
+        parameters: &[Parameter<'db>],
     ) -> bool {
         self.return_ty.contains_self(db, env)
-            || self
-                .parameters
+            || parameters
                 .iter()
-                .enumerate()
-                .skip(usize::from(receiver_is_removed))
-                .any(|(_, parameter)| parameter.annotated_type().contains_self(db, env))
+                .any(|parameter| parameter.annotated_type().contains_self(db, env))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
@@ -1984,7 +2026,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env);
+            .is_always_satisfied(db, env, TypeVarSet::None);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -2020,7 +2062,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env);
+            .is_always_satisfied(db, env, TypeVarSet::None);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
@@ -2054,6 +2096,7 @@ impl<'db> Signature<'db> {
                 db,
                 env,
                 constraints,
+                ConstraintProvenance::Evidence,
                 self_bound_typevar,
                 upper,
             );
@@ -2062,7 +2105,7 @@ impl<'db> Signature<'db> {
                     .overloads
                     .iter()
                     .when_any(db, constraints, |other_signature| {
-                        if self.is_paramspec_value || other_signature.is_paramspec_value {
+                        if self.is_paramspec_value() || other_signature.is_paramspec_value() {
                             ConstraintSet::from_bool(constraints, true)
                         } else {
                             self.return_ty.when_constraint_set_assignable_to(
@@ -2124,11 +2167,14 @@ impl<'db> Signature<'db> {
     fn set_source_overload_index(&mut self, index: Option<NonZeroU32>) {
         if let Some(extras) = self.extras.as_deref_mut() {
             extras.source_overload_index = index;
-            if index.is_none() && extras.receiver_constraints.is_none() {
+            if index.is_none()
+                && extras.receiver_constraints.is_none()
+                && !extras.is_paramspec_value
+            {
                 self.extras = None;
             }
         } else {
-            self.extras = SignatureExtras::new(index, None);
+            self.extras = SignatureExtras::new(index, None, false);
         }
     }
 
@@ -2223,9 +2269,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // additional per-signature obligations and `ParamSpec` values have no meaningful return
         // type. Leave those signatures to the ordinary relation.
         if target_signature.receiver_constraints().is_some()
-            || target_signature.is_paramspec_value
+            || target_signature.is_paramspec_value()
             || source_signatures.iter().any(|signature| {
-                signature.receiver_constraints().is_some() || signature.is_paramspec_value
+                signature.receiver_constraints().is_some() || signature.is_paramspec_value()
             })
         {
             return None;
@@ -2285,7 +2331,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let signatures_are_disjoint = self
                 .as_disjointness_checker()
                 .check_type_pair(db, self_parameter_type, other_parameter_type)
-                .is_always_satisfied(db, env);
+                .is_always_satisfied(db, env, self.inferable);
 
             if signatures_are_disjoint {
                 continue;
@@ -2308,7 +2354,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let aggregate_relation =
             parameters_cover_target.and(db, self.constraints, returns_match_target);
         aggregate_relation
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, self.inferable)
             .then_some(aggregate_relation)
     }
 
@@ -2363,6 +2409,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         source_tvar,
                         upper,
                     );
@@ -2405,7 +2452,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_signature,
                                             )
                                         })
-                                        .is_never_satisfied(db, env)
+                                        .is_never_satisfied(db, env, self.inferable)
                                 })
                                 .map(|signature| {
                                     Signature::new_generic(
@@ -2421,6 +2468,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         target_tvar,
                         lower,
                     );
@@ -2526,13 +2574,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
+        // In lazy comparisons, a captured parameter list refers to typevars owned by the
+        // surrounding call inference. Preserve constraints on those variables instead of
+        // freshening and quantifying them as callable-local variables. Eager comparisons still
+        // use the stored generic context to simplify bounds for compatibility inference.
+        let signature_context = |signature: &Signature<'db>| {
+            signature.generic_context.filter(|_| {
+                !signature.is_paramspec_value()
+                    || self.typevar_evaluation != TypeVarEvaluation::Lazy
+            })
+        };
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the other signature.
         let freshened_source;
-        let source = if source.generic_context != target.generic_context
-            && let Some(generic_context) = source.generic_context
+        let source = if signature_context(source) != signature_context(target)
+            && let Some(generic_context) = signature_context(source)
             && let Some(delta) = target
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
@@ -2544,7 +2602,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let freshened_target;
-        let target = if let Some(generic_context) = target.generic_context
+        let target = if let Some(generic_context) = signature_context(target)
             && let Some(delta) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
@@ -2556,8 +2614,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
 
         let signature_typevars = |signature: &Signature<'db>| {
-            signature
-                .generic_context
+            signature_context(signature)
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db))
         };
         let source_inferable = signature_typevars(source);
@@ -2624,7 +2681,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.is_paramspec_value || target.is_paramspec_value {
+        if source.is_paramspec_value() || target.is_paramspec_value() {
             self.always()
         } else {
             self.check_type_pair(db, source.return_ty, target.return_ty)
@@ -2637,7 +2694,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.is_paramspec_value || target.is_paramspec_value {
+        if source.is_paramspec_value() || target.is_paramspec_value() {
             return self.always();
         }
 
@@ -2907,7 +2964,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db, env);
+            .is_never_satisfied(db, env, self.inferable);
         if let Some(context) = self.report_context()
             && !return_type_checks
         {
@@ -2959,7 +3016,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
                 if result
                     .intersect(db, self.constraints, no_collision)
-                    .is_never_satisfied(db, env)
+                    .is_never_satisfied(db, env, self.inferable)
                 {
                     // Still allow the ParamSpec handling below to preserve its inferred binding.
                     keyword_collision_checks = false;
@@ -2997,7 +3054,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if let Some(context) = self.report_context()
-                && constraint_set.is_never_satisfied(db, env)
+                && constraint_set.is_never_satisfied(db, env, self.inferable)
             {
                 let parameter = ParameterDescription::new(target_index, target_name);
                 context.push(ErrorContext::IncompatibleParameterTypes {
@@ -3010,7 +3067,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db, env)
+                .is_never_satisfied(db, env, self.inferable)
         };
         let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
             ErrorContext::RequiredParameterMustHaveDefault {
@@ -3040,6 +3097,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         source_bound_typevar,
                         Type::TypeVar(target_bound_typevar),
                     );
@@ -3069,6 +3127,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         target_bound_typevar,
                         lower,
                     );
@@ -3098,6 +3157,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         source_bound_typevar,
                         upper,
                     );
@@ -3227,6 +3287,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 env,
                                 self.constraints,
+                                self.provenance,
                                 target_bound_typevar,
                                 lower,
                             );
@@ -3254,6 +3315,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 db,
                                 env,
                                 self.constraints,
+                                self.provenance,
                                 source_bound_typevar,
                                 upper,
                             );
@@ -3264,6 +3326,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             env,
                             self.constraints,
+                            self.provenance,
                             source_bound_typevar,
                             Type::TypeVar(target_bound_typevar),
                         );
@@ -3290,6 +3353,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         target_bound_typevar,
                         lower,
                     );
@@ -3435,6 +3499,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         target_bound_typevar,
                         lower,
                     );
@@ -3461,6 +3526,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         source_bound_typevar,
                         upper,
                     );
@@ -3576,6 +3642,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         db,
                         env,
                         self.constraints,
+                        self.provenance,
                         source_bound_typevar,
                         upper,
                     );
@@ -3820,7 +3887,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             return match self.relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => self.never(),
+                TypeRelation::Subtyping => self.never(),
                 TypeRelation::Redundancy { .. } => result.intersect(
                     db,
                     self.constraints,
@@ -4209,7 +4276,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return match self.relation {
                                         TypeRelation::Assignability => result,
                                         TypeRelation::Subtyping
-                                        | TypeRelation::SubtypingAssuming
                                         | TypeRelation::Redundancy { .. } => self.never(),
                                     };
                                 }
@@ -5235,7 +5301,27 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::new(value, self.data.kind).expand_starred_variadic_annotations(db)
+        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+            let freshen = |paramspec| {
+                Type::TypeVar(paramspec)
+                    .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
+                    .as_typevar()
+                    .unwrap_or(paramspec)
+            };
+            // The structural tail and its two component annotations identify the same ParamSpec.
+            match self.data.kind {
+                ParametersKind::ParamSpec(paramspec) => {
+                    ParametersKind::ParamSpec(freshen(paramspec))
+                }
+                ParametersKind::Concatenate(ConcatenateTail::ParamSpec(paramspec)) => {
+                    ParametersKind::Concatenate(ConcatenateTail::ParamSpec(freshen(paramspec)))
+                }
+                kind => kind,
+            }
+        } else {
+            self.data.kind
+        };
+        Self::new(value, kind).expand_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()

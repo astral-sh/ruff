@@ -1,8 +1,9 @@
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
 use indexmap::map::Slice;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
@@ -10,14 +11,115 @@ use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
-    CandidateTypeVarSolver, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
-    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
+    ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
+    SolutionViolationKind, UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
-type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
+/// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
+/// whether we've already processed a node in an equivalent situation. If so, we don't need to
+/// reproduce whatever results we calculated previously, and can return early.
+///
+/// If you are performing a BDD walk where you always want to process every node, use the
+/// [`never_cache`] callback.
+///
+/// The "in an equivalent situation" part is important. We will often encounter the same BDD node
+/// multiple times when walking a BDD, and how we interpret that node will depend on which other
+/// nodes we've already processed on this path, and what partial solution we've calculated so far
+/// for those other nodes. When constructing a cache key, you should take into account both `path`
+/// and `node`.
+///
+/// Returns `true` if this is the first time we've seen this node in this situation, and should
+/// process it. Returns `false` if this is _not_ the first time we've seen them, and can reuse any
+/// cached results.
+type CheckCache<'a, 'db, L, B> = dyn Fn(
+        &mut SolutionWalker<'db>,
+        &mut ConstraintSetStorage<'db>,
+        &mut L,
+        &mut PathAssignments,
+        Polarity,
+        NodeId,
+    ) -> ControlFlow<B, bool>
+    + 'a;
+
+/// A [`CheckCache`] callback that never caches anything, and always processes every node
+/// encountered when walking a BDD.
+fn never_cache<'db, L, B>(
+    _this: &mut SolutionWalker<'db>,
+    _storage: &mut ConstraintSetStorage<'db>,
+    _limits: &mut L,
+    _path: &mut PathAssignments,
+    _polarity: Polarity,
+    _node: NodeId,
+) -> ControlFlow<B, bool> {
+    ControlFlow::Continue(true)
+}
+
+/// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
+/// whether the current node can affect the partial solution that we've calculated so far for the
+/// current path. If not, we don't need to descend into the node's subtree, and can return early.
+///
+/// If you are performing a BDD walk where you always want to process every node, use the
+/// [`never_prune`] callback.
+///
+/// The current node and its descendents have a fixed set of constraints and typevars that they
+/// check. (We track this in the node's _support_, so that we don't have to calculate it on the
+/// fly.) If those typevars are not inferable, and there are no cross-typevar relationships between
+/// them and any other inferable typevars, then this node's subtree cannot possibly affect the
+/// current solution. There is one exception: if there is no possible way to satisfy the current
+/// node, that contradiction does "carry through" and invalidate the current solution.
+///
+/// Together, this gives three possible outcomes:
+///
+/// - We can skip this node's subtree, because the current solution is valid, and the subtree
+///   cannot affect that solution. ([`PathIs::Satisfied`])
+/// - We can skip this node's subtree, because the subtree is unsatisfiable, and the so the overall
+///   solution is invalid. ([`PathIs::Unsatisfied`])
+/// - The node's subtree can affect the current solution, and so we have to descend into the
+///   subtree to determine which extensions of the current solution are valid.
+///   ([`PathIs::Uncertain`])
+type PrunePath<'a, 'db, L, B> = dyn Fn(
+        &mut SolutionWalker<'db>,
+        &mut ConstraintSetStorage<'db>,
+        &mut L,
+        &mut PathAssignments,
+        Polarity,
+        NodeId,
+    ) -> ControlFlow<B, PathIs>
+    + 'a;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PathIs {
+    /// The current path is already satisfied, and the current node (and its descendants) cannot
+    /// affect the solution.
+    Satisfied,
+    /// The current path is currently satisfied, but all paths from the current node introduce
+    /// contradictions that make it unsatisfied.
+    Unsatisfied,
+    /// The current path is currently satisfied, but the current node can influence the solutions
+    /// that we report, and so we must walk its outgoing edges in full.
+    Uncertain,
+}
+
+/// A [`PrunePath`] callback that never prunes anything, and always processes the descendants of
+/// every node encountered when walking a BDD.
+fn never_prune<'db, L, B>(
+    _this: &mut SolutionWalker<'db>,
+    _storage: &mut ConstraintSetStorage<'db>,
+    _limits: &mut L,
+    _paths: &mut PathAssignments,
+    _polarity: Polarity,
+    _node: NodeId,
+) -> ControlFlow<B, PathIs> {
+    ControlFlow::Continue(PathIs::Uncertain)
+}
+
+/// A callback that is invoked by [`visit_node_and_then`][SolutionWalker::visit_node_and_then]
+/// whenever a satisfied path to the `true` terminal is found.
+type ProcessSatisfied<'a, 'db, L, B> = dyn Fn(
         &mut SolutionWalker<'db>,
         &mut ConstraintSetStorage<'db>,
         &mut L,
@@ -25,10 +127,37 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
     ) -> ControlFlow<B>
     + 'a;
 
+/// Whether [`SolutionWalker`] walks a BDD or its negation. (We can walk the negation of a BDD
+/// lazily, which is more efficient than actually constructing the negation and then walking it
+/// normally.)
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) enum Polarity {
+    Positive,
+    Negative,
+}
+
+type ExploredNodeKey = (
+    Polarity,
+    NodeId,
+    Box<[(ConstraintAssignment, ConstraintId)]>,
+);
+
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
+    /// The relation before non-inferable variables are projected away. Used to recover the
+    /// original upper bounds for diagnostics, since projected paths can contain derived bounds
+    /// that obscure the original evidence.
+    original_node: NodeId,
     inferable: TypeVarSet<'db>,
+    inferable_support: Support,
+
     declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+
+    /// Nodes that we have already explored. We can't cache this only on the node ID, since the
+    /// constraints that are in scope when we encounter the node can affect how we interpret its
+    /// downstream edges. But we also don't want to consider _all_ of the constraints on the path;
+    /// we only want to consider the ones that are relevant to the node and its descendants.
+    explored_nodes: FxHashSet<ExploredNodeKey>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -52,14 +181,74 @@ struct PendingCandidateSolution<'db> {
 }
 
 impl<'db> SolutionWalker<'db> {
-    pub(super) fn new(source_orders: FxIndexSet<ConstraintId>, inferable: TypeVarSet<'db>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_orders: FxIndexSet<ConstraintId>,
+        inferable: TypeVarSet<'db>,
+        original_node: NodeId,
+    ) -> Self {
+        let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,
+            original_node,
             inferable,
+            inferable_support,
             declared_constraint_solutions: FxHashMap::default(),
+            explored_nodes: FxHashSet::default(),
             pending: Vec::default(),
             _phantom: PhantomData,
         }
+    }
+
+    /// Returns an iterator of the positive and negative constraints on the current path
+    fn constrained_assignments(
+        path: &PathAssignments,
+    ) -> impl Iterator<Item = ConstraintId> + Clone {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, _)| assignment.as_constrained())
+    }
+
+    /// Returns an iterator of the constraints on the current path that mention any typevar in the
+    /// given support
+    fn constrained_assignments_mentioning(
+        storage: &ConstraintSetStorage<'db>,
+        path: &PathAssignments,
+        support: &Support,
+    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+        path.assignments
+            .iter()
+            .filter_map(|(assignment, (source_constraint, _))| {
+                let constraint = assignment.as_constrained()?;
+                let constraint_support = storage.constraint_support(constraint);
+                constraint_support
+                    .overlaps_with(support)
+                    .then_some((*assignment, *source_constraint))
+            })
+    }
+
+    pub(super) fn is_never_satisfied(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+    ) -> bool {
+        let mut limits = UnboundedSolutionLimits;
+        let ControlFlow::Continue(satisfiable) = self.node_is_satisfiable_on_path(
+            db,
+            env,
+            storage,
+            &mut limits,
+            path,
+            polarity,
+            node,
+            None,
+        );
+        !satisfiable
     }
 
     /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
@@ -73,25 +262,101 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         all_typevars: Option<&Support>,
+        polarity: Polarity,
         node: NodeId,
     ) -> ControlFlow<L::Break> {
-        let mut validations = None;
+        let validations = all_typevars
+            .map(|all_typevars| Validations::from_support(db, env, storage, all_typevars));
+        let validations = validations.as_ref();
         self.visit_node_and_then(
             db,
             env,
             storage,
             limits,
             path,
+            polarity,
             node,
-            &mut |this, storage, limits, path| match all_typevars {
-                Some(all_typevars) => {
-                    let validations = validations.get_or_insert_with(|| {
-                        Validations::from_support(db, env, storage, all_typevars)
-                    });
+            &|this, storage, _limits, path, polarity, node| {
+                // See if we've already visited this node on an "equivalent" path, where we only
+                // consider the typevars that can affect the solutions we'd find if we were to
+                // continue walking down the node.
+                let mut relevant_typevars = this.inferable_support.clone();
+                // Declared domains can invalidate a path even when their typevars neither
+                // contribute a solution nor occur in the remaining subtree. Such paths must
+                // not share a cache entry with paths that satisfy those domains.
+                if let Some(validations) = validations {
+                    relevant_typevars |= &validations.support;
+                }
+                let node_support = storage.node_support(node);
+                if let Some(node_support) = node_support {
+                    relevant_typevars |= node_support;
+                }
+                relevant_typevars
+                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                let mut relevant_path: Box<[_]> =
+                    Self::constrained_assignments_mentioning(storage, path, &relevant_typevars)
+                        .collect();
+                relevant_path
+                    .sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
+                let key = (polarity, node, relevant_path);
+                ControlFlow::Continue(this.explored_nodes.insert(key))
+            },
+            &|this, storage, limits, path, polarity, node| {
+                // Next see if anything in this node can affect the solution we've already
+                // calculated on the current path.
+                let mut visible_typevars = this.inferable_support.clone();
+                visible_typevars
+                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                if let Some(node_support) = storage.node_support(node)
+                    && visible_typevars.overlaps_with(node_support)
+                {
+                    return ControlFlow::Continue(PathIs::Uncertain);
+                }
+
+                // This node cannot affect the solution we've found. Make sure that the node has
+                // _at least one_ satisfiable path, without walking them all. As long as it does,
+                // we can report the solution we have so far as-is.
+                if this.node_is_satisfiable_on_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    polarity,
+                    node,
+                    validations,
+                )? {
+                    ControlFlow::Continue(PathIs::Satisfied)
+                } else {
+                    ControlFlow::Continue(PathIs::Unsatisfied)
+                }
+            },
+            &|this, storage, limits, path| {
+                let satisfied = Cell::new(false);
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    validations,
+                    &|this, storage, limits, path| {
+                        if this.found_satisfied_path(db, env, storage, limits, path)? {
+                            satisfied.set(true);
+                        }
+                        ControlFlow::Continue(())
+                    },
+                )?;
+
+                // If this path is not satisfied, we want to identify which particular upper
+                // bounds or constraints were violated. To do that, we have to re-check this
+                // path against each one individually.
+                if let Some(validations) = validations
+                    && !satisfied.into_inner()
+                {
                     let upper_bounds = validations.upper_bounds.as_slice();
                     let constrained = validations.constrained.as_slice();
-                    let mut satisfied = false;
-                    this.validate_satisfied_path(
+                    this.attribute_typevar_failures(
                         db,
                         env,
                         storage,
@@ -99,34 +364,10 @@ impl<'db> SolutionWalker<'db> {
                         path,
                         upper_bounds,
                         constrained,
-                        &mut |this, storage, limits, path| {
-                            if this.found_satisfied_path(db, env, storage, limits, path)? {
-                                satisfied = true;
-                            }
-                            ControlFlow::Continue(())
-                        },
                     )?;
-
-                    // If this path is not satisfied, we want to identify which particular upper
-                    // bounds or constraints were violated. To do that, we have to re-check this
-                    // path against each one individually.
-                    if !satisfied {
-                        this.attribute_typevar_failures(
-                            db,
-                            env,
-                            storage,
-                            limits,
-                            path,
-                            upper_bounds,
-                            constrained,
-                        )?;
-                    }
-
-                    ControlFlow::Continue(())
                 }
-                None => this
-                    .found_satisfied_path(db, env, storage, limits, path)
-                    .map_continue(|_| ()),
+
+                ControlFlow::Continue(())
             },
         )
     }
@@ -141,39 +382,176 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        polarity: Polarity,
         node: NodeId,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        check_cache: &CheckCache<'_, 'db, L, L::Break>,
+        prune_path: &PrunePath<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
-        if node == ALWAYS_FALSE {
+        if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
+            (polarity, node)
+        {
+            return ControlFlow::Continue(());
+        }
+
+        if !check_cache(self, storage, limits, path, polarity, node)? {
             return ControlFlow::Continue(());
         }
 
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
-        if node == ALWAYS_TRUE {
+        if let (Polarity::Positive, ALWAYS_TRUE) | (Polarity::Negative, ALWAYS_FALSE) =
+            (polarity, node)
+        {
             return process_satisfied(self, storage, limits, path);
         }
 
-        // At this point we actually have to walk the outgoing edges of this node.
+        match prune_path(self, storage, limits, path, polarity, node)? {
+            PathIs::Satisfied => return process_satisfied(self, storage, limits, path),
+            PathIs::Unsatisfied => return ControlFlow::Continue(()),
+            PathIs::Uncertain => {}
+        }
+
+        // At this point we actually have to walk the outgoing edges of this node. The repetitive
+        // nature of the visit_edge calls is intentional; in the negative polarity case, it's
+        // important that we not construct the `if_false` edge sink unless we actually need to
+        // visit it.
         let interior = storage.interior_node_data(node);
         let constraint = interior.constraint;
-        for (assignment, child) in [
-            (constraint.when_true(), interior.if_true),
-            (constraint.when_unconstrained(), interior.if_uncertain),
-            (constraint.when_false(), interior.if_false),
-        ] {
+
+        let if_true = if polarity == Polarity::Positive {
+            interior.if_true
+        } else {
+            interior.if_true.or(storage, interior.if_uncertain)
+        };
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            polarity,
+            constraint.when_true(),
+            if_true,
+            check_cache,
+            prune_path,
+            process_satisfied,
+        )?;
+
+        if polarity == Polarity::Positive {
             self.visit_edge(
                 db,
                 env,
                 storage,
                 limits,
                 path,
-                assignment,
-                child,
+                polarity,
+                constraint.when_unconstrained(),
+                interior.if_uncertain,
+                check_cache,
+                prune_path,
                 process_satisfied,
             )?;
         }
+
+        let if_false = if polarity == Polarity::Positive {
+            interior.if_false
+        } else {
+            interior.if_false.or(storage, interior.if_uncertain)
+        };
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            polarity,
+            constraint.when_false(),
+            if_false,
+            check_cache,
+            prune_path,
+            process_satisfied,
+        )?;
+
         ControlFlow::Continue(())
+    }
+
+    /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
+    /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
+    /// we find the first satisfied path.
+    #[expect(clippy::too_many_arguments)]
+    fn node_is_satisfiable_on_path<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+        validations: Option<&Validations<'db>>,
+    ) -> ControlFlow<L::Break, bool> {
+        /// A custom [`SolutionLimits`] that lets us return early either when the budget is
+        /// exhausted, or when we detect the first satisfiable path.
+        struct AllowEarlyBreak<'a, L>(&'a mut L);
+
+        enum Break<B> {
+            Limits(B),
+            FoundSolution,
+        }
+
+        impl<L> SolutionLimits for AllowEarlyBreak<'_, L>
+        where
+            L: SolutionLimits,
+        {
+            type Break = Break<L::Break>;
+
+            fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+                self.0.visit_node().map_break(Break::Limits)
+            }
+
+            fn satisfied_path(&mut self) -> ControlFlow<Self::Break> {
+                self.0.satisfied_path().map_break(Break::Limits)
+            }
+        }
+
+        let result = self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            &mut AllowEarlyBreak(limits),
+            path,
+            polarity,
+            node,
+            &never_cache,
+            &never_prune,
+            &|this, storage, limits, path| {
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    validations,
+                    &|this, storage, _limits, path| {
+                        if this
+                            .pending_candidate_solution(db, env, storage, path, None)
+                            .is_some()
+                        {
+                            // break when we find the first solution
+                            ControlFlow::Break(Break::FoundSolution)
+                        } else {
+                            ControlFlow::Continue(())
+                        }
+                    },
+                )
+            },
+        );
+        match result {
+            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
+            ControlFlow::Break(Break::FoundSolution) => ControlFlow::Continue(true),
+            ControlFlow::Continue(()) => ControlFlow::Continue(false),
+        }
     }
 
     /// Visits one of the outgoing edges from a BDD node.
@@ -188,13 +566,18 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        polarity: Polarity,
         assignment: ConstraintAssignment,
         child: NodeId,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        check_cache: &CheckCache<'_, 'db, L, L::Break>,
+        prune_path: &PrunePath<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
-        if child == ALWAYS_FALSE {
+        if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
+            (polarity, child)
+        {
             return ControlFlow::Continue(());
         }
 
@@ -211,7 +594,10 @@ impl<'db> SolutionWalker<'db> {
                         storage,
                         limits,
                         path,
+                        polarity,
                         child,
+                        check_cache,
+                        prune_path,
                         process_satisfied,
                     )?;
                 }
@@ -244,7 +630,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         constraints: &[ConstraintId],
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         let Some((constraint, constraints)) = constraints.split_first() else {
             return process_satisfied(self, storage, limits, path);
@@ -276,11 +662,11 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
+        constraints: impl Iterator<Item = ConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let mut evidence = CandidateTypeVarSolver::default();
-        for (constraint, _) in path.positive_constraints() {
+        for constraint in constraints {
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
                 && constraint.provenance() == ConstraintProvenance::Evidence
@@ -326,7 +712,118 @@ impl<'db> SolutionWalker<'db> {
         let when = when_lower.and(storage, when_upper);
         let when_source_order =
             storage.ordered_source_order(when_lower_source_order, when_upper_source_order);
-        !when.is_never_satisfied(db, env, storage, when_source_order)
+        !when.is_never_satisfied(db, env, storage, self.inferable, when_source_order)
+    }
+
+    /// Finds evidence that excludes every declared constraint without relying on both sides of
+    /// the inferred range together. A conflict between otherwise valid bounds is not itself a
+    /// violation of the type variable's declaration.
+    fn constraint_failure_evidence<L: SolutionLimits>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        evidence: &CandidateTypeVarSolution<'db>,
+        constrained: &Constrained<'db>,
+    ) -> ControlFlow<L::Break, Option<ConstraintFailureEvidence<'db>>> {
+        if let Some(lower) = evidence.inference_lower(db, env)
+            && constrained.declared_constraints.iter().all(|declared| {
+                let when = lower.when_assignable_to_owned(
+                    db,
+                    env,
+                    declared.constrained_ty.top_materialization(db, env),
+                    self.inferable,
+                );
+                let (when, source_order) = storage.load(db, env, &when);
+                when.is_never_satisfied(db, env, storage, self.inferable, source_order)
+            })
+        {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Lower(lower)));
+        }
+
+        // The projected path may contain derived constraints such as `T <= Never`, and source
+        // order also contains constraints from other alternatives. Only collect individual bounds
+        // from the original relation when it is a single conjunction: then each positive edge
+        // necessarily applies to the whole relation. As in `NodeId::is_single_conjunction`, both
+        // a second live branch and an uncertain branch rule out that interpretation. Charge this
+        // scan to the traversal budget because diagnostic collection can occur on many paths.
+        let bound_typevar = evidence.bound_typevar;
+        let mut upper_bounds = Vec::new();
+        let mut current = self.original_node;
+        loop {
+            limits.visit_node()?;
+            let interior = match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => {
+                    upper_bounds.clear();
+                    break;
+                }
+                Node::Interior(_) => storage.interior_node_data(current),
+            };
+            if interior.if_uncertain != ALWAYS_FALSE
+                || (interior.if_true != ALWAYS_FALSE && interior.if_false != ALWAYS_FALSE)
+            {
+                upper_bounds.clear();
+                break;
+            }
+            if interior.if_true == ALWAYS_FALSE {
+                current = interior.if_false;
+                continue;
+            }
+            current = interior.if_true;
+            let constraint_id = interior.constraint;
+            let constraint = storage.constraint_data(constraint_id);
+            if constraint.provenance() != ConstraintProvenance::Evidence {
+                continue;
+            }
+            if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
+                let order = self
+                    .source_orders
+                    .get_index_of(&constraint_id)
+                    .unwrap_or(usize::MAX);
+                upper_bounds.push((order, upper));
+            }
+        }
+        upper_bounds.sort_by_key(|(order, _)| *order);
+        let mut unique = FxIndexSet::default();
+        unique.extend(upper_bounds.into_iter().map(|(_, upper)| upper));
+        let has_never = unique.shift_remove(&Type::Never);
+        let upper_bounds: Box<[_]> = unique.into_iter().collect();
+
+        let excludes_every_constraint =
+            |storage: &mut ConstraintSetStorage<'db>, bounds: &[Type<'db>]| {
+                !bounds.is_empty()
+                    && constrained.declared_constraints.iter().all(|declared| {
+                        let mut when = ALWAYS_TRUE;
+                        let mut source_order = None;
+                        for upper in bounds {
+                            let relation = declared
+                                .constrained_ty
+                                .bottom_materialization(db, env)
+                                .when_assignable_to_owned(db, env, *upper, self.inferable);
+                            let (next, next_order) = storage.load(db, env, &relation);
+                            when = when.and(storage, next);
+                            source_order = storage.ordered_source_order(source_order, next_order);
+                        }
+                        when.is_never_satisfied(db, env, storage, self.inferable, source_order)
+                    })
+            };
+        if excludes_every_constraint(storage, &upper_bounds) {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(upper_bounds)));
+        }
+        if has_never && excludes_every_constraint(storage, &[Type::Never]) {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(Box::new([
+                Type::Never,
+            ]))));
+        }
+        // The solver can still establish an upper-bound failure after projection, even when the
+        // original relation has alternatives or no longer contains the individual clauses.
+        let inferred_upper: Vec<_> = evidence.upper.iter_evidence().collect();
+        ControlFlow::Continue(
+            excludes_every_constraint(storage, &inferred_upper)
+                .then_some(ConstraintFailureEvidence::UpperUnknown),
+        )
     }
 
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
@@ -339,12 +836,17 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
-        upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
-        constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        validations: Option<&Validations<'db>>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
+        let Some(validations) = validations else {
+            return process_satisfied(self, storage, limits, path);
+        };
+
         // We have a path that represents a valid solution to the constraint set. Check if the
         // solution satisfies all of the typevars' declared upper bounds (TODO and constraints).
+        let upper_bounds = validations.upper_bounds.as_slice();
+        let constrained = validations.constrained.as_slice();
         self.validate_upper_bound(
             db,
             env,
@@ -367,7 +869,7 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         let Some(((_, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound. Next check the typevars with
@@ -398,7 +900,7 @@ impl<'db> SolutionWalker<'db> {
             limits,
             path,
             constraints,
-            &mut |this, storage, limits, path| {
+            &|this, storage, limits, path| {
                 this.validate_upper_bound(
                     db,
                     env,
@@ -422,7 +924,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
         let Some(((&bound_typevar, constrained_typevar), constrained)) = constrained.split_first()
         else {
@@ -459,7 +961,14 @@ impl<'db> SolutionWalker<'db> {
         // Note that a fixed caller typevar can only be preserved when its constraints are a subset
         // of this typevar's constraints. A bounded typevar may specialize below its bound, so it
         // must be promoted to an individual declared constraint instead.
-        let Some(evidence) = Self::candidate_evidence(db, env, storage, path, bound_typevar) else {
+        let Some(evidence) = Self::candidate_evidence(
+            db,
+            env,
+            storage,
+            path.positive_constraints()
+                .map(|(constraint, _)| constraint),
+            bound_typevar,
+        ) else {
             // If the evidence is not satisfiable, then we can return early; none of the
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
@@ -509,7 +1018,7 @@ impl<'db> SolutionWalker<'db> {
                     continue;
                 };
 
-                let mut satisfied = false;
+                let satisfied = Cell::new(false);
                 self.visit_constraints_and_then(
                     db,
                     env,
@@ -517,17 +1026,17 @@ impl<'db> SolutionWalker<'db> {
                     limits,
                     path,
                     constraints,
-                    &mut |_this, _storage, _limits, _path| {
+                    &|_this, _storage, _limits, _path| {
                         // We don't need to use pending_candidate_solution here to verify that the
                         // solution is actually valid, because we can accept false positives. We
                         // will catch the failure when we fall through to the full family solution
                         // check below.
-                        satisfied = true;
+                        satisfied.set(true);
                         ControlFlow::Continue(())
                     },
                 )?;
 
-                if satisfied {
+                if satisfied.into_inner() {
                     potentially_satisfied_constraint_count += 1;
                 }
             }
@@ -537,8 +1046,8 @@ impl<'db> SolutionWalker<'db> {
                 // check any remaining constrained typevars with _no_ validity assignment for this
                 // typevar.
                 let previously_pending = self.pending.len();
-                let mut has_family_solution = false;
-                let mut individual_solution_is_required = false;
+                let has_family_solution = Cell::new(false);
+                let individual_solution_is_required = Cell::new(false);
                 self.validate_constrained(
                     db,
                     env,
@@ -546,7 +1055,7 @@ impl<'db> SolutionWalker<'db> {
                     limits,
                     path,
                     constrained,
-                    &mut |this, storage, limits, path| {
+                    &|this, storage, limits, path| {
                         // Check which declared constraints are compatible with this complete
                         // solution for the remaining constrained typevars. Note that we _don't_
                         // update the candidate solution for those declared constraints — we want
@@ -554,7 +1063,7 @@ impl<'db> SolutionWalker<'db> {
                         // the individual declared constraints don't _invalidate_ that solution.
                         let mut satisfied_constraint_count = 0;
                         for declared_constraint in &constrained_typevar.declared_constraints {
-                            let mut satisfied = false;
+                            let satisfied = Cell::new(false);
                             if let Some(constraints) = declared_constraint.constraints.as_deref() {
                                 this.visit_constraints_and_then(
                                     db,
@@ -563,7 +1072,7 @@ impl<'db> SolutionWalker<'db> {
                                     limits,
                                     path,
                                     constraints,
-                                    &mut |this, storage, _limits, path| {
+                                    &|this, storage, _limits, path| {
                                         if !has_preservable_typevar_evidence
                                             && !this.evidence_satisfies_declared_constraint(
                                                 db,
@@ -579,13 +1088,13 @@ impl<'db> SolutionWalker<'db> {
                                             db, env, storage, path, None,
                                         );
                                         if solution.is_some() {
-                                            satisfied = true;
+                                            satisfied.set(true);
                                         }
                                         ControlFlow::Continue(())
                                     },
                                 )?;
                             }
-                            if satisfied {
+                            if satisfied.into_inner() {
                                 satisfied_constraint_count += 1;
                             }
                         }
@@ -604,13 +1113,13 @@ impl<'db> SolutionWalker<'db> {
                                 // than one declared constraint. That means we don't want to use
                                 // this family solution _or any other_. We'll create one or more
                                 // individual solutions below.
-                                individual_solution_is_required = true;
+                                individual_solution_is_required.set(true);
                                 ControlFlow::Continue(())
                             }
                             _ => {
                                 // This solution satisfies more than one declared constraint, so
                                 // it's one of the eligible family solutions that we can report.
-                                has_family_solution = true;
+                                has_family_solution.set(true);
                                 process_satisfied(this, storage, limits, path)
                             }
                         }
@@ -622,7 +1131,8 @@ impl<'db> SolutionWalker<'db> {
                 // need to fall through and find individual solutions
                 // If every valid assignment for the remaining typevars admitted a family
                 // solution, there is no need to also record the individual constraints.
-                if has_family_solution && !individual_solution_is_required {
+                if has_family_solution.into_inner() && !individual_solution_is_required.into_inner()
+                {
                     return ControlFlow::Continue(());
                 }
 
@@ -639,7 +1149,7 @@ impl<'db> SolutionWalker<'db> {
         let previously_pending = self.pending.len();
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
             let constraint = storage.constraint_data(constraint);
-            constraint.provides_lower_bound_for(db, bound_typevar)
+            constraint.lower_bound_for(db, bound_typevar).is_some()
         });
 
         // A constraint preferred over every potentially valid alternative will also be preferred
@@ -742,9 +1252,9 @@ impl<'db> SolutionWalker<'db> {
         evidence: &CandidateTypeVarSolution<'db>,
         declared_constraint: &DeclaredConstraint<'db>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &mut ProcessSatisfied<'_, 'db, L, L::Break>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break, bool> {
-        let mut satisfied = false;
+        let satisfied = Cell::new(false);
         if let Some(constraints) = declared_constraint.constraints.as_deref() {
             self.with_declared_constraint_solution(
                 db,
@@ -758,7 +1268,7 @@ impl<'db> SolutionWalker<'db> {
                         limits,
                         path,
                         constraints,
-                        &mut |this, storage, limits, path| {
+                        &|this, storage, limits, path| {
                             // Selecting a concrete constraint must not specialize a caller's fixed
                             // typevar: `S & str <= int` may hold for some `S`, but not for every `S`.
                             if !this.evidence_satisfies_declared_constraint(
@@ -780,8 +1290,8 @@ impl<'db> SolutionWalker<'db> {
                                 limits,
                                 path,
                                 constrained,
-                                &mut |this, storage, limits, path| {
-                                    satisfied = true;
+                                &|this, storage, limits, path| {
+                                    satisfied.set(true);
                                     process_satisfied(this, storage, limits, path)
                                 },
                             )
@@ -790,7 +1300,7 @@ impl<'db> SolutionWalker<'db> {
                 },
             )?;
         }
-        ControlFlow::Continue(satisfied)
+        ControlFlow::Continue(satisfied.into_inner())
     }
 
     /// Create a pending candidate solution for the current path.
@@ -809,7 +1319,9 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
-        typevar_violations: Option<&FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind>>,
+        typevar_violations: Option<
+            &FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind<'db>>,
+        >,
     ) -> Option<PendingCandidateSolution<'db>> {
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
@@ -818,6 +1330,9 @@ impl<'db> SolutionWalker<'db> {
         // retain that stable per-tie ordering.
         let mut typevars: Vec<_> = path
             .positive_constraints()
+            // Ignore any constraints that were replaced with other constraints on this path due to
+            // substituting an exact type for some typevar.
+            .filter(|(constraint, _)| !path.constraint_is_substituted(*constraint))
             .map(|(constraint, source_constraint)| {
                 let source_order = self
                     .source_orders
@@ -840,29 +1355,49 @@ impl<'db> SolutionWalker<'db> {
             let constraint = storage.constraint_data(constraint);
             match constraint {
                 Constraint::ConcreteLower(lower) => {
-                    let solver = mappings.entry(lower.typevar).or_default();
-                    solver.add_constraint(db, lower.typevar, constraint);
+                    if lower.typevar.is_inferable(db, self.inferable) {
+                        let solver = mappings.entry(lower.typevar).or_default();
+                        solver.add_constraint(db, lower.typevar, constraint);
+                    }
                 }
                 Constraint::ConcreteUpper(upper) => {
-                    let solver = mappings.entry(upper.typevar).or_default();
-                    solver.add_constraint(db, upper.typevar, constraint);
+                    if upper.typevar.is_inferable(db, self.inferable) {
+                        let solver = mappings.entry(upper.typevar).or_default();
+                        solver.add_constraint(db, upper.typevar, constraint);
+                    }
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
-                    let solver = mappings.entry(equivalence.typevar).or_default();
-                    solver.add_constraint(db, equivalence.typevar, constraint);
+                    if equivalence.typevar.is_inferable(db, self.inferable) {
+                        let solver = mappings.entry(equivalence.typevar).or_default();
+                        solver.add_constraint(db, equivalence.typevar, constraint);
+                    }
                 }
                 Constraint::TypeVarRange(bound) => {
-                    let solver = mappings.entry(bound.left).or_default();
-                    solver.add_constraint(db, bound.left, constraint);
-                    let solver = mappings.entry(bound.right).or_default();
-                    solver.add_constraint(db, bound.right, constraint);
+                    // A direct relationship between an inferable and non-inferable typevar must
+                    // contribute bounds for both endpoints. Contextual inference relies on the
+                    // reverse, non-inferable binding to preserve relationships to outer typevars.
+                    if bound.left.is_inferable(db, self.inferable)
+                        || bound.right.is_inferable(db, self.inferable)
+                    {
+                        let solver = mappings.entry(bound.left).or_default();
+                        solver.add_constraint(db, bound.left, constraint);
+                        let solver = mappings.entry(bound.right).or_default();
+                        solver.add_constraint(db, bound.right, constraint);
+                    }
                 }
                 Constraint::TypeVarEquivalence(bound) => {
+                    // A direct relationship between an inferable and non-inferable typevar must
+                    // contribute bounds for both endpoints. Contextual inference relies on the
+                    // reverse, non-inferable binding to preserve relationships to outer typevars.
                     let (left, right) = bound.in_builder(db, storage);
-                    let solver = mappings.entry(left).or_default();
-                    solver.add_constraint(db, left, constraint);
-                    let solver = mappings.entry(right).or_default();
-                    solver.add_constraint(db, right, constraint);
+                    if left.is_inferable(db, self.inferable)
+                        || right.is_inferable(db, self.inferable)
+                    {
+                        let solver = mappings.entry(left).or_default();
+                        solver.add_constraint(db, left, constraint);
+                        let solver = mappings.entry(right).or_default();
+                        solver.add_constraint(db, right, constraint);
+                    }
                 }
             }
         }
@@ -884,13 +1419,17 @@ impl<'db> SolutionWalker<'db> {
                 };
 
                 if let Some(typevar_violations) = typevar_violations
-                    && let Some(&kind) = typevar_violations.get(&bound_typevar)
+                    && let Some(kind) = typevar_violations.get(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument,
                         variance: solution.variance(),
-                        kind,
+                        kind: match kind {
+                            SolutionViolationKind::UpperBound(_) => {
+                                SolutionViolationKind::UpperBound(argument)
+                            }
+                            kind @ SolutionViolationKind::Constraints { .. } => kind.clone(),
+                        },
                     });
                 }
 
@@ -947,7 +1486,7 @@ impl<'db> SolutionWalker<'db> {
         let mut violations = FxHashMap::default();
 
         for (bound_typevar, upper_bound) in upper_bounds {
-            let mut satisfied = false;
+            let satisfied = Cell::new(false);
             if let Some(constraints) = upper_bound.constraints.as_deref() {
                 self.visit_constraints_and_then(
                     db,
@@ -956,28 +1495,37 @@ impl<'db> SolutionWalker<'db> {
                     limits,
                     path,
                     constraints,
-                    &mut |this, storage, _limits, path| {
+                    &|this, storage, _limits, path| {
                         let pending = this.pending_candidate_solution(db, env, storage, path, None);
                         if pending.is_some() {
-                            satisfied = true;
+                            satisfied.set(true);
                         }
                         ControlFlow::Continue(())
                     },
                 )?;
             }
-            if !satisfied {
-                violations.insert(*bound_typevar, SolutionViolationKind::UpperBound);
+            if !satisfied.into_inner() {
+                violations.insert(*bound_typevar, SolutionViolationKind::UpperBound(None));
             }
         }
 
+        // Construct diagnostic lower bounds in the same stable source order as normal solutions.
+        let mut inference_constraints: Vec<_> = path.positive_constraints().collect();
+        inference_constraints.sort_by_key(|(_, source)| self.source_orders.get_index_of(source));
         for (bound_typevar, constrained_typevar) in constrained {
-            let Some(evidence) = Self::candidate_evidence(db, env, storage, path, *bound_typevar)
-            else {
-                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
+            let Some(evidence) = Self::candidate_evidence(
+                db,
+                env,
+                storage,
+                inference_constraints
+                    .iter()
+                    .map(|(constraint, _)| *constraint),
+                *bound_typevar,
+            ) else {
                 continue;
             };
 
-            let mut satisfied = false;
+            let satisfied = Cell::new(false);
             for declared_constraint in &constrained_typevar.declared_constraints {
                 if let Some(constraints) = declared_constraint.constraints.as_deref() {
                     self.visit_constraints_and_then(
@@ -987,7 +1535,7 @@ impl<'db> SolutionWalker<'db> {
                         limits,
                         path,
                         constraints,
-                        &mut |this, storage, _limits, path| {
+                        &|this, storage, _limits, path| {
                             if !this.evidence_satisfies_declared_constraint(
                                 db,
                                 env,
@@ -1000,15 +1548,30 @@ impl<'db> SolutionWalker<'db> {
                             let pending =
                                 this.pending_candidate_solution(db, env, storage, path, None);
                             if pending.is_some() {
-                                satisfied = true;
+                                satisfied.set(true);
                             }
                             ControlFlow::Continue(())
                         },
                     )?;
                 }
             }
-            if !satisfied {
-                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
+            if !satisfied.into_inner()
+                && let Some(evidence) = self.constraint_failure_evidence(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    &evidence,
+                    constrained_typevar,
+                )?
+            {
+                violations.insert(
+                    *bound_typevar,
+                    SolutionViolationKind::Constraints {
+                        constraints: constrained_typevar.typevar_constraints,
+                        evidence,
+                    },
+                );
             }
         }
 
@@ -1021,6 +1584,7 @@ impl<'db> SolutionWalker<'db> {
         if let Some(pending) =
             self.pending_candidate_solution(db, env, storage, path, Some(&violations))
         {
+            limits.satisfied_path()?;
             self.pending.push(pending);
         }
         ControlFlow::Continue(())
@@ -1054,6 +1618,8 @@ impl<'db> SolutionWalker<'db> {
 /// Validations that must be verified for each candidate solution.
 #[derive(Default)]
 struct Validations<'db> {
+    /// Type variables whose assignments can affect declared-domain validation.
+    support: Support,
     upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
     constrained: FxIndexMap<BoundTypeVarInstance<'db>, Constrained<'db>>,
 }
@@ -1065,6 +1631,7 @@ struct UpperBound {
 }
 
 struct Constrained<'db> {
+    typevar_constraints: TypeVarConstraints<'db>,
     declared_constraints: SmallVec<[DeclaredConstraint<'db>; 4]>,
 }
 
@@ -1107,9 +1674,13 @@ impl<'db> Validations<'db> {
         seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) {
-        let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
+        let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db, env)
+        else {
+            return;
+        };
+        self.support.insert(storage.typevar_id(db, bound_typevar));
         match bound_or_constraints {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self.add_upper_bound(
+            TypeVarBoundOrConstraints::UpperBound(bound) => self.add_upper_bound(
                 db,
                 env,
                 storage,
@@ -1118,17 +1689,15 @@ impl<'db> Validations<'db> {
                 bound_typevar,
                 bound,
             ),
-            Some(TypeVarBoundOrConstraints::Constraints(declared_constraints)) => self
-                .add_constrained(
-                    db,
-                    env,
-                    storage,
-                    typevar_queue,
-                    seen_typevars,
-                    bound_typevar,
-                    declared_constraints,
-                ),
-            None => {}
+            TypeVarBoundOrConstraints::Constraints(declared_constraints) => self.add_constrained(
+                db,
+                env,
+                storage,
+                typevar_queue,
+                seen_typevars,
+                bound_typevar,
+                declared_constraints,
+            ),
         }
     }
 
@@ -1138,6 +1707,7 @@ impl<'db> Validations<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
+        support: &mut Support,
         constraints: impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>>,
     ) -> ValidationConstraints {
         let constraints: ValidationConstraints = constraints
@@ -1152,6 +1722,7 @@ impl<'db> Validations<'db> {
         // set of typevars to check.
         for constraint in constraints.iter().flatten() {
             let constraint_support = storage.constraint_support(*constraint);
+            *support |= constraint_support;
             let new_typevars = constraint_support - &*seen_typevars;
             *typevar_queue |= &new_typevars;
         }
@@ -1184,6 +1755,7 @@ impl<'db> Validations<'db> {
                 storage,
                 typevar_queue,
                 seen_typevars,
+                &mut self.support,
                 constraints,
             );
             UpperBound { constraints }
@@ -1202,7 +1774,7 @@ impl<'db> Validations<'db> {
         declared_constraints: TypeVarConstraints<'db>,
     ) {
         self.constrained.entry(bound_typevar).or_insert_with(|| {
-            let declared_constraints = declared_constraints
+            let validations = declared_constraints
                 .elements(db)
                 .iter()
                 .map(|&constrained_ty| {
@@ -1219,6 +1791,7 @@ impl<'db> Validations<'db> {
                         storage,
                         typevar_queue,
                         seen_typevars,
+                        &mut self.support,
                         constraints,
                     );
                     DeclaredConstraint {
@@ -1228,7 +1801,8 @@ impl<'db> Validations<'db> {
                 })
                 .collect();
             Constrained {
-                declared_constraints,
+                typevar_constraints: declared_constraints,
+                declared_constraints: validations,
             }
         });
     }

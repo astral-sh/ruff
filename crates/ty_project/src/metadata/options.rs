@@ -35,7 +35,7 @@ use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
@@ -216,6 +216,14 @@ impl Options {
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
+        let python_environment_error = match &python_environment {
+            Err(ToProgramSettingsError::PythonEnvironment(error)) => Some(PythonEnvironmentError {
+                message: error.to_string().into(),
+                last_usable: None,
+            }),
+            _ => None,
+        };
+
         // If in safe-mode, fallback to None if this fails instead of erroring.
         let python_environment = strategy
             .fallback_opt(python_environment, |_| {
@@ -306,6 +314,10 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                python_environment: match python_environment_error {
+                    Some(error) => Err(error),
+                    None => Ok(python_environment),
+                },
             },
             diagnostics,
         ))
@@ -864,7 +876,7 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.14""#,
+        default = r#""3.15""#,
         value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"

@@ -275,7 +275,15 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `Err(DynamicMetaclassConflict)` if there's a metaclass conflict
     /// (i.e., two base classes have metaclasses that are not in a subclass relationship).
     ///
+    /// A base's type can depend on the reachability of this class's definition, which can in turn
+    /// depend on this class's metaclass. Fall back to an unknown metaclass during cycle recovery.
+    ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| Ok(ClassMetaclass::Selected(SubclassOfType::subclass_of_unknown())),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(in crate::types) fn try_metaclass(
         self,
         db: &'db dyn Db,
@@ -586,7 +594,7 @@ impl<'db> DynamicClassLiteral<'db> {
 /// Error for metaclass conflicts in dynamic classes.
 ///
 /// This mirrors `MetaclassErrorKind::Conflict` for regular classes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DynamicMetaclassConflict<'db> {
     /// The first conflicting metaclass and its originating base class.
     pub(crate) metaclass1: ClassType<'db>,

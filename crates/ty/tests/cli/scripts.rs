@@ -1907,12 +1907,15 @@ mod uv_metadata {
 
         let case = CliTest::with_file(
             "script.py",
-            "# /// script\n# requires-python = '>=3.8'\n# dependencies = ['missing-script-dependency==99.0.0']\n# ///\nprint(missing)\n",
+            "
+            # /// script
+            # requires-python = '>=3.8'
+            # dependencies = ['missing-script-dependency==99.0.0']
+            # ///
+            print(missing)
+            ",
         )?
-        .with_filter(
-            r"(?s)`uv workspace metadata` failed with status.*?missing-script-dependency==99\.0\.0.*?\n(Found 1 diagnostic)",
-            "`uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved\n$1",
-        );
+        .with_filter(r"exit code: (\d+)", "exit status: $1");
         assert_cmd_snapshot!(
             command_with_script_uv(&case)
                 .arg("script.py")
@@ -1921,7 +1924,13 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed: missing-script-dependency==99.0.0 could not be resolved
+        error[uv-metadata]: `uv workspace metadata` failed with `exit status: 1`
+        --> script.py:2:1
+        info: No solution found when resolving dependencies
+          cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
+
+        hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
+
         Found 1 diagnostic
 
         ----- stderr -----

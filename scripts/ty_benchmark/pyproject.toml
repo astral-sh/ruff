@@ -29,6 +29,17 @@ ignore = [
 ]
 
 [tool.ty.rules]
+blanket-ignore-comment = "error"
+missing-type-argument = "error"
+unsound-return-statement = "error"
+unsound-yield = "error"
+unsupported-dynamic-base = "error"
+dynamic-function-decorator-return = "error"
+unsound-assignment = "error"
+redundant-condition-strict = "error"
+disjoint-cast = "error"
+missing-direct-dependency = "error"
+truthiness-test-of-none-union = "error"
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
 unused-ignore-comment = "error"

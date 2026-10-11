@@ -25,7 +25,8 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use crate::place::{DefinedPlace, Provenance, TypeOrigin};
+use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
+use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -35,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::Member;
+use crate::types::member::{Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -67,6 +68,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -1526,7 +1528,7 @@ impl<'db> ClassType<'db> {
         );
         checker
             .check_class_pair(db, self, target)
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Select the more derived metaclass, or return `None` for a conflict.
@@ -1654,7 +1656,7 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                .is_always_satisfied(db, env)
+                .is_always_satisfied(db, env, TypeVarSet::None)
         })
     }
 
@@ -1670,7 +1672,7 @@ impl<'db> ClassType<'db> {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
             checker
                 .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db, env)
+                .is_always_satisfied(db, env, checker.inferable)
         })
     }
 
@@ -1745,11 +1747,11 @@ impl<'db> ClassType<'db> {
             |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
             |this, other| {
                 this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env)
+                    .is_always_satisfied(db, env, TypeVarSet::None)
             },
             |this, other| {
                 this.when_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env)
+                    .is_always_satisfied(db, env, TypeVarSet::None)
             },
         )
     }
@@ -1774,12 +1776,12 @@ impl<'db> ClassType<'db> {
             |this, other| {
                 checker
                     .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db, env)
+                    .is_always_satisfied(db, env, checker.inferable)
             },
             |this, other| {
                 checker
                     .check_type_pair(db, this, other)
-                    .is_always_satisfied(db, env)
+                    .is_always_satisfied(db, env, checker.inferable)
             },
         )
     }
@@ -2272,11 +2274,11 @@ impl<'db> ClassType<'db> {
                     return Place::Undefined.into();
                 }
 
-                class_literal
-                    .instance_member(db, env, specialization, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, specialization)
-                    })
+                // MRO lookup already specializes each member in the class that defines it.
+                // Applying the receiver's specialization again would also substitute type
+                // variables inside the replacement types. For example, applying `T -> list[T]`
+                // twice changes an attribute's type from `list[T]` to `list[list[T]]`.
+                class_literal.instance_member(db, env, specialization, name)
             }
         }
     }
@@ -2696,9 +2698,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.relation.is_assignability() || target.is_object(db),
                 ),
                 ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => {
+                    TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => {
                         ConstraintSet::from_bool(self.constraints, target.is_object(db))
                     }
                     TypeRelation::Assignability => {
@@ -2910,12 +2910,66 @@ pub(super) struct MroLookup<'db, I> {
 
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, mro_iter: I) -> Self {
+    pub(super) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, mro_iter: I) -> Self {
         Self {
             db,
             env: env.clone(),
             mro_iter,
         }
+    }
+
+    /// Finds the annotation governing a new class-body default, without inferring existing defaults.
+    ///
+    /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
+    /// before continuing the MRO prevents a later sibling base from supplying a different contract.
+    /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
+    /// prevent us from determining which declaration applies. Final declarations are handled by
+    /// override diagnostics instead of supplying initializer context.
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+        let db = self.db;
+        for base in self.mro_iter {
+            let base = match base {
+                ClassBase::Generic | ClassBase::Protocol => continue,
+                ClassBase::Class(base) => base,
+                // A dynamic base may supply the member, a divergent base is not yet known,
+                // and TypedDict has a special member lookup.
+                ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_)
+                | ClassBase::TypedDict(_) => return None,
+            };
+            let (base, specialization) = base.static_class_literal(db)?;
+            let scope = base.body_scope(db);
+            let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+                continue;
+            };
+            let use_def = use_def_map(db, scope);
+            let declarations = use_def.end_of_scope_symbol_declarations(symbol);
+            let declared = place_from_declarations(db, &self.env, declarations.clone())
+                .ignore_conflicting_declarations();
+            let declaration = if declared.is_undefined() {
+                let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
+                let predicates = bindings.predicates();
+                let constraints = bindings.reachability_constraints();
+                if !bindings.any(|binding| {
+                    binding.binding.definition().is_some()
+                        && !constraints
+                            .evaluate(db, predicates, binding.reachability_constraint)
+                            .is_always_false()
+                }) {
+                    continue;
+                }
+                inherited_class_body_declaration(db, scope, symbol)
+            } else {
+                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
+                    && declarations.contains_only_annotated_assignments(db))
+                .then_some(declared)
+            };
+            return declaration.map(|declaration| {
+                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+            });
+        }
+        None
     }
 
     /// Infer augmented-assignment results after finding the existing attribute they read.

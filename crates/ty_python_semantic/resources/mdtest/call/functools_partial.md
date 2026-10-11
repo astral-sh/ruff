@@ -844,6 +844,27 @@ p = partial(f, *args)
 reveal_type(p)  # revealed: partial[(b: str) -> bool]
 ```
 
+### Starred args with an immediate list
+
+Unpacking an immediate list binds each element to its corresponding positional parameter, leaving
+only unbound parameters in the partial signature.
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, *[1])
+reveal_type(p)  # revealed: partial[(b: str) -> bool]
+reveal_type(p("hello"))  # revealed: bool
+
+p = partial(f, *[1, "hello"])
+reveal_type(p)  # revealed: partial[() -> bool]
+
+partial(f, *["wrong"])  # error: [invalid-argument-type]
+```
+
 ### Starred args with multiple elements
 
 ```py
@@ -886,6 +907,30 @@ def get_args() -> tuple[int, ...]:
 
 p = partial(f, *get_args())
 reveal_type(p)  # revealed: partial[bool]
+```
+
+### Kwargs splat with an immediate dictionary
+
+Unpacking an immediate dictionary binds its entries as keyword arguments. These arguments can still
+be overridden by keyword.
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, **{"a": 1})
+reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
+reveal_type(p(a=2, b="hello"))  # revealed: bool
+
+p = partial(f, **{"b": "hello", "a": 1})
+reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str = "hello") -> bool]
+
+p = partial(f, **{"a": "wrong", "a": 1})
+reveal_type(p)  # revealed: partial[(*, a: int = 1, b: str) -> bool]
+
+partial(f, **{"a": "wrong"})  # error: [invalid-argument-type]
 ```
 
 ### Kwargs splat with TypedDict
@@ -1026,11 +1071,10 @@ reveal_type(p)  # revealed: partial[bool]
 
 ### Fallback for kwargs splat with dict
 
-We intentionally fall back for a plain `dict`, even if a literal key is visible at the call site,
-because we don't track the key set precisely the way we do for direct keyword arguments or
-`TypedDict`. In particular, we don't know whether a required parameter like `b` will be supplied by
-the mapping, so we can't safely choose between a reduced signature where `b` remains required and
-one where `b` becomes a defaulted keyword-only parameter.
+A dictionary stored in a variable may change before unpacking, so its contents do not determine a
+precise partial signature. In particular, we don't know whether a required parameter like `b` will
+be supplied by the mapping, so we can't safely choose between a reduced signature where `b` remains
+required and one where `b` becomes a defaulted keyword-only parameter.
 
 ```py
 from functools import partial

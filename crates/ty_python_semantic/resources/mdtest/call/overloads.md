@@ -185,6 +185,26 @@ def _(ab: A | B, ac: A | C, bc: B | C):
     reveal_type(f(*(ac,)))  # revealed: A | C
 ```
 
+### Expanding immediate list and dictionary arguments
+
+Unpacking an immediate list or dictionary preserves each element's union type for overload
+expansion.
+
+```py
+from typing import overload
+
+@overload
+def choose(x: int) -> int: ...
+@overload
+def choose(x: str) -> str: ...
+def choose(x: int | str) -> int | str:
+    return x
+
+def _(value: int | str) -> None:
+    reveal_type(choose(*[value]))  # revealed: int | str
+    reveal_type(choose(**{"x": value}))  # revealed: int | str
+```
+
 ### Expanding first argument
 
 If the set of argument lists created by expanding the first argument evaluates successfully, the
@@ -486,6 +506,39 @@ from overloaded import A, B, f
 def _(x: tuple[A | B, int], y: tuple[int, bool]):
     reveal_type(f(x, y))  # revealed: A | B | C | D
     reveal_type(f(*(x, y)))  # revealed: A | B | C | D
+```
+
+### Expanding tuple subclasses
+
+Expanding a tuple subclass preserves its class identity while specializing its element types.
+Overloads accepting either the subclass or its tuple base remain applicable after expansion.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Literal, NamedTuple, overload
+
+class Point(NamedTuple):
+    x: bool
+
+@overload
+def by_class(value: Point, flag: Literal[True]) -> int: ...
+@overload
+def by_class(value: Point, flag: Literal[False]) -> str: ...
+@overload
+def by_element(value: tuple[Literal[True]]) -> int: ...
+@overload
+def by_element(value: tuple[Literal[False]]) -> str: ...
+```
+
+```py
+from overloaded import Point, by_class, by_element
+
+def _(value: Point, flag: bool):
+    reveal_type(by_class(value, flag))  # revealed: int | str
+    reveal_type(by_class(*(value, flag)))  # revealed: int | str
+    reveal_type(by_element(value))  # revealed: int | str
+    reveal_type(by_element(*(value,)))  # revealed: int | str
 ```
 
 ### Expanding `type`
@@ -1409,6 +1462,7 @@ from overloaded import f
 def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
     reveal_type(f(x1, x2))  # revealed: tuple[int, int]
     reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
+    reveal_type(f(*[x1, x2]))  # revealed: tuple[int, int]
 
     # Step 4 should filter out all but the last overload.
     reveal_type(f(x1, *args1))  # revealed: tuple[int, ...]
@@ -1437,8 +1491,10 @@ def _(x1: int, x2: int, kwargs: dict[str, int]):
     reveal_type(f(x1=x1))  # revealed: int
     reveal_type(f(x1=x1, x2=x2))  # revealed: tuple[int, int]
 
-    # Step 4 should filter out all but the last overload.
-    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: int
+    # The literal dictionary has exactly the two keys required by the second overload.
+    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload for unknown dictionary contents.
     reveal_type(f(**kwargs))  # revealed: int
 ```
 
@@ -1923,6 +1979,29 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
+### Variable-length arguments matched to different arities
+
+A variable-length argument can match different numbers of parameters in each overload. Here, the
+later keyword argument does not cause an otherwise viable overload to be discarded.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int, /, *, flag: str) -> int: ...
+@overload
+def f(x: int, /, *, flag: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(args: tuple[int, ...]):
+    reveal_type(f(*args, flag=""))  # revealed: Unknown
+```
+
 ### Variadic argument with generics
 
 `overloaded.pyi`:
@@ -2180,6 +2259,10 @@ from overloaded import A, B, C, f
 def _(arg: tuple[A | B, Any]):
     reveal_type(f(arg))  # revealed: A | Unknown
     reveal_type(f(*(arg,)))  # revealed: A | Unknown
+
+# Ambiguity from the first expansion must not affect the second expansion's return type.
+def _(arg: tuple[B | A, Any]):
+    reveal_type(f(arg))  # revealed: Unknown | A
 ```
 
 #### Both argument lists ambiguous

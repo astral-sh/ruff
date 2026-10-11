@@ -204,6 +204,7 @@ bitflags! {
         const ORDER_DEFAULT = 1 << 1;
         const KW_ONLY_DEFAULT = 1 << 2;
         const FROZEN_DEFAULT = 1 << 3;
+        const SLOTS_DEFAULT = 1 << 4;
     }
 }
 
@@ -227,6 +228,21 @@ pub struct DataclassTransformerParams<'db> {
 }
 
 impl get_size2::GetSize for DataclassTransformerParams<'_> {}
+
+impl<'db> DataclassTransformerParams<'db> {
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let field_specifiers =
+            super::normalize_field_specifiers(db, env, self.field_specifiers(db), div, nested)?;
+
+        Some(Self::new(db, self.flags(db), field_specifiers))
+    }
+}
 
 /// Whether a function should implicitly be treated as a staticmethod based on its name.
 pub(crate) fn is_implicit_staticmethod(function_name: &str) -> bool {
@@ -1757,7 +1773,14 @@ impl<'db> FunctionType<'db> {
             nested,
             || None,
             || {
-                let literal = self.literal(db);
+                let mut literal = self.literal(db);
+                // A field specifier may refer back to this function or its result.
+                if let Some(params) = literal.last_definition.dataclass_transformer_params(db) {
+                    let params = params.recursive_type_normalized_impl(db, env, div, nested)?;
+                    literal.last_definition = literal
+                        .last_definition
+                        .with_dataclass_transformer_params(db, params);
+                }
                 let updated_signature = match self.updated_signature(db) {
                     Some(signature) => {
                         Some(signature.recursive_type_normalized_impl(db, env, div, nested)?)

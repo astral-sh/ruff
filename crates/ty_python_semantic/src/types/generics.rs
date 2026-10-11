@@ -1,6 +1,6 @@
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
@@ -14,9 +14,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths, SolutionViolation,
-    SolutionViolationKind, Solutions, TypeVarSolution,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
+    SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -28,7 +28,9 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -1418,7 +1420,7 @@ impl<'db> Specialization<'db> {
 
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
-            let tcx = TypeContext::new(tcx.get(i).copied());
+            let tcx = TypeContext::declared(tcx.get(i).copied());
             if type_mapping.is_structural() {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
@@ -1571,8 +1573,11 @@ impl<'db> Specialization<'db> {
         let types = self.map_types(db, |_, bound_typevar, vartype| {
             let variance = specialization_variance(db, bound_typevar);
             let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
-            let has_dynamic_type =
-                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization);
+            // Equivalence can recursively inspect a protocol's requirements. Only check it when
+            // the result affects this materialization.
+            let has_dynamic_type = LazyCell::new(|| {
+                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
+            });
 
             match variance {
                 TypeVarVariance::Bivariant => {
@@ -1581,7 +1586,7 @@ impl<'db> Specialization<'db> {
                     top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-                    if has_dynamic_type && bound_typevar.typevar(db).is_constrained(db) =>
+                    if bound_typevar.typevar(db).is_constrained(db) && *has_dynamic_type =>
                 {
                     has_unsimplified_dynamic_typevar = true;
                     vartype
@@ -1595,9 +1600,9 @@ impl<'db> Specialization<'db> {
                     let materialized =
                         vartype.materialize(db, effective_materialization_kind, visitor);
 
-                    if has_dynamic_type
-                        && effective_materialization_kind == MaterializationKind::Top
+                    if effective_materialization_kind == MaterializationKind::Top
                         && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(db)
+                        && *has_dynamic_type
                     {
                         IntersectionType::from_two_elements(
                             db,
@@ -1610,7 +1615,7 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= has_dynamic_type;
+                    has_unsimplified_dynamic_typevar |= *has_dynamic_type;
                     vartype
                 }
             }
@@ -1715,9 +1720,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Assignability and pure redundancy must retain the source's gradual semantics.
         if matches!(
             self.relation,
-            TypeRelation::Subtyping
-                | TypeRelation::SubtypingAssuming
-                | TypeRelation::Redundancy { pure: false }
+            TypeRelation::Subtyping | TypeRelation::Redundancy { pure: false }
         ) && (
             // Explicitly materialized sources are already static and cannot advance further.
             source.materialization_kind(db).is_none()
@@ -1971,6 +1974,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             env,
                             self.constraints,
+                            self.provenance,
                             typevar,
                             ty.top_materialization(db, env),
                             ty.bottom_materialization(db, env),
@@ -1980,6 +1984,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             env,
                             self.constraints,
+                            self.provenance,
                             typevar,
                             ty,
                         )
@@ -1993,32 +1998,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-            (
-                None,
-                Some(target_mat),
-                TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
-                | TypeRelation::SubtypingAssuming,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Top,
-                target_type,
-                target_mat,
-            ),
-            (
-                Some(source_mat),
-                None,
-                TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
-                | TypeRelation::SubtypingAssuming,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Bottom,
-            ),
+            (None, Some(target_mat), TypeRelation::Subtyping | TypeRelation::Redundancy { .. }) => {
+                self.check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    MaterializationKind::Top,
+                    target_type,
+                    target_mat,
+                )
+            }
+            (Some(source_mat), None, TypeRelation::Subtyping | TypeRelation::Redundancy { .. }) => {
+                self.check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    source_mat,
+                    target_type,
+                    MaterializationKind::Bottom,
+                )
+            }
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
             (None, Some(target_mat), TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(
@@ -2227,7 +2224,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         })
                         .negate(db, self.constraints);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, self.env)
+                        && result.is_always_satisfied(db, self.env, self.inferable)
                     {
                         context.push(ErrorContext::InvariantTypeArgument {
                             left: left_type,
@@ -2664,14 +2661,15 @@ enum ConstraintSetAnalysis<'db> {
 impl<'db> ConstraintSetAnalysis<'db> {
     /// Reports why a type variable's declared bound or constraints cannot be satisfied.
     ///
-    /// Multiple rejected paths describe one failure when their lower bounds violate the same type
-    /// variable's declaration in a contravariant position. Their argument types are combined into
-    /// an intersection. For example, paths rejecting `int` and `bool` for `T: bytes` report
-    /// `bool`, the intersection of `int` and `bool`.
+    /// Paths whose lower bounds violate the same declared upper bound in a contravariant position
+    /// are combined into an intersection. For example, paths rejecting `int` and `bool` for
+    /// `T: bytes` report `bool`, their intersection.
     ///
     /// The inference API returns at most one declaration error per relation. Failures involving
-    /// different declarations, variances, or type variables cannot be combined meaningfully, so
-    /// only the first is reported.
+    /// declared constraints describe alternatives across paths, so only the first path's evidence
+    /// is reported. Intersecting rejected lower bounds could produce a type that satisfies the
+    /// constraints. Invariant paths and failures involving different declarations or type variables
+    /// also report only the first failure.
     fn specialization_error(
         &self,
         db: &'db dyn Db,
@@ -2682,69 +2680,42 @@ impl<'db> ConstraintSetAnalysis<'db> {
         };
 
         let first = failures.first()?;
-        // A single failure needs no aggregation; failures for different declarations, type
-        // variables, or variances cannot be combined, so they also return the first failure.
         // TODO: Rank incompatible failures by their diagnostic usefulness, or report them
         // separately.
-        if failures.len() < 2
-            || failures.iter().any(|failure| {
-                failure.error.bound_typevar() != first.error.bound_typevar()
-                    || failure.variance != first.variance
-                    || !matches!(
-                        (&first.error, &failure.error),
-                        (
-                            SpecializationError::MismatchedBound { .. },
-                            SpecializationError::MismatchedBound { .. }
-                        ) | (
-                            SpecializationError::MismatchedConstraint { .. },
-                            SpecializationError::MismatchedConstraint { .. }
-                        )
-                    )
-            })
-        {
-            return Some(first.error.clone());
+        let mut error = first.error.clone();
+        if failures.len() < 2 || first.variance != TypeVarVariance::Contravariant {
+            return Some(error);
         }
 
-        let arguments = failures.iter().map(|failure| failure.error.argument_type());
-        let argument = match first.variance {
-            ConstraintFailureVariance::Contravariant => {
-                IntersectionType::from_elements(db, env, arguments)
-            }
-            ConstraintFailureVariance::Invariant => {
-                // TODO: Combine invariant failures without losing their lower- or upper-bound
-                // evidence.
-                return Some(first.error.clone());
-            }
+        let SpecializationError::MismatchedBound { argument, .. } = &mut error else {
+            return Some(error);
         };
 
-        let mut error = first.error.clone();
-        let (SpecializationError::MismatchedBound {
-            argument: existing, ..
+        let lower_bounds = failures.iter().map(|failure| {
+            if failure.variance != first.variance
+                || failure.error.bound_typevar() != first.error.bound_typevar()
+            {
+                return None;
+            }
+            match &failure.error {
+                SpecializationError::MismatchedBound { argument, .. } => Some(*argument),
+                SpecializationError::MismatchedConstraint { .. } => None,
+            }
+        });
+        if lower_bounds.clone().all(|bound| bound.is_some()) {
+            *argument = IntersectionType::bounded_from_elements(db, env, lower_bounds.flatten())
+                .unwrap_or(*argument);
         }
-        | SpecializationError::MismatchedConstraint {
-            argument: existing, ..
-        }) = &mut error;
-        *existing = argument;
         Some(error)
     }
 }
 
 /// A declared type-variable bound or constraint rejected while solving one alternative.
 ///
-/// The variance identifies whether the rejected lower bound also has an upper bound, so multiple
-/// failures from the same relation can be combined into one diagnostic.
+/// The variance identifies whether rejected lower-bound evidence can be combined across paths.
 struct ConstraintFailure<'db> {
     error: SpecializationError<'db>,
-    variance: ConstraintFailureVariance,
-}
-
-/// The possible variances for a path with a lower bound that violates a declaration.
-///
-/// Covariant and bivariant paths have no lower bound, so they cannot produce declaration failures.
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum ConstraintFailureVariance {
-    Contravariant,
-    Invariant,
+    variance: TypeVarVariance,
 }
 
 /// Returns the directional comparisons required by this comparison's polarity.
@@ -3527,6 +3498,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3534,6 +3506,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3541,6 +3514,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3619,30 +3593,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return None;
         }
 
-        let argument = violation.argument?;
-        let variance = match violation.variance {
-            TypeVarVariance::Contravariant => ConstraintFailureVariance::Contravariant,
-            TypeVarVariance::Invariant => ConstraintFailureVariance::Invariant,
-            TypeVarVariance::Covariant | TypeVarVariance::Bivariant => return None,
-        };
-        let error = match violation.kind {
-            SolutionViolationKind::UpperBound => SpecializationError::MismatchedBound {
+        let error = match &violation.kind {
+            SolutionViolationKind::UpperBound(argument) => SpecializationError::MismatchedBound {
                 bound_typevar,
-                argument,
+                argument: (*argument)?,
             },
-            SolutionViolationKind::Constraints => SpecializationError::MismatchedConstraint {
+            SolutionViolationKind::Constraints {
+                constraints,
+                evidence,
+            } => SpecializationError::MismatchedConstraint {
                 bound_typevar,
-                argument,
+                constraints: *constraints,
+                evidence: evidence.clone(),
             },
         };
-        Some(ConstraintFailure { error, variance })
+        Some(ConstraintFailure {
+            error,
+            variance: violation.variance,
+        })
     }
 
     /// Records one relation in the call-wide constraint set.
     ///
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
-    fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+    pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
         self.pending.intersect(self.db, self.constraints, when);
     }
 
@@ -3859,7 +3834,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             );
             element_when
                 .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env)
+                .is_always_satisfied(db, env, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
@@ -4047,7 +4022,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             !element
                 .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
                 .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
-                .is_always_satisfied(db, self.env)
+                .is_always_satisfied(db, self.env, self.inferable)
         });
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
@@ -4226,7 +4201,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)
-                            .is_always_satisfied(db, self.env)
+                            .is_always_satisfied(db, self.env, self.inferable)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
@@ -4269,7 +4244,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_never_satisfied(db, self.env, self.inferable)
                         {
                             found_matching_element = true;
                         }
@@ -4308,7 +4283,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_always_satisfied(db, self.env)
+                            .is_always_satisfied(db, self.env, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -4370,7 +4345,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(db, self.env)
+                                    .is_always_satisfied(db, self.env, self.inferable)
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -4379,7 +4354,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(db, self.env)
+                                .is_always_satisfied(
+                                    db,
+                                    self.env,
+                                    self.inferable,
+                                )
                             };
 
                             if is_satisfied {
@@ -4397,7 +4376,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
-                            argument: ty,
+                            constraints: typevar_constraints,
+                            evidence: if polarity.is_contravariant() {
+                                ConstraintFailureEvidence::Upper(Box::new([ty]))
+                            } else {
+                                ConstraintFailureEvidence::Lower(ty)
+                            },
                         });
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
@@ -4458,7 +4442,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_never_satisfied(db, self.env, self.inferable)
                         {
                             found_matching_element = true;
                         }
@@ -4824,7 +4808,8 @@ pub(crate) enum SpecializationError<'db> {
     },
     MismatchedConstraint {
         bound_typevar: BoundTypeVarInstance<'db>,
-        argument: Type<'db>,
+        constraints: TypeVarConstraints<'db>,
+        evidence: ConstraintFailureEvidence<'db>,
     },
 }
 
@@ -4833,13 +4818,6 @@ impl<'db> SpecializationError<'db> {
         match self {
             Self::MismatchedBound { bound_typevar, .. } => *bound_typevar,
             Self::MismatchedConstraint { bound_typevar, .. } => *bound_typevar,
-        }
-    }
-
-    pub(crate) fn argument_type(&self) -> Type<'db> {
-        match self {
-            Self::MismatchedBound { argument, .. } => *argument,
-            Self::MismatchedConstraint { argument, .. } => *argument,
         }
     }
 }
@@ -4889,6 +4867,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
+                        ConstraintProvenance::Evidence,
                         typevar,
                         ty,
                     )
@@ -5016,6 +4995,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             t,
             int,
         ));
@@ -5071,6 +5051,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
+                ConstraintProvenance::Evidence,
                 t,
                 ty,
             ));
@@ -5103,7 +5084,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         });
 
         for (budget, expected_choices) in [
@@ -5162,7 +5150,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         });
 
         // Both budgets allow solving the two present bindings, but storing the complete
@@ -5230,7 +5225,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         builder.record_constraint_set([str, int].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         }));
 
         let inference = builder
@@ -5378,6 +5380,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             t,
             int,
             int,
@@ -5549,17 +5552,26 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             int,
         );
 
         let analysis = builder.analyze_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(builder.pending.is_always_satisfied(db, &env));
+        assert!(
+            builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.record_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(!builder.pending.is_always_satisfied(db, &env));
+        assert!(
+            !builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.project_for_legacy_fallback(&analysis);
         assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
@@ -5583,13 +5595,23 @@ mod tests {
 
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(0));
-        let relation =
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, typevar, ty);
+        let relation = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &constraints,
+            ConstraintProvenance::Evidence,
+            typevar,
+            ty,
+        );
         builder.record_constraint_set(relation);
         builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         assert!(matches!(builder.types, LegacyTypeMappings::BudgetExceeded));
-        assert!(!builder.pending.is_never_satisfied(db, &env));
+        assert!(
+            !builder
+                .pending
+                .is_never_satisfied(db, &env, builder.inferable)
+        );
 
         let mut choices = 0;
         let types = builder.solve_hash_map_with(context, &mut |_, _| {
@@ -5620,12 +5642,19 @@ mod tests {
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        let lower_only =
-            ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
+        let lower_only = ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            &env,
+            &constraints,
+            ConstraintProvenance::Evidence,
+            typevar,
+            str,
+        );
         let rejected = ConstraintSet::constrain_typevar_equivalence_bound(
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             str,
         );
@@ -5633,13 +5662,14 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             int,
         );
 
         for (set, variance) in [
-            (lower_only, ConstraintFailureVariance::Contravariant),
-            (rejected, ConstraintFailureVariance::Invariant),
+            (lower_only, TypeVarVariance::Contravariant),
+            (rejected, TypeVarVariance::Invariant),
         ] {
             assert!(matches!(
                 builder.analyze_constraint_set(set),
@@ -5684,14 +5714,62 @@ mod tests {
             )
         };
 
-        let contravariant = analysis(ConstraintFailureVariance::Contravariant, int, bool)
-            .specialization_error(db, &env)
-            .map(|error| error.argument_type());
-        assert_eq!(contravariant, Some(bool));
+        let contravariant =
+            analysis(TypeVarVariance::Contravariant, int, bool).specialization_error(db, &env);
+        assert_eq!(
+            contravariant,
+            Some(SpecializationError::MismatchedBound {
+                bound_typevar: typevar,
+                argument: bool,
+            })
+        );
 
-        let invariant = analysis(ConstraintFailureVariance::Invariant, int, bool)
-            .specialization_error(db, &env)
-            .map(|error| error.argument_type());
-        assert_eq!(invariant, Some(int));
+        let invariant =
+            analysis(TypeVarVariance::Invariant, int, bool).specialization_error(db, &env);
+        assert_eq!(
+            invariant,
+            Some(SpecializationError::MismatchedBound {
+                bound_typevar: typevar,
+                argument: int,
+            })
+        );
+    }
+
+    #[test]
+    fn constraint_failure_diagnostics_keep_upper_bounds_on_the_same_path() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bytes = KnownClass::Bytes.to_instance(db, &env);
+        let constraints = TypeVarConstraints::new(db, [int, str].as_slice());
+        let first = SpecializationError::MismatchedConstraint {
+            bound_typevar: typevar,
+            constraints,
+            evidence: ConstraintFailureEvidence::Upper(Box::new([str, bytes])),
+        };
+        let second = SpecializationError::MismatchedConstraint {
+            bound_typevar: typevar,
+            constraints,
+            evidence: ConstraintFailureEvidence::Upper(Box::new([int])),
+        };
+        let analysis = ConstraintSetAnalysis::Unsatisfiable(
+            [first.clone(), second]
+                .into_iter()
+                .map(|error| ConstraintFailure {
+                    error,
+                    variance: TypeVarVariance::Covariant,
+                })
+                .collect(),
+        );
+
+        assert_eq!(analysis.specialization_error(db, &env), Some(first));
     }
 }

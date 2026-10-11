@@ -165,6 +165,18 @@ class ConstraintSet:
         Universally abstracts the given type variables from this constraint set.
         """
 
+    def is_always_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set always holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+        """
+
+    def is_never_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
+        """
+        Returns whether this constraint set never holds with the given inferable
+        type variables, without checking their declared bounds or constraints.
+        """
+
     def solutions_for(
         self,
         typevar: TypeForm[object],

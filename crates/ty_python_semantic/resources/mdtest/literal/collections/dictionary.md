@@ -76,6 +76,69 @@ reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 reveal_type({x: y for x, y in enumerate(range(42))})
 ```
 
+## Immediately indexed dictionary literals
+
+Indexing a dictionary literal preserves the literal types of its values, since the dictionary cannot
+be mutated before the lookup. The result is the union of the value types.
+
+```py
+reveal_type({1: "a", 2: "b"}[1])  # revealed: Literal["a", "b"]
+reveal_type({"a": 1, "b": 2}["a"])  # revealed: Literal[1, 2]
+
+{"a": 1}[0]  # error: [invalid-argument-type]
+```
+
+This also allows a lookup table to convert between literal unions:
+
+```py
+from typing import Literal
+
+Letter = Literal["A", "B", "C"]
+Word = Literal["Alpha", "Beta", "Charlie"]
+
+def expand_letter(letter: Letter) -> Word:
+    return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # no diagnostic
+```
+
+The key need not itself have a literal type:
+
+```py
+def _(string_key: str, integer_key: int):
+    reveal_type({"a": 1, "b": 2}[string_key])  # revealed: Literal[1, 2]
+    reveal_type({1: "a", 2: "b"}[integer_key])  # revealed: Literal["a", "b"]
+```
+
+Nested mutable values still permit mutation:
+
+```py
+values = {"a": [1]}["a"]
+reveal_type(values)  # revealed: list[int]
+values.append(2)  # no diagnostic
+```
+
+A dictionary stored in a variable still permits later mutation and promotes its value type:
+
+```py
+def _(key: str):
+    values = {"a": 1, "b": 2}
+    reveal_type(values)  # revealed: dict[str, int]
+    reveal_type(values[key])  # revealed: int
+    values["c"] = 3  # no diagnostic
+```
+
+## Dictionary escaping through a bound view method
+
+A saved view method exposes its dictionary through `__self__`, so its key and value types still
+permit mutation:
+
+```py
+method = {"a": 1}.values
+dictionary = method.__self__
+reveal_type(dictionary)  # revealed: dict[str, int]
+dictionary["b"] = 2  # no diagnostic
+reveal_type(method())  # revealed: dict_values[str, int]
+```
+
 ## Key narrowing
 
 The original assignment to each key, as well as future assignments, are used to narrow access to

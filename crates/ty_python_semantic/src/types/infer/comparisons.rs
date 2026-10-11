@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -390,6 +391,8 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                         | KnownBoundMethodType::ConstraintSetSolutions(_)
+                        | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                        | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                             (method, NegativeRetention::Stable)
                         }
@@ -689,6 +692,27 @@ enum NonIdentityOperator {
     Membership(MembershipOperator),
 }
 
+impl NonIdentityOperator {
+    fn truthiness<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+        soundness_policy: ComparisonSoundnessPolicy,
+    ) -> Truthiness {
+        match self {
+            Self::Rich(RichCompareOperator::Eq) => {
+                equality_truthiness(db, env, left, right, soundness_policy)
+            }
+            Self::Rich(RichCompareOperator::Ne) => {
+                inequality_truthiness(db, env, left, right, soundness_policy)
+            }
+            _ => Truthiness::Ambiguous,
+        }
+    }
+}
+
 impl From<NonIdentityOperator> for ast::CmpOp {
     fn from(value: NonIdentityOperator) -> Self {
         match value {
@@ -853,17 +877,13 @@ fn infer_binary_type_comparison_inner<'db>(
         return Ok(Type::from_truthiness(db, env, truthiness));
     }
 
-    let comparison_truthiness = match op {
-        NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
-            equality_truthiness(db, env, left, right, soundness_policy)
+    // An intersection can supply a custom comparison even when another component inherits
+    // `object.__eq__`. Check its return type before using boolean-only simplifications.
+    if !left.is_intersection() && !right.is_intersection() {
+        let comparison_truthiness = op.truthiness(db, env, left, right, soundness_policy);
+        if comparison_truthiness != Truthiness::Ambiguous {
+            return Ok(Type::from_truthiness(db, env, comparison_truthiness));
         }
-        NonIdentityOperator::Rich(RichCompareOperator::Ne) => {
-            inequality_truthiness(db, env, left, right, soundness_policy)
-        }
-        _ => Truthiness::Ambiguous,
-    };
-    if comparison_truthiness != Truthiness::Ambiguous {
-        return Ok(Type::from_truthiness(db, env, comparison_truthiness));
     }
 
     let comparison_result = match (left, right) {
@@ -1277,9 +1297,9 @@ fn infer_binary_type_comparison_inner<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, env, left.constraints(db));
             let right = constraints.load(db, env, right.constraints(db));
-            let equivalent = left
-                .iff(db, &constraints, right)
-                .is_always_satisfied(db, env);
+            let equivalent =
+                left.iff(db, &constraints, right)
+                    .is_always_satisfied(db, env, TypeVarSet::None);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))
@@ -1335,6 +1355,59 @@ fn infer_binary_intersection_type_comparison<'db>(
         };
     }
 
+    let (left, right) = match intersection_on {
+        IntersectionOn::Left => (Type::Intersection(intersection), other),
+        IntersectionOn::Right => (other, Type::Intersection(intersection)),
+    };
+    if matches!(
+        op,
+        NonIdentityOperator::Rich(RichCompareOperator::Eq | RichCompareOperator::Ne)
+    ) {
+        // `Unknown & None` still has only one possible runtime value. Use that fact for
+        // definite equality proofs, but keep the original operands for custom comparisons.
+        let [known_left, known_right] = [left, right].map(|ty| match ty {
+            Type::Intersection(intersection)
+                if intersection.positive(db).iter().any(|ty| ty.is_none(db)) =>
+            {
+                Type::none(db, env)
+            }
+            _ => ty,
+        });
+        if [known_left, known_right] != [left, right]
+            && let truthiness @ (Truthiness::AlwaysTrue | Truthiness::AlwaysFalse) = op.truthiness(
+                db,
+                env,
+                known_left,
+                known_right,
+                ComparisonSoundnessPolicy::CONSERVATIVE,
+            )
+        {
+            return Ok(Type::from_truthiness(db, env, truthiness));
+        }
+    }
+    // Rich comparisons can return arbitrary objects. Use the full receiver to bind `Self`.
+    // A failed call can still succeed via component-specific inference below, such as the
+    // concrete-base fallback for NewTypes of `float`.
+    let rich_result = if let NonIdentityOperator::Rich(rich_op) = op
+        && let Ok(result) =
+            infer_rich_comparison(context, left, right, rich_op, MemberLookupPolicy::default())
+    {
+        // Gradual results such as `bool & Any` still permit boolean simplifications.
+        // Preserve narrower results, including boolean literals and `Never`.
+        if result.top_materialization(db, env) != KnownClass::Bool.to_instance(db, env) {
+            return Ok(result);
+        }
+        let soundness_policy =
+            ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
+        let comparison_truthiness = op.truthiness(db, env, left, right, soundness_policy);
+        if comparison_truthiness != Truthiness::Ambiguous {
+            return Ok(Type::from_truthiness(db, env, comparison_truthiness));
+        }
+        Some(result)
+    } else {
+        None
+    };
+
     // If a comparison yields a definitive true/false answer on a (positive) part
     // of an intersection type, it will also yield a definitive answer on the full
     // intersection type, which is even more specific.
@@ -1355,6 +1428,10 @@ fn infer_binary_intersection_type_comparison<'db>(
         {
             return result;
         }
+    }
+
+    if let Some(result) = rich_result {
+        return Ok(result);
     }
 
     // If none of the simplifications above apply, we still need to return *some*
@@ -1396,8 +1473,6 @@ fn infer_binary_intersection_type_comparison<'db>(
     // we would get a result type `Literal[True]` which is too narrow.
     //
     let mut builder = IntersectionBuilder::new(db, env);
-
-    builder.add_positive_in_place(KnownClass::Bool.to_instance(db, env));
 
     let mut state = State::NoPositiveElements;
 
@@ -1610,6 +1685,8 @@ fn infer_tuple_rich_comparison<'db>(
                     });
 
                 match eq_truthiness {
+                    // Earlier unequal elements can still have completed the comparison.
+                    Truthiness::Uninhabited => return Ok(builder.build()),
                     // - AlwaysTrue : Continue to the next pair for lexicographic comparison
                     Truthiness::AlwaysTrue => continue,
                     // - AlwaysFalse:

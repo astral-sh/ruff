@@ -2,6 +2,8 @@
 # https://github.com/crate-ci/typos/issues/868
 extend-exclude = [
     "crates/ty_vendored/vendor/**/*",
+    "crates/ruff_unicode_names2/**/*",
+    "crates/ruff_unicode_names2_generator/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
     "crates/ruff_linter/src/rules/flake8_implicit_str_concat/rules/collection_literal.rs",

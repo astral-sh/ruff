@@ -28,7 +28,7 @@ An extremely fast Python linter and code formatter, written in Rust.
 - ⚡️ 10-100x faster than existing linters (like Flake8) and formatters (like Black)
 - 🐍 Installable via `pip`
 - 🛠️ `pyproject.toml` support
-- 🤝 Python 3.14 compatibility
+- 🤝 Python 3.15 compatibility
 - ⚖️ Drop-in parity with [Flake8](https://docs.astral.sh/ruff/faq/#how-does-ruffs-linter-compare-to-flake8), [isort](https://docs.astral.sh/ruff/faq/#how-does-ruffs-import-sorting-compare-to-isort), and [Black](https://docs.astral.sh/ruff/faq/#how-does-ruffs-formatter-compare-to-black)
 - 📦 Built-in caching, to avoid re-analyzing unchanged files
 - 🔧 Fix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -122,8 +122,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
 Invoke Ruff directly with [`uvx`](https://docs.astral.sh/uv/):
 
 ```shell
-uvx ruff@0.16.9 check   # Lint all files in the current directory.
-uvx ruff@0.16.9 format  # Format all files in the current directory.
+uvx ruff@0.17.0 check   # Lint all files in the current directory.
+uvx ruff@0.17.0 format  # Format all files in the current directory.
 ```
 
 Or install Ruff with `uv` (recommended), `pip`, or `pipx`:
@@ -150,8 +150,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.16.9/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.16.9/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.17.0/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.17.0/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -184,7 +184,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.16.9
+  rev: v0.17.0
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -254,8 +254,8 @@ exclude = [
 line-length = 88
 indent-width = 4
 
-# Assume Python 3.10
-target-version = "py310"
+# Assume Python 3.11
+target-version = "py311"
 
 [lint]
 # select = [...]  # See the Default Rules page for the full listing.
@@ -266,7 +266,7 @@ fixable = ["ALL"]
 unfixable = []
 
 # Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+dummy-variable-rgx = "^(_+|(_+[\\p{XID_Continue}]*[\\p{XID_Continue}--_]+?))$"
 
 [format]
 # Like Black, use double quotes for strings.

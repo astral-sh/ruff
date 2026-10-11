@@ -217,6 +217,18 @@ class C(B): ...
 reveal_type(A() + C())  # revealed: Literal["right", "left"]
 ```
 
+Excluding an unrelated class from either operand preserves both possible dispatch results:
+
+```py
+class Excluded: ...
+
+def narrowed(left: A, right: B):
+    if not isinstance(left, Excluded):
+        reveal_type(left + right)  # revealed: Literal["right", "left"]
+    if not isinstance(right, Excluded):
+        reveal_type(left + right)  # revealed: Literal["right", "left"]
+```
+
 ## Reflected precedence uses runtime classes
 
 `IntFlag` values are commonly accumulated into a mask that starts at the integer zero. At runtime,

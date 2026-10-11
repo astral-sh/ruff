@@ -2317,3 +2317,31 @@ reveal_type(C())  # revealed: C
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
 ```
+
+## Covariant constructors retain outer type variables from arguments
+
+A holder argument supplies its outer type variable to a covariant constructor, even without an
+expected return type. The constructor's bound and default must not replace that outer variable. Both
+the standalone expression and the return expression infer `RelatedBox[T]`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import TypeVar
+
+class Client: ...
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # revealed: RelatedBox[T@Holder]
+        reveal_type(RelatedBox(self))
+        # revealed: RelatedBox[T@Holder]
+        return reveal_type(RelatedBox(self))
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
+```

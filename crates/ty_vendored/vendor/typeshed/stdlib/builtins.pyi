@@ -2679,7 +2679,7 @@ class memoryview(Sequence[_I]):
     def tolist(self) -> list[int]:
         """Return the data in the buffer as a list of elements."""
 
-    def toreadonly(self) -> memoryview:
+    def toreadonly(self) -> memoryview[_I]:
         """Return a readonly version of the memoryview."""
 
     def release(self) -> None:

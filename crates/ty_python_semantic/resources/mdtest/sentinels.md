@@ -70,6 +70,16 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
         reveal_type(x)  # revealed: MISSING
 ```
 
+Sentinel values can also be combined with types at runtime:
+
+```py
+reveal_type(MISSING | None)  # revealed: <types.UnionType special-form 'MISSING | None'>
+reveal_type(None | MISSING)  # revealed: <types.UnionType special-form 'None | MISSING'>
+reveal_type(MISSING | int)  # revealed: <types.UnionType special-form 'MISSING | int'>
+reveal_type(int | MISSING)  # revealed: <types.UnionType special-form 'int | MISSING'>
+reveal_type(MISSING | MISSING)  # revealed: MISSING
+```
+
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
 rejected as class bases:
 

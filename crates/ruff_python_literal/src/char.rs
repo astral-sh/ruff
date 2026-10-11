@@ -24,3 +24,17 @@ pub(crate) fn is_printable(c: char) -> bool {
             | GeneralCategory::SpaceSeparator
     )
 }
+
+/// Returns whether the character has a Unicode [mark category] (Mn, Mc, or Me).
+/// Characters in these categories are called [combining marks].
+///
+/// [mark category]: https://www.unicode.org/reports/tr44/#General_Category_Values
+/// [combining marks]: https://www.unicode.org/glossary/#combining_character
+pub(crate) fn is_combining_mark(c: char) -> bool {
+    matches!(
+        GeneralCategory::for_char(c),
+        GeneralCategory::NonspacingMark
+            | GeneralCategory::SpacingMark
+            | GeneralCategory::EnclosingMark
+    )
+}

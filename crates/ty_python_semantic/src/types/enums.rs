@@ -1070,14 +1070,17 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
+    let scope_id = class.body_scope(db);
+    let use_def_map = use_def_map(db, scope_id);
+    // As a fast path, avoid looking up base classes if the class body is empty
+    use_def_map.all_end_of_scope_symbol_bindings().next()?;
+
     let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;
     }
 
-    let scope_id = class.body_scope(db);
-    let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();

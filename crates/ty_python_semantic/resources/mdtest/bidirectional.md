@@ -769,6 +769,149 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Upper-bound type context
+
+The declared upper bound of a type variable provides type context for a nested generic call:
+
+```py
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(singleton(True))  # revealed: list[bool]
+reveal_type(bounded(singleton(True)))  # revealed: list[int]
+```
+
+Declared upper bounds also restrict the range of an inferred gradual solution:
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Any
+
+def singleton_sequence[T](value: T) -> Sequence[T]:
+    return [value]
+
+def bounded_sequence[T: Sequence[int]](value: T) -> T:
+    return value
+
+def consumer[T](value: T) -> Callable[[T], None]:
+    return lambda _: None
+
+def bounded_consumer[T: Callable[[int], None]](value: T) -> T:
+    return value
+
+def _(value: Any):
+    # TODO: This should be `Sequence[Any & int]`.
+    reveal_type(bounded_sequence(singleton_sequence(value)))  # revealed: Sequence[Any]
+    # TODO: This should be `list[int]`.
+    reveal_type(bounded(singleton(value)))  # revealed: list[Any | int]
+    reveal_type(bounded_consumer(consumer(value)))  # revealed: (Any | int, /) -> None
+```
+
+The argument of a callable is narrowed based on outer type context:
+
+```py
+def from_callback[T](f: Callable[[T], None]) -> list[T]:
+    return []
+
+def _(f: Callable[[object], None]):
+    reveal_type(from_callback(f))  # revealed: list[object]
+    reveal_type(bounded(from_callback(f)))  # revealed: list[int]
+```
+
+Upper bounds also provide context for `TypedDict` and lambda parameters:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def payload[T: Payload](value: T) -> T:
+    return value
+
+def callback[T: Callable[[int], list[int]]](value: T) -> T:
+    return value
+
+reveal_type(payload({"value": 1}))  # revealed: Payload
+reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
+```
+
+As well as propagate through lambda bodies:
+
+```py
+def _(value: Any):
+    f = callback(lambda _: singleton(value))
+    reveal_type(f(1))  # revealed: list[Any | int]
+```
+
+## Upper-bound context without inference evidence
+
+If there are no inferred or declared constraints for a given type variable, it remains unsolved,
+despite lower and upper validity bounds:
+
+```py
+def empty[T]() -> T:
+    raise NotImplementedError
+
+def bounded[T: int](value: T) -> T:
+    return value
+
+reveal_type(bounded(empty()))  # revealed: Unknown
+
+def empty_list[T]() -> list[T]:
+    return []
+
+def bounded_list[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(empty_list()))  # revealed: list[Unknown]
+```
+
+The type variable remains unsolved when the upper-bound context passes through another generic call:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(identity(empty_list())))  # revealed: list[Unknown]
+```
+
+If an explicit default is provided, it is instead used as the fallback value:
+
+```py
+def empty_with_default[T = bool]() -> T:
+    raise NotImplementedError
+
+reveal_type(bounded(empty_with_default()))  # revealed: bool
+```
+
+## Upper-bound context with constrained type variables
+
+The solution to a constrained type variable is chosen to satisfy outer validity constraints:
+
+```py
+def make[T: (int, str)]() -> T:
+    raise NotImplementedError
+
+def number[U: int](value: U) -> U:
+    return value
+
+reveal_type(number(make()))  # revealed: int
+```
+
+A default is only used when the type variable remains unsolved:
+
+```py
+def make_with_default[T: (int, str) = str]() -> T:
+    raise NotImplementedError
+
+reveal_type(make_with_default())  # revealed: str
+reveal_type(number(make_with_default()))  # revealed: int
+```
+
 ## Generic constructors
 
 The same applies to constructors of generic classes:
@@ -849,6 +992,142 @@ from typing import Any
 # string keys for keyword arguments. We special-case it to match the literal form.
 x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+```
+
+## Covariant constructors with outer return contexts
+
+A bounded, defaulted, covariant constructor should use its outer return context instead of falling
+back to its declared default.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class Client:
+    def no_argument(self) -> EmptyBox[Self]:
+        # revealed: EmptyBox[Self@no_argument]
+        return reveal_type(EmptyBox())
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class EmptyBox(Generic[T]):
+    def __init__(self) -> None:
+        pass
+```
+
+## Dataclass constructors with outer return contexts
+
+A covariant dataclass argument referring to outer `Self` should not specialize to its declared
+default.
+
+```py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class PartialUser:
+    def equipped(self, present: bool) -> Equipped[Self]:
+        return Equipped(
+            first=Item(self) if present else None,
+        )
+
+class User(PartialUser):
+    pass
+
+UserT = TypeVar("UserT", bound=PartialUser, default=User, covariant=True)
+
+class Item(Generic[UserT]):
+    def __init__(self, owner: UserT) -> None:
+        self.owner = owner
+
+@dataclass
+class Equipped(Generic[UserT]):
+    first: Item[UserT] | None
+```
+
+## Generic dictionary factories retain contextual outer key types
+
+A zero-argument dictionary factory uses the expected outer key type instead of introducing a
+spurious `dict[str, T]` alternative.
+
+```py
+from collections import defaultdict
+from collections.abc import Hashable, Mapping
+from dataclasses import field
+
+class SharedMemory[K, T]:
+    value: dict[K, T] = field(default_factory=dict)
+
+def nested_defaultdict[K: Hashable, K2: Hashable, T](
+    data: Mapping[K, Mapping[K2, T]],
+) -> None:
+    value: defaultdict[K2, dict[K, T]] = defaultdict(dict)
+```
+
+## Callback diagnostics retain contextual outer type variables
+
+A constrained outer return type remains visible in an invalid callback diagnostic. The callback
+itself is still invalid, but replacing its expected result with `Unknown` would lose useful
+information.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+C = TypeVar("C", str, bytes, covariant=True)
+Selector = TypeVar("Selector", bound=Callable[[int], C])  # error: [invalid-type-variable-bound]
+
+class CallbackView(Generic[C]):
+    def __init__(self, callback: Callable[[int], C]) -> None:
+        self.callback = callback
+
+class CallbackInterface(Generic[C]):
+    def __init__(self, callback: Selector) -> None:
+        self.callback = callback
+
+    def view(self) -> CallbackView[C]:
+        # error: [invalid-argument-type] "Expected `(int, /) -> C@CallbackInterface`, found `Selector@__init__`"
+        return CallbackView(self.callback)
+```
+
+## Callable factories retain contextual outer element types
+
+Narrowing a union to a callable preserves its outer iterable element type. The callable factory
+argument remains invalid, but its expected result uses the outer `CT` instead of `Unknown`. After
+narrowing the other branch to a sequence, its constructor accepts the same outer element type.
+
+```py
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import Generic, TypeVar
+
+RT = TypeVar("RT")
+CT = TypeVar("CT")
+
+class FactoryView(Iterable[RT], Generic[RT]):
+    def __init__(self, factory: Callable[[], Iterable[RT]]) -> None:
+        self.factory = factory
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.factory())
+
+class SequenceView(Iterable[RT], Generic[RT]):
+    def __init__(self, sequence: Sequence[RT]) -> None:
+        self.sequence = sequence
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.sequence)
+
+def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
+    if callable(matches):
+        # error: [invalid-argument-type] "Expected `() -> Iterable[CT@build_iter_view]`"
+        return FactoryView(matches)
+    if not isinstance(matches, Sequence):
+        matches = list(matches)
+    return SequenceView(matches)
 ```
 
 ## Generic call argument inference

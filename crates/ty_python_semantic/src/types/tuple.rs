@@ -13,6 +13,7 @@
 //! of an unpacking assignment. A `tuple` specialization can include `Never` as a fixed-length
 //! element because a user-defined tuple subclass can inhabit that type.
 
+use crate::types::typevar::TypeVarSet;
 use crate::{Program, ProgramEnvironment};
 use std::cmp::Ordering;
 use std::hash::Hash;
@@ -382,7 +383,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             |(&source, &target)| {
                                 let constraint_set = self.check_type_pair(db, source, target);
                                 if let Some(context) = self.report_context()
-                                    && constraint_set.is_never_satisfied(db, self.env)
+                                    && constraint_set.is_never_satisfied(
+                                        db,
+                                        self.env,
+                                        self.inferable,
+                                    )
                                 {
                                     context.push(ErrorContext::TupleElementNotCompatible {
                                         source,
@@ -830,7 +835,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             let check_element = |(index, (&left, &right))| {
                 let result = self.check_type_pair(db, left, right);
                 if let Some(context) = self.report_context()
-                    && result.is_always_satisfied(db, self.env)
+                    && result.is_always_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::DisjointTupleElement {
                         left,
@@ -1057,7 +1062,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(tuple) => Either::Left(
                 tuple
                     .iter_element_types(db)
-                    .map(|tcx| TypeContext::new(Some(tcx))),
+                    .map(|tcx| TypeContext::declared(Some(tcx))),
             ),
         };
 
@@ -2132,7 +2137,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
                 checker
                     .as_equivalence_checker()
                     .check_type_pair(db, *element, variable)
-                    .is_always_satisfied(db, checker.env)
+                    .is_always_satisfied(db, checker.env, TypeVarSet::None)
             }))
     }
 
@@ -2166,7 +2171,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             checker
                 .as_equivalence_checker()
                 .check_type_pair(db, *element, variable)
-                .is_always_satisfied(db, checker.env)
+                .is_always_satisfied(db, checker.env, TypeVarSet::None)
         })
     }
 

@@ -14,22 +14,25 @@ Editors, playgrounds, and repository automation have [separate models](threat-mo
 
 ## Trust boundaries and assumptions
 
-- **Attacker-controlled:** the names and contents of project files supplied for analysis, including
-    source code, project configuration, and dependency source code. The attacker chooses what is
-    supplied but does not have write access to the copies being analyzed on the user's
-    machine or CI worker.
+- **Trusted analysis input:** the names and contents of project files supplied for analysis, including
+    source code, project configuration, dependency source code, and notebooks, are trusted by default.
 - **Trusted local input:** the operating system, installed programs, environment variables, `PATH`,
     caches, user configuration, command-line arguments, and user-managed filesystem state that
     the attacker cannot change.
 
+The [language server](language-server-threat-model.md) and [playground](playground-threat-model.md)
+models define exceptions where project inputs are untrusted. Within this model, treat Python files as
+attacker-controlled when assessing unexpected code execution during analysis. Other defects that
+require attacker-controlled project files are outside the default CLI model.
+
 The CLI treats command-line options and response files as instructions from its caller. Integrations
 that construct commands from untrusted input, including repository filenames, must ensure that
 intended file arguments are interpreted as files rather than options or response-file references.
-The contents of selected project and configuration files remain attacker-controlled.
 
 ## Security invariants
 
-- **Code Execution:** Analysis must not execute user-supplied code.
+- **Code Execution:** Analysis must not execute user-supplied code. Unexpected code execution caused
+    by analyzing Python files is a security issue, even when those files are otherwise trusted.
 - **Configuration and file discovery:** Ruff's `--isolated` must ignore configuration files. Imports,
     configuration extensions, and symlinks may lead outside the project; reading those files is
     expected.
@@ -47,9 +50,9 @@ The contents of selected project and configuration files remain attacker-control
 
 ## Severity calibration
 
-- **Critical:** With few prerequisites and safe defaults, analysis input compromises credentials
+- **Critical:** With few prerequisites and safe defaults, attacker-controlled input compromises credentials
     with broad permissions or causes widespread file damage without first compromising a trusted host.
-- **High:** A demonstrated path from analysis input to arbitrary native execution, substantial
+- **High:** A demonstrated path from attacker-controlled input to arbitrary native execution, substantial
     disclosure of private data, or destructive filesystem access beyond the requested operation.
 - **Medium:** A limited unauthorized read or write, or bypass of an execution restriction with
     limited effect.

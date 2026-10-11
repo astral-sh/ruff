@@ -5,6 +5,11 @@ all members available on a given type. This routine is used for autocomplete sug
 
 ## Basic functionality
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 The `ty_extensions._internal.all_members` and `ty_extensions._internal.has_member` functions expose
 a Python-level API that can be used to query which attributes `ide_support::all_members` understands
 as being available on a given object. For example, all member functions of `str` are available on

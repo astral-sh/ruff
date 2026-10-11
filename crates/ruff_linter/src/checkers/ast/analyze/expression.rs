@@ -385,10 +385,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::AmbiguousVariableName) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
-                    if !checker.semantic.current_scope().kind.is_class() {
-                        if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                            flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
-                        }
+                    if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+                        flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
                 _ => {}

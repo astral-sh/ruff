@@ -2,9 +2,13 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use char_str::CharStr;
+use pep440_rs::Version;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use thiserror::Error;
+
+use super::command::MINIMUM_UV_VERSION;
 
 mod dependencies;
 mod string_interner;
@@ -82,10 +86,16 @@ pub(crate) struct WorkspaceMember {
 
 #[derive(Debug, Error)]
 pub(crate) enum UvMetadataError {
+    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
+    UnsupportedVersion {
+        executable: String,
+        version: Version,
+    },
+
     #[error("Failed to invoke `uv workspace metadata`: {0}")]
     Invocation(#[source] std::io::Error),
 
-    #[error("`uv workspace metadata` failed with status {status}: {stderr}")]
+    #[error("`uv workspace metadata` failed with `{status}`: {stderr}")]
     CommandFailed {
         status: std::process::ExitStatus,
         stderr: String,
@@ -106,6 +116,33 @@ pub(crate) enum UvMetadataError {
         path: SystemPathBuf,
     },
 }
+
+impl UvMetadataError {
+    pub(crate) fn to_diagnostic(&self, severity: Severity) -> Diagnostic {
+        match self {
+            Self::CommandFailed { status, stderr } => {
+                let mut diagnostic = Diagnostic::new(
+                    DiagnosticId::UvMetadata,
+                    severity,
+                    format_args!("`uv workspace metadata` failed with `{status}`"),
+                );
+                let stderr = stderr.trim();
+                let stderr = stderr.strip_prefix("error:").unwrap_or(stderr).trim_start();
+                // Concise output omits subdiagnostics, so use uv's first stderr line as a
+                // summary. This is a heuristic: uv's errors are unstructured, and the first
+                // line may need context from later lines. Full output retains the whole message.
+                if let Some(summary) = stderr.lines().next() {
+                    diagnostic
+                        .set_concise_message(format_args!("Failed to load uv metadata: {summary}"));
+                    diagnostic.info(stderr);
+                }
+                diagnostic
+            }
+            _ => Diagnostic::new(DiagnosticId::UvMetadata, severity, self.to_string()),
+        }
+    }
+}
+
 fn existing_directory(
     path: PathBuf,
     description: &'static str,

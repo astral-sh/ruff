@@ -403,7 +403,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::Module(write_ty) => {
                 if let Some(write_ty) = write_ty {
                     let value_ty =
-                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 } else {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
@@ -422,7 +422,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             } => match write {
                 Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)) => {
                     let value_ty =
-                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 }
                 Some(ProtocolMemberWriteRequirement::Descriptor {
@@ -430,7 +430,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     domain,
                 }) => {
                     let value_ty = self.infer_value(
-                        TypeContext::new(Some(domain.unwrap_or_else(Type::unknown))),
+                        TypeContext::declared(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
                     if let Some(domain) = domain
@@ -785,7 +785,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 receiver_ty,
             )
         {
-            TypeContext::new(Some(write_ty))
+            TypeContext::declared(Some(write_ty))
         } else {
             TypeContext::default()
         }
@@ -811,7 +811,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     .is_some()
                 }),
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
                 self.check_type_pair(value_ty, *ty, emit_diagnostics)
             }
         }
@@ -918,7 +918,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
@@ -946,7 +946,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 possibly_missing,
             } => {
                 let value_ty = self.infer_value(
-                    TypeContext::new(Some(*ty)),
+                    TypeContext::declared(Some(*ty)),
                     matches!(inference, ContextualInference::Commit) && emit_diagnostics,
                 );
                 if !self.builder.validate_generic_class_attribute_access(
