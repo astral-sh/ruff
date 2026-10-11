@@ -578,3 +578,55 @@ class Cached:
 
 reveal_type(Cached().metadata)  # revealed: int
 ```
+
+## Lazy initialization in a classmethod
+
+We widen an attribute initialized with `None` to `None | Unknown`, since it is unlikely to always
+contain only `None`. A subclass can therefore replace this cache with an instance of its own type,
+and the initialization branch is reachable.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = None
+
+reveal_type(Context.current)  # revealed: None | Unknown
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should include `None | Unknown`, not be `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):  # no diagnostic
+            cls.current = ChildContext()  # no diagnostic
+```
+
+## Incompatible initialization in a classmethod
+
+An attribute initialized with an integer is inferred as `int`, without widening to include
+`Unknown`. Assigning an instance of the subclass to it should be rejected.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = 1
+
+reveal_type(Context.current)  # revealed: int
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should be `int`, not `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):
+            # TODO: Report an invalid-assignment error for assigning `ChildContext` to `int`.
+            cls.current = ChildContext()
+```

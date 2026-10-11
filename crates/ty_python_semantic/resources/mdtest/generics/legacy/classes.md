@@ -3272,5 +3272,36 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Attribute annotations in generic constructors
+
+For a subclass of `Base[int]`, the constructor annotation gives `value` the type `int`. A subclass
+can repeat that annotation.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+class Same(Base[int]):
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+```
+
+Narrowing to `bool` would prevent writes of other integers. An unrelated type such as `str` also
+fails to preserve the inherited type.
+
+```py
+class Narrow(Base[int]):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+
+class Incompatible(Base[int]):
+    value: str  # error: [invalid-attribute-override]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

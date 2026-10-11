@@ -115,6 +115,10 @@ pub(super) fn check_class<'db>(
         }
     }
 
+    if configuration.check_attribute_type_violations() {
+        attributes::check_instance_overrides(context, class_specialized, &bases);
+    }
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
@@ -692,6 +696,19 @@ fn check_class_declaration<'db>(
                         }
                         (Some((superclass_scope, id)), MethodKind::default())
                     } else {
+                        // A method can declare an instance attribute without adding its name
+                        // to the class-body symbol table:
+                        //
+                        // ```python
+                        // class Base:
+                        //     def __init__(self):
+                        //         self.value: int = 0
+                        //
+                        // class Child(Base):
+                        //     value: str  # Incompatible with Base.value.
+                        // ```
+                        //
+                        // Keep this base as an override target even without a class-body symbol.
                         if superclass_literal
                             .own_synthesized_member(
                                 db,
@@ -701,6 +718,9 @@ fn check_class_declaration<'db>(
                                 &member.name,
                             )
                             .is_none()
+                            && superclass
+                                .own_instance_member(db, env, &member.name)
+                                .is_undefined()
                         {
                             continue;
                         }
@@ -750,7 +770,24 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            inherited_member_owner.get_or_insert(superclass);
+            // An inferred receiver assignment is still an override target, but it does not
+            // take ownership of a conflict inherited from an earlier declaration.
+            if !superclass
+                .own_class_member(db, env, None, &member.name)
+                .is_undefined()
+                || matches!(
+                    superclass
+                        .own_instance_member(db, env, &member.name)
+                        .inner
+                        .place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        ..
+                    })
+                )
+            {
+                inherited_member_owner.get_or_insert(superclass);
+            }
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
