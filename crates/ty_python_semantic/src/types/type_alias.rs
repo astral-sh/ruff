@@ -11,7 +11,7 @@ use crate::{
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
-        mapping::{DeferredTypeMapping, MappingProbe},
+        mapping::DeferredTypeMapping,
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -733,7 +733,7 @@ impl<'db> TypeAliasType<'db> {
             }
             _ => {
                 if self.is_recursive(db) {
-                    return if MappingProbe::changes(db, ty, type_mapping, tcx, visitor) {
+                    return if type_mapping.changes_alias(db, ty, tcx, visitor) {
                         Type::TypeAlias(self.with_mappings(
                             db,
                             DeferredTypeMapping::append(

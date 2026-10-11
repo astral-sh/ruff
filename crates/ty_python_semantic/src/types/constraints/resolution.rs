@@ -77,7 +77,10 @@ impl<'db> Resolver<'_, 'db> {
             .visit(db, Type::TypeVar(binding.bound_typevar), || {
                 let original = binding.solution;
                 let replacements = RefCell::new(FxOrderMap::default());
-                if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
+                if !Dependencies::check(db, self.env, original, |dependency| {
+                    if !dependency.is_inferable(db, self.inferable) {
+                        return true;
+                    }
                     let Some(&index) = self.indices.get(&dependency.identity(db)) else {
                         return false;
                     };
@@ -117,34 +120,33 @@ impl<'db> Resolver<'_, 'db> {
                 // Some type forms preserve captured variables when specialized. For example, an
                 // alias changes its explicit arguments but can retain a free variable in its body.
                 // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
-                    .then_some(mapped)
+                Dependencies::check(db, self.env, mapped, |variable| {
+                    !variable.is_inferable(db, self.inferable)
+                })
+                .then_some(mapped)
             })
     }
 }
 
 struct VisitDependencies;
 
-/// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
-struct Dependencies<'a, 'db> {
+/// Visits type-variable occurrences, leaving their declarations' bounds and defaults alone.
+pub(in crate::types) struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
-    inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
     satisfied: Cell<bool>,
     visited: CycleDetector<'db, VisitDependencies, Type<'db>, (), 3>,
 }
 
 impl<'db> Dependencies<'_, 'db> {
-    fn check(
+    pub(in crate::types) fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
         ty: Type<'db>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
         let visitor = Dependencies {
             env,
-            inferable,
             query: &query,
             satisfied: Cell::new(true),
             visited: CycleDetector::new(()),
@@ -189,9 +191,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             }
         }
         if let Type::TypeVar(typevar) = ty {
-            if typevar.is_inferable(db, self.inferable) {
-                self.satisfied.set((self.query)(typevar));
-            }
+            self.satisfied.set((self.query)(typevar));
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.

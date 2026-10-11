@@ -65,7 +65,7 @@ use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
-use super::mapping::{DeferredTypeMapping, MappingProbe};
+use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
@@ -483,7 +483,7 @@ impl<'db> RecursiveType<'db> {
                 })
             }
             _ => {
-                if MappingProbe::changes(db, Type::Recursive(self), mapping, tcx, visitor) {
+                if mapping.changes_alias(db, Type::Recursive(self), tcx, visitor) {
                     Type::Recursive(self.with_mappings(
                         db,
                         DeferredTypeMapping::append(db, self.mappings(db), mapping, tcx, visitor),

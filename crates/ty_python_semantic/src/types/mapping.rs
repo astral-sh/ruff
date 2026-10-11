@@ -2,13 +2,14 @@
 //! recursive references retain the step without rebuilding the recursive constructor.
 //!
 //! Mapping first checks whether reachable alias bodies change in an independent traversal.
-//! Unchanged aliases keep their identity. Each retained step has a separate
+//! Provably unchanged aliases keep their identity. Each retained step has a separate
 //! transformation cache, while nested materialization comparisons share their recursion guard.
 
 use std::cell::{Cell, RefCell};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use super::constraints::resolution::Dependencies;
 use super::cyclic::TypeIdentity;
 use super::generics::{ApplySpecialization, Specialization};
 use super::{
@@ -17,6 +18,32 @@ use super::{
     TypeContext, TypeMapping,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
+
+impl<'db> TypeMapping<'_, 'db> {
+    /// Whether an alias needs to retain this mapping after simplifying substitutions.
+    pub(super) fn changes_alias(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        context: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        if let Self::ApplySpecialization(specialization)
+        | Self::ApplySpecializationWithMaterialization { specialization, .. } = self
+            && visitor.mapping_probe.is_none()
+            && !specialization.materializes_alias_arguments(db)
+        {
+            // Substitutions only act on type variables. Checking both polarities also covers
+            // materialization of replacements inside callable parameters.
+            return !Dependencies::check(db, visitor.env, ty, |variable| {
+                let ty = Type::TypeVar(variable);
+                ty.apply_type_mapping_impl(db, self, context, visitor) == ty
+                    && ty.apply_type_mapping_impl(db, &self.flip(), context, visitor) == ty
+            });
+        }
+        MappingProbe::changes(db, ty, self, context, visitor)
+    }
+}
 
 /// Checks alias bodies and the arguments reaching their exposed parameters without rebuilding
 /// recursive types. Growing aliases share a formal body; parameter uses propagate to arguments
@@ -127,7 +154,7 @@ impl<'db> MappingProbeContext<'_, 'db> {
 }
 
 impl<'db> MappingProbe<'db> {
-    pub(super) fn changes(
+    fn changes(
         db: &'db dyn Db,
         ty: Type<'db>,
         mapping: &TypeMapping<'_, 'db>,
@@ -331,6 +358,49 @@ pub struct MappingStep<'db> {
     materialize_bounds: bool,
 }
 
+impl<'db> MappingStep<'db> {
+    fn absorbs(
+        &self,
+        db: &'db dyn Db,
+        later: &Self,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        self.context == later.context
+            && self.materialize_bounds == later.materialize_bounds
+            && (matches!(
+                (&self.operation, &later.operation),
+                (
+                    MappingOperation::Materialize(_),
+                    MappingOperation::Materialize(_)
+                )
+            ) || self.operation == later.operation && self.operation.is_idempotent()
+                || match (&self.operation, &later.operation) {
+                    (
+                        MappingOperation::Specialize(earlier, None),
+                        MappingOperation::Specialize(later, None),
+                    ) => earlier.absorbs(db, later, visitor),
+                    _ => false,
+                })
+    }
+
+    fn commutes_with(&self, other: &Self) -> bool {
+        // Other promotion kinds can introduce Unknown or dynamic default arguments.
+        self.context == other.context
+            && self.materialize_bounds == other.materialize_bounds
+            && matches!(
+                (&self.operation, &other.operation),
+                (
+                    MappingOperation::Promote(_, PromotionKind::Regular),
+                    MappingOperation::Promote(_, PromotionKind::Regular)
+                        | MappingOperation::Materialize(_)
+                ) | (
+                    MappingOperation::Materialize(_),
+                    MappingOperation::Promote(_, PromotionKind::Regular)
+                )
+            )
+    }
+}
+
 impl get_size2::GetSize for DeferredTypeMapping<'_> {}
 
 impl<'db> DeferredTypeMapping<'db> {
@@ -347,16 +417,7 @@ impl<'db> DeferredTypeMapping<'db> {
         } else {
             context
         };
-        if let Some(previous) = previous
-            && operation.is_idempotent()
-            && previous.step(db).operation == operation
-            && previous.step(db).context == context
-            && previous.step(db).materialize_bounds
-                == visitor.materialize_typevar_bounds_and_defaults
-        {
-            return Some(previous);
-        }
-        Some(Self::new(
+        Self::append_step(
             db,
             previous,
             MappingStep {
@@ -364,7 +425,39 @@ impl<'db> DeferredTypeMapping<'db> {
                 context,
                 materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
             },
-        ))
+            visitor,
+        )
+    }
+
+    fn append_step(
+        db: &'db dyn Db,
+        previous: Option<Self>,
+        step: MappingStep<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        let mut cursor = previous;
+        while let Some(node) = cursor {
+            let earlier = node.step(db);
+            if earlier.absorbs(db, &step, visitor) {
+                return previous;
+            }
+            if !earlier.commutes_with(&step) {
+                break;
+            }
+            cursor = node.previous(db);
+        }
+        if let Some(previous) = previous
+            && matches!(
+                previous.step(db).operation,
+                MappingOperation::Materialize(_)
+            )
+            && previous.step(db).commutes_with(&step)
+        {
+            // Keep materialization last so its marker survives subsequent promotion.
+            let prefix = Self::append_step(db, previous.previous(db), step, visitor);
+            return Some(Self::new(db, prefix, previous.step(db).clone()));
+        }
+        Some(Self::new(db, previous, step))
     }
 
     pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
@@ -494,6 +587,46 @@ enum OwnedSpecialization<'db> {
 }
 
 impl<'db> OwnedSpecialization<'db> {
+    fn absorbs(
+        &self,
+        db: &'db dyn Db,
+        later: &Self,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        // Probe parameters stand for arguments whose free variables are not known yet.
+        if visitor.mapping_probe.is_some() {
+            return false;
+        }
+        self.with_mapping(&mut |earlier| {
+            later.with_mapping(&mut |later| {
+                if earlier.specialize_self_domain()
+                    || later.specialize_self_domain()
+                    || earlier.preserves_lazy_signatures()
+                    || earlier.materializes_alias_arguments(db)
+                    || later.materializes_alias_arguments(db)
+                {
+                    return false;
+                }
+                // Alias arguments use a projected specialization; partial substitutions preserve
+                // their skipped variable there. A later mapping must not expose captured variables
+                // or replace an argument that the earlier projection left untouched.
+                if let Some(earlier_alias) = earlier.as_specialization(db) {
+                    let Some(later_alias) = later.as_specialization(db) else {
+                        return false;
+                    };
+                    if !ApplySpecialization::specialization(earlier_alias).absorbs_bindings(
+                        db,
+                        ApplySpecialization::specialization(later_alias),
+                        visitor,
+                    ) {
+                        return false;
+                    }
+                }
+                earlier.absorbs_bindings(db, later, visitor)
+            })
+        })
+    }
+
     fn new(specialization: ApplySpecialization<'_, 'db>) -> Self {
         match specialization {
             ApplySpecialization::Specialization {
@@ -545,5 +678,68 @@ impl<'db> OwnedSpecialization<'db> {
                 })
             }
         }
+    }
+}
+
+impl<'db> ApplySpecialization<'_, 'db> {
+    fn materializes_alias_arguments(self, db: &'db dyn Db) -> bool {
+        // Stored materialization also acts on existing alias arguments, beyond substitutions.
+        match self {
+            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
+                specialization.materialization_kind(db).is_some()
+            }
+            Self::WithBindings { specialization, .. } => {
+                specialization.materializes_alias_arguments(db)
+            }
+            Self::Partial { .. } | Self::ReturnCallables(_) | Self::Single(..) => false,
+        }
+    }
+
+    fn variables(self, db: &'db dyn Db) -> Vec<BoundTypeVarInstance<'db>> {
+        match self {
+            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
+                specialization.generic_context(db).variables(db).collect()
+            }
+            Self::Partial {
+                generic_context, ..
+            } => generic_context.variables(db).collect(),
+            Self::ReturnCallables(replacements) => replacements.keys().copied().collect(),
+            Self::Single(variable, _) => vec![variable],
+            Self::WithBindings {
+                specialization,
+                bindings,
+            } => {
+                let mut variables = specialization.variables(db);
+                variables.extend(bindings.iter().map(|(variable, _)| *variable));
+                variables
+            }
+        }
+    }
+
+    fn absorbs_bindings(
+        self,
+        db: &'db dyn Db,
+        later: ApplySpecialization<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        if !later
+            .variables(db)
+            .into_iter()
+            .all(|variable| later.get(db, variable).is_none() || self.get(db, variable).is_some())
+        {
+            return false;
+        }
+        let mapping = TypeMapping::ApplySpecialization(later);
+        // The earlier replacements must be unchanged by the later substitution.
+        // In particular, T -> list[T] is not idempotent.
+        self.variables(db)
+            .into_iter()
+            .filter_map(|variable| self.get(db, variable))
+            .all(|ty| {
+                Dependencies::check(db, visitor.env, ty, |variable| {
+                    let ty = Type::TypeVar(variable);
+                    ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor) == ty
+                })
+            })
     }
 }
