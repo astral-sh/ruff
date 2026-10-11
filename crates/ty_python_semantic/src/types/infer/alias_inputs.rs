@@ -33,6 +33,8 @@ pub(super) struct AliasInferenceInputs<'db> {
 }
 
 impl<'db> AliasInferenceInputs<'db> {
+    /// Normalize cached reference types alongside the inference result that owns them.
+    /// Runtime operand types are normalized separately in that result's expression table.
     pub(super) fn normalize_cycle(
         &mut self,
         db: &'db dyn Db,
@@ -134,6 +136,7 @@ impl<'db> AliasInferenceCache<'db> {
         }
     }
 
+    /// Mark eager operands inferred without an expected type for reuse in runtime operator checks.
     pub(super) fn record_runtime_value(
         &mut self,
         expression: &ast::Expr,
@@ -151,6 +154,9 @@ impl<'db> AliasInferenceCache<'db> {
         }
     }
 
+    /// Reuse a value lookup only when deferred lookup and type-variable binding contexts match.
+    /// The returned type retains its value semantics; alias interpretation still performs
+    /// type-expression conversion and cycle validation.
     pub(super) fn reference(
         &self,
         expression: impl Into<ExpressionNodeKey>,
@@ -170,6 +176,13 @@ impl<'db> AliasInferenceCache<'db> {
     }
 
     /// Read an eager operand's runtime type in the same binding context as its value inference.
+    ///
+    /// ```python
+    /// Alias = int | str
+    /// ```
+    ///
+    /// The runtime `|` check uses the class literal types of `int` and `str`, retained in value
+    /// inference's expression table. Type-expression inference produces their instance types.
     pub(super) fn runtime_value(
         &self,
         expression: &ast::Expr,
@@ -206,15 +219,8 @@ impl<'db> AliasInferenceCache<'db> {
 
     pub(super) fn extend_collected(&mut self, inputs: &AliasInferenceInputsBuilder<'db>) {
         if let Self::Collecting(collected) = self {
-            collected
-                .references
-                .extend(inputs.references.iter().map(|(key, value)| (*key, *value)));
-            collected.runtime_values.extend(
-                inputs
-                    .runtime_values
-                    .iter()
-                    .map(|(key, value)| (*key, *value)),
-            );
+            collected.references.extend(&inputs.references);
+            collected.runtime_values.extend(&inputs.runtime_values);
         }
     }
 
