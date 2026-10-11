@@ -1,4 +1,47 @@
-//! Reuse value-inference inputs when interpreting an implicit alias as a type expression.
+//! Reuse value-inference results when interpreting implicit and PEP 613 type aliases.
+//!
+//! ```python
+//! Scalar = int | str
+//! Value = Scalar | bytes
+//!
+//! def consume(value: Value) -> None: ...
+//! ```
+//!
+//! We infer `Value = Scalar | bytes` as an ordinary assignment: `Scalar` refers to a runtime
+//! union object and `bytes` to a class object. Interpreting `Value` in an annotation also infers
+//! its right-hand side as a type expression, where it denotes instances of `int`, `str`, or
+//! `bytes`. This interpretation still needs the runtime operand types to check that `|` is valid.
+//!
+//! The two computations use separate inference builders. This module lets the type-expression
+//! builder reuse work from value inference through three steps:
+//!
+//! 1. **Collect during value inference.** [`AliasInferenceCache::Collecting`] owns an
+//!    [`AliasInferenceInputsBuilder`]. It records the value type, source definition (when known),
+//!    and lookup context of each resolved name or attribute, such as `Scalar` and `bytes`. It also
+//!    records which runtime expression types can be reused for operand checks. Those types already
+//!    live in the builder's expression table; the cache stores only their reuse contexts.
+//! 2. **Retain the results.** When the builder finishes, it compacts the collected maps into
+//!    [`AliasInferenceInputs`]. These are the value pass's outputs that become inputs to alias
+//!    interpretation. They are stored alongside expression types in the Salsa-cached
+//!    [`DefinitionInference`] or [`ExpressionInference`](super::ExpressionInference) result,
+//!    so they outlive the builder that collected them.
+//! 3. **Reuse during type-expression inference.** [`AliasInferenceCache::Reusing`] borrows the
+//!    alias's value-inference [`DefinitionInference`]. The new builder can resolve `Scalar` and
+//!    `bytes` from the saved lookups and read their runtime types from that result's expression
+//!    table when checking `|`.
+//!
+//! Reuse requires compatible contexts: name and attribute lookups must agree on whether lookup
+//! is deferred and which definition binds type variables. Runtime operand types are reusable
+//! only for eager expressions inferred without an expected type, with the same type-variable
+//! binding context. Missing or incompatible entries use ordinary inference.
+//!
+//! [`AliasInferenceCache::Disabled`] is used when a builder neither collects nor reuses these
+//! results. Collected inputs are also discarded when the inferred value does not need further
+//! alias interpretation. A builder never collects and reuses inputs at the same time.
+//!
+//! Reusing a value lookup still leaves type-expression conversion and cycle validation to the
+//! alias inference builder. Simplifying a runtime union can remove recursive references, so the
+//! normalized runtime value alone cannot establish that an alias is valid.
 
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
@@ -23,7 +66,7 @@ struct ResolvedReference<'db> {
     typevar_binding_context: Option<Definition<'db>>,
 }
 
-/// Inputs retained by value inference for a later interpretation of an alias's right-hand side.
+/// Value-inference results retained for interpreting an alias's right-hand side as a type expression.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct AliasInferenceInputs<'db> {
     references: FrozenMap<ExpressionNodeKey, ResolvedReference<'db>>,
@@ -51,7 +94,7 @@ impl<'db> AliasInferenceInputs<'db> {
     }
 }
 
-/// Mutable inputs shared by inference builders and their speculative expression results.
+/// Mutable value-inference results, compacted into [`AliasInferenceInputs`] when inference finishes.
 #[derive(Default)]
 pub(super) struct AliasInferenceInputsBuilder<'db> {
     references: FxHashMap<ExpressionNodeKey, ResolvedReference<'db>>,
