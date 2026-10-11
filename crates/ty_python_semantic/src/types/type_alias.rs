@@ -734,7 +734,7 @@ impl<'db> TypeAliasType<'db> {
             _ => {
                 if self.is_recursive(db) {
                     return if type_mapping.changes_alias(db, ty, tcx, visitor) {
-                        Type::TypeAlias(self.with_mappings(
+                        let mapped = Type::TypeAlias(self.with_mappings(
                             db,
                             DeferredTypeMapping::append(
                                 db,
@@ -743,7 +743,8 @@ impl<'db> TypeAliasType<'db> {
                                 tcx,
                                 visitor,
                             ),
-                        ))
+                        ));
+                        type_mapping.simplify_mapped_alias(db, ty, mapped, visitor)
                     } else {
                         ty
                     };

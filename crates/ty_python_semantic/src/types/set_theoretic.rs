@@ -160,6 +160,12 @@ impl<'db> UnionType<'db> {
             }
             match element.resolve_type_alias(db) {
                 Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                // Keep the recursive identity available to callers' guards once union expansion stops.
+                _ if matches!(element, Type::Recursive(_))
+                    || matches!(element, Type::TypeAlias(alias) if alias.is_recursive(db)) =>
+                {
+                    builder.add_in_place(element);
+                }
                 resolved => builder.add_in_place(resolved),
             }
         }

@@ -121,6 +121,27 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
+    /// Whether a formal parameter can reach a value position through recursive references.
+    pub(super) fn exposes_parameter(
+        self,
+        db: &'db dyn Db,
+        parameter: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+        fn exposes_parameter(
+            db: &dyn Db,
+            ty: Type<'_>,
+            parameter: BoundTypeVarIdentity<'_>,
+        ) -> bool {
+            let Some(reference) = RecursiveDefinition::from_type(db, ty) else {
+                return true;
+            };
+            let graph = SpecializationFlowGraph::build(db, reference.target);
+            graph.exposes_parameter(parameter)
+        }
+        exposes_parameter(db, self, parameter)
+    }
 }
 
 impl<'db> RecursiveType<'db> {
@@ -214,6 +235,8 @@ struct DefinitionUse<'db> {
 /// exact repetition and the cycle detectors can rely on exact type identities.
 #[derive(Default)]
 struct SpecializationFlowGraph<'db> {
+    /// Parameters used outside arguments to other structural definitions.
+    exposed_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
     edges: FxHashSet<FlowEdge<'db>>,
     /// Definition references used to decide whether an unresolved flow can return to the root.
     definition_edges: Vec<(Definition<'db>, Definition<'db>)>,
@@ -227,9 +250,12 @@ struct SpecializationFlowGraph<'db> {
 ///
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
+    exposed_parameters: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+    in_arguments: Cell<bool>,
     source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
     env: ProgramEnvironment<'db>,
     visited_types: TypeCollector<'db>,
+    visited_arguments: TypeCollector<'db>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
     inconclusive: Cell<bool>,
@@ -391,6 +417,9 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
+            graph
+                .exposed_parameters
+                .extend(visitor.exposed_parameters.borrow().iter().copied());
             let (edges, referenced_definitions, inconclusive) = visitor.finish();
             graph.edges.extend(edges);
             if inconclusive {
@@ -404,6 +433,28 @@ impl<'db> SpecializationFlowGraph<'db> {
             pending.extend(referenced_definitions);
         }
         graph
+    }
+
+    fn exposes_parameter(&self, parameter: BoundTypeVarIdentity<'db>) -> bool {
+        if self.inconclusive || !self.inconclusive_definitions.is_empty() {
+            return true;
+        }
+        let mut pending = vec![parameter];
+        let mut visited = FxHashSet::default();
+        while let Some(parameter) = pending.pop() {
+            if !visited.insert(parameter) {
+                continue;
+            }
+            if self.exposed_parameters.contains(&parameter) {
+                return true;
+            }
+            pending.extend(
+                self.edges
+                    .iter()
+                    .filter_map(|edge| (edge.from == parameter).then_some(edge.to)),
+            );
+        }
+        false
     }
 
     fn root_may_have_unbounded_specialization(
@@ -565,9 +616,12 @@ impl<'db> SpecializationFlowGraph<'db> {
 impl<'db> SpecializationFlowVisitor<'db> {
     fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
         Some(Self {
+            exposed_parameters: RefCell::default(),
+            in_arguments: Cell::default(),
             source_parameters: source.source_parameters(db)?,
             env: ProgramEnvironment::from_definition(source.definition(db)),
             visited_types: TypeCollector::default(),
+            visited_arguments: TypeCollector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
             inconclusive: Cell::default(),
@@ -664,6 +718,9 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
+            if !self.in_arguments.get() {
+                self.exposed_parameters.borrow_mut().insert(identity);
+            }
             if !self.source_parameters.contains(&identity) {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
@@ -674,11 +731,19 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
             self.record_reference(db, reference);
+            let in_arguments = self.in_arguments.replace(true);
             reference.walk_arguments(db, self);
+            self.in_arguments.set(in_arguments);
             return;
         }
 
-        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        // Seeing a type in an argument must not hide a later use in the definition's body.
+        let visited = if self.in_arguments.get() {
+            &self.visited_arguments
+        } else {
+            &self.visited_types
+        };
+        walk_type_with_recursion_guard(db, ty, self, visited);
     }
 
     fn visit_bound_type_var_type(

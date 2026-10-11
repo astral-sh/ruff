@@ -114,7 +114,8 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
-    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
+    DynamicContent, DynamicContentMode, any_over_type, any_over_type_including_alias_arguments,
+    dynamic_content, dynamic_content_impl,
 };
 use crate::{Db, FxIndexMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
@@ -515,7 +516,6 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
-    mapping_probe: Option<mapping::MappingProbeContext<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -533,7 +533,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
-            mapping_probe: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -559,8 +558,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     }
 
     fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
+        // A pending comparison cannot justify removing the mapping that it is inspecting.
         self.materialization_equivalence
-            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+            .get_or_init(|| Rc::new(CycleDetector::new(false)))
     }
 
     fn visit(
@@ -596,6 +596,16 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> bool {
+        if left == right {
+            return true;
+        }
+        // Comparing a growing argument to its materialization can recursively materialize the
+        // next argument before reaching the relation guard. Retain uncertain materializations.
+        match dynamic_content_impl(db, self.env, left, DynamicContentMode::Materialization) {
+            DynamicContent::Absent => return true,
+            DynamicContent::Indeterminate => return false,
+            DynamicContent::Present => {}
+        }
         self.materialization_equivalence()
             .visit(db, (left, right), || {
                 left.is_equivalent_to_with_materialization_visitor(db, right, self)
@@ -611,7 +621,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
-            mapping_probe: self.mapping_probe,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9477,12 +9486,6 @@ impl<'db> Type<'db> {
             )
         {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
-        }
-
-        if let Some(probe) = visitor.mapping_probe
-            && let Some(mapped) = probe.map_type(db, self, type_mapping, tcx, visitor)
-        {
-            return mapped;
         }
 
         // Expand union-valued `ParamSpec`s before specializing a given callable.

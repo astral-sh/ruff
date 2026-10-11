@@ -271,11 +271,7 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    pub(super) fn with_arguments(
-        self,
-        db: &'db dyn Db,
-        arguments: Option<Specialization<'db>>,
-    ) -> Self {
+    fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -286,7 +282,12 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
-    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
+    /// Replace the deferred mapping sequence without changing the recursive body or arguments.
+    pub(super) fn with_mappings(
+        self,
+        db: &'db dyn Db,
+        mappings: Option<DeferredTypeMapping<'db>>,
+    ) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -484,10 +485,11 @@ impl<'db> RecursiveType<'db> {
             }
             _ => {
                 if mapping.changes_alias(db, Type::Recursive(self), tcx, visitor) {
-                    Type::Recursive(self.with_mappings(
+                    let mapped = Type::Recursive(self.with_mappings(
                         db,
                         DeferredTypeMapping::append(db, self.mappings(db), mapping, tcx, visitor),
-                    ))
+                    ));
+                    mapping.simplify_mapped_alias(db, Type::Recursive(self), mapped, visitor)
                 } else {
                     Type::Recursive(self)
                 }

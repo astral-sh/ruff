@@ -606,14 +606,20 @@ impl<'db> Type<'db> {
             }
 
             // Expand overlapping alternatives before collecting their subscript errors.
-            (Type::Union(union), _) if union.has_aliases(db) => Some(
-                union
-                    .expand_aliases(db, env)
-                    .subscript(db, env, slice_ty, expr_context),
-            ),
+            (Type::Union(union), _)
+                if union.has_aliases(db)
+                    && let expanded = union.expand_aliases(db, env)
+                    && expanded != value_ty =>
+            {
+                Some(expanded.subscript(db, env, slice_ty, expr_context))
+            }
 
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                Some(value_ty.subscript(db, env, union.expand_aliases(db, env), expr_context))
+            (_, Type::Union(union))
+                if union.has_aliases(db)
+                    && let expanded = union.expand_aliases(db, env)
+                    && expanded != slice_ty =>
+            {
+                Some(value_ty.subscript(db, env, expanded, expr_context))
             }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
