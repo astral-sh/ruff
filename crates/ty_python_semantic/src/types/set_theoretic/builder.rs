@@ -39,6 +39,7 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
+use std::cell::Cell;
 use std::convert::Infallible;
 use std::hint::cold_path;
 use std::ops::ControlFlow;
@@ -1060,6 +1061,7 @@ impl<'db> UnionBuilder<'db> {
         let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
+        let mut ty_contains_alias = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
@@ -1107,6 +1109,7 @@ impl<'db> UnionBuilder<'db> {
             {
                 to_remove.push(i);
                 ty = KnownClass::Range.to_instance(db, &self.env);
+                ty_contains_alias = None;
                 continue;
             }
 
@@ -1117,6 +1120,7 @@ impl<'db> UnionBuilder<'db> {
             {
                 to_remove.push(i);
                 ty = merged_type;
+                ty_contains_alias = None;
                 continue;
             }
 
@@ -1141,12 +1145,31 @@ impl<'db> UnionBuilder<'db> {
             if should_simplify_full && !element_type.is_alias_like() {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
-                if !self.unpack_aliases
-                    && [ty, element_type]
-                        .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
-                {
-                    continue;
+                if !self.unpack_aliases {
+                    let contains_alias = ty_contains_alias.unwrap_or_else(|| {
+                        let can_cache = Cell::new(true);
+                        let contains_alias = any_over_type(db, &self.env, ty, false, |nested| {
+                            // An eager NewType base can enter semantic queries even when lazy
+                            // attributes are skipped. Only reuse walks of immutable fields.
+                            if matches!(
+                                nested,
+                                Type::NewTypeInstance(_)
+                                    | Type::KnownInstance(KnownInstanceType::NewType(_))
+                            ) {
+                                can_cache.set(false);
+                            }
+                            nested.is_alias_like()
+                        });
+                        if can_cache.get() {
+                            ty_contains_alias = Some(contains_alias);
+                        }
+                        contains_alias
+                    });
+                    if contains_alias
+                        || any_over_type(db, &self.env, element_type, false, Type::is_alias_like)
+                    {
+                        continue;
+                    }
                 }
                 if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
                     to_remove.push(i);
