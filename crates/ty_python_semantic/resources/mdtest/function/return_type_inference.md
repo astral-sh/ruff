@@ -499,6 +499,7 @@ class BaseNA:
         return 1
 
 class DerivedNA(BaseNA):
+    # TODO: Without unioning with `Unknown`, this should be an invalid-method-override error.
     def method(self):
         return "a"
 
@@ -572,11 +573,11 @@ the inferred return type with the base class annotation:
 ```py
 class IncompatibleChild(Parent):
     # TODO: This should be an invalid-method-override error.
-    def value(self):
+    def method(self):
         return "a"
 
 # TODO: Should be `int | None | Literal["a"]`
-reveal_type(IncompatibleChild().value())  # revealed: Unknown
+reveal_type(IncompatibleChild().method())  # revealed: Unknown
 ```
 
 ### Methods that return `None` or `Never`
@@ -621,14 +622,14 @@ class Fluent:
 
 Fluent().set_value(1).set_value(2)
 
-# TODO: Should be `Fluent`
+# TODO: Should be `Fluent` or `Fluent | Unknown`
 reveal_type(Fluent().set_value(1))  # revealed: Unknown
 
 class FluentSub(Fluent): ...
 
 FluentSub().set_value(1).set_value(2)
 
-# TODO: Should be `FluentSub`
+# TODO: Should be `FluentSub` or `FluentSub | Unknown`
 reveal_type(FluentSub().set_value(1))  # revealed: Unknown
 ```
 
@@ -669,16 +670,16 @@ class Factory:
 
 class FactorySub(Factory): ...
 
-# TODO: Should be `type[Factory]`
+# TODO: Should be `type[Factory]` or `type[Factory] | Unknown`
 reveal_type(Factory.reference())  # revealed: Unknown
 
-# TODO: Should be `Factory`
+# TODO: Should be `Factory` or `Factory | Unknown`
 reveal_type(Factory.create())  # revealed: Unknown
 
-# TODO: Should be `type[FactorySub]`
+# TODO: Should be `type[FactorySub]` or `type[FactorySub] | Unknown`
 reveal_type(FactorySub.reference())  # revealed: Unknown
 
-# TODO: Should be `FactorySub`
+# TODO: Should be `FactorySub` or `FactorySub | Unknown`
 reveal_type(FactorySub.create())  # revealed: Unknown
 ```
 
@@ -705,20 +706,24 @@ reveal_type(func("a"))  # revealed: str
 
 ## Stub files
 
-Stub bodies do not provide return type information. An omitted annotation remains `Unknown`:
+Stub bodies do not provide return type information. An omitted annotation remains `Unknown`, even
+when the body contains an actual `return` statement:
 
 `library.pyi`:
 
 ```pyi
 def value(): ...
+def seems_to_return_1():
+    return 1
 ```
 
 `main.py`:
 
 ```py
-from library import value
+from library import seems_to_return_1, value
 
 reveal_type(value())  # revealed: Unknown
+reveal_type(seems_to_return_1())  # revealed: Unknown
 ```
 
 ## Recursive functions
