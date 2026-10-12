@@ -1310,7 +1310,8 @@ def _(args: list[str]) -> None:
 
 When a variable-length iterable is unpacked and followed by explicit positional arguments, the
 variadic unpacking should leave room for those arguments, since the iterable might be short enough
-for them to fit.
+for them to fit. This also includes the required elements of later unpacked tuples. Callables with
+variadic parameters are still handled conservatively, as illustrated below.
 
 Regression test for <https://github.com/astral-sh/ty/issues/3649>.
 
@@ -1319,22 +1320,22 @@ from typing import Any
 
 def f(a: str, b: str, c: float) -> None: ...
 def _(args: list[str]) -> None:
-    f(*args, 1.0)
+    f(*args, 1.0)  # no diagnostic
 
 def _(args: tuple[str, ...]) -> None:
-    f(*args, 1.0)
+    f(*args, 1.0)  # no diagnostic
 
 def _(args: Any) -> None:
-    f(*args, 1.0)
+    f(*args, 1.0)  # no diagnostic
 
 def _(args) -> None:
-    f(*args, 1.0)
+    f(*args, 1.0)  # no diagnostic
 
 def _(args: list[str]) -> None:
-    f(*args, "b", 1.0)
+    f(*args, "b", 1.0)  # no diagnostic
 
 def _(args: list[str]) -> None:
-    f("a", *args, 1.0)
+    f("a", *args, 1.0)  # no diagnostic
 
 # The positional argument is still type-checked against the parameter it fills.
 def _(args: list[str]) -> None:
@@ -1343,7 +1344,7 @@ def _(args: list[str]) -> None:
 
 # The fixed prefix of a variable-length tuple still takes the leading parameters.
 def _(args: tuple[str, *tuple[str, ...]]) -> None:
-    f(*args, 1.0)
+    f(*args, 1.0)  # no diagnostic
 
 def _(args: tuple[str, str, *tuple[str, ...]]) -> None:
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f`: expected 3, got 4"
@@ -1357,7 +1358,72 @@ def _(args: list[str]) -> None:
 # Explicit keyword arguments and later positional arguments can be combined.
 def g(a: str, b: str, c: float, d: int) -> None: ...
 def _(args: list[str]) -> None:
+    g(*args, 1.0, d=1)  # no diagnostic
+```
+
+Later unpacked tuples also reserve room for their required elements:
+
+```py
+def _(args: list[str]) -> None:
+    f(*args, *(1.0,))  # no diagnostic
+    f(*args, "b", *(1.0,))  # no diagnostic
+    g(*args, *(1.0,), d=1)  # no diagnostic
+
+def _(args: list[str], tail: tuple[str, str, float]) -> None:
+    f(*args, *tail)  # no diagnostic
+
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type] "Expected `float`, found `Literal["c"]`"
+    f(*args, *("c",))
+    # error: [too-many-positional-arguments] "expected 3, got 4"
+    f(*args, *("a", "b", 1.0, 2.0))
+```
+
+### Variable-length unpacking with fixed suffixes and later positional arguments
+
+The fixed suffix of an unpacked tuple must still be checked when space is reserved for later
+arguments. Both fixed ends keep their positions around the variable-length segment.
+
+```py
+def f(a: str, b: float) -> None: ...
+def _(args: tuple[*tuple[str, ...], bytes]) -> None:
+    # error: [invalid-argument-type] "Expected `str`, found `bytes`"
+    f(*args, 1.0)
+
+def _(args: tuple[*tuple[bytes, ...], str]) -> None:
+    f(*args, 1.0)  # no diagnostic
+
+def g(a: str, b: bytes, c: float, d: int) -> None: ...
+def _(args: tuple[str, *tuple[int, ...], bytes]) -> None:
+    g(*args, 1.0, d=1)  # no diagnostic
+
+def _(args: tuple[str, *tuple[str, ...], str]) -> None:
+    # error: [invalid-argument-type] "Expected `bytes`, found `str`"
     g(*args, 1.0, d=1)
+
+def h(a: str, b: str, c: bytes, d: bytes, e: float) -> None: ...
+def _(args: tuple[*tuple[str, ...], bytes, bytes]) -> None:
+    h(*args, 1.0)  # no diagnostic
+
+def _(args: tuple[str, *tuple[str, ...], bytes, bytes]) -> None:
+    # error: [invalid-argument-type] "Expected `float`, found `bytes`"
+    # error: [too-many-positional-arguments] "expected 2, got 4"
+    f(*args, 1.0)
+```
+
+### Variable-length unpacking with later positional arguments and variadic parameters
+
+When the callable has a variadic parameter, we still assume the unpacked iterable fills all named
+positional parameters, then send later arguments to the variadic parameter. This can produce false
+positives when a shorter iterable would let the later arguments fill named parameters instead.
+
+```py
+def v(a: str, b: str, c: float, *rest: str) -> None: ...
+def _(args: list[str]) -> None:
+    # TODO: Accept this call, which is valid when `args` has two elements.
+    # error: [invalid-argument-type] "Expected `float`, found `str`"
+    # error: [invalid-argument-type] "Expected `str`, found `float"
+    v(*args, 1.0)
 ```
 
 ### Keyword argument, positional-or-keyword parameter
