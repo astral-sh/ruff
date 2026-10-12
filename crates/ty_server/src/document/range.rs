@@ -110,6 +110,16 @@ impl RangeExt for lsp_types::Range {
     }
 }
 
+/// Returns the range of the notebook cell identified by `cell_uri` in the notebook's
+/// concatenated Python source, including the newline that separates it from the next cell.
+///
+/// Returns `None` if `file` isn't an open notebook, if the cell can't be found, or if the cell
+/// isn't part of the notebook's Python source (for example, because it uses a cell magic).
+pub(crate) fn cell_range(db: &dyn Db, file: File, cell_uri: &lsp_types::Uri) -> Option<TextRange> {
+    let cell_index = db.notebook_document(file)?.cell_index_by_uri(cell_uri)?;
+    source_text(db, file).as_notebook()?.cell_range(cell_index)
+}
+
 pub(crate) trait PositionExt {
     /// Convert an LSP Position to internal `TextSize`.
     ///
