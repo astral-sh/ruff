@@ -701,7 +701,6 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
-            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.mappings(db).is_some() => {
                 // Specialized unfoldings can keep growing; keep the alias identity under the
                 // same guard instead of starting a new expansion query for each unfolding.
@@ -733,21 +732,14 @@ impl<'db> TypeAliasType<'db> {
             }
             _ => {
                 if self.is_recursive(db) {
-                    return if type_mapping.changes_alias(db, ty, tcx, visitor) {
-                        let mapped = Type::TypeAlias(self.with_mappings(
-                            db,
-                            DeferredTypeMapping::append(
-                                db,
-                                self.mappings(db),
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
-                        ));
-                        type_mapping.simplify_mapped_alias(db, ty, mapped, visitor)
-                    } else {
-                        ty
-                    };
+                    return DeferredTypeMapping::append(
+                        db,
+                        self.mappings(db),
+                        type_mapping,
+                        tcx,
+                        visitor,
+                        |mappings| Type::TypeAlias(self.with_mappings(db, mappings)),
+                    );
                 }
                 // Expansion can revisit this alias through another recursive type, so retain
                 // the ordinary transformation guard for aliases that are not themselves recursive.

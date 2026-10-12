@@ -63,11 +63,13 @@
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
+use super::constraints::resolution::Dependencies;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
+use super::visitor::{DynamicContentMode, dynamic_content_impl};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind,
     PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
@@ -94,7 +96,11 @@ impl<'db> MappingStep<'db> {
             && (matches!(
                 (&self.operation, &later.operation),
                 (TypeMapping::Materialize(_), TypeMapping::Materialize(_))
-            ) || self.operation == later.operation && self.operation.is_idempotent()
+            ) || self.operation == later.operation
+                && matches!(
+                    self.operation,
+                    TypeMapping::Promote(..) | TypeMapping::ReplaceParameterDefaults
+                )
                 || match (&self.operation, &later.operation) {
                     (
                         TypeMapping::ApplySpecialization(earlier),
@@ -185,18 +191,52 @@ impl<'db> DeferredTypeMapping<'db> {
         Some(images)
     }
 
+    /// Append a mapping and simplify it against the alias and its retained steps.
+    /// `with_mappings` rebuilds the same alias with the supplied mapping sequence.
     pub(super) fn append(
         db: &'db dyn Db,
         previous: Option<Self>,
         mapping: &TypeMapping<'db>,
         context: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<Self> {
+        with_mappings: impl Fn(Option<Self>) -> Type<'db>,
+    ) -> Type<'db> {
+        let original = with_mappings(previous);
         if matches!(
             mapping,
             TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
         ) {
-            return None;
+            return original;
+        }
+        if let TypeMapping::RescopeReturnCallables(replacements) = mapping
+            && replacements.is_empty()
+        {
+            return original;
+        }
+        // Substitutions only act on type variables. Checking both polarities also covers
+        // materialization of replacements inside callable parameters.
+        if let TypeMapping::ApplySpecialization(specialization)
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } = mapping
+            && !specialization.materializes_alias_arguments(db)
+            && Dependencies::check(db, visitor.env, original, |variable| {
+                let ty = Type::TypeVar(variable);
+                ty.apply_type_mapping_impl(db, mapping, context, visitor) == ty
+                    && ty.apply_type_mapping_impl(db, &mapping.flip(), context, visitor) == ty
+            })
+        {
+            return original;
+        }
+        if matches!(mapping, TypeMapping::Materialize(_))
+            && (previous.is_some_and(|mapping| mapping.materialization_kind(db).is_some())
+                || dynamic_content_impl(
+                    db,
+                    visitor.env,
+                    original,
+                    DynamicContentMode::Materialization,
+                )
+                .is_absent())
+        {
+            return original;
         }
         let operation = mapping.clone();
         let context = if context.annotation.is_none() {
@@ -204,7 +244,7 @@ impl<'db> DeferredTypeMapping<'db> {
         } else {
             context
         };
-        Self::append_step(
+        let mappings = Self::append_step(
             db,
             previous,
             MappingStep {
@@ -213,7 +253,22 @@ impl<'db> DeferredTypeMapping<'db> {
                 materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
             },
             visitor,
-        )
+        );
+        let mapped = with_mappings(mappings);
+        // Singleton widening can leave the type unchanged; retain any materialization marker.
+        if matches!(
+            mapping,
+            TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
+        ) && visitor
+            .materialization_equivalence()
+            .visit(db, (original, mapped), || {
+                original.is_equivalent_to_with_materialization_visitor(db, mapped, visitor)
+            })
+        {
+            original
+        } else {
+            mapped
+        }
     }
 
     fn append_step(
@@ -668,9 +723,6 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(self.with_arguments(db, arguments))
             }
-            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => {
-                Type::Recursive(self)
-            }
             TypeMapping::EagerExpansion => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
@@ -688,17 +740,14 @@ impl<'db> RecursiveType<'db> {
                         .into_type()
                 })
             }
-            _ => {
-                if mapping.changes_alias(db, Type::Recursive(self), tcx, visitor) {
-                    let mapped = Type::Recursive(self.with_mappings(
-                        db,
-                        DeferredTypeMapping::append(db, self.mappings(db), mapping, tcx, visitor),
-                    ));
-                    mapping.simplify_mapped_alias(db, Type::Recursive(self), mapped, visitor)
-                } else {
-                    Type::Recursive(self)
-                }
-            }
+            _ => DeferredTypeMapping::append(
+                db,
+                self.mappings(db),
+                mapping,
+                tcx,
+                visitor,
+                |mappings| Type::Recursive(self.with_mappings(db, mappings)),
+            ),
         }
     }
 
