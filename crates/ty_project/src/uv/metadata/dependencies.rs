@@ -211,18 +211,14 @@ impl UvMetadata {
             let Some(module) = ModuleName::new(module) else {
                 continue;
             };
-            // Keep an empty entry when any owner is unknown. Omitting the entry would allow a
-            // caller to use a known parent module's owner for this incomplete child module.
             let owners = owners
                 .iter()
-                .map(|owner| {
-                    distributions
-                        .contains_key(&owner.package_id)
-                        .then(|| owner.package_id.clone())
-                })
-                .collect::<Option<BTreeSet<_>>>();
-            let owners = owners.map_or_else(Box::default, |owners| owners.into_iter().collect());
-            module_owners.insert(module, owners);
+                .filter(|owner| distributions.contains_key(&owner.package_id))
+                .map(|owner| owner.package_id.clone())
+                .collect::<BTreeSet<_>>();
+            // Keep an empty entry when all owners are unknown. Omitting the entry would allow a
+            // caller to use a known parent module's owner for this child module.
+            module_owners.insert(module, owners.into_iter().collect());
         }
 
         if module_owners.values().all(|owners| owners.is_empty())
@@ -567,22 +563,27 @@ mod tests {
     }
 
     #[test]
-    fn unknown_module_owners_prevent_parent_fallback() -> anyhow::Result<()> {
+    fn filters_unknown_module_owners_without_parent_fallback() -> anyhow::Result<()> {
         let mut input = metadata();
-        input["module_owners"]["namespace"] = json!([{"package_id": "direct"}]);
-        input["module_owners"]["namespace.indirect"] = json!([
-            {"package_id": "indirect"}, {"package_id": "missing-package"}
-        ]);
-        input["module_owners"]["namespace.empty"] = json!([]);
-        input["module_owners"]["not-a-module"] = json!([{"package_id": "direct"}]);
+        input["module_owners"] = json!({
+            "namespace": [
+                {"package_id": "indirect"},
+                {"package_id": "missing-package"},
+                {"package_id": "direct"},
+                {"package_id": "indirect"}
+            ],
+            "namespace.unknown": [{"package_id": "missing-package"}],
+            "namespace.empty": [],
+            "not-a-module": [{"package_id": "direct"}]
+        });
         let metadata = extract(&input)?;
 
         let namespace = ModuleName::new("namespace").context("expected a valid module name")?;
         assert_eq!(
             metadata.module_owners.get(&namespace).map(AsRef::as_ref),
-            Some([CharStr::from("direct")].as_slice())
+            Some([CharStr::from("direct"), CharStr::from("indirect")].as_slice())
         );
-        for child in ["namespace.indirect", "namespace.empty"] {
+        for child in ["namespace.unknown", "namespace.empty"] {
             let child = ModuleName::new(child).context("expected a valid module name")?;
             assert!(
                 metadata
@@ -591,7 +592,7 @@ mod tests {
                     .is_some_and(|owners| owners.is_empty())
             );
         }
-        assert_eq!(metadata.module_owners.len(), 6);
+        assert_eq!(metadata.module_owners.len(), 3);
 
         Ok(())
     }
