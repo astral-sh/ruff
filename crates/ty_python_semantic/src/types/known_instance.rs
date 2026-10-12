@@ -862,10 +862,21 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Type<'db> {
         let env = ProgramEnvironment::from_scope(scope_id);
         let mut builder = UnionBuilder::new(db, &env);
-        for ty in &value_expr_types {
+        for (index, ty) in value_expr_types.iter().enumerate() {
             match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
             {
-                Ok(ty) => builder.add_in_place(ty),
+                Ok(ty) => {
+                    if index == 0
+                        && let Type::KnownInstance(KnownInstanceType::UnionType(existing)) =
+                            value_expr_types[0]
+                        && existing._value_expr_types(db).is_some()
+                        && let Type::Union(union) = ty
+                        && builder.try_seed_nominal_union(union)
+                    {
+                        continue;
+                    }
+                    builder.add_in_place(ty);
+                }
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),

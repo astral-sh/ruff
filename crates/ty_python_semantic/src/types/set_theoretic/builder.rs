@@ -651,6 +651,24 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    /// Seed an empty builder from the normalized nominal members of a PEP 604 union.
+    /// The caller must establish the runtime union's value-expression provenance.
+    pub(crate) fn try_seed_nominal_union(&mut self, union: UnionType<'db>) -> bool {
+        debug_assert!(self.elements.is_empty());
+        if union.recursively_defined(self.db).is_yes() {
+            return false;
+        }
+        let elements = union.elements(self.db);
+        if !elements.iter().all(|ty| {
+            matches!(ty, Type::NominalInstance(instance) if instance.is_plain_non_generic_static())
+        }) {
+            return false;
+        }
+        self.elements
+            .extend(elements.iter().copied().map(UnionElement::Type));
+        true
+    }
+
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
         self
