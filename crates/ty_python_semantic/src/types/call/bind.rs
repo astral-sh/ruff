@@ -9,12 +9,14 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
+mod positional;
 mod property;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashSet;
 use std::fmt;
+use std::sync::Arc;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
@@ -24,6 +26,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use self::constructor::{ConstructorBinding, ConstructorContext};
+use self::positional::PositionalMatches;
 use super::ambiguous::merge_ambiguous_returns;
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
@@ -1337,6 +1340,18 @@ impl<'db> Bindings<'db> {
         for item in self.iter_callable_items_mut() {
             item.match_parameters(db, env, arguments);
         }
+    }
+
+    /// Whether argument inference needs to consider multiple positional placements.
+    pub(crate) fn has_ambiguous_positional_arguments(&self) -> bool {
+        self.iter_flat().any(|binding| {
+            binding.overloads.iter().any(|overload| {
+                overload
+                    .positional_matches
+                    .as_ref()
+                    .is_some_and(|positional| positional.has_ambiguous_argument_contexts())
+            })
+        })
     }
 
     /// Verify that the type of each argument is assignable to type of the parameter that it was
@@ -5689,6 +5704,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
+
+    /// Positional arguments were checked together over their possible complete placements.
+    positional_arguments_valid: bool,
 }
 
 /// The formal and actual types associated with one matched argument-parameter pair.
@@ -5794,6 +5812,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inference,
             errors: inference_errors,
             constraint_set_errors,
+            positional_arguments_valid,
         } = inferred;
         errors.extend(inference_errors);
         Self {
@@ -5812,6 +5831,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars,
             inference,
             constraint_set_errors,
+            positional_arguments_valid,
         }
     }
 }
@@ -5862,6 +5882,8 @@ struct InferredCall<'db> {
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
     constraint_set_errors: Vec<bool>,
+    /// The positional arguments have a compatible complete placement.
+    positional_arguments_valid: bool,
 }
 
 /// Fixed inputs used to infer a call before its arguments are validated.
@@ -6092,8 +6114,15 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
     }
 }
 
-impl<'db> CallInference<'_, 'db> {
-    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
+impl<'a, 'db> CallInference<'a, 'db> {
+    fn infer<'c>(
+        self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        positional_constraints: Option<ConstraintSet<'db, 'c>>,
+    ) -> InferredCall<'db>
+    where
+        'a: 'c,
+    {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
@@ -6102,6 +6131,7 @@ impl<'db> CallInference<'_, 'db> {
                 inference: None,
                 errors: Vec::new(),
                 constraint_set_errors,
+                positional_arguments_valid: positional_constraints.is_some(),
             };
         };
 
@@ -6293,6 +6323,7 @@ impl<'db> CallInference<'_, 'db> {
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
             &mut builder,
+            positional_constraints,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
             &mut specialization_errors,
@@ -6311,6 +6342,7 @@ impl<'db> CallInference<'_, 'db> {
 
             self.infer_argument_constraints(
                 &mut builder,
+                positional_constraints,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
                 &mut specialization_errors,
@@ -6331,6 +6363,7 @@ impl<'db> CallInference<'_, 'db> {
             inference: Some(inference),
             errors: specialization_errors,
             constraint_set_errors,
+            positional_arguments_valid: positional_constraints.is_some(),
         }
     }
 
@@ -6760,6 +6793,7 @@ impl<'db> CallInference<'_, 'db> {
     fn infer_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
+        positional_constraints: Option<ConstraintSet<'db, 'c>>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -6767,6 +6801,21 @@ impl<'db> CallInference<'_, 'db> {
     ) -> bool {
         let db = self.db;
         for relation in self.argument_relations() {
+            if positional_constraints.is_some()
+                && self
+                    .arguments
+                    .get(relation.argument_index)
+                    .is_some_and(|argument| {
+                        matches!(
+                            argument,
+                            CallArgument::Synthetic(_)
+                                | CallArgument::Positional(_)
+                                | CallArgument::Variadic(_)
+                        )
+                    })
+            {
+                continue;
+            }
             // Fixed elements can infer normally; the complete variadic pack is inferred below.
             if relation.has_starred_annotation
                 && relation.matched_parameter.expected_type.is_none()
@@ -6799,6 +6848,16 @@ impl<'db> CallInference<'_, 'db> {
                     }),
                 });
             }
+        }
+
+        if let Some(positional_constraints) = positional_constraints
+            && let Err(error) = builder.add_constraint_set(positional_constraints)
+        {
+            specialization_errors.push(BindingError::SpecializationError {
+                error,
+                argument_index: None,
+                argument: None,
+            });
         }
 
         self.infer_typevartuple_argument_constraints(
@@ -6919,7 +6978,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // building them in an earlier separate step.
         //
         // An unresolved `*Ts` still has no per-element expected type.
-        if !self.constraint_set_errors[argument_index]
+        let checked_positionally = self.positional_arguments_valid
+            && matches!(
+                argument,
+                Argument::Synthetic | Argument::Positional | Argument::Variadic
+            );
+        if !checked_positionally
+            && !self.constraint_set_errors[argument_index]
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
@@ -7689,6 +7754,9 @@ pub(crate) struct Binding<'db> {
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
 
+    /// Ordered alternatives retained for calls with ambiguous positional unpacking.
+    positional_matches: Option<Arc<PositionalMatches<'db>>>,
+
     /// Whether an argument that supplies an indeterminate number of positional or keyword
     /// arguments is mapped to a variadic parameter (`*args` or `**kwargs`).
     variadic_argument_matched_to_variadic_parameter: bool,
@@ -7771,6 +7839,7 @@ impl<'db> Binding<'db> {
             inference: None,
             is_partial_application: false,
             argument_matches: Box::from([]),
+            positional_matches: None,
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
             errors: vec![],
@@ -8006,7 +8075,11 @@ impl<'db> Binding<'db> {
             .ok()
     }
 
-    /// Returns the type context to use for bidirectional inference of a source call argument.
+    /// Returns the possible type contexts for bidirectional inference of a source call argument.
+    ///
+    /// During speculative inference, `all_positions` retains every structurally possible position
+    /// so a placement rejected in one inference round can be reconsidered in the next. Committed
+    /// inference uses only positions that survived type checking.
     ///
     /// Request the shared argument specialization only when this parameter needs it. Unmatched
     /// arguments and parameters that use their type variable's upper bound do not need one.
@@ -8020,7 +8093,7 @@ impl<'db> Binding<'db> {
     /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
     /// ```
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn argument_type_context(
+    pub(crate) fn argument_type_contexts(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8028,14 +8101,60 @@ impl<'db> Binding<'db> {
         binding: &CallableBinding<'db>,
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
+        all_positions: bool,
+        call_expression_tcx: TypeContext<'db>,
+        specialization: impl Fn() -> Option<Specialization<'db>>,
+    ) -> SmallVec<[Option<ArgumentTypeContext<'db>>; 1]> {
+        let argument_matches = self
+            .positional_matches
+            .as_ref()
+            .filter(|_| all_positions)
+            .and_then(|positional| {
+                positional
+                    .arguments
+                    .get(argument_index + usize::from(binding.bound_type.is_some()))
+            })
+            .filter(|matched| matched.matched)
+            .or_else(|| self.matched_argument_for_call_argument(binding, argument_index));
+        let Some(argument_matches) =
+            argument_matches.filter(|matched| !matched.parameters.is_empty())
+        else {
+            return smallvec![None];
+        };
+        if self.positional_matches.is_none() && argument_matches.parameters.len() != 1 {
+            return smallvec![None];
+        }
+        argument_matches
+            .iter()
+            .map(|matched_parameter| {
+                self.argument_type_context(
+                    db,
+                    env,
+                    constraints,
+                    binding,
+                    arguments_types,
+                    argument_index,
+                    matched_parameter,
+                    call_expression_tcx,
+                    &specialization,
+                )
+            })
+            .collect()
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn argument_type_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        binding: &CallableBinding<'db>,
+        arguments_types: &CallArguments<'_, 'db>,
+        argument_index: usize,
+        matched_parameter: MatchedParameter<'db>,
         call_expression_tcx: TypeContext<'db>,
         specialization: impl Fn() -> Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
-        let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
-        let [matched_parameter] = argument_matches.parameters.as_slice() else {
-            return None;
-        };
-
         let parameter = &self.signature.parameters()[matched_parameter.index];
         let original_parameter_type = parameter.annotated_type();
         let mut parameter_type = matched_parameter
@@ -8278,17 +8397,52 @@ impl<'db> Binding<'db> {
     ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
+        let positional_matches = if self.signature.generic_context.is_none_or(|context| {
+            context
+                .variables(db)
+                .all(|typevar| !typevar.is_paramspec(db) && !typevar.is_typevartuple(db))
+        }) {
+            PositionalMatches::new(
+                db,
+                env,
+                arguments,
+                parameters,
+                &matcher.explicit_keyword_parameters,
+            )
+            .map(Arc::new)
+        } else {
+            None
+        };
+        if let Some(positional_matches) = &positional_matches {
+            matcher.argument_matches = positional_matches.arguments.to_vec();
+            matcher.num_synthetic_args = arguments
+                .iter()
+                .filter(|argument| matches!(argument, CallArgument::Synthetic(_)))
+                .count();
+            for matched in matcher
+                .argument_matches
+                .iter()
+                .flat_map(MatchedArgument::iter)
+            {
+                matcher.parameter_info[matched.index].matched = true;
+            }
+        }
         let mut keywords_arguments = vec![];
         for (argument_index, argument) in arguments.iter().enumerate() {
             match argument {
                 CallArgument::Positional(_) | CallArgument::Synthetic(_) => {
-                    let _ = matcher.match_positional(argument_index, argument.kind(), None, false);
+                    if positional_matches.is_none() {
+                        let _ =
+                            matcher.match_positional(argument_index, argument.kind(), None, false);
+                    }
                 }
                 CallArgument::Keyword { name, .. } => {
                     let _ = matcher.match_keyword(argument_index, argument.kind(), None, name);
                 }
                 CallArgument::Variadic(variadic) => {
-                    let _ = matcher.match_variadic(db, env, argument_index, variadic);
+                    if positional_matches.is_none() {
+                        let _ = matcher.match_variadic(db, env, argument_index, variadic);
+                    }
                 }
                 CallArgument::Keywords(keywords) => {
                     keywords_arguments.push((argument_index, keywords));
@@ -8302,6 +8456,7 @@ impl<'db> Binding<'db> {
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
         self.argument_matches = matcher.finish(db, env);
+        self.positional_matches = positional_matches;
     }
 
     fn check_types(
@@ -8343,6 +8498,32 @@ impl<'db> Binding<'db> {
             return;
         }
 
+        let inferable_typevars = self
+            .signature
+            .generic_context
+            .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
+        let positional_constraints = self.positional_matches.as_ref().and_then(|positional| {
+            let evaluated = positional.evaluate(
+                db,
+                env,
+                constraints,
+                arguments,
+                parameters,
+                inferable_typevars,
+            );
+            for (index, argument) in arguments.iter().enumerate() {
+                if matches!(
+                    argument,
+                    CallArgument::Synthetic(_)
+                        | CallArgument::Positional(_)
+                        | CallArgument::Variadic(_)
+                ) {
+                    self.argument_matches[index] = evaluated.arguments[index].clone();
+                }
+            }
+            evaluated.constraints
+        });
+
         let inferred = CallInference {
             db,
             env,
@@ -8352,12 +8533,9 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
-            inferable_typevars: self
-                .signature
-                .generic_context
-                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
+            inferable_typevars,
         }
-        .infer(constraints);
+        .infer(constraints, positional_constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,
@@ -8681,6 +8859,7 @@ impl<'db> Binding<'db> {
             inferable_typevars: self.inferable_typevars,
             inference: self.inference,
             argument_matches: self.argument_matches.clone(),
+            positional_matches: self.positional_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
         }
@@ -8692,6 +8871,7 @@ impl<'db> Binding<'db> {
             inferable_typevars,
             inference,
             argument_matches,
+            positional_matches,
             parameter_tys,
             errors,
         } = snapshot;
@@ -8700,6 +8880,7 @@ impl<'db> Binding<'db> {
         self.inferable_typevars = inferable_typevars;
         self.inference = inference;
         self.argument_matches = argument_matches;
+        self.positional_matches = positional_matches;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
     }
@@ -8743,6 +8924,7 @@ impl<'db> Binding<'db> {
         self.inferable_typevars = TypeVarSet::None;
         self.inference = None;
         self.argument_matches = Box::from([]);
+        self.positional_matches = None;
         self.parameter_tys = Box::from([]);
         self.errors.clear();
     }
@@ -8754,6 +8936,7 @@ struct BindingSnapshot<'db> {
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
+    positional_matches: Option<Arc<PositionalMatches<'db>>>,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }
@@ -8796,6 +8979,9 @@ impl CallableBindingSnapshot<'_> {
                 snapshot
                     .argument_matches
                     .clone_from(&binding.argument_matches);
+                snapshot
+                    .positional_matches
+                    .clone_from(&binding.positional_matches);
                 snapshot.parameter_tys.clone_from(&binding.parameter_tys);
             }
 

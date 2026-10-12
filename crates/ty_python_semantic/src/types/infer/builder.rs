@@ -5908,6 +5908,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Enable the expression cache if we are going to perform multi-inference.
         let teardown_expression_cache = if !generic_arguments.is_empty()
             || requires_overload_evaluation(&overload_candidates)
+            || bindings.has_ambiguous_positional_arguments()
         {
             self.setup_expression_cache()
         } else {
@@ -6080,7 +6081,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let env = self.program_environment();
-        let requires_overload_evaluation = requires_overload_evaluation(candidates);
+        let requires_overload_evaluation = requires_overload_evaluation(candidates)
+            || bindings.has_ambiguous_positional_arguments();
         let arguments_tcx = self.collect_call_arguments_type_context(
             baseline_argument_types,
             bindings,
@@ -6174,7 +6176,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
-        let requires_overload_evaluation = requires_overload_evaluation(candidates);
+        let requires_overload_evaluation = requires_overload_evaluation(candidates)
+            || bindings.has_ambiguous_positional_arguments();
 
         let mut arguments_tcx = self.collect_call_arguments_type_context(
             argument_types,
@@ -6355,13 +6358,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     |overload: &Binding<'db>,
                      binding: &CallableBinding<'db>,
                      specialization: &OnceCell<Option<Specialization<'db>>>| {
-                        overload.argument_type_context(
+                        overload.argument_type_contexts(
                             db,
                             env,
                             constraints,
                             binding,
                             argument_types,
                             argument_index,
+                            candidates.is_some(),
                             call_expression_tcx,
                             || {
                                 *specialization.get_or_init(|| {
@@ -6376,23 +6380,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     };
 
-                let parameter_contexts = if let Ok((overload, binding, specialization)) =
-                    overloads_with_binding.iter().exactly_one()
-                {
-                    MatchingArgumentTypeContext::Unique(parameter_tcx(
-                        overload,
-                        binding,
-                        specialization,
-                    ))
-                } else {
-                    MatchingArgumentTypeContext::Many(
-                        overloads_with_binding
-                            .iter()
-                            .map(|(overload, binding, specialization)| {
-                                parameter_tcx(overload, binding, specialization)
-                            })
-                            .collect(),
-                    )
+                let contexts: SmallVec<[_; 1]> = overloads_with_binding
+                    .iter()
+                    .flat_map(|(overload, binding, specialization)| {
+                        parameter_tcx(overload, binding, specialization)
+                    })
+                    .collect();
+                let parameter_contexts = match contexts.as_slice() {
+                    [context] => MatchingArgumentTypeContext::Unique(*context),
+                    _ => MatchingArgumentTypeContext::Many(contexts.into_vec()),
                 };
 
                 Some(parameter_contexts)

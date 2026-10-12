@@ -2222,6 +2222,32 @@ def _(args: tuple[*tuple[str, ...], bytes]) -> None:
     reveal_type(f(*args, 1.0))  # revealed: bytes
 ```
 
+### Positional arguments between variable-length unpacks
+
+Each overload can match the unpacks at different lengths. A required argument between the unpacks
+must still have a compatible position in the selected overload.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(a: int, b: str, c: int) -> str: ...
+@overload
+def f(a: int, b: bytes, c: int) -> bytes: ...
+```
+
+```py
+from overloaded import f
+
+def _(before: list[int], after: list[int], text: str, data: bytes) -> None:
+    reveal_type(f(*before, text, *after))  # revealed: str
+    reveal_type(f(*before, data, *after))  # revealed: bytes
+    # error: [no-matching-overload]
+    f(*before, 1.0, *after)
+```
+
 ### Variadic argument with generics
 
 `overloaded.pyi`:

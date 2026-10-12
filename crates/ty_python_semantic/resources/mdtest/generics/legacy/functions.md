@@ -3132,6 +3132,76 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     return reveal_type(identity_callback(value))
 ```
 
+## Inference across positional unpacking alternatives
+
+Different lengths of an unpack can infer different types for the same type variable. We retain the
+solutions from every compatible placement.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(a: T, b: object = 0) -> T:
+    return a
+
+def _(before: list[str], number: int) -> None:
+    reveal_type(first(*before, number))  # revealed: int | str
+```
+
+An invariant parameter can determine the position of an argument between two unpacks.
+
+```py
+def middle(a: int, values: list[T], b: int) -> T:
+    return values[0]
+
+def _(before: list[int], values: list[str], after: list[int]) -> None:
+    reveal_type(middle(*before, values, *after))  # revealed: str
+```
+
+Keyword arguments constrain the same type variables as positional arguments. Here the keyword
+argument rules out the placement that binds `value` to `a`.
+
+```py
+def checked(a: list[T], b: object = 0, *, expected: list[T]) -> T:
+    return a[0]
+
+def _(before: list[list[str]], value: list[int], expected: list[str]) -> None:
+    reveal_type(checked(*before, value, expected=expected))  # revealed: str
+```
+
+All arguments in one placement must agree on a specialization. Solving each parameter independently
+would incorrectly accept these incompatible invariant arguments.
+
+```py
+def same(a: list[T], b: list[T]) -> T:
+    return a[0]
+
+def _(before, a: list[int], b: list[str], after) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    same(*before, a, b, *after)
+```
+
+## Positional unpacking preserves outer type variables
+
+A type variable belonging to the caller cannot be specialized to make an argument fit.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
+
+def strings(a: int, text: str, b: int) -> None: ...
+def caller(before: list[int], value: T, after: list[int]) -> None:
+    # error: [invalid-argument-type]
+    strings(*before, value, *after)
+
+def bounded(before: list[int], value: S, after: list[int]) -> None:
+    strings(*before, value, *after)  # no diagnostic
+```
+
 ## Generic property setter overrides
 
 A method-scoped type variable is inferred for each write, so an unconstrained setter preserves an
