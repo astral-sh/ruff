@@ -1112,6 +1112,7 @@ impl<'db> UnionBuilder<'db> {
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
             if !self.cycle_recovery
+                && matches!(ty, Type::Intersection(_))
                 && let Some(merged_type) =
                     merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
             {
