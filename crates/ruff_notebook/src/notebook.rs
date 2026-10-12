@@ -397,12 +397,6 @@ impl Notebook {
         &self.cell_offsets
     }
 
-    /// Returns the start offset of the cell at index `cell` in the concatenated
-    /// text document.
-    pub fn cell_offset(&self, cell: OneIndexed) -> Option<TextSize> {
-        self.cell_offsets.get(cell.to_zero_indexed()).copied()
-    }
-
     /// Returns the text range in the concatenated document of the cell
     /// with index `cell`.
     pub fn cell_range(&self, cell: OneIndexed) -> Option<TextRange> {
@@ -410,6 +404,17 @@ impl Notebook {
         let end = self.cell_offsets.get(cell.to_zero_indexed() + 1).copied()?;
 
         Some(TextRange::new(start, end))
+    }
+
+    /// Returns the text range in the concatenated document of the contents of the cell with
+    /// index `cell`, excluding the synthetic newline that separates it from the next cell.
+    pub fn cell_content_range(&self, cell: OneIndexed) -> Option<TextRange> {
+        let range = self.cell_range(cell)?;
+        let end = range
+            .end()
+            .checked_sub(TextSize::of(SYNTHETIC_CELL_SEPARATOR))?;
+
+        Some(TextRange::new(range.start(), end))
     }
 
     /// Return `true` if the notebook has a trailing newline, `false` otherwise.

@@ -631,6 +631,34 @@ fn hover_past_end_of_cell() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A range that ends past the end of a cell covers only that cell, so a request for the first
+/// cell's inlay hints doesn't return the hints from the second cell.
+#[test]
+fn inlay_hints_range_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .enable_inlay_hints(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let first_cell = builder.add_python_cell("x = 1\n");
+    let second_cell = builder.add_python_cell("def f(a: int) -> int:\n    return a\n\ny = f(1)\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    let range = Range::new(Position::new(0, 0), Position::new(10, 0));
+
+    // The second cell has hints of its own.
+    let second_cell_hints = inlay_hints_for_cell(&mut server, &second_cell, range);
+    assert!(!second_cell_hints.is_empty());
+
+    let first_cell_hints = inlay_hints_for_cell(&mut server, &first_cell, range);
+    assert_eq!(first_cell_hints, vec![]);
+
+    Ok(())
+}
+
 #[test]
 fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
@@ -688,6 +716,22 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+fn inlay_hints_for_cell(
+    server: &mut TestServer,
+    cell_uri: &lsp_types::Uri,
+    range: Range,
+) -> Vec<lsp_types::InlayHint> {
+    server
+        .send_request_await::<lsp_types::InlayHintRequest>(lsp_types::InlayHintParams {
+            text_document: TextDocumentIdentifier {
+                uri: cell_uri.clone(),
+            },
+            range,
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        })
+        .unwrap_or_default()
 }
 
 fn semantic_tokens_full_for_cell(

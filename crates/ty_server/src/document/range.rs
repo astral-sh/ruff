@@ -144,10 +144,7 @@ impl PositionExt for lsp_types::Position {
             let notebook_document = db.notebook_document(file)?;
             let cell_index = notebook_document.cell_index_by_uri(uri)?;
 
-            let cell_range = notebook
-                .cell_offsets()
-                .content_ranges()
-                .nth(cell_index.to_zero_indexed())?;
+            let cell_range = notebook.cell_content_range(cell_index)?;
             let cell_relative_line = OneIndexed::from_zero_indexed(u32_index_to_usize(self.line));
 
             let cell_start_location =
