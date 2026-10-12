@@ -610,6 +610,16 @@ def _(task: Task, job: Job):
     reveal_type(job.run())  # revealed: Unknown
 ```
 
+For the child classes, we can infer a stricter (wider) return type based on their own
+implementations. Unioning in the inferred return type of the child method body seems appropriate:
+
+```py
+# TODO: Should probably be `None | int | Unknown`
+reveal_type(IntTask().compute())  # revealed: Unknown
+# TODO: Should probably be `int | Unknown`
+reveal_type(IntJob().run())  # revealed: Unknown
+```
+
 ### Methods returning `self`
 
 A method that returns `self` should have its return type inferred as `Self`, so that subclasses get
