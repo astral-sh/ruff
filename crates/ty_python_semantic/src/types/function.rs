@@ -69,7 +69,7 @@ use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
 use crate::types::generics::{GenericContext, typing_self};
-use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
+use crate::types::infer::{infer_definition_types, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
@@ -656,7 +656,6 @@ impl<'db> OverloadLiteral<'db> {
             return_callable_typevar_scope,
         );
 
-        let generic_context = raw_signature.generic_context;
         raw_signature.add_implicit_self_annotation(db, env, || {
             let is_staticmethod = self.is_staticmethod(db);
             let is_dunder_new = self.name(db) == "__new__";
@@ -664,71 +663,25 @@ impl<'db> OverloadLiteral<'db> {
                 return None;
             }
 
-            // We have not yet added an implicit annotation to the `self` parameter, so any
-            // typevars that currently appear in the method's generic context come from explicit
-            // annotations.
-            let method_has_explicit_self = generic_context
-                .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
-
             let class_scope_id = definition.scope(db);
             let class_scope = index.scope(class_scope_id.file_scope_id(db));
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
             let class_literal = original_class_type(db, class_def)?;
-            let class_is_generic = class_literal.generic_context(db).is_some();
-            let class_is_fallback = class_literal
-                .known(db)
-                .is_some_and(KnownClass::is_fallback_class);
-
-            // Normally we implicitly annotate `self` or `cls` with `Self` or `type[Self]`, and
-            // create a `Self` typevar that we then have to solve for whenever this method is
-            // called. As an optimization, we can skip creating that typevar in certain situations:
-            //
-            //   - The method cannot use explicit `Self` in any other parameter annotations,
-            //     or in its return type. If it does, then we really do need specialization
-            //     inference at each call site to see which specific instance type should be
-            //     used in those other parameters / return type.
-            //
-            //   - The class cannot be generic. If it is, then we might need an actual `Self`
-            //     typevar to help carry through constraints that relate the instance type to
-            //     other typevars in the method signature.
-            //
-            //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
-            //     and so we need specialization inference to determine the "real" class that the
-            //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
-            if method_has_explicit_self || class_is_generic || class_is_fallback {
-                let scope_id = definition.scope(db);
-                let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.program_file(db));
-                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
-
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
-                    .expect(
-                        "We should always find the surrounding class \
+            let typing_self = typing_self(db, class_scope_id, Some(definition), class_literal)
+                .expect(
+                    "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                    );
+                );
 
-                if self.is_classmethod(db) || is_dunder_new {
-                    Some(SubclassOfType::from(
-                        db,
-                        env,
-                        SubclassOfInner::TypeVar(typing_self),
-                    ))
-                } else {
-                    Some(Type::TypeVar(typing_self))
-                }
+            if self.is_classmethod(db) || is_dunder_new {
+                Some(SubclassOfType::from(
+                    db,
+                    env,
+                    SubclassOfInner::TypeVar(typing_self),
+                ))
             } else {
-                // If skip creating the typevar, we use "instance of class" or "subclass of
-                // class" as the implicit annotation instead.
-                if self.is_classmethod(db) || is_dunder_new {
-                    Some(SubclassOfType::from(
-                        db,
-                        env,
-                        SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),
-                    ))
-                } else {
-                    Some(class_literal.to_non_generic_instance(db, env))
-                }
+                Some(Type::TypeVar(typing_self))
             }
         });
 
