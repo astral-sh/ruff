@@ -904,10 +904,7 @@ decorator's return type as the type of the decorated function. If the decorator 
 ability to catch invalid calls and attribute accesses:
 
 ```py
-from collections.abc import Callable
-
-
-def untyped_decorator(function: Callable[..., object]):
+def untyped_decorator(function):
     return function
 
 
@@ -934,10 +931,7 @@ annotations in third-party code installed into `site-packages`.
 `third_party_library.py`:
 
 ```py
-from collections.abc import Callable
-
-
-def untyped_decorator(function: Callable[..., object]):
+def untyped_decorator(function):
     return function
 ```
 

@@ -1992,7 +1992,7 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
 
 The keys of the mapping passed to a double-starred argument must be strings.
 
-```py
+```pyi
 from collections.abc import Mapping
 
 def f(**kwargs: int) -> None: ...
@@ -2025,7 +2025,7 @@ f(**MappingProtocol())
 
 The key can also be a custom type that inherits from `str`.
 
-```py
+```pyi
 class SubStr(str): ...
 class SubInt(int): ...
 
@@ -2037,7 +2037,7 @@ def _(kwargs1: dict[SubStr, int], kwargs2: dict[SubInt, int]) -> None:
 
 Or, it can be a type that is assignable to `str`.
 
-```py
+```pyi
 from typing import Any
 from ty_extensions._internal import Unknown
 
