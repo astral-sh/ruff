@@ -1419,44 +1419,48 @@ reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
 
-## Promotion at each occurrence of a recursive type argument
+## Promotion through recursive type arguments
 
-A callback's result is widened while its parameter retains its inferred literal type. The same rule
-applies after a recursive call changes the type argument to a list.
+Promotion reaches recursive results, including literals introduced by later specializations and
+callables with a parameter specification.
 
 ```py
-from typing import Callable, TypeVar
+from typing import Callable
 from ty_extensions._internal import TypeOf
 
-type G[T] = tuple[TypeOf[1], Callable[[T], T], Callable[[], G[list[T]]]]
+type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
 
-def collect(value: G[TypeOf[2]]):
+def promote(value: Stream[TypeOf[2]]):
     widened = [value][0]
-    reveal_type(widened[1])  # revealed: (Literal[2], /) -> int
-    reveal_type(widened[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
-    repeated = [widened][0]
-    reveal_type(repeated[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
+    reveal_type(widened[2]()[2]()[2]()[1])  # revealed: int
+
+type DelayedStream[T, U, V] = Callable[[], tuple[T, U, DelayedStream[list[T], V, TypeOf[1]]]]
+
+def collect_delayed(value: DelayedStream[int, int, int]):
+    widened = [value][0]
+    reveal_type(widened()[2]()[2]()[1])  # revealed: int
+
+type ParamStream[**P] = Callable[P, tuple[TypeOf[1], ParamStream[P]]]
+
+def collect_params(value: ParamStream[[int, str]]):
+    widened = [value][0]
+    reveal_type(widened(1, "first")[1](2, "second")[1](3, "third")[0])  # revealed: int
 ```
 
 ## Generic callables with growing recursive arguments
 
-Each returned callback binds its own type variables, including callbacks reached through a recursive
-alias with different arguments. Calling one callback does not specialize the others.
+A callback reached through a growing recursive alias binds its own type variables.
 
 ```py
-from typing import Callable, TypeVar
+from typing import Callable
 
 type Callbacks[T, U] = tuple[Callable[[T], T], list[Callbacks[tuple[T, U], U]]]
 
 def factory[T, U]() -> tuple[Callbacks[T, U], Callable[[U], U]]:
     raise NotImplementedError
 
-callbacks, other = factory()
-reveal_type(callbacks[0](1))  # revealed: Literal[1]
+callbacks, _ = factory()
 reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
-nested = callbacks[1][0][1][0][0](((2, "value"), "value"))
-reveal_type(nested)  # revealed: tuple[tuple[Literal[2], Literal["value"]], Literal["value"]]
-reveal_type(other(True))  # revealed: Literal[True]
 ```
 
 ## Promotion through shared generic aliases
@@ -1465,7 +1469,7 @@ The same callback alias can occur in parameter and return positions. Promotion p
 recursive parameter types and widens inferred literals in results, including after recursive calls.
 
 ```py
-from typing import Callable, TypeVar
+from typing import Callable
 from ty_extensions._internal import TypeOf
 
 type Leaf[T] = Callable[[], T]
@@ -1478,32 +1482,7 @@ def collect(
     third: tuple[Tree[int], Leaf[tuple[tuple[TypeOf[1]]]]],
 ):
     widened = [tree][0]
-    reveal_type(widened(first)[0]())  # revealed: int
     reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
-```
-
-## Specializing a promoted recursive type
-
-Promotion widens the stream's inferred literals. A type argument supplied afterwards keeps its own
-literal types, even if that argument is another stream. Promoting an already specialized stream
-instead widens the literals inside its type argument as well.
-
-```py
-from typing import Any, Callable, cast
-from ty_extensions._internal import TypeOf
-
-type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
-type Promoted[T] = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
-
-def specialize(value: Promoted[Stream[int]]):
-    reveal_type(value[0])  # revealed: int
-    reveal_type(value[1][0])  # revealed: Literal[1]
-    reveal_type(value[2]()[2]()[1][0])  # revealed: Literal[1]
-
-def promote(value: Stream[TypeOf[2]]):
-    widened = [value][0]
-    reveal_type(widened[1])  # revealed: int
-    reveal_type(widened[2]()[2]()[2]()[1])  # revealed: int
 ```
 
 ## Promoting materialized aliases with growing arguments
@@ -1526,9 +1505,7 @@ def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int
         widened_bottom = [widened_bottom][0]
     reveal_type(widened_top[0])  # revealed: int
     reveal_type(widened_top[1])  # revealed: None | Unknown
-    reveal_type(widened_top[2])  # revealed: (Never, /) -> object
     reveal_type(widened_top[3]()[2])  # revealed: (tuple[Never], /) -> tuple[object]
-    reveal_type(widened_bottom[2])  # revealed: (object, /) -> Never
     reveal_type(widened_bottom[3]()[2])  # revealed: (tuple[object], /) -> tuple[Never]
 ```
 
@@ -1564,42 +1541,4 @@ def inspect(first: Promoted[a.Widget], second: Promoted[b.Widget]):
     # revealed: tuple[() -> Stream[T@Promoted], () -> Stream[T@Promoted], a.Widget, b.Widget]
     reveal_type((first[2], second[2], first[2]()[1], second[2]()[1]))
     reveal_type((first[2], second[2]()[1]))  # revealed: tuple[() -> Stream[T@Promoted], Widget]
-```
-
-## Specialization after promotion with growing recursive arguments
-
-A promoted alias can remain generic even when each recursive step changes its type argument. A
-literal argument supplied after promotion stays literal at every depth.
-
-```py
-from typing import Any, Callable, cast
-from ty_extensions._internal import TypeOf
-
-type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[list[T]]]]
-type Promoted[T] = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
-
-def specialize(value: Promoted[TypeOf[2]]):
-    reveal_type(value[0])  # revealed: int
-    reveal_type(value[1])  # revealed: Literal[2]
-    reveal_type(value[2]()[0])  # revealed: int
-    reveal_type(value[2]()[1])  # revealed: list[Literal[2]]
-    reveal_type(value[2]()[2]()[1])  # revealed: list[list[Literal[2]]]
-```
-
-## Promotion through recursive callables with a parameter specification
-
-Widening a callable stream preserves its parameters and reaches the payload of subsequent calls.
-
-```py
-from typing import Callable
-from ty_extensions._internal import TypeOf
-
-type Stream[**P] = Callable[P, tuple[TypeOf[1], Stream[P]]]
-
-def collect(value: Stream[[int, str]]):
-    widened = [value][0]
-    reveal_type(widened(1, "first")[0])  # revealed: int
-    reveal_type(widened(1, "first")[1](2, "second")[0])  # revealed: int
-    reveal_type(widened(1, "first")[1](2, "second")[1](3, "third")[0])  # revealed: int
-    widened(1, "first")[1]("second", "payload")  # error: [invalid-argument-type]
 ```

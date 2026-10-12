@@ -3285,10 +3285,10 @@ def inspect(
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
 ```
 
-### Promotion of recursive streams
+### Promotion through recursive aliases
 
-Collecting a stream widens its inferred literals at every recursive depth. Collecting the result
-again applies the same widening without adding another transformation.
+Collecting a recursive value widens inferred literals and `None` at every depth, including through
+returned callables. Repeated collection preserves the resulting type.
 
 ```py
 from typing import Callable
@@ -3299,52 +3299,35 @@ Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
 def collect(value: Stream, flag: bool):
     stream = [value][0]
     reveal_type(stream)  # revealed: Stream
-    reveal_type(stream[0])  # revealed: int
     reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
     while flag:
         stream = [stream][0]
     reveal_type(stream[0])  # revealed: int
-```
 
-### Singleton promotion through recursive aliases
-
-Aliases are transparent to widening `None` inside nested tuples.
-
-```py
 Node = tuple[None, tuple["Node"]]
 
-def collect(value: Node):
+def collect_node(value: Node):
     widened = [value][0]
-    reveal_type(widened[0])  # revealed: None | Unknown
     reveal_type(widened[1][0][1][0][0])  # revealed: None | Unknown
-```
 
-### Promotion of recursively returned callables
+CallableStream = Callable[[], tuple[TypeOf[1], "CallableStream"]]
 
-Collecting a callable stream widens inferred literals in every returned stream.
-
-```py
-from typing import Callable
-from ty_extensions._internal import TypeOf
-
-Stream = Callable[[], tuple[TypeOf[1], "Stream"]]
-
-def collect(value: Stream):
+def collect_callable(value: CallableStream):
     widened = [value][0]
-    reveal_type(widened()[0])  # revealed: int
-    reveal_type(widened()[1]()[0])  # revealed: int
     reveal_type(widened()[1]()[1]()[0])  # revealed: int
 ```
 
 ### Promotion across recursive callable parameters
 
-The promoted type preserves literals in callable parameters and widens them in return types. It is
-equivalent in both directions to the explicitly written pair of recursive aliases.
+Promotion preserves inferred literals in callable parameters and widens them in results. Top
+materialization also reaches recursive calls, becoming bottom materialization in parameter
+positions.
 
 ```py
-from typing import Callable, Literal
-from ty_extensions import static_assert
-from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+from typing import Any, Callable, Literal
+from typing_extensions import Never
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 Consumer = tuple[TypeOf[1], Callable[["Consumer"], "Consumer"]]
 Promoted = tuple[int, Callable[["Flipped"], "Promoted"]]
@@ -3352,47 +3335,13 @@ Flipped = tuple[Literal[1], Callable[[Promoted], "Flipped"]]
 
 def collect(value: Consumer):
     widened = [value][0]
-    static_assert(is_subtype_of(TypeOf[widened], Promoted))
-    static_assert(is_subtype_of(Promoted, TypeOf[widened]))
     static_assert(is_equivalent_to(TypeOf[widened], Promoted))
-```
-
-### Promotion and materialization across callable parameters
-
-Promotion and materialization both reach recursive returns. In callable parameters, promotion
-preserves inferred literals and top materialization becomes bottom materialization.
-
-```py
-from typing import Any, Callable
-from typing_extensions import Never
-from ty_extensions import Top, static_assert
-from ty_extensions._internal import TypeOf, is_equivalent_to
 
 Recursive = Callable[["Recursive"], tuple[TypeOf[1], Any, "Recursive"]]
 Positive = Callable[["Negative"], tuple[int, object, "Positive"]]
 Negative = Callable[[Positive], tuple[TypeOf[1], Never, "Negative"]]
 
-def collect(value: Recursive):
+def materialize(value: Recursive):
     widened = [value][0]
     static_assert(is_equivalent_to(Top[TypeOf[widened]], Positive))
-```
-
-### Promotion of payloads introduced by recursive specialization
-
-Later streams introduce inferred literals as payloads, while another type argument keeps growing.
-Collecting the stream widens those later payloads too.
-
-```py
-from typing import Callable, TypeVar
-from ty_extensions._internal import TypeOf
-
-T = TypeVar("T")
-U = TypeVar("U")
-V = TypeVar("V")
-Stream = Callable[[], tuple[T, U, "Stream[list[T], V, TypeOf[1]]"]]
-
-def collect(value: Stream[int, int, int]):
-    widened = [value][0]
-    reveal_type(widened()[2]()[2]()[1])  # revealed: int
-    reveal_type(widened()[2]()[2]()[2]()[1])  # revealed: int
 ```

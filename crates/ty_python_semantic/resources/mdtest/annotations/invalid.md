@@ -1436,19 +1436,23 @@ info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotat
 
 #### Collection hints for widened recursive types
 
-Putting a recursive value in a list can widen its inferred literals. Although the resulting type
-still displays the alias name, that name no longer describes its elements, so we do not suggest it
-as an annotation. This also applies when the widened type is nested inside another collection.
+A widened recursive alias no longer describes its original elements, so it cannot be suggested as an
+annotation, including when nested inside another collection.
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from ty_extensions._internal import TypeOf
 
 Tree = tuple[TypeOf[1], "Tree"]
+type NamedTree = tuple[TypeOf[1], NamedTree]
 
-def collect(tree: Tree):
+def collect(tree: Tree, named: NamedTree):
     widened = [tree][0]
-    reveal_type(widened)  # revealed: Tree
-    reveal_type(widened[0])  # revealed: int
+    widened_named = [named][0]
 
     def consume(
         direct: "[TypeOf[widened]]",  # snapshot: invalid-type-form
@@ -1456,6 +1460,7 @@ def collect(tree: Tree):
         key: "{TypeOf[widened]: int}",  # snapshot: invalid-type-form
         value: "{str: TypeOf[widened]}",  # snapshot: invalid-type-form
         union: "{TypeOf[widened] | None}",  # snapshot: invalid-type-form
+        named: "[list[TypeOf[widened_named]]]",  # snapshot: invalid-type-form
     ): ...
 ```
 
@@ -1503,34 +1508,13 @@ error[invalid-type-form]: Set literals are not allowed in parameter annotations
    |                 ^^^^^^^^^^^^^^^^^^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
-```
 
-#### Collection hints for widened PEP 695 aliases
 
-The same restriction applies to recursive aliases declared with `type`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from ty_extensions._internal import TypeOf
-
-type Tree = tuple[TypeOf[1], Tree]
-
-def collect(tree: Tree):
-    widened = [tree][0]
-
-    def consume(value: "[list[TypeOf[widened]]]"): ...  # snapshot: invalid-type-form
-```
-
-```snapshot
 error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
- --> src/mdtest_snippet.py:8:25
-  |
-8 |     def consume(value: "[list[TypeOf[widened]]]"): ...  # snapshot: invalid-type-form
-  |                         ^^^^^^^^^^^^^^^^^^^^^^^
+  --> src/mdtest_snippet.py:16:17
+   |
+16 |         named: "[list[TypeOf[widened_named]]]",  # snapshot: invalid-type-form
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```

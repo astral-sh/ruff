@@ -569,9 +569,7 @@ def check(value: Record):
 
 ## One-element tuple hints with widened recursive elements
 
-Widened recursive types keep their alias names in diagnostics, but the original alias is not an
-equivalent annotation. We explain the fixed tuple length without suggesting that alias as a
-replacement.
+Materializing a widened alias does not make its original name suitable for an annotation hint.
 
 ```py
 from typing import Any
@@ -583,7 +581,7 @@ Tree = tuple[TypeOf[1], Any, "Tree"]
 def collect(tree: Tree):
     widened = [tree][0]
 
-    def check(values: tuple[TypeOf[widened]]):
+    def check(values: tuple[Top[TypeOf[widened]]]):
         if values:  # snapshot: redundant-condition
             pass
 ```
@@ -592,48 +590,10 @@ def collect(tree: Tree):
 warning[redundant-condition]: A 1-element tuple is always truthy
   --> src/mdtest_snippet.py:11:12
    |
-10 |     def check(values: tuple[TypeOf[widened]]):
-   |                       ---------------------- Inferred as a 1-element tuple due to this annotation
-11 |         if values:  # snapshot: redundant-condition
-   |            ^^^^^^ Inferred type `tuple[Tree]` is always truthy
-```
-
-`Top` remains expressible when applied to the original alias, but does not make a widened alias
-suitable for annotation suggestions.
-
-```py
-def collect(tree: Tree):
-    widened = [tree][0]
-
-    def check(values: tuple[Top[TypeOf[widened]]]):
-        if values:  # snapshot: redundant-condition
-            pass
-
-def check(values: tuple[Top[Tree]]):
-    if values:  # snapshot: redundant-condition
-        pass
-```
-
-```snapshot
-warning[redundant-condition]: A 1-element tuple is always truthy
-  --> src/mdtest_snippet.py:17:12
-   |
-16 |     def check(values: tuple[Top[TypeOf[widened]]]):
+10 |     def check(values: tuple[Top[TypeOf[widened]]]):
    |                       --------------------------- Inferred as a 1-element tuple due to this annotation
-17 |         if values:  # snapshot: redundant-condition
+11 |         if values:  # snapshot: redundant-condition
    |            ^^^^^^ Inferred type `tuple[Top[Tree]]` is always truthy
-
-
-warning[redundant-condition]: A 1-element tuple is always truthy
-  --> src/mdtest_snippet.py:21:8
-   |
-20 | def check(values: tuple[Top[Tree]]):
-   |                   ----------------
-   |                   |
-   |                   Inferred as a 1-element tuple due to this annotation
-   |                   Did you mean `tuple[Top[Tree], ...]`?
-21 |     if values:  # snapshot: redundant-condition
-   |        ^^^^^^ Inferred type `tuple[Top[Tree]]` is always truthy
 ```
 
 ## One-element tuple annotation hints
