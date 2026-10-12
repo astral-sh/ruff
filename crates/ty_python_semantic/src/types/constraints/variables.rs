@@ -514,7 +514,7 @@ impl<'db> Constraint<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -628,7 +628,7 @@ impl<'db> ConcreteLowerBound<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -746,7 +746,7 @@ impl<'db> ConcreteUpperBound<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -861,7 +861,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -994,7 +994,7 @@ impl<'db> TypeVarRangeBound<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -1141,7 +1141,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {

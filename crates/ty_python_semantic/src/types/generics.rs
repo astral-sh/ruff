@@ -2,6 +2,7 @@ use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
+use std::sync::Arc;
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
@@ -43,7 +44,7 @@ use crate::types::{
     TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
 };
-use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -353,7 +354,7 @@ impl<'db> TypeVarLocations<'db> {
         db: &'db dyn Db,
         function_definition: Definition<'db>,
         generic_context: GenericContext<'db>,
-    ) -> FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>> {
+    ) -> FxOrderMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>> {
         generic_context
             .variables(db)
             .filter(|variable| {
@@ -805,12 +806,14 @@ impl<'db> GenericContext<'db> {
 
         // Then update those return type Callables to be generic, with their generic context
         // containing the typevars that don't appear outside any return type Callable.
-        let replacements = find_typevar_locations.locations.into_inner().finalize(
+        let mut replacements = find_typevar_locations.locations.into_inner().finalize(
             db,
             function_definition,
             generic_context,
         );
-        let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
+        replacements.shrink_to_fit();
+        let replacements = Arc::new(replacements);
+        let type_mapping = TypeMapping::RescopeReturnCallables(Arc::clone(&replacements));
         let return_type =
             return_type.apply_type_mapping(db, &env, &type_mapping, TypeContext::default());
 
@@ -982,7 +985,7 @@ impl<'db> GenericContext<'db> {
 
                 let specialization = ApplySpecialization::Partial {
                     generic_context: self,
-                    types: &types,
+                    types: Arc::from(types.as_ref()),
                     // Don't recursively substitute type[i] in itself. Ideally, we could instead
                     // check if the result is self-referential after we're done applying the
                     // partial specialization. But when we apply a paramspec, we don't use the
@@ -1048,7 +1051,7 @@ impl<'db> GenericContext<'db> {
                 // for legacy contexts.
                 let specialization = ApplySpecialization::Partial {
                     generic_context: self,
-                    types: &expanded,
+                    types: Arc::from(expanded.as_slice()),
                     skip: None,
                 };
                 default.apply_type_mapping(
@@ -1365,10 +1368,10 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: &[Type<'db>],
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1396,7 +1399,7 @@ impl<'db> Specialization<'db> {
                     // unrelated gradual types already present in the argument.
                     let specialized = ty.apply_type_mapping_impl(
                         db,
-                        &TypeMapping::ApplySpecialization(*specialization),
+                        &TypeMapping::ApplySpecialization(specialization.clone()),
                         tcx,
                         visitor,
                     );
@@ -2209,8 +2212,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 ///
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
-pub enum ApplySpecialization<'a, 'db> {
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum ApplySpecialization<'db> {
     Specialization {
         specialization: Specialization<'db>,
         /// Whether to substitute free owner variables in the declared domain of a retained
@@ -2223,23 +2226,23 @@ pub enum ApplySpecialization<'a, 'db> {
     TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
-        types: &'a [Type<'db>],
+        types: Arc<[Type<'db>]>,
         /// An optional typevar to _not_ substitute when applying the specialization. We use this to
         /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
-    ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    ReturnCallables(Arc<FxOrderMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
     /// Overrides the given type variables in an existing specialization mapping.
     WithBindings {
-        specialization: &'a ApplySpecialization<'a, 'db>,
-        bindings: &'a [(BoundTypeVarInstance<'db>, Type<'db>)],
+        specialization: Arc<ApplySpecialization<'db>>,
+        bindings: Arc<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
     },
 }
 
-impl<'db> ApplySpecialization<'_, 'db> {
+impl<'db> ApplySpecialization<'db> {
     pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
         Self::Specialization {
             specialization,
@@ -2247,19 +2250,19 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
-    pub(crate) fn specialize_self_domain(self) -> bool {
+    pub(crate) fn specialize_self_domain(&self) -> bool {
         match self {
             Self::Specialization {
                 specialize_self_domain,
                 ..
-            } => specialize_self_domain,
+            } => *specialize_self_domain,
             Self::WithBindings { specialization, .. } => specialization.specialize_self_domain(),
             _ => false,
         }
     }
 
     /// Returns `true` if this mapping should leave unevaluated function signatures unchanged.
-    pub(super) fn preserves_lazy_signatures(self) -> bool {
+    pub(super) fn preserves_lazy_signatures(&self) -> bool {
         match self {
             Self::ReturnCallables(_) | Self::TypeAlias(_) => true,
             Self::WithBindings { specialization, .. } => specialization.preserves_lazy_signatures(),
@@ -2315,10 +2318,10 @@ impl<'db> ApplySpecialization<'_, 'db> {
 
     /// Convert this specialization mapping to a concrete specialization over its own generic
     /// context, preserving skipped type variables in partial specializations as identity mappings.
-    pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(crate) fn as_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
+            | ApplySpecialization::TypeAlias(specialization) => Some(*specialization),
             ApplySpecialization::Partial {
                 generic_context,
                 types,

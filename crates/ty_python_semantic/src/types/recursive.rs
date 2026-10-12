@@ -98,7 +98,7 @@ impl<'db> RecursiveVar<'db> {
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        mapping: &TypeMapping<'_, 'db>,
+        mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let arguments = self
@@ -119,10 +119,10 @@ impl<'db> RecursiveVar<'db> {
 }
 
 /// A structural substitution that only the recursive-type binder can construct.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum RecursiveSubstitution<'db> {
     /// Replace references to a binder with applications of its recursive constructor.
     /// In the module example, this replaces `F[list[T]]` with `Tree[list[T]]`.
@@ -142,7 +142,7 @@ impl RecursiveSubstitution<'_> {
 }
 
 /// Identifies an alias query and names its recursive binder and variables.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
 pub struct RecursiveCycle(salsa::Id);
 
 impl get_size2::GetSize for RecursiveCycle {}
@@ -416,7 +416,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        mapping: &TypeMapping<'_, 'db>,
+        mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {

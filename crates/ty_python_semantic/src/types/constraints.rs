@@ -770,7 +770,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {

@@ -193,7 +193,7 @@ impl<'db> MethodWrapper<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -585,7 +585,7 @@ impl<'db> KnownInstanceType<'db> {
     pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
@@ -755,7 +755,7 @@ impl<'db> FieldInstance<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -898,7 +898,7 @@ impl<'db> UnionTypeInstance<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1042,7 +1042,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {

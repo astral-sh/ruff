@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::iter;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -117,7 +118,7 @@ use crate::types::visitor::{
     DynamicContent, DynamicContentMode, any_over_type, any_over_type_including_alias_arguments,
     dynamic_content, dynamic_content_impl,
 };
-use crate::{Db, FxIndexMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
+use crate::{Db, FxOrderMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
@@ -567,7 +568,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
         let type_transformer = match type_mapping {
@@ -1751,10 +1752,10 @@ impl<'db> PropertyInstanceType<'db> {
         }
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -9442,20 +9443,20 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
-    fn apply_type_mapping<'a>(
+    fn apply_type_mapping(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::new(env))
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
@@ -9563,8 +9564,8 @@ impl<'db> Type<'db> {
                         // Override the specialization with a specific parameter-list assigned to
                         // each `ParamSpec` from the union expansion.
                         let specialization = ApplySpecialization::WithBindings {
-                            specialization,
-                            bindings: &bindings,
+                            specialization: Arc::new(specialization.clone()),
+                            bindings: bindings.into(),
                         };
 
                         let mapping = match type_mapping {
@@ -11127,18 +11128,17 @@ impl<'db> SelfBinding<'db> {
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
 /// the components of complex types.
 ///
-/// This is represented as an enum (with some variants using `Cow`), and not an `FnMut` trait,
-/// since we sometimes have to apply type mappings lazily (e.g., to the signature of a function
-/// literal).
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-pub enum TypeMapping<'a, 'db> {
+/// Mappings own their inputs so the same operation can be applied immediately or retained by a
+/// recursive alias for application when it is unfolded.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum TypeMapping<'db> {
     /// Applies a specialization to the type
-    ApplySpecialization(ApplySpecialization<'a, 'db>),
+    ApplySpecialization(ApplySpecialization<'db>),
     /// Applies a specialization and materializes only substituted typevars.
     ///
     /// The `materialization_kind` is flipped in contravariant positions.
     ApplySpecializationWithMaterialization {
-        specialization: ApplySpecialization<'a, 'db>,
+        specialization: ApplySpecialization<'db>,
         materialization_kind: MaterializationKind,
     },
     /// A structural substitution constructed only by the recursive-type binder.
@@ -11168,10 +11168,10 @@ pub enum TypeMapping<'a, 'db> {
     EagerExpansion,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
-    RescopeReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    RescopeReturnCallables(Arc<FxOrderMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>>),
 }
 
-impl<'db> TypeMapping<'_, 'db> {
+impl<'db> TypeMapping<'db> {
     /// Update the generic context of a [`Signature`] according to the current type mapping
     fn update_signature_generic_context(
         &self,
@@ -11212,7 +11212,7 @@ impl<'db> TypeMapping<'_, 'db> {
                             .apply_type_mapping(
                                 db,
                                 env,
-                                &TypeMapping::ApplySpecialization(*specialization),
+                                &TypeMapping::ApplySpecialization(specialization.clone()),
                                 TypeContext::default(),
                             )
                             .as_typevar()
@@ -11264,7 +11264,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 specialization,
                 materialization_kind,
             } => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: *specialization,
+                specialization: specialization.clone(),
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
@@ -12322,7 +12322,7 @@ impl<'db> TypeIsType<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
@@ -12351,7 +12351,7 @@ impl<'db> TypeIsType<'db> {
             } => {
                 let specialized = argument.apply_type_mapping_impl(
                     db,
-                    &TypeMapping::ApplySpecialization(*specialization),
+                    &TypeMapping::ApplySpecialization(specialization.clone()),
                     tcx,
                     visitor,
                 );

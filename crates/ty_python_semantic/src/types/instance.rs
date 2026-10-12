@@ -451,10 +451,10 @@ impl<'db> NominalInstanceType<'db> {
         SubclassOfType::from(db, env, self.class(db, env))
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
@@ -1962,10 +1962,10 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -2164,10 +2164,10 @@ mod synthesized_protocol {
             Self(interface)
         }
 
-        pub(super) fn apply_type_mapping_impl<'a>(
+        pub(super) fn apply_type_mapping_impl(
             self,
             db: &'db dyn Db,
-            type_mapping: &TypeMapping<'a, 'db>,
+            type_mapping: &TypeMapping<'db>,
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         ) -> Self {

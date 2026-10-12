@@ -1298,10 +1298,10 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {

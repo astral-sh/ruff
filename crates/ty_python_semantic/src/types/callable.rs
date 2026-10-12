@@ -973,10 +973,10 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1000,7 +1000,7 @@ impl<'db> CallableType<'db> {
             let signatures = self.signatures(db).apply_type_mapping_impl(
                 db,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(
-                    replacements,
+                    replacements.clone(),
                 )),
                 tcx,
                 &visitor.for_new_materialization_root(),

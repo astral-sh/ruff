@@ -301,10 +301,10 @@ impl<'db> CallableSignature<'db> {
         })
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    pub(crate) fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -313,7 +313,7 @@ impl<'db> CallableSignature<'db> {
             self_signature: &Signature<'db>,
             prefix_parameters: &[Parameter<'db>],
             paramspec_value: Type<'db>,
-            type_mapping: &TypeMapping<'_, 'db>,
+            type_mapping: &TypeMapping<'db>,
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         ) -> Option<CallableSignature<'db>> {
@@ -1061,10 +1061,10 @@ impl<'db> Signature<'db> {
         })
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1781,7 +1781,7 @@ impl<'db> Signature<'db> {
     fn map_receiver_constraints(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<OwnedConstraintSet<'db>> {
@@ -1796,7 +1796,7 @@ impl<'db> Signature<'db> {
     fn map_constraints(
         db: &'db dyn Db,
         constraints: &OwnedConstraintSet<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> OwnedConstraintSet<'db> {
@@ -5266,10 +5266,10 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -5814,10 +5814,10 @@ impl<'db> Parameter<'db> {
             .map(|index| index.get() as usize - 1)
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -6290,10 +6290,10 @@ impl<'db> ParameterKind<'db> {
         }
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {

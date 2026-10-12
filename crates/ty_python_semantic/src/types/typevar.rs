@@ -1269,7 +1269,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     fn apply_type_mapping_to_bound_or_constraints(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         self.map_bound_or_constraints(db, |original| {
@@ -1334,14 +1334,14 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.variance_with_polarity(db, TypeVarVariance::Covariant)
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let mapped_specialization_type =
-            |specialization: &ApplySpecialization<'a, 'db>| -> Option<Type<'db>> {
+            |specialization: &ApplySpecialization<'db>| -> Option<Type<'db>> {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
@@ -1358,7 +1358,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             };
 
-        let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
+        let possibly_apply_to_self = |specialization: &ApplySpecialization<'db>| {
             if self.typevar(db).is_self(db)
                 && specialization.specialize_self_domain()
                 && let Some(specialization) = specialization.as_specialization(db)
@@ -1557,7 +1557,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self,
         db: &'db dyn Db,
         nonce: TypeVarNonce,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let typevar = self.typevar(db);
@@ -2204,7 +2204,7 @@ impl<'db> TypeVarConstraints<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let mapped = self
@@ -2296,7 +2296,7 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
     fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
+        type_mapping: &TypeMapping<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         match self {

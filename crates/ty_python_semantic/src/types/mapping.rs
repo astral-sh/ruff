@@ -5,15 +5,19 @@
 //! recursion guard.
 
 use super::constraints::resolution::Dependencies;
-use super::generics::{ApplySpecialization, Specialization};
+use super::generics::ApplySpecialization;
 use super::visitor::{DynamicContentMode, dynamic_content_impl};
 use super::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, PromotionKind, PromotionMode, SelfBinding, Type, TypeContext, TypeMapping,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, MaterializationKind, PromotionKind, Type,
+    TypeContext, TypeMapping,
 };
-use crate::{Db, FxIndexMap};
+use crate::Db;
 
-impl<'db> TypeMapping<'_, 'db> {
+impl<'db> TypeMapping<'db> {
+    fn is_idempotent(&self) -> bool {
+        matches!(self, Self::Promote(..) | Self::ReplaceParameterDefaults)
+    }
+
     /// Remove redundant singleton widening, which adds Unknown without changing variable bindings.
     pub(super) fn simplify_mapped_alias(
         &self,
@@ -22,9 +26,6 @@ impl<'db> TypeMapping<'_, 'db> {
         mapped: Type<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if original == mapped {
-            return original;
-        }
         if matches!(self, Self::Promote(_, PromotionKind::SingletonsOnly))
             && visitor
                 .materialization_equivalence()
@@ -85,7 +86,7 @@ pub struct DeferredTypeMapping<'db> {
 /// A retained operation and the inference context under which it was requested.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingStep<'db> {
-    operation: MappingOperation<'db>,
+    operation: TypeMapping<'db>,
     context: TypeContext<'db>,
     materialize_bounds: bool,
 }
@@ -101,15 +102,12 @@ impl<'db> MappingStep<'db> {
             && self.materialize_bounds == later.materialize_bounds
             && (matches!(
                 (&self.operation, &later.operation),
-                (
-                    MappingOperation::Materialize(_),
-                    MappingOperation::Materialize(_)
-                )
+                (TypeMapping::Materialize(_), TypeMapping::Materialize(_))
             ) || self.operation == later.operation && self.operation.is_idempotent()
                 || match (&self.operation, &later.operation) {
                     (
-                        MappingOperation::Specialize(earlier, None),
-                        MappingOperation::Specialize(later, None),
+                        TypeMapping::ApplySpecialization(earlier),
+                        TypeMapping::ApplySpecialization(later),
                     ) => earlier.absorbs(db, later, visitor),
                     _ => false,
                 })
@@ -122,12 +120,11 @@ impl<'db> MappingStep<'db> {
             && matches!(
                 (&self.operation, &other.operation),
                 (
-                    MappingOperation::Promote(_, PromotionKind::Regular),
-                    MappingOperation::Promote(_, PromotionKind::Regular)
-                        | MappingOperation::Materialize(_)
+                    TypeMapping::Promote(_, PromotionKind::Regular),
+                    TypeMapping::Promote(_, PromotionKind::Regular) | TypeMapping::Materialize(_)
                 ) | (
-                    MappingOperation::Materialize(_),
-                    MappingOperation::Promote(_, PromotionKind::Regular)
+                    TypeMapping::Materialize(_),
+                    TypeMapping::Promote(_, PromotionKind::Regular)
                 )
             )
     }
@@ -141,8 +138,8 @@ impl<'db> MappingStep<'db> {
                 && matches!(
                     (&self.operation, &other.operation),
                     (
-                        MappingOperation::Promote(_, PromotionKind::SingletonsOnly),
-                        MappingOperation::Promote(_, PromotionKind::Regular)
+                        TypeMapping::Promote(_, PromotionKind::SingletonsOnly),
+                        TypeMapping::Promote(_, PromotionKind::Regular)
                     )
                 )
     }
@@ -169,27 +166,35 @@ impl<'db> DeferredTypeMapping<'db> {
         }
         let mut visitor = visitor.for_new_materialization_root();
         visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
-        step.operation.with_mapping(&mut |mapping| {
-            images[0] =
-                images[0].apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-            images[1] = images[1].apply_type_mapping_impl(
-                db,
-                &mapping.flip(),
-                TypeContext::default(),
-                &visitor,
-            );
-        });
+        images[0] = images[0].apply_type_mapping_impl(
+            db,
+            &step.operation,
+            TypeContext::default(),
+            &visitor,
+        );
+        images[1] = images[1].apply_type_mapping_impl(
+            db,
+            &step.operation.flip(),
+            TypeContext::default(),
+            &visitor,
+        );
         Some(images)
     }
 
     pub(super) fn append(
         db: &'db dyn Db,
         previous: Option<Self>,
-        mapping: &TypeMapping<'_, 'db>,
+        mapping: &TypeMapping<'db>,
         context: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Self> {
-        let operation = MappingOperation::from_mapping(mapping)?;
+        if matches!(
+            mapping,
+            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
+        ) {
+            return None;
+        }
+        let operation = mapping.clone();
         let context = if context.annotation.is_none() {
             TypeContext::default()
         } else {
@@ -225,10 +230,7 @@ impl<'db> DeferredTypeMapping<'db> {
             cursor = node.previous(db);
         }
         if let Some(previous) = previous
-            && matches!(
-                previous.step(db).operation,
-                MappingOperation::Materialize(_)
-            )
+            && matches!(previous.step(db).operation, TypeMapping::Materialize(_))
             && previous.step(db).commutes_with(&step)
         {
             // Keep materialization last so its marker survives subsequent promotion.
@@ -240,7 +242,7 @@ impl<'db> DeferredTypeMapping<'db> {
 
     pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
         match &self.step(db).operation {
-            MappingOperation::Materialize(kind) => Some(*kind),
+            TypeMapping::Materialize(kind) => Some(*kind),
             _ => None,
         }
     }
@@ -265,197 +267,48 @@ impl<'db> DeferredTypeMapping<'db> {
         // Each step has its own mapping identity, but materialization comparisons share a guard.
         let mut visitor = visitor.for_new_materialization_root();
         visitor.materialize_typevar_bounds_and_defaults = self.step(db).materialize_bounds;
-        self.step(db).operation.with_mapping(&mut |mapping| {
-            ty.apply_type_mapping_impl(db, &mapping, self.step(db).context, &visitor)
-        })
+        ty.apply_type_mapping_impl(
+            db,
+            &self.step(db).operation,
+            self.step(db).context,
+            &visitor,
+        )
     }
 }
 
-/// Owns the data borrowed by a mapping, so an alias can retain it after inference returns.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum MappingOperation<'db> {
-    Specialize(OwnedSpecialization<'db>, Option<MaterializationKind>),
-    Promote(PromotionMode, PromotionKind),
-    BindLegacyTypevars(BindingContext<'db>),
-    FreshenBoundTypeVars(GenericContext<'db>, u32),
-    BindSelf(SelfBinding<'db>),
-    ReplaceSelf(Type<'db>),
-    Materialize(MaterializationKind),
-    ReplaceParameterDefaults,
-    RescopeReturnCallables(Box<[(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)]>),
-}
-
-impl<'db> MappingOperation<'db> {
-    fn from_mapping(mapping: &TypeMapping<'_, 'db>) -> Option<Self> {
-        Some(match mapping {
-            TypeMapping::ApplySpecialization(specialization) => {
-                Self::Specialize(OwnedSpecialization::new(*specialization), None)
-            }
-            TypeMapping::ApplySpecializationWithMaterialization {
-                specialization,
-                materialization_kind,
-            } => Self::Specialize(
-                OwnedSpecialization::new(*specialization),
-                Some(*materialization_kind),
-            ),
-            TypeMapping::Promote(mode, kind) => Self::Promote(*mode, *kind),
-            TypeMapping::BindLegacyTypevars(context) => Self::BindLegacyTypevars(*context),
-            TypeMapping::FreshenBoundTypeVars {
-                generic_context,
-                delta,
-            } => Self::FreshenBoundTypeVars(*generic_context, *delta),
-            TypeMapping::BindSelf(binding) => Self::BindSelf(binding.clone()),
-            TypeMapping::ReplaceSelf { new_upper_bound } => Self::ReplaceSelf(*new_upper_bound),
-            TypeMapping::Materialize(kind) => Self::Materialize(*kind),
-            TypeMapping::ReplaceParameterDefaults => Self::ReplaceParameterDefaults,
-            TypeMapping::RescopeReturnCallables(replacements) => {
-                Self::RescopeReturnCallables(replacements.iter().map(|(a, b)| (*a, *b)).collect())
-            }
-            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion => {
-                return None;
-            }
-        })
-    }
-
-    fn is_idempotent(&self) -> bool {
-        matches!(self, Self::Promote(..) | Self::ReplaceParameterDefaults)
-    }
-
-    fn with_mapping<R>(&self, f: &mut dyn FnMut(TypeMapping<'_, 'db>) -> R) -> R {
-        match self {
-            Self::Specialize(specialization, kind) => {
-                specialization.with_mapping(&mut |specialization| {
-                    f(match kind {
-                        Some(kind) => TypeMapping::ApplySpecializationWithMaterialization {
-                            specialization,
-                            materialization_kind: *kind,
-                        },
-                        None => TypeMapping::ApplySpecialization(specialization),
-                    })
-                })
-            }
-            Self::Promote(mode, kind) => f(TypeMapping::Promote(*mode, *kind)),
-            Self::BindLegacyTypevars(context) => f(TypeMapping::BindLegacyTypevars(*context)),
-            Self::FreshenBoundTypeVars(context, delta) => f(TypeMapping::FreshenBoundTypeVars {
-                generic_context: *context,
-                delta: *delta,
-            }),
-            Self::BindSelf(binding) => f(TypeMapping::BindSelf(binding.clone())),
-            Self::ReplaceSelf(ty) => f(TypeMapping::ReplaceSelf {
-                new_upper_bound: *ty,
-            }),
-            Self::Materialize(kind) => f(TypeMapping::Materialize(*kind)),
-            Self::ReplaceParameterDefaults => f(TypeMapping::ReplaceParameterDefaults),
-            Self::RescopeReturnCallables(replacements) => f(TypeMapping::RescopeReturnCallables(
-                &replacements.iter().copied().collect(),
-            )),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum OwnedSpecialization<'db> {
-    Specialization(Specialization<'db>, bool),
-    TypeAlias(Specialization<'db>),
-    Partial(GenericContext<'db>, Box<[Type<'db>]>, Option<usize>),
-    ReturnCallables(Box<[(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)]>),
-    Single(BoundTypeVarInstance<'db>, Type<'db>),
-    WithBindings(Box<Self>, Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>),
-}
-
-impl<'db> OwnedSpecialization<'db> {
+impl<'db> ApplySpecialization<'db> {
     fn absorbs(
         &self,
         db: &'db dyn Db,
         later: &Self,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
-        self.with_mapping(&mut |earlier| {
-            later.with_mapping(&mut |later| {
-                if earlier.specialize_self_domain()
-                    || later.specialize_self_domain()
-                    || earlier.preserves_lazy_signatures()
-                    || earlier.materializes_alias_arguments(db)
-                    || later.materializes_alias_arguments(db)
-                {
-                    return false;
-                }
-                // Alias arguments use a projected specialization; partial substitutions preserve
-                // their skipped variable there. A later mapping must not expose captured variables
-                // or replace an argument that the earlier projection left untouched.
-                if let Some(earlier_alias) = earlier.as_specialization(db) {
-                    let Some(later_alias) = later.as_specialization(db) else {
-                        return false;
-                    };
-                    if !ApplySpecialization::specialization(earlier_alias).absorbs_bindings(
-                        db,
-                        ApplySpecialization::specialization(later_alias),
-                        visitor,
-                    ) {
-                        return false;
-                    }
-                }
-                earlier.absorbs_bindings(db, later, visitor)
-            })
-        })
-    }
-
-    fn new(specialization: ApplySpecialization<'_, 'db>) -> Self {
-        match specialization {
-            ApplySpecialization::Specialization {
-                specialization,
-                specialize_self_domain,
-            } => Self::Specialization(specialization, specialize_self_domain),
-            ApplySpecialization::TypeAlias(specialization) => Self::TypeAlias(specialization),
-            ApplySpecialization::Partial {
-                generic_context,
-                types,
-                skip,
-            } => Self::Partial(generic_context, types.into(), skip),
-            ApplySpecialization::ReturnCallables(replacements) => {
-                Self::ReturnCallables(replacements.iter().map(|(a, b)| (*a, *b)).collect())
-            }
-            ApplySpecialization::Single(variable, ty) => Self::Single(variable, ty),
-            ApplySpecialization::WithBindings {
-                specialization,
-                bindings,
-            } => Self::WithBindings(Box::new(Self::new(*specialization)), bindings.into()),
+        if self.specialize_self_domain()
+            || later.specialize_self_domain()
+            || self.preserves_lazy_signatures()
+            || self.materializes_alias_arguments(db)
+            || later.materializes_alias_arguments(db)
+        {
+            return false;
         }
-    }
-
-    fn with_mapping<R>(&self, f: &mut dyn FnMut(ApplySpecialization<'_, 'db>) -> R) -> R {
-        match self {
-            Self::Specialization(specialization, specialize_self_domain) => {
-                f(ApplySpecialization::Specialization {
-                    specialization: *specialization,
-                    specialize_self_domain: *specialize_self_domain,
-                })
-            }
-            Self::TypeAlias(specialization) => f(ApplySpecialization::TypeAlias(*specialization)),
-            Self::Partial(context, types, skip) => f(ApplySpecialization::Partial {
-                generic_context: *context,
-                types,
-                skip: *skip,
-            }),
-            Self::ReturnCallables(replacements) => {
-                let replacements: FxIndexMap<_, _> = replacements.iter().copied().collect();
-                f(ApplySpecialization::ReturnCallables(&replacements))
-            }
-            Self::Single(variable, ty) => f(ApplySpecialization::Single(*variable, *ty)),
-            Self::WithBindings(specialization, bindings) => {
-                specialization.with_mapping(&mut |specialization| {
-                    f(ApplySpecialization::WithBindings {
-                        specialization: &specialization,
-                        bindings,
-                    })
-                })
+        // Partial substitutions preserve their skipped variable in alias arguments.
+        // Both the direct substitution and its alias projection must absorb the later mapping.
+        if let Some(earlier_alias) = self.as_specialization(db) {
+            let Some(later_alias) = later.as_specialization(db) else {
+                return false;
+            };
+            if !Self::specialization(earlier_alias).absorbs_bindings(
+                db,
+                &Self::specialization(later_alias),
+                visitor,
+            ) {
+                return false;
             }
         }
+        self.absorbs_bindings(db, later, visitor)
     }
-}
 
-impl<'db> ApplySpecialization<'_, 'db> {
-    fn materializes_alias_arguments(self, db: &'db dyn Db) -> bool {
+    fn materializes_alias_arguments(&self, db: &'db dyn Db) -> bool {
         // Stored materialization also acts on existing alias arguments, beyond substitutions.
         match self {
             Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
@@ -468,7 +321,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
         }
     }
 
-    fn variables(self, db: &'db dyn Db) -> Vec<BoundTypeVarInstance<'db>> {
+    fn variables(&self, db: &'db dyn Db) -> Vec<BoundTypeVarInstance<'db>> {
         match self {
             Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
                 specialization.generic_context(db).variables(db).collect()
@@ -477,7 +330,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
                 generic_context, ..
             } => generic_context.variables(db).collect(),
             Self::ReturnCallables(replacements) => replacements.keys().copied().collect(),
-            Self::Single(variable, _) => vec![variable],
+            Self::Single(variable, _) => vec![*variable],
             Self::WithBindings {
                 specialization,
                 bindings,
@@ -490,9 +343,9 @@ impl<'db> ApplySpecialization<'_, 'db> {
     }
 
     fn absorbs_bindings(
-        self,
+        &self,
         db: &'db dyn Db,
-        later: ApplySpecialization<'_, 'db>,
+        later: &ApplySpecialization<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
         if !later
@@ -502,7 +355,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
         {
             return false;
         }
-        let mapping = TypeMapping::ApplySpecialization(later);
+        let mapping = TypeMapping::ApplySpecialization(later.clone());
         // The earlier replacements must be unchanged by the later substitution.
         // In particular, T -> list[T] is not idempotent.
         self.variables(db)

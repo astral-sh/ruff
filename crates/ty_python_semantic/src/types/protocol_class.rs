@@ -387,10 +387,10 @@ impl<'db> ProtocolClass<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1007,10 +1007,10 @@ impl<'db> ProtocolInterface<'db> {
         ))
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1195,10 +1195,10 @@ impl<'db> ProtocolMemberWrite<'db> {
         })
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1290,10 +1290,10 @@ impl<'db> ProtocolAnnotation<'db> {
         Some(Self { ty, ..self })
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1448,10 +1448,10 @@ impl<'db> ProtocolPropertyType<'db> {
         Some(self.with_ty(ty))
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -1816,10 +1816,10 @@ impl<'db> ProtocolMemberData<'db> {
         })
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         &self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -2005,10 +2005,10 @@ impl<'db> ProtocolMemberKind<'db> {
         })
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {

@@ -125,10 +125,10 @@ impl<'db> TypedDictOpenness<'db> {
         matches!(self, Self::Closed)
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -607,10 +607,10 @@ impl<'db> TypedDictType<'db> {
         VarianceTerm::join(db, variances)
     }
 
-    pub(crate) fn apply_type_mapping_impl<'a>(
+    pub(crate) fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -3145,10 +3145,10 @@ impl<'db> SynthesizedTypedDictType<'db> {
         )
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
@@ -3264,10 +3264,10 @@ impl<'db> TypedDictField<'db> {
             .build()
     }
 
-    fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
+        type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
