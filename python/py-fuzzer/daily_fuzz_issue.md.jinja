@@ -6,7 +6,12 @@ Test executable: {{ executable }} at commit `{{ executable_revision }}`.
 {% else %}
 {{ failure_description }}
 
-Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run `{{ reproduction_command }}`.
+Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run:
+
+```
+{{ reproduction_command }}
+```
+
 {% for reproducer in reproducers %}
 {% if reproducer.bug.minimization_succeeded %}
 
