@@ -22,6 +22,9 @@ impl<'db> TypeMapping<'_, 'db> {
         mapped: Type<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if original == mapped {
+            return original;
+        }
         if matches!(self, Self::Promote(_, PromotionKind::SingletonsOnly))
             && visitor
                 .materialization_equivalence()
@@ -128,6 +131,21 @@ impl<'db> MappingStep<'db> {
                 )
             )
     }
+
+    /// Whether this step preserves a fixed point of `other`.
+    /// Singleton widening only introduces Unknown, so P(S(P(T))) = S(P(T)) for regular promotion P.
+    fn preserves_fixed_points_of(&self, other: &Self) -> bool {
+        self.commutes_with(other)
+            || self.context == other.context
+                && self.materialize_bounds == other.materialize_bounds
+                && matches!(
+                    (&self.operation, &other.operation),
+                    (
+                        MappingOperation::Promote(_, PromotionKind::SingletonsOnly),
+                        MappingOperation::Promote(_, PromotionKind::Regular)
+                    )
+                )
+    }
 }
 
 impl get_size2::GetSize for DeferredTypeMapping<'_> {}
@@ -201,7 +219,7 @@ impl<'db> DeferredTypeMapping<'db> {
             if earlier.absorbs(db, &step, visitor) {
                 return previous;
             }
-            if !earlier.commutes_with(&step) {
+            if !earlier.preserves_fixed_points_of(&step) {
                 break;
             }
             cursor = node.previous(db);
