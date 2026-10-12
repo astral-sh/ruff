@@ -566,6 +566,39 @@ b: Litera
     Ok(())
 }
 
+/// Completions in an empty trailing cell must not panic when the requested position lies past
+/// the end of the cell (for example, when the client sends a position from before the user
+/// deleted the cell's only character).
+///
+/// Regression test for <https://github.com/astral-sh/ty/issues/4687>.
+#[test]
+fn completion_past_end_of_empty_last_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("x = 1\n");
+    let empty_cell = builder.add_python_cell("");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [
+        Position::new(0, 0),
+        Position::new(0, 1),
+        Position::new(1, 0),
+    ] {
+        let completions = server.completion_request(&empty_cell, position);
+        assert!(
+            completions.iter().any(|item| item.label == "x"),
+            "expected `x` in completions at {position:?}"
+        );
+    }
+
+    Ok(())
+}
+
 #[test]
 fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
