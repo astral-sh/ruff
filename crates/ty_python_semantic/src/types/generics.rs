@@ -13,7 +13,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
-use crate::types::constraints::resolution::{Dependencies, SolutionType, resolve_solution};
+use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
@@ -2243,99 +2243,6 @@ pub enum ApplySpecialization<'db> {
 }
 
 impl<'db> ApplySpecialization<'db> {
-    /// Whether applying `later` after this specialization leaves its result unchanged.
-    pub(super) fn absorbs(
-        &self,
-        db: &'db dyn Db,
-        later: &Self,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> bool {
-        if self.specialize_self_domain()
-            || later.specialize_self_domain()
-            || self.preserves_lazy_signatures()
-            || self.materializes_alias_arguments(db)
-            || later.materializes_alias_arguments(db)
-        {
-            return false;
-        }
-        // Partial substitutions preserve their skipped variable in alias arguments.
-        // Both the direct substitution and its alias projection must absorb the later mapping.
-        if let Some(earlier_alias) = self.as_specialization(db) {
-            let Some(later_alias) = later.as_specialization(db) else {
-                return false;
-            };
-            if !Self::specialization(earlier_alias).absorbs_bindings(
-                db,
-                &Self::specialization(later_alias),
-                visitor,
-            ) {
-                return false;
-            }
-        }
-        self.absorbs_bindings(db, later, visitor)
-    }
-
-    /// Whether stored materialization also acts on existing alias arguments, beyond substitutions.
-    pub(super) fn materializes_alias_arguments(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
-                specialization.materialization_kind(db).is_some()
-            }
-            Self::WithBindings { specialization, .. } => {
-                specialization.materializes_alias_arguments(db)
-            }
-            Self::Partial { .. } | Self::ReturnCallables(_) | Self::Single(..) => false,
-        }
-    }
-
-    fn variables(&self, db: &'db dyn Db) -> Vec<BoundTypeVarInstance<'db>> {
-        match self {
-            Self::Specialization { specialization, .. } | Self::TypeAlias(specialization) => {
-                specialization.generic_context(db).variables(db).collect()
-            }
-            Self::Partial {
-                generic_context, ..
-            } => generic_context.variables(db).collect(),
-            Self::ReturnCallables(replacements) => replacements.keys().copied().collect(),
-            Self::Single(variable, _) => vec![*variable],
-            Self::WithBindings {
-                specialization,
-                bindings,
-            } => {
-                let mut variables = specialization.variables(db);
-                variables.extend(bindings.iter().map(|(variable, _)| *variable));
-                variables
-            }
-        }
-    }
-
-    fn absorbs_bindings(
-        &self,
-        db: &'db dyn Db,
-        later: &ApplySpecialization<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> bool {
-        if !later
-            .variables(db)
-            .into_iter()
-            .all(|variable| later.get(db, variable).is_none() || self.get(db, variable).is_some())
-        {
-            return false;
-        }
-        let mapping = TypeMapping::ApplySpecialization(later.clone());
-        // The earlier replacements must be unchanged by the later substitution.
-        // In particular, T -> list[T] is not idempotent.
-        self.variables(db)
-            .into_iter()
-            .filter_map(|variable| self.get(db, variable))
-            .all(|ty| {
-                Dependencies::check(db, visitor.env, ty, |variable| {
-                    let ty = Type::TypeVar(variable);
-                    ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor) == ty
-                })
-            })
-    }
-
     pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
         Self::Specialization {
             specialization,

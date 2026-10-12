@@ -139,7 +139,7 @@ pub(in crate::types) struct Dependencies<'a, 'db> {
 }
 
 impl<'db> Dependencies<'_, 'db> {
-    pub(in crate::types) fn check(
+    fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,

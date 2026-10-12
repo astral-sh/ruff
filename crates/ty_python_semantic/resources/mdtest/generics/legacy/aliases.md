@@ -8,7 +8,7 @@ specializations, even when the type arguments keep growing.
 ```py
 from typing import Any, TypeVar
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to, is_subtype_of
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -26,4 +26,15 @@ def collect(value: Late[int, int]):
     widened = [value][0]
     # revealed: tuple[tuple[int, None | Unknown], None | Unknown]
     reveal_type(widened[1][1][1][1][0])
+
+Materialized = tuple[A, "Top[Materialized[list[A]]] | None"]
+
+def collect_materialized(value: Materialized[TypeOf[1]], flag: bool):
+    widened = [value][0]
+    while flag:
+        widened = [widened][0]
+    reveal_type(widened[0])  # revealed: int
+    next = widened[1]
+    if next is not None:
+        reveal_type(next[0])  # revealed: list[Literal[1]]
 ```

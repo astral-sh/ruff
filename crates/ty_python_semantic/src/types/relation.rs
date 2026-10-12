@@ -13,7 +13,6 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::recursive::DeferredTypeMapping;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
@@ -1035,16 +1034,6 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
     }
 }
 
-impl<'db> Type<'db> {
-    fn alias_mappings(self, db: &'db dyn Db) -> Option<DeferredTypeMapping<'db>> {
-        match self {
-            Type::Recursive(alias) => alias.mappings(db),
-            Type::TypeAlias(alias) => alias.mappings(db),
-            _ => None,
-        }
-    }
-}
-
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
@@ -1619,9 +1608,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if self.can_close_alias_cycle(db, source, target) {
-            return self.always();
-        }
         if let Some(nominally_satisfied) = self.try_check_nominal_protocol_cycle(db, source, target)
         {
             return nominally_satisfied;
@@ -1635,75 +1621,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // The correct choice here is a logical value that is "neither true nor false", and expressing this requires the introduction of 3-valued logic.
         // Discussion: https://github.com/astral-sh/ty/issues/4050
         self.never()
-    }
-
-    /// A repeated constructor/mapping pair has already had its bodies compared. Its growing
-    /// arguments must still agree wherever the constructor can eventually expose them.
-    fn can_close_alias_cycle(&self, db: &'db dyn Db, source: Type<'db>, target: Type<'db>) -> bool {
-        let (source_arguments, target_arguments, constructor) = match (source, target) {
-            (Type::Recursive(source), Type::Recursive(target))
-                if source.with_mappings(db, None).constructor(db)
-                    == target.with_mappings(db, None).constructor(db) =>
-            {
-                (
-                    source.arguments(db),
-                    target.arguments(db),
-                    Type::Recursive(source.with_mappings(db, None).constructor(db)),
-                )
-            }
-            (Type::TypeAlias(source), Type::TypeAlias(target))
-                if source.unspecialized(db) == target.unspecialized(db) =>
-            {
-                (
-                    source.specialization(db),
-                    target.specialization(db),
-                    Type::TypeAlias(source.unspecialized(db)),
-                )
-            }
-            _ => return false,
-        };
-        let (Some(source_arguments), Some(target_arguments)) = (source_arguments, target_arguments)
-        else {
-            return false;
-        };
-        if source_arguments.generic_context(db) != target_arguments.generic_context(db)
-            || source_arguments.materialization_kind(db).is_some()
-            || target_arguments.materialization_kind(db).is_some()
-            || source_arguments.tuple(db).is_some()
-            || target_arguments.tuple(db).is_some()
-        {
-            return false;
-        }
-        source_arguments
-            .generic_context(db)
-            .variables(db)
-            .zip(
-                source_arguments
-                    .types(db)
-                    .iter()
-                    .zip(target_arguments.types(db)),
-            )
-            .all(|(parameter, (left, right))| {
-                if !constructor.exposes_parameter(db, parameter.identity(db)) {
-                    return true;
-                }
-                let left = source
-                    .alias_mappings(db)
-                    .map_or(Some([*left; 2]), |mapping| {
-                        mapping.argument_images(db, *left, self.materialization_visitor)
-                    });
-                let right = target
-                    .alias_mappings(db)
-                    .map_or(Some([*right; 2]), |mapping| {
-                        mapping.argument_images(db, *right, self.materialization_visitor)
-                    });
-                // Equality alone is insufficient for gradual subtyping: Any is not a subtype of Any.
-                left.is_some_and(|images| {
-                    images
-                        .into_iter()
-                        .all(|image| self.relation.can_safely_assume_reflexivity(image))
-                }) && left == right
-            })
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?

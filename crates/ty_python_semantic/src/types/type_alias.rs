@@ -732,14 +732,17 @@ impl<'db> TypeAliasType<'db> {
             }
             _ => {
                 if self.is_recursive(db) {
-                    return DeferredTypeMapping::append(
+                    return Type::TypeAlias(self.with_mappings(
                         db,
-                        self.mappings(db),
-                        type_mapping,
-                        tcx,
-                        visitor,
-                        |mappings| Type::TypeAlias(self.with_mappings(db, mappings)),
-                    );
+                        DeferredTypeMapping::append(
+                            db,
+                            ty,
+                            self.mappings(db),
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
+                    ));
                 }
                 // Expansion can revisit this alias through another recursive type, so retain
                 // the ordinary transformation guard for aliases that are not themselves recursive.

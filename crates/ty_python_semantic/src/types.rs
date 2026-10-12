@@ -54,6 +54,7 @@ pub(crate) use self::match_pattern::{
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
+use self::recursive::MappingProbeContext;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
@@ -115,8 +116,7 @@ use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
-    DynamicContent, DynamicContentMode, any_over_type, any_over_type_including_alias_arguments,
-    dynamic_content, dynamic_content_impl,
+    any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
@@ -516,6 +516,7 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    mapping_probe: Option<MappingProbeContext<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -533,6 +534,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            mapping_probe: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -599,13 +601,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         if left == right {
             return true;
         }
-        // Comparing a growing argument to its materialization can recursively materialize the
-        // next argument before reaching the relation guard. Retain uncertain materializations.
-        match dynamic_content_impl(db, self.env, left, DynamicContentMode::Materialization) {
-            DynamicContent::Absent => return true,
-            DynamicContent::Indeterminate => return false,
-            DynamicContent::Present => {}
-        }
         self.materialization_equivalence()
             .visit(db, (left, right), || {
                 left.is_equivalent_to_with_materialization_visitor(db, right, self)
@@ -621,6 +616,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            mapping_probe: self.mapping_probe,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9465,6 +9461,12 @@ impl<'db> Type<'db> {
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
+        }
+
+        if let Some(probe) = visitor.mapping_probe
+            && let Some(mapped) = probe.map_type(db, self, type_mapping, tcx, visitor)
+        {
+            return mapped;
         }
 
         // Aliases are transparent to singleton promotion. Their exposed body still determines
