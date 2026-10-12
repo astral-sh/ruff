@@ -1,7 +1,8 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use compact_str::CompactString;
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion};
+use ruff_text_size::Ranged;
 
 use super::TypeInferenceBuilder;
 use crate::types::call::CallArguments;
@@ -12,6 +13,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::function::OverloadLiteral;
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::set_theoretic::nominal_union::{NominalUnionBuilder, NominalUnionMember};
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
@@ -23,6 +25,12 @@ use crate::types::{
 enum BinaryExpressionOperandTypes<'db> {
     Inferred(Type<'db>, Type<'db>),
     TypedDictResult(Type<'db>),
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum UnionExpressionContext<'db> {
+    Value(TypeContext<'db>),
+    Annotation { check_runtime: bool },
 }
 
 type BinaryExpressionVisitor<'db> =
@@ -161,6 +169,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         binary: &ast::ExprBinOp,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if let Some(ty) =
+            self.try_infer_nominal_union_chain(binary, UnionExpressionContext::Value(tcx))
+        {
+            return ty;
+        }
         if tcx.is_typealias() {
             return self.infer_pep_604_union_type_alias(binary, tcx);
         }
@@ -187,6 +200,153 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
             Type::unknown()
         })
+    }
+
+    /// Infer an ordinary class union while retaining each intermediate expression's type.
+    ///
+    /// Fall back without committing speculative results if an operand needs general union
+    /// construction or runtime-operator validation.
+    pub(super) fn try_infer_nominal_union_chain(
+        &mut self,
+        binary: &ast::ExprBinOp,
+        context: UnionExpressionContext<'db>,
+    ) -> Option<Type<'db>> {
+        if binary.op != ast::Operator::BitOr
+            || !matches!(binary.left.as_ref(), ast::Expr::BinOp(left) if left.op == ast::Operator::BitOr)
+            || self
+                .union_chain_fallback
+                .is_some_and(|range| binary.range().contains_range(range))
+        {
+            return None;
+        }
+        let mut binaries = vec![binary];
+        let mut first = binary.left.as_ref();
+        while let ast::Expr::BinOp(binary) = first
+            && binary.op == ast::Operator::BitOr
+        {
+            binaries.push(binary);
+            first = &binary.left;
+        }
+        // Small unions do not benefit from constructing ancestry indexes.
+        if binaries.len() < 3 {
+            return None;
+        }
+        if !matches!(first, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+            self.union_chain_fallback = binaries.last().map(Ranged::range);
+            return None;
+        }
+        if let Some(binary) = binaries.iter().rev().find(|binary| {
+            !matches!(
+                binary.right.as_ref(),
+                ast::Expr::Name(_) | ast::Expr::Attribute(_)
+            )
+        }) {
+            self.union_chain_fallback = Some(binary.range());
+            return None;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+        let mut inference = self.speculate();
+        let mut infer_member = |expression: &ast::Expr| {
+            let (value_ty, instance_ty) = if let UnionExpressionContext::Value(tcx) = context {
+                let operand_tcx = if tcx.is_typealias() {
+                    tcx
+                } else {
+                    TypeContext::default()
+                };
+                let value_ty = inference.infer_expression(expression, operand_tcx);
+                if !matches!(value_ty, Type::ClassLiteral(_)) {
+                    return None;
+                }
+                let instance_ty = value_ty
+                    .in_type_expression_impl(
+                        db,
+                        inference.scope(),
+                        inference.typevar_binding_context,
+                        inference.inference_flags(),
+                    )
+                    .ok()?;
+                (value_ty, instance_ty)
+            } else {
+                let instance_ty = inference.infer_type_expression(expression);
+                if matches!(
+                    context,
+                    UnionExpressionContext::Annotation {
+                        check_runtime: true
+                    }
+                ) {
+                    if env.python_version(db) < PythonVersion::PY310 {
+                        return None;
+                    }
+                    let value_ty = inference
+                        .speculate_without_diagnostics()
+                        .infer_expression(expression, TypeContext::default());
+                    let Type::ClassLiteral(class) = value_ty else {
+                        return None;
+                    };
+                    if class
+                        .inferred_metaclass(db)
+                        .for_inheritance(db, env)
+                        .to_class_type(db)
+                        .and_then(|metaclass| metaclass.known(db))
+                        != Some(KnownClass::Type)
+                    {
+                        return None;
+                    }
+                }
+                (instance_ty, instance_ty)
+            };
+            Some((value_ty, NominalUnionMember::new(db, env, instance_ty)?))
+        };
+
+        let Some((mut left, member)) = infer_member(first) else {
+            self.union_chain_fallback = binaries.last().map(Ranged::range);
+            return None;
+        };
+        let mut builder = NominalUnionBuilder::new();
+        builder.add(db, member);
+        let mut members = Vec::with_capacity(binaries.len());
+        for binary in binaries.iter().rev() {
+            let Some(member) = infer_member(&binary.right) else {
+                self.union_chain_fallback = Some(binary.range());
+                return None;
+            };
+            members.push(member);
+        }
+
+        for (index, (right, member)) in members.into_iter().enumerate() {
+            let union = builder.add(db, member);
+            left = if matches!(context, UnionExpressionContext::Value(_)) {
+                if left == right {
+                    left
+                } else {
+                    UnionTypeInstance::from_normalized_value_expression_types(
+                        db,
+                        [left, right],
+                        union,
+                    )
+                }
+            } else {
+                union
+            };
+            // The caller records the root. The left operand of its parent is this binary
+            // expression, giving us an Expr reference for every other prefix.
+            if index + 1 < binaries.len() {
+                let expression = binaries[binaries.len() - index - 2].left.as_ref();
+                left = match context {
+                    UnionExpressionContext::Value(tcx) => {
+                        inference.finish_expression_type(expression, left, tcx)
+                    }
+                    UnionExpressionContext::Annotation { .. } => {
+                        inference.store_expression_type(expression, left);
+                        left
+                    }
+                };
+            }
+        }
+        self.extend(inference);
+        Some(left)
     }
 
     fn infer_pep_604_union_type_alias(

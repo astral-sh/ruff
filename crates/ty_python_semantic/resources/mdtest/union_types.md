@@ -94,6 +94,30 @@ def _(
     reveal_type(u4)  # revealed: str | bytes
 ```
 
+## Nominal union prefixes
+
+Adding a superclass removes redundant subclasses while preserving the order of the remaining
+members. Repeating a member does not change the union, including after earlier replacements.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+class D(A): ...
+class E(A, B): ...
+class F(D): ...
+
+Alias = F | C | E | D | B | A | F | E
+OptionalAlias = F | C | E | D | B | A | F | E | None
+
+def check(value: Alias, direct: F | C | E | D | B | A | F | E):
+    reveal_type(value)  # revealed: A | C | B
+    reveal_type(direct)  # revealed: A | C | B
+
+def check_optional(value: OptionalAlias):
+    reveal_type(value)  # revealed: A | C | B | None
+```
+
 ## Boolean literals
 
 The union `Literal[True] | Literal[False]` is exactly equivalent to `bool`:

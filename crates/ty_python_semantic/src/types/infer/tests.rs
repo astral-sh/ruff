@@ -1359,32 +1359,48 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test]
-fn pep604_union_prefix_updates_after_base_and_cycle_changes() -> anyhow::Result<()> {
+#[test_case::test_case(0)]
+#[test_case::test_case(40)]
+fn pep604_union_prefix_updates_after_base_and_cycle_changes(extra: usize) -> anyhow::Result<()> {
     let mut db = setup_db();
-    let base = "\
+    let mut base = "\
 class Parent: ...
 class Peer: ...
 class Child(Parent): ...
 class Extra: ...
 class Last: ...
-";
+"
+    .to_string();
+    let mut imports = String::new();
+    let mut suffix = String::new();
+    for index in 0..extra {
+        writeln!(base, "class Other{index}: ...")?;
+        write!(imports, ", Other{index}")?;
+        write!(suffix, " | Other{index}")?;
+    }
     let peer_base = base.replace("Child(Parent)", "Child(Peer)");
     let unrelated = base.replace("Child(Parent)", "Child(object)");
     let cyclic = base.replace("class Parent:", "class Parent(Child):");
-    let main = "\
-from base import Child, Peer, Extra, Parent, Last
-Alias = Child | Peer | Extra | Parent | Last
+    let main = format!(
+        "\
+from base import Child, Peer, Extra, Parent, Last{imports}
+Alias = Child | Peer | Extra | Parent | Last{suffix}
 value: Alias
-";
+"
+    );
     let observe = |db: &TestDb| -> anyhow::Result<_> {
         let base = system_path_to_file(db, "/src/base.pyi")?;
         let main = system_path_to_file(db, "/src/main.py")?;
-        let ty = global_symbol(db, main, "value")
-            .place
-            .expect_type()
-            .display(db, &db.program_environment())
-            .to_string();
+        let ty = global_symbol(db, main, "value").place.expect_type();
+        let members = match ty {
+            Type::Union(union) => union.elements(db),
+            _ => std::slice::from_ref(&ty),
+        };
+        let ty = members
+            .iter()
+            .map(|ty| ty.display(db, &db.program_environment()).to_string())
+            .collect::<Vec<_>>()
+            .join(" | ");
         let diagnostics = [base, main].map(|file| {
             check_types(db, program_file(db, file))
                 .iter()
@@ -1414,27 +1430,27 @@ value: Alias
         Ok((ty, diagnostics))
     };
 
-    db.write_files([("/src/main.py", main)])?;
+    db.write_files([("/src/main.py", main.as_str())])?;
 
     for (source, expected) in [
-        (base, Some("Parent | Peer | Extra | Last")),
+        (base.as_str(), Some("Parent | Peer | Extra | Last")),
         (peer_base.as_str(), Some("Peer | Extra | Parent | Last")),
         (
             unrelated.as_str(),
             Some("Child | Peer | Extra | Parent | Last"),
         ),
-        (base, Some("Parent | Peer | Extra | Last")),
+        (base.as_str(), Some("Parent | Peer | Extra | Last")),
         (cyclic.as_str(), None),
-        (base, Some("Parent | Peer | Extra | Last")),
+        (base.as_str(), Some("Parent | Peer | Extra | Last")),
     ] {
         db.write_files([("/src/base.pyi", source)])?;
         let mut fresh = setup_db();
-        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main)])?;
+        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main.as_str())])?;
 
         let observed = observe(&db)?;
         assert_eq!(observed, observe(&fresh)?, "{source}");
         if let Some(expected) = expected {
-            assert_eq!(observed.0, expected, "{source}");
+            assert_eq!(observed.0, format!("{expected}{suffix}"), "{source}");
             assert!(observed.1.iter().all(Vec::is_empty), "{observed:?}");
         } else {
             assert!(observed.1[0].iter().any(|diagnostic| {
@@ -1442,6 +1458,56 @@ value: Alias
             }));
         }
     }
+    Ok(())
+}
+
+#[test]
+fn nominal_union_retains_intermediate_expression_types() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let mut source = String::new();
+    for index in 0..40 {
+        writeln!(source, "class C{index}: ...")?;
+    }
+    let union = (0..40)
+        .map(|index| format!("C{index}"))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    writeln!(source, "Alias = {union}")?;
+    db.write_file("/src/main.py", source)?;
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let definition = first_public_binding(&db, file, "Alias");
+    let module = parsed_module(&db, program_file(&db, file).python_file(&db)).load(&db);
+    let Some(mut expression) = definition.kind(&db).value(&module) else {
+        anyhow::bail!("expected an alias value");
+    };
+    let inference = infer_definition_types(&db, definition);
+    let env = db.program_environment();
+    let expected = (0..40)
+        .map(|index| {
+            let class = global_symbol(&db, file, &format!("C{index}"))
+                .place
+                .expect_type()
+                .expect_class_literal();
+            Type::instance(&db, &env, class.default_specialization(&db))
+        })
+        .collect::<Vec<_>>();
+    let mut count = 40;
+    while let ast::Expr::BinOp(binary) = expression {
+        let Some(Type::KnownInstance(KnownInstanceType::UnionType(union))) =
+            inference.try_expression_type(expression)
+        else {
+            anyhow::bail!("missing union type for prefix of length {count}");
+        };
+        let Ok(Type::Union(ty)) = union.union_type(&db) else {
+            anyhow::bail!("invalid union prefix");
+        };
+        assert_eq!(ty.elements(&db), &expected[..count]);
+        expression = &binary.left;
+        count -= 1;
+    }
+    assert_eq!(count, 1);
     Ok(())
 }
 

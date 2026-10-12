@@ -10,6 +10,7 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use super::binary_expressions::UnionExpressionContext;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
@@ -415,6 +416,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match binary.op {
                     // PEP-604 unions are okay, e.g., `int | str`
                     ast::Operator::BitOr => {
+                        if let Some(ty) = self.try_infer_nominal_union_chain(
+                            binary,
+                            UnionExpressionContext::Annotation {
+                                check_runtime: !ignore_runtime_errors(self),
+                            },
+                        ) {
+                            return ty;
+                        }
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 

@@ -887,6 +887,15 @@ impl<'db> UnionTypeInstance<'db> {
 
         let union_type = builder.build();
 
+        Self::from_normalized_value_expression_types(db, value_expr_types, union_type)
+    }
+
+    /// Retain runtime operands after their union has already been normalized.
+    pub(crate) fn from_normalized_value_expression_types(
+        db: &'db dyn Db,
+        value_expr_types: [Type<'db>; 2],
+        union_type: Type<'db>,
+    ) -> Type<'db> {
         // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
         // instance when its semantic union already contains the new operand, rather than storing
         // an ever-deeper value-expression tree like `((A | B) | B) | B`.

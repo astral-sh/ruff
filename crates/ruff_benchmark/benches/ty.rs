@@ -1368,6 +1368,29 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+/// Measure union construction at several sizes, including interpreting the result as an alias.
+fn benchmark_nominal_union_construction(criterion: &mut Criterion) {
+    for count in [64, 256, 1024] {
+        let mut code = String::new();
+        for index in 0..count {
+            writeln!(code, "class C{index}: ...").ok();
+        }
+        let members = (0..count).map(|index| format!("C{index}")).join(" | ");
+        let classes = code;
+        let code = format!("{classes}Alias = {members}\nvalue: Alias");
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[nominal_union_construction_{count}]"),
+            &code,
+        );
+        benchmark_micro_case(
+            criterion,
+            &format!("ty_micro[object_union_construction_{count}]"),
+            &format!("{classes}Alias = object | {members}\nvalue: Alias"),
+        );
+    }
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -2534,6 +2557,7 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_nominal_union_construction,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,

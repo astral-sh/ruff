@@ -379,6 +379,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
+    /// The smallest prefix of the last `|` chain that required general inference. Ancestors
+    /// skip probing it again, while shorter prefixes can still use nominal construction.
+    union_chain_fallback: Option<TextRange>,
+
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
@@ -510,6 +514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             implicit_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
+            union_chain_fallback: None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
@@ -11942,6 +11947,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             called_functions,
             index: _,
             region: _,
@@ -12009,6 +12015,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             index: _,
             region: _,
         } = self;
@@ -12122,6 +12129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             index: _,
             region: _,
             cycle_recovery: _,
@@ -12179,6 +12187,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -12328,6 +12337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             called_functions: _,
             index: _,
             region: _,
@@ -12381,6 +12391,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index,
             cycle_recovery,
             deferred_state,
+            union_chain_fallback,
             typevar_binding_context,
             ref expression_cache,
             ref reachability_cache,
@@ -12424,6 +12435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Ensure the speculative builder has the same inference context as the current one.
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
+        builder.union_chain_fallback = union_chain_fallback;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
@@ -12477,6 +12489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             reachability_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
+            union_chain_fallback: _,
             called_functions,
             index: _,
             region: _,

@@ -18,14 +18,18 @@ use crate::{Db, FxOrderSet, Program};
 
 pub(crate) mod builder;
 mod generic_gradual_intersections;
+pub(crate) mod nominal_union;
+mod union_elements;
+
+use union_elements::UnionElements;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
-    #[returns(deref)]
-    pub elements: Box<[Type<'db>]>,
+    #[returns(ref)]
+    _elements: UnionElements<'db>,
     /// Whether the value pointed to by this type is recursively defined.
     /// If `Yes`, union literal widening is performed early.
     #[returns(copy)]
@@ -47,6 +51,27 @@ impl get_size2::GetSize for UnionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> UnionType<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        elements: Box<[Type<'db>]>,
+        recursively_defined: RecursivelyDefined,
+    ) -> Self {
+        Self::new_internal(db, UnionElements::new(db, elements), recursively_defined)
+    }
+
+    /// Return the ordered, normalized members, materializing shared prefixes only when needed.
+    pub fn elements(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        match self._elements(db) {
+            UnionElements::Leaf(elements) => elements,
+            UnionElements::Branch { .. } => self.materialized_elements(db),
+        }
+    }
+
+    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    fn materialized_elements(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        self._elements(db).flatten(db)
+    }
+
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     ///
