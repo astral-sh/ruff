@@ -202,7 +202,7 @@ class CustomLenEnum(Enum):
     NO = 0
     YES = 1
 
-    def __len__(self):
+    def __len__(self) -> int:
         return 0
 
 reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]

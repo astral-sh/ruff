@@ -316,7 +316,7 @@ def returns_class():
 Inner1 = returns_class()
 Inner2 = returns_class()
 
-# This should be `bool` or `Literal[False]`, not `Literal[True]`
+# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
 reveal_type(Inner1 is Inner2)  # revealed: bool
 
 # TODO: This should ideally be an error
