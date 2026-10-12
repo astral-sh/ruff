@@ -64,7 +64,7 @@ impl<'db> UnionElements<'db> {
         }
     }
 
-    pub(super) fn len(&self) -> usize {
+    fn len(&self) -> usize {
         match self {
             Self::Leaf(elements) => elements.len(),
             Self::Branch { len, .. } => *len,
