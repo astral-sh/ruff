@@ -7,6 +7,7 @@ from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
 from typing import (
     Any,
+    Concatenate,
     Final,
     Generic,
     Literal,
@@ -45,6 +46,8 @@ _PWrapped = ParamSpec("_PWrapped")
 _RWrapped = TypeVar("_RWrapped")
 _PWrapper = ParamSpec("_PWrapper")
 _RWrapper = TypeVar("_RWrapper")
+_WrapperSelfT = TypeVar("_WrapperSelfT")
+_PBound = ParamSpec("_PBound")
 
 if sys.version_info >= (3, 14):
     @overload
@@ -190,9 +193,16 @@ WRAPPER_UPDATES: Final[tuple[Literal["__dict__"]]]
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
     __wrapped__: Callable[_PWrapped, _RWrapped]
     def __call__(self, *args: _PWrapper.args, **kwargs: _PWrapper.kwargs) -> _RWrapper: ...
-    # as with ``Callable``, we'll assume that these attributes exist
+    # as with ``Callable``, we'll assume that these attributes/methods exist
     __name__: str
     __qualname__: str
+
+    @overload
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
+    @overload
+    def __get__(
+        self: Callable[Concatenate[_WrapperSelfT, _PBound], _RWrapper], instance: _WrapperSelfT, owner: type | None = None, /
+    ) -> Callable[_PBound, _RWrapper]: ...
 
 @type_check_only
 class _Wrapper(Generic[_PWrapped, _RWrapped]):
