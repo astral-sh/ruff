@@ -567,16 +567,17 @@ class GrandChild(Child):
 reveal_type(GrandChild().method())  # revealed: Unknown
 ```
 
-When a subclass method returns an incompatible type compared to its base class annotation, we union
-the inferred return type with the base class annotation:
+The inherited return annotation takes precedence over the inferred body return type. If a subclass
+method returns an incompatible value, we report an error on the `return` statement and retain the
+inherited return type for callers:
 
 ```py
 class IncompatibleChild(Parent):
-    # TODO: This should be an invalid-method-override error.
     def method(self):
+        # TODO: This should be an invalid-return-type error.
         return "a"
 
-# TODO: Should be `int | None | Literal["a"]`
+# TODO: Should be `int | None`
 reveal_type(IncompatibleChild().method())  # revealed: Unknown
 ```
 
