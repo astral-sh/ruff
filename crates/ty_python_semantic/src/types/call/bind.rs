@@ -10387,7 +10387,7 @@ impl<'db> ClassInfoValidator<'_, 'db> {
         let ty =
             match ty {
                 Type::TypeAlias(alias)
-                    if matches!(ty.to_type_identity(db), TypeIdentity::GrowingTypeAlias(_)) =>
+                    if matches!(ty.to_type_identity(db), TypeIdentity::GrowingTypeAlias(..)) =>
                 {
                     Type::TypeAlias(alias.apply_specialization(db, |parameters| {
                         parameters.identity_specialization(db)

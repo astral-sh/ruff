@@ -715,8 +715,8 @@ pub(super) fn contains_growing_type<'db>(
             if is_generic
                 && matches!(
                     ty.to_type_identity(db),
-                    TypeIdentity::GrowingTypeAlias(_)
-                        | TypeIdentity::GrowingRecursive(_)
+                    TypeIdentity::GrowingTypeAlias(..)
+                        | TypeIdentity::GrowingRecursive(..)
                         | TypeIdentity::GrowingProtocol(_)
                         | TypeIdentity::GrowingTypedDict(_)
                 )

@@ -1012,8 +1012,8 @@ pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
 
 impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
     type Id = (
-        (TypeIdentity<'db>, Option<DeferredTypeMapping<'db>>),
-        (TypeIdentity<'db>, Option<DeferredTypeMapping<'db>>),
+        TypeIdentity<'db>,
+        TypeIdentity<'db>,
         TypeRelation,
         TypeVarEvaluation,
     );
@@ -1026,10 +1026,9 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
     }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        // Flipped mappings must each have their bodies checked before a cycle can close.
         (
-            (self.0.to_type_identity(db), self.0.alias_mappings(db)),
-            (self.1.to_type_identity(db), self.1.alias_mappings(db)),
+            self.0.to_type_identity(db),
+            self.1.to_type_identity(db),
             self.2,
             self.3,
         )

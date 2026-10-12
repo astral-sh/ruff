@@ -34,6 +34,7 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::recursive::DeferredTypeMapping;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
@@ -42,14 +43,16 @@ use crate::types::{
 use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
+///
+/// Growing aliases retain their mappings so that each mapped body is visited before a cycle closes.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
     GrowingProtocol(Definition<'db>),
-    GrowingTypeAlias(Definition<'db>),
+    GrowingTypeAlias(Definition<'db>, Option<DeferredTypeMapping<'db>>),
     GrowingTypedDict(Definition<'db>),
-    GrowingRecursive(Definition<'db>),
+    GrowingRecursive(Definition<'db>, Option<DeferredTypeMapping<'db>>),
     Other(Type<'db>),
 }
 
@@ -96,7 +99,7 @@ impl<'db> Type<'db> {
                 Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
             }
             // Recursive aliases, protocols, and TypedDicts whose specialization can keep changing
-            // (e.g. `type Growing[T] = T | Growing[list[T]]`) are collapsed to their definition so
+            // (e.g. `type Growing[T] = T | Growing[list[T]]`) use definition-level identities so
             // that visits stop even though no exact type repeats. Recursion that revisits one
             // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
             // no definition-level identity: the detectors stop on the repeated type itself.
@@ -109,12 +112,19 @@ impl<'db> Type<'db> {
                     return None;
                 }
                 let definition = target.definition(db);
+                let mappings = match self {
+                    Type::TypeAlias(alias) => alias.mappings(db),
+                    Type::Recursive(alias) => alias.mappings(db),
+                    _ => None,
+                };
                 Some(match target {
-                    RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
+                    RecursiveDefinition::TypeAlias(_) => {
+                        TypeIdentity::GrowingTypeAlias(definition, mappings)
+                    }
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
                     RecursiveDefinition::Structural(_) => {
-                        TypeIdentity::GrowingRecursive(definition)
+                        TypeIdentity::GrowingRecursive(definition, mappings)
                     }
                 })
             }
@@ -149,7 +159,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         matches!(
             Type::Recursive(self).recursive_identity(db),
-            Some(TypeIdentity::GrowingRecursive(_))
+            Some(TypeIdentity::GrowingRecursive(..))
         )
     }
 }
@@ -1429,7 +1439,7 @@ type Alternating[X, Y] = tuple[
 
         assert!(matches!(
             Type::TypeAlias(global_type_alias(&db, &env, "Alternating")).recursive_identity(&db),
-            Some(TypeIdentity::GrowingTypeAlias(_))
+            Some(TypeIdentity::GrowingTypeAlias(..))
         ));
     }
 
