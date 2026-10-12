@@ -240,6 +240,16 @@ impl<'db> NominalInstanceType<'db> {
         ))
     }
 
+    /// Whether this is an ordinary non-generic instance of a static class.
+    pub(super) const fn is_plain_non_generic_static(self) -> bool {
+        matches!(
+            self.0,
+            NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(ClassType::NonGeneric(
+                ClassLiteral::Static(_)
+            )))
+        )
+    }
+
     /// Return whether this instance's class inherits from an explicit `Any` base.
     pub(super) const fn inherits_from_explicit_any(self) -> bool {
         match self.0 {
