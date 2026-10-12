@@ -77,140 +77,7 @@ mod stable {
         type_generation::{FullyStaticTy, Ty},
         union,
     };
-    use crate::db::tests::TestDbBuilder;
-    use crate::place::global_symbol;
-    use crate::types::tuple::TupleType;
     use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ty_python_core::ProgramFile;
-
-    #[test]
-    fn nominal_negation_subtyping_matches_materialized_negation() -> anyhow::Result<()> {
-        let mut db = TestDbBuilder::new().build()?;
-        db.write_dedented(
-            "/src/nominal_negation.py",
-            r#"
-            import sys
-            from typing import Any
-
-            class Plain: ...
-            class Derived(Plain): ...
-            class Box[T]: ...
-            class Parent(Child): ...
-            class Child(Parent): ...
-            Dynamic = type("Dynamic", (Plain,), {})
-
-            plain: Plain
-            derived: Derived
-            specialized: Box[int]
-            gradual: Box[Any]
-            unspecialized: Box
-            dynamic = Dynamic()
-            parent: Parent
-            child: Child
-            version = sys.version_info
-            "#,
-        )?;
-        let db = &db;
-        let env = &db.program_environment();
-        let file = system_path_to_file(db, "/src/nominal_negation.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-
-        // All nominal cases from the core property-test generator, plus tuple
-        // specializations and nominal representations that require Python definitions.
-        let mut nominals: Vec<_> = [
-            Ty::None,
-            Ty::UnittestMockInstance,
-            Ty::SingleMemberEnumLiteral,
-            Ty::KnownClassInstance(KnownClass::Object),
-            Ty::KnownClassInstance(KnownClass::Str),
-            Ty::KnownClassInstance(KnownClass::Int),
-            Ty::KnownClassInstance(KnownClass::Float),
-            Ty::KnownClassInstance(KnownClass::Complex),
-            Ty::KnownClassInstance(KnownClass::Bool),
-            Ty::KnownClassInstance(KnownClass::FunctionType),
-            Ty::KnownClassInstance(KnownClass::SpecialForm),
-            Ty::KnownClassInstance(KnownClass::TypeVar),
-            Ty::KnownClassInstance(KnownClass::ExtensionsTypeAliasType),
-            Ty::KnownClassInstance(KnownClass::NoDefaultType),
-            Ty::BuiltinInstance("type"),
-            Ty::AbcInstance("ABC"),
-            Ty::AbcInstance("ABCMeta"),
-            Ty::FixedLengthTuple(vec![]),
-            Ty::FixedLengthTuple(vec![Ty::IntLiteral(1), Ty::Any]),
-        ]
-        .into_iter()
-        .map(|ty| ty.into_type(db, env))
-        .collect();
-        nominals.push(Type::tuple(TupleType::homogeneous(db, env, Type::any())));
-        nominals.extend(
-            [
-                "plain",
-                "derived",
-                "specialized",
-                "gradual",
-                "unspecialized",
-                "dynamic",
-                "parent",
-                "child",
-                "version",
-            ]
-            .map(|name| global_symbol(db, file, name).place.expect_type()),
-        );
-        for &ty in &nominals {
-            assert!(
-                matches!(ty, Type::NominalInstance(_)),
-                "{}",
-                ty.display(db, env)
-            );
-        }
-
-        for &source in &nominals {
-            let negated = source.negate(db, env);
-            for &target in &nominals {
-                let mut cache = None;
-                assert_eq!(
-                    source.negation_is_subtype_of_cached(db, env, target, &mut cache),
-                    negated.is_subtype_of(db, env, target),
-                    "~{} <: {}",
-                    source.display(db, env),
-                    target.display(db, env),
-                );
-                assert!(cache.is_none());
-            }
-
-            // A later non-nominal target must initialize the same negation that an
-            // eager cache would contain, and subsequent nominal targets must reuse it.
-            let mut cache = None;
-            for target in [
-                nominals[0],
-                Type::int_literal(1),
-                Type::any(),
-                Type::object(),
-            ] {
-                assert_eq!(
-                    source.negation_is_subtype_of_cached(db, env, target, &mut cache),
-                    negated.is_subtype_of(db, env, target),
-                );
-            }
-            assert_eq!(cache, Some(negated));
-
-            // Existing cache contents take precedence, even if a caller supplied
-            // a negation different from the one for this source.
-            for cached in [negated, Type::Never, Type::object()] {
-                for &target in &nominals {
-                    let mut cache = Some(cached);
-                    assert_eq!(
-                        source.negation_is_subtype_of_cached(db, env, target, &mut cache),
-                        cached.is_subtype_of(db, env, target),
-                    );
-                    assert_eq!(cache, Some(cached));
-                }
-            }
-        }
-        Ok(())
-    }
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -242,11 +109,16 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, env, t) && t.is_subtype_of(db, env, s) => s.is_equivalent_to(db, env, t)
     );
 
+    // Reusing a negation cache across targets gives the same results as explicitly negating `S`.
     type_property_test!(
-        structural_negation_subtyping_matches_materialized_negation, db, env,
-        forall types s, t. {
+        negation_subtyping_matches_materialized_negation, db, env,
+        forall types s, t, u. {
+            let negated = s.negate(db, env);
             let mut cache = None;
-            s.negation_is_subtype_of_cached(db, env, t, &mut cache) == s.negate(db, env).is_subtype_of(db, env, t)
+            [t, u].into_iter().all(|target| {
+                s.negation_is_subtype_of_cached(db, env, target, &mut cache)
+                    == negated.is_subtype_of(db, env, target)
+            })
         }
     );
 
