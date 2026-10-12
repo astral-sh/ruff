@@ -5023,8 +5023,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             })
     }
 
-    /// Returns the minimum number of positional values supplied by later arguments, including
-    /// the required elements of unpacked tuples. Unknown-length iterables can be empty.
+    /// Returns the minimum number of positional values supplied by the arguments after the
+    /// argument at `argument_index`.
+    ///
+    /// Each positional argument (e.g. `x` in `f(*args, x)`) supplies one value, and each unpacked
+    /// argument supplies at least its minimum length (e.g. one value for `*(x,)` in
+    /// `f(*args, *(x,))`, but none for `*more` in `f(*args, *more)` if `more` is a list).
+    ///
+    /// Unlike [`Self::has_later_positional_input`], which only asks whether later arguments could
+    /// shift positional slots, this counts the values that later arguments are guaranteed to
+    /// supply, so that an earlier variable-length argument can leave room for them.
     fn later_minimum_positional_count(
         &self,
         db: &'db dyn Db,
@@ -5045,7 +5053,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     }
 
     /// Returns the number of positional parameters, starting at `next_positional`, that can still
-    /// be filled positionally before reaching one that has an explicit keyword argument.
+    /// be filled positionally. This stops at the first parameter that has an explicit keyword
+    /// argument, or that cannot be filled positionally (a keyword-only or variadic parameter).
     fn available_positional_parameter_count(&self) -> usize {
         (self.next_positional..self.parameters.len())
             .take_while(|index| {
@@ -5206,9 +5215,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         let reserved_positional_parameters = if !has_variadic_parameter {
             self.later_minimum_positional_count(db, env, argument_index)
         } else {
-            // With a variadic parameter, later arguments can also fill that parameter. We still
-            // match the unpacked iterable greedily in this ambiguous case; see the TODO mdtest
-            // for `v(*args, 1.0)` in `call/function.md`.
+            // With a variadic parameter, later arguments could fill it instead, as in
+            // `log(*parts, x)` for `def log(fmt: str, *args: object)`. We still match the unpacked
+            // iterable greedily in this ambiguous case. This can produce false positives when
+            // a later argument should fill a named parameter; see the TODO mdtest for
+            // `v(*args, 1.0)` in `call/function.md`.
             0
         };
         // Correlations between tuple-union lengths and element types are only safe to

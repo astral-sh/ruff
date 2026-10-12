@@ -1205,8 +1205,9 @@ def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
 
 # Later positional arguments must not be allowed to "slide left" when a longer
 # union member would still bind an incompatible tuple element. We currently
-# handle this conservatively, so this still reports the broader iterator-based
-# family of errors.
+# handle this conservatively by unpacking `x` as an iterable of `int | str`,
+# so both `a` and `b` are reported, even though only `b` can actually receive
+# a `str`.
 def f24(a: int, b: int, c: int = 0) -> None: ...
 def f25(x: tuple[int] | tuple[int, str]) -> None:
     # error: [invalid-argument-type]
@@ -1282,7 +1283,8 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-However, other arguments that follow a variable-length variadic are still handled conservatively:
+When later variable-length or keyword variadics supply no guaranteed positional values, we still
+assume that the first variadic fills every remaining parameter:
 
 ```py
 # Multiple variable-length variadics are ambiguous
@@ -1308,9 +1310,9 @@ def _(args: list[str]) -> None:
 
 ### Variable-length unpacking with later positional arguments
 
-When a variable-length iterable is unpacked and followed by explicit positional arguments, the
-variadic unpacking should leave room for those arguments, since the iterable might be short enough
-for them to fit. This also includes the required elements of later unpacked tuples. Callables with
+When a variable-length iterable is unpacked and followed by explicit positional arguments, we leave
+room for those arguments in the remaining parameters, since the iterable might be short enough for
+them to fit. This also includes the required elements of later unpacked tuples. Callables with
 variadic parameters are still handled conservatively, as illustrated below.
 
 Regression test for <https://github.com/astral-sh/ty/issues/3649>.
@@ -1359,9 +1361,14 @@ def _(args: list[str]) -> None:
 def g(a: str, b: str, c: float, d: int) -> None: ...
 def _(args: list[str]) -> None:
     g(*args, 1.0, d=1)  # no diagnostic
+
+# A later keyword variadic doesn't prevent leaving room for later positional arguments.
+def _(args: list[str], kwargs: dict[str, int]) -> None:
+    f(*args, 1.0, **kwargs)  # no diagnostic
 ```
 
-Later unpacked tuples also reserve room for their required elements:
+Later unpacked arguments reserve room based on their minimum number of elements. An unpacked
+argument that might be empty does not require any room:
 
 ```py
 def _(args: list[str]) -> None:
@@ -1371,6 +1378,12 @@ def _(args: list[str]) -> None:
 
 def _(args: list[str], tail: tuple[str, str, float]) -> None:
     f(*args, *tail)  # no diagnostic
+
+def _(args: list[str], more: tuple[float, *tuple[float, ...]]) -> None:
+    f(*args, *more)  # no diagnostic
+
+def _(args: list[str], more: list[float]) -> None:
+    f(*args, *more, 1.0)  # no diagnostic
 
 def _(args: list[str]) -> None:
     # error: [invalid-argument-type] "Expected `float`, found `Literal["c"]`"
@@ -1413,9 +1426,18 @@ def _(args: tuple[str, *tuple[str, ...], bytes, bytes]) -> None:
 
 ### Variable-length unpacking with later positional arguments and variadic parameters
 
-When the callable has a variadic parameter, we still assume the unpacked iterable fills all named
-positional parameters, then send later arguments to the variadic parameter. This can produce false
-positives when a shorter iterable would let the later arguments fill named parameters instead.
+When the callable has a variadic parameter, later positional arguments could fill that parameter
+instead, so we cannot tell which parameters they fill. We assume the unpacked iterable fills all
+named positional parameters, then send later arguments to the variadic parameter:
+
+```py
+def log(fmt: str, *args: object) -> None: ...
+def _(parts: list[str]) -> None:
+    log(*parts, 1)  # no diagnostic
+```
+
+This can produce false positives when a shorter iterable would let the later arguments fill named
+parameters instead:
 
 ```py
 def v(a: str, b: str, c: float, *rest: str) -> None: ...
@@ -1424,6 +1446,20 @@ def _(args: list[str]) -> None:
     # error: [invalid-argument-type] "Expected `float`, found `str`"
     # error: [invalid-argument-type] "Expected `str`, found `float"
     v(*args, 1.0)
+```
+
+### Positional argument between variable-length unpacks
+
+Reserving room for known arguments does not determine how unknown-length unpacks divide the
+remaining parameters. We still match the first unpack greedily, so the middle-argument example in
+<https://github.com/astral-sh/ty/issues/3649> remains a false positive:
+
+```py
+def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
+def _(before, text: str, after) -> None:
+    # TODO: Accept this call when `before` and `after` each supply two integers.
+    # error: [invalid-argument-type] "Expected `int`, found `str`"
+    f(*before, text, *after)
 ```
 
 ### Keyword argument, positional-or-keyword parameter
