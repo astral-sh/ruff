@@ -2002,20 +2002,24 @@ def _(args: tuple[int, ...]):
     reveal_type(f(*args, flag=""))  # revealed: Unknown
 ```
 
-### Variable-length arguments with fixed suffixes and later positional arguments
+### Required tuple elements before a later positional argument
 
-A required tuple suffix participates in overload selection even when space is reserved for a later
-positional argument. The variable segment can be empty, but the suffix cannot be omitted.
+The tuple's required final `bytes` element selects the second overload. Its variable-length part
+must be empty to leave room for `1.0`:
 
-```py
+`overloaded.pyi`:
+
+```pyi
 from typing import overload
 
 @overload
 def f(a: str, b: float) -> str: ...
 @overload
 def f(a: bytes, b: float) -> bytes: ...
-def f(a: str | bytes, b: float) -> str | bytes:
-    return a
+```
+
+```py
+from overloaded import f
 
 def _(args: tuple[*tuple[str, ...], bytes]) -> None:
     reveal_type(f(*args, 1.0))  # revealed: bytes

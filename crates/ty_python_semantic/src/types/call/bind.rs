@@ -5026,13 +5026,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     /// Returns the minimum number of positional values supplied by the arguments after the
     /// argument at `argument_index`.
     ///
-    /// Each positional argument (e.g. `x` in `f(*args, x)`) supplies one value, and each unpacked
-    /// argument supplies at least its minimum length (e.g. one value for `*(x,)` in
-    /// `f(*args, *(x,))`, but none for `*more` in `f(*args, *more)` if `more` is a list).
-    ///
-    /// Unlike [`Self::has_later_positional_input`], which only asks whether later arguments could
-    /// shift positional slots, this counts the values that later arguments are guaranteed to
-    /// supply, so that an earlier variable-length argument can leave room for them.
+    /// In `f(*args, x, *tail)`, this counts one value for `x` plus the minimum length of `tail`.
+    /// Unlike [`Self::has_later_positional_input`], this ignores iterables that might be empty.
     fn later_minimum_positional_count(
         &self,
         db: &'db dyn Db,
@@ -5215,11 +5210,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         let reserved_positional_parameters = if !has_variadic_parameter {
             self.later_minimum_positional_count(db, env, argument_index)
         } else {
-            // With a variadic parameter, later arguments could fill it instead, as in
-            // `log(*parts, x)` for `def log(fmt: str, *args: object)`. We still match the unpacked
-            // iterable greedily in this ambiguous case. This can produce false positives when
-            // a later argument should fill a named parameter; see the TODO mdtest for
-            // `v(*args, 1.0)` in `call/function.md`.
+            // For `def f(a: str, *args: object)`, a later argument could fill `a` or `args`.
+            // Keep matching greedily until we can consider both possibilities.
             0
         };
         // Correlations between tuple-union lengths and element types are only safe to
@@ -5312,7 +5304,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // we run out of `argument_types` and have no `variable_element`. If the callable has no
         // variadic parameter, we also leave room for the minimum number of positional values
         // supplied by later arguments, since the unpacked iterable could be short enough to fit.
-        } else if is_variable {
+        } else {
             let available = self
                 .available_positional_parameter_count()
                 .saturating_sub(reserved_positional_parameters);
@@ -5341,17 +5333,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // argument types to it, but only if there is at least one remaining argument type. This is
         // because a variadic parameter is optional, so if this was done unconditionally, ty could
         // raise a false positive as "too many arguments".
-        if has_variadic_parameter {
-            if let Some(argument_type) = argument_types.next().or(variable_element) {
+        if has_variadic_parameter
+            && let Some(argument_type) = argument_types.next().or(variable_element)
+        {
+            self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+            for argument_type in argument_types {
                 self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
-                for argument_type in argument_types {
-                    self.match_positional(
-                        argument_index,
-                        argument,
-                        Some(argument_type),
-                        is_variable,
-                    )?;
-                }
             }
         }
 
