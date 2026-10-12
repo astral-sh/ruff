@@ -599,6 +599,38 @@ fn completion_past_end_of_empty_last_cell() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// A position past the end of a cell resolves to the end of that cell, not to the start of the
+/// next cell.
+#[test]
+fn hover_past_end_of_cell() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    let empty_cell = builder.add_python_cell("");
+    builder.add_python_cell("x = 1\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(2);
+
+    for position in [Position::new(0, 1), Position::new(1, 0)] {
+        let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+            text_document_position_params: lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: empty_cell.clone(),
+                },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+        });
+        let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+        assert_eq!(hover, None, "expected no hover at {position:?}");
+    }
+
+    Ok(())
+}
+
 #[test]
 fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
