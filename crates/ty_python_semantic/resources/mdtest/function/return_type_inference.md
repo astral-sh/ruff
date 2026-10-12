@@ -450,7 +450,8 @@ def returns_2():
 reveal_type(returns_2())  # revealed: Unknown
 ```
 
-pyright can also handle unannotated decorators, but this might be much harder to support:
+In principle, return type inference can also be used to support unannotated decorators, but this
+might be much harder to support:
 
 ```py
 def identity_3(func):
@@ -462,6 +463,18 @@ def returns_3():
 
 # TODO: should ideally be `Literal[3]`
 reveal_type(returns_3())  # revealed: Unknown
+
+def replace(func):
+    def returns_str():
+        return "a"
+    return returns_str
+
+@replace  # error: [dynamic-function-decorator-return]
+def returns_4_but_will_be_replaced():
+    return 4
+
+# TODO: should ideally be `Literal["a"]`
+reveal_type(returns_4_but_will_be_replaced())  # revealed: Unknown
 ```
 
 ## Methods
