@@ -1210,8 +1210,6 @@ def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
 def f24(a: int, b: int, c: int = 0) -> None: ...
 def f25(x: tuple[int] | tuple[int, str]) -> None:
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [too-many-positional-arguments]
     f24(*x, 1)  # error: [invalid-argument-type]
 ```
 
@@ -1284,16 +1282,10 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-However, when there's no explicit keyword argument, the behavior remains conservative:
+However, other arguments that follow a variable-length variadic are still handled conservatively:
 
 ```py
-# Positional argument after variable-length variadic is ambiguous
-def _(args: list[str]) -> None:
-    # error: [invalid-argument-type]
-    # error: [too-many-positional-arguments]
-    f(*args, 1.0)
-
-# Multiple variable-length variadics are also ambiguous
+# Multiple variable-length variadics are ambiguous
 def _(args1: list[str], args2: list[float]) -> None:
     # error: [invalid-argument-type]
     f(*args1, *args2)
@@ -1312,6 +1304,60 @@ def _(args: list[str]) -> None:
     # error: [invalid-argument-type]
     # error: [parameter-already-assigned]
     f(*args, **CKwargs(c=1.0))
+```
+
+### Variable-length unpacking with later positional arguments
+
+When a variable-length iterable is unpacked and followed by explicit positional arguments, the
+variadic unpacking should leave room for those arguments, since the iterable might be short enough
+for them to fit.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3649>.
+
+```py
+from typing import Any
+
+def f(a: str, b: str, c: float) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, 1.0)
+
+def _(args: tuple[str, ...]) -> None:
+    f(*args, 1.0)
+
+def _(args: Any) -> None:
+    f(*args, 1.0)
+
+def _(args) -> None:
+    f(*args, 1.0)
+
+def _(args: list[str]) -> None:
+    f(*args, "b", 1.0)
+
+def _(args: list[str]) -> None:
+    f("a", *args, 1.0)
+
+# The positional argument is still type-checked against the parameter it fills.
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `float`, found `Literal["c"]`"
+    f(*args, "c")
+
+# The fixed prefix of a variable-length tuple still takes the leading parameters.
+def _(args: tuple[str, *tuple[str, ...]]) -> None:
+    f(*args, 1.0)
+
+def _(args: tuple[str, str, *tuple[str, ...]]) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `f`: expected 3, got 4"
+    f(*args, 1.0, 2.0)
+
+# Too many positional arguments are still reported, even if the iterable is empty.
+def _(args: list[str]) -> None:
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `f`: expected 3, got 4"
+    f(*args, "a", "b", 1.0, 2.0)
+
+# Explicit keyword arguments and later positional arguments can be combined.
+def g(a: str, b: str, c: float, d: int) -> None: ...
+def _(args: list[str]) -> None:
+    g(*args, 1.0, d=1)
 ```
 
 ### Keyword argument, positional-or-keyword parameter

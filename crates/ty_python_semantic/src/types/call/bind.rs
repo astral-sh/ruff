@@ -5023,6 +5023,27 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             })
     }
 
+    /// Returns the number of explicit positional arguments (e.g. `x` in `f(*args, x)`) that
+    /// appear after the argument at `argument_index`.
+    fn later_positional_argument_count(&self, argument_index: usize) -> usize {
+        self.arguments
+            .iter()
+            .skip(argument_index + 1)
+            .filter(|argument| matches!(argument.kind(), Argument::Positional))
+            .count()
+    }
+
+    /// Returns the number of positional parameters, starting at `next_positional`, that can still
+    /// be filled positionally before reaching one that has an explicit keyword argument.
+    fn available_positional_parameter_count(&self) -> usize {
+        (self.next_positional..self.parameters.len())
+            .take_while(|index| {
+                self.parameters.get_positional(*index).is_some()
+                    && !self.explicit_keyword_parameters.contains(index)
+            })
+            .count()
+    }
+
     fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
         if argument_index >= self.num_synthetic_args {
             // Adjust the argument index to skip synthetic args, which don't appear at the call
@@ -5236,19 +5257,16 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // If the tuple is truly variable-length, we assume that it will soak up all remaining
         // positional parameters, stopping only when we reach a parameter that has an explicit
         // keyword argument or a parameter that can only be provided via keyword argument, or if
-        // we run out of `argument_types` and have no `variable_element`.
+        // we run out of `argument_types` and have no `variable_element`. If the callable has no
+        // variadic parameter, we also leave room for any explicit positional arguments that
+        // follow, since the unpacked iterable could be short enough for them to fit.
         } else if is_variable {
-            while self
-                .parameters
-                .get_positional(self.next_positional)
-                .is_some()
-            {
-                if self
-                    .explicit_keyword_parameters
-                    .contains(&self.next_positional)
-                {
-                    break;
-                }
+            let reserved_positional_parameters = if self.parameters.variadic().is_none() {
+                self.later_positional_argument_count(argument_index)
+            } else {
+                0
+            };
+            while self.available_positional_parameter_count() > reserved_positional_parameters {
                 let arg_type = argument_types.next().or(variable_element);
                 if arg_type.is_none() {
                     break;
