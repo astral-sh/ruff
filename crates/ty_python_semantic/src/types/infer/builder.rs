@@ -47,7 +47,7 @@ use crate::place_load::{
     PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
 };
 use crate::reachability::{
-    ReachabilityConstraintsExtension, ReachabilityEvaluationCache, evaluate_reachability_with_cache,
+    ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
 };
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -12455,16 +12455,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         returns = returns.add(returned.ty);
                     }
                 }
-                let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
-                if !use_def
-                    .reachability_constraints()
-                    .evaluate(
-                        db,
-                        use_def.predicates(),
-                        use_def.end_of_scope_reachability(),
-                    )
-                    .is_always_false()
-                {
+                if is_end_of_scope_reachable(db, self.scope()) {
                     returns = returns.add(Type::none(db, env));
                 }
                 returns.build()
