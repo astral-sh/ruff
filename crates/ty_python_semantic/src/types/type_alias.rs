@@ -11,7 +11,7 @@ use crate::{
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
-        mapping::DeferredTypeMapping,
+        recursive::DeferredTypeMapping,
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },

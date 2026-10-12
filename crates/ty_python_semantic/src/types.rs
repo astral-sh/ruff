@@ -77,6 +77,7 @@ use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::resolution::Dependencies;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
     AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
@@ -159,7 +160,6 @@ mod iteration;
 mod known_instance;
 pub mod list_members;
 mod literal;
-mod mapping;
 mod match_pattern;
 mod member;
 mod method;
@@ -11172,6 +11172,65 @@ pub enum TypeMapping<'db> {
 }
 
 impl<'db> TypeMapping<'db> {
+    fn is_idempotent(&self) -> bool {
+        matches!(self, Self::Promote(..) | Self::ReplaceParameterDefaults)
+    }
+
+    /// Remove redundant singleton widening, which adds Unknown without changing variable bindings.
+    fn simplify_mapped_alias(
+        &self,
+        db: &'db dyn Db,
+        original: Type<'db>,
+        mapped: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if matches!(self, Self::Promote(_, PromotionKind::SingletonsOnly))
+            && visitor
+                .materialization_equivalence()
+                .visit(db, (original, mapped), || {
+                    original.is_equivalent_to_with_materialization_visitor(db, mapped, visitor)
+                })
+        {
+            original
+        } else {
+            mapped
+        }
+    }
+
+    /// Whether an alias needs to retain this mapping after simplifying substitutions.
+    fn changes_alias(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        context: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        if let Self::RescopeReturnCallables(replacements) = self
+            && replacements.is_empty()
+        {
+            return false;
+        }
+        if let Self::ApplySpecialization(specialization)
+        | Self::ApplySpecializationWithMaterialization { specialization, .. } = self
+            && !specialization.materializes_alias_arguments(db)
+        {
+            // Substitutions only act on type variables. Checking both polarities also covers
+            // materialization of replacements inside callable parameters.
+            return !Dependencies::check(db, visitor.env, ty, |variable| {
+                let ty = Type::TypeVar(variable);
+                ty.apply_type_mapping_impl(db, self, context, visitor) == ty
+                    && ty.apply_type_mapping_impl(db, &self.flip(), context, visitor) == ty
+            });
+        }
+        match self {
+            Self::Materialize(_) => {
+                !dynamic_content_impl(db, visitor.env, ty, DynamicContentMode::Materialization)
+                    .is_absent()
+            }
+            _ => true,
+        }
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     fn update_signature_generic_context(
         &self,

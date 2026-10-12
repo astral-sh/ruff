@@ -65,15 +65,220 @@ use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
-use super::mapping::DeferredTypeMapping;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind,
+    PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
+
+/// A retained operation and the inference context under which it was requested.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct MappingStep<'db> {
+    operation: TypeMapping<'db>,
+    context: TypeContext<'db>,
+    materialize_bounds: bool,
+}
+
+impl<'db> MappingStep<'db> {
+    fn absorbs(
+        &self,
+        db: &'db dyn Db,
+        later: &Self,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        self.context == later.context
+            && self.materialize_bounds == later.materialize_bounds
+            && (matches!(
+                (&self.operation, &later.operation),
+                (TypeMapping::Materialize(_), TypeMapping::Materialize(_))
+            ) || self.operation == later.operation && self.operation.is_idempotent()
+                || match (&self.operation, &later.operation) {
+                    (
+                        TypeMapping::ApplySpecialization(earlier),
+                        TypeMapping::ApplySpecialization(later),
+                    ) => earlier.absorbs(db, later, visitor),
+                    _ => false,
+                })
+    }
+
+    fn commutes_with(&self, other: &Self) -> bool {
+        // Other promotion kinds can introduce Unknown or dynamic default arguments.
+        self.context == other.context
+            && self.materialize_bounds == other.materialize_bounds
+            && matches!(
+                (&self.operation, &other.operation),
+                (
+                    TypeMapping::Promote(_, PromotionKind::Regular),
+                    TypeMapping::Promote(_, PromotionKind::Regular) | TypeMapping::Materialize(_)
+                ) | (
+                    TypeMapping::Materialize(_),
+                    TypeMapping::Promote(_, PromotionKind::Regular)
+                )
+            )
+    }
+
+    /// Whether this step preserves a fixed point of `other`.
+    /// Singleton widening only introduces Unknown, so P(S(P(T))) = S(P(T)) for regular promotion P.
+    fn preserves_fixed_points_of(&self, other: &Self) -> bool {
+        self.commutes_with(other)
+            || self.context == other.context
+                && self.materialize_bounds == other.materialize_bounds
+                && matches!(
+                    (&self.operation, &other.operation),
+                    (
+                        TypeMapping::Promote(_, PromotionKind::SingletonsOnly),
+                        TypeMapping::Promote(_, PromotionKind::Regular)
+                    )
+                )
+    }
+}
+
+/// An ordered sequence of mappings applied after the alias's own specialization.
+///
+/// Each step acts on a closed, specialized unfolding; recursive references retain the step
+/// without rebuilding the recursive constructor. Each step has its own transformation cache,
+/// while equivalence checks share their recursion guard.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct DeferredTypeMapping<'db> {
+    #[returns(copy)]
+    previous: Option<DeferredTypeMapping<'db>>,
+    #[returns(ref)]
+    step: MappingStep<'db>,
+}
+
+impl get_size2::GetSize for DeferredTypeMapping<'_> {}
+
+impl<'db> DeferredTypeMapping<'db> {
+    /// Map an argument in both callable polarities. An enclosing annotation can make the
+    /// result depend on the argument's position, in which case no context-free images exist.
+    pub(super) fn argument_images(
+        self,
+        db: &'db dyn Db,
+        argument: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<[Type<'db>; 2]> {
+        let mut images = match self.previous(db) {
+            Some(previous) => previous.argument_images(db, argument, visitor)?,
+            None => [argument; 2],
+        };
+        let step = self.step(db);
+        if step.context.annotation.is_some() {
+            return None;
+        }
+        let mut visitor = visitor.for_new_materialization_root();
+        visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
+        images[0] = images[0].apply_type_mapping_impl(
+            db,
+            &step.operation,
+            TypeContext::default(),
+            &visitor,
+        );
+        images[1] = images[1].apply_type_mapping_impl(
+            db,
+            &step.operation.flip(),
+            TypeContext::default(),
+            &visitor,
+        );
+        Some(images)
+    }
+
+    pub(super) fn append(
+        db: &'db dyn Db,
+        previous: Option<Self>,
+        mapping: &TypeMapping<'db>,
+        context: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        if matches!(
+            mapping,
+            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
+        ) {
+            return None;
+        }
+        let operation = mapping.clone();
+        let context = if context.annotation.is_none() {
+            TypeContext::default()
+        } else {
+            context
+        };
+        Self::append_step(
+            db,
+            previous,
+            MappingStep {
+                operation,
+                context,
+                materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
+            },
+            visitor,
+        )
+    }
+
+    fn append_step(
+        db: &'db dyn Db,
+        previous: Option<Self>,
+        step: MappingStep<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        let mut cursor = previous;
+        while let Some(node) = cursor {
+            let earlier = node.step(db);
+            if earlier.absorbs(db, &step, visitor) {
+                return previous;
+            }
+            if !earlier.preserves_fixed_points_of(&step) {
+                break;
+            }
+            cursor = node.previous(db);
+        }
+        if let Some(previous) = previous
+            && matches!(previous.step(db).operation, TypeMapping::Materialize(_))
+            && previous.step(db).commutes_with(&step)
+        {
+            // Keep materialization last so its marker survives subsequent promotion.
+            let prefix = Self::append_step(db, previous.previous(db), step, visitor);
+            return Some(Self::new(db, prefix, previous.step(db).clone()));
+        }
+        Some(Self::new(db, previous, step))
+    }
+
+    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+        match &self.step(db).operation {
+            TypeMapping::Materialize(kind) => Some(*kind),
+            _ => None,
+        }
+    }
+
+    pub(super) fn without_materialization(self, db: &'db dyn Db) -> Option<Self> {
+        if self.materialization_kind(db).is_some() {
+            self.previous(db)
+        } else {
+            Some(self)
+        }
+    }
+
+    pub(super) fn apply(
+        self,
+        db: &'db dyn Db,
+        mut ty: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if let Some(previous) = self.previous(db) {
+            ty = previous.apply(db, ty, visitor);
+        }
+        // Each step has its own mapping identity, but materialization comparisons share a guard.
+        let mut visitor = visitor.for_new_materialization_root();
+        visitor.materialize_typevar_bounds_and_defaults = self.step(db).materialize_bounds;
+        ty.apply_type_mapping_impl(
+            db,
+            &self.step(db).operation,
+            self.step(db).context,
+            &visitor,
+        )
+    }
+}
 
 /// A recursive variable named by its binder's query cycle.
 /// An escaping reference has no type semantics; in particular, it is neither a
