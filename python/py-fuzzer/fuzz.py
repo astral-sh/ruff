@@ -65,11 +65,12 @@ ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 
-# Reserve time within the budget for the final summary and any issue report.
-REPORTING_RESERVE_SECONDS: Final = 60
+# Reserve time within the budget for CI job setup before the first step,
+# the final summary and any issue report, and steps after fuzzing.
+REPORTING_RESERVE_SECONDS: Final = 90
 
-# Leave at least one minute for checking seeds and minimizing failures, in
-# addition to the reserve.
+# Before accounting for elapsed setup time, leave at least one minute for
+# checking seeds and minimizing failures in addition to the reserve.
 MINIMUM_BUDGET_MINUTES: Final = REPORTING_RESERVE_SECONDS / 60 + 1
 
 # GitHub issue descriptions are reportedly limited to 65,536 Unicode code points:
@@ -564,7 +565,7 @@ def write_github_issue_body(
         )
     except KeyError as error:
         raise RuntimeError(
-            f"--write-github-issue requires the {error.args[0]} environment variable"
+            f"`--write-github-issue` requires the {error.args[0]} environment variable"
         ) from None
 
     version_output = subprocess.check_output(
@@ -598,11 +599,14 @@ def write_github_issue_body(
 
 
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
-    deadline = (
-        time.monotonic() + args.budget_minutes * 60 - REPORTING_RESERVE_SECONDS
-        if args.budget_minutes is not None
-        else None
-    )
+    deadline = None
+    if args.budget_minutes is not None and args.job_started_at is not None:
+        remaining = (
+            args.budget_minutes * 60
+            - (time.time() - args.job_started_at)
+            - REPORTING_RESERVE_SECONDS
+        )
+        deadline = time.monotonic() + remaining
 
     if len(args.seeds) <= 5:
         run_result = run_fuzzer_sequentially(args, deadline=deadline)
@@ -695,6 +699,7 @@ class ResolvedCliArgs:
     quiet: bool
     github_issue_path: Path | None
     budget_minutes: float | None
+    job_started_at: float | None
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -727,13 +732,25 @@ def parse_args() -> ResolvedCliArgs:
         type=float,
         metavar="MINUTES",
         help=(
-            "Time budget after any automatic build for checking seeds, minimizing "
-            "failures, and reporting results "
-            f"(no limit by default; minimum: {MINIMUM_BUDGET_MINUTES:g} minutes). "
-            "Reserves 60 seconds for reporting. Once that reserve is reached, "
-            "stops starting new seed checks and stops minimization at the next "
-            "candidate check. Work already in progress can finish later, so total "
-            "runtime may exceed the budget."
+            f"CI job time budget in minutes (minimum: {MINIMUM_BUDGET_MINUTES:g} "
+            "minutes). Requires `--job-started-at`. By default, the fuzzer runs "
+            f"without a time limit. Reserves {REPORTING_RESERVE_SECONDS} seconds for "
+            "setup before the first CI step, the final summary, any issue report, "
+            "and steps after fuzzing. Once the time for checking and minimizing "
+            "expires, stops starting new seed checks and stops minimization before "
+            "checking another candidate. Work already in progress can finish later, "
+            "so the fuzzer may run past the job's time budget."
+        ),
+    )
+    parser.add_argument(
+        "--job-started-at",
+        type=float,
+        metavar="TIMESTAMP",
+        help=(
+            "Unix timestamp in seconds recorded in the CI job's first step. "
+            "Requires `--budget-minutes`. The fuzzer counts the time since this "
+            "timestamp against the budget. Setup time may exhaust the budget "
+            "before fuzzing begins."
         ),
     )
     parser.add_argument(
@@ -768,8 +785,13 @@ def parse_args() -> ResolvedCliArgs:
 
     args = parser.parse_args()
 
+    if (args.budget_minutes is None) != (args.job_started_at is None):
+        parser.error(
+            "`--budget-minutes` and `--job-started-at` must be provided together"
+        )
+
     if args.budget_minutes is not None and args.budget_minutes < MINIMUM_BUDGET_MINUTES:
-        parser.error(f"--budget-minutes must be at least {MINIMUM_BUDGET_MINUTES:g}")
+        parser.error(f"`--budget-minutes` must be at least {MINIMUM_BUDGET_MINUTES:g}")
 
     executable = Executable(args.bin)
 
@@ -850,6 +872,7 @@ def parse_args() -> ResolvedCliArgs:
         baseline_executable_path=args.baseline_executable,
         github_issue_path=args.write_github_issue,
         budget_minutes=args.budget_minutes,
+        job_started_at=args.job_started_at,
     )
 
 

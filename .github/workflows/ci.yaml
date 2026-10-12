@@ -676,7 +676,6 @@ jobs:
         run: cargo build --bin ruff
       - name: Fuzz
         run: |
-          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           (
             uv run \
             --python="${PYTHON_VERSION}" \
@@ -684,7 +683,8 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
-            --budget-minutes="${budget_minutes}" \
+            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
+            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ruff \
             0-500
           )
@@ -908,7 +908,6 @@ jobs:
 
           git checkout --detach "$GITHUB_SHA"
 
-          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           (
             uv run \
             --python="${PYTHON_VERSION}" \
@@ -918,7 +917,8 @@ jobs:
             --test-executable=ty-new \
             --baseline-executable=ty-old \
             --only-new-bugs \
-            --budget-minutes="${budget_minutes}" \
+            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
+            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ty \
             0-1000
           )

@@ -70,7 +70,6 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
             issue_options+=(--write-github-issue="$RUNNER_TEMP/fuzz-issue.md")
           fi
-          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           # shellcheck disable=SC2046
           (
             uv run \
@@ -79,7 +78,8 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
-            --budget-minutes="${budget_minutes}" \
+            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
+            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ruff \
             "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)
