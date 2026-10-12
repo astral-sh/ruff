@@ -1286,8 +1286,8 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-For other unpacked arguments, we still assume that the first iterable fills every remaining
-positional parameter:
+If no later argument is known to supply a positional value, we still assume that the first iterable
+fills every remaining positional parameter:
 
 ```py
 # Multiple variable-length variadics are ambiguous
