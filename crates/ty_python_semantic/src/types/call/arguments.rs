@@ -203,9 +203,40 @@ impl<'db> VariadicArgument<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<Cow<'_, TupleSpec<'db>>> {
         Some(match self {
-            Self::Type(_) => self.source_type()?.iterate(db, env),
+            Self::Type(_) => Self::sequence_for_type(db, env, self.source_type()?),
             Self::Sequence { sequence, .. } => Cow::Borrowed(sequence),
         })
+    }
+
+    fn sequence_for_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Cow<'db, TupleSpec<'db>> {
+        let sequence = ty.iterate(db, env);
+        if sequence.len() != TupleLength::unknown() {
+            return sequence;
+        }
+        let Type::Union(union) = ty.expand_top_level_aliases(db, env) else {
+            return sequence;
+        };
+
+        // Combining unequal tuple shapes loses their minimum lengths. Even when matching
+        // cannot preserve each member's positions, it must account for guaranteed elements:
+        // `tuple[int] | tuple[int, int]` cannot be empty in a call like `f(*args, 1)`.
+        let minimum = union
+            .elements(db)
+            .iter()
+            .map(|ty| ty.iterate(db, env).len().minimum())
+            .min()
+            .unwrap_or(0);
+        if minimum > 0
+            && let Ok(resized) = sequence.resize(db, env, TupleLength::Variable(minimum, 0))
+        {
+            Cow::Owned(resized)
+        } else {
+            sequence
+        }
     }
 
     fn is_fixed_sequence(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
@@ -319,7 +350,7 @@ impl<'db> VariadicArgument<'db> {
             };
         }
 
-        let sequence = ty.iterate(db, env);
+        let sequence = Self::sequence_for_type(db, env, ty);
         VariadicArgumentMatch {
             types: sequence.iter_element_types(db).collect(),
             length: sequence.len(),

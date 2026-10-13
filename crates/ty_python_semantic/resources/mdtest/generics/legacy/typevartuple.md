@@ -713,6 +713,24 @@ reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], L
 reveal_type(tail(*[1]))  # revealed: tuple[()]
 ```
 
+### Union splatted arguments
+
+Unpacking a union of tuples with different lengths into a `TypeVarTuple` preserves the minimum
+length of the union members.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def collect(*args: *Ts) -> tuple[*Ts]:
+    return args
+
+def _(values: tuple[int] | tuple[str, bytes]) -> None:
+    # revealed: tuple[int | str | bytes, *tuple[int | str | bytes, ...]]
+    reveal_type(collect(*values))
+```
+
 ### Partials with bound variadic arguments
 
 Binding positional arguments infers a fixed-length type variable tuple. The resulting partial
