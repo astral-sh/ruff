@@ -2032,9 +2032,15 @@ impl<'db> StaticClassLiteral<'db> {
                     return None;
                 }
 
-                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
-                    // TODO: could be `Self`.
-                    .with_annotated_type(instance_ty);
+                let self_parameter = if field_policy.is_pydantic() {
+                    // Pydantic makes the receiver positional-only so a model can have a
+                    // field named `self`.
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                } else {
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                }
+                // TODO: could be `Self`.
+                .with_annotated_type(instance_ty);
                 signature_from_fields(vec![self_parameter], Type::none(db, env))
             }
             (
