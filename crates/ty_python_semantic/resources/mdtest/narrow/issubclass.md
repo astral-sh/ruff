@@ -434,6 +434,40 @@ def _(cls: type[Sequence[int]]) -> None:
         reveal_type(cls())  # revealed: list[int]
 ```
 
+## Generic aliases declared in stubs
+
+A stub can declare a runtime class as an alias to a specialization of a generic class, as NumPy does
+for `int64 = signedinteger[_64Bit]`:
+
+`scalars.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+_NBit = TypeVar("_NBit")
+
+class _64Bit: ...
+class signedinteger(Generic[_NBit]): ...
+
+int64 = signedinteger[_64Bit]
+```
+
+```py
+from scalars import int64
+
+def _(cls: type, other: type[int] | type[int64]) -> None:
+    if issubclass(cls, int64):
+        # TODO: should be `type[signedinteger[_64Bit]]`
+        reveal_type(cls)  # revealed: type
+
+    if issubclass(other, int64):
+        # TODO: should be `type[signedinteger[_64Bit]]`
+        reveal_type(other)  # revealed: type[int | signedinteger[_64Bit]]
+    else:
+        # TODO: should be `type[int]`
+        reveal_type(other)  # revealed: type[int | signedinteger[_64Bit]]
+```
+
 ## `classinfo` is a generic final class
 
 ```toml

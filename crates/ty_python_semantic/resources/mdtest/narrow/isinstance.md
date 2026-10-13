@@ -660,6 +660,60 @@ def _(x: list[str] | list[int] | list[bytes]):
         reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
 ```
 
+## Generic aliases declared in stubs
+
+A stub can declare a runtime class as an alias to a specialization of a generic class. NumPy does
+this for its scalar types (`int64 = signedinteger[_64Bit]`), so `isinstance(x, numpy.int64)` works
+at runtime.
+
+`scalars.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+_NBit = TypeVar("_NBit")
+
+class _32Bit: ...
+class _64Bit: ...
+
+class signedinteger(Generic[_NBit]):
+    def __int__(self) -> int: ...
+
+int32 = signedinteger[_32Bit]
+int64 = signedinteger[_64Bit]
+```
+
+```py
+from scalars import int32, int64
+
+def _(x: object, y: int | int64, z: int32 | int64 | None):
+    if isinstance(x, int64):
+        # TODO: should be `signedinteger[_64Bit]`
+        reveal_type(x)  # revealed: object
+        # TODO: no error
+        # error: [invalid-argument-type]
+        reveal_type(int(x))  # revealed: int
+
+    if isinstance(y, int64):
+        y = int(y)
+    # TODO: should be `int`
+    reveal_type(y)  # revealed: int | signedinteger[_64Bit]
+
+    if isinstance(z, int64):
+        # TODO: should be `signedinteger[_64Bit]`
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+    else:
+        # TODO: should be `signedinteger[_32Bit] | None`
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+
+    if isinstance(z, (int32, int64)):
+        # TODO: should be `signedinteger[_32Bit] | signedinteger[_64Bit]`
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+    else:
+        # TODO: should be `None`
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+```
+
 ## `type[]` types are narrowed as well as class-literal types
 
 ```py

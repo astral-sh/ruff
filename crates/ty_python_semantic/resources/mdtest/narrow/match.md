@@ -1100,6 +1100,44 @@ def test_union_class_pattern_uses_members_from_matching_class(
             reveal_type(value)  # revealed: IndirectIntPattern
 ```
 
+## Class patterns with generic aliases declared in stubs
+
+A stub can declare a runtime class as an alias to a specialization of a generic class, as NumPy does
+for `int64 = signedinteger[_64Bit]`. Such an alias can be used in a class pattern:
+
+`scalars.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+_NBit = TypeVar("_NBit")
+
+class _64Bit: ...
+class signedinteger(Generic[_NBit]): ...
+
+int64 = signedinteger[_64Bit]
+```
+
+```py
+from scalars import int64
+
+def _(value: object, other: int | int64) -> None:
+    match value:
+        case int64() as item:
+            # TODO: should be `signedinteger[_64Bit]`
+            reveal_type(item)  # revealed: object
+            # TODO: should be `signedinteger[_64Bit]`
+            reveal_type(value)  # revealed: object
+
+    match other:
+        case int64():
+            # TODO: should be `signedinteger[_64Bit]`
+            reveal_type(other)  # revealed: int | signedinteger[_64Bit]
+        case _:
+            # TODO: should be `int`
+            reveal_type(other)  # revealed: int | signedinteger[_64Bit]
+```
+
 ## Class pattern aliases
 
 The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a

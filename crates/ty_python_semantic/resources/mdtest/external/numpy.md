@@ -49,6 +49,27 @@ interpolated = np.interp(values, values, values)
 reveal_type(interpolated)  # revealed: ndarray[tuple[Any, ...], dtype[float64]]
 ```
 
+## `isinstance()` with scalar types
+
+NumPy's stubs declare most scalar types as aliases to specializations of generic classes, for
+example `int64 = signedinteger[_64Bit]`. At runtime they are classes, so `isinstance()` can narrow
+with them:
+
+```py
+import numpy as np
+
+def as_int(value: int | np.int64) -> int:
+    if isinstance(value, np.int64):
+        value = int(value)
+    # TODO: no error
+    return value  # error: [invalid-return-type]
+
+def scalar(value: object) -> None:
+    if isinstance(value, np.int64):
+        # TODO: should be `signedinteger[_64Bit]`
+        reveal_type(value)  # revealed: object
+```
+
 ## Iterating over an array union
 
 An array can satisfy `map`'s iterable parameter through its gradual iterator overload, even when
