@@ -106,8 +106,8 @@ pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 pub(crate) use crate::types::typevar::{
-    BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, TypeVarBoundOrConstraints,
-    TypeVarNonce,
+    BindingContext, BoundTypeVarIdentity, ParamSpecAttrKind, SelfTypeVarOrigin,
+    TypeVarBoundOrConstraints, TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
@@ -9893,7 +9893,9 @@ impl<'db> Type<'db> {
     ) {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
             match bound_typevar.typevar(db).kind(db) {
-                TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
+                TypeVarKind::LegacyTypeVar
+                | TypeVarKind::Pep613Alias
+                | TypeVarKind::TypingSelf { .. }
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
                             == BindingContext::Definition(binding_context)
@@ -11028,17 +11030,17 @@ pub enum PromotionKind {
     SingletonsOnly,
 }
 
-/// Returns the [`ClassLiteral`] that "owns" a `Self` typevar (i.e., the class from its upper bound).
-fn self_typevar_owner_class_literal<'db>(
+/// Returns the class recorded in a `Self` typevar's origin.
+fn self_typevar_origin_class_literal<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    bound_typevar
-        .typevar(db)
-        .upper_bound(db, env)
-        .and_then(|ty| ty.nominal_class(db, env))
-        .map(|class| class.class_literal(db))
+    match bound_typevar.kind(db) {
+        TypeVarKind::TypingSelf {
+            origin: SelfTypeVarOrigin::Class(class),
+        } => Some(class),
+        _ => None,
+    }
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -11055,8 +11057,8 @@ fn class_mro_literals<'db>(
 
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
-/// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
-/// is in the MRO of the self type's class.
+/// Uses the binding context and MRO-based matching against the class recorded in a `Self`
+/// typevar's origin.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
@@ -11083,7 +11085,7 @@ impl<'db> SelfBinding<'db> {
     ) -> Self {
         let class_literal = match self_type {
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
-                self_typevar_owner_class_literal(db, env, typevar)
+                self_typevar_origin_class_literal(db, typevar)
             }
             _ => self_type
                 .nominal_class(db, env)
@@ -11098,12 +11100,7 @@ impl<'db> SelfBinding<'db> {
     }
 
     /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
-    fn should_bind(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
         if !bound_typevar.typevar(db).is_self(db) {
             return false;
         }
@@ -11114,12 +11111,12 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
+        // Check that Self's originating class is in the receiver's MRO. Receiver placeholders
+        // and synthesized TypedDict schemas have no class to restrict matching.
         self.class_literal.is_some_and(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, env, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
+            self_typevar_origin_class_literal(db, bound_typevar)
+                .is_none_or(|origin_class| class_mro.contains(&origin_class))
         })
     }
 }
@@ -11156,8 +11153,11 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),
-    /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
-    ReplaceSelf { new_upper_bound: Type<'db> },
+    /// Replaces `typing.Self` when adapting a synthesized method to another class or schema.
+    ReplaceSelf {
+        new_origin: SelfTypeVarOrigin<'db>,
+        new_upper_bound: Type<'db>,
+    },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
@@ -11236,13 +11236,17 @@ impl<'db> TypeMapping<'_, 'db> {
                     context
                 }
             }
-            TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
+            TypeMapping::ReplaceSelf {
+                new_origin,
+                new_upper_bound,
+            } => GenericContext::from_typevar_instances(
                 db,
                 env,
                 context.variables(db).map(|typevar| {
                     if typevar.typevar(db).is_self(db) {
                         BoundTypeVarInstance::synthetic_self(
                             db,
+                            *new_origin,
                             *new_upper_bound,
                             typevar.binding_context(db),
                         )
@@ -12528,24 +12532,21 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 }
 
 /// Walk the MRO of this class and return the last class just before the specified known base.
-/// This can be used to determine upper bounds for `Self` type variables on methods that are
-/// being added to the given class.
+/// This determines the owner and upper bound of `Self` on synthesized fallback methods.
 ///
 /// Preserve the class's specialization so that a method on `Child[int]` has a bound such as
 /// `Base[int]`, rather than retaining the type variable in `Base[T@Child]`.
-pub(super) fn determine_upper_bound<'db>(
+pub(super) fn determine_self_class<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
-) -> Type<'db> {
-    let upper_bound = class
+) -> ClassType<'db> {
+    class
         .iter_mro(db)
         .take_while(|base| !is_known_base(*base))
         .filter_map(ClassBase::into_class)
         .last()
-        .unwrap_or(class);
-    Type::instance(db, env, upper_bound)
+        .unwrap_or(class)
 }
 
 // Make sure that the `Type` enum does not grow unexpectedly.
