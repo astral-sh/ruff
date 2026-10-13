@@ -1,11 +1,11 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -502,30 +502,22 @@ impl MetaTypeRecursion<'_> {
     }
 }
 
-struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
 
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
-/// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-///
-/// Some recursive transformations visit the same type under more than one mapping mode within a
-/// single call chain. Keep separate cycle caches for those modes so one transformation cannot
-/// reuse the result of another.
+/// Mapping results and expansion guards shared by one recursive transformation.
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     mapping_probe: Option<MappingProbeContext<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
-    default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    mapped: RefCell<FxHashMap<(Type<'db>, TypeMapping<'db>, TypeContext<'db>), Type<'db>>>,
+    expanding: ActiveRecursionDetector<(TypeIdentity<'db>, TypeMapping<'db>)>,
+    /// Results that encounter an expansion cycle depend on the active recursion stack.
+    expansion_cycles: Cell<usize>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -536,13 +528,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             recursion_context: None,
             mapping_probe: None,
             materialize_typevar_bounds_and_defaults: true,
-            default: OnceCell::default(),
-            top_materialization: OnceCell::default(),
-            bottom_materialization: OnceCell::default(),
-            top_specialization_materialization: OnceCell::default(),
-            bottom_specialization_materialization: OnceCell::default(),
-            promotion: OnceCell::default(),
-            skip_promotion: OnceCell::default(),
+            mapped: RefCell::default(),
+            expanding: ActiveRecursionDetector::default(),
+            expansion_cycles: Cell::default(),
             materialization_equivalence: OnceCell::default(),
         }
     }
@@ -572,24 +560,14 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         type_mapping: &TypeMapping<'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let type_transformer = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
-            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Top,
-                ..
-            } => &self.top_specialization_materialization,
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Bottom,
-                ..
-            } => &self.bottom_specialization_materialization,
-            TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
-            TypeMapping::Promote(PromotionMode::Off, _) => &self.skip_promotion,
-            _ => &self.default,
-        };
-        type_transformer
-            .get_or_init(Box::default)
-            .visit_type(db, ty, func)
+        self.expanding.visit(
+            &(ty.to_type_identity(db), type_mapping.clone()),
+            || {
+                self.expansion_cycles.set(self.expansion_cycles.get() + 1);
+                ty
+            },
+            func,
+        )
     }
 
     fn is_equivalent_to_materialization(
@@ -9469,6 +9447,28 @@ impl<'db> Type<'db> {
             return mapped;
         }
 
+        // Shared subtrees must be mapped once, even when they cannot form a recursive cycle.
+        // Keep the operation and expected type in the key: both can change within a traversal.
+        let key = (self, type_mapping.clone(), tcx);
+        if let Some(mapped) = visitor.mapped.borrow().get(&key) {
+            return *mapped;
+        }
+        let expansion_cycles = visitor.expansion_cycles.get();
+        let mapped = self.apply_type_mapping_uncached(db, type_mapping, tcx, visitor);
+        if visitor.expansion_cycles.get() == expansion_cycles {
+            visitor.mapped.borrow_mut().insert(key, mapped);
+        }
+        mapped
+    }
+
+    /// Transform this node; children go through `apply_type_mapping_impl` to reuse shared subtrees.
+    fn apply_type_mapping_uncached(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
         // Aliases are transparent to singleton promotion. Their exposed body still determines
         // whether traversal continues: only nominal instances (including tuples) are traversed.
         if matches!(
