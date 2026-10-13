@@ -188,6 +188,78 @@ reveal_type(Base().narrowed)  # revealed: bound method Base.narrowed(x: int) -> 
 reveal_type(Child().narrowed)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
 ```
 
+## Aliases of methods with explicit receiver annotations
+
+A class-level alias selects the same receiver-specific overload as the original method.
+
+```py
+from typing import overload
+
+class Base:
+    @overload
+    def method(self: "IntReceiver") -> int: ...
+    @overload
+    def method(self: "StrReceiver") -> str: ...
+    def method(self) -> int | str:
+        raise NotImplementedError
+
+    alias = method
+
+class IntReceiver(Base): ...
+class StrReceiver(Base): ...
+
+reveal_type(IntReceiver().method())  # revealed: int
+reveal_type(IntReceiver().alias())  # revealed: int
+reveal_type(StrReceiver().method())  # revealed: str
+reveal_type(StrReceiver().alias())  # revealed: str
+
+wrong: int = StrReceiver().alias()  # error: [invalid-assignment]
+Base().alias()  # error: [no-matching-overload]
+```
+
+## Aliases of methods with protocol receiver annotations
+
+Protocol receiver annotations can distinguish synchronous and asynchronous implementations. Calling
+an alias on an asynchronous receiver preserves the awaitable return type.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4715>.
+
+```py
+from collections.abc import Awaitable
+from typing import Any, Literal, Protocol, overload
+
+class SyncClient(Protocol):
+    is_async: Literal[False]
+
+class AsyncClient(Protocol):
+    is_async: Literal[True]
+
+class Commands:
+    @overload
+    def method(self: SyncClient) -> int: ...
+    @overload
+    def method(self: AsyncClient) -> Awaitable[int]: ...
+    def method(self: Any) -> int | Awaitable[int]:
+        raise NotImplementedError
+
+    alias = method
+
+class SyncCommands(Commands):
+    is_async: Literal[False] = False
+
+class AsyncCommands(Commands):
+    is_async: Literal[True] = True
+
+reveal_type(SyncCommands().method())  # revealed: int
+reveal_type(SyncCommands().alias())  # revealed: int
+
+async def use_async(client: AsyncCommands) -> None:
+    reveal_type(client.method())  # revealed: Awaitable[int]
+    reveal_type(client.alias())  # revealed: Awaitable[int]
+    await client.method()  # no diagnostic
+    await client.alias()  # no diagnostic
+```
+
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.

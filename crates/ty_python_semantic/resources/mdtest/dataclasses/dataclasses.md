@@ -1402,7 +1402,7 @@ class A:
     y: int
 
 # error: [missing-argument] "No arguments provided for required parameters `x`, `y`"
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 0, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 3"
 a = A(1, 2)
 a = A(x=1, y=2)
 ```
@@ -2689,7 +2689,7 @@ error[missing-argument]: No argument provided for required parameter `y`
    | ^^^^^^^^
 
 
-error[too-many-positional-arguments]: Too many positional arguments: expected 1, got 2
+error[too-many-positional-arguments]: Too many positional arguments: expected 2, got 3
   --> src/mdtest_snippet.py:13:6
    |
 13 | C(3, "")

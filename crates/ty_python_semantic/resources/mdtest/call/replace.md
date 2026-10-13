@@ -116,7 +116,7 @@ class Point(NamedTuple):
     x: int
     y: int
 
-reveal_type(Point.__replace__)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
+reveal_type(Point.__replace__)  # revealed: [Self](self: Self, *, x: int = ..., y: int = ...) -> Self
 ```
 
 The `__replace__` method can either be called directly or through the `replace` function:
