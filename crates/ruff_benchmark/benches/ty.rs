@@ -1444,25 +1444,19 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
-/// Measure runtime union construction for ordinary and specialized generic classes.
+/// Measure runtime union construction for specialized generic classes.
 fn benchmark_union_construction(criterion: &mut Criterion) {
-    for (kind, parameters, arguments) in [("nominal", "", ""), ("generic", "[T]", "[int]")] {
-        for count in [64, 256, 1024] {
-            let mut code = String::new();
-            for index in 0..count {
-                writeln!(code, "class C{index}{parameters}: ...").ok();
-            }
-            let members = (0..count)
-                .map(|index| format!("C{index}{arguments}"))
-                .join(" | ");
-            writeln!(code, "Alias = {members}").ok();
-            benchmark_micro_case(
-                criterion,
-                &format!("ty_micro[{kind}_union_construction_{count}]"),
-                &code,
-            );
-        }
+    const NUM_CLASSES: usize = 256;
+
+    let mut code = String::new();
+    for index in 0..NUM_CLASSES {
+        writeln!(code, "class C{index}[T]: ...").ok();
     }
+    let members = (0..NUM_CLASSES)
+        .map(|index| format!("C{index}[int]"))
+        .join(" | ");
+    writeln!(code, "Alias = {members}").ok();
+    benchmark_micro_case(criterion, "ty_micro[generic_union_construction_256]", &code);
 }
 
 /// Benchmark for narrowing a large union type through multiple match statements.

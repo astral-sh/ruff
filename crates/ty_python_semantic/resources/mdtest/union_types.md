@@ -401,6 +401,16 @@ def _(
     reveal_type(h)  # revealed: Invariant[Any | str] | Invariant[Any]
 ```
 
+In a union, `Covariant[int]` subsumes an earlier `Covariant[bool]` even when another type separates
+them:
+
+```py
+Alias = Covariant[bool] | bytes | Covariant[int] | str
+
+def extended(value: Alias):
+    reveal_type(value)  # revealed: Covariant[int] | bytes | str
+```
+
 A type alias does not make a gradual type argument static. Covariant unions simplify the same way
 whether the gradual argument is written directly or hidden behind one or more aliases.
 

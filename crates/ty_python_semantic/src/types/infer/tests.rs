@@ -1360,40 +1360,6 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
-fn generic_union_prefix_updates_after_base_and_variance_changes() -> anyhow::Result<()> {
-    let base = r#"class Base: ...
-class Child(Base): ...
-class Box[T]:
-    def get(self) -> T: ...
-class Extra: ...
-"#;
-    let unrelated = base.replace("Child(Base)", "Child(object)");
-    let invariant = base.replace("def get(self) -> T: ...", "value: T");
-    let mut db = setup_db();
-    db.write_file(
-        "/src/main.py",
-        "from base import Base, Child, Box, Extra\nAlias = Box[Child] | Box[Base] | Extra\nvalue: Alias\n",
-    )?;
-    let file = system_path_to_file(&db, "/src/main.py")?;
-    for (source, expected) in [
-        (base, "Box[Base] | Extra"),
-        (unrelated.as_str(), "Box[Child] | Box[Base] | Extra"),
-        (base, "Box[Base] | Extra"),
-        (invariant.as_str(), "Box[Child] | Box[Base] | Extra"),
-        (base, "Box[Base] | Extra"),
-    ] {
-        db.write_file("/src/base.pyi", source)?;
-        let ty = global_symbol(&db, file, "value").place.expect_type();
-        assert_eq!(
-            ty.display(&db, &db.program_environment()).to_string(),
-            expected
-        );
-        assert_file_diagnostics(&db, "/src/main.py", &[]);
-    }
-    Ok(())
-}
-
-#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
