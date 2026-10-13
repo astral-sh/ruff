@@ -1610,8 +1610,8 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.33">0.0.33</a
 Detects attribute overrides that change whether an inherited attribute is a class variable or an
 instance variable, expose an incompatible value type, or make a writable attribute read-only.
 
-Narrowing a mutable attribute's type is checked separately by the opt-in [`invalid-mutable-override`](#invalid-mutable-override)
-rule. Overrides involving properties are checked by [`invalid-property-type-override`](#invalid-property-type-override).
+Narrowing a mutable attribute's type is checked separately by the [`invalid-mutable-override`](#invalid-mutable-override) rule.
+Overrides involving properties are checked by [`invalid-property-type-override`](#invalid-property-type-override).
 
 **Why is this bad?**
 
@@ -2700,7 +2700,7 @@ from module import missing  # error
 ## `invalid-mutable-override`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.81">0.0.81</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20%22invalid-mutable-override%22" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1368" target="_blank">View source</a>
@@ -2711,8 +2711,6 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.81">0.0.81</a
 
 
 Detects overrides that narrow the type of a writable attribute.
-
-This rule is disabled by default. Enable it to enforce invariance of mutable attributes.
 
 **Why is this bad?**
 
