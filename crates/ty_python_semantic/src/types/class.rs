@@ -2989,9 +2989,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }
                 return inherited_class_body_declaration(db, scope, symbol).map(|declaration| {
                     ClassBodyDeclaration {
-                        member: declaration.member.map_type(|ty| {
-                            ty.apply_optional_specialization(db, specialization)
-                        }),
+                        member: declaration
+                            .member
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
                         ..declaration
                     }
                 });

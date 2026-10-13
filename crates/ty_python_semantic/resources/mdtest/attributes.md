@@ -3288,13 +3288,13 @@ class IncompatibleDescriptor:
         pass
 
 class Invalid(Base):
+    # error: [invalid-attribute-override]
     value = IncompatibleDescriptor()  # error: [invalid-assignment]
 ```
 
 ### Descriptor setter compatibility with instance annotations
 
-ty does not yet check that the descriptor's setter accepts every value allowed by the inherited
-instance annotation:
+The descriptor's setter must accept every value allowed by the inherited instance annotation:
 
 ```py
 class WritableBase:
@@ -3309,8 +3309,7 @@ class NarrowSetter:
         pass
 
 class NarrowSetterChild(WritableBase):
-    # TODO: The setter does not accept every value allowed by the inherited annotation.
-    value = NarrowSetter()
+    value = NarrowSetter()  # error: [invalid-mutable-override]
 ```
 
 ### Annotations in class methods
@@ -3333,7 +3332,8 @@ reveal_type(ClassChild.class_value)  # revealed: str
 ### Instance annotations follow the MRO
 
 An inherited default retains the annotation from the base that supplied it, even when another base
-declares the same instance attribute.
+declares the same instance attribute. An incompatible annotation from a later base still produces an
+override error.
 
 ```py
 class Root:
@@ -3348,7 +3348,7 @@ class Right:
         self.value: bytes = b"right"
 
 class Child(Left, Right):
-    value = 1
+    value = 1  # error: [invalid-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 ```
@@ -3357,6 +3357,7 @@ The annotation from `Right` does not replace the annotation inherited by `Left`:
 
 ```py
 class Invalid(Left, Right):
+    # error: [invalid-attribute-override]
     value = b"wrong"  # error: [invalid-assignment]
 ```
 
