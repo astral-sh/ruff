@@ -152,6 +152,14 @@ reason = "lets downstream lexer callers inspect the current token flags"
 
 [[override]]
 lint = "hawk::unnecessary_public"
+crate = "ruff_python_parser"
+item = "parser::options::ParseOptions::with_max_recursion_depth"
+kind = "inherent_method"
+level = "expect"
+reason = "lets downstream parser clients bound parser recursion when parsing untrusted code"
+
+[[override]]
+lint = "hawk::unnecessary_public"
 crate = "ruff_workspace"
 item = "settings::FormatterSettings::resolve_target_version"
 kind = "inherent_method"
@@ -421,6 +429,14 @@ item = "Parsed::<T>::as_result"
 kind = "inherent_method"
 level = "expect"
 reason = "downstream parser clients retain borrowed result conversion"
+
+[[override]]
+lint = "hawk::dead_public"
+crate = "ruff_python_parser"
+item = "parser::options::ParseOptions::max_recursion_depth"
+kind = "inherent_method"
+level = "expect"
+reason = "parse options retain a public accessor for the recursion limit builder"
 
 [[override]]
 lint = "hawk::dead_public"

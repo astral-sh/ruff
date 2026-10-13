@@ -2883,9 +2883,21 @@ impl<'src> Parser<'src> {
                 // Although this statement is not a valid `async` statement,
                 // we still parse it. Guard the recursive recovery path so
                 // `async async async ...` cannot overflow the parser stack.
-                self.with_recursion(Self::parse_statement)
+                self.with_recursion(Self::parse_statement, |parser| {
+                    parser.recursion_recovery_stmt()
+                })
             }
         }
+    }
+
+    /// The placeholder returned when a statement is nested too deeply to parse.
+    fn recursion_recovery_stmt(&self) -> Stmt {
+        let value = self.recursion_recovery_expr();
+        Stmt::Expr(ast::StmtExpr {
+            range: value.range(),
+            value: Box::new(value),
+            node_index: AtomicNodeIndex::NONE,
+        })
     }
 
     /// Parses a decorator list followed by a class, function or async function definition.
@@ -3124,15 +3136,18 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = self.with_recursion(|parser| {
-            let snapshot = parser.stmt_scratch.snapshot();
-            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
-                let statement = parser.parse_statement();
-                parser.stmt_scratch.push(statement);
-            });
+        let statements = self.with_recursion(
+            |parser| {
+                let snapshot = parser.stmt_scratch.snapshot();
+                parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+                    let statement = parser.parse_statement();
+                    parser.stmt_scratch.push(statement);
+                });
 
-            parser.stmt_scratch.take_thin_vec(snapshot)
-        });
+                parser.stmt_scratch.take_thin_vec(snapshot)
+            },
+            |_| Suite::new(),
+        );
 
         self.expect(TokenKind::Dedent);
 

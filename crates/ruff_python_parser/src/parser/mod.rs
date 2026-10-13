@@ -7,8 +7,8 @@ use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
-    ModModule, ParameterWithDefault, Stmt, StringFlags,
+    self as ast, Alias, AtomicNodeIndex, ElifElseClause, Expr, ExprContext, Int, IpyEscapeKind,
+    Keyword, Mod, ModExpression, ModModule, ParameterWithDefault, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -101,6 +101,10 @@ pub(crate) struct Parser<'src> {
     /// Number of active recursive statement, expression, and pattern parsing operations.
     recursion_depth: usize,
 
+    /// The value of `recursion_depth` at which [`Parser::with_recursion`] stops recursing.
+    /// `usize::MAX` when [`ParseOptions::max_recursion_depth`] is unset.
+    max_recursion_depth: usize,
+
     /// Reusable, nesting-safe scratch storage for expression lists.
     expr_scratch: ScratchBuffer<Expr>,
 
@@ -133,6 +137,9 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
+        let max_recursion_depth = options
+            .max_recursion_depth
+            .map_or(usize::MAX, |depth| depth.get() as usize);
 
         Parser {
             options,
@@ -146,6 +153,7 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             recursion_depth: 0,
+            max_recursion_depth,
             current_token_id: TokenId::default(),
             expr_scratch: ScratchBuffer::with_capacity(16),
             keyword_scratch: ScratchBuffer::new(),
@@ -156,9 +164,21 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Grows the stack for recursive parser calls only after shallow nesting is exceeded.
+    /// Runs a recursive parser call, growing the stack only after shallow nesting is exceeded.
+    ///
+    /// If the call would exceed [`ParseOptions::max_recursion_depth`], `f` does not run. Instead,
+    /// the error is reported, the remaining tokens are consumed, and `exceeded` produces a
+    /// placeholder node in place of the construct that could not be parsed.
     #[inline]
-    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+    fn with_recursion<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> T,
+        exceeded: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        if self.recursion_depth >= self.max_recursion_depth {
+            return self.recursion_limit_exceeded(exceeded);
+        }
+
         self.recursion_depth += 1;
 
         let result = if self.recursion_depth > MAX_UNCHECKED_RECURSION_DEPTH {
@@ -174,6 +194,37 @@ impl<'src> Parser<'src> {
     #[cold]
     fn grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || f(self))
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn recursion_limit_exceeded<T>(&mut self, exceeded: impl FnOnce(&mut Self) -> T) -> T {
+        // Push directly rather than through `add_error`: that method drops an error reported at
+        // the same location as the previous one, which would hide the limit error behind an
+        // unrelated error that the current frame has just reported, as in `async async ...`.
+        self.errors.push(ParseError {
+            error: ParseErrorType::RecursionLimitExceeded,
+            location: self.current_token_range(),
+        });
+
+        // Skip to the end of the file so that the outer parser frames unwind without reporting
+        // an error for every unclosed bracket or block, and without the `ParserProgress` guards
+        // firing when they see the same token that this frame did not consume.
+        while !self.at(TokenKind::EndOfFile) {
+            self.bump_any();
+        }
+
+        exceeded(self)
+    }
+
+    /// The placeholder expression used in place of a construct that was nested too deeply.
+    fn recursion_recovery_expr(&self) -> Expr {
+        Expr::Name(ast::ExprName {
+            range: self.missing_node_range(),
+            id: Name::empty(),
+            ctx: ExprContext::Invalid,
+            node_index: AtomicNodeIndex::NONE,
+        })
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].

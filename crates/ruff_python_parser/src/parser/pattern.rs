@@ -141,37 +141,50 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-closed_pattern>
     fn parse_match_pattern_lhs(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
-        self.with_recursion(|parser| {
-            let start = parser.node_start();
+        self.with_recursion(
+            |parser| {
+                let start = parser.node_start();
 
-            let mut lhs = match parser.current_token_kind() {
-                TokenKind::Lbrace => Pattern::MatchMapping(parser.parse_match_pattern_mapping()),
-                TokenKind::Star => {
-                    let star_pattern = parser.parse_match_pattern_star();
-                    if allow_star_pattern.is_no() {
-                        parser.add_error(ParseErrorType::InvalidStarPatternUsage, &star_pattern);
+                let mut lhs = match parser.current_token_kind() {
+                    TokenKind::Lbrace => {
+                        Pattern::MatchMapping(parser.parse_match_pattern_mapping())
                     }
-                    Pattern::MatchStar(star_pattern)
+                    TokenKind::Star => {
+                        let star_pattern = parser.parse_match_pattern_star();
+                        if allow_star_pattern.is_no() {
+                            parser
+                                .add_error(ParseErrorType::InvalidStarPatternUsage, &star_pattern);
+                        }
+                        Pattern::MatchStar(star_pattern)
+                    }
+                    TokenKind::Lpar | TokenKind::Lsqb => {
+                        parser.parse_parenthesized_or_sequence_pattern()
+                    }
+                    _ => parser.parse_match_pattern_literal(),
+                };
+
+                if parser.at(TokenKind::Lpar) {
+                    lhs = Pattern::MatchClass(parser.parse_match_pattern_class(lhs, start));
                 }
-                TokenKind::Lpar | TokenKind::Lsqb => {
-                    parser.parse_parenthesized_or_sequence_pattern()
+
+                if matches!(
+                    parser.current_token_kind(),
+                    TokenKind::Plus | TokenKind::Minus
+                ) {
+                    lhs = Pattern::MatchValue(parser.parse_complex_literal_pattern(lhs, start));
                 }
-                _ => parser.parse_match_pattern_literal(),
-            };
 
-            if parser.at(TokenKind::Lpar) {
-                lhs = Pattern::MatchClass(parser.parse_match_pattern_class(lhs, start));
-            }
-
-            if matches!(
-                parser.current_token_kind(),
-                TokenKind::Plus | TokenKind::Minus
-            ) {
-                lhs = Pattern::MatchValue(parser.parse_complex_literal_pattern(lhs, start));
-            }
-
-            lhs
-        })
+                lhs
+            },
+            |parser| {
+                let value = parser.recursion_recovery_expr();
+                Pattern::MatchValue(ast::PatternMatchValue {
+                    range: value.range(),
+                    value: Box::new(value),
+                    node_index: AtomicNodeIndex::NONE,
+                })
+            },
+        )
     }
 
     /// Parses a mapping pattern.

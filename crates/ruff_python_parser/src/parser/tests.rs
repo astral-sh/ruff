@@ -1,8 +1,9 @@
 use std::assert_matches;
+use std::num::NonZeroU32;
 
-use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::{Expr, ExprContext, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
-use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
 // Keep recursive ASTs shallow enough for Windows's 1 MiB test-thread stacks.
 const RECURSIVE_AST_TEST_DEPTH: usize = 1_000;
@@ -520,4 +521,224 @@ fn nested_unary_chains_grow_stack() {
 
     let source = format!("{}True\n", "not ".repeat(depth));
     parse_module(&source).unwrap();
+}
+
+/// Parse options that stop recursing after `depth` nested parser calls.
+fn limited(depth: u32) -> ParseOptions {
+    ParseOptions::from(Mode::Module)
+        .with_max_recursion_depth(NonZeroU32::new(depth).expect("depth must be non-zero"))
+}
+
+#[test]
+fn recursion_limit_nested_parens() {
+    let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_allows_nesting_within_limit() {
+    // Each nesting level needs one recursive call, plus one for the statement and one for the
+    // innermost atom, so 50 levels fit comfortably within a limit of 100.
+    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
+    parse(&src, limited(100)).unwrap();
+}
+
+#[test]
+fn recursion_limit_reports_error_at_the_offending_token() {
+    // With a limit of 3, the assignment value and the contents of the first two parentheses each
+    // use one level. The parser has consumed the third `(` when it tries to recurse into its
+    // contents, so the error points at the `1`.
+    let src = "x = (((1)))";
+    let parsed = crate::parse_unchecked(src, limited(3));
+    let error = parsed.errors().first().expect("expected an error");
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+    assert_eq!(&src[error.location], "1");
+}
+
+#[test]
+fn recursion_limit_substitutes_placeholder_expression() {
+    let src = "x = (((1)))";
+    let parsed = crate::parse_unchecked(src, limited(3))
+        .try_into_module()
+        .unwrap();
+
+    let Some(Stmt::Assign(assign)) = parsed.suite().first() else {
+        panic!("expected an assignment, got {:?}", parsed.suite());
+    };
+    assert_matches!(
+        &*assign.value,
+        Expr::Name(name) if name.id.is_empty() && name.ctx == ExprContext::Invalid
+    );
+}
+
+#[test]
+fn recursion_limit_preserves_prior_statements() {
+    // The rest of the file is skipped once the limit is exceeded, but statements parsed before
+    // the overflowing one are kept.
+    let src = format!(
+        "before = 1\n{}1{}\nafter = 2\n",
+        "(".repeat(1_000),
+        ")".repeat(1_000),
+    );
+    let parsed = crate::parse_unchecked(&src, limited(100))
+        .try_into_module()
+        .unwrap();
+
+    assert_matches!(
+        parsed.errors().first().map(|error| &error.error),
+        Some(ParseErrorType::RecursionLimitExceeded)
+    );
+    assert_matches!(parsed.suite().first(), Some(Stmt::Assign(_)));
+    assert_eq!(parsed.suite().len(), 2);
+}
+
+#[test]
+fn recursion_limit_reports_a_single_error() {
+    // Outer frames unwind after the limit is hit. Callers read the first error via
+    // `into_result` or `Parsed::errors()`, so `RecursionLimitExceeded` must come first and the
+    // unwinding frames must not add one error per unclosed parenthesis.
+    let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
+    let parsed = crate::parse_unchecked(&src, limited(50));
+    let errors = parsed.errors();
+
+    assert_matches!(
+        errors.first().map(|error| &error.error),
+        Some(ParseErrorType::RecursionLimitExceeded)
+    );
+    let recursion_errors = errors
+        .iter()
+        .filter(|error| matches!(error.error, ParseErrorType::RecursionLimitExceeded))
+        .count();
+    assert_eq!(recursion_errors, 1);
+    assert!(errors.len() <= 8, "unexpected errors: {errors:?}");
+}
+
+#[test]
+fn recursion_limit_expression_mode() {
+    let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
+    let options = ParseOptions::from(Mode::Expression)
+        .with_max_recursion_depth(NonZeroU32::new(100).unwrap());
+    let error = parse(&src, options).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_def_blocks() {
+    // Nested blocks recurse through `parse_block` rather than through expressions.
+    let depth = 400;
+    let mut src = String::new();
+    for i in 0..depth {
+        src.push_str(&"\t".repeat(i));
+        src.push_str("def f():\n");
+    }
+    src.push_str(&"\t".repeat(depth));
+    src.push_str("pass\n");
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_lists() {
+    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_calls() {
+    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_subscripts() {
+    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_match_patterns() {
+    let mut src = String::from("match x:\n case ");
+    for _ in 0..600 {
+        src.push('(');
+    }
+    src.push('y');
+    for _ in 0..600 {
+        src.push(')');
+    }
+    src.push_str(": pass\n");
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_binary_paren_interplay() {
+    // `1+(1+(1+(1+...)))` alternates a binary operator and a parenthesized sub-expression.
+    let depth = 2_000;
+    let mut src = String::new();
+    for _ in 0..depth {
+        src.push_str("1+(");
+    }
+    src.push('1');
+    for _ in 0..depth {
+        src.push(')');
+    }
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_right_assoc_pow_chain() {
+    // `**` is right-associative, so the right operand recurses without any brackets.
+    let src = format!("{}1", "1**".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_ternary_else_chain() {
+    let src = format!("{}1", "1 if 1 else ".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_lambda_chain() {
+    let src = format!("x = {}1", "lambda: ".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_nested_format_specs() {
+    // Each nested format spec `{x:{x:{x:...}}}` recurses through the f-string element parser.
+    let src = format!("f\"{{x{}}}\"", ":{x".repeat(1_000) + &"}".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+}
+
+#[test]
+fn recursion_limit_invalid_async_chain() {
+    let src = format!("{}x = 1\n", "async ".repeat(5_000));
+    let parsed = crate::parse_unchecked(&src, limited(100));
+    assert!(
+        parsed
+            .errors()
+            .iter()
+            .any(|error| matches!(error.error, ParseErrorType::RecursionLimitExceeded))
+    );
+}
+
+#[test]
+fn recursion_limit_nested_unary_chains() {
+    let src = format!("{}1\n", "-~+".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
+
+    let src = format!("{}True\n", "not ".repeat(1_000));
+    let error = parse(&src, limited(100)).unwrap_err();
+    assert_matches!(error.error, ParseErrorType::RecursionLimitExceeded);
 }
