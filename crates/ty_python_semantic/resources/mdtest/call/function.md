@@ -1096,11 +1096,8 @@ def _(
     f1(*args6)
     f1(*args7)  # error: [invalid-argument-type]
 
-    # The reason for two errors here is because of the two fixed elements in the tuple of `args8`
-    # which are both `int`
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    f1(*args8)
+    # Both fixed elements have the same incompatible type, so we report the error once.
+    f1(*args8)  # error: [invalid-argument-type]
 
     f1(*args9)  # error: [invalid-argument-type]
     f1(*args10)  # error: [invalid-argument-type]
