@@ -11,7 +11,13 @@ A mismatched name can be a typo and can make a sentinel's runtime representation
 ## Default level
 
 This rule is disabled by default because sentinel names are not required to match their assigned
-variables. Enable it to enforce consistent sentinel naming.
+variables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier
+characters.
+
+Enable this rule to enforce consistent sentinel naming.
+
+This rule is similar to `mismatched-type-name`, but is a distinct rule because the default severity
+differs.
 
 ## Examples
 

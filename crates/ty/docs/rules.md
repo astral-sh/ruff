@@ -4031,7 +4031,13 @@ A mismatched name can be a typo and can make a sentinel's runtime representation
 
 
 This rule is disabled by default because sentinel names are not required to match their assigned
-variables. Enable it to enforce consistent sentinel naming.
+variables, and sometimes the preferred `__repr__` for a sentinel may include non-identifier
+characters.
+
+Enable this rule to enforce consistent sentinel naming.
+
+This rule is similar to [`mismatched-type-name`](#mismatched-type-name), but is a distinct rule because the default severity
+differs.
 
 **Examples**
 
@@ -4076,6 +4082,8 @@ assigned to.
 Constructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`, `TypedDict`, and `TypeAliasType`
 all take a name argument that is normally expected to match the assigned variable. A mismatch is
 usually a typo and makes later diagnostics harder to understand.
+
+[`mismatched-sentinel-name`](#mismatched-sentinel-name) is a similar but distinct rule, disabled by default.
 
 **Default level**
 
