@@ -9380,26 +9380,6 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization, specialize_self_domain)
-    }
-
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, id, _, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
-            let env = ProgramEnvironment::from_program(
-                specialization.generic_context(db).program(db),
-            );
-            value.cycle_normalized_impl(db, &env, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn apply_specialization_inner(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-        specialize_self_domain: bool,
-    ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
         let apply_specialization = ApplySpecialization::Specialization {
             specialization,
@@ -9423,7 +9403,28 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::new(env))
+        self.apply_type_mapping_inner(db, env.program(db), type_mapping.clone(), tcx)
+    }
+
+    /// Cache transformations whose inputs have already been inferred and need no caller's guards.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, program: Program<'db>, _, _| {
+            let env = ProgramEnvironment::from_program(program);
+            value.cycle_normalized_impl(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn apply_type_mapping_inner(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        type_mapping: TypeMapping<'db>,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let env = ProgramEnvironment::from_program(program);
+        self.apply_type_mapping_impl(db, &type_mapping, tcx, &ApplyTypeMappingVisitor::new(&env))
     }
 
     fn apply_type_mapping_impl(

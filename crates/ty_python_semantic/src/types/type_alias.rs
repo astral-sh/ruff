@@ -430,6 +430,10 @@ fn apply_type_alias_specialization<'db>(
         },
     };
 
+    if recursion_context.is_none() {
+        return ty.apply_type_mapping(db, &env, &type_mapping, TypeContext::default());
+    }
+
     ty.apply_type_mapping_impl(
         db,
         &type_mapping,
