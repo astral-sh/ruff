@@ -1368,20 +1368,24 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
-/// Measure runtime construction of ordinary class unions as their number of members grows.
-fn benchmark_nominal_union_construction(criterion: &mut Criterion) {
-    for count in [64, 256, 1024] {
-        let mut code = String::new();
-        for index in 0..count {
-            writeln!(code, "class C{index}: ...").ok();
+/// Measure runtime union construction for ordinary and specialized generic classes.
+fn benchmark_union_construction(criterion: &mut Criterion) {
+    for (kind, parameters, arguments) in [("nominal", "", ""), ("generic", "[T]", "[int]")] {
+        for count in [64, 256, 1024] {
+            let mut code = String::new();
+            for index in 0..count {
+                writeln!(code, "class C{index}{parameters}: ...").ok();
+            }
+            let members = (0..count)
+                .map(|index| format!("C{index}{arguments}"))
+                .join(" | ");
+            writeln!(code, "Alias = {members}").ok();
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[{kind}_union_construction_{count}]"),
+                &code,
+            );
         }
-        let members = (0..count).map(|index| format!("C{index}")).join(" | ");
-        writeln!(code, "Alias = {members}").ok();
-        benchmark_micro_case(
-            criterion,
-            &format!("ty_micro[nominal_union_construction_{count}]"),
-            &code,
-        );
     }
 }
 
@@ -2551,7 +2555,7 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
-    benchmark_nominal_union_construction,
+    benchmark_union_construction,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
