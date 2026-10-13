@@ -98,6 +98,15 @@ static_assert(not is_equivalent_to(D[Any], C[Any]))
 static_assert(not is_equivalent_to(D[Any], C[Unknown]))
 ```
 
+When extending a union, a broader specialization also subsumes an earlier, narrower specialization:
+
+```py
+Alias = C[B] | bytes | C[A] | str
+
+def union(value: Alias):
+    reveal_type(value)  # revealed: C[A] | bytes | str
+```
+
 ## Contravariance
 
 With a contravariant typevar, subtyping and assignability are in "opposition": if `A <: B` and

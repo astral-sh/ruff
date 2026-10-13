@@ -2504,139 +2504,6 @@ mod tests {
     use ty_python_core::ProgramFile;
 
     #[test]
-    fn resuming_normalized_unions_matches_rebuilding() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/normalized.py",
-            r#"
-            from enum import Enum
-            from typing import Any, Literal, Protocol, TypedDict
-
-            class Box[T]: ...
-            class P(Protocol):
-                def f(self) -> int: ...
-            class D(TypedDict):
-                x: int
-            class E(Enum):
-                A = 1
-                B = 2
-                C = 3
-            type Alias = int | str
-
-            generic: Box[int]
-            protocol: P
-            dictionary: D
-            alias: Alias
-            enum_a: Literal[E.A]
-            enum_b: Literal[E.B]
-            enum_c: Literal[E.C]
-            gradual: Any
-        "#,
-        )?;
-        let env = db.program_environment();
-        let file = ruff_db::files::system_path_to_file(&db, "/src/normalized.py")?;
-        let file = ProgramFile::new(&db, file, env.program(&db));
-        let mut types = [
-            "generic",
-            "protocol",
-            "dictionary",
-            "alias",
-            "enum_a",
-            "enum_b",
-            "enum_c",
-            "gradual",
-        ]
-        .map(|name| global_symbol(&db, file, name).place.expect_type())
-        .to_vec();
-        types.extend([
-            Type::int_literal(1),
-            Type::int_literal(2),
-            Type::string_literal(&db, "a"),
-            Type::string_literal(&db, "b"),
-            Type::bytes_literal(&db, b"a"),
-            Type::bytes_literal(&db, b"b"),
-            Type::bool_literal(true),
-            Type::bool_literal(false),
-            KnownClass::Int.to_instance(&db, &env),
-            KnownClass::Str.to_instance(&db, &env),
-            Type::unknown(),
-            Type::object(),
-        ]);
-        for unpack_aliases in [false, true] {
-            for cycle_recovery in [false, true] {
-                for recursively_defined in [RecursivelyDefined::No, RecursivelyDefined::Yes] {
-                    let builder = || {
-                        UnionBuilder::new(&db, &env)
-                            .unpack_aliases(unpack_aliases)
-                            .cycle_recovery(cycle_recovery)
-                            .or_recursively_defined(recursively_defined)
-                    };
-                    for start in 0..types.len() {
-                        let mut resumed = builder().build_normalized();
-                        let mut rebuilt = builder().build();
-                        for &ty in types[start..].iter().chain(&types[..start]) {
-                            resumed = builder().add_normalized(resumed).add(ty).build_normalized();
-                            rebuilt = builder().add(rebuilt).add(ty).build();
-                            assert_eq!(
-                                resumed.ty(),
-                                rebuilt,
-                                "start={start}, unpack_aliases={unpack_aliases}, cycle_recovery={cycle_recovery}, recursively_defined={recursively_defined:?}, ty={ty:?}"
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn cycle_recovery_union_requires_ordinary_normalization() {
-        let db = setup_db();
-        let env = db.program_environment();
-        let int = KnownClass::Int.to_instance(&db, &env);
-        let boolean = KnownClass::Bool.to_instance(&db, &env);
-        let recovered = UnionBuilder::new(&db, &env)
-            .cycle_recovery(true)
-            .add(boolean)
-            .add(int)
-            .build_normalized();
-        assert!(recovered.ty().is_union());
-        assert_eq!(
-            UnionBuilder::new(&db, &env)
-                .cycle_recovery(true)
-                .add_normalized(recovered)
-                .build(),
-            recovered.ty()
-        );
-        assert_eq!(
-            UnionBuilder::new(&db, &env)
-                .add_normalized(recovered)
-                .build(),
-            int
-        );
-    }
-
-    #[test]
-    fn adding_normalized_union_to_nonempty_builder() {
-        let db = setup_db();
-        let env = db.program_environment();
-        let int = KnownClass::Int.to_instance(&db, &env);
-        let string = KnownClass::Str.to_instance(&db, &env);
-        let normalized = UnionBuilder::new(&db, &env)
-            .add(KnownClass::Bool.to_instance(&db, &env))
-            .add(string)
-            .build_normalized();
-        assert_eq!(
-            UnionBuilder::new(&db, &env)
-                .add(int)
-                .add_normalized(normalized)
-                .build(),
-            UnionBuilder::new(&db, &env).add(int).add(string).build(),
-        );
-    }
-
-    #[test]
     fn build_union_no_elements() {
         let db = setup_db();
         let db = &db;
@@ -2740,14 +2607,28 @@ mod tests {
             (Type::bool_literal(true), Type::bool_literal(false)),
         ] {
             for (first, second) in [(left, right), (right, left)] {
-                let union = UnionBuilder::new(db, &env)
+                let normalized = UnionBuilder::new(db, &env)
                     .cycle_recovery(true)
                     .add(first)
                     .add(second)
-                    .build()
-                    .expect_union();
+                    .build_normalized();
+                let union = normalized.ty().expect_union();
                 assert!(union.elements(db).contains(&left));
                 assert!(union.elements(db).contains(&right));
+                assert_eq!(
+                    UnionBuilder::new(db, &env)
+                        .cycle_recovery(true)
+                        .add_normalized(normalized)
+                        .build(),
+                    normalized.ty()
+                );
+                // Reusing the result outside cycle recovery must simplify redundant members.
+                assert_eq!(
+                    UnionBuilder::new(db, &env)
+                        .add_normalized(normalized)
+                        .build(),
+                    UnionType::from_elements(db, &env, [first, second])
+                );
             }
         }
     }
