@@ -3173,6 +3173,62 @@ class Incompatible(Base):
     def callback(self) -> int: ...  # error: [invalid-method-override]
 ```
 
+## Methods replacing final callable attributes
+
+Finality and signature compatibility are independent checks. A method that replaces a final callable
+attribute violates finality even if its signature is compatible. An incompatible signature also
+produces a method override diagnostic, including when the finality diagnostic is suppressed.
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # error: [override-of-final-variable]
+
+class Incompatible(Base):
+    # error: [override-of-final-variable]
+    # error: [invalid-method-override]
+    def value(self) -> int: ...
+
+class SuppressedFinality(Base):
+    # error: [invalid-method-override]
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable]
+
+class SuppressedSignature(Base):
+    # error: [override-of-final-variable]
+    def value(self) -> int: ...  # ty: ignore[invalid-method-override]
+
+class SuppressedBoth(Base):
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable, invalid-method-override]
+```
+
+## Disabling final variable override checks
+
+Disabling finality diagnostics still leaves signature compatibility checks enabled.
+
+```toml
+[rules]
+override-of-final-variable = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> int: ...  # error: [invalid-method-override]
+```
+
 ## Inactive method declarations
 
 An inactive declaration does not provide an override contract. An incompatible override is reported
@@ -3345,6 +3401,18 @@ class CallableBase:
 
 class Child(CallableBase):
     def make(self) -> Factory: ...  # no diagnostic
+```
+
+Finality checks remain enabled even when the overriding method has an incompatible signature.
+
+```pyi
+from typing import Final
+
+class FinalBase:
+    value: Final[Callable[[int], int]]
+
+class IncompatibleFinal(FinalBase):
+    def value(self) -> int: ...  # error: [override-of-final-variable]
 ```
 
 ## Disabled overrides do not hide other rules

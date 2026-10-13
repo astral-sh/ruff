@@ -197,8 +197,8 @@ fn member_contract<'db>(
         .map_or(std::slice::from_ref(&own_place.ty), |union| {
             union.elements(db)
         });
-    // Only pairs of methods go to the method checker. A decorator can turn a
-    // function into a property, in which case its exposed value must be checked.
+    // A decorator can turn a function into a property, in which case its exposed
+    // value must be checked instead of the original function's signature.
     let is_method = is_method_type(db, own_place.ty);
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
@@ -410,7 +410,7 @@ fn attribute_violation<'db>(
 
 /// Select the checker from the members' access semantics before applying diagnostic settings.
 pub(super) enum OverrideCheck<'db> {
-    /// Compare an overriding method with an inherited method or inferred callable.
+    /// Compare an overriding method with an inherited callable's signature.
     Callable,
     /// Attribute checking is complete. `None` includes compatible pairs and conflicts
     /// already present in a base class.
@@ -498,8 +498,9 @@ impl<'db> AttributeOverrideViolation<'db> {
 ///
 /// Declared attributes compare the values exposed after descriptor access. An
 /// inferred callable default has no declared attribute contract, but an overriding
-/// method must still preserve its call signature. Diagnostic settings do not affect
-/// which check applies.
+/// method must still preserve its call signature. Methods replacing final callable
+/// attributes also retain signature checking, independently of finality diagnostics.
+/// Diagnostic settings do not affect which check applies.
 pub(super) fn check_override<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -555,6 +556,15 @@ pub(super) fn check_override<'db>(
         }
         Some(MemberContract::Inferred(_)) | None => return OverrideCheck::Unavailable,
     };
+    // Final attributes are exempt from attribute compatibility checks, but finality
+    // and signature compatibility are independent: suppressing a finality diagnostic
+    // must not hide an incompatible method signature.
+    if source.is_method
+        && target.qualifiers.contains(TypeQualifiers::FINAL)
+        && target.read.try_upcast_to_callable(db, env).is_some()
+    {
+        return OverrideCheck::Callable;
+    }
     let Some(violation) = attribute_violation(
         db,
         env,
