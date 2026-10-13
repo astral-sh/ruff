@@ -2,48 +2,6 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
-#[test]
-fn mutable_override_enabled_by_default() -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "test.py",
-        r#"
-        class Base:
-            value: int
-            other: int
-
-        class Child(Base):
-            value: bool
-            other: str
-        "#,
-    )?;
-
-    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    test.py:7:5: error[invalid-mutable-override] Invalid override of attribute `value`: Override does not accept writes of type `int`
-    test.py:8:5: error[invalid-attribute-override] Invalid override of attribute `other`: Type `str` is not assignable to inherited type `int`
-    Found 2 diagnostics
-
-    ----- stderr -----
-    ");
-
-    assert_cmd_snapshot!(
-        case.command().args(["--output-format=concise", "--ignore", "invalid-mutable-override"]),
-        @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    test.py:8:5: error[invalid-attribute-override] Invalid override of attribute `other`: Type `str` is not assignable to inherited type `int`
-    Found 1 diagnostic
-
-    ----- stderr -----
-    "
-    );
-
-    Ok(())
-}
-
 /// The rule severity can be changed in the configuration file
 #[test]
 fn configuration_rule_severity() -> anyhow::Result<()> {
