@@ -1964,6 +1964,147 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Ambiguous overloads preserve generic return types
+
+When a gradual receiver matches overloads returning different specializations of the same class, the
+result retains that class. Only the differing type arguments become unknown. This covers the
+operator overloads in [#4055](https://github.com/astral-sh/ty/issues/4055).
+
+```py
+from __future__ import annotations
+
+from typing import Any, overload
+from ty_extensions._internal import Unknown
+
+class Series[T]:
+    @overload
+    def __add__(self: Series[int], other: int) -> Series[int]: ...
+    @overload
+    def __add__(self: Series[str], other: int) -> Series[str]: ...
+    def __add__(self, other: int): ...
+    def count(self) -> int:
+        return 0
+
+def gradual(series: Series[Any]):
+    reveal_type(series + 1)  # revealed: Series[Unknown]
+    reveal_type(series.__add__(1))  # revealed: Series[Unknown]
+    reveal_type(Series.__add__(series, 1))  # revealed: Series[Unknown]
+
+def unknown(series: Series[Unknown]):
+    reveal_type(series + 1)  # revealed: Series[Unknown]
+```
+
+Concrete receivers select the matching overload:
+
+```py
+def _(integers: Series[int], strings: Series[str]):
+    reveal_type(integers + 1)  # revealed: Series[int]
+    reveal_type(strings + 1)  # revealed: Series[str]
+```
+
+The returned instance supports known methods, and ty still rejects missing attributes:
+
+```py
+def _(series: Series[Any]):
+    result = series + 1
+    reveal_type(result.count())  # revealed: int
+    result.missing()  # error: [unresolved-attribute]
+```
+
+## Ambiguous overloads returning generic protocols
+
+Specializations of a single protocol preserve the protocol while differing type arguments become
+unknown.
+
+```py
+from typing import Any, Protocol, overload
+
+class P[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+@overload
+def same_protocol(x: int) -> P[int]: ...
+@overload
+def same_protocol(x: str) -> P[str]: ...
+def same_protocol(x): ...
+def _(x: Any):
+    reveal_type(same_protocol(x))  # revealed: P[Unknown]
+```
+
+The return types `P[int]` and `Q[int]` are equivalent, but neither is equivalent to `P[str]`. The
+returns do not all specialize the same protocol, so their ambiguous result is `Unknown` regardless
+of declaration order.
+
+```py
+class Q[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+@overload
+def p_first(x: int) -> P[int]: ...
+@overload
+def p_first(x: str) -> Q[int]: ...
+@overload
+def p_first(x: bytes) -> P[str]: ...
+def p_first(x): ...
+@overload
+def q_first(x: str) -> Q[int]: ...
+@overload
+def q_first(x: int) -> P[int]: ...
+@overload
+def q_first(x: bytes) -> P[str]: ...
+def q_first(x): ...
+def _(x: Any):
+    reveal_type(p_first(x))  # revealed: Unknown
+    reveal_type(q_first(x))  # revealed: Unknown
+```
+
+## Parameter packs in ambiguous overload returns
+
+Equivalent `ParamSpec` arguments are preserved while other type arguments are merged. Differing
+parameter packs currently make the entire ambiguous return type unknown:
+
+```py
+from typing import Any, overload
+
+class WithParams[T, **P]: ...
+
+@overload
+def same_parameters(x: int) -> WithParams[int, [bytes]]: ...
+@overload
+def same_parameters(x: str) -> WithParams[str, [bytes]]: ...
+def same_parameters(x): ...
+@overload
+def parameters(x: int) -> WithParams[int, [int]]: ...
+@overload
+def parameters(x: str) -> WithParams[int, [str]]: ...
+def parameters(x): ...
+def _(x: Any):
+    reveal_type(same_parameters(x))  # revealed: WithParams[Unknown, (bytes, /)]
+    reveal_type(parameters(x))  # revealed: Unknown
+```
+
+The same applies to `TypeVarTuple` arguments:
+
+```py
+class WithItems[T, *Ts]: ...
+
+@overload
+def same_items(x: int) -> WithItems[int, bytes, float]: ...
+@overload
+def same_items(x: str) -> WithItems[str, bytes, float]: ...
+def same_items(x): ...
+@overload
+def items(x: int) -> WithItems[int, bytes]: ...
+@overload
+def items(x: str) -> WithItems[int, float]: ...
+def items(x): ...
+def _(x: Any):
+    reveal_type(same_items(x))  # revealed: WithItems[Unknown, bytes, float]
+    reveal_type(items(x))  # revealed: Unknown
+```
+
 ## Instance attributes with substituted type variables
 
 Instance attributes are specialized once, even when the type arguments refer to the class's own type

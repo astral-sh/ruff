@@ -5004,7 +5004,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | list[Unknown] | list[list[Unknown] | int]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -5106,9 +5106,9 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
-During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
-in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
-regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+During fixpoint iteration, overloads may become ambiguous, introducing `Unknown` into their return
+types. Even in this case, `Divergent` is propagated, guaranteeing the convergence of type inference.
+Here is the regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
 from typing import Any
@@ -5123,8 +5123,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | list[Unknown]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | list[Unknown]
 ```
 
 ### Builtin types attributes
