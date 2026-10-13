@@ -21,7 +21,7 @@
 # no-build = true
 # exclude-newer = "P7D"
 # require-build-hashes = true
-# preview-features = ["build-dependency-hashes"]
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Generate the confusables.rs file from the VS Code ambiguous.json file."""

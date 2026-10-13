@@ -122,12 +122,7 @@ repos:
     hooks:
       - id: uv-lock
         priority: 0
-        args:
-          [
-            --default-index=https://pypi.org/simple,
-            --check,
-            --refresh,
-          ]
+        args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e # frozen: v0.17.0

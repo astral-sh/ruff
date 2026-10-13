@@ -20,7 +20,7 @@
 #
 # [tool.uv]
 # require-build-hashes = true
-# preview-features = ["build-dependency-hashes"]
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Run a reproduction command with the recorded environment and a supplied deadline."""

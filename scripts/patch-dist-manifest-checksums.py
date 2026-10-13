@@ -19,7 +19,7 @@
 #
 # [tool.uv]
 # require-build-hashes = true
-# preview-features = ["build-dependency-hashes"]
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Add sidecar SHA-256 checksums to a cargo-dist local manifest.

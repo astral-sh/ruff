@@ -22,14 +22,19 @@
 # [tool.uv]
 # no-build = true
 # no-binary-package = ["mypy-primer"]
-# build-constraint-dependencies = ["setuptools==84.0.0"]
+# build-constraint-dependencies = [
+#     { requirement = "setuptools==84.0.0", hashes = [
+#         "sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+#         "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73",
+#     ] },
+# ]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
 # exclude-newer = "P7D"
 # require-build-hashes = true
-# preview-features = ["build-dependency-hashes"]
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 #
 # [tool.uv.sources]
 # # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
