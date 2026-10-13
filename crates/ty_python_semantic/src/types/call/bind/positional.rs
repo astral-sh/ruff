@@ -4,12 +4,14 @@ use super::{InvalidArgumentTypeProvenance, MatchedArgument, MatchedParameter};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgument, CallArguments};
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::tuple::{TupleSpec, VariableSegment};
+use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::any_over_type;
 use crate::types::{Parameters, Type};
 
-/// Bound the dense tables used for matching. Larger calls use the ordinary matcher, whose memory
-/// use does not grow with the product of both call dimensions.
+/// Bound the dense tables used for matching and constraint propagation. Larger calls use the
+/// ordinary matcher, whose memory use does not grow with the product of both call dimensions.
 const MAX_POSITIONAL_STATES: usize = 65_536;
 
 /// One required value or a homogeneous, possibly empty sequence of values.
@@ -54,6 +56,11 @@ pub(super) struct PositionalMatches<'db> {
     /// From each (segment, parameter) state, can the rest of the call fit this signature?
     /// This checks argument counts only; `evaluate` checks the types later.
     can_finish: Box<[bool]>,
+    pub(super) arguments: Box<[MatchedArgument<'db>]>,
+}
+
+pub(super) struct PositionalEvaluation<'db, 'c> {
+    pub(super) constraints: ConstraintSet<'db, 'c>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
 }
 
@@ -272,19 +279,36 @@ impl<'db> PositionalMatches<'db> {
         }
     }
 
-    /// Checks argument types and retains matches that belong to a valid complete placement.
+    /// Checks argument types across complete placements, keeping each placement's constraints
+    /// together when combining alternatives.
     ///
+    /// Returns positional constraints and matches that can participate in a valid complete
+    /// placement. Keyword arguments filter these matches, but the caller still infers their
+    /// constraints separately.
     /// Returns `None` when the ordinary matcher should diagnose the call.
-    pub(super) fn evaluate(
+    pub(super) fn evaluate<'c>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         parameters: &Parameters<'db>,
-    ) -> Option<Box<[MatchedArgument<'db>]>> {
-        // Check each segment's element type against each parameter once. Different unpack
-        // lengths may use the same match.
-        let mut edges = vec![false; self.state(self.segments.len(), 0)];
+        inferable: TypeVarSet<'db>,
+    ) -> Option<PositionalEvaluation<'db, 'c>> {
+        let never = ConstraintSet::from_bool(constraints, false);
+        let always = ConstraintSet::from_bool(constraints, true);
+        // Keep inference evidence while allowing only this call's type variables to be solved.
+        // The lazy relation alone could specialize an unrelated type variable from the caller.
+        let argument_constraints = |actual: Type<'db>, expected: Type<'db>| {
+            actual
+                .when_assignable_to(db, env, expected, constraints, inferable)
+                .and(db, constraints, || {
+                    actual.when_constraint_set_assignable_to(db, env, expected, constraints)
+                })
+        };
+        // An edge's constraints describe assigning this segment's element type to this
+        // parameter. Compute them once; different unpack lengths may use the same edge.
+        let mut edges = vec![never; self.state(self.segments.len(), 0)];
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..self.parameter_count {
                 let current = self.state(index, position);
@@ -295,16 +319,16 @@ impl<'db> PositionalMatches<'db> {
                 edges[current] = arguments
                     .get(segment.argument_index)
                     .and_then(|argument| argument.matched_type(expected, segment.argument_type))
-                    .is_none_or(|actual| actual.is_assignable_to(db, env, expected));
+                    .map_or(always, |actual| argument_constraints(actual, expected));
             }
         }
 
-        // A state can finish if a compatible match leads to a state that can finish, or if
-        // ending the current unpack allows the remaining arguments to fit.
-        let mut suffix = vec![false; self.can_finish.len()];
+        // For each state, build the constraints for completing the rest of the call. Intersect
+        // along a placement (all arguments must fit) and union alternatives (any length may fit).
+        let mut suffix = vec![never; self.can_finish.len()];
         for position in 0..=self.parameter_count {
             let terminal = self.state(self.segments.len(), position);
-            suffix[terminal] = self.can_finish[terminal];
+            suffix[terminal] = ConstraintSet::from_bool(constraints, self.can_finish[terminal]);
         }
         for (index, segment) in self.segments.iter().enumerate().rev() {
             for position in (0..=self.parameter_count).rev() {
@@ -312,42 +336,70 @@ impl<'db> PositionalMatches<'db> {
                 let mut condition = if segment.repeated {
                     suffix[self.state(index + 1, position)]
                 } else {
-                    false
+                    never
                 };
                 if let Some(next) = self.next_state(index, position) {
-                    condition |= edges[current] && suffix[next];
+                    condition.union(
+                        db,
+                        constraints,
+                        edges[current].and(db, constraints, || suffix[next]),
+                    );
                 }
                 suffix[current] = condition;
             }
         }
 
-        if !suffix[0] {
+        // Keyword arguments constrain the same type variables, so they must participate when
+        // deciding which positional placements remain possible.
+        let mut common = always;
+        for argument in arguments.iter() {
+            if let CallArgument::Keyword { name, .. } = argument
+                && let Some((_, parameter)) = parameters.keyword_by_name(name)
+                && let Some(actual) = argument.matched_type(parameter.annotated_type(), None)
+            {
+                common.intersect(
+                    db,
+                    constraints,
+                    argument_constraints(actual, parameter.annotated_type()),
+                );
+            }
+        }
+        let possible = |condition: ConstraintSet<'db, 'c>| {
+            !condition.is_never_satisfied(db, env, inferable)
+                && !condition.has_no_valid_solutions(db, env)
+        };
+        if !possible(common.and(db, constraints, || suffix[0])) {
             return None;
         }
 
-        // Keep a match only when we can reach it from the start and complete the call after it.
+        // Keep an individual match only if both the arguments before it and those after it can
+        // satisfy the same constraints. Testing an edge alone would mix incompatible placements.
         let mut matched = Self::empty_matches(arguments);
-        let mut reachable = vec![false; self.can_finish.len()];
-        reachable[0] = true;
+        let mut prefix = vec![never; self.can_finish.len()];
+        prefix[0] = common;
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..=self.parameter_count {
                 let current = self.state(index, position);
-                if !reachable[current] {
+                let previous = prefix[current];
+                if previous.is_trivially_never_satisfied() {
                     continue;
                 }
                 if segment.repeated {
-                    reachable[self.state(index + 1, position)] = true;
+                    prefix[self.state(index + 1, position)].union(db, constraints, previous);
                 }
-                if let Some(next) = self.next_state(index, position)
-                    && edges[current]
-                    && suffix[next]
-                {
-                    segment.add_match(&mut matched, position);
-                    reachable[next] = true;
+                if let Some(next) = self.next_state(index, position) {
+                    let condition = previous.and(db, constraints, || edges[current]);
+                    if possible(condition.and(db, constraints, || suffix[next])) {
+                        segment.add_match(&mut matched, position);
+                        prefix[next].union(db, constraints, condition);
+                    }
                 }
             }
         }
         Self::deduplicate_matches(&mut matched);
-        Some(matched)
+        Some(PositionalEvaluation {
+            constraints: suffix[0],
+            arguments: matched,
+        })
     }
 }
