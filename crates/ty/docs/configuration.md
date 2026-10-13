@@ -160,6 +160,42 @@ Defaults to `true`.
 
 ---
 
+### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    return-type-inference = "always"
+    ```
+
+---
+
 ### `strict-equality-semantics`
 
 Configure ty's behavior regarding type inference and narrowing of equality
@@ -827,6 +863,48 @@ Defaults to `true`.
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    return-type-inference = "always"
     ```
 
 ---

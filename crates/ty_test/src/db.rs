@@ -20,8 +20,8 @@ use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
-    default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, ReturnTypeInference,
+    check_file_unwrap, default_lint_registry,
 };
 
 #[salsa::db]
@@ -289,17 +289,23 @@ impl std::ops::Deref for MdtestRuleSelection {
 }
 
 fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
+    let defaults = AnalysisSettings {
+        // TODO: Change this back to just using the default when return type inference is enabled by default.
+        return_type_inference: ReturnTypeInference::Always,
+        ..AnalysisSettings::default()
+    };
     let Some(options) = options else {
-        return AnalysisSettings::default();
+        return defaults;
     };
 
     let AnalysisSettings {
+        return_type_inference: return_type_inference_default,
         strict_generic_narrowing: strict_generic_narrowing_default,
         strict_equality_semantics: strict_equality_semantics_default,
         respect_type_ignore_comments: respect_type_ignore_comments_default,
         allowed_unresolved_imports: allowed_unresolved_imports_default,
         replace_imports_with_any: replace_imports_with_any_default,
-    } = AnalysisSettings::default();
+    } = defaults;
 
     let allowed_unresolved_imports =
         if let Some(allowed_unresolved_imports) = options.allowed_unresolved_imports.as_deref() {
@@ -328,6 +334,9 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         };
 
     AnalysisSettings {
+        return_type_inference: options
+            .return_type_inference
+            .unwrap_or(return_type_inference_default),
         strict_generic_narrowing: options
             .strict_generic_narrowing
             .unwrap_or(strict_generic_narrowing_default),
