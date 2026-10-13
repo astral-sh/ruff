@@ -493,6 +493,43 @@ reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
 ```
 
+## Overload resolution with union operators
+
+Checking a union against multiple `TypeForm` parameters preserves runtime operator diagnostics.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`operators.pyi`:
+
+```pyi
+class Meta(type):
+    def __or__(self, other: str) -> str: ...
+    def __ror__(self, other: str) -> str: ...
+
+class A(metaclass=Meta): ...
+class B(metaclass=Meta): ...
+class C: ...
+```
+
+```py
+from operators import A, B, C
+from typing import overload
+from typing_extensions import TypeForm
+
+@overload
+def accept(form: "TypeForm[A | B | C]") -> int: ...
+@overload
+def accept(form: TypeForm[str]) -> str: ...
+def accept(form: object) -> int | str:
+    return 1
+
+# error: [unsupported-operator]
+reveal_type(accept(A | B | C))  # revealed: int
+```
+
 ## Narrowing to runtime classes
 
 A `TypeForm[T]` value may or may not be a runtime class object. An `isinstance(..., type)` check can
