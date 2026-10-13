@@ -124,16 +124,15 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         cfg_select! {
-            debug_assertions => {
-                f.debug_struct("AstNodeRef")
-                    .field("kind", &self.kind)
-                    .field("range", &self.range)
-                    .finish()
-            },
+            debug_assertions => f
+                .debug_struct("AstNodeRef")
+                .field("kind", &self.kind)
+                .field("range", &self.range)
+                .finish(),
             _ => {
                 // Unfortunately we have no access to the AST here.
                 f.debug_tuple("AstNodeRef").finish_non_exhaustive()
-            },
+            }
         }
     }
 }

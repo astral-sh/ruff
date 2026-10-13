@@ -55,7 +55,7 @@ pub(crate) const fn choose_quote(
 pub struct UnicodeEscape<'a> {
     source: &'a str,
     layout: EscapeLayout,
-    display_escapes: Option<Vec<usize>>,
+    display_escapes: DisplayEscapes,
 }
 
 impl<'a> UnicodeEscape<'a> {
@@ -65,7 +65,7 @@ impl<'a> UnicodeEscape<'a> {
         Self {
             source,
             layout,
-            display_escapes: None,
+            display_escapes: DisplayEscapes::NotComputed,
         }
     }
 
@@ -82,10 +82,17 @@ impl<'a> UnicodeEscape<'a> {
     /// [canonically equivalent]: https://www.unicode.org/reports/tr15/#Canon_Compat_Equivalence
     #[must_use]
     pub fn escape_for_display(mut self) -> Self {
-        if self.display_escapes.is_some() || self.source.is_ascii() {
+        match self.display_escapes {
+            DisplayEscapes::NotComputed => {}
+            DisplayEscapes::Computed(_) => return self,
+        }
+
+        if self.source.is_ascii() {
             return self;
         }
+
         let display_escapes = Self::display_escapes(self.source, self.layout.quote);
+
         for &index in &display_escapes {
             if let Some(ch) = self.source[index..].chars().next() {
                 let extra = Self::escaped_codepoint_len(ch) - ch.len_utf8();
@@ -96,7 +103,9 @@ impl<'a> UnicodeEscape<'a> {
                     .filter(|&len| len <= isize::MAX as usize - Self::REPR_RESERVED_LEN);
             }
         }
-        self.display_escapes = Some(display_escapes);
+
+        self.display_escapes = DisplayEscapes::Computed(display_escapes);
+
         self
     }
 
@@ -329,8 +338,11 @@ impl UnicodeEscape<'_> {
 
     /// Records offsets of characters that would attach to the following escape or closing quote.
     fn escape_preceding_prepends(source: &str, end: usize, escapes: &mut Vec<usize>) {
-        // Grapheme_Cluster_Break=Prepend characters join the following character. Once one is
-        // escaped, a preceding Prepend would join the escape's backslash, so escape that too.
+        // `GraphemeClusterBreak::Prepend` characters can join the following character. Once one is
+        // escaped, a preceding `Prepend` would join the escape's backslash, so escape that too.
+        //
+        // See Unicode's grapheme cluster boundary rules:
+        // https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules
         let start = source[..end]
             .char_indices()
             .rev()
@@ -440,12 +452,12 @@ impl Escape for UnicodeEscape<'_> {
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
-        let mut display_escapes = self
-            .display_escapes
-            .as_deref()
-            .unwrap_or_default()
-            .iter()
-            .peekable();
+        let display_escapes: &[usize] = match &self.display_escapes {
+            DisplayEscapes::NotComputed => &[],
+            DisplayEscapes::Computed(offsets) => offsets,
+        };
+
+        let mut display_escapes = display_escapes.iter().peekable();
 
         for (index, ch) in self.source.char_indices() {
             let force_escape = display_escapes
@@ -456,6 +468,7 @@ impl Escape for UnicodeEscape<'_> {
             }
             Self::write_char(ch, self.layout.quote, force_escape, formatter)?;
         }
+
         Ok(())
     }
 }
@@ -624,6 +637,25 @@ impl std::fmt::Display for BytesRepr<'_, '_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.write(formatter)
     }
+}
+
+/// Whether additional display escapes have been calculated for a string.
+#[derive(Debug)]
+enum DisplayEscapes {
+    /// Display escaping has not been calculated for the given string.
+    ///
+    /// ASCII strings stay in this state even after [`UnicodeEscape::escape_for_display`] is called
+    /// because they need no additional display escapes.
+    NotComputed,
+
+    /// Display escaping has been calculated for the given string.
+    ///
+    /// The wrapped vector contains the byte offsets of characters that need extra escaping. The
+    /// vector may be empty.
+    ///
+    /// This state lets [`UnicodeEscape::escape_for_display`] skip recalculation, which also prevents
+    /// it from adding extra escape lengths to the layout twice.
+    Computed(Vec<usize>),
 }
 
 #[cfg(test)]
