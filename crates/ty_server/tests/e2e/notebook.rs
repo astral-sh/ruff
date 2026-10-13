@@ -659,6 +659,47 @@ fn inlay_hints_range_past_end_of_cell() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Cells that use a cell magic, such as `%%bash`, aren't Python code, so they aren't part of the
+/// notebook's Python source. Requests for the cells after them still resolve to the right cell,
+/// and requests for the magic cell itself return no Python results.
+#[test]
+fn cells_after_cell_magic() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let mut builder = NotebookBuilder::virtual_file("test.ipynb");
+    builder.add_python_cell("y = 'a'\n");
+    let magic_cell = builder.add_python_cell("%%bash\necho hi\n");
+    let x_cell = builder.add_python_cell("x = 1\n");
+    builder.add_python_cell("z = \"zz\"\n");
+    builder.open(&mut server);
+
+    server.collect_publish_diagnostic_notifications(4);
+
+    let id = server.send_request::<lsp_types::HoverRequest>(lsp_types::HoverParams {
+        text_document_position_params: lsp_types::TextDocumentPositionParams {
+            text_document: TextDocumentIdentifier {
+                uri: x_cell.clone(),
+            },
+            position: Position::new(0, 0),
+        },
+        work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+    });
+    let hover = server.await_response::<lsp_types::HoverRequest>(&id);
+    assert_json_snapshot!("cells_after_cell_magic_hover", hover);
+
+    let x_cell_tokens = semantic_tokens_full_for_cell(&mut server, &x_cell);
+    assert_json_snapshot!("cells_after_cell_magic_tokens", x_cell_tokens);
+
+    let magic_cell_tokens = semantic_tokens_full_for_cell(&mut server, &magic_cell)
+        .map(|tokens| tokens.data)
+        .unwrap_or_default();
+    assert_eq!(magic_cell_tokens, vec![]);
+
+    Ok(())
+}
+
 #[test]
 fn undefined_reveal_fix_stays_in_cell() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
