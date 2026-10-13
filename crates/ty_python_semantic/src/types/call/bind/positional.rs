@@ -17,12 +17,31 @@ struct Segment<'db> {
     repeated: bool,
 }
 
+impl<'db> Segment<'db> {
+    fn add_match(self, arguments: &mut [MatchedArgument<'db>], parameter_index: usize) {
+        arguments[self.argument_index]
+            .parameters
+            .push(MatchedParameter {
+                index: parameter_index,
+                argument_type: self.argument_type,
+                expected_type: None,
+                provenance: InvalidArgumentTypeProvenance::Argument,
+            });
+    }
+}
+
 /// Possible ordered bindings of positional arguments to a fixed positional signature.
 ///
 /// Each state identifies an argument segment and the next parameter. A repeated segment can
 /// either finish or consume one parameter without advancing to the next segment. Keeping these
 /// choices until argument types are available allows `f(*before, text, *after)` to place `text`
 /// at a compatible parameter without enumerating combinations of unpack lengths.
+///
+/// ```python
+/// def f(a: int, text: str, b: int): ...
+/// def call(before: list[int], after: list[int]):
+///     f(*before, "text", *after)
+/// ```
 #[derive(Clone, Debug)]
 pub(super) struct PositionalMatches<'db> {
     segments: Box<[Segment<'db>]>,
@@ -38,6 +57,11 @@ pub(super) struct PositionalEvaluation<'db, 'c> {
 }
 
 impl<'db> PositionalMatches<'db> {
+    /// Builds the possible placements from argument lengths, before checking their types.
+    ///
+    /// Returns `None` when the ordinary matcher should handle the call, including unsupported
+    /// unpacking forms and argument counts that cannot fit. The initial matches retain every
+    /// possible parameter for argument inference; [`Self::evaluate`] then checks complete placements.
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -202,8 +226,13 @@ impl<'db> PositionalMatches<'db> {
         })
     }
 
-    /// Intersect constraints along each complete placement and union alternative placements.
-    /// The resulting projection contains only edges that participate in a successful path.
+    /// Checks argument types across complete placements, keeping each placement's constraints
+    /// together when combining alternatives.
+    ///
+    /// Returns positional constraints and matches that can participate in a valid complete
+    /// placement. Keyword arguments filter these matches, but the caller still infers their
+    /// constraints separately.
+    /// On failure, returns one complete placement for diagnostics and `None` for the constraints.
     pub(super) fn evaluate<'c>(
         &self,
         db: &'db dyn Db,
@@ -216,6 +245,15 @@ impl<'db> PositionalMatches<'db> {
         let width = self.parameter_count + 1;
         let never = ConstraintSet::from_bool(constraints, false);
         let always = ConstraintSet::from_bool(constraints, true);
+        // Keep inference evidence while allowing only this call's type variables to be solved.
+        // The lazy relation alone could specialize an unrelated type variable from the caller.
+        let argument_constraints = |actual: Type<'db>, expected: Type<'db>| {
+            actual
+                .when_assignable_to(db, env, expected, constraints, inferable)
+                .and(db, constraints, || {
+                    actual.when_constraint_set_assignable_to(db, env, expected, constraints)
+                })
+        };
         let mut edges = vec![never; self.segments.len() * width];
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..self.parameter_count {
@@ -226,21 +264,7 @@ impl<'db> PositionalMatches<'db> {
                 edges[index * width + position] = arguments
                     .get(segment.argument_index)
                     .and_then(|argument| argument.matched_type(expected, segment.argument_type))
-                    .map_or(always, |actual| {
-                        // Only this call's type variables may be solved. The lazy relation
-                        // retains inference evidence, but alone could specialize a caller's
-                        // unrelated type variable to make this placement appear valid.
-                        actual
-                            .when_assignable_to(db, env, expected, constraints, inferable)
-                            .and(db, constraints, || {
-                                actual.when_constraint_set_assignable_to(
-                                    db,
-                                    env,
-                                    expected,
-                                    constraints,
-                                )
-                            })
-                    });
+                    .map_or(always, |actual| argument_constraints(actual, expected));
             }
         }
 
@@ -282,22 +306,7 @@ impl<'db> PositionalMatches<'db> {
                 common.intersect(
                     db,
                     constraints,
-                    actual
-                        .when_assignable_to(
-                            db,
-                            env,
-                            parameter.annotated_type(),
-                            constraints,
-                            inferable,
-                        )
-                        .and(db, constraints, || {
-                            actual.when_constraint_set_assignable_to(
-                                db,
-                                env,
-                                parameter.annotated_type(),
-                                constraints,
-                            )
-                        }),
+                    argument_constraints(actual, parameter.annotated_type()),
                 );
             }
         }
@@ -344,8 +353,9 @@ impl<'db> PositionalMatches<'db> {
         }
     }
 
-    /// Select a structurally valid placement with the fewest individually incompatible edges.
-    /// Ordinary inference and argument checking then report errors for that complete placement.
+    /// Selects a complete placement with the fewest incompatible argument/parameter pairs,
+    /// ending the current unpack sooner when costs tie. The caller validates that placement to
+    /// report errors, rather than combining diagnostics from mutually exclusive placements.
     fn best_failing_matches<'c>(
         &self,
         arguments: &CallArguments<'_, 'db>,
@@ -397,18 +407,5 @@ impl<'db> PositionalMatches<'db> {
         }
         Self::deduplicate_matches(&mut matched);
         matched
-    }
-}
-
-impl<'db> Segment<'db> {
-    fn add_match(self, arguments: &mut [MatchedArgument<'db>], parameter_index: usize) {
-        let parameter = MatchedParameter {
-            index: parameter_index,
-            argument_type: self.argument_type,
-            expected_type: None,
-            provenance: InvalidArgumentTypeProvenance::Argument,
-        };
-        let matched = &mut arguments[self.argument_index];
-        matched.parameters.push(parameter);
     }
 }

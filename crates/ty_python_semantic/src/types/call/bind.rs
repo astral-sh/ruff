@@ -1342,16 +1342,17 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Whether argument inference needs to consider multiple positional placements.
+    /// Whether argument inference needs to consider multiple positional placements, even for a
+    /// single signature. Such arguments need the same inference rounds as overloaded calls.
     pub(crate) fn has_ambiguous_positional_arguments(&self) -> bool {
-        self.iter_flat().any(|binding| {
-            binding.overloads.iter().any(|overload| {
+        self.iter_flat()
+            .flat_map(|binding| &binding.overloads)
+            .any(|overload| {
                 overload
                     .positional_matches
                     .as_ref()
                     .is_some_and(|positional| positional.has_ambiguous_argument_contexts())
             })
-        })
     }
 
     /// Verify that the type of each argument is assignable to type of the parameter that it was
@@ -8142,6 +8143,8 @@ impl<'db> Binding<'db> {
             .collect()
     }
 
+    /// Returns the context for one argument/parameter match, specializing the parameter only when
+    /// its expected type requires information from the other arguments or the call's return type.
     #[expect(clippy::too_many_arguments)]
     fn argument_type_context(
         &self,
