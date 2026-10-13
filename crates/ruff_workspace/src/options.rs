@@ -1662,18 +1662,28 @@ pub struct Flake8ImportConventionsOptions {
     /// The conventional aliases for imports. These aliases can be extended by
     /// the [`extend-aliases`](#lint_flake8-import-conventions_extend-aliases) option.
     #[option(
-        default = r#"{"altair": "alt", "datetime": "dt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
+        default = r#"{"altair": "alt", "datetime": "dt", "matplotlib": "mpl", "matplotlib.pyplot": "plt", "networkx": "nx", "numpy": "np", "numpy.typing": "npt", "pandas": "pd", "seaborn": "sns", "tensorflow": "tf", "tkinter":  "tk", "holoviews": "hv", "panel": "pn", "plotly.express": "px", "polars": "pl", "pyarrow": "pa", "xml.etree.ElementTree": "ET"}"#,
         value_type = "dict[str, str]",
         scope = "aliases",
         example = r#"
             # Declare the default aliases.
             altair = "alt"
             datetime = "dt"
+            matplotlib = "mpl"
             "matplotlib.pyplot" = "plt"
+            networkx = "nx"
             numpy = "np"
+            "numpy.typing" = "npt"
             pandas = "pd"
             seaborn = "sns"
-            scipy = "sp"
+            tensorflow = "tf"
+            tkinter = "tk"
+            holoviews = "hv"
+            panel = "pn"
+            "plotly.express" = "px"
+            polars = "pl"
+            pyarrow = "pa"
+            "xml.etree.ElementTree" = "ET"
         "#
     )]
     aliases: Option<FxHashMap<ModuleName, Alias>>,
