@@ -21,13 +21,13 @@ use crate::{
     },
     reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
-        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
-        MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
-        StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
-        TypingModule, UnionBuilder, UnionType,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+        CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS,
+        DataclassFlags, DataclassParams, GenericAlias, GenericContext, KnownClass,
+        KnownInstanceType, MaterializationKind, MemberLookupPolicy, MetaclassCandidate,
+        MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin,
+        Signature, SpecialFormType, StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping,
+        TypeVarVariance, TypingModule, UnionBuilder, UnionType,
         attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -1992,13 +1992,32 @@ impl<'db> StaticClassLiteral<'db> {
                 parameters.push(extra);
             }
 
-            let signature = match name {
-                "__new__" | "__init__" => Signature::new_generic(
-                    inherited_generic_context.or_else(|| self.inherited_generic_context(db)),
-                    Parameters::standard(parameters),
-                    return_ty,
-                ),
-                _ => Signature::new(Parameters::standard(parameters), return_ty),
+            let generic_context = match name {
+                "__new__" | "__init__" => {
+                    inherited_generic_context.or_else(|| self.inherited_generic_context(db))
+                }
+                _ => None,
+            };
+            let signature = if return_ty.contains_self(db, env)
+                || parameters
+                    .iter()
+                    .any(|parameter| parameter.annotated_type().contains_self(db, env))
+            {
+                // Field annotations bind `Self` to their class. The generated method needs its
+                // own inferable `Self`, shared with the receiver, including for inherited fields.
+                let self_typevar = BoundTypeVarInstance::synthetic_self(
+                    db,
+                    SelfTypeVarOrigin::Class(self.into()),
+                    instance_ty,
+                    BindingContext::Synthetic(env.program(db)),
+                );
+                let self_ty = Type::TypeVar(self_typevar);
+                let receiver = parameters.first_mut()?;
+                *receiver = receiver.clone().with_annotated_type(self_ty);
+                Signature::new_generic(generic_context, Parameters::standard(parameters), return_ty)
+                    .with_inferable_self(db, env, self_typevar)
+            } else {
+                Signature::new_generic(generic_context, Parameters::standard(parameters), return_ty)
             };
             Some(Type::function_like_callable(db, signature))
         };
