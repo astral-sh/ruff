@@ -746,28 +746,6 @@ class Box[T: NamedTuple]:
         return result
 ```
 
-### Variable-length positional unpacks
-
-Constructor calls currently match the unpacked iterable to the first parameter and the later
-argument to the second. This infers a string list for `value`, even though an empty `before` could
-instead put the integer list there. We still reject writing an integer to the inferred string list.
-
-```py
-from typing import Self
-
-class Box[T, Tag = bytes]:
-    def __new__(cls, value: list[T], other: object = None) -> Self:
-        return super().__new__(cls)
-
-    def __init__(self, value: list[T], other: object = None):
-        self.value = value
-
-def _(before: list[list[str]], value: list[int]) -> None:
-    result = Box(*before, value)
-    result.value.append(1)  # error: [invalid-argument-type]
-    valid: Box[int] | Box[str] = result  # no diagnostic
-```
-
 ### Passing Self to a NamedTuple-bounded constructor
 
 A `NamedTuple` bound also allows passing `self` to a constructor parameter annotated with `Self`.

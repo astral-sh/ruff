@@ -5807,13 +5807,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
         inferred: InferredCall<'db>,
+        positional_arguments_valid: bool,
     ) -> Self {
         let InferredCall {
             inferable_typevars,
             inference,
             errors: inference_errors,
             constraint_set_errors,
-            positional_arguments_valid,
         } = inferred;
         errors.extend(inference_errors);
         Self {
@@ -5883,8 +5883,6 @@ struct InferredCall<'db> {
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
     constraint_set_errors: Vec<bool>,
-    /// The positional arguments have a compatible complete placement.
-    positional_arguments_valid: bool,
 }
 
 /// Fixed inputs used to infer a call before its arguments are validated.
@@ -6115,15 +6113,8 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
     }
 }
 
-impl<'a, 'db> CallInference<'a, 'db> {
-    fn infer<'c>(
-        self,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        positional_constraints: Option<ConstraintSet<'db, 'c>>,
-    ) -> InferredCall<'db>
-    where
-        'a: 'c,
-    {
+impl<'db> CallInference<'_, 'db> {
+    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
         let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
@@ -6132,7 +6123,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
                 inference: None,
                 errors: Vec::new(),
                 constraint_set_errors,
-                positional_arguments_valid: positional_constraints.is_some(),
             };
         };
 
@@ -6324,7 +6314,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_constraints(
             &mut builder,
-            positional_constraints,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
             &mut specialization_errors,
@@ -6343,7 +6332,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
 
             self.infer_argument_constraints(
                 &mut builder,
-                positional_constraints,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
                 &mut specialization_errors,
@@ -6364,7 +6352,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
             inference: Some(inference),
             errors: specialization_errors,
             constraint_set_errors,
-            positional_arguments_valid: positional_constraints.is_some(),
         }
     }
 
@@ -6794,7 +6781,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
     fn infer_argument_constraints<'c>(
         &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
-        positional_constraints: Option<ConstraintSet<'db, 'c>>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -6802,21 +6788,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
     ) -> bool {
         let db = self.db;
         for relation in self.argument_relations() {
-            if positional_constraints.is_some()
-                && self
-                    .arguments
-                    .get(relation.argument_index)
-                    .is_some_and(|argument| {
-                        matches!(
-                            argument,
-                            CallArgument::Synthetic(_)
-                                | CallArgument::Positional(_)
-                                | CallArgument::Variadic(_)
-                        )
-                    })
-            {
-                continue;
-            }
             // Fixed elements can infer normally; the complete variadic pack is inferred below.
             if relation.has_starred_annotation
                 && relation.matched_parameter.expected_type.is_none()
@@ -6849,16 +6820,6 @@ impl<'a, 'db> CallInference<'a, 'db> {
                     }),
                 });
             }
-        }
-
-        if let Some(positional_constraints) = positional_constraints
-            && let Err(error) = builder.add_constraint_set(positional_constraints)
-        {
-            specialization_errors.push(BindingError::SpecializationError {
-                error,
-                argument_index: None,
-                argument: None,
-            });
         }
 
         self.infer_typevartuple_argument_constraints(
@@ -7486,14 +7447,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        let return_ty = self.inference.map_or(self.return_ty, |inference| {
-            if self.positional_arguments_valid {
-                inference.specialize_result(self.db, self.env, self.return_ty)
-            } else {
-                self.return_ty
-                    .apply_specialization(self.db, inference.merged_specialization(self.db))
-            }
-        });
+        let return_ty = self.return_ty.apply_optional_specialization(
+            self.db,
+            self.inference
+                .map(|inference| inference.merged_specialization(self.db)),
+        );
         (self.inferable_typevars, self.inference, return_ty)
     }
 }
@@ -8413,15 +8371,12 @@ impl<'db> Binding<'db> {
     ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
-        // Constructor inference combines evidence from several methods into one specialization.
-        // Use the ordinary matcher until it can preserve complete alternatives across that chain.
+        // Keep generic and constructor calls on the ordinary matcher: their inference must
+        // preserve the type variables belonging to each complete placement.
         let positional_matches = if use_positional_matching
             && self.constructor_context.is_none()
-            && self.signature.generic_context.is_none_or(|context| {
-                context
-                    .variables(db)
-                    .all(|typevar| !typevar.is_paramspec(db) && !typevar.is_typevartuple(db))
-            }) {
+            && self.signature.generic_context.is_none()
+        {
             PositionalMatches::new(
                 db,
                 env,
@@ -8518,20 +8473,9 @@ impl<'db> Binding<'db> {
             return;
         }
 
-        let inferable_typevars = self
-            .signature
-            .generic_context
-            .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
-        let positional_constraints = if let Some(positional) = &self.positional_matches {
+        let positional_arguments_valid = if let Some(positional) = &self.positional_matches {
             let Some(evaluated) = positional
-                .evaluate(
-                    db,
-                    env,
-                    constraints,
-                    arguments,
-                    parameters,
-                    inferable_typevars,
-                )
+                .evaluate(db, env, arguments, parameters)
                 .filter(|evaluated| !evaluated.provisional)
             else {
                 // Keep the ordinary diagnostics when no complete placement succeeds or when
@@ -8550,9 +8494,9 @@ impl<'db> Binding<'db> {
                     self.argument_matches[index] = evaluated.arguments[index].clone();
                 }
             }
-            Some(evaluated.constraints)
+            true
         } else {
-            None
+            false
         };
 
         let inferred = CallInference {
@@ -8564,9 +8508,12 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
-            inferable_typevars,
+            inferable_typevars: self
+                .signature
+                .generic_context
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
         }
-        .infer(constraints, positional_constraints);
+        .infer(constraints);
 
         let mut checker = ArgumentTypeChecker::new(
             db,
@@ -8581,6 +8528,7 @@ impl<'db> Binding<'db> {
             self.return_ty,
             &mut self.errors,
             inferred,
+            positional_arguments_valid,
         );
         checker.check_argument_types(constraints);
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();

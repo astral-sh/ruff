@@ -3132,89 +3132,22 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     return reveal_type(identity_callback(value))
 ```
 
-## Inference from positional unpacks of different lengths
+## Generic calls with variable-length unpacks
 
-`before` can be empty, in which case `number` fills `a`, or it can supply a string to `a`. Both
-types contribute to the return type:
-
-```py
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def first(a: T, b: object = 0) -> T:
-    return a
-
-def _(before: list[str], number: int) -> None:
-    reveal_type(first(*before, number))  # revealed: int | str
-```
-
-An argument between two unpacks can also determine the type variable. Only `values` can fill the
-`list[T]` parameter:
-
-```py
-def middle(a: int, values: list[T], b: int) -> T:
-    return values[0]
-
-def _(before: list[int], values: list[str], after: list[int]) -> None:
-    reveal_type(middle(*before, values, *after))  # revealed: str
-```
-
-The keyword argument can rule out an otherwise valid length for `before`. Here `expected` requires
-`T` to be `int`, so `before` must be empty and `value` must fill `a`.
-
-```py
-def checked(a: list[T], b: object = 0, *, expected: list[T]) -> T:
-    return a[0]
-
-def _(before: list[list[str]], value: list[int], expected: list[int]) -> None:
-    reveal_type(checked(*before, value, expected=expected))  # revealed: int
-```
-
-Finding a position for each argument does not make two incompatible `list[T]` arguments valid. No
-choice of `T` accepts both `list[int]` and `list[str]`:
-
-```py
-def same(a: list[T], b: list[T]) -> T:
-    return a[0]
-
-def _(before, a: list[int], b: list[str], after) -> None:
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    same(*before, a, b, *after)
-```
-
-## Positional unpacking retains whole return types
-
-An unpack can put either of two lists in the first parameter. The returned list still has one
-particular element type: accepting an integer on every possible result would mutate a string list
-when `before` supplies that parameter.
+Generic calls retain their existing matching behavior. The returned value can be a string list, so
+appending an integer is unsafe.
 
 ```py
 from typing import TypeVar
 
 T = TypeVar("T")
-S = TypeVar("S")
 
 def first(value: list[T], other: object = None) -> list[T]:
     return value
 
 def _(before: list[list[str]], ints: list[int]) -> None:
     result = first(*before, ints)
-    reveal_type(result)  # revealed: list[int] | list[str]
     result.append(1)  # error: [invalid-argument-type]
-    valid: list[int] | list[str] = result  # no diagnostic
-```
-
-Two inferred type variables also stay together: swapping which tuple is first cannot produce a tuple
-whose two elements have the same type.
-
-```py
-def pair(value: tuple[T, S], other: object = None) -> tuple[T, S]:
-    return value
-
-def _(before: list[tuple[str, int]], value: tuple[int, str]) -> None:
-    reveal_type(pair(*before, value))  # revealed: tuple[int, str] | tuple[str, int]
 ```
 
 ## Positional unpacking preserves outer type variables
@@ -3276,22 +3209,4 @@ class BoundedSetter(Base):
 
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
-```
-
-## Lambdas after positional unpacks
-
-Neither placement of this lambda is valid: it cannot accept the integer `1`, and the callbacks in
-`before` cannot accept the lambda as their argument.
-
-```py
-from collections.abc import Callable
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def apply(callback: Callable[[T], T], value: T, other: object = None) -> T:
-    return callback(value)
-
-def _(before: list[Callable[[int], int]]) -> None:
-    apply(*before, lambda x: x.upper(), 1)  # error: [invalid-argument-type]
 ```
