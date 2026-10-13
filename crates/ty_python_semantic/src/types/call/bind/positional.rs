@@ -9,6 +9,10 @@ use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Parameters, Type};
 
+/// Bound the dense tables used for matching and constraint propagation. Larger calls use the
+/// ordinary matcher, whose memory use does not grow with the product of both call dimensions.
+const MAX_POSITIONAL_STATES: usize = 65_536;
+
 /// One required value or a homogeneous, possibly empty sequence of values.
 #[derive(Clone, Copy, Debug)]
 struct Segment<'db> {
@@ -141,13 +145,16 @@ impl<'db> PositionalMatches<'db> {
         }
 
         let parameter_count = parameters.positional().count();
+        let state_count = (segments.len() + 1).checked_mul(parameter_count + 1)?;
+        if state_count > MAX_POSITIONAL_STATES {
+            return None;
+        }
         // Explicit keywords occupy their parameter even when an earlier unpack could reach it.
         let can_consume = (0..parameter_count)
             .map(|index| !explicit_keywords.contains(&index))
             .collect::<Box<[_]>>();
         let mut matches = Self {
-            can_finish: vec![false; (segments.len() + 1) * (parameter_count + 1)]
-                .into_boxed_slice(),
+            can_finish: vec![false; state_count].into_boxed_slice(),
             segments: segments.into_boxed_slice(),
             parameter_count,
             can_consume,

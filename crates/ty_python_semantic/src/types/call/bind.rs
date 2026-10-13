@@ -10746,6 +10746,7 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
+    use crate::types::call::arguments::Argument;
     use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
 
@@ -10771,6 +10772,38 @@ mod tests {
         binding
             .inference
             .ok_or_else(|| anyhow::anyhow!("expected generic call inference"))
+    }
+
+    #[test]
+    fn large_positional_calls_preserve_argument_checks() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let parameters = Parameters::from_annotation(
+            &db,
+            std::iter::repeat_n(
+                Parameter::positional_only(None).with_annotated_type(int),
+                256,
+            ),
+        );
+        let signature = Signature::new(parameters, Type::none(&db, &env));
+
+        for (last, valid) in [(int, true), (Type::string_literal(&db, "bad"), false)] {
+            // The unpack can be empty, leaving all 256 parameters for explicit arguments. The
+            // fallback must still validate the last argument without allocating the dense table.
+            let arguments = std::iter::once((
+                Argument::Variadic,
+                Some(Type::homogeneous_tuple(&db, &env, int)),
+            ))
+            .chain(std::iter::repeat_n((Argument::Positional, Some(int)), 255))
+            .chain(std::iter::once((Argument::Positional, Some(last))))
+            .collect::<CallArguments<'_, '_>>();
+            let mut binding = Binding::single(Type::unknown(), signature.clone());
+            binding.match_parameters(&db, &env, &arguments);
+            assert!(binding.positional_matches.is_none());
+            binding.check_types(&db, &env, &arguments, TypeContext::default());
+            assert_eq!(!binding.has_errors_affecting_overload_resolution(), valid);
+        }
     }
 
     #[test]
