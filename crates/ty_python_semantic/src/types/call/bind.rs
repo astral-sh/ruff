@@ -8403,11 +8403,14 @@ impl<'db> Binding<'db> {
     ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
-        let positional_matches = if self.signature.generic_context.is_none_or(|context| {
-            context
-                .variables(db)
-                .all(|typevar| !typevar.is_paramspec(db) && !typevar.is_typevartuple(db))
-        }) {
+        // Constructor inference combines evidence from several methods into one specialization.
+        // Use the ordinary matcher until it can preserve complete alternatives across that chain.
+        let positional_matches = if self.constructor_context.is_none()
+            && self.signature.generic_context.is_none_or(|context| {
+                context
+                    .variables(db)
+                    .all(|typevar| !typevar.is_paramspec(db) && !typevar.is_typevartuple(db))
+            }) {
             PositionalMatches::new(
                 db,
                 env,

@@ -3191,7 +3191,7 @@ particular element type: accepting an integer on every possible result would mut
 when `before` supplies that parameter.
 
 ```py
-from typing import Generic, Self, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -3215,32 +3215,6 @@ def pair(value: tuple[T, S], other: object = None) -> tuple[T, S]:
 
 def _(before: list[tuple[str, int]], value: tuple[int, str]) -> None:
     reveal_type(pair(*before, value))  # revealed: tuple[int, str] | tuple[str, int]
-```
-
-The same distinction applies when inferring a constructed instance. Both `__new__` and `__init__`
-see the same arguments, so their alternatives cannot be mixed.
-
-```py
-class Box(Generic[T]):
-    def __new__(cls, value: list[T], other: object = None) -> Self:
-        return super().__new__(cls)
-
-    def __init__(self, value: list[T], other: object = None):
-        self.value = value
-
-def _(before: list[list[str]], ints: list[int]) -> None:
-    result = Box(*before, ints)
-    reveal_type(result)  # revealed: Box[int] | Box[str]
-    result.value.append(1)  # error: [invalid-argument-type]
-```
-
-Even when the two element types overlap, both methods see the same list. Their results do not
-introduce a third kind of box.
-
-```py
-def _(before: list[list[int | str]], value: list[int | bytes]) -> None:
-    result = Box(*before, value)
-    valid: Box[int | str] | Box[int | bytes] = result  # no diagnostic
 ```
 
 ## Positional unpacking preserves outer type variables
