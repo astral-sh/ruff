@@ -457,15 +457,12 @@ from scalars import int64
 
 def _(cls: type, other: type[int] | type[int64]) -> None:
     if issubclass(cls, int64):
-        # TODO: should be `type[signedinteger[_64Bit]]`
-        reveal_type(cls)  # revealed: type
+        reveal_type(cls)  # revealed: type[signedinteger[_64Bit]]
 
     if issubclass(other, int64):
-        # TODO: should be `type[signedinteger[_64Bit]]`
-        reveal_type(other)  # revealed: type[int | signedinteger[_64Bit]]
+        reveal_type(other)  # revealed: type[signedinteger[_64Bit]]
     else:
-        # TODO: should be `type[int]`
-        reveal_type(other)  # revealed: type[int | signedinteger[_64Bit]]
+        reveal_type(other)  # revealed: type[int] & ~type[signedinteger[_64Bit]]
 ```
 
 ## `classinfo` is a generic final class

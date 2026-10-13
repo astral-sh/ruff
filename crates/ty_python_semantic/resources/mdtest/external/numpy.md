@@ -61,13 +61,11 @@ import numpy as np
 def as_int(value: int | np.int64) -> int:
     if isinstance(value, np.int64):
         value = int(value)
-    # TODO: no error
-    return value  # error: [invalid-return-type]
+    return value
 
 def scalar(value: object) -> None:
     if isinstance(value, np.int64):
-        # TODO: should be `signedinteger[_64Bit]`
-        reveal_type(value)  # revealed: object
+        reveal_type(value)  # revealed: signedinteger[_64Bit]
 ```
 
 ## Iterating over an array union

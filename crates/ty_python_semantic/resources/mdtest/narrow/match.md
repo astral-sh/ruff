@@ -1124,15 +1124,12 @@ from scalars import int64
 def _(value: object, other: int | int64) -> None:
     match value:
         case int64() as item:
-            # TODO: should be `signedinteger[_64Bit]`
-            reveal_type(item)  # revealed: object
-            # TODO: should be `signedinteger[_64Bit]`
-            reveal_type(value)  # revealed: object
+            reveal_type(item)  # revealed: signedinteger[_64Bit]
+            reveal_type(value)  # revealed: signedinteger[_64Bit]
 
     match other:
         case int64():
-            # TODO: should be `signedinteger[_64Bit]`
-            reveal_type(other)  # revealed: int | signedinteger[_64Bit]
+            reveal_type(other)  # revealed: signedinteger[_64Bit]
         case _:
             # TODO: should be `int`
             reveal_type(other)  # revealed: int | signedinteger[_64Bit]

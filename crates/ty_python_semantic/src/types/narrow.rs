@@ -564,17 +564,10 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
         let env = self.env;
         let is_positive = self.is_positive;
         let use_generic_filtering = self.use_generic_filtering;
-        let constraint_from_class_literal = |class: ClassLiteral<'db>| {
-            let specialization = if use_generic_filtering {
-                class.unknown_specialization(db)
-            } else {
-                class.top_materialization(db)
-            };
+        let constraint_from_class = |class: ClassType<'db>| {
             let constraint = match self.function {
-                ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, specialization),
-                ClassInfoConstraintFunction::IsSubclass => {
-                    SubclassOfType::from(db, env, specialization)
-                }
+                ClassInfoConstraintFunction::IsInstance => Type::instance(db, env, class),
+                ClassInfoConstraintFunction::IsSubclass => SubclassOfType::from(db, env, class),
             };
 
             if use_generic_filtering {
@@ -584,6 +577,13 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 // materialization. Materialize the whole type, including gradual protocol members.
                 constraint.top_materialization(db, env)
             }
+        };
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| {
+            constraint_from_class(if use_generic_filtering {
+                class.unknown_specialization(db)
+            } else {
+                class.top_materialization(db)
+            })
         };
 
         match classinfo {
@@ -671,9 +671,11 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 }
             }
 
-            // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-            // e.g. `isinstance(x, list[int])` fails at runtime.
-            Type::GenericAlias(_) => None,
+            // A generic alias such as `list[int]` is not a valid second argument to `isinstance()`
+            // or `issubclass()` at runtime. But a stub can declare a runtime class as an alias to
+            // a specialized generic class, as NumPy does for `int64 = signedinteger[_64Bit]`,
+            // so we narrow to the specialization, as `TypeIs[signedinteger[_64Bit]]` would.
+            Type::GenericAlias(alias) => Some(constraint_from_class(ClassType::Generic(alias))),
 
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db, env) => {
                 UnionType::try_from_elements(
@@ -699,6 +701,10 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                             // `None` is not a class literal.
                             if element.is_none(db) {
                                 self.generate(db, KnownClass::NoneType.to_class_literal(db, env))
+                            } else if element.is_generic_alias() {
+                                // We report a generic alias in a `UnionType` as invalid, since
+                                // `isinstance(x, list[int] | int)` fails at runtime.
+                                None
                             } else {
                                 self.generate(db, element)
                             }

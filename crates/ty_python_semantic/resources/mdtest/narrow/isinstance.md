@@ -645,14 +645,15 @@ isinstance(*args)  # error: [invalid-argument-type]
 
 ## Generic aliases are not supported as second argument
 
-The `classinfo` argument cannot be a generic alias:
+The `classinfo` argument cannot be a generic alias at runtime. We still narrow with a generic alias
+on its own, because a stub can declare a runtime class as one (see below), but not with a
+`UnionType` that contains one:
 
 ```py
 def _(x: list[str] | list[int] | list[bytes]):
     # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
     if isinstance(x, list[int]):
-        # No narrowing here:
-        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+        reveal_type(x)  # revealed: list[int]
 
     # error: [invalid-argument-type] "Invalid second argument to `isinstance`"
     if isinstance(x, list[int] | list[str]):
@@ -664,7 +665,7 @@ def _(x: list[str] | list[int] | list[bytes]):
 
 A stub can declare a runtime class as an alias to a specialization of a generic class. NumPy does
 this for its scalar types (`int64 = signedinteger[_64Bit]`), so `isinstance(x, numpy.int64)` works
-at runtime.
+at runtime. We narrow to the specialization, as we would for `TypeIs[int64]`.
 
 `scalars.pyi`:
 
@@ -688,30 +689,22 @@ from scalars import int32, int64
 
 def _(x: object, y: int | int64, z: int32 | int64 | None):
     if isinstance(x, int64):
-        # TODO: should be `signedinteger[_64Bit]`
-        reveal_type(x)  # revealed: object
-        # TODO: no error
-        # error: [invalid-argument-type]
+        reveal_type(x)  # revealed: signedinteger[_64Bit]
         reveal_type(int(x))  # revealed: int
 
     if isinstance(y, int64):
         y = int(y)
-    # TODO: should be `int`
-    reveal_type(y)  # revealed: int | signedinteger[_64Bit]
+    reveal_type(y)  # revealed: int
 
     if isinstance(z, int64):
-        # TODO: should be `signedinteger[_64Bit]`
-        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+        reveal_type(z)  # revealed: signedinteger[_64Bit]
     else:
-        # TODO: should be `signedinteger[_32Bit] | None`
-        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | None
 
     if isinstance(z, (int32, int64)):
-        # TODO: should be `signedinteger[_32Bit] | signedinteger[_64Bit]`
-        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
     else:
-        # TODO: should be `None`
-        reveal_type(z)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit] | None
+        reveal_type(z)  # revealed: None
 ```
 
 ## `type[]` types are narrowed as well as class-literal types
