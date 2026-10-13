@@ -3811,10 +3811,10 @@ class BoundedSetter(Base):
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
 
-## Inference across positional unpacking alternatives
+## Inference from positional unpacks of different lengths
 
-Different lengths of an unpack can infer different types for the same type variable. We retain the
-solutions from every compatible placement.
+`before` can be empty, in which case `number` fills `a`, or it can supply a string to `a`. Both
+types contribute to the return type:
 
 ```py
 def first[T](a: T, b: object = 0) -> T:
@@ -3824,7 +3824,8 @@ def _(before: list[str], number: int) -> None:
     reveal_type(first(*before, number))  # revealed: int | str
 ```
 
-An invariant parameter can determine the position of an argument between two unpacks.
+An argument between two unpacks can also determine the type variable. Only `values` can fill the
+`list[T]` parameter:
 
 ```py
 def middle[T](a: int, values: list[T], b: int) -> T:
@@ -3834,19 +3835,19 @@ def _(before: list[int], values: list[str], after: list[int]) -> None:
     reveal_type(middle(*before, values, *after))  # revealed: str
 ```
 
-Keyword arguments constrain the same type variables as positional arguments. Here the keyword
-argument rules out the placement that binds `value` to `a`.
+The keyword argument can rule out an otherwise valid length for `before`. Here `expected` requires
+`T` to be `int`, so `before` must be empty and `value` must fill `a`.
 
 ```py
 def checked[T](a: list[T], b: object = 0, *, expected: list[T]) -> T:
     return a[0]
 
-def _(before: list[list[str]], value: list[int], expected: list[str]) -> None:
-    reveal_type(checked(*before, value, expected=expected))  # revealed: str
+def _(before: list[list[str]], value: list[int], expected: list[int]) -> None:
+    reveal_type(checked(*before, value, expected=expected))  # revealed: int
 ```
 
-All arguments in one placement must agree on a specialization. Solving each parameter independently
-would incorrectly accept these incompatible invariant arguments.
+Finding a position for each argument does not make two incompatible `list[T]` arguments valid. No
+choice of `T` accepts both `list[int]` and `list[str]`:
 
 ```py
 def same[T](a: list[T], b: list[T]) -> T:
@@ -3860,16 +3861,21 @@ def _(before, a: list[int], b: list[str], after) -> None:
 
 ## Positional unpacking preserves outer type variables
 
-A type variable belonging to the caller cannot be specialized to make an argument fit.
+A type variable bounded by `str` can fill the string parameter:
 
 ```py
 def strings(a: int, text: str, b: int) -> None: ...
+def bounded[T: str](before: list[int], value: T, after: list[int]) -> None:
+    strings(*before, value, *after)  # no diagnostic
+```
+
+Without that bound, `value` might have any type. The caller's type variable cannot be specialized by
+`strings`:
+
+```py
 def caller[T](before: list[int], value: T, after: list[int]) -> None:
     # error: [invalid-argument-type]
     strings(*before, value, *after)
-
-def bounded[T: str](before: list[int], value: T, after: list[int]) -> None:
-    strings(*before, value, *after)  # no diagnostic
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

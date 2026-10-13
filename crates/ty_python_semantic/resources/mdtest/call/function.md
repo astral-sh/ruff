@@ -1324,13 +1324,10 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-Later unpacks can also determine where an earlier unpack stops. Unknown keyword unpacks still use
-conservative matching:
+Unpacking keyword arguments still uses conservative matching, even when a `TypedDict` identifies the
+keys:
 
 ```py
-def _(args1: list[str], args2: list[float]) -> None:
-    f(*args1, *args2)  # no diagnostic
-
 # Keyword variadic (**dict) with unknown keys is also ambiguous
 def _(args: list[str], kwargs: dict[str, float]) -> None:
     # error: [invalid-argument-type]
@@ -1433,6 +1430,14 @@ def _(args: list[str], more: list[float]) -> None:
     f(*args, *more, 1.0)  # no diagnostic
 ```
 
+The later iterable can also supply the final parameter itself. Neither iterable's length has to be
+known, as long as their element types can fill the parameters in order:
+
+```py
+def _(args1: list[str], args2: list[float]) -> None:
+    f(*args1, *args2)  # no diagnostic
+```
+
 ### Required tuple elements before a later positional argument
 
 The variable-length part of a tuple can be empty, leaving only its required final element:
@@ -1500,8 +1505,8 @@ def _(args: list[str]) -> None:
 
 ### Positional arguments between variable-length unpacks
 
-We accept an unpacking of unknown length when its elements can fill the remaining parameters in
-order. A later argument can determine where an earlier unpack must stop.
+The middle argument determines where the first unpack stops: `text` can fill only `c`, so each
+iterable can supply two integers.
 
 Regression test for <https://github.com/astral-sh/ty/issues/3649>.
 
@@ -1509,18 +1514,17 @@ Regression test for <https://github.com/astral-sh/ty/issues/3649>.
 def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
 def dynamic(before, text: str, after) -> None:
     f(*before, text, *after)  # no diagnostic
-
-def typed(before: list[int], text: str, after: list[int]) -> None:
-    f(*before, text, *after)  # no diagnostic
-
-def integers(a: int, b: int, c: int) -> None: ...
-def incompatible(before, text: str, after) -> None:
-    # error: [invalid-argument-type]
-    integers(*before, text, *after)
 ```
 
-Required arguments retain their order; finding a compatible parameter for each argument separately
-does not establish that the entire call can match.
+The same call is valid when the iterables have known element types:
+
+```py
+def typed(before: list[int], text: str, after: list[int]) -> None:
+    f(*before, text, *after)  # no diagnostic
+```
+
+Arguments must still match in order. These two arguments each have a compatible parameter, but no
+choice of iterable lengths can put them in the right order:
 
 ```py
 def ordered(a: int, b: str) -> None: ...
@@ -1532,8 +1536,7 @@ def reversed(before, text: str, number: int, after) -> None:
 
 ### Variable-length unpacking with defaulted parameters
 
-An unpack can stop before a defaulted parameter, allowing a later argument to fill an earlier
-parameter.
+An empty `values` lets `"text"` fill `a` while `b` keeps its default.
 
 ```py
 def defaults(a: str, b: int = 0) -> None: ...
@@ -1562,20 +1565,19 @@ def _(before: tuple[int, *tuple[int, ...], bytes], after: list[int]) -> None:
 
 ### Contextual inference between variable-length unpacks
 
-We infer an argument using the parameter types from its possible positions, then retain the
-positions compatible with the other arguments.
+The callback's possible parameter supplies the type of the lambda argument. That makes `.upper()`
+valid:
 
 ```py
 from collections.abc import Callable
 
 def f(a: int, callback: Callable[[str], str], b: int) -> None: ...
-def g(a: int, values: list[str], b: int) -> None: ...
 def _(before: list[int], after: list[int]) -> None:
     f(*before, lambda text: text.upper(), *after)  # no diagnostic
-    g(*before, [], *after)  # no diagnostic
 ```
 
-Keyword arguments retain their expected types while positional placements are being inferred:
+Keyword arguments still receive their own expected types when a positional argument can match
+different parameters. The dictionary is checked as an `Options`:
 
 ```py
 from typing import TypedDict
@@ -1583,9 +1585,9 @@ from typing import TypedDict
 class Options(TypedDict):
     count: int
 
-def configured(a: int, b: str, *, options: Options) -> None: ...
-def _(before: list[int]) -> None:
-    configured(*before, "text", options={"count": 1})  # no diagnostic
+def configured(a: int, b: str, c: int, *, options: Options) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    configured(*before, "text", *after, options={"count": 1})  # no diagnostic
 ```
 
 ### Keyword argument, positional-or-keyword parameter

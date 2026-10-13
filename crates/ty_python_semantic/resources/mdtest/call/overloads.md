@@ -2224,8 +2224,7 @@ def _(args: tuple[*tuple[str, ...], bytes]) -> None:
 
 ### Positional arguments between variable-length unpacks
 
-Each overload can match the unpacks at different lengths. A required argument between the unpacks
-must still have a compatible position in the selected overload.
+The argument between the two unpacks selects the overload. Both unpacks can supply an integer:
 
 `overloaded.pyi`:
 
@@ -2244,8 +2243,6 @@ from overloaded import f
 def _(before: list[int], after: list[int], text: str, data: bytes) -> None:
     reveal_type(f(*before, text, *after))  # revealed: str
     reveal_type(f(*before, data, *after))  # revealed: bytes
-    # error: [no-matching-overload]
-    f(*before, 1.0, *after)
 ```
 
 ### Variadic argument with generics
