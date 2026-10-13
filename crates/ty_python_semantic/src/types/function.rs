@@ -694,7 +694,6 @@ impl<'db> OverloadLiteral<'db> {
             //     or in its return type. If it does, then we really do need specialization
             //     inference at each call site to see which specific instance type should be
             //     used in those other parameters / return type.
-            //     An unannotated return can also acquire `Self` from the function body.
             //
             //   - The class cannot be generic. If it is, then we might need an actual `Self`
             //     typevar to help carry through constraints that relate the instance type to
