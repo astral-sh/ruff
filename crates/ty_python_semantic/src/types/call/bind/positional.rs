@@ -59,7 +59,7 @@ pub(super) struct PositionalMatches<'db> {
 }
 
 pub(super) struct PositionalEvaluation<'db, 'c> {
-    pub(super) constraints: Option<ConstraintSet<'db, 'c>>,
+    pub(super) constraints: ConstraintSet<'db, 'c>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
     pub(super) provisional: bool,
 }
@@ -285,7 +285,7 @@ impl<'db> PositionalMatches<'db> {
     /// Returns positional constraints and matches that can participate in a valid complete
     /// placement. Keyword arguments filter these matches, but the caller still infers their
     /// constraints separately.
-    /// On failure, returns one complete placement for diagnostics and `None` for the constraints.
+    /// Returns `None` when the ordinary matcher should diagnose the call.
     pub(super) fn evaluate<'c>(
         &self,
         db: &'db dyn Db,
@@ -294,7 +294,7 @@ impl<'db> PositionalMatches<'db> {
         arguments: &CallArguments<'_, 'db>,
         parameters: &Parameters<'db>,
         inferable: TypeVarSet<'db>,
-    ) -> PositionalEvaluation<'db, 'c> {
+    ) -> Option<PositionalEvaluation<'db, 'c>> {
         let never = ConstraintSet::from_bool(constraints, false);
         let always = ConstraintSet::from_bool(constraints, true);
         // Keep inference evidence while allowing only this call's type variables to be solved.
@@ -374,11 +374,7 @@ impl<'db> PositionalMatches<'db> {
                 && !condition.has_no_valid_solutions(db, env)
         };
         if !possible(common.and(db, constraints, || suffix[0])) {
-            return PositionalEvaluation {
-                constraints: None,
-                arguments: self.best_failing_matches(arguments, &edges, possible),
-                provisional: false,
-            };
+            return None;
         }
 
         // Keep an individual match only if both the arguments before it and those after it can
@@ -408,64 +404,10 @@ impl<'db> PositionalMatches<'db> {
             }
         }
         Self::deduplicate_matches(&mut matched);
-        PositionalEvaluation {
-            constraints: Some(suffix[0]),
+        Some(PositionalEvaluation {
+            constraints: suffix[0],
             arguments: matched,
             provisional,
-        }
-    }
-
-    /// Selects a complete placement with the fewest incompatible argument/parameter pairs,
-    /// ending the current unpack sooner when costs tie. The caller validates that placement to
-    /// report errors, rather than combining diagnostics from mutually exclusive placements.
-    fn best_failing_matches<'c>(
-        &self,
-        arguments: &CallArguments<'_, 'db>,
-        edges: &[ConstraintSet<'db, 'c>],
-        possible: impl Fn(ConstraintSet<'db, 'c>) -> bool,
-    ) -> Box<[MatchedArgument<'db>]> {
-        // Zero further errors at a valid stopping point; usize::MAX marks states that cannot
-        // finish. Saturating addition below keeps those states impossible when charging an error.
-        let mut costs = vec![usize::MAX; self.can_finish.len()];
-        for position in 0..=self.parameter_count {
-            let terminal = self.state(self.segments.len(), position);
-            if self.can_finish[terminal] {
-                costs[terminal] = 0;
-            }
-        }
-        for (index, segment) in self.segments.iter().enumerate().rev() {
-            for position in (0..=self.parameter_count).rev() {
-                let current = self.state(index, position);
-                let mut cost = if segment.repeated {
-                    costs[self.state(index + 1, position)]
-                } else {
-                    usize::MAX
-                };
-                if let Some(next) = self.next_state(index, position) {
-                    let error_count = usize::from(!possible(edges[current]));
-                    cost = cost.min(costs[next].saturating_add(error_count));
-                }
-                costs[current] = cost;
-            }
-        }
-
-        // Reconstruct one cheapest placement. On a tie, stop the current unpack here.
-        let mut matched = Self::empty_matches(arguments);
-        let (mut index, mut position) = (0, 0);
-        while let Some(segment) = self.segments.get(index) {
-            if segment.repeated
-                && costs[self.state(index, position)] == costs[self.state(index + 1, position)]
-            {
-                index += 1;
-            } else if let Some(next) = self.next_state(index, position) {
-                segment.add_match(&mut matched, position);
-                let width = self.parameter_count + 1;
-                (index, position) = (next / width, next % width);
-            } else {
-                break;
-            }
-        }
-        Self::deduplicate_matches(&mut matched);
-        matched
+        })
     }
 }

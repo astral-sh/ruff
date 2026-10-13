@@ -805,8 +805,8 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_one(*args)  # error: [too-many-positional-arguments]
     takes_two(*args)  # no diagnostic
     takes_two_positional_only(*args)  # no diagnostic
-    takes_two_different(*args)  # error: [invalid-argument-type]
-    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
     takes_at_least_two(*args)  # error: [invalid-argument-type]
@@ -933,8 +933,8 @@ def _(args: IntStarStrInt) -> None:
     takes_two(*args)  # no diagnostic
     takes_two_positional_only(*args)  # no diagnostic
 
-    takes_two_different(*args)  # error: [invalid-argument-type]
-    takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
+    takes_two_different(*args)
+    takes_two_different_positional_only(*args)
 
     takes_at_least_zero(*args)
 

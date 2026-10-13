@@ -3238,6 +3238,7 @@ Without that bound, `value` might have any type. The caller's type variable cann
 ```py
 def caller(before: list[int], value: T, after: list[int]) -> None:
     # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
     strings(*before, value, *after)
 ```
 

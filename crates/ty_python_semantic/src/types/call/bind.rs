@@ -8401,11 +8401,22 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
+        self.match_parameters_impl(db, env, arguments, true);
+    }
+
+    fn match_parameters_impl(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        use_positional_matching: bool,
+    ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         // Constructor inference combines evidence from several methods into one specialization.
         // Use the ordinary matcher until it can preserve complete alternatives across that chain.
-        let positional_matches = if self.constructor_context.is_none()
+        let positional_matches = if use_positional_matching
+            && self.constructor_context.is_none()
             && self.signature.generic_context.is_none_or(|context| {
                 context
                     .variables(db)
@@ -8511,17 +8522,24 @@ impl<'db> Binding<'db> {
             .signature
             .generic_context
             .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
-        let mut provisional = false;
-        let positional_constraints = self.positional_matches.as_ref().and_then(|positional| {
-            let evaluated = positional.evaluate(
-                db,
-                env,
-                constraints,
-                arguments,
-                parameters,
-                inferable_typevars,
-            );
-            provisional = evaluated.provisional;
+        let positional_constraints = if let Some(positional) = &self.positional_matches {
+            let Some(evaluated) = positional
+                .evaluate(
+                    db,
+                    env,
+                    constraints,
+                    arguments,
+                    parameters,
+                    inferable_typevars,
+                )
+                .filter(|evaluated| !evaluated.provisional)
+            else {
+                // Keep the ordinary diagnostics when no complete placement succeeds or when
+                // unresolved lambda parameters prevent us from validating it.
+                self.reset(db);
+                self.match_parameters_impl(db, env, arguments, false);
+                return self.check_types(db, env, arguments, call_expression_tcx);
+            };
             for (index, argument) in arguments.iter().enumerate() {
                 if matches!(
                     argument,
@@ -8532,16 +8550,10 @@ impl<'db> Binding<'db> {
                     self.argument_matches[index] = evaluated.arguments[index].clone();
                 }
             }
-            evaluated.constraints
-        });
-
-        if provisional {
-            // Provisional lambda parameters cannot establish a new successful placement.
-            // Keep the ordinary diagnostics until inference has resolved their types.
-            self.reset(db);
-            self.match_parameters(db, env, arguments);
-            return self.check_types(db, env, arguments, call_expression_tcx);
-        }
+            Some(evaluated.constraints)
+        } else {
+            None
+        };
 
         let inferred = CallInference {
             db,
