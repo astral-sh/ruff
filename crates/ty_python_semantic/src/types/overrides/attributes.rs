@@ -68,6 +68,17 @@ enum AttributeContractKind {
     Inherited,
 }
 
+/// Whether every alternative has method binding behavior rather than only a call signature.
+fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    ty.as_union()
+        .map_or(std::slice::from_ref(&ty), |union| union.elements(db))
+        .iter()
+        .all(|ty| {
+            matches!(ty, Type::FunctionLiteral(_))
+                || matches!(ty, Type::Callable(callable) if callable.is_method_like(db))
+        })
+}
+
 /// Resolve an owner's declaration as seen through the receiver being checked.
 ///
 /// Keep the owner's generic specialization, but bind `Self` and descriptor access to
@@ -181,10 +192,7 @@ fn attribute_contract<'db>(
         });
     // Only pairs of methods go to the method checker. A decorator can turn a
     // function into a property, in which case its exposed value must be checked.
-    let is_method = alternatives.iter().all(|ty| {
-        matches!(ty, Type::FunctionLiteral(_))
-            || matches!(ty, Type::Callable(callable) if callable.is_method_like(db))
-    });
+    let is_method = is_method_type(db, own_place.ty);
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
@@ -393,23 +401,122 @@ fn attribute_violation<'db>(
     None
 }
 
-/// Report an incompatible explicit override, if its diagnostic rule is enabled.
+/// Select the checker from the members' access semantics before applying diagnostic settings.
+pub(super) enum OverrideCheck<'db> {
+    /// Both members are methods; compare them using the common receiver domain.
+    Method,
+    /// Attribute checking is complete. `None` includes compatible pairs and conflicts
+    /// already present in a base class.
+    Attribute(Option<AttributeOverrideViolation<'db>>),
+    /// At least one member has no attribute contract that we can check.
+    Unavailable,
+}
+
+pub(super) struct AttributeOverrideViolation<'db> {
+    violation: AttributeViolation<'db>,
+    involves_property: bool,
+}
+
+impl<'db> AttributeOverrideViolation<'db> {
+    pub(super) fn rule(&self) -> &'static LintMetadata {
+        if self.involves_property {
+            &INVALID_PROPERTY_TYPE_OVERRIDE
+        } else if matches!(self.violation, AttributeViolation::Write { .. }) {
+            &INVALID_MUTABLE_OVERRIDE
+        } else {
+            &INVALID_ATTRIBUTE_OVERRIDE
+        }
+    }
+
+    pub(super) fn report(
+        &self,
+        context: &InferContext<'db, '_>,
+        superclass: ClassType<'db>,
+        name: &Name,
+        definition: Definition<'db>,
+        superclass_definition: Option<Definition<'db>>,
+    ) {
+        let db = context.db();
+        let env = &context.program_environment();
+        let rule = self.rule();
+        let Some(builder) = context.report_lint(rule, definition.focus_range(db, context.module()))
+        else {
+            return;
+        };
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Invalid override of attribute `{name}`"));
+        match self.violation {
+            AttributeViolation::Read { source, target } => {
+                if self.involves_property {
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Read type `{}` is not assignable to inherited read type `{}`",
+                        source.display(db, env),
+                        target.display(db, env),
+                    ));
+                } else {
+                    diagnostic.set_primary_annotation_message(format_args!(
+                        "Type `{}` is not assignable to inherited type `{}`",
+                        source.display(db, env),
+                        target.display(db, env),
+                    ));
+                }
+            }
+            AttributeViolation::Write { target } => {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Override does not accept writes of type `{}`",
+                    target.display(db, env),
+                ));
+            }
+            AttributeViolation::ReadOnly => diagnostic.set_primary_annotation_message(
+                "Read-only attribute overrides a writable attribute",
+            ),
+        }
+        if let Some(base_definition) = superclass_definition
+            && base_definition.file(db) == context.file()
+        {
+            diagnostic.annotate(
+                Annotation::secondary(
+                    context.span(base_definition.focus_range(db, context.module())),
+                )
+                .message(format_args!(
+                    "`{}.{name}` declared here",
+                    superclass.name(db)
+                )),
+            );
+        }
+    }
+}
+
+/// Classify an override and check attribute compatibility without emitting diagnostics.
 ///
-/// Return the rule for an incompatibility even when its diagnostic is suppressed or
-/// disabled, so callers do not report the same conflict as a method override. Callers
-/// can still check other bases when this rule is disabled. Property incompatibilities
-/// and ordinary mutable narrowing have separate rules.
+/// Ordinary `Callable` attributes do not bind a receiver. Mixed overrides compare the
+/// values exposed after descriptor access. They never fall through to the method
+/// checker, even when compatible or suppressed.
 pub(super) fn check_override<'db>(
-    context: &InferContext<'db, '_>,
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
     superclass: ClassType<'db>,
     inherited_owner: Option<ClassType<'db>>,
     name: &Name,
     definition: Definition<'db>,
-    superclass_definition: Option<Definition<'db>>,
-) -> Option<&'static LintMetadata> {
-    let db = context.db();
-    let env = &context.program_environment();
+) -> OverrideCheck<'db> {
+    // Classify methods before constructing attribute contracts: some members, such as
+    // `object.__hash__`, have method signatures but no general attribute contract.
+    // Receiver annotations still describe instance storage even if a method with
+    // the same name exists in the class body.
+    if definition.place(db).is_symbol()
+        && [class, superclass].into_iter().all(|owner| {
+            owner
+                .own_class_member(db, env, None, name)
+                .inner
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| is_method_type(db, ty))
+        })
+    {
+        return OverrideCheck::Method;
+    }
     let receiver = Type::instance(db, env, class);
     let source_kind = if definition.place(db).is_member() {
         AttributeContractKind::Receiver
@@ -426,9 +533,14 @@ pub(super) fn check_override<'db>(
     } else {
         AttributeContractKind::Inherited
     };
-    let source = attribute_contract(db, env, class, receiver, name, source_kind)?;
-    let target = attribute_contract(db, env, superclass, receiver, name, inherited_kind)?;
-    let violation = attribute_violation(
+    let Some(source) = attribute_contract(db, env, class, receiver, name, source_kind) else {
+        return OverrideCheck::Unavailable;
+    };
+    let Some(target) = attribute_contract(db, env, superclass, receiver, name, inherited_kind)
+    else {
+        return OverrideCheck::Unavailable;
+    };
+    let Some(violation) = attribute_violation(
         db,
         env,
         receiver,
@@ -436,7 +548,9 @@ pub(super) fn check_override<'db>(
         name,
         &source,
         &target,
-    )?;
+    ) else {
+        return OverrideCheck::Attribute(None);
+    };
     // Suppress only conflicts already present with the parent's own specialization of
     // this ancestor. An unrelated base, or a newly incompatible specialization in the
     // child, must still be checked.
@@ -468,60 +582,13 @@ pub(super) fn check_override<'db>(
                         })
                 })
         {
-            return None;
+            return OverrideCheck::Attribute(None);
         }
     }
-    let involves_property = source.is_property || target.is_property;
-    let rule = if involves_property {
-        &INVALID_PROPERTY_TYPE_OVERRIDE
-    } else if matches!(violation, AttributeViolation::Write { .. }) {
-        &INVALID_MUTABLE_OVERRIDE
-    } else {
-        &INVALID_ATTRIBUTE_OVERRIDE
-    };
-    let Some(builder) = context.report_lint(rule, definition.focus_range(db, context.module()))
-    else {
-        return Some(rule);
-    };
-    let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of attribute `{name}`"));
-    match violation {
-        AttributeViolation::Read { source, target } => {
-            if involves_property {
-                diagnostic.set_primary_annotation_message(format_args!(
-                    "Read type `{}` is not assignable to inherited read type `{}`",
-                    source.display(db, env),
-                    target.display(db, env),
-                ));
-            } else {
-                diagnostic.set_primary_annotation_message(format_args!(
-                    "Type `{}` is not assignable to inherited type `{}`",
-                    source.display(db, env),
-                    target.display(db, env),
-                ));
-            }
-        }
-        AttributeViolation::Write { target } => {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Override does not accept writes of type `{}`",
-                target.display(db, env),
-            ));
-        }
-        AttributeViolation::ReadOnly => diagnostic
-            .set_primary_annotation_message("Read-only attribute overrides a writable attribute"),
-    }
-    if let Some(base_definition) = superclass_definition
-        && base_definition.file(db) == context.file()
-    {
-        diagnostic.annotate(
-            Annotation::secondary(context.span(base_definition.focus_range(db, context.module())))
-                .message(format_args!(
-                    "`{}.{name}` declared here",
-                    superclass.name(db)
-                )),
-        );
-    }
-    Some(rule)
+    OverrideCheck::Attribute(Some(AttributeOverrideViolation {
+        violation,
+        involves_property: source.is_property || target.is_property,
+    }))
 }
 
 /// Check receiver annotations that introduce declarations outside the class body.
@@ -607,18 +674,19 @@ pub(super) fn check_instance_overrides<'db>(
                     Place::Undefined => None,
                 },
             );
-            if check_override(
-                context,
+            if let OverrideCheck::Attribute(Some(violation)) = check_override(
+                db,
+                env,
                 class,
                 base,
                 Some(inherited_owner),
                 name,
                 definition,
-                base_definition,
-            )
-            .is_some_and(|rule| context.is_lint_enabled(rule))
-            {
-                break;
+            ) {
+                violation.report(context, base, name, definition, base_definition);
+                if context.is_lint_enabled(violation.rule()) {
+                    break;
+                }
             }
         }
     }

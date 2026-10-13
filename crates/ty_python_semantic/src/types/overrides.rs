@@ -920,19 +920,32 @@ fn check_class_declaration<'db>(
 
             // Constructors may change their signature. Leave their special receiver
             // binding and `@override` checks to the method checker below.
-            if !is_constructor_like_method(&member.name)
-                && let Some(rule) = attributes::check_override(
-                    context,
+            if !is_constructor_like_method(&member.name) {
+                match attributes::check_override(
+                    db,
+                    env,
                     class,
                     superclass,
                     inherited_member_owner,
                     &member.name,
                     *first_reachable_definition,
-                    superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id)),
-                )
-            {
-                liskov_check_complete = context.is_lint_enabled(rule);
-                continue;
+                ) {
+                    attributes::OverrideCheck::Method => {}
+                    attributes::OverrideCheck::Attribute(Some(violation)) => {
+                        violation.report(
+                            context,
+                            superclass,
+                            &member.name,
+                            *first_reachable_definition,
+                            superclass_symbol
+                                .and_then(|(scope, id)| symbol_definition(db, scope, id)),
+                        );
+                        liskov_check_complete = context.is_lint_enabled(violation.rule());
+                        continue;
+                    }
+                    attributes::OverrideCheck::Attribute(None)
+                    | attributes::OverrideCheck::Unavailable => continue,
+                }
             }
 
             if !configuration.check_method_liskov_violations() {
