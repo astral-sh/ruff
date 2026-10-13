@@ -956,30 +956,62 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
         let mut groups = Vec::new();
         let mut count = 0;
-        for arguments in expanded {
-            let mut lengths = vec![vec![0; arguments.len()]];
+        for mut arguments in expanded {
+            let mut variable_arguments = Vec::new();
+            let mut has_later_positional_input = false;
             for (index, argument) in arguments.iter().enumerate() {
-                if let CallArgument::Variadic(argument) = argument
-                    && let sequence = argument.sequence(db, env)?
-                    && let TupleSpec::Variable(sequence) = sequence.as_ref()
-                {
-                    if !matches!(sequence.variable(), VariableSegment::Homogeneous(_))
-                        || lengths.len().saturating_mul(max_length.saturating_add(1))
-                            > MAX_TOTAL_EXPANSION.saturating_sub(count)
-                    {
-                        return None;
+                match argument {
+                    CallArgument::Synthetic(_) | CallArgument::Positional(_) => {
+                        has_later_positional_input |= !variable_arguments.is_empty();
                     }
-                    lengths = lengths
-                        .into_iter()
-                        .flat_map(|lengths| {
-                            (0..=max_length).map(move |length| {
-                                let mut lengths = lengths.clone();
-                                lengths[index] = length;
-                                lengths
-                            })
-                        })
-                        .collect();
+                    CallArgument::Variadic(argument) => {
+                        let sequence = argument.sequence(db, env)?;
+                        match sequence.as_ref() {
+                            TupleSpec::Fixed(sequence) => {
+                                has_later_positional_input |= !variable_arguments.is_empty()
+                                    && sequence.iter_all_elements().next().is_some();
+                            }
+                            TupleSpec::Variable(sequence) => {
+                                if !matches!(sequence.variable(), VariableSegment::Homogeneous(_)) {
+                                    return None;
+                                }
+                                has_later_positional_input |= !variable_arguments.is_empty()
+                                    || !sequence.suffix_elements().is_empty();
+                                variable_arguments.push(index);
+                            }
+                        }
+                    }
+                    CallArgument::Keyword { .. } | CallArgument::Keywords(_) => {}
                 }
+            }
+            if !has_later_positional_input {
+                // Keep checking a trailing unpack's element type against optional parameters.
+                // A tuple union does not make it safe to treat that member as an empty tuple.
+                arguments.constructor_arguments = ConstructorArguments::Original;
+                count += 1;
+                if count > MAX_TOTAL_EXPANSION {
+                    return None;
+                }
+                groups.push(vec![arguments]);
+                continue;
+            }
+            let mut lengths = vec![vec![0; arguments.len()]];
+            for index in variable_arguments {
+                if lengths.len().saturating_mul(max_length.saturating_add(1))
+                    > MAX_TOTAL_EXPANSION.saturating_sub(count)
+                {
+                    return None;
+                }
+                lengths = lengths
+                    .into_iter()
+                    .flat_map(|lengths| {
+                        (0..=max_length).map(move |length| {
+                            let mut lengths = lengths.clone();
+                            lengths[index] = length;
+                            lengths
+                        })
+                    })
+                    .collect();
             }
             count += lengths.len();
             if count > MAX_TOTAL_EXPANSION {

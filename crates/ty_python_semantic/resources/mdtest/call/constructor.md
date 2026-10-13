@@ -746,6 +746,20 @@ def _(before: list[str], after: list[str]) -> None:
     Incompatible(*before, 1, *after)
 ```
 
+## Trailing unpacks and optional parameters
+
+The element type of a trailing unpack is checked against optional parameters. The default for `name`
+does not make `object` assignable to `str`, including when the unpack is a union of different
+sequence types.
+
+```py
+class Rule:
+    def __init__(self, name: str = ""): ...
+
+def add_rule(rule: tuple[object, ...] | list[object]) -> None:
+    Rule(*rule)  # error: [invalid-argument-type]
+```
+
 ## Callback return types after positional unpacking
 
 The initializer expects a callback that returns an integer. The unpacks can fill `a` and `b`, but

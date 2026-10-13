@@ -98,7 +98,6 @@ impl<'db> PositionalMatches<'db> {
         arguments: &CallArguments<'_, 'db>,
         parameters: &Parameters<'db>,
         explicit_keywords: &FxHashSet<usize>,
-        allow_trailing_unpack: bool,
     ) -> Option<Self> {
         if !Self::supports_arguments(db, env, arguments, parameters)
             || parameters
@@ -161,11 +160,10 @@ impl<'db> PositionalMatches<'db> {
 
         // With no later positional input, preserve the existing treatment of a single
         // homogeneous unpack, including checking its elements against defaulted parameters.
-        if !allow_trailing_unpack
-            && !segments
-                .iter()
-                .take(segments.len().saturating_sub(1))
-                .any(|segment| segment.repeated)
+        if !segments
+            .iter()
+            .take(segments.len().saturating_sub(1))
+            .any(|segment| segment.repeated)
         {
             return None;
         }

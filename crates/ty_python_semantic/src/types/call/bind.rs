@@ -8502,7 +8502,6 @@ impl<'db> Binding<'db> {
                 arguments,
                 parameters,
                 &matcher.explicit_keyword_parameters,
-                constructor_lengths.is_some(),
             )
             .map(Arc::new)
         } else {
