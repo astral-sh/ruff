@@ -999,6 +999,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnnecessaryDirectLambdaCall) {
                 pylint::rules::unnecessary_direct_lambda_call(checker, expr, func);
             }
+            if checker.is_rule_enabled(Rule::CallNonCallable) {
+                pylint::rules::call_non_callable(checker, call);
+            }
             if checker.is_rule_enabled(Rule::SysExitAlias) {
                 pylint::rules::sys_exit_alias(checker, call);
             }
