@@ -862,7 +862,7 @@ pub struct UseDefMap<'db> {
     ///
     /// Function `f` may implicitly return `None`, but `g` cannot.
     ///
-    /// This is used by `can_implicitly_return_none` in the `ty_python_semantic` crate.
+    /// This is used by `is_end_of_scope_reachable` in the `ty_python_semantic` crate.
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
