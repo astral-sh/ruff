@@ -3146,12 +3146,9 @@ impl<'db> TupleSpecBuilder<'db> {
     /// tuple-spec for `tuple[Literal[56], str]`, the result will be a tuple-spec builder for
     /// `tuple[Literal[42, 56], str]`.
     ///
-    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
-    /// a tuple spec if both `self` and `other` have the exact same length. For example,
-    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
-    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
-    /// `tuple[int | str | bytes, ...]`. We could consider improving this in the future if real-world
-    /// use cases arise.
+    /// For other tuple shapes, combine all element types into a variable-length tuple while
+    /// preserving the smaller minimum length. For example, unioning `tuple[int]` with
+    /// `tuple[str, bytes]` produces `tuple[int | str | bytes, *tuple[int | str | bytes, ...]]`.
     pub(crate) fn union(
         mut self,
         db: &'db dyn Db,
@@ -3176,6 +3173,11 @@ impl<'db> TupleSpecBuilder<'db> {
             // would actually lead to more precise inference, so it's probably not worth the
             // complexity.
             _ => {
+                let minimum = match &self {
+                    Self::Fixed(elements) => elements.len(),
+                    Self::Variable { prefix, suffix, .. } => prefix.len() + suffix.len(),
+                }
+                .min(other.len().minimum());
                 let unioned = UnionType::from_elements_leave_aliases(
                     db,
                     env,
@@ -3183,7 +3185,7 @@ impl<'db> TupleSpecBuilder<'db> {
                         .chain(other.iter_element_types(db)),
                 );
                 TupleSpecBuilder::Variable {
-                    prefix: vec![],
+                    prefix: vec![unioned; minimum],
                     segment: VariableSegment::Homogeneous(unioned),
                     suffix: vec![],
                 }

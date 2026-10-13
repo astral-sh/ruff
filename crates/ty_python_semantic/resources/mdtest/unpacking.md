@@ -568,6 +568,31 @@ def fixed_ends(values: list[str]):
     reveal_type(last)  # revealed: Literal[2]
 ```
 
+### Tuple unions in starred expressions
+
+Unpacking tuples of different lengths combines their element types but preserves their minimum
+length:
+
+```py
+def _(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int | str, *tuple[int | str, ...]]
+```
+
+Required elements in variable-length tuples also contribute to the minimum, whether they precede or
+follow the variable-length part:
+
+```py
+def _(values: tuple[int, *tuple[int, ...]] | tuple[*tuple[str, ...], str]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int | str, *tuple[int | str, ...]]
+```
+
+If any member can be empty, the unpacked result can be empty too:
+
+```py
+def _(values: tuple[()] | tuple[int]) -> None:
+    reveal_type((*values,))  # revealed: tuple[int, ...]
+```
+
 ### Ambiguous positions around an expansion
 
 When an expansion may be empty, a fixed target can receive either one of its elements or a value

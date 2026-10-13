@@ -1207,6 +1207,48 @@ def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
 
 ### Tuple unions followed by positional arguments
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A tuple union retains its minimum length when followed by another positional argument. Both members
+here supply at least one element, so the call always has too many arguments:
+
+```py
+def one(a: int) -> None: ...
+def _(args: tuple[int] | tuple[int, int]) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+The minimum can include several required elements:
+
+```py
+def two(a: int, b: int) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]) -> None:
+    two(*args, 1)  # error: [too-many-positional-arguments] "expected 2, got 3"
+```
+
+Type aliases preserve the same minimum:
+
+```py
+type Nonempty = tuple[int] | tuple[int, int]
+
+def _(args: Nonempty) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+An empty tuple member or an iterable of unknown length can leave room for the later argument:
+
+```py
+def optional(a: int, b: int = 0) -> None: ...
+def _(args: tuple[()] | tuple[int]) -> None:
+    optional(*args, 1)  # no diagnostic
+
+def _(args: list[int] | tuple[int]) -> None:
+    one(*args, 1)  # no diagnostic
+```
+
 When a tuple union is followed by another positional argument, we currently combine its element
 types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
 an error for both `a` and `b`, even though only `b` can receive a `str`:

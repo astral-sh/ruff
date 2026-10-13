@@ -938,7 +938,8 @@ info: Type variable defined here
 ### Union splatted arguments
 
 Equal-length tuple unions preserve their length and combine the types at each position. Different
-lengths produce an open tuple, while direct arguments around the splat keep their known positions.
+lengths produce a variable-length tuple that preserves the minimum length of the union members.
+Direct arguments around the splat keep their known positions.
 
 ```py
 def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
@@ -953,7 +954,8 @@ def check(
 ) -> None:
     reveal_type(collect(*same_length))  # revealed: tuple[int | str]
     reveal_type(collect(*paired))  # revealed: tuple[int | bytes, str | bool]
-    reveal_type(collect(*different_lengths))  # revealed: tuple[int | str | bytes, ...]
+    # revealed: tuple[int | str | bytes, *tuple[int | str | bytes, ...]]
+    reveal_type(collect(*different_lengths))
     reveal_type(collect(prefix, *same_length, suffix))  # revealed: tuple[bool, int | str, bytes]
 
     # error: [invalid-assignment]
