@@ -1446,6 +1446,43 @@ value: Alias
 }
 
 #[test]
+fn generic_union_prefix_updates_after_base_and_variance_changes() -> anyhow::Result<()> {
+    let base = "class Base: ...\nclass Child(Base): ...\nclass Box[T]:\n    def get(self) -> T: ...\nclass Extra: ...\n";
+    let unrelated = base.replace("Child(Base)", "Child(object)");
+    let invariant = base.replace("def get(self) -> T: ...", "value: T");
+    let main = "from base import Base, Child, Box, Extra\nAlias = Box[Child] | Box[Base] | Extra\nvalue: Alias\n";
+    let observe = |db: &TestDb| -> anyhow::Result<_> {
+        let file = system_path_to_file(db, "/src/main.py")?;
+        let ty = global_symbol(db, file, "value")
+            .place
+            .expect_type()
+            .display(db, &db.program_environment())
+            .to_string();
+        for path in ["/src/base.pyi", "/src/main.py"] {
+            assert_file_diagnostics(db, path, &[]);
+        }
+        Ok(ty)
+    };
+    let mut db = setup_db();
+    db.write_file("/src/main.py", main)?;
+    for (source, expected) in [
+        (base, "Box[Base] | Extra"),
+        (unrelated.as_str(), "Box[Child] | Box[Base] | Extra"),
+        (base, "Box[Base] | Extra"),
+        (invariant.as_str(), "Box[Child] | Box[Base] | Extra"),
+        (base, "Box[Base] | Extra"),
+    ] {
+        db.write_file("/src/base.pyi", source)?;
+        let observed = observe(&db)?;
+        assert_eq!(observed, expected);
+        let mut fresh = setup_db();
+        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main)])?;
+        assert_eq!(observed, observe(&fresh)?);
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\

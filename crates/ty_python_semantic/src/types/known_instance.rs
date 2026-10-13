@@ -2,6 +2,7 @@ use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
+use crate::types::set_theoretic::builder::NormalizedUnion;
 use crate::{
     Db, DisplaySettings,
     types::{
@@ -867,6 +868,49 @@ pub struct UnionTypeInstance<'db> {
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
+/// Retain normalization independently of the runtime union's interned identity.
+///
+/// Each inference context gets its own result, including dependencies on class
+/// relationships and alias definitions. Mapped operands are reusable only when
+/// their normalization matches the type being extended.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn normalized_value_union<'db>(
+    db: &'db dyn Db,
+    value_expr_types: [Type<'db>; 2],
+    scope_id: ScopeId<'db>,
+    typevar_binding_context: Option<Definition<'db>>,
+    inference_flags: InferenceFlags,
+) -> Option<NormalizedUnion<'db>> {
+    let env = ProgramEnvironment::from_scope(scope_id);
+    let mut builder = UnionBuilder::new(db, &env);
+    for (index, value) in value_expr_types.iter().enumerate() {
+        let ty = value
+            .in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
+            .ok()?;
+        if index == 0
+            && let Type::KnownInstance(KnownInstanceType::UnionType(existing)) = value
+            && let Some(operands) = existing._value_expr_types(db)
+            && let Some(normalized) = normalized_value_union(
+                db,
+                *operands,
+                scope_id,
+                typevar_binding_context,
+                inference_flags,
+            )
+            && normalized.ty() == ty
+        {
+            builder = builder.add_normalized(normalized);
+        } else {
+            builder.add_in_place(ty);
+        }
+    }
+    Some(builder.build_normalized())
+}
+
 impl<'db> UnionTypeInstance<'db> {
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
@@ -875,32 +919,34 @@ impl<'db> UnionTypeInstance<'db> {
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(scope_id);
-        let mut builder = UnionBuilder::new(db, &env);
-        for (index, ty) in value_expr_types.iter().enumerate() {
-            match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
-            {
-                Ok(ty) => {
-                    if index == 0
-                        && let Type::KnownInstance(KnownInstanceType::UnionType(existing)) =
-                            value_expr_types[0]
-                        && existing._value_expr_types(db).is_some()
-                        && let Type::Union(union) = ty
-                        && builder.try_seed_nominal_union(union)
-                    {
-                        continue;
+        let union_type = if let Some(normalized) = normalized_value_union(
+            db,
+            value_expr_types,
+            scope_id,
+            typevar_binding_context,
+            inference_flags,
+        ) {
+            normalized.ty()
+        } else {
+            let env = ProgramEnvironment::from_scope(scope_id);
+            let mut builder = UnionBuilder::new(db, &env);
+            for ty in &value_expr_types {
+                match ty.in_type_expression_impl(
+                    db,
+                    scope_id,
+                    typevar_binding_context,
+                    inference_flags,
+                ) {
+                    Ok(ty) => builder.add_in_place(ty),
+                    Err(error) => {
+                        return Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        ));
                     }
-                    builder.add_in_place(ty);
-                }
-                Err(error) => {
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
-                    ));
                 }
             }
-        }
-
-        let union_type = builder.build();
+            builder.build()
+        };
 
         // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
         // instance when its semantic union already contains the new operand, rather than storing
