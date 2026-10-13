@@ -1085,9 +1085,9 @@ class Box(Generic[T]):
 
 ### Variable-length positional unpacks
 
-Constructor calls currently match the unpacked iterable to the first parameter and the later
-argument to the second. This infers a string list for `value`, even though an empty `before` could
-instead put the integer list there. We still reject writing an integer to the inferred string list.
+An empty `before` puts the integer list in `value`; a one-element `before` puts a string list there.
+The constructor can therefore return either specialization. The default for `Tag` applies to both,
+and an integer cannot safely be appended to both lists.
 
 ```py
 from typing import Generic, Self
@@ -1105,15 +1105,126 @@ class Box(Generic[T, Tag]):
 
 def _(before: list[list[str]], value: list[int]) -> None:
     result = Box(*before, value)
+    reveal_type(result)  # revealed: Box[int, bytes] | Box[str, bytes]
     result.value.append(1)  # error: [invalid-argument-type]
-    valid: Box[int] | Box[str] = result  # no diagnostic
+```
+
+The alternatives also remain separate when their element types overlap. A box containing `list[int]`
+does not allow the same writes as one containing `list[int | str]`.
+
+```py
+def _(before: list[list[int | str]], value: list[int]) -> None:
+    reveal_type(Box(*before, value))  # revealed: Box[int, bytes] | Box[int | str, bytes]
+```
+
+An expected result type cannot rule out the placement that produces `Box[int, bytes]`.
+
+```py
+def accept_wider(box: Box[int | str, bytes]) -> None: ...
+def _(before: list[list[int | str]], value: list[int]) -> None:
+    accept_wider(Box(*before, value))  # error: [invalid-argument-type]
+```
+
+### Defaults after both constructor methods
+
+When neither constructor method determines `Tag`, its default uses the `T` inferred for that call.
+Each possible placement can therefore produce a different default.
+
+```py
+from typing import Generic, Self
+from typing_extensions import TypeVar
+
+T = TypeVar("T")
+Tag = TypeVar("Tag", default=T)
+
+class Box(Generic[T, Tag]):
+    def __new__(cls, value: list[T], other: object = None, *, tag: object = None) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: list[T], other: object = None, *, tag: Tag | None = None):
+        self.value = value
+        self.tag = tag
+
+def _(before: list[list[str]], value: list[int]) -> None:
+    reveal_type(Box(*before, value))  # revealed: Box[int, int] | Box[str, str]
+```
+
+An argument to `__init__` can determine `Tag` even when `__new__` leaves it unsolved. The default
+does not replace that evidence.
+
+```py
+def _(before: list[list[str]], value: list[int]) -> None:
+    reveal_type(Box(*before, value, tag="tag"))  # revealed: Box[int, str] | Box[str, str]
+```
+
+### Shared type parameters in constructor methods
+
+The two constructor methods must agree on `T`. Here, `__new__` receives a `list[int]` and `__init__`
+receives a `list[str]`. Neither list is assignable to `list[int | str]`, so combining their element
+types does not make the call valid.
+
+```py
+from typing import Generic, Self, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __new__(cls, a: int, value: list[T], other: object) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, a: int, value: object, other: list[T]):
+        self.value = other
+
+def _(before: list[int], value: list[int], after: list[list[str]]) -> None:
+    Box(*before, value, *after)  # error: [invalid-argument-type]
+```
+
+### Remapping type parameters in `__new__`
+
+The return annotation on `__new__` wraps its inferred type in `list`. `__init__` receives that
+specialization, so its attribute contains a list of lists.
+
+```py
+from typing import Generic, TypeVar, cast
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __new__(cls, value: T, other: object = None) -> "Box[list[T]]":
+        return cast("Box[list[T]]", super().__new__(cls))
+
+    def __init__(self, value: object, other: object = None):
+        self.items: list[T] = []
+
+def _(before: list[str], value: int) -> None:
+    result = Box(*before, value)
+    reveal_type(result)  # revealed: Box[list[int]] | Box[list[str]]
+    result.items.append([1])  # error: [invalid-argument-type]
+```
+
+### Lambdas after positional unpacks
+
+An empty `before` would pass an integer to a lambda that calls `upper`. A nonempty `before` would
+pass the lambda to a callback that expects an integer. Neither placement is valid.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, callback: Callable[[T], T], value: T, other: object = None):
+        self.value = callback(value)
+
+def _(before: list[Callable[[int], int]]) -> None:
+    Box(*before, lambda x: x.upper(), 1)  # error: [invalid-argument-type]
 ```
 
 ### Tuple unions in `__init__`
 
-We do not yet match each member of a tuple union separately for a constructor with one signature.
-Both tuples below could produce a valid call, but their combined element type does not fit the first
-two parameters.
+Each member of the tuple union produces a valid constructor call. The resulting box contains an
+integer list or a string list, so a string cannot safely be appended to its value.
 
 ```py
 from typing import Generic, TypeVar
@@ -1125,16 +1236,15 @@ class Box(Generic[T]):
         self.value = value
 
 def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
-    # TODO: Accept this call and infer Box[int] | Box[str].
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    Box(*values, "text")
+    result = Box(*values, "text")
+    reveal_type(result)  # revealed: Box[int] | Box[str]
+    result.value.append("unsafe")  # error: [invalid-argument-type]
 ```
 
 ### Tuple unions in `__new__` returning a subclass
 
-The same limitation applies when `__new__` has its own type parameter and returns a subclass. Each
-tuple would construct a different specialization of `Sub`.
+A type parameter on `__new__` can determine which specialization of a subclass is returned. Both
+tuple members contribute to that return type.
 
 ```py
 from typing import Generic, TypeVar
@@ -1152,16 +1262,15 @@ class Base(Generic[T]):
 class Sub(Base[T]): ...
 
 def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
-    # TODO: Accept this call and infer Sub[int] | Sub[str].
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    Base(*values, "text")
+    result = Base(*values, "text")
+    reveal_type(result)  # revealed: Sub[int] | Sub[str]
+    result.value.append("unsafe")  # error: [invalid-argument-type]
 ```
 
 ### Tuple unions with overloaded `__new__`
 
-An overloaded `__new__` can check the tuple members separately, but the single `__init__` signature
-still rejects the combined element type.
+Both tuple members select the same `__new__` overload. Each member is then checked against
+`__init__` before the completed instance types are combined.
 
 ```py
 from typing import Generic, Self, TypeVar, overload
@@ -1180,10 +1289,10 @@ class Box(Generic[T]):
         self.value = value
 
 def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
-    # TODO: Accept this call and infer Box[int] | Box[str].
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    Box(*values, "text")
+    result = Box(*values, "text")
+    reveal_type(result)  # revealed: Box[int] | Box[str]
+    if isinstance(result.value, list):
+        result.value.append("unsafe")  # error: [invalid-argument-type]
 ```
 
 ### Passing Self to a NamedTuple-bounded constructor

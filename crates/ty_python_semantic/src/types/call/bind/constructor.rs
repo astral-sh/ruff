@@ -1,17 +1,23 @@
+use std::sync::Arc;
+
 use super::{
-    ArgumentMatchingMode, Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode,
+    ArgumentMatchingMode, Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, PositionalMatches,
     generic_context_has_paramspec,
 };
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::types::call::arguments::CallArguments;
+use crate::types::call::arguments::{Argument, CallArgument, CallArguments};
+use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::Parameter;
+use crate::types::generics::{
+    GenericContext, Specialization, TypeVarInference, TypeVarInferenceFallback,
+    TypeVarInferenceSolutions,
+};
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
+    TypeMapping, TypeVarBoundOrConstraints, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -57,6 +63,9 @@ pub(super) struct ConstructorBinding<'db> {
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<Bindings<'db>>>,
+    /// Complete successful constructor evaluations. Each keeps one choice of argument types and
+    /// unpack lengths through the entire chain, before their instance types are unioned.
+    evaluations: Option<Arc<[ConstructorBinding<'db>]>>,
 }
 
 impl<'db> ConstructorBinding<'db> {
@@ -68,6 +77,7 @@ impl<'db> ConstructorBinding<'db> {
             entry,
             constructor_context,
             downstream_constructor: None,
+            evaluations: None,
         }
     }
 
@@ -231,6 +241,18 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         mode: CheckTypesMode,
     ) {
+        self.evaluations = None;
+        if argument_types.constructor_lengths().is_none()
+            && self.check_alternative_arguments(
+                db,
+                env,
+                constraints,
+                argument_types,
+                call_expression_tcx,
+            )
+        {
+            return;
+        }
         self.entry
             .check_types(db, env, constraints, argument_types, call_expression_tcx);
 
@@ -238,11 +260,12 @@ impl<'db> ConstructorBinding<'db> {
         // constructors should be checked or not.
         if mode.is_provisional() {
             if let Some(downstream) = self.downstream_constructor_mut() {
+                let argument_types = argument_types.for_downstream_constructor();
                 let _ = downstream.check_types_impl(
                     db,
                     env,
                     constraints,
-                    argument_types,
+                    argument_types.as_ref(),
                     call_expression_tcx,
                     &[],
                     mode,
@@ -251,6 +274,475 @@ impl<'db> ConstructorBinding<'db> {
         } else if !self.should_check_downstream(db, env) {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
+        }
+    }
+
+    /// Check complete constructor calls before combining their results. Every member of a tuple
+    /// union must succeed, but only one possible length of a homogeneous unpack needs to succeed.
+    fn check_alternative_arguments(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> bool {
+        if self.entry.argument_matching_mode != ArgumentMatchingMode::PositionalAlternatives
+            || !arguments
+            .iter()
+            .any(|argument| matches!(argument, CallArgument::Variadic(_)))
+        {
+            return false;
+        }
+        let mut needed = arguments.expansions(db, env).has_expandable_variadic();
+        let mut supported = true;
+        let mut max_length = 0;
+        self.visit_evaluated_callables(&mut |callable| {
+            for overload in &callable.overloads {
+                needed |= overload.positional_matches.is_some();
+                let parameters = overload.signature.parameters();
+                max_length = max_length.max(parameters.positional().count());
+                supported &= PositionalMatches::supports_arguments(db, env, arguments, parameters)
+                    && !parameters
+                    .variadic()
+                    .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
+                    && overload.signature.generic_context.is_none_or(|context| {
+                        context
+                            .variables(db)
+                            .all(|var| !var.is_paramspec(db) && !var.is_typevartuple(db))
+                    });
+            }
+        });
+        if !needed || !supported {
+            return false;
+        }
+        let Some(groups) = arguments.constructor_argument_groups(db, env, max_length) else {
+            return false;
+        };
+        let mut evaluations = Vec::new();
+        let nonce = TypeVarNonceGenerator::default();
+        for group in groups {
+            let before = evaluations.len();
+            for mut arguments in group {
+                let mut evaluation = self.clone();
+                evaluation.reset(db);
+                evaluation.match_parameters(db, env, &arguments, self.entry.argument_matching_mode);
+                if evaluation.entry.as_result().is_err() {
+                    continue;
+                }
+                evaluation.freshen_alternative(db, env, &mut arguments, &nonce);
+                // An expected result can guide inference, but it cannot determine an unpack's
+                // length. If it rejects this placement, check the arguments without that context.
+                for tcx in std::iter::once(call_expression_tcx).chain(
+                    call_expression_tcx
+                        .annotation
+                        .map(|_| TypeContext::default()),
+                ) {
+                    let mut checked = evaluation.clone();
+                    match checked.check_argument_choice(db, env, constraints, &arguments, tcx) {
+                        Some(true) => {
+                            evaluations.push(checked);
+                            break;
+                        }
+                        Some(false) => {}
+                        None => return false,
+                    }
+                }
+            }
+            if before == evaluations.len() {
+                // Preserve the original constructor diagnostics when a known member has no
+                // successful complete placement.
+                return false;
+            }
+        }
+        let Some(first) = evaluations.first() else {
+            return false;
+        };
+        self.copy_inference(first);
+        self.evaluations = Some(evaluations.into());
+        true
+    }
+
+    /// Check one choice of argument types and unpack lengths through every active method.
+    /// `None` means the result is incomplete and cannot safely contribute to a union of results.
+    fn check_argument_choice(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<bool> {
+        self.reset(db);
+        self.match_parameters(db, env, arguments, self.entry.argument_matching_mode);
+        self.check_types(
+            db,
+            env,
+            constraints,
+            arguments,
+            call_expression_tcx,
+            CheckTypesMode::Finalize,
+        );
+        self.check_downstream_constructor(
+            db,
+            env,
+            constraints,
+            arguments,
+            call_expression_tcx,
+            &[],
+        );
+        if self.as_result(db).is_err()
+            || !self.solve_constructor_chain(db, env, arguments, call_expression_tcx)?
+        {
+            return Some(false);
+        }
+
+        Some(true)
+    }
+
+    /// Give each constructor method its own inference variables. For example, a return of
+    /// `C[list[T]]` from `__new__` determines `__init__`'s `T` without making `T = list[T]` recursive.
+    ///
+    /// ```python
+    /// class C[T]:
+    ///     def __new__(cls, value: T) -> C[list[T]]: ...
+    ///     def __init__(self, value: object): ...
+    /// ```
+    fn freshen_alternative(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &mut CallArguments<'_, 'db>,
+        nonce: &TypeVarNonceGenerator<'db>,
+    ) {
+        let context = GenericContext::from_typevar_instances(
+            db,
+            env,
+            self.entry.overloads.iter().flat_map(|overload| {
+                overload
+                    .signature
+                    .generic_context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+            }),
+        );
+        if context.variables(db).next().is_some() {
+            let delta = nonce.next().value();
+            arguments.freshen_constructor_contexts(db, env, context, delta);
+            let mapping = TypeMapping::FreshenBoundTypeVars {
+                generic_context: context,
+                delta,
+            };
+            let visitor = ApplyTypeMappingVisitor::new(env);
+            self.entry.bound_type = self.entry.bound_type.map(|ty| {
+                ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+            });
+            for overload in &mut self.entry.overloads {
+                overload.signature = overload.signature.apply_type_mapping_impl(
+                    db,
+                    &mapping,
+                    TypeContext::default(),
+                    &visitor,
+                );
+                if let Some(context) = overload.constructor_context {
+                    let instance = context.instance_type().apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        &visitor,
+                    );
+                    overload.set_constructor_context(db, context.with_instance_type(instance));
+                }
+            }
+        }
+        if let Some(downstream) = &mut self.downstream_constructor {
+            for constructor in downstream.iter_constructor_items_mut() {
+                constructor.freshen_alternative(db, env, arguments, nonce);
+            }
+        }
+    }
+
+    /// Solve the active methods together, leaving class defaults until every method has supplied
+    /// its evidence. Separate method variables allow `__new__` to remap the instance type.
+    ///
+    /// `Some(false)` rejects this choice of arguments. `None` means we cannot represent all of its
+    /// solutions, so the caller must preserve the original behavior for the entire call.
+    fn solve_constructor_chain(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Option<bool> {
+        if self.downstream_constructor.is_none()
+            || self
+                .constructed_instance_type()
+                .class_specialization(db, env)
+                .is_none()
+        {
+            return Some(true);
+        }
+        let mut methods = Vec::new();
+        self.visit_evaluated_callables(&mut |callable| methods.push(callable));
+        let mut selected = Vec::new();
+        for callable in methods {
+            let mut overloads = callable.selected_overloads();
+            let (_, overload) = overloads.next()?;
+            if overloads.next().is_some() {
+                return None;
+            }
+            selected.push((callable, overload));
+        }
+        let (_, first) = selected.first()?;
+        let context = GenericContext::from_typevar_instances(
+            db,
+            env,
+            selected.iter().flat_map(|(_, overload)| {
+                overload
+                    .signature
+                    .generic_context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+            }),
+        );
+        let mut parameters = Vec::new();
+        let mut actual = Vec::new();
+        let mut add_relation = |argument, expected| {
+            parameters.push(Parameter::positional_only(None).with_annotated_type(expected));
+            actual.push((Argument::Positional, Some(argument)));
+        };
+        for (callable, overload) in &selected {
+            let arguments = arguments.with_self(callable.bound_type);
+            for (argument, matched) in arguments.iter().zip(&overload.argument_matches) {
+                for parameter in matched.iter() {
+                    let expected = parameter.expected_type.unwrap_or_else(|| {
+                        overload.signature.parameters()[parameter.index].annotated_type()
+                    });
+                    // The receiver already passed its own method's checks. Implicit Self does
+                    // not add class evidence and may have a different bound in another method.
+                    if matches!(argument, CallArgument::Synthetic(_))
+                        && (matches!(expected, Type::TypeVar(var) if var.typevar(db).is_self(db))
+                            || matches!(expected, Type::SubclassOf(ty)
+                                if ty.into_type_var().is_some_and(|var| var.typevar(db).is_self(db))))
+                    {
+                        continue;
+                    }
+                    if let Some(ty) = argument.matched_type(expected, parameter.argument_type) {
+                        add_relation(ty, expected);
+                    }
+                }
+            }
+        }
+        let class = self
+            .constructed_class_literal(db, env)
+            .and_then(ClassLiteral::as_static)?;
+        let variables: Vec<_> = context.variables(db).collect();
+        let mut linked: Vec<_> = variables.iter().copied().map(Type::TypeVar).collect();
+        for pair in selected.windows(2) {
+            let upstream = pair[0].1;
+            let downstream = pair[1].1;
+            let downstream_context = downstream.constructor_context?;
+            let mut returned = upstream.unspecialized_return_type(db);
+            if let Type::TypeVar(var) = returned
+                && upstream.is_self_like_constructor_return_typevar(db, var)
+                && let Some(upstream_context) = upstream.constructor_context
+            {
+                returned = upstream_context.instance_type();
+            }
+            let returned = returned.nominal_class(db, env).and_then(|returned| {
+                returned.iter_mro(db).find_map(|base| {
+                    let ClassBase::Class(base) = base else {
+                        return None;
+                    };
+                    let (literal, specialization) = base.static_class_literal(db)?;
+                    (literal == class).then_some(specialization).flatten()
+                })
+            })?;
+            let instance = downstream_context
+                .instance_type()
+                .specialization_of(db, env, class)?;
+            for (&returned, &instance) in returned.types(db).iter().zip(instance.types(db)) {
+                if let Type::TypeVar(var) = instance
+                    && let Some(index) = variables.iter().position(|owned| *owned == var)
+                {
+                    let previous = context.specialize(db, linked.as_slice());
+                    linked[index] = returned.apply_specialization(db, previous);
+                } else if returned != instance {
+                    // An explicit specialization was already applied to the downstream signature.
+                    // It cannot be remapped without rebuilding that signature from its declaration.
+                    return None;
+                }
+            }
+        }
+        let links = context.specialize(db, linked.as_slice());
+        let parameters = parameters.into_iter().map(|parameter| {
+            let ty = parameter.annotated_type().apply_specialization(db, links);
+            parameter.with_annotated_type(ty)
+        });
+        let actual = actual
+            .into_iter()
+            .map(|(kind, ty)| (kind, ty.map(|ty| ty.apply_specialization(db, links))));
+        let mut signature = Signature::new(
+            Parameters::from_annotation(db, parameters),
+            first
+                .unspecialized_return_type(db)
+                .apply_specialization(db, links),
+        );
+        signature.generic_context = Some(context);
+        let mut joint = Binding::single(self.entry.signature_type, signature);
+        if let Some(context) = first.constructor_context {
+            joint.set_constructor_context(db, context);
+        }
+        let arguments = actual.into_iter().collect::<CallArguments<'_, '_>>();
+        joint.match_parameters_impl(db, env, &arguments, self.entry.argument_matching_mode);
+        joint.check_types(db, env, &arguments, call_expression_tcx);
+        if joint.has_errors_affecting_overload_resolution() {
+            return Some(false);
+        }
+        if let Some(inference) = joint.inference {
+            if !matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Single
+                    | TypeVarInferenceSolutions::Unavailable(
+                        TypeVarInferenceFallback::Unconstrained
+                    )
+            ) {
+                return None;
+            }
+            let specialization = inference.merged_specialization_with(db, |var, inferred| {
+                let index = variables.iter().position(|owned| *owned == var)?;
+                if linked[index] != Type::TypeVar(var) {
+                    Some(linked[index])
+                } else if inferred.is_none() {
+                    var.default_type(db)
+                        .map(|ty| ty.apply_specialization(db, links))
+                } else {
+                    None
+                }
+            });
+            let inferred = TypeVarInference::new(
+                db,
+                context,
+                specialization
+                    .types(db)
+                    .iter()
+                    .copied()
+                    .map(Some)
+                    .collect::<Box<[_]>>(),
+                TypeVarInferenceSolutions::Single,
+            );
+            for (variable, ty) in variables.iter().zip(specialization.types(db)) {
+                let valid = match variable.typevar(db).bound_or_constraints(db, env) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        ty.is_assignable_to(db, env, bound.apply_specialization(db, specialization))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(bounds)) => {
+                        bounds.elements(db).iter().any(|bound| {
+                            ty.is_assignable_to(
+                                db,
+                                env,
+                                bound.apply_specialization(db, specialization),
+                            )
+                        })
+                    }
+                    None => true,
+                };
+                if !valid {
+                    return Some(false);
+                }
+            }
+            self.apply_joint_inference(db, inferred);
+        }
+        Some(true)
+    }
+
+    fn apply_joint_inference(&mut self, db: &'db dyn Db, inference: TypeVarInference<'db>) {
+        let specialization = inference.merged_specialization(db);
+        let selected: Vec<_> = self
+            .entry
+            .selected_overloads()
+            .map(|(index, _)| index)
+            .collect();
+        for index in selected {
+            let overload = &mut self.entry.overloads[index];
+            overload.inference = Some(inference);
+            overload.return_ty = overload
+                .unspecialized_return_type(db)
+                .apply_specialization(db, specialization);
+        }
+        if let Some(downstream) = &mut self.downstream_constructor {
+            for constructor in downstream.iter_constructor_items_mut() {
+                constructor.apply_joint_inference(db, inference);
+            }
+        }
+    }
+
+    /// Reset inference without changing the constructor's already-freshened signatures.
+    pub(super) fn reset(&mut self, db: &'db dyn Db) {
+        self.evaluations = None;
+        self.entry.overload_call_result = None;
+        self.entry.matching_overload_before_type_checking = None;
+        for overload in &mut self.entry.overloads {
+            overload.reset(db);
+        }
+        if let Some(downstream) = &mut self.downstream_constructor {
+            for constructor in downstream.iter_constructor_items_mut() {
+                constructor.reset(db);
+            }
+        }
+    }
+
+    /// Keep the original callable layout for inference iterations while updating its evidence.
+    /// Committed argument inference visits the complete evaluations instead.
+    fn copy_inference(&mut self, other: &Self) {
+        for (overload, evaluated) in self.entry.overloads.iter_mut().zip(&other.entry.overloads) {
+            let possible_positions = overload.positional_matches.clone();
+            overload.restore(evaluated.snapshot());
+            overload.positional_matches = possible_positions;
+        }
+        self.entry
+            .overload_call_result
+            .clone_from(&other.entry.overload_call_result);
+        self.entry.matching_overload_before_type_checking =
+            other.entry.matching_overload_before_type_checking;
+        if let (Some(downstream), Some(other)) = (
+            &mut self.downstream_constructor,
+            &other.downstream_constructor,
+        ) {
+            for (constructor, evaluated) in downstream
+                .iter_constructor_items_mut()
+                .zip(other.iter_constructor_items())
+            {
+                constructor.copy_inference(evaluated);
+            }
+        }
+    }
+
+    pub(super) fn as_result(&self, db: &'db dyn Db) -> Result<(), super::CallErrorKind> {
+        if self.evaluations.is_some() {
+            return Ok(());
+        }
+        self.entry.as_result()?;
+        self.downstream_constructor()
+            .map_or(Ok(()), |downstream| downstream.as_result(db))
+    }
+
+    pub(super) fn evaluated_calls(&self) -> &[Self] {
+        self.evaluations
+            .as_deref()
+            .unwrap_or_else(|| std::slice::from_ref(self))
+    }
+
+    /// Visit each completed constructor evaluation, or the original methods before expansion.
+    pub(super) fn visit_evaluated_callables<'a>(
+        &'a self,
+        visit: &mut impl FnMut(&'a CallableBinding<'db>),
+    ) {
+        for evaluation in self.evaluated_calls() {
+            visit(&evaluation.entry);
+            if let Some(downstream) = &evaluation.downstream_constructor {
+                downstream.visit_evaluated_type_context_callables(visit);
+            }
         }
     }
 
@@ -291,6 +783,9 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
+        if self.evaluations.is_some() {
+            return false;
+        }
         if self.should_check_downstream(db, env) {
             true
         } else {
@@ -309,14 +804,18 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) {
+        if self.evaluations.is_some() {
+            return;
+        }
         if let Some(downstream) = self.downstream_constructor_mut() {
+            let argument_types = argument_types.for_downstream_constructor();
             // We discard the result here, but that's fine; it's `report_diagnostics` and
             // `as_result` that ultimately matter.
             let _ = downstream.check_types_impl(
                 db,
                 env,
                 constraints,
-                argument_types,
+                argument_types.as_ref(),
                 call_expression_tcx,
                 dataclass_field_specifiers,
                 CheckTypesMode::Finalize,
@@ -325,7 +824,11 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     pub(super) fn downstream_constructor(&self) -> Option<&Bindings<'db>> {
-        self.downstream_constructor.as_deref()
+        if self.evaluations.is_some() {
+            None
+        } else {
+            self.downstream_constructor.as_deref()
+        }
     }
 
     pub(super) fn downstream_constructor_mut(&mut self) -> Option<&mut Bindings<'db>> {
@@ -333,6 +836,11 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     pub(super) fn init_argument_matches_keyword_variadic(&self, argument_index: usize) -> bool {
+        if let Some(evaluations) = &self.evaluations {
+            return evaluations.iter().any(|evaluation| {
+                evaluation.init_argument_matches_keyword_variadic(argument_index)
+            });
+        }
         if self.constructor_kind().is_init() {
             self.entry.argument_matches_keyword_variadic(argument_index)
         } else {
@@ -353,11 +861,21 @@ impl<'db> ConstructorBinding<'db> {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
             downstream_constructor: None,
+            evaluations: None,
         }
     }
 
     /// Compute the overall effective return type of this `ConstructorBinding`.
     pub(super) fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        if let Some(evaluations) = &self.evaluations {
+            return UnionType::from_elements(
+                db,
+                env,
+                evaluations
+                    .iter()
+                    .map(|evaluation| evaluation.return_type(db, env)),
+            );
+        }
         let constructed_instance_type = self.constructed_instance_type();
 
         // If we are checking downstream constructors, and the downstream constructor resolves to a

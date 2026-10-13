@@ -726,6 +726,86 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+## Shared positional unpacks
+
+`__new__` and `__init__` receive the same arguments. We reject a call when each method could accept
+a different length for `before`, but no length satisfies both.
+
+```py
+from typing import Self
+
+class Incompatible:
+    def __new__(cls, a: str, b: int) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, a: int, b: str): ...
+
+def _(before: list[str], after: list[str]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Incompatible(*before, 1, *after)
+```
+
+## Callback return types after positional unpacking
+
+The initializer expects a callback that returns an integer. The unpacks can fill `a` and `b`, but
+they cannot make a callback that returns a string valid.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Item:
+    def __new__(cls, *args: object) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, a: int, callback: Callable[[str], int], b: int): ...
+
+def _(before: list[int], after: list[int]) -> None:
+    Item(*before, lambda x: len(x), *after)  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Item(*before, lambda x: x.upper(), *after)
+```
+
+## Positional unpacks through a metaclass
+
+A string between two integer unpacks can fill `text` in all three constructor methods.
+
+```py
+from typing import Self
+
+class Meta(type):
+    def __call__(cls, a: int, text: str, b: int) -> "Item":
+        raise NotImplementedError
+
+class Item(metaclass=Meta):
+    def __new__(cls, a: int, text: str, b: int) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, a: int, text: str, b: int): ...
+
+def _(before: list[int], after: list[int]) -> None:
+    Item(*before, "text", *after)  # no diagnostic
+```
+
+## Skipping initialization after positional unpacking
+
+The metaclass returns a string, so the initializer does not run. Only the metaclass's parameters
+constrain the unpack lengths.
+
+```py
+class Meta(type):
+    def __call__(cls, a: int, text: str, b: int) -> str:
+        return text
+
+class Item(metaclass=Meta):
+    def __init__(self, value: bytes): ...
+
+def _(before: list[int], after: list[int]) -> None:
+    reveal_type(Item(*before, "text", *after))  # revealed: str
+```
+
 ## `__new__` return type
 
 Python's `__new__` method can return any type, not just an instance of the class. When `__new__`
