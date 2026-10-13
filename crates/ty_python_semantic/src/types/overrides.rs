@@ -930,7 +930,7 @@ fn check_class_declaration<'db>(
                     &member.name,
                     *first_reachable_definition,
                 ) {
-                    attributes::OverrideCheck::Method => {}
+                    attributes::OverrideCheck::Callable => {}
                     attributes::OverrideCheck::Attribute(Some(violation)) => {
                         violation.report(
                             context,

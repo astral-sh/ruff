@@ -3131,6 +3131,66 @@ class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
 ```
 
+## Methods replacing inferred callable defaults
+
+A class assigned to an unannotated attribute is callable without binding a receiver. An overriding
+method must accept the constructor's arguments, even though the inferred attribute has no declared
+read or write type.
+
+```pyi
+class Float:
+    def __init__(self, num: int, dps: int) -> None: ...
+
+class FloatBaseType:
+    cast_nocheck = Float
+
+class Compatible(FloatBaseType):
+    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # no diagnostic
+
+class Incompatible(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # error: [invalid-method-override]
+
+class Suppressed(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # ty: ignore[invalid-method-override]
+```
+
+The same check applies to an instance with a `__call__` method. Ordinary inferred defaults still do
+not impose a declared attribute contract.
+
+```pyi
+class Callback:
+    def __call__(self, value: int) -> int: ...
+
+class Base:
+    callback = Callback()
+    value = 0
+
+class Compatible(Base):
+    def callback(self, value: int) -> int: ...  # no diagnostic
+    value = "text"  # no diagnostic
+
+class Incompatible(Base):
+    def callback(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Inactive method declarations
+
+An inactive declaration does not provide an override contract. An incompatible override is reported
+against the ancestor that defines the inherited method.
+
+```pyi
+class Bdb:
+    def set_trace(self, frame: object) -> None: ...
+
+class Pdb(Bdb):
+    if False:
+        def set_trace(self) -> None: ...
+
+class Debugger(Pdb):
+    # error: [invalid-method-override] "Definition is incompatible with `Bdb.set_trace`"
+    def set_trace(self) -> None: ...
+```
+
 ## Descriptors exposing callables
 
 A descriptor that returns a callable has an attribute contract. We compare the value returned by
@@ -3237,6 +3297,19 @@ class Compatible(Base):
     def method(self, x: int) -> int: ...  # no diagnostic
 ```
 
+Methods replacing inferred callable defaults still have their signatures checked.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Incompatible(CallableBase):
+    def make(self) -> Factory: ...  # error: [invalid-method-override]
+```
+
 ## Disabling method override rules
 
 Disabling method override diagnostics still leaves attribute and property checks enabled.
@@ -3259,6 +3332,19 @@ class Child(Base):
     def attribute(self) -> int: ...  # error: [invalid-attribute-override]
     def property(self) -> int: ...  # error: [invalid-property-type-override]
     def method(self) -> int: ...  # no diagnostic
+```
+
+This also disables signature checking for methods that replace inferred callable defaults.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Child(CallableBase):
+    def make(self) -> Factory: ...  # no diagnostic
 ```
 
 ## Disabled overrides do not hide other rules

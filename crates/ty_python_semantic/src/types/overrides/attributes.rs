@@ -33,6 +33,13 @@ struct AttributeContract<'db> {
     qualifiers: TypeQualifiers,
 }
 
+/// An inferred default has no declared attribute contract, but its value can still
+/// provide a call signature that an overriding method needs to preserve.
+enum MemberContract<'db> {
+    Attribute(AttributeContract<'db>),
+    Inferred(Type<'db>),
+}
+
 /// Selects the declaration that supplies an attribute's override contract.
 ///
 /// A class default can retain an inherited annotation while a receiver annotation
@@ -99,14 +106,14 @@ fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// ```
 ///
 /// With `owner = Base` and a `Child` receiver, the read contract remains `int`.
-fn attribute_contract<'db>(
+fn member_contract<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     owner: ClassType<'db>,
     receiver: Type<'db>,
     name: &str,
     kind: AttributeContractKind,
-) -> Option<AttributeContract<'db>> {
+) -> Option<MemberContract<'db>> {
     // `object.__class__` is specialized by member lookup, so its synthetic `Self` is
     // not an override contract. Likewise, not every object is hashable or has a
     // writable instance dictionary, despite the broad declarations in typeshed.
@@ -211,7 +218,7 @@ fn attribute_contract<'db>(
     // Other inferred bindings do not define an independent write contract: their raw
     // types can retain literals that ordinary attribute access widens.
     if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
-        return None;
+        return Some(MemberContract::Inferred(own_place.ty));
     }
     let (read, write) = if is_descriptor {
         let read = Type::resolve_descriptor_access(
@@ -261,7 +268,7 @@ fn attribute_contract<'db>(
             ),
         )
     };
-    Some(AttributeContract {
+    Some(MemberContract::Attribute(AttributeContract {
         read,
         write: if is_final || !is_class_var && literal.is_frozen_dataclass(db) == Some(true) {
             None
@@ -271,7 +278,7 @@ fn attribute_contract<'db>(
         is_property,
         is_method,
         qualifiers,
-    })
+    }))
 }
 
 /// Return the input type accepted by every possible descriptor or instance-storage path.
@@ -403,8 +410,8 @@ fn attribute_violation<'db>(
 
 /// Select the checker from the members' access semantics before applying diagnostic settings.
 pub(super) enum OverrideCheck<'db> {
-    /// Both members are methods; compare them using the common receiver domain.
-    Method,
+    /// Compare an overriding method with an inherited method or inferred callable.
+    Callable,
     /// Attribute checking is complete. `None` includes compatible pairs and conflicts
     /// already present in a base class.
     Attribute(Option<AttributeOverrideViolation<'db>>),
@@ -489,9 +496,10 @@ impl<'db> AttributeOverrideViolation<'db> {
 
 /// Classify an override and check attribute compatibility without emitting diagnostics.
 ///
-/// Ordinary `Callable` attributes do not bind a receiver. Mixed overrides compare the
-/// values exposed after descriptor access. They never fall through to the method
-/// checker, even when compatible or suppressed.
+/// Declared attributes compare the values exposed after descriptor access. An
+/// inferred callable default has no declared attribute contract, but an overriding
+/// method must still preserve its call signature. Diagnostic settings do not affect
+/// which check applies.
 pub(super) fn check_override<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -515,7 +523,7 @@ pub(super) fn check_override<'db>(
                 .is_some_and(|ty| is_method_type(db, ty))
         })
     {
-        return OverrideCheck::Method;
+        return OverrideCheck::Callable;
     }
     let receiver = Type::instance(db, env, class);
     let source_kind = if definition.place(db).is_member() {
@@ -533,12 +541,19 @@ pub(super) fn check_override<'db>(
     } else {
         AttributeContractKind::Inherited
     };
-    let Some(source) = attribute_contract(db, env, class, receiver, name, source_kind) else {
-        return OverrideCheck::Unavailable;
-    };
-    let Some(target) = attribute_contract(db, env, superclass, receiver, name, inherited_kind)
+    let Some(MemberContract::Attribute(source)) =
+        member_contract(db, env, class, receiver, name, source_kind)
     else {
         return OverrideCheck::Unavailable;
+    };
+    let target = match member_contract(db, env, superclass, receiver, name, inherited_kind) {
+        Some(MemberContract::Attribute(target)) => target,
+        Some(MemberContract::Inferred(target))
+            if source.is_method && target.try_upcast_to_callable(db, env).is_some() =>
+        {
+            return OverrideCheck::Callable;
+        }
+        Some(MemberContract::Inferred(_)) | None => return OverrideCheck::Unavailable,
     };
     let Some(violation) = attribute_violation(
         db,
@@ -558,8 +573,8 @@ pub(super) fn check_override<'db>(
         && parent != superclass
     {
         let parent_receiver = Type::instance(db, env, parent);
-        if let Some(parent_source) =
-            attribute_contract(db, env, parent, parent_receiver, name, inherited_kind)
+        if let Some(MemberContract::Attribute(parent_source)) =
+            member_contract(db, env, parent, parent_receiver, name, inherited_kind)
             && parent
                 .iter_mro(db)
                 .skip(1)
@@ -567,8 +582,11 @@ pub(super) fn check_override<'db>(
                 .chain(parent.iter_explicit_ancestors(db, env).skip(1))
                 .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
                 .any(|ancestor| {
-                    attribute_contract(db, env, ancestor, parent_receiver, name, inherited_kind)
+                    member_contract(db, env, ancestor, parent_receiver, name, inherited_kind)
                         .is_some_and(|parent_target| {
+                            let MemberContract::Attribute(parent_target) = parent_target else {
+                                return false;
+                            };
                             attribute_violation(
                                 db,
                                 env,
