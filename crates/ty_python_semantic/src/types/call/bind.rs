@@ -8608,7 +8608,19 @@ impl<'db> Binding<'db> {
         compound_diag: Option<&dyn CompoundDiagnostic>,
         matching_overload: Option<&MatchingOverloadLiteral<'db>>,
     ) {
+        let mut reported_argument_errors: FxHashMap<_, SmallVec<[_; 1]>> = FxHashMap::default();
         for error in &self.errors {
+            // Multiple elements of one starred argument can produce the same type error for a
+            // variadic parameter. Deduplicate only when reporting: overload selection uses the
+            // number of binding errors, so removing errors earlier could change inference.
+            if let BindingError::InvalidArgumentType { argument_index, .. } = error {
+                let reported = reported_argument_errors.entry(argument_index).or_default();
+                if reported.contains(&error) {
+                    continue;
+                }
+                reported.push(error);
+            }
+
             error.report_diagnostic(
                 context,
                 node,
