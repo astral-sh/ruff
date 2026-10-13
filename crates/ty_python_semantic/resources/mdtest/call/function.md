@@ -348,7 +348,8 @@ class C:
     # parameter in a classmethod, and is always passed positionally at runtime,
     # We therefore understand both `cls` and `__x` here as positional-only; we do not
     # emit `[invalid-legacy-positional-parameter]` on the method.
-    def __new__(cls, __x: int): ...
+    def __new__(cls, __x: int):
+        return super().__new__(cls)
 
 # error: [positional-only-parameter-as-kwarg]
 C(42).method(__x=1)
