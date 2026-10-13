@@ -221,9 +221,10 @@ impl<'db> VariadicArgument<'db> {
             return sequence;
         };
 
-        // Combining unequal tuple shapes loses their minimum lengths. Even when matching
-        // cannot preserve each member's positions, it must account for guaranteed elements:
-        // `tuple[int] | tuple[int, int]` cannot be empty in a call like `f(*args, 1)`.
+        // `Type::iterate` combines unequal tuple shapes into a sequence with minimum length zero.
+        // Restore the minimum length guaranteed by every union member here, so matching
+        // accounts for required elements: `tuple[int] | tuple[int, int]` cannot be empty
+        // in a call like `f(*args, 1)`.
         let minimum = union
             .elements(db)
             .iter()
