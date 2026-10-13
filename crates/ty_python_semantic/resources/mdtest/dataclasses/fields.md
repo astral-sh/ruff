@@ -166,7 +166,7 @@ reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")
 
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
+# error: [too-many-positional-arguments] "Too many positional arguments: expected 2, got 3"
 bob = Person("Bob", 30)
 ```
 
