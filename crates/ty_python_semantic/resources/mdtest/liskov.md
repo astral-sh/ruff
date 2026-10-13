@@ -2289,6 +2289,22 @@ help:         return <logic to compare two `Bad` instances>
 help: 
 ```
 
+## Hash method overrides
+
+The signature of `object.__hash__` still constrains overriding methods, even though a subclass can
+disable hashing by setting `__hash__` to `None`.
+
+```pyi
+class Hashable:
+    def __hash__(self) -> int: ...  # no diagnostic
+
+class InvalidHash:
+    def __hash__(self) -> str: ...  # error: [invalid-method-override]
+
+class Unhashable:
+    __hash__ = None  # no diagnostic
+```
+
 ## Class-private names do not override
 
 ```py
@@ -2368,6 +2384,22 @@ info: `Baz._asdict` is a generated method created because `Baz` inherits from `t
    |
 37 | class Baz(NamedTuple):
    |       ^^^^^^^^^^^^^^^ Definition of `Baz`
+```
+
+## Functional named tuple methods
+
+Named tuples created with the functional syntax also expose generated method signatures.
+
+```pyi
+from typing import NamedTuple
+
+Base = NamedTuple("Base", [("value", int)])
+
+class Compatible(Base):
+    def _asdict(self) -> dict[str, int]: ...  # no diagnostic
+
+class Incompatible(Base):
+    def _asdict(self) -> int: ...  # error: [invalid-method-override]
 ```
 
 ## Staticmethods and classmethods
@@ -3031,6 +3063,205 @@ class CompatibleMethod(CallablePropertyBase):
         return 1
 ```
 
+## Decorators preserving method binding
+
+A decorator returning `Callable` preserves method binding. Overriding its result is checked as a
+method override, including when the diagnostic is suppressed.
+
+```pyi
+from collections.abc import Callable
+
+def decorate(function: Callable[..., int]) -> Callable[..., int]: ...
+
+class Base:
+    @decorate
+    def value(self) -> int: ...
+
+class Compatible(Base):
+    def value(self) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> str: ...  # error: [invalid-method-override]
+
+class Suppressed(Base):
+    def value(self) -> str: ...  # ty: ignore[invalid-method-override]
+```
+
+## Callable attributes and method binding
+
+A `Callable` attribute does not bind a receiver. When a method overrides it, we compare the bound
+method's signature with the attribute's callable type. The same comparison applies when an attribute
+overrides a method.
+
+The optional mutable-override rule is disabled here to isolate read compatibility.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class AttributeBase:
+    value: Callable[[int], int]
+
+class CompatibleMethod(AttributeBase):
+    def value(self, x: int, /) -> int: ...  # no diagnostic
+
+class IncompatibleMethod(AttributeBase):
+    def value(self) -> int: ...  # error: [invalid-attribute-override]
+
+class MethodBase:
+    def value(self, x: int, /) -> int: ...
+
+class CompatibleAttribute(MethodBase):
+    value: Callable[[int], int]  # no diagnostic
+
+class IncompatibleAttribute(MethodBase):
+    value: Callable[[], int]  # error: [invalid-attribute-override]
+```
+
+## Methods replacing inferred callable defaults
+
+A class assigned to an unannotated attribute is callable without binding a receiver. An overriding
+method must accept the constructor's arguments, even though the inferred attribute has no declared
+read or write type.
+
+```pyi
+class Float:
+    def __init__(self, num: int, dps: int) -> None: ...
+
+class FloatBaseType:
+    cast_nocheck = Float
+
+class Compatible(FloatBaseType):
+    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # no diagnostic
+
+class Incompatible(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # error: [invalid-method-override]
+
+class Suppressed(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # ty: ignore[invalid-method-override]
+```
+
+The same check applies to an instance with a `__call__` method. Ordinary inferred defaults still do
+not impose a declared attribute contract.
+
+```pyi
+class Callback:
+    def __call__(self, value: int) -> int: ...
+
+class Base:
+    callback = Callback()
+    value = 0
+
+class Compatible(Base):
+    def callback(self, value: int) -> int: ...  # no diagnostic
+    value = "text"  # no diagnostic
+
+class Incompatible(Base):
+    def callback(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Methods replacing final callable attributes
+
+Finality and signature compatibility are independent checks. A method that replaces a final callable
+attribute violates finality even if its signature is compatible. An incompatible signature also
+produces a method override diagnostic, including when the finality diagnostic is suppressed.
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # error: [override-of-final-variable]
+
+class Incompatible(Base):
+    # error: [override-of-final-variable]
+    # error: [invalid-method-override]
+    def value(self) -> int: ...
+
+class SuppressedFinality(Base):
+    # error: [invalid-method-override]
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable]
+
+class SuppressedSignature(Base):
+    # error: [override-of-final-variable]
+    def value(self) -> int: ...  # ty: ignore[invalid-method-override]
+
+class SuppressedBoth(Base):
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable, invalid-method-override]
+```
+
+## Disabling final variable override checks
+
+Disabling finality diagnostics still leaves signature compatibility checks enabled.
+
+```toml
+[rules]
+override-of-final-variable = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Inactive method declarations
+
+An inactive declaration does not provide an override contract. An incompatible override is reported
+against the ancestor that defines the inherited method.
+
+```pyi
+class Bdb:
+    def set_trace(self, frame: object) -> None: ...
+
+class Pdb(Bdb):
+    if False:
+        def set_trace(self) -> None: ...
+
+class Debugger(Pdb):
+    # error: [invalid-method-override] "Definition is incompatible with `Bdb.set_trace`"
+    def set_trace(self) -> None: ...
+```
+
+## Descriptors exposing callables
+
+A descriptor that returns a callable has an attribute contract. We compare the value returned by
+`__get__` with the overriding bound method, and report incompatible attribute overrides.
+
+```pyi
+from collections.abc import Callable
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Callable[[int], int]: ...
+
+class Base:
+    value = Descriptor()
+
+class Compatible(Base):
+    def value(self, x: int) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> int: ...  # error: [invalid-attribute-override]
+
+class Suppressed(Base):
+    def value(self) -> int: ...  # ty: ignore[invalid-attribute-override]
+```
+
 ## Suppressing mixed override diagnostics
 
 Suppressing an incompatible attribute or property override does not expose a method override
@@ -3106,6 +3337,73 @@ class Child(Base):
     def attribute(self) -> int: ...  # no diagnostic
     def property(self) -> int: ...  # no diagnostic
     def method(self) -> int: ...  # error: [invalid-method-override]
+
+class Compatible(Base):
+    def attribute(self, x: int) -> int: ...  # no diagnostic
+    def property(self, x: int) -> int: ...  # no diagnostic
+    def method(self, x: int) -> int: ...  # no diagnostic
+```
+
+Methods replacing inferred callable defaults still have their signatures checked.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Incompatible(CallableBase):
+    def make(self) -> Factory: ...  # error: [invalid-method-override]
+```
+
+## Disabling method override rules
+
+Disabling method override diagnostics still leaves attribute and property checks enabled.
+
+```toml
+[rules]
+invalid-method-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class Base:
+    attribute: Callable[[int], int]
+    @property
+    def property(self) -> Callable[[int], int]: ...
+    def method(self, x: int) -> int: ...
+
+class Child(Base):
+    def attribute(self) -> int: ...  # error: [invalid-attribute-override]
+    def property(self) -> int: ...  # error: [invalid-property-type-override]
+    def method(self) -> int: ...  # no diagnostic
+```
+
+This also disables signature checking for methods that replace inferred callable defaults.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Child(CallableBase):
+    def make(self) -> Factory: ...  # no diagnostic
+```
+
+Finality checks remain enabled even when the overriding method has an incompatible signature.
+
+```pyi
+from typing import Final
+
+class FinalBase:
+    value: Final[Callable[[int], int]]
+
+class IncompatibleFinal(FinalBase):
+    def value(self) -> int: ...  # error: [override-of-final-variable]
 ```
 
 ## Disabled overrides do not hide other rules
