@@ -308,7 +308,8 @@ pub fn parse_unchecked_source(source: &str, source_type: PySourceType) -> Parsed
 ///
 /// This validates sources such as Jupyter notebooks, where each cell must be syntactically valid on
 /// its own while later cells can still reference earlier definitions.
-/// The `ranges` must be ordered and non-overlapping.
+/// The `ranges` must be ordered and non-overlapping, and the first range, if any, must start at
+/// offset zero.
 ///
 /// Consecutive ranges must be separated by a single-byte `\n`: each range ends just before the
 /// separator and the next range starts just after it, as Ruff's notebook cells are. A syntax error
@@ -320,6 +321,12 @@ pub fn parse_cells_unchecked(
     options: &ParseOptions,
 ) -> Parsed<ModModule> {
     let mut ranges = ranges.into_iter().peekable();
+    let first_range = ranges.peek();
+    debug_assert!(
+        first_range.is_none_or(|range| range.start() == TextSize::new(0)),
+        "the first cell range must start at offset zero",
+    );
+
     let mut body = Suite::new();
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
