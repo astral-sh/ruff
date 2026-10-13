@@ -565,6 +565,7 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+
 /// A completed union construction together with the policy under which it was normalized.
 ///
 /// This is separate from `UnionType`: structural substitutions and cycle recovery can
