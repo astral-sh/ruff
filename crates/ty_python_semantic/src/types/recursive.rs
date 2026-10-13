@@ -60,7 +60,7 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::definition::Definition;
@@ -138,14 +138,13 @@ impl MappingStep<'_> {
 /// until no new mapping state is discovered.
 #[derive(Default)]
 pub(super) struct MappingProbe<'db> {
-    seen: RefCell<FxHashSet<(Type<'db>, MappingStep<'db>)>>,
+    bodies: RefCell<FxIndexSet<(Type<'db>, MappingStep<'db>)>>,
     constructors: RefCell<Vec<ProbeConstructor<'db>>>,
     parameters: RefCell<
         FxHashMap<BoundTypeVarIdentity<'db>, (BoundTypeVarInstance<'db>, ProbeParameter<'db>)>,
     >,
     calls: RefCell<Vec<(usize, Specialization<'db>)>>,
     uses: RefCell<FxIndexSet<(ProbeParameter<'db>, MappingStep<'db>)>>,
-    changed: Cell<bool>,
 }
 
 struct ProbeConstructor<'db> {
@@ -235,7 +234,7 @@ impl<'db> MappingProbeContext<'_, 'db> {
             return None;
         }
         match self {
-            Self::Inspect(_) => probe.inspect_alias(
+            Self::Inspect(_) => Some(probe.record_alias(
                 db,
                 ty,
                 &MappingStep {
@@ -243,8 +242,7 @@ impl<'db> MappingProbeContext<'_, 'db> {
                     context,
                     materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
                 },
-                visitor,
-            ),
+            )),
             Self::Compose(_) => None,
         }
     }
@@ -263,8 +261,34 @@ impl<'db> MappingProbe<'db> {
         let mut visitor = visitor.for_new_materialization_root();
         visitor.mapping_probe = Some(MappingProbeContext::Inspect(&probe));
         ty.apply_type_mapping_impl(db, mapping, context, &visitor);
+        let mut next_body = 0;
         let mut checked = FxHashSet::default();
-        while !probe.changed.get() {
+        loop {
+            loop {
+                let Some((source, step)) = probe.bodies.borrow().get_index(next_body).cloned()
+                else {
+                    break;
+                };
+                next_body += 1;
+                let mut body_visitor = visitor.for_new_materialization_root();
+                body_visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
+                let body = match source {
+                    Type::Recursive(recursive) => recursive
+                        .unfold_with_mapping_visitor(db, &body_visitor)
+                        .into_type(),
+                    Type::TypeAlias(alias) => {
+                        alias.value_type_with_mapping_visitor(db, &body_visitor)
+                    }
+                    _ => continue,
+                };
+                // Inspect this body before its recursive references: a local change already
+                // proves that the mapping must be retained.
+                if body.apply_type_mapping_impl(db, &step.operation, step.context, &body_visitor)
+                    != body
+                {
+                    return true;
+                }
+            }
             let before = checked.len();
             let calls = probe.calls.borrow().clone();
             let uses = probe.uses.borrow().clone();
@@ -290,15 +314,14 @@ impl<'db> MappingProbe<'db> {
                         &use_visitor,
                     ) != argument
                     {
-                        probe.changed.set(true);
+                        return true;
                     }
                 }
             }
-            if before == checked.len() {
-                break;
+            if before == checked.len() && next_body == probe.bodies.borrow().len() {
+                return false;
             }
         }
-        probe.changed.get()
     }
 
     fn parameter(
@@ -322,17 +345,11 @@ impl<'db> MappingProbe<'db> {
         variable
     }
 
-    fn inspect_alias(
-        &self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        step: &MappingStep<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<Type<'db>> {
+    fn record_alias(&self, db: &'db dyn Db, ty: Type<'db>, step: &MappingStep<'db>) -> Type<'db> {
         let (source, arguments) = match ty.to_type_identity(db) {
             TypeIdentity::GrowingRecursive(..) => {
                 let Type::Recursive(alias) = ty else {
-                    return None;
+                    return ty;
                 };
                 let arguments = alias.arguments(db);
                 (
@@ -347,7 +364,7 @@ impl<'db> MappingProbe<'db> {
             }
             TypeIdentity::GrowingTypeAlias(..) => {
                 let Type::TypeAlias(alias) = ty else {
-                    return None;
+                    return ty;
                 };
                 let arguments = alias.specialization(db).or_else(|| {
                     alias
@@ -409,24 +426,8 @@ impl<'db> MappingProbe<'db> {
         } else {
             source
         };
-        if !self.seen.borrow_mut().insert((source, step.clone())) {
-            return Some(ty);
-        }
-        let body = match source {
-            Type::Recursive(recursive) => recursive
-                .unfold_with_mapping_visitor(db, visitor)
-                .into_type(),
-            Type::TypeAlias(alias) => alias.value_type_with_mapping_visitor(db, visitor),
-            _ => return None,
-        };
-        // An enclosing callable may be identical to this body. Inspect each alias with its
-        // own structural cache; only the alias/parameter worklist is shared across bodies.
-        let mut visitor = visitor.for_new_materialization_root();
-        visitor.mapping_probe = Some(MappingProbeContext::Inspect(self));
-        if body.apply_type_mapping_impl(db, &step.operation, step.context, &visitor) != body {
-            self.changed.set(true);
-        }
-        Some(ty)
+        self.bodies.borrow_mut().insert((source, step.clone()));
+        ty
     }
 }
 
