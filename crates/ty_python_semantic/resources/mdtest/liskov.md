@@ -3040,6 +3040,106 @@ class CompatibleMethod(CallablePropertyBase):
         return 1
 ```
 
+## Suppressing mixed override diagnostics
+
+Suppressing an incompatible attribute or property override does not expose a method override
+diagnostic for the same definition.
+
+```py
+from collections.abc import Callable
+
+class AttributeBase:
+    value: Callable[[int], int]
+
+class Incompatible(AttributeBase):
+    def value(self) -> int:  # error: [invalid-attribute-override]
+        return 0
+
+class Suppressed(AttributeBase):
+    def value(self) -> int:  # ty: ignore[invalid-attribute-override]
+        return 0
+
+class PropertyBase:
+    @property
+    def value(self) -> Callable[[int], int]:
+        return lambda x: x
+
+class SuppressedProperty(PropertyBase):
+    def value(self) -> int:  # ty: ignore[invalid-property-type-override]
+        return 0
+```
+
+## Suppressing decorated overrides
+
+A cached class method exposes attributes in addition to its call signature. Replacing it with an
+ordinary class method is an attribute override; suppressing that diagnostic does not expose a method
+override diagnostic.
+
+```py
+from functools import cache
+
+class Base:
+    @classmethod
+    @cache
+    def value(cls) -> int:
+        return 0
+
+class Child(Base):
+    @classmethod
+    def value(cls) -> int:  # ty: ignore[invalid-attribute-override]
+        return 0
+```
+
+## Disabling attribute override rules
+
+Disabling attribute and property override rules does not move their diagnostics to the method
+override rule. Incompatible overrides of ordinary methods are still rejected.
+
+```toml
+[rules]
+invalid-attribute-override = "ignore"
+invalid-property-type-override = "ignore"
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class Base:
+    attribute: Callable[[int], int]
+    @property
+    def property(self) -> Callable[[int], int]: ...
+    def method(self, x: int) -> int: ...
+
+class Child(Base):
+    def attribute(self) -> int: ...  # no diagnostic
+    def property(self) -> int: ...  # no diagnostic
+    def method(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Disabled overrides do not hide other rules
+
+An override can violate different contracts from multiple bases. Disabling the rule for the first
+conflict does not suppress an enabled rule for a later conflict.
+
+```toml
+[rules]
+invalid-property-type-override = "ignore"
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+class PropertyBase:
+    @property
+    def value(self) -> int: ...
+
+class AttributeBase:
+    value: str
+
+class Child(PropertyBase, AttributeBase):
+    value: bytes  # error: [invalid-attribute-override]
+```
+
 ## Class variables replacing properties
 
 A property makes no `ClassVar` declaration. Changing the kind of storage is permitted, but the
