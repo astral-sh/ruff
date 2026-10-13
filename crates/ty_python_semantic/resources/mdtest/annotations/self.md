@@ -535,7 +535,8 @@ class LinkedList:
 reveal_type(LinkedList().next())  # revealed: LinkedList
 ```
 
-Dataclass fields can also use `Self` in their annotations:
+Dataclass fields can also use `Self` in their annotations. The generated methods infer `Self` from
+their arguments, just like handwritten methods. A base-class argument can widen the inferred type:
 
 ```py
 from dataclasses import dataclass
@@ -545,7 +546,13 @@ from typing import Self
 class Node:
     parent: Self | None = None
 
-Node(Node())
+class Child(Node): ...
+
+Node(Node())  # no diagnostic
+Child(Child())  # no diagnostic
+Child(Node())  # no diagnostic
+Child().__replace__(parent=Child())  # no diagnostic
+Child().__replace__(parent=Node())  # no diagnostic
 ```
 
 Attributes annotated with `Self` can be assigned on instances:

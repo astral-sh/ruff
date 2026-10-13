@@ -1339,7 +1339,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -1368,6 +1368,31 @@ class IntBox(Box[int]):
     pass
 
 reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
+```
+
+### Fields annotated with `Self`
+
+The generated constructor and replacement methods use the same inferable `Self` for their receiver
+and field annotations.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple, Self
+
+class Node(NamedTuple):
+    parent: Self | None = None
+
+class Child(Node): ...
+
+reveal_type(Node(Node()))  # revealed: Node
+reveal_type(Child(Child()))  # revealed: Child
+reveal_type(Child()._replace(parent=Child()))  # revealed: Child
+reveal_type(Child().__replace__(parent=Child()))  # revealed: Child
+Child()._replace(parent=1)  # error: [invalid-argument-type]
 ```
 
 ## `collections.namedtuple`
@@ -1457,7 +1482,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: (self: Self, *, name: Any = ..., age: Any = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: Any = ..., age: Any = ...) -> Self
 
 # _make creates instances from an iterable.
 reveal_type(Person._make(["Alice", 30]))  # revealed: Person
@@ -1536,7 +1561,7 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
+reveal_type(Point._replace)  # revealed: [Self](self: Self, *, x: int = ..., y: int = ...) -> Self
 
 # Point is assignable to NamedTuple.
 static_assert(is_assignable_to(Point, NamedTuple))

@@ -44,13 +44,6 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             );
             let self_ty = Type::TypeVar(self_typevar);
 
-            let variables = inherited_generic_context
-                .iter()
-                .flat_map(|ctx| ctx.variables(db))
-                .chain(std::iter::once(self_typevar));
-
-            let generic_context = GenericContext::from_typevar_instances(db, env, variables);
-
             // CPython generates namedtuple `__new__` as `(_cls, field1, ...)` so field names like
             // `cls` remain usable as keyword arguments at call sites.
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("_cls"))
@@ -64,10 +57,11 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             }));
 
             let signature = Signature::new_generic(
-                Some(generic_context),
+                inherited_generic_context,
                 Parameters::standard(parameters),
                 self_ty,
-            );
+            )
+            .with_inferable_self(db, env, self_typevar);
             Some(Type::function_like_callable(db, signature))
         }
         "__match_args__" => {
@@ -94,11 +88,12 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             }
 
             // _replace(self, *, field1=..., field2=...) -> Self
-            let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+            let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
-            ));
+            );
+            let self_ty = Type::TypeVar(self_typevar);
 
             let first_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
                 .with_annotated_type(self_ty);
@@ -110,7 +105,8 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
                     .with_definition(field.definition)
             }));
 
-            let signature = Signature::new(Parameters::standard(parameters), self_ty);
+            let signature = Signature::new(Parameters::standard(parameters), self_ty)
+                .with_inferable_self(db, env, self_typevar);
             Some(Type::function_like_callable(db, signature))
         }
         "__init__" => {
