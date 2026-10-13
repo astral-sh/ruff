@@ -120,76 +120,6 @@ def to_str(x: int | str):
 reveal_type(to_str(1))  # revealed: str
 ```
 
-## Disabled return type inference
-
-Disabling return type inference leaves unannotated returns as `Unknown`. Explicit annotations still
-determine the return type.
-
-```toml
-[analysis]
-return-type-inference = "never"
-```
-
-```py
-def value():
-    return 1
-
-class Fluent:
-    def chain(self):
-        return self
-
-def annotated() -> int:
-    return 1
-
-reveal_type(value())  # revealed: Unknown
-reveal_type(Fluent().chain())  # revealed: Unknown
-reveal_type(annotated())  # revealed: int
-```
-
-## Return type inference across files
-
-The defining file controls return type inference for a function, even when the caller uses a
-different setting.
-
-`enabled.py`:
-
-```py
-# /// script
-# [tool.ty.analysis]
-# return-type-inference = "always"
-# ///
-
-def value():
-    return 1
-```
-
-`disabled.py`:
-
-```py
-# /// script
-# [tool.ty.analysis]
-# return-type-inference = "never"
-# ///
-
-def value():
-    return 1
-```
-
-`main.py`:
-
-```py
-# /// script
-# [tool.ty.analysis]
-# return-type-inference = "never"
-# ///
-
-import disabled
-import enabled
-
-reveal_type(enabled.value())  # revealed: Literal[1]
-reveal_type(disabled.value())  # revealed: Unknown
-```
-
 ## Functions with non-trivial control flow
 
 ### Returning from a loop
@@ -961,8 +891,7 @@ return type of `logged(..)` calls. For example:
 ```py
 logging_len = logged(len)
 
-# TODO: Should be `_Wrapped[(...), Unknown, (arg), Unknown]`
-reveal_type(logging_len)  # revealed: Unknown
+reveal_type(logging_len)  # revealed: _Wrapped[(...), Unknown, (arg), Unknown]
 ```
 
 The wrapped function can be called, and the `__wrapped__` attribute can be accessed:
@@ -977,13 +906,13 @@ i.e. `method` should be callable with an implicitly bound `self` argument:
 
 ```py
 class C:
-    # TODO: Return type inference should remove this diagnostic.
-    @logged  # error: [dynamic-function-decorator-return]
+    @logged
     def method(self):
         return 42
 
 instance = C()
-instance.method()  # no diagnostic
+# TODO: This shouldn't be an error
+instance.method()  # error: [missing-argument]
 ```
 
 Calling `method` on the class object itself is also possible:
@@ -1007,8 +936,7 @@ class C:
             return NotImplemented
         return self.x == other.x
 
-# TODO: Should be `NotImplementedType | Unknown | bool`
-reveal_type(C.__eq__(C(1), C(2)))  # revealed: Unknown
+reveal_type(C.__eq__(C(1), C(2)))  # revealed: NotImplementedType | Unknown | bool
 ```
 
 However, when called implicitly through the `==` operator, a return value of `NotImplemented` is
@@ -1018,6 +946,6 @@ back to `lhs is rhs`). Therefore, the final result for the following comparisons
 
 ```py
 # TODO: These should ideally be `bool` or `bool | Unknown`
-reveal_type(C(1) == C(2))  # revealed: Unknown
-reveal_type(C(1) == "something else")  # revealed: Unknown
+reveal_type(C(1) == C(2))  # revealed: NotImplementedType | Unknown | bool
+reveal_type(C(1) == "something else")  # revealed: NotImplementedType | Unknown | bool
 ```

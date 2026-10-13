@@ -1673,6 +1673,11 @@ impl<'db> FunctionType<'db> {
         let Some(function) = scope.node(db).as_function() else {
             return Type::unknown();
         };
+        // Functions defined only for type checking can have placeholder bodies, just like stubs.
+        if index.is_in_type_checking_block(scope.file_scope_id(db), function.node(&module).range())
+        {
+            return Type::unknown();
+        }
         if function.node(&module).is_async || scope.file_scope_id(db).is_generator_function(index) {
             return Type::unknown();
         }
