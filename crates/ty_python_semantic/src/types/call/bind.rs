@@ -5023,6 +5023,42 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             })
     }
 
+    /// Returns the minimum number of positional values supplied by the arguments after the
+    /// argument at `argument_index`.
+    ///
+    /// In `f(*args, x, *tail)`, this counts one value for `x` plus the minimum length of `tail`.
+    /// Unlike [`Self::has_later_positional_input`], this ignores iterables that might be empty.
+    fn later_minimum_positional_count(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument_index: usize,
+    ) -> usize {
+        self.arguments
+            .iter()
+            .skip(argument_index + 1)
+            .map(|argument| match argument {
+                CallArgument::Synthetic(_) | CallArgument::Positional(_) => 1,
+                CallArgument::Variadic(variadic) => variadic
+                    .sequence(db, env)
+                    .map_or(0, |sequence| sequence.len().minimum()),
+                CallArgument::Keyword { .. } | CallArgument::Keywords(_) => 0,
+            })
+            .sum()
+    }
+
+    /// Returns the number of positional parameters, starting at `next_positional`, that can still
+    /// be filled positionally. This stops at the first parameter that has an explicit keyword
+    /// argument, or that cannot be filled positionally (a keyword-only or variadic parameter).
+    fn available_positional_parameter_count(&self) -> usize {
+        (self.next_positional..self.parameters.len())
+            .take_while(|index| {
+                self.parameters.get_positional(*index).is_some()
+                    && !self.explicit_keyword_parameters.contains(index)
+            })
+            .count()
+    }
+
     fn get_argument_index(&self, argument_index: usize) -> Option<usize> {
         if argument_index >= self.num_synthetic_args {
             // Adjust the argument index to skip synthetic args, which don't appear at the call
@@ -5170,14 +5206,43 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         variadic: &VariadicArgument<'db>,
     ) -> Result<(), ()> {
         let argument = Argument::Variadic;
+        let has_variadic_parameter = self.parameters.variadic().is_some();
+        let reserved_positional_parameters = if !has_variadic_parameter {
+            self.later_minimum_positional_count(db, env, argument_index)
+        } else {
+            // For `def f(a: str, *args: object)`, a later argument could fill `a` or `args`.
+            // Keep matching greedily until we can consider both possibilities.
+            0
+        };
         // Correlations between tuple-union lengths and element types are only safe to
         // combine when later arguments cannot shift their positional slots.
-        let unpacked = variadic.matching(
+        let mut unpacked = variadic.matching(
             db,
             env,
-            self.parameters.variadic().is_none()
-                && !self.has_later_positional_input(argument_index),
+            !has_variadic_parameter && !self.has_later_positional_input(argument_index),
         );
+        // Choose an unpacked length that leaves room for later positional values. Resizing
+        // preserves both fixed ends: truncating the element iterator could discard a required
+        // suffix, or treat the variable element as a required value when that segment is empty.
+        // Keep at least the minimum length so excess required elements are still reported.
+        if reserved_positional_parameters > 0
+            && unpacked.length.is_variable()
+            && unpacked.variable_element.is_some()
+            && let Some(sequence) = variadic.sequence(db, env)
+            && let Ok(sequence) = sequence.resize(
+                db,
+                env,
+                TupleLength::Fixed(
+                    self.available_positional_parameter_count()
+                        .saturating_sub(reserved_positional_parameters)
+                        .max(unpacked.length.minimum()),
+                ),
+            )
+        {
+            unpacked.types = sequence.iter_element_types(db).collect();
+            unpacked.length = sequence.len();
+            unpacked.variable_element = None;
+        }
         let argument_types = unpacked.types;
         let length = unpacked.length;
         let variable_element = unpacked.variable_element;
@@ -5236,24 +5301,18 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // If the tuple is truly variable-length, we assume that it will soak up all remaining
         // positional parameters, stopping only when we reach a parameter that has an explicit
         // keyword argument or a parameter that can only be provided via keyword argument, or if
-        // we run out of `argument_types` and have no `variable_element`.
-        } else if is_variable {
-            while self
-                .parameters
-                .get_positional(self.next_positional)
-                .is_some()
-            {
-                if self
-                    .explicit_keyword_parameters
-                    .contains(&self.next_positional)
-                {
+        // we run out of `argument_types` and have no `variable_element`. If the callable has no
+        // variadic parameter, we also leave room for the minimum number of positional values
+        // supplied by later arguments, since the unpacked iterable could be short enough to fit.
+        } else {
+            let available = self
+                .available_positional_parameter_count()
+                .saturating_sub(reserved_positional_parameters);
+            for _ in 0..available {
+                let Some(argument_type) = argument_types.next().or(variable_element) else {
                     break;
-                }
-                let arg_type = argument_types.next().or(variable_element);
-                if arg_type.is_none() {
-                    break;
-                }
-                self.match_positional(argument_index, argument, arg_type, is_variable)?;
+                };
+                self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
             }
         }
 
@@ -5274,17 +5333,12 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         // argument types to it, but only if there is at least one remaining argument type. This is
         // because a variadic parameter is optional, so if this was done unconditionally, ty could
         // raise a false positive as "too many arguments".
-        if self.parameters.variadic().is_some() {
-            if let Some(argument_type) = argument_types.next().or(variable_element) {
+        if has_variadic_parameter
+            && let Some(argument_type) = argument_types.next().or(variable_element)
+        {
+            self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
+            for argument_type in argument_types {
                 self.match_positional(argument_index, argument, Some(argument_type), is_variable)?;
-                for argument_type in argument_types {
-                    self.match_positional(
-                        argument_index,
-                        argument,
-                        Some(argument_type),
-                        is_variable,
-                    )?;
-                }
             }
         }
 

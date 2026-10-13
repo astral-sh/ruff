@@ -2002,6 +2002,29 @@ def _(args: tuple[int, ...]):
     reveal_type(f(*args, flag=""))  # revealed: Unknown
 ```
 
+### Required tuple elements before a later positional argument
+
+The tuple's required final `bytes` element selects the second overload. Its variable-length part
+must be empty to leave room for `1.0`:
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(a: str, b: float) -> str: ...
+@overload
+def f(a: bytes, b: float) -> bytes: ...
+```
+
+```py
+from overloaded import f
+
+def _(args: tuple[*tuple[str, ...], bytes]) -> None:
+    reveal_type(f(*args, 1.0))  # revealed: bytes
+```
+
 ### Variadic argument with generics
 
 `overloaded.pyi`:
