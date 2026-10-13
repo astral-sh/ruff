@@ -3234,6 +3234,15 @@ def _(before: list[list[str]], ints: list[int]) -> None:
     result.value.append(1)  # error: [invalid-argument-type]
 ```
 
+Even when the two element types overlap, both methods see the same list. Their results do not
+introduce a third kind of box.
+
+```py
+def _(before: list[list[int | str]], value: list[int | bytes]) -> None:
+    result = Box(*before, value)
+    valid: Box[int | str] | Box[int | bytes] = result  # no diagnostic
+```
+
 ## Positional unpacking preserves outer type variables
 
 A type variable bounded by `str` can fill the string parameter:

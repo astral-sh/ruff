@@ -514,6 +514,14 @@ impl<'db> ConstructorBinding<'db> {
                     specializations.push(specialization);
                 }
             }
+            // When two constructor methods infer the same possible instance types, the later
+            // method adds no evidence. Taking their product could invent a third instance type:
+            // for example, Box[int | str | bytes] from Box[int | str] and Box[int | bytes].
+            if combined.len() == specializations.len()
+                && combined.iter().all(|spec| specializations.contains(spec))
+            {
+                return;
+            }
             if combined.is_empty() {
                 combined = specializations;
             } else if !specializations.is_empty() {
