@@ -650,7 +650,7 @@ fn check_class_declaration<'db>(
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
-    let mut liskov_diagnostic_emitted = false;
+    let mut liskov_check_complete = false;
     let mut missing_override_target: Option<MissingOverrideTarget<'db>> = None;
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
@@ -846,9 +846,9 @@ fn check_class_declaration<'db>(
             // is about Liskov Substitution Principle checks
             // **********************************************************
 
-            // Only one Liskov diagnostic should be emitted per each invalid override,
-            // even if it overrides multiple superclasses incorrectly!
-            if liskov_diagnostic_emitted {
+            // Stop after the first violation of an enabled rule, even if its diagnostic
+            // is suppressed or the override is incompatible with multiple superclasses.
+            if liskov_check_complete {
                 continue;
             }
 
@@ -912,17 +912,16 @@ fn check_class_declaration<'db>(
                             subclass_kind,
                             superclass_variable_kind,
                         );
-                        liskov_diagnostic_emitted = true;
+                        liskov_check_complete = true;
                         continue;
                     }
                 }
             }
 
-            if configuration.check_attribute_type_violations()
-                // Constructors may change their signature. Leave their special receiver
-                // binding and `@override` checks to the method checker below.
-                && !is_constructor_like_method(&member.name)
-                && attributes::check_override(
+            // Constructors may change their signature. Leave their special receiver
+            // binding and `@override` checks to the method checker below.
+            if !is_constructor_like_method(&member.name)
+                && let Some(rule) = attributes::check_override(
                     context,
                     class,
                     superclass,
@@ -932,7 +931,7 @@ fn check_class_declaration<'db>(
                     superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id)),
                 )
             {
-                liskov_diagnostic_emitted = true;
+                liskov_check_complete = context.is_lint_enabled(rule);
                 continue;
             }
 
@@ -1006,7 +1005,7 @@ fn check_class_declaration<'db>(
                 },
             );
 
-            liskov_diagnostic_emitted = true;
+            liskov_check_complete = true;
         }
     }
 

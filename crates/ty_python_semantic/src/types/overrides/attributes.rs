@@ -7,6 +7,7 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 
 use crate::{
     Db, ProgramEnvironment, attribute_declarations,
+    lint::LintMetadata,
     place::{DefinedPlace, Place, TypeOrigin},
     types::{
         ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
@@ -394,9 +395,10 @@ fn attribute_violation<'db>(
 
 /// Report an incompatible explicit override, if its diagnostic rule is enabled.
 ///
-/// Return `true` only when a diagnostic was emitted, so callers can stop after the first
-/// reported base conflict. Property incompatibilities and ordinary mutable narrowing
-/// have separate rules.
+/// Return the rule for an incompatibility even when its diagnostic is suppressed or
+/// disabled, so callers do not report the same conflict as a method override. Callers
+/// can still check other bases when this rule is disabled. Property incompatibilities
+/// and ordinary mutable narrowing have separate rules.
 pub(super) fn check_override<'db>(
     context: &InferContext<'db, '_>,
     class: ClassType<'db>,
@@ -405,7 +407,7 @@ pub(super) fn check_override<'db>(
     name: &Name,
     definition: Definition<'db>,
     superclass_definition: Option<Definition<'db>>,
-) -> bool {
+) -> Option<&'static LintMetadata> {
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class);
@@ -424,14 +426,9 @@ pub(super) fn check_override<'db>(
     } else {
         AttributeContractKind::Inherited
     };
-    let Some(source) = attribute_contract(db, env, class, receiver, name, source_kind) else {
-        return false;
-    };
-    let Some(target) = attribute_contract(db, env, superclass, receiver, name, inherited_kind)
-    else {
-        return false;
-    };
-    let Some(violation) = attribute_violation(
+    let source = attribute_contract(db, env, class, receiver, name, source_kind)?;
+    let target = attribute_contract(db, env, superclass, receiver, name, inherited_kind)?;
+    let violation = attribute_violation(
         db,
         env,
         receiver,
@@ -439,9 +436,7 @@ pub(super) fn check_override<'db>(
         name,
         &source,
         &target,
-    ) else {
-        return false;
-    };
+    )?;
     // Suppress only conflicts already present with the parent's own specialization of
     // this ancestor. An unrelated base, or a newly incompatible specialization in the
     // child, must still be checked.
@@ -473,7 +468,7 @@ pub(super) fn check_override<'db>(
                         })
                 })
         {
-            return false;
+            return None;
         }
     }
     let involves_property = source.is_property || target.is_property;
@@ -486,7 +481,7 @@ pub(super) fn check_override<'db>(
     };
     let Some(builder) = context.report_lint(rule, definition.focus_range(db, context.module()))
     else {
-        return false;
+        return Some(rule);
     };
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Invalid override of attribute `{name}`"));
@@ -526,7 +521,7 @@ pub(super) fn check_override<'db>(
                 )),
         );
     }
-    true
+    Some(rule)
 }
 
 /// Check receiver annotations that introduce declarations outside the class body.
@@ -620,7 +615,9 @@ pub(super) fn check_instance_overrides<'db>(
                 name,
                 definition,
                 base_definition,
-            ) {
+            )
+            .is_some_and(|rule| context.is_lint_enabled(rule))
+            {
                 break;
             }
         }
