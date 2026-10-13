@@ -46,7 +46,10 @@ impl<'db> Segment<'db> {
 pub(super) struct PositionalMatches<'db> {
     segments: Box<[Segment<'db>]>,
     parameter_count: usize,
+    /// A parameter already supplied by keyword cannot also accept a positional argument.
     can_consume: Box<[bool]>,
+    /// From each (segment, parameter) state, can the rest of the call fit this signature?
+    /// This checks argument counts only; `evaluate` checks the types later.
     can_finish: Box<[bool]>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
 }
@@ -77,6 +80,9 @@ impl<'db> PositionalMatches<'db> {
             return None;
         }
 
+        // Split tuple unpacks into their fixed elements and, if present, one repeated element.
+        // For example, *tuple[int, *tuple[str, ...], bool] has three such segments. Keep the
+        // original argument index so that we can give its possible parameter types to inference.
         let mut segments = Vec::new();
         for (argument_index, argument) in arguments.iter().enumerate() {
             let mut push = |argument_type, repeated| {
@@ -133,62 +139,100 @@ impl<'db> PositionalMatches<'db> {
         }
 
         let parameter_count = parameters.positional().count();
-        let width = parameter_count + 1;
+        // Explicit keywords occupy their parameter even when an earlier unpack could reach it.
         let can_consume = (0..parameter_count)
             .map(|index| !explicit_keywords.contains(&index))
             .collect::<Box<[_]>>();
-        let mut can_finish = vec![false; (segments.len() + 1) * width];
-        can_finish[segments.len() * width + parameter_count] = true;
-        for position in (0..parameter_count).rev() {
-            can_finish[segments.len() * width + position] = can_finish
-                [segments.len() * width + position + 1]
-                && (parameters[position].has_default() || explicit_keywords.contains(&position));
-        }
-        for (index, segment) in segments.iter().enumerate().rev() {
-            for position in (0..=parameter_count).rev() {
-                let skip = segment.repeated && can_finish[(index + 1) * width + position];
-                let next = if segment.repeated { index } else { index + 1 };
-                let consume = position < parameter_count
-                    && can_consume[position]
-                    && can_finish[next * width + position + 1];
-                can_finish[index * width + position] = skip || consume;
-            }
-        }
-        if !can_finish[0] {
-            // The ordinary matcher provides arity and duplicate-argument diagnostics when
-            // even the argument shapes cannot fit this signature.
-            return None;
-        }
-
         let mut matches = Self {
+            can_finish: vec![false; (segments.len() + 1) * (parameter_count + 1)]
+                .into_boxed_slice(),
             segments: segments.into_boxed_slice(),
             parameter_count,
             can_consume,
-            can_finish: can_finish.into_boxed_slice(),
             arguments: Self::empty_matches(arguments),
         };
-        let mut reachable = vec![false; matches.can_finish.len()];
+        matches.mark_possible_finishes(parameters);
+        if !matches.can_finish[0] {
+            // Let the ordinary matcher diagnose impossible arities or duplicate arguments.
+            return None;
+        }
+        matches.collect_possible_matches();
+        Some(matches)
+    }
+
+    /// Indexes the same (segment, next parameter) state in each of the algorithm's tables.
+    /// The final row means all segments are exhausted; the final column means no fixed
+    /// positional parameters remain.
+    fn state(&self, segment: usize, parameter: usize) -> usize {
+        segment * (self.parameter_count + 1) + parameter
+    }
+
+    /// Where matching one element against this parameter leads, if it accepts positional input.
+    /// A repeated segment can keep supplying elements; a fixed segment is used exactly once.
+    fn next_state(&self, index: usize, position: usize) -> Option<usize> {
+        if !self.can_consume.get(position).copied().unwrap_or(false) {
+            return None;
+        }
+        let next_index = if self.segments[index].repeated {
+            index
+        } else {
+            index + 1
+        };
+        Some(self.state(next_index, position + 1))
+    }
+
+    /// Records whether the remaining arguments can fill the remaining required parameters.
+    fn mark_possible_finishes(&mut self, parameters: &Parameters<'db>) {
+        // With no segments left, we can stop if all remaining parameters have defaults or
+        // were supplied by keyword. An omitted required parameter prevents every earlier stop.
+        let last_row = self.state(self.segments.len(), 0);
+        self.can_finish[last_row + self.parameter_count] = true;
+        for position in (0..self.parameter_count).rev() {
+            let already_supplied = !self.can_consume[position];
+            self.can_finish[last_row + position] = self.can_finish[last_row + position + 1]
+                && (parameters[position].has_default() || already_supplied);
+        }
+
+        // Work backward: every transition goes right to a later parameter or down to a later
+        // segment. A repeated segment may stop here, or supply one more value. It can finish
+        // only if at least one of those choices leads to a complete call.
+        for (index, segment) in self.segments.iter().enumerate().rev() {
+            for position in (0..=self.parameter_count).rev() {
+                let current = self.state(index, position);
+                let after_segment = self.state(index + 1, position);
+                let stop_unpack = segment.repeated && self.can_finish[after_segment];
+                let consume = self
+                    .next_state(index, position)
+                    .is_some_and(|next| self.can_finish[next]);
+                self.can_finish[current] = stop_unpack || consume;
+            }
+        }
+    }
+
+    /// Collects each argument's possible parameter types before inferring the arguments.
+    fn collect_possible_matches(&mut self) {
+        // A state that can finish is useful only if we can reach it from the start of this call.
+        // Retain a match only when it belongs to at least one complete placement.
+        let mut reachable = vec![false; self.can_finish.len()];
         reachable[0] = true;
-        for (index, segment) in matches.segments.iter().enumerate() {
-            for position in 0..=parameter_count {
-                if !reachable[index * width + position] {
+        for (index, segment) in self.segments.iter().enumerate() {
+            for position in 0..=self.parameter_count {
+                if !reachable[self.state(index, position)] {
                     continue;
                 }
-                if segment.repeated && matches.can_finish[(index + 1) * width + position] {
-                    reachable[(index + 1) * width + position] = true;
+                let after_segment = self.state(index + 1, position);
+                if segment.repeated && self.can_finish[after_segment] {
+                    reachable[after_segment] = true;
                 }
-                let next = if segment.repeated { index } else { index + 1 };
-                if position < parameter_count
-                    && matches.can_consume[position]
-                    && matches.can_finish[next * width + position + 1]
+                if let Some(next) = self.next_state(index, position)
+                    && self.can_finish[next]
                 {
-                    reachable[next * width + position + 1] = true;
-                    segment.add_match(&mut matches.arguments, position);
+                    reachable[next] = true;
+                    segment.add_match(&mut self.arguments, position);
                 }
             }
         }
-        Self::deduplicate_matches(&mut matches.arguments);
-        Some(matches)
+        Self::deduplicate_matches(&mut self.arguments);
     }
 
     fn empty_matches(arguments: &CallArguments<'_, 'db>) -> Box<[MatchedArgument<'db>]> {
@@ -242,7 +286,6 @@ impl<'db> PositionalMatches<'db> {
         parameters: &Parameters<'db>,
         inferable: TypeVarSet<'db>,
     ) -> PositionalEvaluation<'db, 'c> {
-        let width = self.parameter_count + 1;
         let never = ConstraintSet::from_bool(constraints, false);
         let always = ConstraintSet::from_bool(constraints, true);
         // Keep inference evidence while allowing only this call's type variables to be solved.
@@ -254,44 +297,46 @@ impl<'db> PositionalMatches<'db> {
                     actual.when_constraint_set_assignable_to(db, env, expected, constraints)
                 })
         };
-        let mut edges = vec![never; self.segments.len() * width];
+        // An edge's constraints describe assigning this segment's element type to this
+        // parameter. Compute them once; different unpack lengths may use the same edge.
+        let mut edges = vec![never; self.state(self.segments.len(), 0)];
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..self.parameter_count {
-                if !self.can_finish[index * width + position] || !self.can_consume[position] {
+                let current = self.state(index, position);
+                if !self.can_finish[current] || !self.can_consume[position] {
                     continue;
                 }
                 let expected = parameters[position].annotated_type();
-                edges[index * width + position] = arguments
+                edges[current] = arguments
                     .get(segment.argument_index)
                     .and_then(|argument| argument.matched_type(expected, segment.argument_type))
                     .map_or(always, |actual| argument_constraints(actual, expected));
             }
         }
 
+        // For each state, build the constraints for completing the rest of the call. Intersect
+        // along a placement (all arguments must fit) and union alternatives (any length may fit).
         let mut suffix = vec![never; self.can_finish.len()];
         for position in 0..=self.parameter_count {
-            suffix[self.segments.len() * width + position] = ConstraintSet::from_bool(
-                constraints,
-                self.can_finish[self.segments.len() * width + position],
-            );
+            let terminal = self.state(self.segments.len(), position);
+            suffix[terminal] = ConstraintSet::from_bool(constraints, self.can_finish[terminal]);
         }
         for (index, segment) in self.segments.iter().enumerate().rev() {
             for position in (0..=self.parameter_count).rev() {
+                let current = self.state(index, position);
                 let mut condition = if segment.repeated {
-                    suffix[(index + 1) * width + position]
+                    suffix[self.state(index + 1, position)]
                 } else {
                     never
                 };
-                if position < self.parameter_count && self.can_consume[position] {
-                    let next = if segment.repeated { index } else { index + 1 };
+                if let Some(next) = self.next_state(index, position) {
                     condition.union(
                         db,
                         constraints,
-                        edges[index * width + position]
-                            .and(db, constraints, || suffix[next * width + position + 1]),
+                        edges[current].and(db, constraints, || suffix[next]),
                     );
                 }
-                suffix[index * width + position] = condition;
+                suffix[current] = condition;
             }
         }
 
@@ -321,27 +366,26 @@ impl<'db> PositionalMatches<'db> {
             };
         }
 
+        // Keep an individual match only if both the arguments before it and those after it can
+        // satisfy the same constraints. Testing an edge alone would mix incompatible placements.
         let mut matched = Self::empty_matches(arguments);
         let mut prefix = vec![never; self.can_finish.len()];
         prefix[0] = common;
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..=self.parameter_count {
-                let previous = prefix[index * width + position];
+                let current = self.state(index, position);
+                let previous = prefix[current];
                 if previous.is_trivially_never_satisfied() {
                     continue;
                 }
                 if segment.repeated {
-                    prefix[(index + 1) * width + position].union(db, constraints, previous);
+                    prefix[self.state(index + 1, position)].union(db, constraints, previous);
                 }
-                if position < self.parameter_count && self.can_consume[position] {
-                    let next = if segment.repeated { index } else { index + 1 };
-                    let condition =
-                        previous.and(db, constraints, || edges[index * width + position]);
-                    if possible(
-                        condition.and(db, constraints, || suffix[next * width + position + 1]),
-                    ) {
+                if let Some(next) = self.next_state(index, position) {
+                    let condition = previous.and(db, constraints, || edges[current]);
+                    if possible(condition.and(db, constraints, || suffix[next])) {
                         segment.add_match(&mut matched, position);
-                        prefix[next * width + position + 1].union(db, constraints, condition);
+                        prefix[next].union(db, constraints, condition);
                     }
                 }
             }
@@ -362,45 +406,43 @@ impl<'db> PositionalMatches<'db> {
         edges: &[ConstraintSet<'db, 'c>],
         possible: impl Fn(ConstraintSet<'db, 'c>) -> bool,
     ) -> Box<[MatchedArgument<'db>]> {
-        let width = self.parameter_count + 1;
+        // Zero further errors at a valid stopping point; usize::MAX marks states that cannot
+        // finish. Saturating addition below keeps those states impossible when charging an error.
         let mut costs = vec![usize::MAX; self.can_finish.len()];
         for position in 0..=self.parameter_count {
-            if self.can_finish[self.segments.len() * width + position] {
-                costs[self.segments.len() * width + position] = 0;
+            let terminal = self.state(self.segments.len(), position);
+            if self.can_finish[terminal] {
+                costs[terminal] = 0;
             }
         }
         for (index, segment) in self.segments.iter().enumerate().rev() {
             for position in (0..=self.parameter_count).rev() {
+                let current = self.state(index, position);
                 let mut cost = if segment.repeated {
-                    costs[(index + 1) * width + position]
+                    costs[self.state(index + 1, position)]
                 } else {
                     usize::MAX
                 };
-                if position < self.parameter_count && self.can_consume[position] {
-                    let next = if segment.repeated { index } else { index + 1 };
-                    cost = cost.min(
-                        costs[next * width + position + 1].saturating_add(usize::from(!possible(
-                            edges[index * width + position],
-                        ))),
-                    );
+                if let Some(next) = self.next_state(index, position) {
+                    let error_count = usize::from(!possible(edges[current]));
+                    cost = cost.min(costs[next].saturating_add(error_count));
                 }
-                costs[index * width + position] = cost;
+                costs[current] = cost;
             }
         }
 
+        // Reconstruct one cheapest placement. On a tie, stop the current unpack here.
         let mut matched = Self::empty_matches(arguments);
         let (mut index, mut position) = (0, 0);
         while let Some(segment) = self.segments.get(index) {
             if segment.repeated
-                && costs[index * width + position] == costs[(index + 1) * width + position]
+                && costs[self.state(index, position)] == costs[self.state(index + 1, position)]
             {
                 index += 1;
-            } else if position < self.parameter_count && self.can_consume[position] {
+            } else if let Some(next) = self.next_state(index, position) {
                 segment.add_match(&mut matched, position);
-                position += 1;
-                if !segment.repeated {
-                    index += 1;
-                }
+                let width = self.parameter_count + 1;
+                (index, position) = (next / width, next % width);
             } else {
                 break;
             }
