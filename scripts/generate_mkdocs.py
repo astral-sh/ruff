@@ -24,6 +24,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 # ///
 
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""

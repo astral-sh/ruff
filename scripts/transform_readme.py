@@ -20,6 +20,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 # ///
 
 """Transform the README.md to support a specific deployment target.

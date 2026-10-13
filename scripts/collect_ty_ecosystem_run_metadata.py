@@ -22,6 +22,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 # ///
 
 """Collect exact ecosystem-run inputs and preserve evidence for runtime inspection."""

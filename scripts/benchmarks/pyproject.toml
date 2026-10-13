@@ -26,4 +26,6 @@ linter = [
 
 [tool.uv]
 no-build = true
+require-build-hashes = true
 exclude-newer = "P7D"
+preview-features = ["build-dependency-hashes"]

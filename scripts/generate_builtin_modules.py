@@ -20,6 +20,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 # ///
 
 """Script to generate `crates/ruff_python_stdlib/src/sys/builtin_modules.rs`.

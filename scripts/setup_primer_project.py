@@ -28,6 +28,8 @@
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 #
 # [tool.uv.sources]
 # # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file

@@ -20,6 +20,10 @@
 # redundant-condition-strict = "warn"
 # disjoint-cast = "warn"
 # missing-direct-dependency = "warn"
+#
+# [tool.uv]
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes"]
 # ///
 
 """Update script lockfiles.
