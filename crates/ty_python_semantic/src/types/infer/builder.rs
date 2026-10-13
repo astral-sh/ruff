@@ -139,7 +139,10 @@ use crate::types::{
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
+use crate::{
+    AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, ReturnTypeInference,
+    SemanticModel,
+};
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
@@ -12438,7 +12441,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_function()
             .filter(|function| {
                 let function = function.node(self.module());
-                function.returns.is_none()
+                self.settings().return_type_inference == ReturnTypeInference::Always
+                    && function.returns.is_none()
                     && !function.is_async
                     && !self
                         .scope()

@@ -2,6 +2,30 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+#[test]
+fn return_type_inference_is_opt_in() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "def value():\n    return 1\n\nvalue().upper()\n")?;
+
+    for mode in [None, Some("never"), Some("always")] {
+        let mut command = case.command();
+        if let Some(mode) = mode {
+            command
+                .arg("--config")
+                .arg(format!(r#"analysis.return-type-inference="{mode}""#));
+        }
+        let output = command.output()?;
+        assert_eq!(
+            output.status.success(),
+            mode != Some("always"),
+            "{output:?}"
+        );
+        if mode == Some("always") {
+            assert!(String::from_utf8(output.stdout)?.contains("unresolved-attribute"));
+        }
+    }
+    Ok(())
+}
+
 /// ty ignores `type: ignore` comments when setting `respect-type-ignore-comments=false`
 #[test]
 fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {

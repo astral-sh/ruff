@@ -87,7 +87,7 @@ use crate::types::{
     SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
     definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxOrderSet, ProgramEnvironment, ReturnTypeInference};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -706,6 +706,8 @@ impl<'db> OverloadLiteral<'db> {
                 || class_is_generic
                 || class_is_fallback
                 || (function_stmt_node.returns.is_none()
+                    && db.analysis_settings(self.file(db)).return_type_inference
+                        == ReturnTypeInference::Always
                     && !matches!(self.name(db).as_str(), "__new__" | "__init__"))
             {
                 let scope_id = definition.scope(db);
@@ -1640,7 +1642,8 @@ impl<'db> FunctionType<'db> {
         let [overload] = signature.overloads.as_slice() else {
             return Cow::Borrowed(signature);
         };
-        if !overload.return_ty.is_unknown()
+        if db.analysis_settings(self.file(db)).return_type_inference == ReturnTypeInference::Never
+            || !overload.return_ty.is_unknown()
             || self.file(db).is_stub(db)
             || self.has_explicit_return_annotation(db)
             || !self.overloads_and_implementation(db).0.is_empty()

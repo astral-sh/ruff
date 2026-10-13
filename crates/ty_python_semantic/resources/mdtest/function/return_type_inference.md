@@ -120,6 +120,76 @@ def to_str(x: int | str):
 reveal_type(to_str(1))  # revealed: str
 ```
 
+## Disabled return type inference
+
+Disabling return type inference leaves unannotated returns as `Unknown`. Explicit annotations still
+determine the return type.
+
+```toml
+[analysis]
+return-type-inference = "never"
+```
+
+```py
+def value():
+    return 1
+
+class Fluent:
+    def chain(self):
+        return self
+
+def annotated() -> int:
+    return 1
+
+reveal_type(value())  # revealed: Unknown
+reveal_type(Fluent().chain())  # revealed: Unknown
+reveal_type(annotated())  # revealed: int
+```
+
+## Return type inference across files
+
+The defining file controls return type inference for a function, even when the caller uses a
+different setting.
+
+`enabled.py`:
+
+```py
+# /// script
+# [tool.ty.analysis]
+# return-type-inference = "always"
+# ///
+
+def value():
+    return 1
+```
+
+`disabled.py`:
+
+```py
+# /// script
+# [tool.ty.analysis]
+# return-type-inference = "never"
+# ///
+
+def value():
+    return 1
+```
+
+`main.py`:
+
+```py
+# /// script
+# [tool.ty.analysis]
+# return-type-inference = "never"
+# ///
+
+import disabled
+import enabled
+
+reveal_type(enabled.value())  # revealed: Literal[1]
+reveal_type(disabled.value())  # revealed: Unknown
+```
+
 ## Functions with non-trivial control flow
 
 ### Returning from a loop
