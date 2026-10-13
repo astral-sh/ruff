@@ -7486,11 +7486,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        let return_ty = self.return_ty.apply_optional_specialization(
-            self.db,
-            self.inference
-                .map(|inference| inference.merged_specialization(self.db)),
-        );
+        let return_ty = self.inference.map_or(self.return_ty, |inference| {
+            if self.positional_arguments_valid {
+                inference.specialize_result(self.db, self.env, self.return_ty)
+            } else {
+                self.return_ty
+                    .apply_specialization(self.db, inference.merged_specialization(self.db))
+            }
+        });
         (self.inferable_typevars, self.inference, return_ty)
     }
 }

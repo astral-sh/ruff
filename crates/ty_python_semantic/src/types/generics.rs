@@ -2546,6 +2546,41 @@ pub(crate) struct TypeVarInference<'db> {
 impl get_size2::GetSize for TypeVarInference<'_> {}
 
 impl<'db> TypeVarInference<'db> {
+    /// Specialize a result before joining complete inference alternatives. Joining the bindings
+    /// first would turn, for example, `list[int] | list[str]` into the unsound `list[int | str]`.
+    ///
+    /// Unresolved or incomplete families use the existing recovery projection. In particular,
+    /// never treat only the resolved siblings of an incomplete family as exhaustive.
+    pub(crate) fn specialize_result(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        result: Type<'db>,
+    ) -> Type<'db> {
+        let fallback = || result.apply_specialization(db, self.merged_specialization(db));
+        let TypeVarInferenceSolutions::Alternatives(paths) = self.solutions(db) else {
+            return fallback();
+        };
+        if paths.iter().any(|path| {
+            path.iter()
+                .any(|binding| matches!(binding, Some(SolutionType::Unresolved(_))))
+        }) {
+            return fallback();
+        }
+        UnionType::from_elements(
+            db,
+            env,
+            paths.iter().map(|path| {
+                let types = path.iter().map(|binding| match binding {
+                    Some(SolutionType::Resolved(ty)) => Some(*ty),
+                    Some(SolutionType::Unresolved(_)) | None => None,
+                });
+                let specialization = self.generic_context(db).specialize_partial(db, types);
+                result.apply_specialization(db, specialization)
+            }),
+        )
+    }
+
     /// Merge the alternatives into one closed specialization, discarding their correlations and
     /// completeness. Compatibility and diagnostic results use their recovery mapping.
     pub(crate) fn merged_specialization(self, db: &'db dyn Db) -> Specialization<'db> {

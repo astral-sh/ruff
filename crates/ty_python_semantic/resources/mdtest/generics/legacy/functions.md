@@ -3184,6 +3184,56 @@ def _(before, a: list[int], b: list[str], after) -> None:
     same(*before, a, b, *after)
 ```
 
+## Positional unpacking retains whole return types
+
+An unpack can put either of two lists in the first parameter. The returned list still has one
+particular element type: accepting an integer on every possible result would mutate a string list
+when `before` supplies that parameter.
+
+```py
+from typing import Generic, Self, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+def first(value: list[T], other: object = None) -> list[T]:
+    return value
+
+def _(before: list[list[str]], ints: list[int]) -> None:
+    result = first(*before, ints)
+    reveal_type(result)  # revealed: list[int] | list[str]
+    result.append(1)  # error: [invalid-argument-type]
+    valid: list[int] | list[str] = result  # no diagnostic
+```
+
+Two inferred type variables also stay together: swapping which tuple is first cannot produce a tuple
+whose two elements have the same type.
+
+```py
+def pair(value: tuple[T, S], other: object = None) -> tuple[T, S]:
+    return value
+
+def _(before: list[tuple[str, int]], value: tuple[int, str]) -> None:
+    reveal_type(pair(*before, value))  # revealed: tuple[int, str] | tuple[str, int]
+```
+
+The same distinction applies when inferring a constructed instance. Both `__new__` and `__init__`
+see the same arguments, so their alternatives cannot be mixed.
+
+```py
+class Box(Generic[T]):
+    def __new__(cls, value: list[T], other: object = None) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, value: list[T], other: object = None):
+        self.value = value
+
+def _(before: list[list[str]], ints: list[int]) -> None:
+    result = Box(*before, ints)
+    reveal_type(result)  # revealed: Box[int] | Box[str]
+    result.value.append(1)  # error: [invalid-argument-type]
+```
+
 ## Positional unpacking preserves outer type variables
 
 A type variable bounded by `str` can fill the string parameter:

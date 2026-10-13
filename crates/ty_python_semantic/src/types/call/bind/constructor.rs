@@ -1,3 +1,5 @@
+use smallvec::{SmallVec, smallvec};
+
 use super::{
     Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
 };
@@ -5,12 +7,13 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::constraints::projection::SolutionBudget;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
+    TypeMapping, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -384,8 +387,7 @@ impl<'db> ConstructorBinding<'db> {
             return return_ty;
         }
 
-        constructed_instance_type
-            .apply_optional_specialization(db, self.instance_return_specialization(db, env))
+        self.specialize_instance_return(db, env, constructed_instance_type)
     }
 
     fn first_matching_overload(&self) -> Option<&Binding<'db>> {
@@ -395,27 +397,30 @@ impl<'db> ConstructorBinding<'db> {
             .next()
     }
 
-    /// Combine inferred specializations from this constructor and downstream constructors. The
-    /// resulting specialization can be applied either to the constructed instance type or to an
-    /// explicit `__new__` / `__call__` return annotation that is an instance of the constructed
-    /// type or a subclass.
-    fn instance_return_specialization(
+    /// Specialize an instance return using this constructor and its downstream constructors.
+    /// Keep whole positional alternatives until they have been applied to the result.
+    fn specialize_instance_return(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Option<Specialization<'db>> {
+        result: Type<'db>,
+    ) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
+        let Some((_, class_specialization)) =
+            constructed_instance_type.class_specialization(db, env)
+        else {
+            return result;
+        };
         let static_class_literal = self
             .constructed_class_literal(db, env)
             .and_then(ClassLiteral::as_static);
         let class_context = class_specialization.generic_context(db);
 
-        let mut combined: Option<Specialization<'db>> = None;
+        let mut combined: SmallVec<[Specialization<'db>; 1]> = SmallVec::new();
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
             let Some(overload) = binding
                 .first_matching_overload()
@@ -423,79 +428,139 @@ impl<'db> ConstructorBinding<'db> {
             else {
                 return;
             };
-            let return_specialization = static_class_literal
-                // Use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, env, lit));
+            // A successful positional match can have inferred several whole instance types.
+            // Decomposing that union here preserves their class type-variable correlations.
+            let returns = match overload.return_ty {
+                Type::Union(union)
+                    if overload.positional_matches.is_some()
+                        && !overload.has_errors_affecting_overload_resolution() =>
+                {
+                    union.elements(db)
+                }
+                _ => std::slice::from_ref(&overload.return_ty),
+            };
+            let mut specializations = SmallVec::<[Specialization<'db>; 1]>::new();
+            for &return_ty in returns {
+                let return_specialization =
+                    static_class_literal.and_then(|lit| return_ty.specialization_of(db, env, lit));
 
-            // TODO All this handling of return-specialization vs self-specialization is a hacky
-            // work-around to a situation that can occur with a case like `def __init__(self:
-            // "Class6[V1, V2]", v1: V1, v2: V2)`, where we don't currently solve across the entire
-            // call, so the self annotation gives us `V1 = T1`, `V2 = T2` (where `T1` and `T2` are
-            // the class typevars), and we consider T1 and T2 as unknowns. This will be fixed when
-            // we start building up constraint sets across the full call. We should be able to just
-            // use the return specialization and eliminate all this.
-            let return_specialization_is_informative =
-                return_specialization.is_some_and(|specialization| {
-                    class_context.variables(db).any(|class_typevar| {
-                        specialization
-                            .get(db, class_typevar)
-                            .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
-                    })
-                });
-            let self_parameter_specialization = static_class_literal.and_then(|lit| {
-                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
-                let resolved_self_param_ty = overload
-                    .merged_specialization(db)
-                    .map_or(self_param_ty, |specialization| {
-                        self_param_ty.apply_specialization(db, specialization)
-                    });
-                resolved_self_param_ty.specialization_of(db, env, lit)
-            });
-            let refined_self_parameter_specialization =
-                self_parameter_specialization.map(|specialization| {
-                    let types: Box<[_]> = specialization
-                        .types(db)
-                        .iter()
-                        .copied()
-                        .map(|mapped_ty| {
-                            let without_unknown =
-                                mapped_ty.filter_union(db, env, |element| !element.is_unknown());
-                            let mapped_ty = if without_unknown.is_never() {
-                                mapped_ty
-                            } else {
-                                without_unknown
-                            };
-                            mapped_ty.promote(db, env)
+                // TODO All this handling of return-specialization vs self-specialization is a hacky
+                // work-around to a situation that can occur with a case like `def __init__(self:
+                // "Class6[V1, V2]", v1: V1, v2: V2)`, where we don't currently solve across the entire
+                // call, so the self annotation gives us `V1 = T1`, `V2 = T2` (where `T1` and `T2` are
+                // the class typevars), and we consider T1 and T2 as unknowns. This will be fixed when
+                // we start building up constraint sets across the full call. We should be able to just
+                // use the return specialization and eliminate all this.
+                let return_specialization_is_informative =
+                    return_specialization.is_some_and(|specialization| {
+                        class_context.variables(db).any(|class_typevar| {
+                            specialization
+                                .get(db, class_typevar)
+                                .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
                         })
-                        .collect();
-                    Specialization::new(
-                        db,
-                        specialization.generic_context(db),
-                        types,
-                        specialization.materialization_kind(db),
-                        None,
-                    )
+                    });
+                let self_parameter_specialization = static_class_literal.and_then(|lit| {
+                    let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                    let resolved_self_param_ty = overload
+                        .merged_specialization(db)
+                        .map_or(self_param_ty, |specialization| {
+                            self_param_ty.apply_specialization(db, specialization)
+                        });
+                    resolved_self_param_ty.specialization_of(db, env, lit)
                 });
-            let specialization = if return_specialization_is_informative {
-                return_specialization
-            } else {
-                refined_self_parameter_specialization
-                    .or(return_specialization)
-                    .or_else(|| {
-                        overload
-                            .merged_specialization(db)?
-                            .restrict(db, class_context)
-                    })
-            };
-            // end TODO
+                let refined_self_parameter_specialization =
+                    self_parameter_specialization.map(|specialization| {
+                        let types: Box<[_]> = specialization
+                            .types(db)
+                            .iter()
+                            .copied()
+                            .map(|mapped_ty| {
+                                let without_unknown = mapped_ty
+                                    .filter_union(db, env, |element| !element.is_unknown());
+                                let mapped_ty = if without_unknown.is_never() {
+                                    mapped_ty
+                                } else {
+                                    without_unknown
+                                };
+                                mapped_ty.promote(db, env)
+                            })
+                            .collect();
+                        Specialization::new(
+                            db,
+                            specialization.generic_context(db),
+                            types,
+                            specialization.materialization_kind(db),
+                            None,
+                        )
+                    });
+                let specialization = if return_specialization_is_informative {
+                    return_specialization
+                } else {
+                    refined_self_parameter_specialization
+                        .or(return_specialization)
+                        .or_else(|| {
+                            overload
+                                .merged_specialization(db)?
+                                .restrict(db, class_context)
+                        })
+                };
+                // end TODO
 
-            let Some(specialization) = specialization else {
-                return;
-            };
-            combined = Some(match combined {
-                None => specialization,
-                Some(previous) => previous.combine(db, specialization),
-            });
+                if let Some(specialization) = specialization {
+                    if !specializations.contains(&specialization) {
+                        specializations.push(specialization);
+                    }
+                }
+            }
+            if combined.is_empty() {
+                combined = specializations;
+            } else if !specializations.is_empty() {
+                // Bound the product before constructing it, including when a constructor chain
+                // contains a metaclass, __new__, and __init__. Recovery must retain all inputs.
+                let has_alternatives = combined.len() > 1 || specializations.len() > 1;
+                let mut next = SmallVec::new();
+                if combined.len().saturating_mul(specializations.len())
+                    <= SolutionBudget::default().paths
+                {
+                    for &previous in &combined {
+                        for &current in &specializations {
+                            // Different solutions for the same constructed class cannot be spliced
+                            // together. Unknown still represents missing evidence in this legacy
+                            // constructor combination, and may be refined by the other method.
+                            if has_alternatives
+                                && previous
+                                    .types(db)
+                                    .iter()
+                                    .zip(current.types(db))
+                                    .any(|(a, b)| {
+                                        !a.is_unknown()
+                                            && !b.is_unknown()
+                                            && a.is_disjoint_from(db, env, *b)
+                                    })
+                            {
+                                continue;
+                            }
+                            let specialization = previous.combine(db, current);
+                            if !next.contains(&specialization) {
+                                next.push(specialization);
+                            }
+                        }
+                    }
+                }
+                if next.is_empty() {
+                    // Preserve diagnostic recovery and every source of constructor evidence if
+                    // no alternative survived, or the family was too large to construct.
+                    let previous = combined.iter().copied().reduce(|a, b| a.combine(db, b));
+                    let current = specializations.into_iter().reduce(|a, b| a.combine(db, b));
+                    combined = match (previous, current) {
+                        (Some(a), Some(b)) => smallvec![a.combine(db, b)],
+                        (Some(a), None) | (None, Some(a)) => smallvec![a],
+                        (None, None) => SmallVec::new(),
+                    };
+                } else {
+                    combined = next;
+                }
+            }
         };
 
         combine_binding_specialization(self);
@@ -509,9 +574,21 @@ impl<'db> ConstructorBinding<'db> {
             }
         }
 
-        combined.map(|specialization| {
-            specialization.apply_optional_specialization(db, Some(class_specialization))
-        })
+        if combined.is_empty() {
+            result
+        } else {
+            UnionType::from_elements(
+                db,
+                env,
+                combined.into_iter().map(|specialization| {
+                    result.apply_specialization(
+                        db,
+                        specialization
+                            .apply_optional_specialization(db, Some(class_specialization)),
+                    )
+                }),
+            )
+        }
     }
 
     /// Compute the explicit return type from a `__new__` or metaclass `__call__`.
@@ -622,13 +699,7 @@ impl<'db> ConstructorBinding<'db> {
                 constructor_returns_instance(db, env, class_literal, return_ty)
             })
         {
-            return (
-                return_ty.apply_optional_specialization(
-                    db,
-                    self.instance_return_specialization(db, env),
-                ),
-                true,
-            );
+            return (self.specialize_instance_return(db, env, return_ty), true);
         }
 
         (overload.return_ty, false)
