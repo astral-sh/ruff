@@ -20,7 +20,7 @@ class User(BaseModel):
     id: int
     name: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, id: LaxInt, name: LaxStr, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, id: LaxInt, name: LaxStr, **extra: Any) -> None
 
 user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
@@ -28,6 +28,21 @@ reveal_type(user.name)  # revealed: str
 
 # error: [missing-argument] "No argument provided for required parameter `name`"
 invalid_user = User(id=2)
+```
+
+## Field named `self`
+
+The constructor's receiver is positional-only, so `self` can be used as a field name:
+
+```py
+from pydantic import BaseModel
+
+class Links(BaseModel):
+    self: str
+
+links = Links(self="/items")
+reveal_type(links.self)  # revealed: str
+Links(self=1)  # error: [invalid-argument-type]
 ```
 
 ## Usage of `Field`
@@ -43,7 +58,7 @@ class Product(BaseModel):
     tags: list[str] = Field(default_factory=list)
     internal_price_cent: int = Field(gt=0, alias="price_cent")
 
-# revealed: (self: Product, *, name: LaxStr, tags: Iterable[LaxStr] = ..., price_cent: LaxInt, **extra: Any) -> None
+# revealed: (self: Product, /, *, name: LaxStr, tags: Iterable[LaxStr] = ..., price_cent: LaxInt, **extra: Any) -> None
 reveal_type(Product.__init__)
 
 product = Product(name="Laptop", price_cent=999_00)
@@ -399,7 +414,7 @@ from pydantic import BaseModel
 class Model(BaseModel):
     value: AliasedDatetime
 
-reveal_type(Model.__init__)  # revealed: (self: Model, *, value: LaxDatetime, **extra: Any) -> None
+reveal_type(Model.__init__)  # revealed: (self: Model, /, *, value: LaxDatetime, **extra: Any) -> None
 ```
 
 For collections, we widen something like `list[int]` to `Iterable[LaxInt]`. Pydantic can coerce a
@@ -487,7 +502,7 @@ class Parent(BaseModel):
     child: Child
     children: list[Child]
 
-# revealed: (self: Parent, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
+# revealed: (self: Parent, /, *, child: Child | Mapping[str, Any], children: Iterable[Child | Mapping[str, Any]], **extra: Any) -> None
 reveal_type(Parent.__init__)
 
 child_input = {"value": "1"}
@@ -518,7 +533,7 @@ class BeforeValidatedParent(BaseModel):
             return {"value": value}
         return value
 
-# revealed: (self: BeforeValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: BeforeValidatedParent, /, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(BeforeValidatedParent.__init__)
 
 BeforeValidatedParent(child=1, untouched_child={"value": "2"})
@@ -539,7 +554,7 @@ class BeforeValidatorBase(BaseModel):
 class InheritedBeforeValidatedParent(BeforeValidatorBase):
     child: Child
 
-# revealed: (self: InheritedBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: InheritedBeforeValidatedParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(InheritedBeforeValidatedParent.__init__)
 ```
 
@@ -556,7 +571,7 @@ class WildcardBeforeValidatedParent(BaseModel):
             return {"value": value}
         return value
 
-# revealed: (self: WildcardBeforeValidatedParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: WildcardBeforeValidatedParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(WildcardBeforeValidatedParent.__init__)
 
 WildcardBeforeValidatedParent(child=1)
@@ -574,7 +589,7 @@ class PlainValidatedParent(BaseModel):
     def accept_child(cls, value: object) -> object:
         return value
 
-# revealed: (self: PlainValidatedParent, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: PlainValidatedParent, /, *, child: Any, untouched_child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(PlainValidatedParent.__init__)
 
 PlainValidatedParent(child=1, untouched_child={"value": "2"})
@@ -592,7 +607,7 @@ class AfterValidatedParent(BaseModel):
     def validate_child(cls, value: Child) -> Child:
         return value
 
-# revealed: (self: AfterValidatedParent, *, child: Child | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: AfterValidatedParent, /, *, child: Child | Mapping[str, Any], **extra: Any) -> None
 reveal_type(AfterValidatedParent.__init__)
 
 AfterValidatedParent(child=1)  # error: [invalid-argument-type]
@@ -608,7 +623,7 @@ class Box[T](BaseModel):
 class HasBox(BaseModel):
     box: Box[int]
 
-# revealed: (self: HasBox, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
+# revealed: (self: HasBox, /, *, box: Box[Unknown] | Mapping[str, Any], **extra: Any) -> None
 reveal_type(HasBox.__init__)
 
 HasBox(box=Box(value=1))
@@ -635,7 +650,7 @@ class AttributeSource:
     def __init__(self, value: int) -> None:
         self.value = value
 
-# revealed: (self: AttributeParent, *, child: Any, **extra: Any) -> None
+# revealed: (self: AttributeParent, /, *, child: Any, **extra: Any) -> None
 reveal_type(AttributeParent.__init__)
 
 AttributeParent(child=AttributeSource(1))
@@ -655,7 +670,7 @@ class Color(Enum):
 class LaxColor(BaseModel):
     value: Color
 
-reveal_type(LaxColor.__init__)  # revealed: (self: LaxColor, *, value: Any, **extra: Any) -> None
+reveal_type(LaxColor.__init__)  # revealed: (self: LaxColor, /, *, value: Any, **extra: Any) -> None
 
 LaxColor(value=Color.RED)
 LaxColor(value="red")
@@ -685,7 +700,7 @@ Unions are converted element-wise:
 class LaxUnion(BaseModel):
     value: int | list[str] | None
 
-reveal_type(LaxUnion.__init__)  # revealed: (self: LaxUnion, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
+reveal_type(LaxUnion.__init__)  # revealed: (self: LaxUnion, /, *, value: LaxInt | Iterable[LaxStr] | None, **extra: Any) -> None
 
 LaxUnion(value=1)
 LaxUnion(value="1")
@@ -1089,7 +1104,7 @@ class PersonWithoutExtras(BaseModel):
 
     name: str
 
-# revealed: (self: PersonWithoutExtras, *, name: LaxStr) -> None
+# revealed: (self: PersonWithoutExtras, /, *, name: LaxStr) -> None
 reveal_type(PersonWithoutExtras.__init__)
 PersonWithoutExtras(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
@@ -1111,7 +1126,7 @@ class FrameworkBase(BaseModel):
 class User(FrameworkBase):
     name: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, name: LaxStr, **extra: Any) -> None
 User(name="Alice", city="Berlin")
 ```
 
@@ -1145,7 +1160,7 @@ class PersonWithExtraField(BaseModel):
 
     extra: int
 
-# revealed: (self: PersonWithExtraField, *, extra: LaxInt, **extra_: Any) -> None
+# revealed: (self: PersonWithExtraField, /, *, extra: LaxInt, **extra_: Any) -> None
 reveal_type(PersonWithExtraField.__init__)
 PersonWithExtraField(extra=1, something_else=2)
 ```
@@ -1164,7 +1179,7 @@ class Person(BaseModel):
     _private_with_default: int = 1
     _explicit_private: int = PrivateAttr(default=0)
 
-# revealed: (self: Person, *, name: LaxStr, **extra: Any) -> None
+# revealed: (self: Person, /, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Person.__init__)
 
 person = Person(name="Alice")
@@ -1527,7 +1542,7 @@ from pydantic import RootModel, BaseModel
 
 class IntList(RootModel[list[int]]): ...
 
-reveal_type(IntList.__init__)  # revealed: (self: IntList, root: Iterable[LaxInt]) -> None
+reveal_type(IntList.__init__)  # revealed: (self: IntList, /, root: Iterable[LaxInt]) -> None
 
 IntList([1, 2, 3])
 IntList(root=[1, 2, 3])
@@ -1717,7 +1732,7 @@ class Mixin:
 class MyModel(BaseModel, Mixin):
     model_field: bool
 
-# revealed: (self: MyModel, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
+# revealed: (self: MyModel, /, *, mixin_field: LaxBool, model_field: LaxBool, **extra: Any) -> None
 reveal_type(MyModel.__init__)
 MyModel(model_field=True, mixin_field=False)
 ```
@@ -1737,7 +1752,7 @@ class RequiredAfterDefault(BaseModel):
     defaulted: int = 0
     required: int
 
-# revealed: (self: RequiredAfterDefault, *, defaulted: LaxInt = 0, required: LaxInt, **extra: Any) -> None
+# revealed: (self: RequiredAfterDefault, /, *, defaulted: LaxInt = 0, required: LaxInt, **extra: Any) -> None
 reveal_type(RequiredAfterDefault.__init__)
 RequiredAfterDefault(required=1)
 ```
@@ -1988,7 +2003,7 @@ class User(BaseModel, metaclass=RegistryMeta):
     name: str
     age: int = 0
 
-reveal_type(User.__init__)  # revealed: (self: User, *, name: LaxStr, age: LaxInt = 0, **extra: Any) -> None
+reveal_type(User.__init__)  # revealed: (self: User, /, *, name: LaxStr, age: LaxInt = 0, **extra: Any) -> None
 
 User(name="alice")
 User(name="alice", age=1)
