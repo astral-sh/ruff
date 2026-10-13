@@ -1031,6 +1031,7 @@ pub struct BoundTypeVarInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
+#[salsa::tracked]
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn new(
         db: &'db dyn Db,
@@ -1304,6 +1305,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,
