@@ -1,3 +1,5 @@
+use std::cell::LazyCell;
+
 use smallvec::{SmallVec, smallvec};
 
 use super::{
@@ -439,6 +441,40 @@ impl<'db> ConstructorBinding<'db> {
                 }
                 _ => std::slice::from_ref(&overload.return_ty),
             };
+            // The self annotation is shared by every return alternative. Refine it only when a
+            // return specialization leaves the class type variables unknown.
+            let refined_self_parameter_specialization = LazyCell::new(|| {
+                let self_parameter_specialization = static_class_literal.and_then(|lit| {
+                    let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                    let resolved_self_param_ty = self_param_ty
+                        .apply_optional_specialization(db, overload.merged_specialization(db));
+                    resolved_self_param_ty.specialization_of(db, env, lit)
+                });
+                self_parameter_specialization.map(|specialization| {
+                    let types: Box<[_]> = specialization
+                        .types(db)
+                        .iter()
+                        .copied()
+                        .map(|mapped_ty| {
+                            let without_unknown =
+                                mapped_ty.filter_union(db, env, |element| !element.is_unknown());
+                            let mapped_ty = if without_unknown.is_never() {
+                                mapped_ty
+                            } else {
+                                without_unknown
+                            };
+                            mapped_ty.promote(db, env)
+                        })
+                        .collect();
+                    Specialization::new(
+                        db,
+                        specialization.generic_context(db),
+                        types,
+                        specialization.materialization_kind(db),
+                        None,
+                    )
+                })
+            });
             let mut specializations = SmallVec::<[Specialization<'db>; 1]>::new();
             for &return_ty in returns {
                 let return_specialization =
@@ -459,44 +495,10 @@ impl<'db> ConstructorBinding<'db> {
                                 .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
                         })
                     });
-                let self_parameter_specialization = static_class_literal.and_then(|lit| {
-                    let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
-                    let resolved_self_param_ty = overload
-                        .merged_specialization(db)
-                        .map_or(self_param_ty, |specialization| {
-                            self_param_ty.apply_specialization(db, specialization)
-                        });
-                    resolved_self_param_ty.specialization_of(db, env, lit)
-                });
-                let refined_self_parameter_specialization =
-                    self_parameter_specialization.map(|specialization| {
-                        let types: Box<[_]> = specialization
-                            .types(db)
-                            .iter()
-                            .copied()
-                            .map(|mapped_ty| {
-                                let without_unknown = mapped_ty
-                                    .filter_union(db, env, |element| !element.is_unknown());
-                                let mapped_ty = if without_unknown.is_never() {
-                                    mapped_ty
-                                } else {
-                                    without_unknown
-                                };
-                                mapped_ty.promote(db, env)
-                            })
-                            .collect();
-                        Specialization::new(
-                            db,
-                            specialization.generic_context(db),
-                            types,
-                            specialization.materialization_kind(db),
-                            None,
-                        )
-                    });
                 let specialization = if return_specialization_is_informative {
                     return_specialization
                 } else {
-                    refined_self_parameter_specialization
+                    (*refined_self_parameter_specialization)
                         .or(return_specialization)
                         .or_else(|| {
                             overload
@@ -506,10 +508,10 @@ impl<'db> ConstructorBinding<'db> {
                 };
                 // end TODO
 
-                if let Some(specialization) = specialization {
-                    if !specializations.contains(&specialization) {
-                        specializations.push(specialization);
-                    }
+                if let Some(specialization) = specialization
+                    && !specializations.contains(&specialization)
+                {
+                    specializations.push(specialization);
                 }
             }
             if combined.is_empty() {
