@@ -3906,7 +3906,8 @@ class AnnotatedDefault(Base):
 
 Further subclasses can repeat the receiver declaration without reporting its existing conflict
 again. The unannotated default does not replace the receiver declaration's contract when the class
-is used as a base. Overrides with a different incompatible type still produce an error.
+is used as a base, so subclass defaults must also satisfy that declaration. Overrides with a
+different incompatible type still produce an error.
 
 ```py
 class RepeatedReceiver(WithDefault):
@@ -3917,7 +3918,10 @@ class RepeatedClassBody(WithDefault):
     value: str  # no diagnostic
 
 class RepeatedDefault(WithDefault):
-    value = 0  # no diagnostic
+    value = ""  # no diagnostic
+
+class InvalidDefault(WithDefault):
+    value = 0  # error: [invalid-assignment]
 
 class NewReceiverConflict(WithDefault):
     def __init__(self) -> None:
