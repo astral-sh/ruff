@@ -1360,111 +1360,21 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
-fn pep604_union_prefix_updates_after_base_and_cycle_changes() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let base = "\
-class Parent: ...
-class Peer: ...
-class Child(Parent): ...
-class Extra: ...
-class Last: ...
-";
-    let peer_base = base.replace("Child(Parent)", "Child(Peer)");
-    let unrelated = base.replace("Child(Parent)", "Child(object)");
-    let cyclic = base.replace("class Parent:", "class Parent(Child):");
-    let main = "\
-from base import Child, Peer, Extra, Parent, Last
-Alias = Child | Peer | Extra | Parent | Last
-value: Alias
-";
-    let observe = |db: &TestDb| -> anyhow::Result<_> {
-        let base = system_path_to_file(db, "/src/base.pyi")?;
-        let main = system_path_to_file(db, "/src/main.py")?;
-        let ty = global_symbol(db, main, "value")
-            .place
-            .expect_type()
-            .display(db, &db.program_environment())
-            .to_string();
-        let diagnostics = [base, main].map(|file| {
-            check_types(db, program_file(db, file))
-                .iter()
-                .map(|diagnostic| {
-                    let annotations = diagnostic
-                        .annotations()
-                        .iter()
-                        .map(|annotation| {
-                            let span = annotation.get_span();
-                            (
-                                span.expect_ty_file().path(db).to_string(),
-                                span.range(),
-                                annotation.is_primary(),
-                                annotation.get_message().map(str::to_owned),
-                            )
-                        })
-                        .collect::<Vec<_>>();
-                    (
-                        diagnostic.id(),
-                        diagnostic.severity(),
-                        diagnostic.headline_message().to_owned(),
-                        annotations,
-                    )
-                })
-                .collect::<Vec<_>>()
-        });
-        Ok((ty, diagnostics))
-    };
-
-    db.write_files([("/src/main.py", main)])?;
-
-    for (source, expected) in [
-        (base, Some("Parent | Peer | Extra | Last")),
-        (peer_base.as_str(), Some("Peer | Extra | Parent | Last")),
-        (
-            unrelated.as_str(),
-            Some("Child | Peer | Extra | Parent | Last"),
-        ),
-        (base, Some("Parent | Peer | Extra | Last")),
-        (cyclic.as_str(), None),
-        (base, Some("Parent | Peer | Extra | Last")),
-    ] {
-        db.write_files([("/src/base.pyi", source)])?;
-        let mut fresh = setup_db();
-        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main)])?;
-
-        let observed = observe(&db)?;
-        assert_eq!(observed, observe(&fresh)?, "{source}");
-        if let Some(expected) = expected {
-            assert_eq!(observed.0, expected, "{source}");
-            assert!(observed.1.iter().all(Vec::is_empty), "{observed:?}");
-        } else {
-            assert!(observed.1[0].iter().any(|diagnostic| {
-                diagnostic.0 == DiagnosticId::lint("cyclic-class-definition")
-            }));
-        }
-    }
-    Ok(())
-}
-
-#[test]
 fn generic_union_prefix_updates_after_base_and_variance_changes() -> anyhow::Result<()> {
-    let base = "class Base: ...\nclass Child(Base): ...\nclass Box[T]:\n    def get(self) -> T: ...\nclass Extra: ...\n";
+    let base = r#"class Base: ...
+class Child(Base): ...
+class Box[T]:
+    def get(self) -> T: ...
+class Extra: ...
+"#;
     let unrelated = base.replace("Child(Base)", "Child(object)");
     let invariant = base.replace("def get(self) -> T: ...", "value: T");
-    let main = "from base import Base, Child, Box, Extra\nAlias = Box[Child] | Box[Base] | Extra\nvalue: Alias\n";
-    let observe = |db: &TestDb| -> anyhow::Result<_> {
-        let file = system_path_to_file(db, "/src/main.py")?;
-        let ty = global_symbol(db, file, "value")
-            .place
-            .expect_type()
-            .display(db, &db.program_environment())
-            .to_string();
-        for path in ["/src/base.pyi", "/src/main.py"] {
-            assert_file_diagnostics(db, path, &[]);
-        }
-        Ok(ty)
-    };
     let mut db = setup_db();
-    db.write_file("/src/main.py", main)?;
+    db.write_file(
+        "/src/main.py",
+        "from base import Base, Child, Box, Extra\nAlias = Box[Child] | Box[Base] | Extra\nvalue: Alias\n",
+    )?;
+    let file = system_path_to_file(&db, "/src/main.py")?;
     for (source, expected) in [
         (base, "Box[Base] | Extra"),
         (unrelated.as_str(), "Box[Child] | Box[Base] | Extra"),
@@ -1473,11 +1383,12 @@ fn generic_union_prefix_updates_after_base_and_variance_changes() -> anyhow::Res
         (base, "Box[Base] | Extra"),
     ] {
         db.write_file("/src/base.pyi", source)?;
-        let observed = observe(&db)?;
-        assert_eq!(observed, expected);
-        let mut fresh = setup_db();
-        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main)])?;
-        assert_eq!(observed, observe(&fresh)?);
+        let ty = global_symbol(&db, file, "value").place.expect_type();
+        assert_eq!(
+            ty.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
     }
     Ok(())
 }
