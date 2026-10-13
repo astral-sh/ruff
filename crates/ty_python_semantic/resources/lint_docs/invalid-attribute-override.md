@@ -3,8 +3,8 @@
 Detects attribute overrides that change whether an inherited attribute is a class variable or an
 instance variable, expose an incompatible value type, or make a writable attribute read-only.
 
-Narrowing a mutable attribute's type is checked separately by the opt-in `invalid-mutable-override`
-rule. Overrides involving properties are checked by `invalid-property-type-override`.
+Narrowing a mutable attribute's type is checked separately by the `invalid-mutable-override` rule.
+Overrides involving properties are checked by `invalid-property-type-override`.
 
 ## Why is this bad?
 

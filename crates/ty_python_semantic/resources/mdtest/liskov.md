@@ -2734,8 +2734,9 @@ reveal_type(Compatible().method(1))  # revealed: int
 
 ## Attribute value types
 
-An overriding attribute must expose a value compatible with the superclass annotation. Mutable
-narrowing is allowed by default, but incompatible readable types are rejected.
+An overriding attribute must expose a value compatible with the superclass annotation. Disabling
+`invalid-mutable-override` permits mutable narrowing, but incompatible readable types are still
+rejected.
 
 ```toml
 [rules]
@@ -2753,7 +2754,7 @@ class InitializedAttribute(AttributeBase):
     value = 1
 
 class NarrowedAttribute(AttributeBase):
-    value: bool  # Mutable narrowing is allowed by default.
+    value: bool  # no diagnostic
 ```
 
 ```snapshot
@@ -2798,11 +2799,6 @@ class InheritsAnnotation(Declared):
 An instance assignment does not narrow an inherited annotation. Overrides in later subclasses use
 the declared type, just like ordinary attribute reads and writes, whether or not the base provides a
 class default.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 class Base:
@@ -2910,13 +2906,8 @@ class NewReceiverConflict(Bridge):
 
 ## Mutable attribute narrowing
 
-When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
+The `invalid-mutable-override` rule rejects narrowing that prevents writes allowed by the
 superclass. An `Any` annotation remains gradually compatible in either direction.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 from typing import Any, ClassVar
@@ -3427,11 +3418,6 @@ class PropertyChild(Base):
 An explicit descriptor annotation establishes its own write type. Its setter must accept every value
 that the inherited attribute accepts. The same restriction applies when assigning the subclass to a
 protocol with that writable attribute.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 from typing import Protocol

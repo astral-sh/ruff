@@ -1370,7 +1370,7 @@ declare_lint! {
     pub(crate) static INVALID_MUTABLE_OVERRIDE = {
         summary: "detects overrides that narrow writable attribute types",
         status: LintStatus::stable("0.0.81"),
-        default_level: Level::Ignore,
+        default_level: Level::Error,
     }
 }
 
