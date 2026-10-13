@@ -3906,5 +3906,20 @@ def caller[T](before: list[int], value: T, after: list[int]) -> None:
     strings(*before, value, *after)
 ```
 
+## Lambdas after positional unpacks
+
+Neither placement of this lambda is valid: it cannot accept the integer `1`, and the callbacks in
+`before` cannot accept the lambda as their argument.
+
+```py
+from collections.abc import Callable
+
+def apply[T](callback: Callable[[T], T], value: T, other: object = None) -> T:
+    return callback(value)
+
+def _(before: list[Callable[[int], int]]) -> None:
+    apply(*before, lambda x: x.upper(), 1)  # error: [invalid-argument-type]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

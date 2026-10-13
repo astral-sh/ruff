@@ -3276,3 +3276,21 @@ class BoundedSetter(Base):
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
+
+## Lambdas after positional unpacks
+
+Neither placement of this lambda is valid: it cannot accept the integer `1`, and the callbacks in
+`before` cannot accept the lambda as their argument.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def apply(callback: Callable[[T], T], value: T, other: object = None) -> T:
+    return callback(value)
+
+def _(before: list[Callable[[int], int]]) -> None:
+    apply(*before, lambda x: x.upper(), 1)  # error: [invalid-argument-type]
+```

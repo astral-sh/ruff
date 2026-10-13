@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 use super::{InvalidArgumentTypeProvenance, MatchedArgument, MatchedParameter};
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgument, CallArguments};
+use crate::types::call::arguments::{CallArgument, CallArguments, is_provisional_argument_type};
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::typevar::TypeVarSet;
@@ -57,6 +57,7 @@ pub(super) struct PositionalMatches<'db> {
 pub(super) struct PositionalEvaluation<'db, 'c> {
     pub(super) constraints: Option<ConstraintSet<'db, 'c>>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
+    pub(super) provisional: bool,
 }
 
 impl<'db> PositionalMatches<'db> {
@@ -72,7 +73,8 @@ impl<'db> PositionalMatches<'db> {
         parameters: &Parameters<'db>,
         explicit_keywords: &FxHashSet<usize>,
     ) -> Option<Self> {
-        if parameters.variadic().is_some()
+        if arguments.has_provisional_types(db, env)
+            || parameters.variadic().is_some()
             || !arguments
                 .iter()
                 .any(|argument| matches!(argument, CallArgument::Variadic(_)))
@@ -300,6 +302,7 @@ impl<'db> PositionalMatches<'db> {
         // An edge's constraints describe assigning this segment's element type to this
         // parameter. Compute them once; different unpack lengths may use the same edge.
         let mut edges = vec![never; self.state(self.segments.len(), 0)];
+        let mut provisional_edges = vec![false; edges.len()];
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..self.parameter_count {
                 let current = self.state(index, position);
@@ -310,7 +313,11 @@ impl<'db> PositionalMatches<'db> {
                 edges[current] = arguments
                     .get(segment.argument_index)
                     .and_then(|argument| argument.matched_type(expected, segment.argument_type))
-                    .map_or(always, |actual| argument_constraints(actual, expected));
+                    .map_or(always, |actual| {
+                        provisional_edges[current] = is_provisional_argument_type(db, env, actual)
+                            && !actual.is_subtype_of(db, env, expected);
+                        argument_constraints(actual, expected)
+                    });
             }
         }
 
@@ -363,12 +370,14 @@ impl<'db> PositionalMatches<'db> {
             return PositionalEvaluation {
                 constraints: None,
                 arguments: self.best_failing_matches(arguments, &edges, possible),
+                provisional: false,
             };
         }
 
         // Keep an individual match only if both the arguments before it and those after it can
         // satisfy the same constraints. Testing an edge alone would mix incompatible placements.
         let mut matched = Self::empty_matches(arguments);
+        let mut provisional = false;
         let mut prefix = vec![never; self.can_finish.len()];
         prefix[0] = common;
         for (index, segment) in self.segments.iter().enumerate() {
@@ -384,6 +393,7 @@ impl<'db> PositionalMatches<'db> {
                 if let Some(next) = self.next_state(index, position) {
                     let condition = previous.and(db, constraints, || edges[current]);
                     if possible(condition.and(db, constraints, || suffix[next])) {
+                        provisional |= provisional_edges[current];
                         segment.add_match(&mut matched, position);
                         prefix[next].union(db, constraints, condition);
                     }
@@ -394,6 +404,7 @@ impl<'db> PositionalMatches<'db> {
         PositionalEvaluation {
             constraints: Some(suffix[0]),
             arguments: matched,
+            provisional,
         }
     }
 

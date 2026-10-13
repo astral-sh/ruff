@@ -27,6 +27,24 @@ use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 /// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L566
 const MAX_TOTAL_EXPANSION: usize = 256;
 
+/// A lambda's parameters must be known before they can establish a new argument placement.
+/// Its return type can still be provisional while its body is inferred from those parameters.
+pub(super) fn is_provisional_argument_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    match ty {
+        Type::Callable(callable) => callable.signatures(db).overloads.iter().any(|signature| {
+            signature
+                .parameters()
+                .iter()
+                .any(|parameter| parameter.annotated_type().has_provisional_marker(db, env))
+        }),
+        _ => ty.has_provisional_marker(db, env),
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Argument<'a> {
     /// The synthetic `self` or `cls` argument, which doesn't appear explicitly at the call site.
@@ -701,6 +719,20 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     pub(crate) fn get(&self, index: usize) -> Option<&CallArgument<'a, 'db>> {
         self.items.get(index)
+    }
+
+    /// Whether some argument still depends on a placeholder from contextual inference.
+    pub(super) fn has_provisional_types(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        self.items.iter().any(|argument| {
+            argument
+                .source_types()
+                .iter()
+                .any(|(_, ty)| is_provisional_argument_type(db, env, ty))
+        })
     }
 
     /// The inferred source expression types, before any argument unpacking.
