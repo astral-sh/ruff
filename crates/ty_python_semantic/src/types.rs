@@ -10617,6 +10617,14 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         negated_cache: &mut Option<Type<'db>>,
     ) -> bool {
+        if negated_cache.is_none()
+            && let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, target)
+        {
+            // `~object` is `Never`. Every other nominal negation has only the implicit
+            // positive element `object`, which is a subtype of no other nominal type.
+            return source.is_object() || target.is_object();
+        }
+
         match self {
             Type::Intersection(intersection) => {
                 intersection.negation_is_subtype_of(db, env, target)
