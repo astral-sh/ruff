@@ -154,10 +154,12 @@ Foo(1, 2)
 def _(flag: bool) -> None:
     class Foo:
         if flag:
-            def __new__(cls, x: int): ...
+            def __new__(cls, x: int):
+                return super().__new__(cls)
 
         else:
-            def __new__(cls, x: int, y: int = 1): ...
+            def __new__(cls, x: int, y: int = 1):
+                return super().__new__(cls)
 
     reveal_type(Foo(1))  # revealed: Foo
     # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"

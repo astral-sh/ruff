@@ -633,6 +633,62 @@ reveal_type(IntTask().compute())  # revealed: Unknown
 reveal_type(IntJob().run())  # revealed: Unknown
 ```
 
+### `__new__`
+
+`__new__` methods are currently excluded from return type inference, for two reasons. First, there
+is very little gain from inferring the return type, as most `__new__` methods simply return an
+instance of the class. This common case is already handled by a heuristic that makes this
+assumption. And second, `__new__` is such a special method that inferring imprecise or
+overly-precise types can lead to downstream problems in constructor call inference.
+
+So *in principle*, we could infer `Literal["special"]` as the return type here, but we currently do
+not.
+
+```py
+class Special:
+    def __new__(cls):
+        return "special"
+
+# Could ideally be `Literal["special"]` or `Literal["special"] | Unknown`
+reveal_type(Special())  # revealed: Special
+```
+
+Whether we support return type inference on `__new__` or not, the following constructor calls should
+be inferred as creating an instance of the class:
+
+```py
+class Normal:
+    def __new__(cls):
+        return super().__new__(cls)
+
+reveal_type(Normal())  # revealed: Normal
+
+class Direct:
+    def __new__(cls):
+        return object.__new__(cls)
+
+reveal_type(Direct())  # revealed: Direct
+```
+
+### `__init__`
+
+`__init__` methods are expected to return `None`, and if they don't, the runtime will raise a
+`TypeError`. So there is very little gain from inferring the return type of `__init__`, and we
+currently exclude them explicitly:
+
+```py
+class StrangeInit:
+    def __init__(self):
+        return "strange"
+
+# This raises a `TypeError` at runtime:
+instance = StrangeInit()
+
+# This returns `"strange"` at runtime (with whatever argument you pass in), but we
+# do not attempt to infer the return type of `__init__`, so it's just `Unknown`:
+reveal_type(StrangeInit.__init__(instance))  # revealed: Unknown
+```
+
 ### Methods returning `self`
 
 A method that returns `self` should have its return type inferred as `Self`, so that subclasses get
@@ -728,7 +784,9 @@ reveal_type(func(1))  # revealed: int
 reveal_type(func("a"))  # revealed: str
 ```
 
-## Stub files
+## Stub files and `TYPE_CHECKING` blocks
+
+### Stub files
 
 Stub bodies do not provide return type information. An omitted annotation remains `Unknown`, even
 when the body contains an actual `return` statement:
@@ -747,6 +805,21 @@ def seems_to_return_1():
 from library import seems_to_return_1, value
 
 reveal_type(value())  # revealed: Unknown
+reveal_type(seems_to_return_1())  # revealed: Unknown
+```
+
+### `TYPE_CHECKING` blocks
+
+We treat `if TYPE_CHECKING` blocks in the same way as stubs, and disable return type inference
+completely for functions defined within such blocks:
+
+```py
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    def seems_to_return_1():
+        return 1
+
 reveal_type(seems_to_return_1())  # revealed: Unknown
 ```
 
@@ -829,4 +902,91 @@ def right(n: int):
 # TODO: Should be `Literal[1, "a"]` or `Literal[1, "a"] | Unknown`
 reveal_type(left(3))  # revealed: Unknown
 reveal_type(right(3))  # revealed: Unknown
+```
+
+## Edge cases
+
+### `functools.wraps`
+
+Consider this untyped decorator using `functools.wraps`:
+
+```py
+from functools import wraps
+
+def logged(func):
+    @wraps(func)
+    def wrapper(arg):
+        print("Calling", func.__name__)
+        return func(arg)
+    return wrapper
+```
+
+typeshed annotates `functools.wraps` as returning an instance of `_Wrapper`, which when applied as a
+decorator to a function returns an instance of `_Wrapped`. This is a typeshed helper that can be
+called like the original function, and adds attributes like `__wrapped__` that exist on the wrapped
+function at runtime. With return type inference, those `_Wrapped` instances can show up as the
+return type of `logged(..)` calls. For example:
+
+```py
+logging_len = logged(len)
+
+# TODO: Should be `_Wrapped[(...), Unknown, (arg), Unknown]`
+reveal_type(logging_len)  # revealed: Unknown
+```
+
+The wrapped function can be called, and the `__wrapped__` attribute can be accessed:
+
+```py
+logging_len([1, 2, 3])
+logging_len.__wrapped__
+```
+
+When a method is decorated with `logged`, the descriptor behavior of the method should be preserved,
+i.e. `method` should be callable with an implicitly bound `self` argument:
+
+```py
+class C:
+    # TODO: Return type inference should remove this diagnostic.
+    @logged  # error: [dynamic-function-decorator-return]
+    def method(self):
+        return 42
+
+instance = C()
+instance.method()  # no diagnostic
+```
+
+Calling `method` on the class object itself is also possible:
+
+```py
+C.method(instance)  # also no diagnostic
+```
+
+### `NotImplemented`
+
+A dunder method that returns `NotImplemented` is not treated in a special way by return type
+inference:
+
+```py
+class C:
+    def __init__(self, x):
+        self.x = x
+
+    def __eq__(self, other):
+        if not isinstance(other, C):
+            return NotImplemented
+        return self.x == other.x
+
+# TODO: Should be `NotImplementedType | Unknown | bool`
+reveal_type(C.__eq__(C(1), C(2)))  # revealed: Unknown
+```
+
+However, when called implicitly through the `==` operator, a return value of `NotImplemented` is
+handled in a special way (the reverse `type(rhs).__eq__(rhs, lhs)` call is tried, and then it falls
+back to `lhs is rhs`). Therefore, the final result for the following comparisons should always be a
+`bool`:
+
+```py
+# TODO: These should ideally be `bool` or `bool | Unknown`
+reveal_type(C(1) == C(2))  # revealed: Unknown
+reveal_type(C(1) == "something else")  # revealed: Unknown
 ```
