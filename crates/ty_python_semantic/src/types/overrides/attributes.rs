@@ -270,7 +270,12 @@ fn member_contract<'db>(
     };
     Some(MemberContract::Attribute(AttributeContract {
         read,
-        write: if is_final || !is_class_var && literal.is_frozen_dataclass(db) == Some(true) {
+        // `object` provides no instance attribute storage, so its declarations impose
+        // no write contract on subclasses.
+        write: if owner.is_object(db)
+            || is_final
+            || !is_class_var && literal.is_frozen_dataclass(db) == Some(true)
+        {
             None
         } else {
             write

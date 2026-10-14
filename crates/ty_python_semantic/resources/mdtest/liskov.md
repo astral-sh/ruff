@@ -3711,6 +3711,38 @@ class PropertyChild(Base):
         return ""
 ```
 
+## Attribute contracts inherited from `object`
+
+`object` does not provide writable instance attributes. Its attribute declarations constrain read
+types, but do not require subclasses to support instance writes.
+
+```py
+class Slotted:
+    __slots__ = ()
+    __module__ = "custom"  # no diagnostic
+    __doc__ = None  # no diagnostic
+    __annotations__ = {}  # no diagnostic
+```
+
+Overrides must still preserve the declared read types.
+
+```py
+class InvalidRead:
+    __module__: int = 0  # error: [invalid-attribute-override]
+```
+
+Explicit declarations on user-defined bases still constrain overrides of `__module__`.
+
+```py
+from typing import Literal
+
+class Declared:
+    __module__: str = "custom"
+
+class Narrowed(Declared):
+    __module__: Literal["custom"] = "custom"  # error: [invalid-mutable-override]
+```
+
 ## Descriptor setters cannot narrow accepted writes
 
 An explicit descriptor annotation establishes its own write type. Its setter must accept every value
