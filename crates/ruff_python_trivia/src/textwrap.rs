@@ -594,7 +594,7 @@ mod tests {
         ].join("\n");
         let y = [
             "  # foo",
-            "  # bar",
+            "    # bar",
             "# baz"
         ].join("\n");
         assert_eq!(dedent_to(&x, "  "), Some(y));
@@ -605,8 +605,8 @@ mod tests {
             "        return 2",
         ].join("\n");
         let y = [
-            "   # foo",
-            "   # bar",
+            "       # foo",
+            "       # bar",
             "    return 2",
         ].join("\n");
         assert_eq!(dedent_to(&x, "    "), Some(y));
