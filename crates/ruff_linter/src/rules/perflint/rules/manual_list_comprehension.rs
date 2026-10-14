@@ -12,7 +12,6 @@ use crate::rules::perflint::helpers::comment_strings_in_range;
 use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -395,7 +394,7 @@ fn convert_to_list_extend(
         None => String::new(),
     };
 
-    let for_iter_str =
+    let (for_iter_str, for_iter_range) =
         parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let for_type = if for_stmt.is_async {
@@ -415,18 +414,7 @@ fn convert_to_list_extend(
     };
 
     let variable_name = locator.slice(binding);
-    let mut ranges_to_ignore = vec![
-        to_append.range(),
-        // `parenthesize_loop_iter_if_necessary` keeps any parentheses around the iterable, and the
-        // comments inside them, so they must not be moved a second time.
-        parenthesized_range(
-            for_stmt.iter.as_ref().into(),
-            for_stmt.into(),
-            checker.tokens(),
-        )
-        .unwrap_or(for_stmt.iter.range()),
-        for_stmt.target.range(),
-    ];
+    let mut ranges_to_ignore = vec![to_append.range(), for_iter_range, for_stmt.target.range()];
     if let Some(test) = if_test {
         ranges_to_ignore.push(test.range());
     }

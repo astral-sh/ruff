@@ -1,7 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
-    token::parenthesized_range,
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
@@ -340,7 +339,7 @@ fn convert_to_dict_comprehension(
         None => String::new(),
     };
 
-    let iter_str =
+    let (iter_str, iter_range) =
         parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let target_str = locator.slice(for_stmt.target.range());
@@ -385,14 +384,7 @@ fn convert_to_dict_comprehension(
     let mut ranges_to_ignore = vec![
         key.range(),
         value.range(),
-        // `parenthesize_loop_iter_if_necessary` keeps any parentheses around the iterable, and the
-        // comments inside them, so they must not be moved a second time.
-        parenthesized_range(
-            for_stmt.iter.as_ref().into(),
-            for_stmt.into(),
-            checker.tokens(),
-        )
-        .unwrap_or(for_stmt.iter.range()),
+        iter_range,
         for_stmt.target.range(),
     ];
     if let Some(test) = if_test {

@@ -420,6 +420,8 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// A helper function that extracts the `iter` from a [`ast::StmtFor`] node and
 /// adds parentheses if needed.
 ///
+/// Also returns the original source range, including any existing parentheses.
+///
 /// These cases are okay and will not be modified:
 ///
 /// - `for x in z: ...`       ->  `"z"`
@@ -435,7 +437,7 @@ pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
     for_stmt: &'a ast::StmtFor,
     checker: &'a Checker,
     location: IterLocation,
-) -> Cow<'a, str> {
+) -> (Cow<'a, str>, TextRange) {
     let locator = checker.locator();
     let iter = for_stmt.iter.as_ref();
 
@@ -443,18 +445,20 @@ pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
         parenthesized_range(iter.into(), for_stmt.into(), checker.tokens());
 
     if let Some(range) = original_parenthesized_range {
-        return Cow::Borrowed(locator.slice(range));
+        return (Cow::Borrowed(locator.slice(range)), range);
     }
 
     let iter_in_source = locator.slice(iter);
 
-    match iter {
+    let contents = match iter {
         Expr::Tuple(tuple) if !tuple.parenthesized => Cow::Owned(format!("({iter_in_source})")),
         Expr::Lambda(_) | Expr::If(_) if matches!(location, IterLocation::Comprehension) => {
             Cow::Owned(format!("({iter_in_source})"))
         }
         _ => Cow::Borrowed(iter_in_source),
-    }
+    };
+
+    (contents, iter.range())
 }
 
 #[derive(Copy, Clone)]
