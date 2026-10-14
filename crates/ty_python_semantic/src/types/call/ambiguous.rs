@@ -12,13 +12,8 @@ use crate::{Db, ProgramEnvironment};
 /// Retains the shared structure of ambiguous overload return types.
 ///
 /// For example, `dict[str, list[int]]` and `dict[str, list[bytes]]` become
-/// `dict[str, list[Unknown]]`. The differing leaves retain the ambiguity marker used by cycle
-/// recovery. Matching class origins, tuple shapes, and `type[]` wrappers can be retained;
-/// differing unions, intersections, and callable signatures are treated as indivisible leaves.
-///
-/// Compare all candidates together: equivalent types can have different structures, so replacing
-/// an equivalent pair with one representative before considering other candidates can make the
-/// result depend on overload order.
+/// `dict[str, list[Unknown]]`. Shared structure in generic classes, tuples, and `type[...]` can be
+/// preserved. Differing unions, intersections, and callable signatures fall back to `Unknown`.
 pub(super) fn merge_ambiguous_returns<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -62,10 +57,16 @@ struct AmbiguousReturnMerger<'env, 'db> {
 
 impl<'db> AmbiguousReturnMerger<'_, 'db> {
     fn merge(&self, types: &[Type<'db>]) -> Type<'db> {
+        // Differing leaves retain this marker so cycle recovery can recognize when overload
+        // ambiguity caused a loss of precision.
         let unknown = Type::Dynamic(DynamicType::AmbiguousOverload);
         if types.contains(&unknown) {
             return unknown;
         }
+
+        // Compare all candidates together: equivalent types can have different structures, so
+        // replacing an equivalent pair with one representative before considering other
+        // candidates can make the result depend on overload order.
         if let Some(equivalent) = self.equivalent_representative(types) {
             return equivalent;
         }
