@@ -4415,6 +4415,64 @@ obj = object()
 obj.non_existing = 1  # error: [unresolved-attribute]
 ```
 
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. We therefore
+reject assignments to these attributes on values typed as `object`, even when the assigned value
+matches the annotation:
+
+```py
+def set_module(obj: object):
+    obj.__module__ = "custom"  # error: [invalid-assignment] "Cannot assign to attribute `__module__` on type `object`"
+
+def set_metadata(obj: object):
+    obj.__doc__ = None  # error: [invalid-assignment]
+    obj.__annotations__ = {}  # error: [invalid-assignment]
+    obj.__dict__ = {}  # error: [invalid-assignment]
+    obj.__class__ = object  # error: [invalid-assignment]
+```
+
+A subclass can expose this metadata as a read-only property. Passing it to a function that accepts
+`object` is valid; the invalid operation is the write inside the function.
+
+```py
+class ReadOnly:
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnly())  # no diagnostic
+```
+
+Ordinary subclasses provide instance dictionaries, so they can still write inherited metadata. Class
+attributes remain writable as well:
+
+```py
+class Writable: ...
+
+def set_writable_metadata(obj: Writable):
+    obj.__module__ = "custom"  # no diagnostic
+    obj.__doc__ = None  # no diagnostic
+    obj.__annotations__ = {}  # no diagnostic
+    obj.__dict__ = {}  # no diagnostic
+    obj.__class__ = Writable  # no diagnostic
+
+Writable.__module__ = "custom"  # no diagnostic
+Writable.__doc__ = None  # no diagnostic
+Writable.__annotations__ = {}  # no diagnostic
+```
+
+`NewType` preserves the storage limitations of its underlying type:
+
+```py
+from typing import NewType
+
+WrappedObject = NewType("WrappedObject", object)
+
+def set_wrapped_module(obj: WrappedObject):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+```
+
 ### Setting attributes on `Never` / `Any`
 
 Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute

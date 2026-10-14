@@ -513,6 +513,30 @@ fn instance_attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
+    // `object` has no writable instance storage, even though typeshed annotates metadata such
+    // as `__module__` as ordinary instance attributes. Truthiness does not establish storage.
+    let is_object_receiver = |ty: Type<'db>| {
+        ty.nominal_class(db, env)
+            .is_some_and(|class| class.is_object(db))
+            || matches!(ty, Type::AlwaysTruthy | Type::AlwaysFalsy)
+    };
+    let has_object_bound = match object_ty {
+        // Explicit bounds and constraints are expanded by `attribute_write_requirement`.
+        Type::TypeVar(typevar) => matches!(
+            typevar.require_bound_or_constraints(db, env),
+            TypeVarBoundOrConstraints::UpperBound(bound) if is_object_receiver(bound)
+        ),
+        _ => is_object_receiver(object_ty),
+    };
+    if has_object_bound
+        && !object_ty
+            .class_member(db, env, attribute)
+            .place
+            .is_undefined()
+    {
+        return AttributeWriteRequirement::CannotAssign;
+    }
+
     AttributeWriteRequirement::Instance {
         object_ty,
         receiver,

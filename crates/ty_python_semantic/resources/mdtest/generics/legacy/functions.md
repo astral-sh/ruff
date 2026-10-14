@@ -1924,6 +1924,56 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Object metadata writes on TypeVars bounded by `object`
+
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. So an implicit
+or explicit `object` bound does not guarantee that these are writable, even after narrowing by
+truthiness. A more precise bound with instance storage does permit these writes.
+
+```py
+from typing import NewType, TypeVar
+
+T = TypeVar("T")
+O = TypeVar("O", bound=object)
+C = TypeVar("C", object, int)
+
+def implicit(obj: T):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+    if obj:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+    else:
+        obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def explicit(obj: O):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def constrained(obj: C):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+WrappedObject = NewType("WrappedObject", object)
+N = TypeVar("N", bound=WrappedObject)
+NC = TypeVar("NC", WrappedObject, int)
+U = TypeVar("U", bound=WrappedObject | int)
+
+def wrapped(obj: N):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def wrapped_constraint(obj: NC):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+def union_bound(obj: U):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+class Writable: ...
+
+W = TypeVar("W", bound=Writable)
+
+def writable(obj: W):
+    obj.__module__ = "custom"  # no diagnostic
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.
