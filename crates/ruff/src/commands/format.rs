@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{Write, stderr, stdout};
+use std::io::{Write, stderr};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -72,6 +72,7 @@ pub(crate) fn format(
     cli: FormatArguments,
     config_arguments: &ConfigArguments,
     pyproject_config: &PyprojectConfig,
+    writer: &mut dyn Write,
 ) -> Result<ExitStatus> {
     let mode = FormatMode::from_cli(&cli);
     let files = resolve_default_files(cli.files, false);
@@ -205,10 +206,10 @@ pub(crate) fn format(
         match mode {
             FormatMode::Write => {}
             FormatMode::Check => {
-                results.write_changed(&mut stdout().lock(), output_format, &errors)?;
+                results.write_changed(writer, output_format, &errors)?;
             }
             FormatMode::Diff => {
-                results.write_diff(&mut stdout().lock())?;
+                results.write_diff(writer)?;
             }
         }
     }
@@ -219,9 +220,11 @@ pub(crate) fn format(
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
         } else if output_format.is_human_readable() {
-            results.write_summary(&mut stdout().lock())?;
+            results.write_summary(writer)?;
         }
     }
+
+    writer.flush()?;
 
     match mode {
         FormatMode::Write => {
@@ -548,7 +551,7 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a diff of the formatting changes to the given writer.
-    fn write_diff(&self, f: &mut impl Write) -> io::Result<()> {
+    fn write_diff(&self, f: &mut dyn Write) -> io::Result<()> {
         for (path, unformatted, formatted) in self
             .results
             .iter()
@@ -574,7 +577,7 @@ impl<'a> FormatResults<'a> {
     /// Write a list of the files that would be changed and any errors to the given writer.
     fn write_changed(
         &self,
-        f: &mut impl Write,
+        f: &mut dyn Write,
         output_format: OutputFormat,
         errors: &[FormatCommandError],
     ) -> io::Result<()> {
@@ -609,7 +612,7 @@ impl<'a> FormatResults<'a> {
     }
 
     /// Write a summary of the formatting results to the given writer.
-    fn write_summary(&self, f: &mut impl Write) -> io::Result<()> {
+    fn write_summary(&self, f: &mut dyn Write) -> io::Result<()> {
         // Compute the number of changed and unchanged files.
         let mut changed = 0u32;
         let mut unchanged = 0u32;

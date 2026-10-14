@@ -738,6 +738,179 @@ fn output_format_notebook() -> Result<()> {
 }
 
 #[test]
+fn output_file_check() -> Result<()> {
+    let test = CliTest::with_settings(|_project_dir, mut settings| {
+        // JSON double escapes backslashes
+        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+
+        settings
+    })?;
+    test.write_file("input.py", "def     foo():\n                pass\n")?;
+
+    // The diagnostics are written to the output file rather than stdout.
+    assert_cmd_snapshot!(
+        test.format_command().args([
+            "--check",
+            "--output-format",
+            "json",
+            "--output-file",
+            "out.json",
+            "input.py",
+        ]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
+
+    insta::assert_snapshot!(test.read_file("out.json")?, @r#"
+    [
+      {
+        "cell": null,
+        "code": "unformatted",
+        "end_location": {
+          "column": 13,
+          "row": 2
+        },
+        "filename": "[TMP]/input.py",
+        "fix": {
+          "applicability": "safe",
+          "edits": [
+            {
+              "content": "foo():\n",
+              "end_location": {
+                "column": 13,
+                "row": 2
+              },
+              "location": {
+                "column": 5,
+                "row": 1
+              }
+            }
+          ],
+          "message": null
+        },
+        "location": {
+          "column": 5,
+          "row": 1
+        },
+        "message": "File would be reformatted",
+        "name": "unformatted",
+        "noqa_row": null,
+        "severity": "error",
+        "url": null
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn output_file_creates_parent_directories() -> Result<()> {
+    let test = CliTest::with_file("input.py", "def     foo():\n                pass\n")?;
+
+    // Missing parent directories are created, and the summary goes to the file too.
+    assert_cmd_snapshot!(
+        test.format_command().args([
+            "--check",
+            "--output-file",
+            "reports/nested/out.txt",
+            "input.py",
+        ]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
+
+    insta::assert_snapshot!(test.read_file("reports/nested/out.txt")?, @"
+    unformatted: File would be reformatted
+     --> input.py:1:5
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
+    1 file would be reformatted
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn output_file_diff() -> Result<()> {
+    let test = CliTest::with_file("input.py", "def     foo():\n                pass\n")?;
+
+    // The diff is written to the output file; the summary still goes to stderr.
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--diff", "--output-file", "out.diff", "input.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    1 file would be reformatted
+    "
+    );
+
+    insta::assert_snapshot!(test.read_file("out.diff")?, @"
+    --- input.py
+    +++ input.py
+    @@ -1,2 +1,2 @@
+    -def     foo():
+    -                pass
+    +def foo():
+    +    pass
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn output_file_env_var() -> Result<()> {
+    let test = CliTest::with_file("input.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(
+        test.format_command()
+            .env("RUFF_OUTPUT_FILE", "out.txt")
+            .args(["--check", "input.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
+
+    insta::assert_snapshot!(test.read_file("out.txt")?, @"
+    unformatted: File would be reformatted
+     --> input.py:1:5
+      |
+      - def     foo():
+      -                 pass
+    1 + def foo():
+    2 +     pass
+      |
+
+    1 file would be reformatted
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn exit_non_zero_on_format() -> Result<()> {
     let test = CliTest::new()?;
 
