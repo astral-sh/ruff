@@ -3543,5 +3543,39 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Nested generic class attributes
+
+Accessing a nested class through the defining class retains the exact class object. Accessing a
+nested class through an instance or an unspecified subclass accounts for possible overrides.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Outer:
+    class Inner(Generic[T]):
+        def __init__(self, value: T) -> None:
+            self.value = value
+
+reveal_type(Outer.Inner)  # revealed: <class 'Inner'>
+
+def inspect(obj: Outer, cls: type[Outer]) -> None:
+    reveal_type(obj.Inner)  # revealed: type[Inner[Unknown]]
+    reveal_type(cls.Inner)  # revealed: type[Inner[Unknown]]
+```
+
+The nested class can be used in annotations, explicit specializations, and base classes.
+
+```py
+def accept(value: Outer.Inner[int]) -> int:
+    return value.value
+
+class Integer(Outer.Inner[int]): ...
+
+reveal_type(Outer.Inner[int](1))  # revealed: Inner[int]
+reveal_type(accept(Integer(1)))  # revealed: int
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
