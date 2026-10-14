@@ -1,7 +1,7 @@
 //! Computes a perfect hash table using [the CHD
 //! algorithm](http://cmph.sourceforge.net/papers/esa09.pdf).
 //!
-//! Strongly inspired by https://github.com/sfackler/rust-phf
+//! Strongly inspired by <https://github.com/sfackler/rust-phf>
 
 use rand::prelude::{RngExt, SeedableRng, SliceRandom, StdRng};
 

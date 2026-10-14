@@ -363,10 +363,7 @@ pub fn character(search_name: &str) -> Option<char> {
                 _ => return None,
             }
         }
-        let ch = match char::from_u32(v) {
-            Some(ch) => ch,
-            None => return None,
-        };
+        let ch = char::from_u32(v)?;
 
         // check if the resulting code is indeed in the known ranges
         if is_cjk_unified_ideograph(ch) {
