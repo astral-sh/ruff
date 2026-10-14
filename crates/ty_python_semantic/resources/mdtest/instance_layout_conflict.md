@@ -322,7 +322,8 @@ class A(Plain, int, str): ...  # error: [instance-layout-conflict]
 class B(int, str, Plain): ...  # error: [instance-layout-conflict]
 ```
 
-The same applies when the common ancestor is listed explicitly:
+A shared ancestor with non-empty `__slots__` also does not resolve conflicts between its subclasses,
+even when that ancestor appears directly in the bases list:
 
 ```py
 class Base:
@@ -334,7 +335,23 @@ class Left(Base):
 class Right(Base):
     __slots__ = ("right",)
 
-class C(Left, Right, Base): ...  # error: [instance-layout-conflict]
+# snapshot
+class C(Left, Right, Base): ...
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:14:7
+   |
+14 | class C(Left, Right, Base): ...
+   |       ^^^^^^^^^^^^^^^^^^^^ Bases `Left` and `Right` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:14:9
+   |
+14 | class C(Left, Right, Base): ...
+   |         ----  ----- `Right` instances have a distinct memory layout because `Right` defines non-empty `__slots__`
+   |         |
+   |         `Left` instances have a distinct memory layout because `Left` defines non-empty `__slots__`
 ```
 
 ## Slot names declared in a list

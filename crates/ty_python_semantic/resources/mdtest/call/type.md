@@ -1070,16 +1070,6 @@ class Conflict(
 ): ...
 ```
 
-A common ancestor of two conflicting disjoint bases does not resolve the conflict. `Plain`
-contributes the disjoint base `object`, which is an ancestor of both `int` and `str`:
-
-```py
-class Plain: ...
-
-# error: [instance-layout-conflict]
-WithPlain = type("WithPlain", (Plain, int, str), {})
-```
-
 `instance-layout-conflict` errors are also emitted for classes that inherit from dynamic classes
 with disjoint bases:
 

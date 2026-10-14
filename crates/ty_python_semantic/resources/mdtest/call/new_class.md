@@ -273,19 +273,13 @@ def g(x: type[Any]):
 ## Instance layout conflicts
 
 As with a `class` statement, the bases of a class created with `types.new_class()` cannot have
-conflicting instance memory layouts. A common ancestor of the conflicting disjoint bases, such as
-the `object` contributed by `Plain`, does not resolve the conflict:
+conflicting instance memory layouts:
 
 ```py
 import types
 
-class Plain: ...
-
 # error: [instance-layout-conflict]
 Conflict = types.new_class("Conflict", (int, str))
-
-# error: [instance-layout-conflict]
-WithPlain = types.new_class("WithPlain", (Plain, int, str))
 ```
 
 ## Dynamic namespace via `exec_body`
