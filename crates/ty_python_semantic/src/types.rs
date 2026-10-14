@@ -54,6 +54,7 @@ pub(crate) use self::match_pattern::{
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
+use self::recursive::MappingProbeContext;
 use self::relation::TypeRelationStack;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::NegativeIntersectionElements;
@@ -513,6 +514,7 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    mapping_probe: Option<MappingProbeContext<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     mapped: RefCell<FxHashMap<(Type<'db>, TypeMapping<'db>, TypeContext<'db>), Type<'db>>>,
@@ -528,6 +530,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            mapping_probe: None,
             materialize_typevar_bounds_and_defaults: true,
             mapped: RefCell::default(),
             expanding: ActiveRecursionDetector::default(),
@@ -597,6 +600,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             materialization_equivalence,
             relation_stack: self.relation_stack.clone(),
             recursion_context: self.recursion_context,
+            mapping_probe: self.mapping_probe,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9479,6 +9483,12 @@ impl<'db> Type<'db> {
                 return self;
             }
             _ => {}
+        }
+
+        if let Some(probe) = visitor.mapping_probe
+            && let Some(mapped) = probe.map_type(db, self, type_mapping, tcx, visitor)
+        {
+            return mapped;
         }
 
         // Shared subtrees must be mapped once, even when they cannot form a recursive cycle.

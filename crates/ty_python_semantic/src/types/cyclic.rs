@@ -918,6 +918,11 @@ where
             _tag: PhantomData,
         }
     }
+
+    /// Whether there are neither active visits nor memoized results.
+    pub(super) fn is_empty(&self) -> bool {
+        self.seen.borrow().is_empty() && matches!(*self.cache.borrow(), CycleDetectorCache::Empty)
+    }
 }
 
 impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>

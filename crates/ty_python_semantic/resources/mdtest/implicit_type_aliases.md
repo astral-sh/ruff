@@ -2927,9 +2927,6 @@ Calling a generic function or binding a method's `Self` does not change the type
 successive depths of an unrelated recursive alias. Promoting collection elements preserves the same
 progression.
 
-TODO: Comparing growing recursive aliases currently rejects the attribute assignment and some list
-accesses below.
-
 ```toml
 [environment]
 python-version = "3.12"
@@ -2937,7 +2934,6 @@ python-version = "3.12"
 
 ```py
 from typing import Generic, Self, TypeVar
-from typing_extensions import reveal_type
 
 T = TypeVar("T")
 Growing = T | list["Growing[list[T]]"]
@@ -2957,7 +2953,7 @@ class Container:
 
 class Box(Generic[T]):
     def __init__(self, value: Growing[T]) -> None:
-        self.value = value  # error: [invalid-assignment]
+        self.value = value
 
 def inspect(container: Container):
     for tree in (fixed(1), container.get()[1]):
@@ -3241,9 +3237,6 @@ def inspect(top: Top[NestedDict[str, int]], bottom: Bottom[NestedDict[str, int]]
 The type arguments grow when these aliases refer back to each other. Inferring a list containing one
 of these values preserves the alias without expanding the recursive references indefinitely.
 
-TODO: We do not yet recognize equivalent growing aliases after promotion or materialization, causing
-the list check and equivalence assertions below to fail.
-
 ```py
 from typing import TypeVar
 from typing_extensions import reveal_type
@@ -3253,8 +3246,7 @@ GrowingA = tuple[T, "GrowingB[T] | None"]
 GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
 
 def f(a: GrowingA[int]):
-    # TODO: Should reveal list[GrowingA[int]].
-    reveal_type([a])  # revealed: list[GrowingA[int] | GrowingA[int]]
+    reveal_type([a])  # revealed: list[GrowingA[int]]
 ```
 
 These aliases contain no dynamic types when specialized with `int`, so both materializations are
@@ -3264,8 +3256,8 @@ equivalent to the original type.
 from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_equivalent_to
 
-static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))  # error: [static-assert-error]
-static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))
+static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))
 ```
 
 ### Materialized recursive aliases in collections
@@ -3273,9 +3265,6 @@ static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))  # error: 
 Literal promotion preserves a recursive alias's materialization, including when its type arguments
 change at each level. In particular, inserting a top-materialized value into a list must not restore
 `Any` as an unconstrained leaf type.
-
-TODO: The displayed alias omits its materialization after promotion. The bottom-materialized growing
-alias also retains redundant union elements.
 
 ```py
 from typing import Any, TypeVar
@@ -3293,14 +3282,10 @@ def inspect(
     top_growing: Top[Growing[Any]],
     bottom_growing: Bottom[Growing[Any]],
 ):
-    # TODO: Should reveal list[Top[Tree[Any]]].
-    reveal_type([top])  # revealed: list[Tree[Any]]
-    # TODO: Should reveal list[Bottom[Tree[Any]]].
-    reveal_type([bottom])  # revealed: list[Tree[Any]]
-    # TODO: Should reveal list[Top[Growing[Any]]].
-    reveal_type([top_growing])  # revealed: list[Growing[Any]]
-    # TODO: Should reveal list[Bottom[Growing[Any]]].
-    reveal_type([bottom_growing])  # revealed: list[Growing[Any] | Bottom[Growing[Any]]]
+    reveal_type([top])  # revealed: list[Top[Tree[Any]]]
+    reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
+    reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
+    reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
     static_assert(is_equivalent_to(TypeOf[[top][0]], Top[Tree[Any]]))
     static_assert(is_equivalent_to(TypeOf[[bottom][0]], Bottom[Tree[Any]]))
     static_assert(not is_equivalent_to(TypeOf[[top][0]], Tree[Any]))

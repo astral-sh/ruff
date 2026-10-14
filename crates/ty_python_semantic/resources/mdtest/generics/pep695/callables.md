@@ -1458,8 +1458,6 @@ def specialize_promoted(value: Promoted[TypeOf[2]]):
 
 A callback reached through a growing recursive alias binds its own type variables.
 
-TODO: Comparing growing recursive aliases currently rejects some valid list accesses below.
-
 ```py
 from typing import Callable
 
@@ -1469,17 +1467,13 @@ def factory[T, U]() -> tuple[Callbacks[T, U], Callable[[U], U]]:
     raise NotImplementedError
 
 callbacks, _ = factory()
-# TODO: Should reveal tuple[Literal[1], Literal["value"]].
-# error: [invalid-argument-type]
-reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: Unknown
+reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
 ```
 
 ## Promotion through shared generic aliases
 
 The same callback alias can occur in parameter and return positions. Promotion preserves static
 recursive parameter types and widens inferred literals in results, including after recursive calls.
-
-TODO: Comparing growing recursive aliases currently rejects the callback arguments below.
 
 ```py
 from typing import Callable
@@ -1495,9 +1489,6 @@ def collect(
     third: tuple[Tree[int], Leaf[tuple[tuple[TypeOf[1]]]]],
 ):
     widened = [tree][0]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
 ```
 

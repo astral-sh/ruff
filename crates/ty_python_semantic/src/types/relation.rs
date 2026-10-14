@@ -1628,10 +1628,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return nominally_satisfied;
         }
 
-        // TODO: Prove growing recursive relations modulo redundant deferred mappings. An
-        // irrelevant substitution or a no-op materialization can prevent exact pair repetition
-        // even when both operands describe the same type.
-        //
         // TODO: Recursively-specialized structural types can encode context-free languages,
         // whose inclusion and equivalence are undecidable. No complete fallback exists, but
         // more decidable cases can be recognized here before conservatively rejecting the pair.
