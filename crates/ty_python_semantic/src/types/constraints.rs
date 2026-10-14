@@ -3018,6 +3018,7 @@ struct CandidateTypeVarSolver<'db> {
     lower: FxIndexSet<(ConstraintProvenance, Type<'db>)>,
     upper: UpperBound<'db>,
     has_declared_evidence: bool,
+    has_declared_lower_evidence: bool,
 }
 
 impl<'db> CandidateTypeVarSolver<'db> {
@@ -3070,6 +3071,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
         self.has_declared_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
+        self.has_declared_lower_evidence |= provenance.contains(ConstraintProvenance::DECLARED);
         if provenance.is_evidence() || !ty.is_never() {
             self.lower.insert((provenance, ty));
         }
@@ -3094,6 +3096,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
             lower,
             mut upper,
             has_declared_evidence,
+            has_declared_lower_evidence,
         } = self;
 
         let iter_lower_bounds = |source: EvidenceSource, include_validity| {
@@ -3133,9 +3136,15 @@ impl<'db> CandidateTypeVarSolver<'db> {
 
         // Exclude bounds derived using validity constraints from the declared candidate, so as to
         // prefer the declared type as written by the caller.
-        let declared_lower = union_lower_bounds(EvidenceSource::Declared, false);
         let evidence_lower = union_lower_bounds(EvidenceSource::All, true);
-        let inferred_lower = union_lower_bounds(EvidenceSource::Inferred, true);
+        let (inferred_lower, declared_lower) = if has_declared_lower_evidence {
+            (
+                union_lower_bounds(EvidenceSource::Inferred, true),
+                union_lower_bounds(EvidenceSource::Declared, false),
+            )
+        } else {
+            (evidence_lower, None)
+        };
         let validity_lower = UnionType::from_elements(
             db,
             env,
