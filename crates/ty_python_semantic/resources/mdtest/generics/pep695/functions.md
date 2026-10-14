@@ -1753,10 +1753,10 @@ the actual argument even for non-final classes.
 
 ```py
 class P[T]:
-    x: T  # invariant
+    p: T  # invariant
 
 class Q[T]:
-    x: T  # invariant
+    q: T  # invariant
 
 def extract_t[T](x: P[T] | Q[T]) -> T:
     raise NotImplementedError

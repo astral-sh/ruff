@@ -1639,10 +1639,10 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 class P(Generic[T]):
-    x: T
+    p: T
 
 class Q(Generic[T]):
-    x: T
+    q: T
 
 def extract_t(x: P[T] | Q[T]) -> T:
     raise NotImplementedError

@@ -16,7 +16,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, ProgramEnvironment, attribute_declarations,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -85,8 +85,14 @@ pub(super) fn check_class<'db>(
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let class_specialized = class.identity_specialization(db);
-    if configuration.check_method_liskov_violations() && !inconsistent_generic_bases {
-        check_inherited_method_conflicts(context, class, class_specialized, &own_class_members);
+    if configuration.check_liskov_violations() && !inconsistent_generic_bases {
+        check_inherited_conflicts(
+            context,
+            class,
+            class_specialized,
+            &own_class_members,
+            configuration,
+        );
     }
     let enum_info = enum_metadata(db, class.into());
 
@@ -136,90 +142,55 @@ pub(super) fn check_class<'db>(
     }
 }
 
-/// Rechecks methods defined on parents against the remainder of the resolved MRO.
+/// Discover inherited members and select their owners for both kinds of override check.
 ///
-/// A multiple-inheritance join can place two otherwise-unrelated classes in the same MRO. The
-/// effective source-defined method in that ordering must be compatible with each later definition
-/// of the same method:
-///
-/// ```python
-/// class ReturnsStr:
-///     def method(self) -> str: ...
-///
-/// class ReturnsInt:
-///     def method(self) -> int: ...
-///
-/// class Combined(ReturnsStr, ReturnsInt): ...  # Error
-/// ```
-///
-/// The caller skips classes with inconsistent generic bases, since their specialized MRO is not a
-/// valid contract to check.
-fn check_inherited_method_conflicts<'db>(
+/// Source declarations, receiver assignments, and slots supply the names to check. Generated
+/// members can shadow those declarations, so select the owner through member lookup rather
+/// than assuming it is the class where the name was found. Explicit overrides are checked
+/// separately, and a dynamic base prevents selecting a member from later in the MRO.
+fn check_inherited_conflicts<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
-    class_specialized: ClassType<'db>,
-    own_class_members: &FxHashSet<MemberWithDefinition<'db>>,
+    class_type: ClassType<'db>,
+    own_members: &FxHashSet<MemberWithDefinition<'db>>,
+    configuration: OverrideRulesConfig,
 ) {
+    let Some((mro, first_dynamic_base)) = inherited_conflict_mro(context, class, class_type) else {
+        return;
+    };
     let db = context.db();
     let env = &context.program_environment();
-
-    let mut direct_bases = Vec::new();
-    for base in class.explicit_bases(db) {
-        match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
-            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
-                direct_bases.push(base);
-            }
-            Some(
-                ClassBase::Generic
-                | ClassBase::Protocol
-                | ClassBase::Any
-                | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_),
-            ) => {}
-            _ => return,
-        }
-    }
-    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
-        return;
-    }
-
-    let constraints = ConstraintSetBuilder::new();
-    if direct_bases.iter().enumerate().any(|(index, left)| {
-        direct_bases[index + 1..]
-            .iter()
-            .any(|right| !left.could_coexist_in_mro_with(db, env, *right, &constraints))
-    }) {
-        return;
-    }
-
-    let mut mro = Vec::new();
-    let mut first_dynamic_base = None;
-    for base in class_specialized.iter_mro(db).skip(1) {
-        match base {
-            ClassBase::Class(base) if base.is_object(db) => break,
-            ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
-            ClassBase::Protocol | ClassBase::Generic => {}
-            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
-                first_dynamic_base.get_or_insert(mro.len());
-            }
-            ClassBase::TypedDict(_) | ClassBase::Class(_) => return,
-        }
-    }
-    let receiver = Type::instance(db, env, class_specialized);
-    let mut seen_names: FxHashSet<_> = own_class_members
+    let mut seen: FxHashSet<Name> = own_members
         .iter()
         .map(|member| member.member.name.clone())
         .collect();
+    seen.extend(class.slot_names(db).unwrap_or_default().iter().cloned());
+    seen.extend(
+        class_type
+            .own_instance_attribute_names(db)
+            .iter()
+            .filter(|name| has_own_instance_declaration(db, class.body_scope(db), name))
+            .filter(|name| {
+                matches!(class_type.own_instance_member(db, env, name).inner.place,
+                    Place::Defined(place) if place.origin == TypeOrigin::Declared)
+            })
+            .cloned(),
+    );
+    let attribute_contracts = configuration.check_attribute_type_violations().then(|| {
+        mro.iter()
+            .copied()
+            .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
+            .collect::<Vec<_>>()
+    });
 
-    for (index, owner) in mro.iter().copied().enumerate() {
-        if first_dynamic_base.is_some_and(|dynamic_index| index >= dynamic_index) {
+    for (index, candidate_owner) in mro.iter().copied().enumerate() {
+        if first_dynamic_base.is_some_and(|position| index >= position) {
             break;
         }
-        let Some((owner_literal, _)) = owner.static_class_literal(db) else {
+        let Some((literal, _)) = candidate_owner.static_class_literal(db) else {
             continue;
         };
-        let scope = owner_literal.body_scope(db);
-        // TODO: Include synthesized members when checking inherited conflicts. For example,
+        // TODO: Include synthesized methods when checking inherited conflicts. For example,
         // `Ordered.__gt__` is synthesized here and is incompatible with `AcceptsObject.__gt__`:
         //
         // ```python
@@ -234,121 +205,255 @@ fn check_inherited_method_conflicts<'db>(
         //
         // class Conflict(Ordered, AcceptsObject): ...
         // ```
-        let members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
-
-        #[expect(
-            clippy::iter_over_hash_type,
-            reason = "each class member is checked independently"
-        )]
-        'members: for member in members {
-            let name = &member.member.name;
-            if is_mangled_private(name.as_str())
-                || is_constructor_like_method(name.as_str())
-                || !seen_names.insert(name.clone())
+        let names = all_end_of_scope_members(db, literal.body_scope(db))
+            .map(|member| (member.member.name, Some(member.first_reachable_definition)))
+            .chain(
+                candidate_owner
+                    .own_instance_attribute_names(db)
+                    .iter()
+                    .chain(literal.slot_names(db).unwrap_or_default().iter())
+                    .cloned()
+                    .map(|name| (name, None)),
+            );
+        for (name, definition) in names {
+            if is_mangled_private(&name)
+                || !seen.insert(name.clone())
+                || class
+                    .own_synthesized_member(db, env, None, None, &name)
+                    .is_some()
             {
                 continue;
             }
-            let Some((selected_decorator, selected_ty)) =
-                source_method_contract(db, env, owner, receiver, name)
-            else {
-                continue;
-            };
+            let owner = mro[..=index]
+                .iter()
+                .copied()
+                .find(|owner| {
+                    !owner.own_class_member(db, env, None, &name).is_undefined()
+                        || !owner.own_instance_member(db, env, &name).is_undefined()
+                })
+                .unwrap_or(candidate_owner);
 
-            for contract_owner in mro[index + 1..].iter().copied() {
-                let Some((contract_decorator, contract_ty)) =
-                    source_method_contract(db, env, contract_owner, receiver, name)
-                else {
-                    continue;
-                };
-                let Some((selected_ty, contract_ty)) =
-                    method_override_types(db, env, selected_ty, contract_ty)
-                else {
-                    continue;
-                };
-                if selected_decorator == contract_decorator
-                    && selected_ty.is_assignable_to(db, env, contract_ty)
-                {
-                    continue;
-                }
-
-                // `EnumType` can replace mixin dunders while constructing the enum, so the
-                // inherited definitions do not necessarily describe the resulting method. For
-                // example, the inherited check would otherwise compare the incompatible
-                // `int.__format__` and `Enum.__format__` definitions here:
-                //
-                // ```python
-                // from enum import Enum
-                //
-                // # int.__format__(self, format_spec: str, /) -> str
-                // # Enum.__format__(self, format_spec: str) -> str
-                // class Status(int, Enum):
-                //     READY = 1
-                // ```
-                //
-                // Keep this check specific to the enum definition so conflicts between two
-                // ordinary mixins are still reported.
-                if enum_class_creation_manages_conflict(db, class, name, owner, contract_owner) {
-                    continue;
-                }
-
-                // Do not re-emit an incompatibility that already exists in the parent's own MRO.
-                // This matters for intentionally suppressed typeshed overrides such as
-                // `str.__contains__` versus `Sequence.__contains__`, while still allowing a
-                // receiver-sensitive incompatibility that appears only when rebound to `class`.
-                // Resolve the ancestor in the parent's own MRO so that its generic specialization
-                // matches the one used by the normal Liskov check on the parent.
-                if let Some(parent_contract_owner) = owner
-                    .iter_mro(db)
-                    .skip(1)
-                    .filter_map(ClassBase::into_class)
-                    .find(|ancestor| ancestor.class_literal(db) == contract_owner.class_literal(db))
-                {
-                    let parent_receiver = Type::instance(db, env, owner);
-                    let Some((parent_decorator, parent_ty)) =
-                        source_method_contract(db, env, owner, parent_receiver, name)
-                    else {
-                        continue;
-                    };
-                    let Some((ancestor_decorator, ancestor_ty)) = source_method_contract(
-                        db,
-                        env,
-                        parent_contract_owner,
-                        parent_receiver,
-                        name,
-                    ) else {
-                        continue;
-                    };
-                    if parent_decorator != ancestor_decorator
-                        || !is_assignable_method_override(db, env, parent_ty, ancestor_ty)
-                    {
-                        continue;
-                    }
-                }
-
-                let Some((contract_literal, _)) = contract_owner.static_class_literal(db) else {
-                    continue;
-                };
-                let contract_scope = contract_literal.body_scope(db);
-                let Some(contract_symbol) = place_table(db, contract_scope).symbol_id(name) else {
-                    continue;
-                };
-                let Some(contract_definition) =
-                    symbol_definition(db, contract_scope, contract_symbol)
-                else {
-                    continue;
-                };
-                report_incompatible_base_method(
+            // Only a source definition on the selected owner goes to the method checker.
+            // A generated member on an earlier base must not expose an older method.
+            if configuration.check_method_liskov_violations()
+                && owner == candidate_owner
+                && let Some(definition) = definition
+            {
+                check_inherited_method_conflict(
                     context,
                     class,
-                    name,
-                    (owner, member.first_reachable_definition, selected_decorator),
-                    (contract_owner, contract_definition, contract_decorator),
-                    || selected_ty.assignability_error_context(db, env, contract_ty),
+                    class_type,
+                    owner,
+                    &mro[index + 1..],
+                    &name,
+                    definition,
                 );
-                continue 'members;
+            }
+            if let Some(contracts) = &attribute_contracts {
+                attributes::check_inherited_conflict(
+                    context, class, class_type, owner, contracts, &name,
+                );
             }
         }
     }
+}
+
+/// Check for a receiver annotation without inferring the method that contains it.
+///
+/// Only call this for the class being checked: accessing another file's declarations
+/// directly would add a dependency on its AST. The caller still checks the resolved
+/// member's origin, since a syntactic declaration may be inactive.
+fn has_own_instance_declaration<'db>(
+    db: &'db dyn Db,
+    class_scope: ScopeId<'db>,
+    name: &str,
+) -> bool {
+    attribute_declarations(db, class_scope, name).any(|(mut declarations, _)| {
+        declarations.any(|declaration| declaration.declaration.definition().is_some())
+    })
+}
+
+/// Check a source-defined method against the later declarations in the resolved MRO.
+///
+/// Both signatures are bound to the subclass receiver. Conflicts already present in the
+/// selected owner's own hierarchy are suppressed.
+///
+/// ```python
+/// class ReturnsStr:
+///     def method(self) -> str: ...
+///
+/// class ReturnsInt:
+///     def method(self) -> int: ...
+///
+/// class Combined(ReturnsStr, ReturnsInt): ...  # Error
+/// ```
+fn check_inherited_method_conflict<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_type: ClassType<'db>,
+    owner: ClassType<'db>,
+    contracts: &[ClassType<'db>],
+    name: &Name,
+    definition: Definition<'db>,
+) {
+    if is_constructor_like_method(name) {
+        return;
+    }
+    let db = context.db();
+    let env = &context.program_environment();
+    let receiver = Type::instance(db, env, class_type);
+    let Some((selected_decorator, selected_ty)) =
+        source_method_contract(db, env, owner, receiver, name)
+    else {
+        return;
+    };
+
+    for contract_owner in contracts.iter().copied() {
+        let Some((contract_decorator, contract_ty)) =
+            source_method_contract(db, env, contract_owner, receiver, name)
+        else {
+            continue;
+        };
+        let Some((selected_ty, contract_ty)) =
+            method_override_types(db, env, selected_ty, contract_ty)
+        else {
+            continue;
+        };
+        if selected_decorator == contract_decorator
+            && selected_ty.is_assignable_to(db, env, contract_ty)
+        {
+            continue;
+        }
+
+        // `EnumType` can replace mixin dunders while constructing the enum, so the
+        // inherited definitions do not necessarily describe the resulting method. For
+        // example, the inherited check would otherwise compare the incompatible
+        // `int.__format__` and `Enum.__format__` definitions here:
+        //
+        // ```python
+        // from enum import Enum
+        //
+        // # int.__format__(self, format_spec: str, /) -> str
+        // # Enum.__format__(self, format_spec: str) -> str
+        // class Status(int, Enum):
+        //     READY = 1
+        // ```
+        //
+        // Keep this check specific to the enum definition so conflicts between two
+        // ordinary mixins are still reported.
+        if enum_class_creation_manages_conflict(db, class, name, owner, contract_owner) {
+            continue;
+        }
+
+        // Do not re-emit an incompatibility that already exists in the parent's own MRO.
+        // This matters for intentionally suppressed typeshed overrides such as
+        // `str.__contains__` versus `Sequence.__contains__`, while still allowing a
+        // receiver-sensitive incompatibility that appears only when rebound to `class`.
+        // Resolve the ancestor in the parent's own MRO so that its generic specialization
+        // matches the one used by the normal Liskov check on the parent.
+        if let Some(parent_contract_owner) = owner
+            .iter_mro(db)
+            .skip(1)
+            .filter_map(ClassBase::into_class)
+            .find(|ancestor| ancestor.class_literal(db) == contract_owner.class_literal(db))
+        {
+            let parent_receiver = Type::instance(db, env, owner);
+            let Some((parent_decorator, parent_ty)) =
+                source_method_contract(db, env, owner, parent_receiver, name)
+            else {
+                continue;
+            };
+            let Some((ancestor_decorator, ancestor_ty)) =
+                source_method_contract(db, env, parent_contract_owner, parent_receiver, name)
+            else {
+                continue;
+            };
+            if parent_decorator != ancestor_decorator
+                || !is_assignable_method_override(db, env, parent_ty, ancestor_ty)
+            {
+                continue;
+            }
+        }
+
+        let Some((contract_literal, _)) = contract_owner.static_class_literal(db) else {
+            continue;
+        };
+        let contract_scope = contract_literal.body_scope(db);
+        let Some(contract_symbol) = place_table(db, contract_scope).symbol_id(name) else {
+            continue;
+        };
+        let Some(contract_definition) = symbol_definition(db, contract_scope, contract_symbol)
+        else {
+            continue;
+        };
+        report_incompatible_base_method(
+            context,
+            class,
+            name,
+            (owner, definition, selected_decorator),
+            (contract_owner, contract_definition, contract_decorator),
+            || selected_ty.assignability_error_context(db, env, contract_ty),
+        );
+        return;
+    }
+}
+
+/// Resolve the static MRO entries for a supported multiple-inheritance join.
+///
+/// Return `None` for fewer than two known direct bases, invalid or incompatible bases,
+/// or unsupported MRO entries. The returned list excludes the class itself and `object`.
+/// The optional index identifies where the first dynamic base interrupts known lookup:
+/// entries at and beyond it still constrain overrides, but cannot supply the selected member.
+fn inherited_conflict_mro<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_specialized: ClassType<'db>,
+) -> Option<(Vec<ClassType<'db>>, Option<usize>)> {
+    let db = context.db();
+    let env = &context.program_environment();
+    let mut direct_bases = Vec::new();
+    for base in class.explicit_bases(db) {
+        match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
+            Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
+                direct_bases.push(base);
+            }
+            Some(
+                ClassBase::Generic
+                | ClassBase::Protocol
+                | ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_),
+            ) => {}
+            _ => return None,
+        }
+    }
+    if direct_bases.len() < 2 || class.try_mro(db, None).is_err() {
+        return None;
+    }
+
+    let constraints = ConstraintSetBuilder::new();
+    if direct_bases.iter().enumerate().any(|(index, left)| {
+        direct_bases[index + 1..]
+            .iter()
+            .any(|right| !left.could_coexist_in_mro_with(db, env, *right, &constraints))
+    }) {
+        return None;
+    }
+
+    let mut mro = Vec::new();
+    let mut first_dynamic_base = None;
+    for base in class_specialized.iter_mro(db).skip(1) {
+        match base {
+            ClassBase::Class(base) if base.is_object(db) => break,
+            ClassBase::Class(base) if base.static_class_literal(db).is_some() => mro.push(base),
+            ClassBase::Protocol | ClassBase::Generic => {}
+            ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                first_dynamic_base.get_or_insert(mro.len());
+            }
+            ClassBase::TypedDict(_) | ClassBase::Class(_) => return None,
+        }
+    }
+    Some((mro, first_dynamic_base))
 }
 
 /// Returns a source-defined method bound to the class whose MRO is being checked.
@@ -359,19 +464,6 @@ fn source_method_contract<'db>(
     receiver: Type<'db>,
     name: &Name,
 ) -> Option<(MethodDecorator, Type<'db>)> {
-    // TODO: Check inherited conflicts involving properties and other attributes. For example:
-    //
-    // ```python
-    // class ReturnsStr:
-    //     @property
-    //     def value(self) -> str: ...
-    //
-    // class ReturnsInt:
-    //     @property
-    //     def value(self) -> int: ...
-    //
-    // class Conflict(ReturnsStr, ReturnsInt): ...
-    // ```
     let Type::FunctionLiteral(function) = owner
         .own_class_member(db, env, None, name)
         .inner
