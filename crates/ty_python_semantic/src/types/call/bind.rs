@@ -8443,6 +8443,8 @@ impl<'db> Binding<'db> {
         };
         if let Some(positional_matches) = &positional_matches {
             matcher.argument_matches = positional_matches.arguments.to_vec();
+            matcher.variadic_argument_matched_to_variadic_parameter =
+                positional_matches.variadic_argument_matched;
             matcher.num_synthetic_args = arguments
                 .iter()
                 .filter(|argument| matches!(argument, CallArgument::Synthetic(_)))
@@ -8554,6 +8556,8 @@ impl<'db> Binding<'db> {
                     self.argument_matches[index] = evaluated.arguments[index].clone();
                 }
             }
+            self.variadic_argument_matched_to_variadic_parameter =
+                evaluated.variadic_argument_matched;
             Some(evaluated.constraints)
         } else {
             None
@@ -8895,6 +8899,8 @@ impl<'db> Binding<'db> {
             inference: self.inference,
             argument_matches: self.argument_matches.clone(),
             positional_matches: self.positional_matches.clone(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
             parameter_tys: self.parameter_tys.clone(),
             errors: self.errors.clone(),
         }
@@ -8907,6 +8913,7 @@ impl<'db> Binding<'db> {
             inference,
             argument_matches,
             positional_matches,
+            variadic_argument_matched_to_variadic_parameter,
             parameter_tys,
             errors,
         } = snapshot;
@@ -8916,6 +8923,8 @@ impl<'db> Binding<'db> {
         self.inference = inference;
         self.argument_matches = argument_matches;
         self.positional_matches = positional_matches;
+        self.variadic_argument_matched_to_variadic_parameter =
+            variadic_argument_matched_to_variadic_parameter;
         self.parameter_tys = parameter_tys;
         self.errors = errors;
     }
@@ -8972,6 +8981,7 @@ struct BindingSnapshot<'db> {
     inference: Option<TypeVarInference<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     positional_matches: Option<Arc<PositionalMatches<'db>>>,
+    variadic_argument_matched_to_variadic_parameter: bool,
     parameter_tys: Box<[Option<Type<'db>>]>,
     errors: Vec<BindingError<'db>>,
 }
@@ -9017,6 +9027,8 @@ impl CallableBindingSnapshot<'_> {
                 snapshot
                     .positional_matches
                     .clone_from(&binding.positional_matches);
+                snapshot.variadic_argument_matched_to_variadic_parameter =
+                    binding.variadic_argument_matched_to_variadic_parameter;
                 snapshot.parameter_tys.clone_from(&binding.parameter_tys);
             }
 

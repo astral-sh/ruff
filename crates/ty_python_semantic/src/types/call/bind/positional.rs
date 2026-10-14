@@ -35,7 +35,7 @@ impl<'db> Segment<'db> {
     }
 }
 
-/// Possible ordered bindings of positional arguments to a fixed positional signature.
+/// Possible ordered bindings of positional arguments to a positional signature.
 ///
 /// Each state identifies an argument segment and the next parameter. A repeated segment can
 /// either finish or consume one parameter without advancing to the next segment. Keeping these
@@ -50,18 +50,22 @@ impl<'db> Segment<'db> {
 #[derive(Clone, Debug)]
 pub(super) struct PositionalMatches<'db> {
     segments: Box<[Segment<'db>]>,
+    /// The number of parameters before an optional variadic parameter.
     parameter_count: usize,
+    variadic: bool,
     /// A parameter already supplied by keyword cannot also accept a positional argument.
     can_consume: Box<[bool]>,
     /// From each (segment, parameter) state, can the rest of the call fit this signature?
     /// This checks argument counts only; `evaluate` checks the types later.
     can_finish: Box<[bool]>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
+    pub(super) variadic_argument_matched: bool,
 }
 
 pub(super) struct PositionalEvaluation<'db, 'c> {
     pub(super) constraints: ConstraintSet<'db, 'c>,
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
+    pub(super) variadic_argument_matched: bool,
 }
 
 impl<'db> PositionalMatches<'db> {
@@ -86,7 +90,9 @@ impl<'db> PositionalMatches<'db> {
                     matches!(ty, Type::TypeForm(_))
                 })
             })
-            || parameters.variadic().is_some()
+            || parameters
+                .variadic()
+                .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
             || !arguments
                 .iter()
                 .any(|argument| matches!(argument, CallArgument::Variadic(_)))
@@ -157,16 +163,19 @@ impl<'db> PositionalMatches<'db> {
         if state_count > MAX_POSITIONAL_STATES {
             return None;
         }
+        let variadic = parameters.variadic().is_some();
         // Explicit keywords occupy their parameter even when an earlier unpack could reach it.
-        let can_consume = (0..parameter_count)
+        let can_consume = (0..parameter_count + usize::from(variadic))
             .map(|index| !explicit_keywords.contains(&index))
             .collect::<Box<[_]>>();
         let mut matches = Self {
             can_finish: vec![false; state_count].into_boxed_slice(),
             segments: segments.into_boxed_slice(),
             parameter_count,
+            variadic,
             can_consume,
             arguments: Self::empty_matches(arguments),
+            variadic_argument_matched: false,
         };
         matches.mark_possible_finishes(parameters);
         if !matches.can_finish[0] {
@@ -184,18 +193,36 @@ impl<'db> PositionalMatches<'db> {
         segment * (self.parameter_count + 1) + parameter
     }
 
-    /// Where matching one element against this parameter leads, if it accepts positional input.
-    /// A repeated segment can keep supplying elements; a fixed segment is used exactly once.
+    /// Whether an unpack can stop before matching the current parameter.
+    ///
+    /// At a variadic parameter, we check its element type even if the iterable might be empty:
+    ///
+    /// ```python
+    /// def ints(*args: int): ...
+    /// def call(strings: list[str]):
+    ///     ints(*strings, 1)  # str is not assignable to int
+    /// ```
+    fn can_skip(&self, index: usize, position: usize) -> bool {
+        self.segments[index].repeated && !(self.variadic && position == self.parameter_count)
+    }
+
+    /// Returns the next state after consuming a value, or `None` if the parameter cannot accept it
+    /// positionally. At a variadic parameter, one comparison covers the entire repeated segment;
+    /// advancing past that segment keeps the state graph acyclic.
     fn next_state(&self, index: usize, position: usize) -> Option<usize> {
         if !self.can_consume.get(position).copied().unwrap_or(false) {
             return None;
         }
-        let next_index = if self.segments[index].repeated {
-            index
+        if position == self.parameter_count {
+            Some(self.state(index + 1, position))
         } else {
-            index + 1
-        };
-        Some(self.state(next_index, position + 1))
+            let next_index = if self.segments[index].repeated {
+                index
+            } else {
+                index + 1
+            };
+            Some(self.state(next_index, position + 1))
+        }
     }
 
     /// Records whether the remaining arguments can fill the remaining required parameters.
@@ -213,11 +240,11 @@ impl<'db> PositionalMatches<'db> {
         // Work backward: every transition goes right to a later parameter or down to a later
         // segment. A repeated segment may stop here, or supply one more value. It can finish
         // only if at least one of those choices leads to a complete call.
-        for (index, segment) in self.segments.iter().enumerate().rev() {
+        for index in (0..self.segments.len()).rev() {
             for position in (0..=self.parameter_count).rev() {
                 let current = self.state(index, position);
                 let after_segment = self.state(index + 1, position);
-                let stop_unpack = segment.repeated && self.can_finish[after_segment];
+                let stop_unpack = self.can_skip(index, position) && self.can_finish[after_segment];
                 let consume = self
                     .next_state(index, position)
                     .is_some_and(|next| self.can_finish[next]);
@@ -238,7 +265,7 @@ impl<'db> PositionalMatches<'db> {
                     continue;
                 }
                 let after_segment = self.state(index + 1, position);
-                if segment.repeated && self.can_finish[after_segment] {
+                if self.can_skip(index, position) && self.can_finish[after_segment] {
                     reachable[after_segment] = true;
                 }
                 if let Some(next) = self.next_state(index, position)
@@ -246,6 +273,8 @@ impl<'db> PositionalMatches<'db> {
                 {
                     reachable[next] = true;
                     segment.add_match(&mut self.arguments, position);
+                    self.variadic_argument_matched |=
+                        segment.repeated && position == self.parameter_count;
                 }
             }
         }
@@ -310,9 +339,9 @@ impl<'db> PositionalMatches<'db> {
         // parameter. Compute them once; different unpack lengths may use the same edge.
         let mut edges = vec![never; self.state(self.segments.len(), 0)];
         for (index, segment) in self.segments.iter().enumerate() {
-            for position in 0..self.parameter_count {
+            for position in 0..=self.parameter_count {
                 let current = self.state(index, position);
-                if !self.can_finish[current] || !self.can_consume[position] {
+                if !self.can_finish[current] || self.next_state(index, position).is_none() {
                     continue;
                 }
                 let expected = parameters[position].annotated_type();
@@ -330,10 +359,10 @@ impl<'db> PositionalMatches<'db> {
             let terminal = self.state(self.segments.len(), position);
             suffix[terminal] = ConstraintSet::from_bool(constraints, self.can_finish[terminal]);
         }
-        for (index, segment) in self.segments.iter().enumerate().rev() {
+        for index in (0..self.segments.len()).rev() {
             for position in (0..=self.parameter_count).rev() {
                 let current = self.state(index, position);
-                let mut condition = if segment.repeated {
+                let mut condition = if self.can_skip(index, position) {
                     suffix[self.state(index + 1, position)]
                 } else {
                     never
@@ -375,6 +404,7 @@ impl<'db> PositionalMatches<'db> {
         // Keep an individual match only if both the arguments before it and those after it can
         // satisfy the same constraints. Testing an edge alone would mix incompatible placements.
         let mut matched = Self::empty_matches(arguments);
+        let mut variadic_argument_matched = false;
         let mut prefix = vec![never; self.can_finish.len()];
         prefix[0] = common;
         for (index, segment) in self.segments.iter().enumerate() {
@@ -384,13 +414,15 @@ impl<'db> PositionalMatches<'db> {
                 if previous.is_trivially_never_satisfied() {
                     continue;
                 }
-                if segment.repeated {
+                if self.can_skip(index, position) {
                     prefix[self.state(index + 1, position)].union(db, constraints, previous);
                 }
                 if let Some(next) = self.next_state(index, position) {
                     let condition = previous.and(db, constraints, || edges[current]);
                     if possible(condition.and(db, constraints, || suffix[next])) {
                         segment.add_match(&mut matched, position);
+                        variadic_argument_matched |=
+                            segment.repeated && position == self.parameter_count;
                         prefix[next].union(db, constraints, condition);
                     }
                 }
@@ -400,6 +432,7 @@ impl<'db> PositionalMatches<'db> {
         Some(PositionalEvaluation {
             constraints: suffix[0],
             arguments: matched,
+            variadic_argument_matched,
         })
     }
 }

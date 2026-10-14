@@ -809,8 +809,8 @@ def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_two_different_positional_only(*args)
     takes_at_least_zero(*args)
     takes_at_least_one(*args)
-    takes_at_least_two(*args)  # error: [invalid-argument-type]
-    takes_at_least_two_positional_only(*args)  # error: [invalid-argument-type]
+    takes_at_least_two(*args)  # no diagnostic
+    takes_at_least_two_positional_only(*args)  # no diagnostic
 ```
 
 ### Subclass of mixed tuple argument
@@ -940,11 +940,9 @@ def _(args: IntStarStrInt) -> None:
 
     takes_at_least_one(*args)
 
-    # error: [invalid-argument-type]
-    takes_at_least_two(*args)
+    takes_at_least_two(*args)  # no diagnostic
 
-    # error: [invalid-argument-type]
-    takes_at_least_two_positional_only(*args)
+    takes_at_least_two_positional_only(*args)  # no diagnostic
 ```
 
 ### String argument
@@ -1482,8 +1480,7 @@ def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
 
 ### Later positional arguments and variadic parameters
 
-When the callable has a variadic parameter, we still assume the unpacked iterable fills the named
-positional parameters. Later arguments then go to the variadic parameter:
+An unpacked iterable can fill the named parameters while a later argument goes to `*args`:
 
 ```py
 def log(fmt: str, *args: object) -> None: ...
@@ -1491,16 +1488,30 @@ def _(parts: list[str]) -> None:
     log(*parts, 1)  # no diagnostic
 ```
 
-This remains a limitation: we reject calls that would succeed if the iterable were shorter. With two
-strings in `args`, `1.0` would fill `c`:
+It can also stop in time for the later argument to fill a named parameter. Here two strings leave
+`c` for `1.0`:
 
 ```py
 def v(a: str, b: str, c: float, *rest: str) -> None: ...
 def _(args: list[str]) -> None:
-    # TODO: Accept this call.
-    # error: [invalid-argument-type] "Expected `float`, found `str`"
-    # error: [invalid-argument-type] "Expected `str`"
-    v(*args, 1.0)
+    v(*args, 1.0)  # no diagnostic
+```
+
+The last unpack can fill `*rest` after the middle argument fills `text`:
+
+```py
+def g(a: int, text: str, *rest: int) -> None: ...
+def _(before: list[int], text: str, after: list[int]) -> None:
+    g(*before, text, *after)  # no diagnostic
+```
+
+When an unpacked iterable reaches a variadic parameter, we still check its element type, even though
+the iterable could be empty:
+
+```py
+def integers(*args: int) -> None: ...
+def _(strings: list[str]) -> None:
+    integers(*strings, 1)  # error: [invalid-argument-type]
 ```
 
 ### Positional arguments between variable-length unpacks
