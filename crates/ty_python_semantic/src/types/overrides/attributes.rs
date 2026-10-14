@@ -270,8 +270,10 @@ fn member_contract<'db>(
     };
     Some(MemberContract::Attribute(AttributeContract {
         read,
-        // `object` provides no instance attribute storage, so its declarations impose
-        // no write contract on subclasses.
+        // Attributes on `object` are included here because typeshed declares attributes such as
+        // `__module__: str` on `object`, which normally implies writable instance attributes. But
+        // `object()` provides no instance-attribute storage, so it does not actually guarantee
+        // writability of these attributes.
         write: if owner.is_object(db)
             || is_final
             || !is_class_var && literal.is_frozen_dataclass(db) == Some(true)
