@@ -803,8 +803,8 @@ def _(args: tuple[int, *tuple[int, ...], int]) -> None:
 def _(args: tuple[int, *tuple[str, ...], int]) -> None:
     takes_zero(*args)  # error: [too-many-positional-arguments]
     takes_one(*args)  # error: [too-many-positional-arguments]
-    takes_two(*args)  # error: [invalid-argument-type]
-    takes_two_positional_only(*args)  # error: [invalid-argument-type]
+    takes_two(*args)  # no diagnostic
+    takes_two_positional_only(*args)  # no diagnostic
     takes_two_different(*args)
     takes_two_different_positional_only(*args)
     takes_at_least_zero(*args)
@@ -930,10 +930,8 @@ def _(args: IntStarStrInt) -> None:
 
     takes_one(*args)  # error: [too-many-positional-arguments]
 
-    # error: [invalid-argument-type]
-    takes_two(*args)
-    # error: [invalid-argument-type]
-    takes_two_positional_only(*args)
+    takes_two(*args)  # no diagnostic
+    takes_two_positional_only(*args)  # no diagnostic
 
     takes_two_different(*args)
     takes_two_different_positional_only(*args)
@@ -1326,15 +1324,10 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-If no later argument is known to supply a positional value, we still assume that the first iterable
-fills every remaining positional parameter:
+With an unpacked dictionary, we still assume that the first iterable fills every remaining
+positional parameter:
 
 ```py
-# Multiple variable-length variadics are ambiguous
-def _(args1: list[str], args2: list[float]) -> None:
-    # error: [invalid-argument-type]
-    f(*args1, *args2)
-
 # Keyword variadic (**dict) with unknown keys is also ambiguous
 def _(args: list[str], kwargs: dict[str, float]) -> None:
     # error: [invalid-argument-type]
@@ -1479,6 +1472,139 @@ def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
     f(*args, 1.0)
 ```
 
+### Several variable-length positional arguments
+
+Two unpacked iterables can each supply part of the argument list:
+
+```py
+def f(a: str, b: float) -> None: ...
+def _(strings: list[str], floats: list[float]) -> None:
+    f(*strings, *floats)  # no diagnostic
+```
+
+### Positional argument between unpacked iterables
+
+The first iterable can stop in time for `text` to fill `c`, leaving the last two parameters for the
+second iterable.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3649>.
+
+```py
+def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
+def _(before: list[int], text: str, after: list[int]) -> None:
+    f(*before, text, *after)  # no diagnostic
+```
+
+The same call is accepted when the iterables have unknown types:
+
+```py
+def _(before, text: str, after) -> None:
+    f(*before, text, *after)  # no diagnostic
+```
+
+### Bound methods with unpacked positional arguments
+
+Unpacked arguments can also supply the parameters of a bound method:
+
+```py
+class C:
+    def f(self, a: int, text: str, b: int) -> None: ...
+
+def _(instance: C, before: list[int], after: list[int]) -> None:
+    instance.f(*before, "text", *after)  # no diagnostic
+```
+
+### Argument order with variable-length unpacking
+
+The arguments must still appear in parameter order. No choice of iterable lengths can put `text`
+after `number`:
+
+```py
+def ordered(a: int, b: str) -> None: ...
+def _(before, text: str, number: int, after) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    ordered(*before, text, number, *after)
+```
+
+### Variable-length unpacking with defaulted parameters
+
+An empty iterable lets `"text"` fill `a` while `b` keeps its default:
+
+```py
+def defaults(a: str, b: int = 0) -> None: ...
+def _(values: list[int]) -> None:
+    defaults(*values, "text")  # no diagnostic
+```
+
+Defaulted parameters cannot be skipped when assigning positional arguments:
+
+```py
+def gap(a: int = 0, b: str = "") -> None: ...
+def _(values: list[str]) -> None:
+    gap(*values, "text")  # error: [invalid-argument-type]
+```
+
+### Several unpacks with required tuple elements
+
+The fixed elements on either side of a variable-length tuple remain required, even when another
+unpack follows it:
+
+```py
+def f(a: int, b: bytes, c: str, d: int) -> None: ...
+def _(before: tuple[int, *tuple[int, ...], bytes], after: list[int]) -> None:
+    f(*before, "text", *after)  # no diagnostic
+```
+
+### Unpacked positional arguments with keyword arguments
+
+Unpacked positional arguments leave room for a parameter supplied by keyword:
+
+```py
+def f(a: int, text: str, b: int, c: int, *, enabled: bool) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    f(*before, "text", *after, c=1, enabled=True)  # no diagnostic
+```
+
+An incompatible keyword-only argument is still rejected:
+
+```py
+def _(values: list[int]) -> None:
+    f(*values, "text", b=1, c=1, enabled="yes")  # error: [invalid-argument-type]
+```
+
+### Callbacks between unpacked arguments
+
+An annotated callback can match the middle parameter:
+
+```py
+from collections.abc import Callable
+
+def f(a: int, callback: Callable[[str], str], b: int) -> None: ...
+def _(before: list[int], callback: Callable[[str], str], after: list[int]) -> None:
+    f(*before, callback, *after)  # no diagnostic
+```
+
+Lambdas are a known limitation: ty does not infer their parameter types from the alternative
+argument placement.
+
+```py
+def _(before: list[int], after: list[int]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f(*before, lambda text: text.upper(), *after)
+```
+
+### Collection literals between unpacked arguments
+
+A collection literal can match the middle parameter using its inferred type:
+
+```py
+def f(a: int, items: list[str], b: int) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    f(*before, ["text"], *after)  # no diagnostic
+```
+
 ### Later positional arguments and variadic parameters
 
 When the callable has a variadic parameter, we still assume the unpacked iterable fills the named
@@ -1500,20 +1626,6 @@ def _(args: list[str]) -> None:
     # error: [invalid-argument-type] "Expected `float`, found `str`"
     # error: [invalid-argument-type] "Expected `str`"
     v(*args, 1.0)
-```
-
-### Positional argument between unpacked iterables
-
-We also reject the middle-argument example from <https://github.com/astral-sh/ty/issues/3649>. The
-first iterable fills four parameters, leaving `text` to fill `e`. The call would succeed if each
-iterable supplied two integers instead:
-
-```py
-def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
-def _(before, text: str, after) -> None:
-    # TODO: Accept this call.
-    # error: [invalid-argument-type] "Expected `int`, found `str`"
-    f(*before, text, *after)
 ```
 
 ### Keyword argument, positional-or-keyword parameter

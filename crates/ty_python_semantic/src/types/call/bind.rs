@@ -9,6 +9,7 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
+mod positional;
 mod property;
 
 use std::borrow::Cow;
@@ -335,6 +336,31 @@ impl<'db> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => {
                 binding.check_types(db, env, constraints, argument_types, call_expression_tcx);
+
+                // With one non-generic signature, one valid placement is sufficient. Keep the
+                // original diagnostics unless the ordinary type checker accepts that placement.
+                let [overload] = binding.overloads.as_mut_slice() else {
+                    return;
+                };
+                if overload.errors.is_empty()
+                    || overload.constructor_context.is_some()
+                    || overload.is_partial_application
+                {
+                    return;
+                }
+                let arguments = argument_types.with_self(binding.bound_type);
+                if let Some(matches) =
+                    positional::match_arguments(db, env, &arguments, &overload.signature)
+                {
+                    let mut candidate = overload.clone();
+                    candidate.argument_matches = matches;
+                    candidate.errors.clear();
+                    candidate.parameter_tys.fill(None);
+                    candidate.check_types(db, env, &arguments, call_expression_tcx);
+                    if candidate.errors.is_empty() {
+                        *overload = candidate;
+                    }
+                }
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(
