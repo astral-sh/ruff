@@ -434,7 +434,7 @@ screenshots or recordings of your change in action.
 After opening the PR, an ecosystem report will be run as part of CI. This shows
 a diff of linter and formatter behavior before and after the changes in your PR.
 Going through these changes and reporting your findings in the PR summary or an
-additional comment help us to review your PR more efficiently. It's also a great
+additional comment helps us review your PR more efficiently. It's also a great
 way to find new test cases to incorporate into your PR if you identify any
 issues.
 
@@ -472,12 +472,13 @@ The documentation should then be available locally at
 
 ## Release Process
 
-As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub
+As of now, Ruff has an ad hoc release process: releases are cut frequently via GitHub
 Actions, which automatically generates the appropriate wheels across architectures and publishes
 them to [PyPI](https://pypi.org/project/ruff/).
 
-Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
-even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+Ruff uses a [custom versioning scheme](https://docs.astral.sh/ruff/versioning/). Breaking changes
+generally require a minor release. Patch releases can include bug fixes, backwards-compatible
+additions, and preview changes.
 
 ### Installing tools
 
@@ -506,7 +507,7 @@ review and remaining preparation steps below. To prepare the release locally, st
 
 1. The changelog should then be editorialized for consistency
 
-    - Often labels will be missing from pull requests they will need to be manually organized into the proper section
+    - Pull requests often lack labels and will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
     - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `prek`
 
@@ -1110,8 +1111,8 @@ The project root does not have a significant impact beyond that all relative pat
 configuration file are resolved relative to the project root.
 
 For example, to indicate that `bar` above is a namespace package (it isn't, but let's run with it),
-the `pyproject.toml` would list `namespace-packages = ["./src/bar"]`, which would resolve
-to `my_project/src/bar`.
+the `pyproject.toml` would list `namespace-packages = ["./src/foo/bar"]`, which would resolve
+to `my_project/src/foo/bar`.
 
 The same logic applies when providing a configuration file via `--config`. In that case, the
 _current working directory_ is used as the project root, and so all paths in that configuration file
@@ -1180,5 +1181,5 @@ There are three ways in which an import can be categorized as "first-party":
     the `src` setting and, for each directory, check for the existence of a subdirectory `foo` or a
     file `foo.py`.
 
-By default, `src` is set to the project root, along with `"src"` subdirectory in the project root.
+By default, `src` is set to the project root, along with the `"src"` subdirectory in the project root.
 This ensures that Ruff supports both flat and "src" layouts out of the box.

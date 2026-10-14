@@ -73,7 +73,8 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ## GitLab CI/CD
 
-You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format` in parallel with a `ruff check` compatible with GitLab's codequality report.
+Add the following configuration to `.gitlab-ci.yml` to run `ruff format` in parallel with
+`ruff check`, which produces a report compatible with GitLab's code quality report.
 
 ```yaml
 .base_ruff:
