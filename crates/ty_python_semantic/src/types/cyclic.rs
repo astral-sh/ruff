@@ -34,7 +34,6 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::recursive::DeferredTypeMapping;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
@@ -44,22 +43,29 @@ use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
 ///
-/// Growing aliases retain their mappings so that each mapped body is visited before a cycle closes.
+/// Alias identities omit their deferred mappings; growing aliases also omit their arguments.
+/// The original types retain both for equality checks and cached results.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
     GrowingProtocol(Definition<'db>),
-    GrowingTypeAlias(Definition<'db>, Option<DeferredTypeMapping<'db>>),
+    GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
-    GrowingRecursive(Definition<'db>, Option<DeferredTypeMapping<'db>>),
+    GrowingRecursive(Definition<'db>),
     Other(Type<'db>),
 }
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
-        self.recursive_identity(db)
-            .unwrap_or(TypeIdentity::Other(self))
+        if let Some(identity) = self.recursive_identity(db) {
+            return identity;
+        }
+        TypeIdentity::Other(match self {
+            Type::TypeAlias(alias) => Type::TypeAlias(alias.with_mappings(db, None)),
+            Type::Recursive(alias) => Type::Recursive(alias.with_mappings(db, None)),
+            _ => self,
+        })
     }
 
     /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
@@ -112,19 +118,12 @@ impl<'db> Type<'db> {
                     return None;
                 }
                 let definition = target.definition(db);
-                let mappings = match self {
-                    Type::TypeAlias(alias) => alias.mappings(db),
-                    Type::Recursive(alias) => alias.mappings(db),
-                    _ => None,
-                };
                 Some(match target {
-                    RecursiveDefinition::TypeAlias(_) => {
-                        TypeIdentity::GrowingTypeAlias(definition, mappings)
-                    }
+                    RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
                     RecursiveDefinition::Structural(_) => {
-                        TypeIdentity::GrowingRecursive(definition, mappings)
+                        TypeIdentity::GrowingRecursive(definition)
                     }
                 })
             }

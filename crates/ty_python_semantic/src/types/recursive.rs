@@ -783,7 +783,11 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Replace the deferred mapping sequence without changing the recursive body or arguments.
-    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
+    pub(super) fn with_mappings(
+        self,
+        db: &'db dyn Db,
+        mappings: Option<DeferredTypeMapping<'db>>,
+    ) -> Self {
         Self::new_internal(
             db,
             self.definition(db),

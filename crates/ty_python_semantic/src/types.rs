@@ -9208,7 +9208,7 @@ impl<'db> Type<'db> {
                                     };
                                     // Identity analysis can itself expand aliases, so establish the
                                     // exact-alias guard before checking for growing specializations.
-                                    if let TypeIdentity::GrowingTypeAlias(definition, _) =
+                                    if let TypeIdentity::GrowingTypeAlias(definition) =
                                         Type::TypeAlias(alias).to_type_identity(db)
                                     {
                                         context.meta_type.growing_aliases.visit(
