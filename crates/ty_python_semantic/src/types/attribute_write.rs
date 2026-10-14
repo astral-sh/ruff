@@ -760,7 +760,7 @@ fn class_fallback_write_requirement<'db>(
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
     let ty = ty.bind_self_typevars(db, env, class_attr_self_ty);
-    let ty = if matches!(object_ty, Type::ClassLiteral(_))
+    let ty = if matches!(object_ty, Type::ClassLiteral(_) | Type::SubclassOf(_))
         && let Type::FunctionLiteral(function) = ty
         && function.callable_type_kind(db) == CallableTypeKind::FunctionLike
     {

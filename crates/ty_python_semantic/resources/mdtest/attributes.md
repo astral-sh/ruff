@@ -1505,6 +1505,55 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
+## Replacing methods through a subclass receiver
+
+Method replacement through `type[Base]` follows the same rules as replacement on a concrete class.
+This includes `cls` in `__init_subclass__`.
+
+```py
+class Base:
+    def method(self, value: int) -> str:
+        return str(value)
+
+    def __init_subclass__(cls):
+        def replacement(self: Base, value: int) -> str:
+            return str(value)
+
+        cls.method = replacement  # no diagnostic
+
+class Child(Base): ...
+```
+
+An explicit class parameter accepts a compatible replacement. It still rejects an incompatible
+return type or a replacement that only accepts one particular subclass.
+
+```py
+def replacement(self: Base, value: int) -> str:
+    return str(value)
+
+def incompatible(self: Base, value: int) -> int:
+    return value
+
+def child_only(self: Child, value: int) -> str:
+    return str(value)
+
+def patch(cls: type[Base]) -> None:
+    cls.method = replacement  # no diagnostic
+    cls.method = incompatible  # error: [invalid-assignment]
+    cls.method = child_only  # error: [invalid-assignment]
+```
+
+The method signature also supplies lambda parameter types.
+
+```py
+def patch_lambda(cls: type[Base]) -> None:
+    cls.method = lambda self, value: str(value.bit_length())  # no diagnostic
+    cls.method = lambda self, value: value.upper()  # error: [unresolved-attribute]
+    cls.method = lambda self, value: value  # error: [invalid-assignment]
+```
+
+## Replacing decorated methods
+
 `staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
 replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
 `DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
