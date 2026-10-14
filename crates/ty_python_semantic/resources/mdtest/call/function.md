@@ -1242,15 +1242,54 @@ def _(args: list[int] | tuple[int]) -> None:
     one(*args, 1)  # no diagnostic
 ```
 
-When a tuple union is followed by another positional argument, we currently combine its element
-types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
-an error for both `a` and `b`, even though only `b` can receive a `str`:
+Each member of an unpacked tuple union can place a later argument at a different parameter. Both
+members below leave a string parameter for `"text"`:
 
 ```py
-def f(a: int, b: int, c: int = 0) -> None: ...
-def _(args: tuple[int] | tuple[int, str]) -> None:
+def strings(a: int, b: str, c: str = "") -> None: ...
+def _(values: tuple[int] | tuple[int, str]) -> None:
+    strings(*values, "text")  # no diagnostic
+```
+
+Every member must produce a valid call. The `tuple[int]` member fits this signature, but
+`tuple[int, str]` does not:
+
+```py
+def integers(a: int, b: int, c: int = 0) -> None: ...
+def _(values: tuple[int] | tuple[int, str]) -> None:
     # error: [invalid-argument-type]
-    f(*args, 1)  # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    integers(*values, 1)
+```
+
+When another iterable is also unpacked, it must leave room for all required elements of each tuple:
+
+```py
+def f(a: int, text: str, b: int, c: int = 0) -> None: ...
+def _(before: list[int], text: str, after: tuple[int] | tuple[int, int]) -> None:
+    f(*before, text, *after)  # no diagnostic
+```
+
+Either tuple leaves a parameter of type `Payload` for an already-typed dictionary:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    count: int
+
+def contextual(a: int, b: Payload, c: Payload | None = None) -> None: ...
+def _(values: tuple[int] | tuple[int, Payload], payload: Payload) -> None:
+    contextual(*values, payload)  # no diagnostic
+```
+
+A dictionary literal keeps ordinary matching because its type can depend on the parameter context:
+
+```py
+def _(values: tuple[int] | tuple[int, Payload]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    contextual(*values, {"count": 1})
 ```
 
 ### Mixed argument and parameter containing variadic
@@ -1651,6 +1690,18 @@ def _(before: list[int], after: list[int]) -> None:
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     class_first(Box, *before, "text", *after)
+```
+
+`TypeForm` parameters retain ordinary matching because their context can make a string literal a
+type expression:
+
+```py
+from typing_extensions import TypeForm
+
+def type_form(hint: TypeForm[int], other: str = "") -> None: ...
+def _(values: list[str]) -> None:
+    type_form("int", *values)  # no diagnostic
+    type_form("int", *values, "text")  # no diagnostic
 ```
 
 ### Keyword argument, positional-or-keyword parameter

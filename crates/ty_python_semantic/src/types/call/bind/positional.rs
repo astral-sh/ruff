@@ -69,6 +69,24 @@ pub(super) struct PositionalEvaluation<'db, 'c> {
 }
 
 impl<'db> PositionalMatches<'db> {
+    /// Whether argument types are available without provisional inference or `TypeForm` context.
+    pub(super) fn supports_arguments(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        parameters: &Parameters<'db>,
+    ) -> bool {
+        arguments.iter().all(|argument| {
+            argument.source_type().is_some_and(|ty| !ty.has_provisional_marker(db, env))
+        })
+            // A name or string literal can become a type expression in a `TypeForm` context.
+            && !parameters.iter().any(|parameter| {
+                any_over_type(db, env, parameter.annotated_type(), false, |ty| {
+                    matches!(ty, Type::TypeForm(_))
+                })
+            })
+    }
+
     /// Builds the possible placements from argument lengths, before checking their types.
     ///
     /// Returns `None` when the ordinary matcher should handle the call, including unsupported
@@ -81,15 +99,7 @@ impl<'db> PositionalMatches<'db> {
         parameters: &Parameters<'db>,
         explicit_keywords: &FxHashSet<usize>,
     ) -> Option<Self> {
-        if arguments.iter().any(|argument| {
-                argument.source_type().is_none_or(|ty| ty.has_provisional_marker(db, env))
-            })
-            // A name or string literal can become a type expression in a `TypeForm` context.
-            || parameters.iter().any(|parameter| {
-                any_over_type(db, env, parameter.annotated_type(), false, |ty| {
-                    matches!(ty, Type::TypeForm(_))
-                })
-            })
+        if !Self::supports_arguments(db, env, arguments, parameters)
             || parameters
                 .variadic()
                 .is_some_and(|(_, parameter)| parameter.has_starred_annotation())

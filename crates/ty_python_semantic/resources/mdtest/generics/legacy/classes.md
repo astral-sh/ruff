@@ -1109,6 +1109,83 @@ def _(before: list[list[str]], value: list[int]) -> None:
     valid: Box[int] | Box[str] = result  # no diagnostic
 ```
 
+### Tuple unions in `__init__`
+
+We do not yet match each member of a tuple union separately for a constructor with one signature.
+Both tuples below could produce a valid call, but their combined element type does not fit the first
+two parameters.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: list[T], b: str, c: str = ""):
+        self.value = value
+
+def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
+    # TODO: Accept this call and infer Box[int] | Box[str].
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Box(*values, "text")
+```
+
+### Tuple unions in `__new__` returning a subclass
+
+The same limitation applies when `__new__` has its own type parameter and returns a subclass. Each
+tuple would construct a different specialization of `Sub`.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Base(Generic[T]):
+    def __new__(cls, value: list[U], b: str, c: str = "") -> "Sub[U]":
+        return object.__new__(Sub)
+
+    def __init__(self, value: list[T], b: str, c: str = ""):
+        self.value = value
+
+class Sub(Base[T]): ...
+
+def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
+    # TODO: Accept this call and infer Sub[int] | Sub[str].
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Base(*values, "text")
+```
+
+### Tuple unions with overloaded `__new__`
+
+An overloaded `__new__` can check the tuple members separately, but the single `__init__` signature
+still rejects the combined element type.
+
+```py
+from typing import Generic, Self, TypeVar, overload
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    @overload
+    def __new__(cls, value: list[T], b: str, c: str = "") -> Self: ...
+    @overload
+    def __new__(cls, value: int, b: int) -> "Box[int]": ...
+    def __new__(cls, value, b, c=""):
+        return super().__new__(cls)
+
+    def __init__(self, value: list[T] | int, b: str | int, c: str = ""):
+        self.value = value
+
+def _(values: tuple[list[int]] | tuple[list[str], str]) -> None:
+    # TODO: Accept this call and infer Box[int] | Box[str].
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Box(*values, "text")
+```
+
 ### Passing Self to a NamedTuple-bounded constructor
 
 A `NamedTuple` bound also allows passing `self` to a constructor parameter annotated with `Self`.

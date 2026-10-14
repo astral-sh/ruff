@@ -3962,9 +3962,19 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
+        // Constructor inference still needs one specialization for the entire method chain.
+        // Preserve its existing expansion rules until it can retain every expanded result.
+        let positions_can_change =
+            self.can_expand_positional_alternatives(db, env, &call_arguments)
+                && argument_expansions.has_expandable_variadic();
         let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
-            .should_retry_after_provisional_arity(&argument_expansions)
+            .should_retry_after_provisional_arity(db, env, &call_arguments, &argument_expansions)
         {
+            if let [overload] = self.overloads.as_mut_slice() {
+                // Preserve the ordinary call's type diagnostics if none of the expanded
+                // argument lists succeeds.
+                overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            }
             // We will retry all overloads after argument expansion.
             (true, (0..self.overloads.len()).collect())
         } else {
@@ -3988,7 +3998,14 @@ impl<'db> CallableBinding<'db> {
                         call_arguments.as_ref(),
                         call_expression_tcx,
                     );
-                    return;
+                    if !self.overloads[index].has_errors_affecting_overload_resolution()
+                        || !positions_can_change
+                    {
+                        return;
+                    }
+                    // A single signature can also require different placements for the
+                    // members of an unpacked tuple union. Every expanded call must succeed.
+                    (false, vec![index])
                 }
                 MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
             }
@@ -4079,7 +4096,10 @@ impl<'db> CallableBinding<'db> {
         for (argument_index, call_argument) in call_arguments.iter().enumerate() {
             let argument = call_argument.kind();
             // TODO: Remove `Keywords` once `**kwargs` support is added
-            if matches!(argument, Argument::Synthetic | Argument::Keywords) {
+            if positions_can_change || matches!(argument, Argument::Synthetic | Argument::Keywords)
+            {
+                // An unpacked union can move later arguments to different parameters, so
+                // their provisional matches cannot rule out all expanded calls.
                 continue;
             }
             // TODO: For types inferred multiple times with distinct type context, we currently only
@@ -4302,18 +4322,46 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_provisional_arity(&call_arguments.expansions(db, env)) {
+        if self.should_retry_after_provisional_arity(
+            db,
+            env,
+            call_arguments,
+            &call_arguments.expansions(db, env),
+        ) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
         }
     }
 
+    /// Single-signature expansion can move arguments only when their types are independent of
+    /// those positions. Constructors retain their existing expansion rules.
+    fn can_expand_positional_alternatives(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+    ) -> bool {
+        self.argument_matching_mode == ArgumentMatchingMode::PositionalAlternatives
+            && self.overloads.iter().all(|overload| {
+                overload.constructor_context.is_none()
+                    && PositionalMatches::supports_arguments(
+                        db,
+                        env,
+                        arguments,
+                        overload.signature.parameters(),
+                    )
+            })
+    }
+
     fn should_retry_after_provisional_arity(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
         expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
-        self.overloads.len() > 1
+        (self.overloads.len() > 1 || self.can_expand_positional_alternatives(db, env, arguments))
             && self.matching_overloads().count() < self.overloads.len()
             && expansions.has_expandable_variadic()
     }
@@ -9052,7 +9100,7 @@ struct CallableBindingSnapshotter(Vec<usize>);
 impl CallableBindingSnapshotter {
     /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
-        debug_assert!(indexes.len() > 1);
+        debug_assert!(!indexes.is_empty());
         CallableBindingSnapshotter(indexes)
     }
 
