@@ -107,7 +107,7 @@ impl Support {
     }
 
     /// Returns whether this support contains any typevars that are not in `other`.
-    fn contains_more_than(&self, other: &Self) -> bool {
+    pub(super) fn contains_more_than(&self, other: &Self) -> bool {
         let lhs = self.iter_chunks();
         let rhs = std::iter::chain(other.iter_chunks(), std::iter::repeat(0));
         std::iter::zip(lhs, rhs).any(|(lhs, rhs)| (lhs & !rhs) != 0)

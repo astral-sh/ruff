@@ -836,11 +836,29 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
         let mut storage = builder.storage.borrow_mut();
-        let to_remove = Support::from_typevar_set(db, &mut storage, to_remove);
+        let to_remove_support = Support::from_typevar_set(db, &mut storage, to_remove);
+        // A body mentioning only its fresh locals cannot constrain the surrounding BDD. Evaluate
+        // it once here instead of repeatedly during solution extraction. Declared upper bounds and
+        // constraints are checked later and can mention additional typevars that are not in the
+        // body's support, so leave those on the normal validation path.
+        // TODO: If we start calcaluting support so that it includes any typevars mentioned in
+        // declared upper bounds and constraints, we'll only need the contains_more_than check.
+        if let Some(body_support) = storage.node_support(self.node)
+            && body_support.is_complete()
+            && !body_support.contains_more_than(&to_remove_support)
+            && to_remove
+                .iter(db)
+                .all(|typevar| typevar.typevar(db).bound_or_constraints(db, env).is_none())
+        {
+            drop(storage);
+            let body_is_satisfiable = !self.is_never_satisfied(db, env, TypeVarSet::None);
+            return Self::from_bool(builder, body_is_satisfiable);
+        }
+
         let Some(existential) = ExistentialBound::new(
             &storage,
             ConstraintProvenance::Evidence,
-            to_remove,
+            to_remove_support,
             self.node,
             self.source_order,
         ) else {
