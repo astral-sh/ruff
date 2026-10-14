@@ -1815,6 +1815,8 @@ from typing import Any
 from overloaded import union_arguments, optional
 
 def _(value: Any):
+    # A union-aware merge could infer list[int | Unknown], but we currently don't attempt to
+    # find the common structure of two unions.
     reveal_type(union_arguments(value))  # revealed: list[Unknown]
     reveal_type(optional(value))  # revealed: Unknown
 ```
