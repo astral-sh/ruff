@@ -676,14 +676,15 @@ info: This violates the Liskov Substitution Principle
 
 ## `ClassVar` and instance variables
 
-A `ClassVar` cannot replace an attribute that permits writes through instances. Conversely, subclass
-declarations preserve a base class's explicit `ClassVar` qualifier.
+A `ClassVar` cannot replace an attribute that permits writes through instances. We allow a nominal
+subclass to omit `ClassVar` from a class-body annotation: the resulting regular attribute permits
+all the class operations of the base and also permits writes through instances.
 
 ### Direct overrides
 
-A class-body annotation without `ClassVar` declares a regular attribute, even when it has a
-class-level default. An explicit `ClassVar` declaration restricts writes to the class object.
-Changing between these two kinds is an invalid override:
+A class-body annotation without `ClassVar` declares a regular attribute. An explicit `ClassVar`
+declaration restricts writes to the class object. Replacing a regular attribute with a `ClassVar`
+therefore removes an operation available on the base class:
 
 ```py
 from typing import ClassVar
@@ -700,8 +701,7 @@ class Subclass(Base):
     # error: [invalid-attribute-override] "class variable cannot override instance variable `Base.instance_attr_with_default`"
     instance_attr_with_default: ClassVar[int] = 1
 
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
-    class_attr: int
+    class_attr: int  # no diagnostic
 
 class ValidSubclass(Base):
     instance_attr: int
@@ -709,22 +709,23 @@ class ValidSubclass(Base):
     class_attr: ClassVar[int] = 1
 ```
 
-The same rule applies when the annotation has a default value.
+Omitting `ClassVar` is also allowed when the annotation has a default value.
 
 ```py
 class WithDefault(Base):
-    class_attr: int = 1  # error: [invalid-attribute-override]
+    class_attr: int = 1  # no diagnostic
 ```
 
-Changing the qualifier takes precedence over read and write type incompatibilities.
+The attribute's type must still be compatible. An unrelated type fails the read check, and narrowing
+to `bool` fails the mutable-override check.
 
 ```py
 class Incompatible(Base):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+    # error: [invalid-attribute-override] "Type `str` is not assignable to inherited type `int`"
     class_attr: str
 
 class Narrow(Base):
-    class_attr: bool  # error: [invalid-attribute-override]
+    class_attr: bool  # error: [invalid-mutable-override]
 ```
 
 ### Annotations in methods
@@ -860,13 +861,13 @@ class Logs(Pile, LayoutWidget):
 ```
 
 An explicit annotation or a receiver assignment still establishes its own storage contract, even if
-another base is unknown. A known inherited annotation also remains authoritative when it occurs
-before the dynamic base.
+another base is unknown. The regular attribute provides class storage and can replace a nominal
+`ClassVar`; the receiver-only assignment removes that storage and is rejected. A known inherited
+annotation remains authoritative when it occurs before the dynamic base.
 
 ```py
 class Explicit(Any, LayoutWidget):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable"
-    keyctx: str = "commands"
+    keyctx: str = "commands"  # no diagnostic
 
 class Receiver(Any, LayoutWidget):
     def __init__(self) -> None:
@@ -877,27 +878,26 @@ class Regular:
     keyctx: str = ""
 
 class KnownFirst(Regular, Any, LayoutWidget):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable"
-    keyctx = "commands"
+    keyctx = "commands"  # no diagnostic
 
 class InferredRegular:
     keyctx = "commands"
 
 # A known default without an annotation masks later declarations. It is not an unknown base.
 class KnownDefaultFirst(InferredRegular, Any, LayoutWidget):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable"
-    keyctx = "commands"
+    keyctx = "commands"  # no diagnostic
 
 class ExplicitMixin(Any):
     keyctx: str = "commands"
 
-class StillConflicting(ExplicitMixin, LayoutWidget): ...  # error: [invalid-attribute-override]
+class RegularMixin(ExplicitMixin, LayoutWidget): ...  # no diagnostic
 ```
 
 ### Repeated inherited conflicts
 
-When a parent already changed between an instance attribute and a `ClassVar`, a subclass keeping the
-parent's declaration does not receive the same error again.
+Once a parent replaces an instance attribute with a `ClassVar`, a subclass that keeps the `ClassVar`
+does not receive the same error again. A regular attribute over a base `ClassVar` is valid
+throughout the hierarchy.
 
 ```py
 from typing import ClassVar
@@ -906,8 +906,7 @@ class GrandparentClassVar:
     attr: ClassVar[int]
 
 class ParentInstance(GrandparentClassVar):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `GrandparentClassVar.attr`"
-    attr: int
+    attr: int  # no diagnostic
 
 class ChildInstance(ParentInstance):
     attr: int  # no diagnostic
@@ -952,8 +951,8 @@ class DescriptorAnnotationOverride(DescriptorAnnotationBase):
 
 ### Multiple inheritance
 
-The subclass must satisfy both bases. An explicit regular attribute cannot replace a `ClassVar` from
-another base, even when it agrees with the first base.
+An explicit class-body annotation can permit instance writes while retaining the type of an
+inherited class variable. This satisfies both base classes.
 
 ```py
 from typing import ClassVar
@@ -965,16 +964,15 @@ class InstanceBase:
     attr: int
 
 class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
-    # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
-    attr: int
+    attr: int  # no diagnostic
 ```
 
-Without an explicit annotation, the first base supplies the attribute. Either order creates a
-conflict with the other base.
+Without an explicit annotation, the first base supplies the attribute. A `ClassVar` from the first
+base removes the instance writes permitted by the other base; the reverse order is valid.
 
 ```py
 class ClassFirst(ClassVarBase, InstanceBase): ...  # error: [invalid-attribute-override]
-class InstanceFirst(InstanceBase, ClassVarBase): ...  # error: [invalid-attribute-override]
+class InstanceFirst(InstanceBase, ClassVarBase): ...  # no diagnostic
 ```
 
 Ordinary classes do not merge an attribute named `model_config`. The same inherited storage check
