@@ -486,5 +486,39 @@ help: Add `thing_id` to function signature
 370 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
 371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+372 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `item_id` appears in route path, but not in `get_item_assigned_depends` signature
+   --> FAST003.py:382:18
+    |
+381 | # OK: `AssignedDepends` resolves to `Depends(find_item_by_id)`, which accepts `item_id`.
+382 | @app.get("/items/{item_id}")
+    |                  ^^^^^^^^^
+383 | async def get_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
+    |
+help: Add `item_id` to function signature
+    |
+382 | @app.get("/items/{item_id}")
+    - async def get_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
+383 + async def get_item_assigned_depends(item: Annotated[str, AssignedDepends], item_id): ...
+384 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `other_id` appears in route path, but not in `get_other_item_assigned_depends` signature
+   --> FAST003.py:386:18
+    |
+385 | # Error: `AssignedDepends` covers `item_id`, not `other_id`.
+386 | @app.get("/items/{other_id}")
+    |                  ^^^^^^^^^^
+387 | async def get_other_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
+    |
+help: Add `other_id` to function signature
+    |
+386 | @app.get("/items/{other_id}")
+    - async def get_other_item_assigned_depends(item: Annotated[str, AssignedDepends]): ...
+387 + async def get_other_item_assigned_depends(item: Annotated[str, AssignedDepends], other_id): ...
     |
 note: This is an unsafe fix and may change runtime behavior
