@@ -49,7 +49,9 @@ use crate::place_load::{
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
+use crate::types::attribute_write::{
+    AssignmentAttributeMembers, assignment_attribute_members, nested_class_instance_override,
+};
 use crate::types::call::bind::{
     ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
     requires_overload_evaluation,
@@ -3196,6 +3198,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeForm(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
+                if object_ty
+                    .member(db, env, attribute)
+                    .qualifiers
+                    .contains(TypeQualifiers::NESTED_CLASS)
+                    && nested_class_instance_override(db, env, object_ty, attribute, None).is_none()
+                {
+                    if emit_diagnostics
+                        && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot delete read-only attribute `{attribute}` on type `{}`",
+                            object_ty.display(db, env),
+                        ));
+                    }
+                    return false;
+                }
                 let frozen_dataclass_dispatch = object_ty
                     .nominal_class(db, env)
                     .and_then(|class| class.static_class_literal(db))
@@ -4496,6 +4514,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(target, TypeContext::default());
             if let ast::Expr::Attribute(target) = target.as_ref() {
                 self.report_undeclared_protocol_attribute(target);
+            }
+
+            if let (Some(value), Some(value_ty), ast::Expr::Attribute(target)) =
+                (value.as_deref(), value_ty, target.as_ref())
+                && let object_ty = self.expression_type(&target.value)
+                && object_ty
+                    .member(db, env, target.attr.as_str())
+                    .qualifiers
+                    .contains(TypeQualifiers::NESTED_CLASS)
+            {
+                self.validate_attribute_assignment(
+                    target,
+                    value,
+                    object_ty,
+                    target.attr.as_str(),
+                    &mut |_, _| value_ty,
+                    true,
+                );
             }
 
             // For annotated assignments like `self.x: Final[int] = 1`, the `Final` qualifier

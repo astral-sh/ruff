@@ -18,13 +18,14 @@ use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionCons
 use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
 use super::{
-    BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    BindingContext, ClassBase, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    Parameter, PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping,
+    TypeQualifiers, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_symbol,
+    place_from_bindings,
 };
 
 /// The operation required to write an attribute.
@@ -513,13 +514,103 @@ fn instance_attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
+    let member = if object_ty
+        .class_member(db, env, attribute)
+        .qualifiers
+        .contains(TypeQualifiers::NESTED_CLASS)
+    {
+        let Some(member) = nested_class_instance_override(db, env, object_ty, attribute, receiver)
+        else {
+            return AttributeWriteRequirement::CannotAssign;
+        };
+        InstanceAttributeWriteMember::Instance(instance_fallback_write_requirement(
+            db, env, object_ty, attribute, member, receiver,
+        ))
+    } else {
+        instance_attribute_write_member_requirement(db, env, object_ty, attribute, receiver)
+    };
     AttributeWriteRequirement::Instance {
         object_ty,
         receiver,
-        member: instance_attribute_write_member_requirement(
-            db, env, object_ty, attribute, receiver,
-        ),
+        member,
     }
+}
+
+/// Return a receiver annotation that redeclares an inherited nested class as instance storage.
+/// Class objects use receiver annotations declared on their metaclass.
+///
+/// A subclass can add writes while preserving the inherited read type:
+///
+/// ```python
+/// class Base:
+///     class Meta: ...
+///
+/// class Child(Base):
+///     def __init__(self):
+///         self.Meta: type[Base.Meta] = Base.Meta
+/// ```
+///
+/// A nearer nested class definition restores the read-only contract, including when the receiver
+/// annotation and nested class definition belong to the same class.
+pub(super) fn nested_class_instance_override<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    attribute: &str,
+    receiver: Option<Type<'db>>,
+) -> Option<PlaceAndQualifiers<'db>> {
+    if !object_ty
+        .class_member(db, env, attribute)
+        .qualifiers
+        .contains(TypeQualifiers::NESTED_CLASS)
+    {
+        return None;
+    }
+
+    let class = match object_ty {
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            if object_ty
+                .find_name_in_mro(db, env, attribute)
+                .is_some_and(|member| member.is_read_only())
+            {
+                return None;
+            }
+            object_ty
+                .to_meta_type(db, env)
+                .to_instance_approximation(db, env)?
+                .nominal_class(db, env)?
+        }
+        _ => object_ty.nominal_class(db, env)?,
+    };
+    for owner in class.iter_mro(db).filter_map(ClassBase::into_class) {
+        let class_member = owner.own_class_member(db, env, None, attribute).inner;
+        if class_member
+            .qualifiers
+            .intersects(TypeQualifiers::NESTED_CLASS | TypeQualifiers::CLASS_VAR)
+        {
+            return None;
+        }
+        let member = owner.own_instance_member(db, env, attribute).inner;
+        if matches!(
+            member.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Declared,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
+        ) {
+            return Some(member.map_type(|ty| {
+                bind_attribute_self_typevars(
+                    db,
+                    env,
+                    ty,
+                    Type::instance(db, env, owner),
+                    Some(receiver.unwrap_or(object_ty)),
+                )
+            }));
+        }
+    }
+    None
 }
 
 /// Resolve the declared member that governs an instance attribute write.
@@ -647,6 +738,22 @@ fn class_attribute_write_requirement<'db>(
             };
         }
     };
+
+    if type_member
+        .qualifiers
+        .contains(TypeQualifiers::NESTED_CLASS)
+    {
+        let Some(member) = nested_class_instance_override(db, env, object_ty, attribute, None)
+        else {
+            return AttributeWriteRequirement::CannotAssign;
+        };
+        return AttributeWriteRequirement::Class {
+            object_ty,
+            member: ClassAttributeWriteMember::ClassAttribute(instance_fallback_write_requirement(
+                db, env, object_ty, attribute, member, None,
+            )),
+        };
+    }
 
     let member = match type_member {
         PlaceAndQualifiers {

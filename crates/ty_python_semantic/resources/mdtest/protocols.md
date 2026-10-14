@@ -2304,6 +2304,79 @@ as something that must be supported by type checkers:
 > To distinguish between protocol class variables and protocol instance variables, the special
 > `ClassVar` annotation should be used.
 
+## Nested class members
+
+### Access through protocol receivers
+
+A nested class declares a read-only member on both the protocol instance and its class. An
+implementation can provide a subclass of that nested class, so these accesses expose `type[Meta]`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class HasMeta(Protocol):
+    class Meta: ...
+
+class Implementation:
+    class Meta(HasMeta.Meta): ...
+
+static_assert(is_subtype_of(Implementation, HasMeta))
+static_assert(is_subtype_of(TypeOf[Implementation], type[HasMeta]))
+
+def access(obj: HasMeta, cls: type[HasMeta]) -> None:
+    reveal_type(obj.Meta)  # revealed: type[Meta]
+    reveal_type(cls.Meta)  # revealed: type[Meta]
+    obj.Meta = HasMeta.Meta  # error: [invalid-assignment]
+    cls.Meta = HasMeta.Meta  # error: [invalid-assignment]
+    del obj.Meta  # error: [invalid-assignment]
+    del cls.Meta  # error: [invalid-assignment]
+```
+
+A property returning the right class type satisfies instance reads, but class access returns the
+property itself. Such an implementation does not satisfy the nested class member's contract.
+
+```py
+class PropertyImplementation:
+    @property
+    def Meta(self) -> type[HasMeta.Meta]:
+        return HasMeta.Meta
+
+static_assert(not is_subtype_of(PropertyImplementation, HasMeta))
+static_assert(not is_subtype_of(TypeOf[PropertyImplementation], type[HasMeta]))
+```
+
+### Implementing readable and writable members
+
+A nested class can implement a read-only property returning its class type. It cannot implement a
+writable attribute or `ClassVar`, because those protocols permit replacing the class object.
+
+```py
+from typing import ClassVar, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to, is_subtype_of
+
+class Namespace:
+    class Meta: ...
+
+class Readable(Protocol):
+    @property
+    def Meta(self) -> type[Namespace.Meta]: ...
+
+class Writable(Protocol):
+    Meta: type[Namespace.Meta]
+
+class ClassWritable(Protocol):
+    Meta: ClassVar[type[Namespace.Meta]]
+
+static_assert(is_subtype_of(Namespace, Readable))
+static_assert(is_subtype_of(TypeOf[Namespace], Readable))
+static_assert(not is_assignable_to(Namespace, Writable))
+static_assert(not is_assignable_to(TypeOf[Namespace], Writable))
+static_assert(not is_assignable_to(Namespace, ClassWritable))
+```
+
 ## Declared instance attribute members
 
 Declared protocol instance attributes should be available both on protocol-typed values and through

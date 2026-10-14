@@ -1,8 +1,10 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::place::TypeOrigin;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    StaticClassLiteral, SubclassOfType, Type, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypingModule, UnionType,
     function::{KnownFunction, OverloadLiteral},
     infer::{
         TypeInferenceBuilder,
@@ -13,7 +15,10 @@ use crate::types::{
 };
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
-use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
+use ty_python_core::{
+    definition::Definition,
+    scope::{NodeWithScopeRef, ScopeKind},
+};
 
 enum ClassDecoratorApplication<'db> {
     Ordinary(Option<(Type<'db>, ClassDecoratorResult<'db>)>),
@@ -416,10 +421,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.undecorated_type = undecorated_ty;
 
+        let qualifiers =
+            if self.index.scope(self.scope().file_scope_id(db)).kind() == ScopeKind::Class {
+                TypeQualifiers::NESTED_CLASS
+            } else {
+                TypeQualifiers::empty()
+            };
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
+            &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::new(
+                inferred_ty,
+                TypeOrigin::Inferred,
+                qualifiers,
+            )),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope

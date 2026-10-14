@@ -2801,6 +2801,60 @@ error[invalid-attribute-override]: Invalid override of attribute `value`
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
+## Nested class overrides
+
+A nested class is a read-only attribute. A subclass can override it with a subclass of the nested
+class, even when mutable attribute narrowing is rejected. An unrelated nested class remains an
+incompatible override.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+class Base:
+    class Inner: ...
+
+class Compatible(Base):
+    class Inner(Base.Inner): ...  # no diagnostic
+
+class Incompatible(Base):
+    class Inner: ...  # error: [invalid-attribute-override]
+```
+
+Making the attribute writable preserves the operations promised by the read-only base.
+
+```py
+class Writable(Base):
+    Inner: type[Base.Inner] = Base.Inner  # no diagnostic
+```
+
+The override also preserves class access. A property returning a compatible class on instances does
+not satisfy that requirement, since accessing it on the class returns the property object.
+
+```py
+class PropertyOverride(Base):
+    @property
+    def Inner(self) -> type[Base.Inner]:  # error: [invalid-property-type-override]
+        return Base.Inner
+```
+
+## Nested classes overriding writable attributes
+
+A nested class cannot replace a writable attribute: the override removes writes permitted by the
+base, even when its readable type is compatible.
+
+```py
+class Inner: ...
+
+class Base:
+    Nested: type[Inner]
+
+class ReadOnly(Base):
+    class Nested(Inner): ...  # error: [invalid-attribute-override]
+```
+
 ## Annotated attributes with class defaults
 
 A class-body default does not erase an annotation's contract. Both the default and a later instance
