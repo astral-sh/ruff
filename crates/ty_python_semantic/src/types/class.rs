@@ -2833,6 +2833,8 @@ pub(crate) enum FieldKind<'db> {
         alias: Option<Box<str>>,
         /// The mode selected by Pydantic's `strict` argument.
         strict: pydantic::ConfigBoolean,
+        /// Whether `Field(frozen=True)` forbids assigning to this field.
+        frozen: bool,
     },
     /// `TypedDict` field metadata
     TypedDict {

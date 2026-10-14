@@ -150,7 +150,7 @@ pub(super) fn instance_attribute_write_is_blocked<'db>(
     setattr_result: &Result<Bindings<'db>, CallDunderError<'db>>,
     frozen_dataclass_dispatch: Option<FrozenDataclassDispatch<'db>>,
 ) -> bool {
-    match pydantic::setattr_behavior(db, env, object_ty) {
+    match pydantic::setattr_behavior(db, env, object_ty, attribute) {
         Some(pydantic::SetAttrBehavior::Frozen) => {
             !(matches!(member, InstanceAttributeWriteMember::Explicit { .. })
                 && pydantic::is_private_attribute(attribute))

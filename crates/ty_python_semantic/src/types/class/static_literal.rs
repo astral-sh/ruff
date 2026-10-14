@@ -1778,6 +1778,7 @@ impl<'db> StaticClassLiteral<'db> {
                         default_ty,
                         alias,
                         strict,
+                        ..
                     } => (*init, *default_ty, None, alias.as_ref(), None, *strict),
                     FieldKind::TypedDict { .. } => continue,
                 };
@@ -2712,6 +2713,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut alias = None;
                 let mut converter = None;
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
+                let mut frozen = false;
                 if field_policy.is_pydantic() {
                     let metadata =
                         pydantic::field_metadata(db, first_declaration, default_ty, specialization);
@@ -2719,6 +2721,7 @@ impl<'db> StaticClassLiteral<'db> {
                     init = metadata.init;
                     alias = metadata.alias;
                     strict = metadata.strict;
+                    frozen = metadata.frozen.is_enabled();
                 } else if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) =
                     default_ty
                 {
@@ -2745,6 +2748,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init: init && !pydantic::is_private_attribute(symbol.name()),
                         alias,
                         strict,
+                        frozen,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {

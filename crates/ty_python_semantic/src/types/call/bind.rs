@@ -2057,6 +2057,18 @@ impl<'db> Bindings<'db> {
                                 }
                             },
                         );
+                        // Unlike `strict=None`, `Field(frozen=None)` is an explicit value that
+                        // leaves the field mutable and overrides an earlier `frozen=True`.
+                        let frozen = get_argument_type("frozen", false).map_or(
+                            ConfigBoolean::Unspecified,
+                            |frozen| {
+                                if frozen.is_none(db) {
+                                    ConfigBoolean::Disabled
+                                } else {
+                                    ConfigBoolean::from_type(frozen)
+                                }
+                            },
+                        );
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -2196,7 +2208,7 @@ impl<'db> Bindings<'db> {
                         // to `T`. Otherwise, we would error on `name: str = field(default="")`.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
                             FieldInstance::new(
-                                db, default_ty, init, kw_only, alias, converter, strict,
+                                db, default_ty, init, kw_only, alias, converter, strict, frozen,
                             ),
                         )));
                     }
