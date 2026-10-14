@@ -77,7 +77,7 @@ use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
     MaterializationKind, PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
 };
-use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment};
 
 /// A retained operation and the inference context under which it was requested.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -87,7 +87,17 @@ pub struct MappingStep<'db> {
     materialize_bounds: bool,
 }
 
-impl MappingStep<'_> {
+impl<'db> MappingStep<'db> {
+    /// Start a traversal with the retained settings and the caller's comparison guards.
+    fn visitor<'a>(
+        &self,
+        visitor: &ApplyTypeMappingVisitor<'a, 'db>,
+    ) -> ApplyTypeMappingVisitor<'a, 'db> {
+        let mut visitor = visitor.for_new_materialization_root();
+        visitor.materialize_typevar_bounds_and_defaults = self.materialize_bounds;
+        visitor
+    }
+
     fn absorbs(&self, later: &Self) -> bool {
         self.context == later.context
             && self.materialize_bounds == later.materialize_bounds
@@ -101,7 +111,9 @@ impl MappingStep<'_> {
                 ))
     }
 
-    fn commutes_with(&self, other: &Self) -> bool {
+    /// Whether this step preserves a fixed point of `other`.
+    /// Singleton widening only introduces Unknown, so P(S(P(T))) = S(P(T)) for regular promotion P.
+    fn preserves_fixed_points_of(&self, other: &Self) -> bool {
         // Other promotion kinds can introduce Unknown or dynamic default arguments.
         self.context == other.context
             && self.materialize_bounds == other.materialize_bounds
@@ -111,25 +123,11 @@ impl MappingStep<'_> {
                     TypeMapping::Promote(_, PromotionKind::Regular),
                     TypeMapping::Promote(_, PromotionKind::Regular) | TypeMapping::Materialize(_)
                 ) | (
-                    TypeMapping::Materialize(_),
+                    TypeMapping::Materialize(_)
+                        | TypeMapping::Promote(_, PromotionKind::SingletonsOnly),
                     TypeMapping::Promote(_, PromotionKind::Regular)
                 )
             )
-    }
-
-    /// Whether this step preserves a fixed point of `other`.
-    /// Singleton widening only introduces Unknown, so P(S(P(T))) = S(P(T)) for regular promotion P.
-    fn preserves_fixed_points_of(&self, other: &Self) -> bool {
-        self.commutes_with(other)
-            || self.context == other.context
-                && self.materialize_bounds == other.materialize_bounds
-                && matches!(
-                    (&self.operation, &other.operation),
-                    (
-                        TypeMapping::Promote(_, PromotionKind::SingletonsOnly),
-                        TypeMapping::Promote(_, PromotionKind::Regular)
-                    )
-                )
     }
 }
 
@@ -139,15 +137,10 @@ impl MappingStep<'_> {
 #[derive(Default)]
 pub(super) struct MappingProbe<'db> {
     bodies: RefCell<FxIndexSet<(Type<'db>, MappingStep<'db>)>>,
-    constructors: RefCell<Vec<ProbeConstructor<'db>>>,
+    constructors: RefCell<FxIndexMap<Type<'db>, Type<'db>>>,
     parameters: RefCell<ProbeParameters<'db>>,
-    calls: RefCell<Vec<(usize, Specialization<'db>)>>,
+    calls: RefCell<FxIndexSet<(usize, Specialization<'db>)>>,
     uses: RefCell<FxIndexSet<(ProbeParameter<'db>, MappingStep<'db>)>>,
-}
-
-struct ProbeConstructor<'db> {
-    source: Type<'db>,
-    body_source: Type<'db>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -219,7 +212,11 @@ impl<'db> MappingProbeContext<'_, 'db> {
         ) {
             return None;
         }
-        let operation = mapping.clone();
+        let step = MappingStep {
+            operation: mapping.clone(),
+            context,
+            materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
+        };
         let probe = match self {
             Self::Inspect(probe) | Self::Compose(probe) => probe,
         };
@@ -233,26 +230,12 @@ impl<'db> MappingProbeContext<'_, 'db> {
             if let Some(mut reference) = reference {
                 return Some(match self {
                     Self::Inspect(_) => {
-                        probe.uses.borrow_mut().insert((
-                            reference,
-                            MappingStep {
-                                operation,
-                                context,
-                                materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-                            },
-                        ));
+                        probe.uses.borrow_mut().insert((reference, step));
                         ty
                     }
                     Self::Compose(_) => {
-                        reference.mappings = Some(DeferredTypeMapping::new(
-                            db,
-                            reference.mappings,
-                            MappingStep {
-                                operation,
-                                context,
-                                materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-                            },
-                        ));
+                        reference.mappings =
+                            Some(DeferredTypeMapping::new(db, reference.mappings, step));
                         Type::TypeVar(probe.parameters.borrow_mut().intern(db, reference))
                     }
                 });
@@ -260,15 +243,7 @@ impl<'db> MappingProbeContext<'_, 'db> {
             return None;
         }
         match self {
-            Self::Inspect(_) => Some(probe.record_alias(
-                db,
-                ty,
-                &MappingStep {
-                    operation,
-                    context,
-                    materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-                },
-            )),
+            Self::Inspect(_) => Some(probe.record_alias(db, ty, &step)),
             Self::Compose(_) => None,
         }
     }
@@ -280,25 +255,16 @@ impl<'db> MappingProbe<'db> {
     fn changes(
         db: &'db dyn Db,
         ty: Type<'db>,
-        mapping: &TypeMapping<'db>,
-        context: TypeContext<'db>,
+        step: &MappingStep<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
         if visitor.recursion_context.is_none()
-            && let Some(changes) = Self::cached_changes(
-                db,
-                visitor.env.program(db),
-                ty,
-                MappingStep {
-                    operation: mapping.clone(),
-                    context,
-                    materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-                },
-            )
+            && let Some(changes) =
+                Self::cached_changes(db, visitor.env.program(db), ty, step.clone())
         {
             return changes;
         }
-        Self::changes_impl(db, ty, mapping, context, visitor)
+        Self::changes_impl(db, ty, step, visitor)
     }
 
     /// A probe that never uses its comparison state is independent of the caller's state.
@@ -314,9 +280,8 @@ impl<'db> MappingProbe<'db> {
         step: MappingStep<'db>,
     ) -> Option<bool> {
         let env = ProgramEnvironment::from_program(program);
-        let mut visitor = ApplyTypeMappingVisitor::new(&env);
-        visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
-        let changes = Self::changes_impl(db, ty, &step.operation, step.context, &visitor);
+        let visitor = ApplyTypeMappingVisitor::new(&env);
+        let changes = Self::changes_impl(db, ty, &step, &visitor);
         visitor
             .materialization_equivalence
             .get()
@@ -327,14 +292,13 @@ impl<'db> MappingProbe<'db> {
     fn changes_impl(
         db: &'db dyn Db,
         ty: Type<'db>,
-        mapping: &TypeMapping<'db>,
-        context: TypeContext<'db>,
+        step: &MappingStep<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
         let probe = Self::default();
-        let mut visitor = visitor.for_new_materialization_root();
+        let mut visitor = step.visitor(visitor);
         visitor.mapping_probe = Some(MappingProbeContext::Inspect(&probe));
-        ty.apply_type_mapping_impl(db, mapping, context, &visitor);
+        ty.apply_type_mapping_impl(db, &step.operation, step.context, &visitor);
         let mut next_body = 0;
         let mut checked_calls = 0;
         let mut checked_uses = 0;
@@ -345,8 +309,7 @@ impl<'db> MappingProbe<'db> {
                     break;
                 };
                 next_body += 1;
-                let mut body_visitor = visitor.for_new_materialization_root();
-                body_visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
+                let body_visitor = step.visitor(&visitor);
                 let body = match source {
                     Type::Recursive(recursive) => recursive
                         .unfold_with_mapping_visitor(db, &body_visitor)
@@ -389,8 +352,7 @@ impl<'db> MappingProbe<'db> {
                     let argument = parameter
                         .mappings
                         .map_or(argument, |mappings| mappings.apply(db, argument, &visitor));
-                    let mut use_visitor = visitor.for_new_materialization_root();
-                    use_visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
+                    let use_visitor = step.visitor(&visitor);
                     if argument.apply_type_mapping_impl(
                         db,
                         &step.operation,
@@ -443,11 +405,7 @@ impl<'db> MappingProbe<'db> {
             _ => (ty, None),
         };
         let source = if let Some(arguments) = arguments {
-            let existing = self
-                .constructors
-                .borrow()
-                .iter()
-                .position(|node| node.source == source);
+            let existing = self.constructors.borrow().get_index_of(&source);
             let index = existing.unwrap_or_else(|| {
                 let index = self.constructors.borrow().len();
                 let parameters = arguments.generic_context(db);
@@ -474,17 +432,11 @@ impl<'db> MappingProbe<'db> {
                     }
                     _ => source,
                 };
-                self.constructors.borrow_mut().push(ProbeConstructor {
-                    source,
-                    body_source,
-                });
+                self.constructors.borrow_mut().insert(source, body_source);
                 index
             });
-            let mut calls = self.calls.borrow_mut();
-            if !calls.contains(&(index, arguments)) {
-                calls.push((index, arguments));
-            }
-            self.constructors.borrow()[index].body_source
+            self.calls.borrow_mut().insert((index, arguments));
+            self.constructors.borrow()[index]
         } else {
             source
         };
@@ -529,17 +481,14 @@ impl<'db> DeferredTypeMapping<'db> {
         {
             return previous;
         }
+        let mut step = MappingStep {
+            operation: mapping.clone(),
+            context,
+            materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
+        };
         // Symbolic arguments retain each replayed step; the outer probe checks their actual uses.
         if matches!(visitor.mapping_probe, Some(MappingProbeContext::Compose(_))) {
-            return Some(Self::new(
-                db,
-                previous,
-                MappingStep {
-                    operation: mapping.clone(),
-                    context,
-                    materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-                },
-            ));
+            return Some(Self::new(db, previous, step));
         }
         if matches!(mapping, TypeMapping::Materialize(_))
             && dynamic_content_impl(
@@ -552,22 +501,11 @@ impl<'db> DeferredTypeMapping<'db> {
         {
             return previous;
         }
-        let operation = mapping.clone();
-        let context = if context.annotation.is_none() {
-            TypeContext::default()
-        } else {
-            context
-        };
-        let mappings = Self::append_step(
-            db,
-            previous,
-            MappingStep {
-                operation,
-                context,
-                materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-            },
-        );
-        if mappings == previous || !MappingProbe::changes(db, original, mapping, context, visitor) {
+        if step.context.annotation.is_none() {
+            step.context = TypeContext::default();
+        }
+        let mappings = Self::append_step(db, previous, step.clone());
+        if mappings == previous || !MappingProbe::changes(db, original, &step, visitor) {
             previous
         } else {
             mappings
@@ -592,7 +530,7 @@ impl<'db> DeferredTypeMapping<'db> {
         }
         if let Some(previous) = previous
             && matches!(previous.step(db).operation, TypeMapping::Materialize(_))
-            && previous.step(db).commutes_with(&step)
+            && previous.step(db).preserves_fixed_points_of(&step)
         {
             // Keep materialization last so its marker survives subsequent promotion.
             let prefix = Self::append_step(db, previous.previous(db), step);
@@ -626,9 +564,8 @@ impl<'db> DeferredTypeMapping<'db> {
             ty = previous.apply(db, ty, visitor);
         }
         // Each step has its own mapping identity, but materialization comparisons share a guard.
-        let mut visitor = visitor.for_new_materialization_root();
+        let mut visitor = self.step(db).visitor(visitor);
         visitor.mapping_probe = visitor.mapping_probe.map(MappingProbeContext::composing);
-        visitor.materialize_typevar_bounds_and_defaults = self.step(db).materialize_bounds;
         ty.apply_type_mapping_impl(
             db,
             &self.step(db).operation,
