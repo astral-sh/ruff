@@ -1222,7 +1222,7 @@ still permits assignment to the attribute:
 
 ```py
 class WithExcludedMember(Protocol):
-    __doc__: str  # error: [invalid-mutable-override]
+    __doc__: str
 
     def method(self) -> None:
         self.__doc__ = "Protocol documentation"  # no error
