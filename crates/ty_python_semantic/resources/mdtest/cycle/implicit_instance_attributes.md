@@ -33,6 +33,38 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Self-referential slot values
+
+Rebuilding a dictionary from its own contents preserves the dictionary type of a slotted attribute.
+
+```py
+class Slotted:
+    __slots__ = ("data",)
+
+    def __init__(self, **data):
+        self.data = data
+
+    def update(self):
+        self.data = {"a": self.data["a"]}
+
+# not a great type, but we do know that it's a dictionary with string keys!
+reveal_type(Slotted().data)  # revealed: dict[str, Unknown] | dict[str, Divergent]
+```
+
+## Slots storing their own descriptors
+
+Inference converges when a slot contains its own class descriptor, preserving the descriptor type.
+
+```py
+class Slotted:
+    __slots__ = ("value",)
+
+    def __init__(self):
+        self.value = Slotted.value
+
+reveal_type(Slotted().value)  # revealed: MemberDescriptorType
+```
+
 ## Assigning a bound method in a loop
 
 Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,
