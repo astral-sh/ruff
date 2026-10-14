@@ -2218,7 +2218,7 @@ class MaybeDescriptorMeta(type):
 
 class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
     def __init__(self) -> None:
-        self.generated_descriptor = b"instance"
+        self.generated_descriptor = b"instance"  # error: [invalid-assignment]
 
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | int | bytes
 ```
@@ -2361,7 +2361,7 @@ reveal_type(ConditionalGenerated().generated)  # revealed: int
 class ConditionalMethodAssignment(metaclass=StoringMeta):
     if flag:
         def assign(self) -> None:
-            self.generated = "instance"
+            self.generated = "instance"  # error: [invalid-assignment]
 
 reveal_type(ConditionalMethodAssignment().generated)  # revealed: int | str
 ```
