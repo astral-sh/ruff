@@ -53,15 +53,9 @@ use generated::{
     MAX_NAME_LENGTH, PHRASEBOOK_OFFSET_SHIFT, PHRASEBOOK_OFFSETS1, PHRASEBOOK_OFFSETS2,
 };
 
-#[allow(dead_code)]
-#[rustfmt::skip]
-#[allow(clippy::all)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
-#[allow(dead_code)]
-#[rustfmt::skip]
-#[allow(clippy::all)]
 mod generated_phf {
     include!(concat!(env!("OUT_DIR"), "/generated_phf.rs"));
 }
