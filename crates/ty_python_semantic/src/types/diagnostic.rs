@@ -3531,8 +3531,9 @@ impl<'db> IncompatibleBases<'db> {
     }
 
     /// Two disjoint bases are allowed to coexist in an MRO if one is a subclass of the other.
-    /// This method therefore removes any entry in `self` that is a subclass of one or more
-    /// other entries also contained in `self`.
+    /// This method therefore removes any entry in `self` that is a superclass of one or more
+    /// other entries also contained in `self`, keeping only the most-derived entries. If more
+    /// than one entry remains, no remaining entry is a subclass of another, so they conflict.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
         self.0 = self
             .0
@@ -3545,10 +3546,10 @@ impl<'db> IncompatibleBases<'db> {
                         // CPython's layout check operates on runtime classes. Type arguments are
                         // irrelevant here: a generic disjoint base and any specialization of that
                         // base share the same layout.
-                        !disjoint_base
+                        !other_base
                             .class
                             .default_specialization(db)
-                            .is_subtype_of_class_literal(db, other_base.class)
+                            .is_subtype_of_class_literal(db, disjoint_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
