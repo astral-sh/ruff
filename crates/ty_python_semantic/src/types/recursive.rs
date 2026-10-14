@@ -62,7 +62,7 @@
 
 use std::cell::RefCell;
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
@@ -140,9 +140,7 @@ impl MappingStep<'_> {
 pub(super) struct MappingProbe<'db> {
     bodies: RefCell<FxIndexSet<(Type<'db>, MappingStep<'db>)>>,
     constructors: RefCell<Vec<ProbeConstructor<'db>>>,
-    parameters: RefCell<
-        FxHashMap<BoundTypeVarIdentity<'db>, (BoundTypeVarInstance<'db>, ProbeParameter<'db>)>,
-    >,
+    parameters: RefCell<ProbeParameters<'db>>,
     calls: RefCell<Vec<(usize, Specialization<'db>)>>,
     uses: RefCell<FxIndexSet<(ProbeParameter<'db>, MappingStep<'db>)>>,
 }
@@ -157,6 +155,33 @@ struct ProbeParameter<'db> {
     constructor: usize,
     variable: BoundTypeVarInstance<'db>,
     mappings: Option<DeferredTypeMapping<'db>>,
+}
+
+/// Interns opaque parameters and recovers their references during trial mappings.
+#[derive(Default)]
+struct ProbeParameters<'db> {
+    variables: FxHashMap<ProbeParameter<'db>, BoundTypeVarInstance<'db>>,
+    references: FxHashMap<BoundTypeVarIdentity<'db>, ProbeParameter<'db>>,
+}
+
+impl<'db> ProbeParameters<'db> {
+    fn intern(
+        &mut self,
+        db: &'db dyn Db,
+        parameter: ProbeParameter<'db>,
+    ) -> BoundTypeVarInstance<'db> {
+        if let Some(variable) = self.variables.get(&parameter) {
+            return *variable;
+        }
+        // These parameters only occur in probe bodies. The suffix cannot appear in a Python
+        // identifier, and distinct mapping states must remain distinct during simplification.
+        let variable = parameter
+            .variable
+            .with_name_suffix(db, &format!("$mapping{}", self.variables.len()));
+        self.variables.insert(parameter, variable);
+        self.references.insert(variable.identity(db), parameter);
+        variable
+    }
 }
 
 /// Deferred steps compose on opaque parameters; the requested step inspects their uses.
@@ -202,8 +227,9 @@ impl<'db> MappingProbeContext<'_, 'db> {
             let reference = probe
                 .parameters
                 .borrow()
+                .references
                 .get(&variable.identity(db))
-                .map(|(_, parameter)| *parameter);
+                .copied();
             if let Some(mut reference) = reference {
                 return Some(match self {
                     Self::Inspect(_) => {
@@ -227,7 +253,7 @@ impl<'db> MappingProbeContext<'_, 'db> {
                                 materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
                             },
                         ));
-                        Type::TypeVar(probe.parameter(db, reference))
+                        Type::TypeVar(probe.parameters.borrow_mut().intern(db, reference))
                     }
                 });
             }
@@ -262,7 +288,8 @@ impl<'db> MappingProbe<'db> {
         visitor.mapping_probe = Some(MappingProbeContext::Inspect(&probe));
         ty.apply_type_mapping_impl(db, mapping, context, &visitor);
         let mut next_body = 0;
-        let mut checked = FxHashSet::default();
+        let mut checked_calls = 0;
+        let mut checked_uses = 0;
         loop {
             loop {
                 let Some((source, step)) = probe.bodies.borrow().get_index(next_body).cloned()
@@ -289,14 +316,23 @@ impl<'db> MappingProbe<'db> {
                     return true;
                 }
             }
-            let before = checked.len();
-            let calls = probe.calls.borrow().clone();
-            let uses = probe.uses.borrow().clone();
-            for (constructor, arguments) in calls {
-                for (parameter, step) in &uses {
-                    if parameter.constructor != constructor
-                        || !checked.insert((arguments, *parameter, step.clone()))
-                    {
+            let calls = probe.calls.borrow().len();
+            let uses = probe.uses.borrow().len();
+            if checked_calls == calls && checked_uses == uses {
+                return false;
+            }
+            // Both collections only grow and contain unique entries. Pair new calls with every
+            // use, and old calls only with new uses, so each pair is inspected once.
+            for call in 0..calls {
+                let (constructor, arguments) = probe.calls.borrow()[call];
+                let first_use = if call < checked_calls {
+                    checked_uses
+                } else {
+                    0
+                };
+                for use_index in first_use..uses {
+                    let (parameter, step) = probe.uses.borrow()[use_index].clone();
+                    if parameter.constructor != constructor {
                         continue;
                     }
                     let Some(argument) = arguments.get(db, parameter.variable) else {
@@ -318,31 +354,9 @@ impl<'db> MappingProbe<'db> {
                     }
                 }
             }
-            if before == checked.len() && next_body == probe.bodies.borrow().len() {
-                return false;
-            }
+            checked_calls = calls;
+            checked_uses = uses;
         }
-    }
-
-    fn parameter(
-        &self,
-        db: &'db dyn Db,
-        parameter: ProbeParameter<'db>,
-    ) -> BoundTypeVarInstance<'db> {
-        let mut parameters = self.parameters.borrow_mut();
-        if let Some((variable, _)) = parameters
-            .values()
-            .find(|(_, existing)| *existing == parameter)
-        {
-            return *variable;
-        }
-        // These parameters only occur in probe bodies. The suffix cannot appear in a Python
-        // identifier, and distinct mapping states must remain distinct during simplification.
-        let variable = parameter
-            .variable
-            .with_name_suffix(db, &format!("$mapping{}", parameters.len()));
-        parameters.insert(variable.identity(db), (variable, parameter));
-        variable
     }
 
     fn record_alias(&self, db: &'db dyn Db, ty: Type<'db>, step: &MappingStep<'db>) -> Type<'db> {
@@ -392,7 +406,7 @@ impl<'db> MappingProbe<'db> {
                 let variables = parameters
                     .variables(db)
                     .map(|variable| {
-                        Type::TypeVar(self.parameter(
+                        Type::TypeVar(self.parameters.borrow_mut().intern(
                             db,
                             ProbeParameter {
                                 constructor: index,
