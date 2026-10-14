@@ -59,12 +59,10 @@ mod generated {
 mod generated_phf {
     include!(concat!(env!("OUT_DIR"), "/generated_phf.rs"));
 }
-#[allow(dead_code)]
 mod jamo;
 
 /// A map of unicode aliases to their corresponding values.
 /// Generated in generator
-#[allow(dead_code)]
 static ALIASES: phf::Map<&'static [u8], char> =
     include!(concat!(env!("OUT_DIR"), "/generated_alias.rs"));
 
