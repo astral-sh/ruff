@@ -117,7 +117,7 @@ def f(x: A):
 
 ## Recursive tuple elements in `Iterable`
 
-Ty can use the element type of `Iterable` when simplifying its intersection with a tuple. That
+We use the element type of `Iterable` when simplifying its intersection with a tuple. That
 simplification also preserves a recursive element type.
 
 ```py
