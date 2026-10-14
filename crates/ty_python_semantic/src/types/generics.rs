@@ -4227,16 +4227,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // reveal_type(f(P[str]()))  # revealed: str
                 // reveal_type(f(Q[int]()))  # revealed: int
                 // ```
-                let mut first_error = None;
-                let mut found_matching_element = false;
-                for formal_element in union_formal.elements(db) {
-                    let result = self.infer_map_impl(*formal_element, actual, polarity, visitor);
-                    if let Err(err) = result {
-                        first_error.get_or_insert(err);
-                    } else {
-                        // The recursive call to `infer_map_impl` may succeed even if the actual type is
-                        // not assignable to the formal element.
-                        if !actual
+                let mut elements: SmallVec<[_; 2]> = union_formal
+                    .elements(db)
+                    .iter()
+                    .map(|formal_element| {
+                        let matches = !actual
                             .when_assignable_to(
                                 db,
                                 self.env,
@@ -4244,10 +4239,33 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env, self.inferable)
-                        {
-                            found_matching_element = true;
-                        }
+                            .is_never_satisfied(db, self.env, self.inferable);
+
+                        (formal_element, matches)
+                    })
+                    .collect();
+
+                // When assigning to a union, we only preserve matching union members. If there
+                // are no members to which the source type is assignable, we preserve the entire
+                // union for diagnostics.
+                //
+                // In the reverse direction, all union members must be assignable to the target type.
+                if matches!(relation_polarity, TypeVarVariance::Covariant)
+                    && elements.iter().any(|(_, matches)| *matches)
+                {
+                    elements.retain(|(_, matches)| *matches);
+                }
+
+                let mut first_error = None;
+                let mut found_matching_element = false;
+                for (formal_element, matches) in elements {
+                    let result = self.infer_map_impl(*formal_element, actual, polarity, visitor);
+                    if let Err(err) = result {
+                        first_error.get_or_insert(err);
+                    } else {
+                        // The recursive call to `infer_map_impl` may succeed even if the actual type is
+                        // not assignable to the formal element.
+                        found_matching_element |= matches;
                     }
                 }
 

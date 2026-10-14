@@ -1583,6 +1583,32 @@ reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
+## Unmatched union members do not constrain other arguments
+
+When assigning to a declared union type, only members to which the source type is assignable
+contribute to the inferred constraints. Unsatisfied members are ignored, and do not contribute any
+constraints.
+
+```py
+from typing import Any, Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class HasMethod(Protocol):
+    def method(self) -> int: ...
+
+def f(callback: Callable[[T], None], value: T, other: Any | HasMethod) -> T:
+    return value
+
+def g(callback: Callable[[T], None], value: T, other: HasMethod | Any) -> T:
+    return value
+
+def accepts_object(value: object) -> None: ...
+def _(other: object):
+    reveal_type(f(accepts_object, 1, other))  # revealed: Literal[1]
+    reveal_type(g(accepts_object, 1, other))  # revealed: Literal[1]
+```
+
 ## A single generic member of a union
 
 An optional container supplies its element type even when the argument can also be `None`. The fixed
