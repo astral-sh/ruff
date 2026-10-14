@@ -4931,7 +4931,8 @@ enum OverloadCallResult<'db> {
     /// Argument expansion stopped at this argument's expansion limit.
     ArgumentTypeExpansionLimitReached(usize),
     /// Several overloads remain with non-equivalent return types. Their shared structure is
-    /// preserved, with an ambiguity marker at each differing part.
+    /// preserved, with each differing part replaced by `DynamicType::AmbiguousOverload`, which
+    /// displays as `Unknown`.
     Ambiguous(Type<'db>),
 }
 
