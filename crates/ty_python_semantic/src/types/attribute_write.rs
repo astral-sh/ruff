@@ -396,7 +396,9 @@ pub(super) fn attribute_write_requirement<'db>(
                         receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
-                _ => instance_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                TypeVarBoundOrConstraints::UpperBound(_) => {
+                    instance_attribute_write_requirement(db, env, object_ty, attribute, receiver)
+                }
             }
         }
 
