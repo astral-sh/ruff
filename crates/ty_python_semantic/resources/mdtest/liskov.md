@@ -3713,8 +3713,10 @@ class PropertyChild(Base):
 
 ## Attribute contracts inherited from `object`
 
-`object` does not provide writable instance attributes. Its attribute declarations constrain read
-types, but do not require subclasses to support instance writes.
+Typeshed declares metadata such as `__module__: str` on `object`. Normally, this annotation would
+permit instance writes. But instances of `object` do not provide instance-attribute storage, so
+writability of these attributes is not guaranteed by `object`. This means that slotted subclasses
+can assign this metadata in their class bodies without violating an inherited write contract.
 
 ```py
 class Slotted:
