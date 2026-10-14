@@ -43,8 +43,8 @@ use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
 ///
-/// Alias identities omit their deferred mappings; growing aliases also omit their arguments.
-/// The original types retain both for equality checks and cached results.
+/// Growing alias identities omit their arguments and deferred mappings. Other aliases retain
+/// both so that finite recursive comparisons can reach an exact repetition.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
@@ -61,11 +61,7 @@ impl<'db> Type<'db> {
         if let Some(identity) = self.recursive_identity(db) {
             return identity;
         }
-        TypeIdentity::Other(match self {
-            Type::TypeAlias(alias) => Type::TypeAlias(alias.with_mappings(db, None)),
-            Type::Recursive(alias) => Type::Recursive(alias.with_mappings(db, None)),
-            _ => self,
-        })
+        TypeIdentity::Other(self)
     }
 
     /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
