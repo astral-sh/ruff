@@ -1,4 +1,4 @@
-use super::{ArgumentMatchResult, ArgumentMatcher};
+use super::{ArgumentMatchResult, ArgumentMatcher, MatchedArgument};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgument, CallArguments};
@@ -13,7 +13,7 @@ struct Segment<'db> {
     repeated: bool,
 }
 
-/// Returns a candidate placement of already inferred positional arguments.
+/// Returns a candidate mapping covering every combination of tuple members.
 ///
 /// For example, `f(*before, "text", *after)` can match `(int, str, int)` when both
 /// unpacks contain integers. A repeated segment can consume the next parameter or end,
@@ -58,6 +58,42 @@ pub(super) fn match_arguments<'db>(
         return None;
     }
 
+    let mut result = ArgumentMatchResult {
+        argument_matches: vec![MatchedArgument::default(); arguments.len()].into_boxed_slice(),
+        variadic_argument_matched_to_variadic_parameter: false,
+    };
+    for arguments in arguments.expand_tuple_unions(db, env)?.iter() {
+        let alternative = match_single(db, env, arguments, signature)?;
+        result.variadic_argument_matched_to_variadic_parameter |=
+            alternative.variadic_argument_matched_to_variadic_parameter;
+        // Every combination needs a complete placement. Since the signature is non-generic,
+        // the ordinary type checker can check all contributed types together.
+        for (combined, argument) in result
+            .argument_matches
+            .iter_mut()
+            .zip(alternative.argument_matches)
+        {
+            combined.matched = true;
+            for parameter in argument.parameters {
+                if !combined.parameters.contains(&parameter) {
+                    combined.parameters.push(parameter);
+                }
+            }
+        }
+    }
+    Some(result)
+}
+
+/// Matches one combination, searching only when a repeated segment has later positional input.
+fn match_single<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    arguments: &CallArguments<'_, 'db>,
+    signature: &Signature<'db>,
+) -> Option<ArgumentMatchResult<'db>> {
+    let parameters = signature.parameters();
+    let variadic = parameters.variadic();
+
     let mut segments = Vec::new();
     for (argument_index, argument) in arguments.iter().enumerate() {
         let mut push = |element_type, repeated| {
@@ -70,10 +106,8 @@ pub(super) fn match_arguments<'db>(
         match argument {
             CallArgument::Synthetic(_) | CallArgument::Positional(_) => push(None, false),
             CallArgument::Variadic(variadic) => {
-                // Every member of a union must work; choosing one placement for the merged
-                // element types would lose the correlation between its lengths and types.
                 let source = argument.source_type()?.resolve_type_alias(db);
-                if source.is_union() || source.as_paramspec_typevar(db).is_some() {
+                if source.as_paramspec_typevar(db).is_some() {
                     return None;
                 }
                 match variadic.sequence(db, env)?.as_ref() {
@@ -101,10 +135,15 @@ pub(super) fn match_arguments<'db>(
         }
     }
 
-    // Preserve ordinary checking of a trailing homogeneous unpack, including its element
-    // type against optional parameters. Only search when there is later positional input.
+    let mut errors = Vec::new();
+    let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut errors);
+
+    // Fixed tuples and trailing homogeneous unpacks use ordinary matching. In particular,
+    // a trailing unpack must still check its element type against optional parameters.
     if !segments.windows(2).any(|pair| pair[0].repeated) {
-        return None;
+        matcher.match_arguments(db, env);
+        let result = matcher.finish(db, env);
+        return errors.is_empty().then_some(result);
     }
 
     let parameter_count = parameters.positional().count();
@@ -112,8 +151,6 @@ pub(super) fn match_arguments<'db>(
     if (segments.len() + 1).checked_mul(parameter_count + 1)? > 65_536 {
         return None;
     }
-    let mut errors = Vec::new();
-    let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut errors);
 
     // can_finish[s][p] means that segments[s..] can fill parameters[p..]. Parameters
     // left after the final segment must have defaults or be supplied by keyword.
