@@ -24,53 +24,87 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  9 |         return self
 10 | 
 11 | class Meta(MetaBase):
-12 |     def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
-13 |         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
-14 |         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
-15 |         return super().__call__(*args, **kwargs)
-16 | 
-17 | class BaseWithMeta(metaclass=Meta):
-18 |     pass
-19 | 
-20 | class SubWithMeta(BaseWithMeta):
-21 |     def extra(self) -> int:
-22 |         return 42
-23 | 
-24 | reveal_type(SubWithMeta())  # revealed: SubWithMeta
-25 | SubWithMeta().extra()
-26 | reveal_type(super(Meta, BaseWithMeta).meta_base_value)  # revealed: int
-27 | 
-28 | class OtherMeta(type):
-29 |     pass
-30 | 
-31 | class OtherBase(metaclass=OtherMeta):
-32 |     pass
-33 | 
-34 | super(Meta, OtherBase)  # error: [invalid-super-argument]
+12 |     # XXX: The receiver check requires `object <= _TMeta`, losing the metaclass restriction.
+13 |     # error: [invalid-method-override]
+14 |     def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+15 |         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
+16 |         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
+17 |         return super().__call__(*args, **kwargs)
+18 | 
+19 | class BaseWithMeta(metaclass=Meta):
+20 |     pass
+21 | 
+22 | class SubWithMeta(BaseWithMeta):
+23 |     def extra(self) -> int:
+24 |         return 42
+25 | 
+26 | reveal_type(SubWithMeta())  # revealed: SubWithMeta
+27 | SubWithMeta().extra()
+28 | reveal_type(super(Meta, BaseWithMeta).meta_base_value)  # revealed: int
+29 | 
+30 | class OtherMeta(type):
+31 |     pass
+32 | 
+33 | class OtherBase(metaclass=OtherMeta):
+34 |     pass
 35 | 
-36 | T = TypeVar("T", bound=int)
+36 | super(Meta, OtherBase)  # error: [invalid-super-argument]
 37 | 
-38 | class BoundIntMeta(type):
-39 |     def __call__(cls: type[T]) -> T:
-40 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
+38 | T = TypeVar("T", bound=int)
+39 | 
+40 | class BoundIntMeta(type):
+41 |     # XXX: The receiver check requires `object <= T`, losing the metaclass restriction.
+42 |     # error: [invalid-method-override]
+43 |     def __call__(cls: type[T]) -> T:
+44 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```
 
 # Diagnostics
 
 ```
+error[invalid-method-override]: Invalid override of method `__call__`
+   --> src/mdtest_snippet.py:14:9
+    |
+ 14 |     def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `type.__call__`
+    |
+   ::: stdlib/builtins.pyi:285:9
+    |
+285 |     def __call__(self, *args: Any, **kwds: Any) -> Any:
+    |         ---------------------------------------------- `type.__call__` defined here
+info: This violates the Liskov Substitution Principle
+
+```
+
+```
 error[invalid-super-argument]: `<class 'OtherBase'>` is not an instance or subclass of `<class 'Meta'>` in `super(<class 'Meta'>, <class 'OtherBase'>)` call
-  --> src/mdtest_snippet.py:34:1
+  --> src/mdtest_snippet.py:36:1
    |
-34 | super(Meta, OtherBase)  # error: [invalid-super-argument]
+36 | super(Meta, OtherBase)  # error: [invalid-super-argument]
    | ^^^^^^^^^^^^^^^^^^^^^^
 
 ```
 
 ```
+error[invalid-method-override]: Invalid override of method `__call__`
+   --> src/mdtest_snippet.py:43:9
+    |
+ 43 |     def __call__(cls: type[T]) -> T:
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `type.__call__`
+    |
+   ::: stdlib/builtins.pyi:285:9
+    |
+285 |     def __call__(self, *args: Any, **kwds: Any) -> Any:
+    |         ---------------------------------------------- `type.__call__` defined here
+info: This violates the Liskov Substitution Principle
+
+```
+
+```
 error[invalid-super-argument]: `type[T@__call__]` is not an instance or subclass of `<class 'BoundIntMeta'>` in `super(<class 'BoundIntMeta'>, type[T@__call__])` call
-  --> src/mdtest_snippet.py:40:16
+  --> src/mdtest_snippet.py:44:16
    |
-40 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
+44 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
    |                ^^^^^^^^^^^^^^^^^^^^^^^^
 info: Type variable `T` has upper bound `int`
 info: `type[int]` is not an instance or subclass of `<class 'BoundIntMeta'>`

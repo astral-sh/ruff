@@ -1621,6 +1621,90 @@ def infer(value: Required[A, B]) -> tuple[A, B]:
 reveal_type(infer(Implementation()))  # revealed: tuple[int, str]
 ```
 
+## Callable specialization with protocol bounds
+
+A generic callback must satisfy its declared bound. The bound's generic methods have their own
+independent type parameters.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Token(Protocol):
+    def identity(self, value: T) -> T: ...
+
+class Concrete:
+    def identity(self, value: T) -> T:
+        return value
+
+B = TypeVar("B", bound=Token)
+
+def bounded(value: B) -> B:
+    return value
+
+accepted: Callable[[Concrete], Concrete] = bounded  # no diagnostic
+rejected: Callable[[int], int] = bounded  # error: [invalid-assignment]
+```
+
+## Inferring through protocol-valued callback returns
+
+Specializing the callback also constrains the protocol's type argument.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T", covariant=True)
+U = TypeVar("U")
+
+class Value(Protocol[T]):
+    @property
+    def value(self) -> T: ...
+
+class IntValue:
+    value: int = 1
+
+def identity(value: U) -> U:
+    return value
+
+def infer(callback: Callable[[IntValue], Value[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(identity))  # revealed: int
+```
+
+## Protocol bounds that capture outer type variables
+
+A protocol defined inside a generic function can refer to that function's type parameter.
+Specializing a callback bounded by the protocol does not choose a new value for that parameter.
+
+```py
+from typing import Callable, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class IntValue:
+    value: int = 1
+
+def check(value: T):
+    class Captured(Protocol):
+        @property
+        def value(self) -> T: ...
+
+    class Matching:
+        @property
+        def value(self) -> T:
+            return value
+
+    U = TypeVar("U", bound=Captured)
+
+    def bounded(value: U) -> U:
+        return value
+
+    accepted: Callable[[Matching], Matching] = bounded  # no diagnostic
+    rejected: Callable[[IntValue], IntValue] = bounded  # error: [invalid-assignment]
+```
+
 ## Specializing generic protocol methods
 
 A method can use its own type parameter as the class argument of another instance of its protocol.

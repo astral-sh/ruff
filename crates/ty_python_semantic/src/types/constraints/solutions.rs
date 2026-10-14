@@ -15,7 +15,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, CandidateSolution,
     CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
     ConstraintFailureEvidence, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
-    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind, SourceOrderId,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -180,6 +180,32 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             .map_continue(|satisfiable| !satisfiable)
     }
 
+    /// Checks for a satisfiable path including the type variables' declared bounds and constraints,
+    /// stopping at the first valid path. Reaching a computation limit leaves the result unknown.
+    pub(super) fn has_valid_solution(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        node: NodeId,
+        source_order: Option<SourceOrderId>,
+    ) -> ControlFlow<L::Break, bool> {
+        let mut path = node.path_assignments(db, env, storage, source_order);
+        let validations = storage
+            .node_supports(node)
+            .map(|supports| supports.validation.clone())
+            .map(|support| Validations::from_support(db, env, storage, &support));
+        self.node_is_satisfiable_on_path(
+            db,
+            env,
+            storage,
+            &mut path,
+            Polarity::Positive,
+            node,
+            validations.as_ref(),
+        )
+    }
+
     /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
     /// any satisfiable path we discover from the node.
     #[expect(clippy::too_many_arguments)]
@@ -189,12 +215,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
-        all_typevars: Option<&Support>,
+        validation_support: Option<&Support>,
         polarity: Polarity,
         node: NodeId,
     ) -> ControlFlow<L::Break> {
-        let validations = all_typevars
-            .map(|all_typevars| Validations::from_support(db, env, storage, all_typevars));
+        let validations =
+            validation_support.map(|support| Validations::from_support(db, env, storage, support));
         let validations = validations.as_ref();
         self.visit_node_inner(db, env, storage, path, polarity, node, validations)
     }
@@ -878,8 +904,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // Test the negation from an empty path: the evidence path may itself constrain a fixed
         // typevar, but the declared bound has to hold for every allowed specialization of it.
         let validations = storage
-            .node_support(node)
-            .cloned()
+            .node_supports(node)
+            .map(|supports| supports.validation.clone())
             .map(|support| Validations::from_support(db, env, storage, &support));
         let mut relation_path = node.path_assignments(db, env, storage, source_order);
         let has_counterexample = self
@@ -1860,22 +1886,15 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        all_typevars: &Support,
+        validation_support: &Support,
     ) -> Self {
-        let mut result = Self::default();
-        let mut typevar_queue = all_typevars.clone();
-        let mut seen_typevars = Support::default();
-        while let Some(typevar) = typevar_queue.pop() {
-            seen_typevars.insert(typevar);
+        let mut result = Self {
+            support: validation_support.clone(),
+            ..Self::default()
+        };
+        for typevar in validation_support.iter() {
             let bound_typevar = storage.typevar_data(typevar);
-            result.add_typevar(
-                db,
-                env,
-                storage,
-                &mut typevar_queue,
-                &mut seen_typevars,
-                bound_typevar,
-            );
+            result.add_typevar(db, env, storage, bound_typevar);
         }
         result
     }
@@ -1885,34 +1904,19 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        typevar_queue: &mut Support,
-        seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) {
         let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db, env)
         else {
             return;
         };
-        self.support.insert(storage.typevar_id(db, bound_typevar));
         match bound_or_constraints {
-            TypeVarBoundOrConstraints::UpperBound(bound) => self.add_upper_bound(
-                db,
-                env,
-                storage,
-                typevar_queue,
-                seen_typevars,
-                bound_typevar,
-                bound,
-            ),
-            TypeVarBoundOrConstraints::Constraints(declared_constraints) => self.add_constrained(
-                db,
-                env,
-                storage,
-                typevar_queue,
-                seen_typevars,
-                bound_typevar,
-                declared_constraints,
-            ),
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                self.add_upper_bound(db, env, storage, bound_typevar, bound);
+            }
+            TypeVarBoundOrConstraints::Constraints(declared_constraints) => {
+                self.add_constrained(db, env, storage, bound_typevar, declared_constraints);
+            }
         }
     }
 
@@ -1920,39 +1924,21 @@ impl<'db> Validations<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        typevar_queue: &mut Support,
-        seen_typevars: &mut Support,
-        support: &mut Support,
         constraints: impl Iterator<Item = Result<AtomicConstraint<'db>, UnsatisfiableBound>>,
     ) -> ValidationConstraints {
-        let constraints: ValidationConstraints = constraints
+        constraints
             .map(Result::ok)
             .map(|constraint| {
                 constraint.map(|constraint| storage.intern_atomic_constraint(db, env, constraint))
             })
-            .collect();
-
-        // If any typevars are mentioned in the upper bound, we have to validate them too.
-        // TODO: Consider calculating this at construction time, so that here we have a fixed
-        // set of typevars to check.
-        for constraint in constraints.iter().flatten() {
-            let constraint_support = storage.constraint_support(constraint.into_inner());
-            *support |= constraint_support;
-            let new_typevars = constraint_support - &*seen_typevars;
-            *typevar_queue |= &new_typevars;
-        }
-
-        constraints
+            .collect()
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn add_upper_bound(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        typevar_queue: &mut Support,
-        seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) {
@@ -1964,27 +1950,16 @@ impl<'db> Validations<'db> {
                 bound_typevar,
                 bound,
             );
-            let constraints = Self::intern_typevar_constraints(
-                db,
-                env,
-                storage,
-                typevar_queue,
-                seen_typevars,
-                &mut self.support,
-                constraints,
-            );
+            let constraints = Self::intern_typevar_constraints(db, env, storage, constraints);
             UpperBound { constraints }
         });
     }
 
-    #[expect(clippy::too_many_arguments)]
     fn add_constrained(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        typevar_queue: &mut Support,
-        seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
         declared_constraints: TypeVarConstraints<'db>,
     ) {
@@ -2000,15 +1975,8 @@ impl<'db> Validations<'db> {
                         bound_typevar,
                         constrained_ty,
                     );
-                    let constraints = Self::intern_typevar_constraints(
-                        db,
-                        env,
-                        storage,
-                        typevar_queue,
-                        seen_typevars,
-                        &mut self.support,
-                        constraints,
-                    );
+                    let constraints =
+                        Self::intern_typevar_constraints(db, env, storage, constraints);
                     DeclaredConstraint {
                         constraints,
                         constrained_ty,
