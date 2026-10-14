@@ -17,6 +17,7 @@ help: Capitalize `this` to `This`
 2 +     """This docstring is not capitalized"""
 3 |
   |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:30:5
@@ -34,6 +35,7 @@ help: Capitalize `singleword` to `Singleword`
 30 +     """Singleword."""
 31 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:33:5
@@ -51,6 +53,7 @@ help: Capitalize `singleword` to `Singleword`
 33 +     """Singleword"""
 34 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `here` -> `Here`
   --> D403.py:36:5
@@ -75,6 +78,7 @@ help: Capitalize `here` to `Here`
 40 +     Here is the start of my docstring!
 41 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:46:5
@@ -94,6 +98,7 @@ help: Capitalize `singleword` to `Singleword`
 46 +     """Singleword
 47 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:51:5
@@ -113,6 +118,7 @@ help: Capitalize `singleword` to `Singleword`
 51 +     """Singleword.
 52 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:56:5
@@ -132,6 +138,7 @@ help: Capitalize `singleword` to `Singleword`
 57 +     Singleword
 58 |     """
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:61:5
@@ -151,6 +158,7 @@ help: Capitalize `singleword` to `Singleword`
 62 +     Singleword.
 63 |     """
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:66:5
@@ -171,6 +179,7 @@ help: Capitalize `singleword` to `Singleword`
 66 +     """Singleword
 67 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:72:5
@@ -191,6 +200,7 @@ help: Capitalize `singleword` to `Singleword`
 72 +     """Singleword.
 73 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:78:5
@@ -212,6 +222,7 @@ help: Capitalize `singleword` to `Singleword`
 79 +     Singleword
 80 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 D403 [*] First word of the docstring should be capitalized: `singleword` -> `Singleword`
   --> D403.py:85:5
@@ -230,3 +241,4 @@ help: Capitalize `singleword` to `Singleword`
 86 +     Singleword.
 87 |
    |
+note: This is an unsafe fix and may change runtime behavior

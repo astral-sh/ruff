@@ -26,6 +26,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked unsafe because it may change the meaning of the docstring
+/// when the first word is a case-sensitive name, such as a variable or class name.
+///
 /// ## Options
 ///
 /// - `lint.pydocstyle.ignore-decorators`
@@ -104,7 +108,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
         docstring.range(),
     );
 
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         capitalized_word,
         TextRange::at(body.start() + leading_whitespace_len, first_word.text_len()),
     )));
