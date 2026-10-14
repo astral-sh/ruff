@@ -1,9 +1,9 @@
 use formatting::Context;
 use std::{
     char, cmp,
-    collections::{hash_map, HashMap},
+    collections::{HashMap, hash_map},
     fs::{self, File},
-    io::{self, prelude::*, BufWriter},
+    io::{self, BufWriter, prelude::*},
     path::Path,
 };
 
@@ -292,9 +292,11 @@ fn write_codepoint_maps(ctxt: &mut Context, codepoint_names: Vec<(char, &str)>) 
             previous_len = len;
         }
 
-        assert!(word_encodings
-            .insert(word, vec![hi as u32, lo as u32])
-            .is_none());
+        assert!(
+            word_encodings
+                .insert(word, vec![hi as u32, lo as u32])
+                .is_none()
+        );
     }
     // don't forget the last one.
     lexicon_ordered_lengths.push((lexicon_offsets.len(), previous_len));
