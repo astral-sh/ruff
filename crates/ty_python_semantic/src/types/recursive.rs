@@ -589,6 +589,9 @@ pub struct RecursiveVar<'db> {
     /// Unfolding substitutes the enclosing application's arguments for the type parameters.
     #[returns(copy)]
     arguments: Option<Specialization<'db>>,
+    /// Operations on this occurrence after applying its arguments and closing the body.
+    #[returns(copy)]
+    mappings: Option<DeferredTypeMapping<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveVar<'_> {}
@@ -607,12 +610,17 @@ impl<'db> RecursiveVar<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(recursive),
-            )) if self.cycle(db) == recursive.cycle(db) => {
-                Type::Recursive(recursive.with_arguments(db, arguments))
-            }
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
-                Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
-            }
+            )) if self.cycle(db) == recursive.cycle(db) => Type::Recursive(
+                recursive
+                    .with_arguments(db, arguments)
+                    .with_mappings(db, self.mappings(db)),
+            ),
+            TypeMapping::ApplyRecursiveSubstitution(_) => Type::RecursiveVar(Self::new_internal(
+                db,
+                self.cycle(db),
+                arguments,
+                self.mappings(db),
+            )),
             _ => unreachable!("semantic operation on an unbound recursive variable"),
         }
     }
@@ -713,7 +721,7 @@ impl<'db> RecursiveType<'db> {
             db,
             definition,
             cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
+            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments, None)),
             arguments,
             None,
         )
@@ -923,11 +931,17 @@ impl<'db> RecursiveType<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),
-            )) if self.cycle(db) == *cycle && self.mappings(db).is_none() => {
+            )) if self.cycle(db) == *cycle => {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
+                // Retain operations on the reference so mapped self-references also close the cycle.
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    self.cycle(db),
+                    arguments,
+                    self.mappings(db),
+                ))
             }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
                 // This binder shadows the target in its body, but not in its arguments.

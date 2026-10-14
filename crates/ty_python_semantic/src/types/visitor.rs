@@ -497,8 +497,8 @@ pub(super) fn dynamic_content_impl<'db>(
         recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
-        active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
-        active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
+        // Unfolding can grow a recursive reference's mappings as well as its arguments.
+        active_aliases: ActiveRecursionDetector<Definition<'db>>,
         content: Cell<DynamicContent>,
         mode: DynamicContentMode,
     }
@@ -584,7 +584,7 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            self.active_type_aliases.visit(
+            self.active_aliases.visit(
                 &alias.definition(db),
                 || self.record(DynamicContent::Indeterminate),
                 || walk_type_alias_type(db, alias, self),
@@ -592,8 +592,8 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            self.active_recursive_types.visit(
-                &recursive.constructor(db),
+            self.active_aliases.visit(
+                &recursive.definition(db),
                 || self.record(DynamicContent::Indeterminate),
                 || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
             );
@@ -659,8 +659,7 @@ pub(super) fn dynamic_content_impl<'db>(
         recursion_guard: TypeCollector::default(),
         active_class_protocols: ActiveRecursionDetector::default(),
         active_class_typed_dicts: ActiveRecursionDetector::default(),
-        active_type_aliases: ActiveRecursionDetector::default(),
-        active_recursive_types: ActiveRecursionDetector::default(),
+        active_aliases: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
         mode,
     };

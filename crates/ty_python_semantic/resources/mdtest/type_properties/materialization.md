@@ -1399,7 +1399,8 @@ static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ## Materialization of recursively returned callables
 
 Materialization reaches every recursive result, including payloads introduced by later
-specializations. It also preserves invariant materializations such as `Bottom[list[Any]]`.
+specializations. It also preserves invariant materializations such as `Bottom[list[Any]]`. When
+applied to a recursive reference, it leaves the first payload unchanged.
 
 ```toml
 [environment]
@@ -1412,17 +1413,25 @@ from ty_extensions import Bottom, Top
 
 Stream = Callable[[], tuple[Any, "Stream"]]
 type NamedStream = Callable[[], tuple[Any, NamedStream]]
+MaterializedStream = Callable[[], tuple[Any, "Top[MaterializedStream]"]]
 
-def payloads(implicit: Top[Stream], explicit: Top[NamedStream]):
+def payloads(implicit: Top[Stream], explicit: Top[NamedStream], materialized: MaterializedStream):
     reveal_type(implicit()[1]()[0])  # revealed: object
     reveal_type(explicit()[1]()[0])  # revealed: object
+    reveal_type(materialized()[0])  # revealed: Any
+    reveal_type(materialized()[1]()[0])  # revealed: object
+    reveal_type(materialized()[1]()[1]()[0])  # revealed: object
 
 ListStream = Callable[[], tuple[list[Any], "ListStream"]]
 type NamedListStream = Callable[[], tuple[list[Any], NamedListStream]]
+MaterializedListStream = Callable[[], tuple[list[Any], "Bottom[MaterializedListStream]"]]
 
-def bottom_payloads(implicit: Bottom[ListStream], explicit: Bottom[NamedListStream]):
+def bottom_payloads(implicit: Bottom[ListStream], explicit: Bottom[NamedListStream], materialized: MaterializedListStream):
     reveal_type(implicit()[1]()[0])  # revealed: Bottom[list[Any]]
     reveal_type(explicit()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(materialized()[0])  # revealed: list[Any]
+    reveal_type(materialized()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(materialized()[1]()[1]()[0])  # revealed: Bottom[list[Any]]
 
 T = TypeVar("T")
 U = TypeVar("U")
