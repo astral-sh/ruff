@@ -2452,7 +2452,7 @@ impl<'db> StaticClassLiteral<'db> {
                     let own_fields =
                         class.own_fields_with_class_variables(db, specialization, field_policy);
 
-                    if field_policy.is_dataclass_like() {
+                    if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                         class_variables.extend(own_fields.class_variables.iter().cloned());
                         for name in own_fields.fields.keys() {
                             class_variables.swap_remove(name);
@@ -2488,7 +2488,7 @@ impl<'db> StaticClassLiteral<'db> {
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect();
 
-        if field_policy.is_dataclass_like() {
+        if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
             // `own_fields` excludes class variables, but their declarations can still mask
             // inherited fields. Delay removal so restoring a field preserves its original slot.
             map.retain(|name, _| !class_variables.contains(name));
@@ -2679,7 +2679,7 @@ impl<'db> StaticClassLiteral<'db> {
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
-                if field_policy.is_dataclass_like() {
+                if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                     class_variables.push(symbol.name().clone());
                 }
                 continue;
