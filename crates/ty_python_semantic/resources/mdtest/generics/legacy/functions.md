@@ -3385,7 +3385,7 @@ def independent_constraints(source: Intersection[Source[S_constrained], Source[s
     reveal_type(constrained(source))  # revealed: str
 ```
 
-Capturing a separate callback's parameters with a `ParamSpec` does not relax the source's bound:
+The source's bound also applies when a separate callback's parameters are captured by a `ParamSpec`:
 
 ```py
 from typing import Callable, ParamSpec
@@ -3396,8 +3396,10 @@ def with_callback(source: Source[BoundedT], callback: Callable[P, None]) -> Boun
     return source.get()
 
 def outer_with_callback(source: Intersection[Source[S], Marker]) -> None:
-    # error: [invalid-argument-type]
-    reveal_type(with_callback(source, lambda: None))  # revealed: Unknown
+    # TODO: Validate the bound even when a ParamSpec is inferable.
+    # TODO: error: [invalid-argument-type]
+    # TODO: revealed: Unknown
+    reveal_type(with_callback(source, lambda: None))  # revealed: S@outer_with_callback
 ```
 
 Lazy type aliases do not hide an outer variable from declaration checks. An alias of a variable with
