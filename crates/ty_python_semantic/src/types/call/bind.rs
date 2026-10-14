@@ -1342,19 +1342,6 @@ impl<'db> Bindings<'db> {
         }
     }
 
-    /// Whether argument inference needs to consider multiple positional placements, even for a
-    /// single signature. Such arguments need the same inference rounds as overloaded calls.
-    pub(crate) fn has_ambiguous_positional_arguments(&self) -> bool {
-        self.iter_flat()
-            .flat_map(|binding| &binding.overloads)
-            .any(|overload| {
-                overload
-                    .positional_matches
-                    .as_ref()
-                    .is_some_and(|positional| positional.has_ambiguous_argument_contexts())
-            })
-    }
-
     /// Verify that the type of each argument is assignable to type of the parameter that it was
     /// matched to.
     ///
@@ -8037,11 +8024,7 @@ impl<'db> Binding<'db> {
             .ok()
     }
 
-    /// Returns the possible type contexts for bidirectional inference of a source call argument.
-    ///
-    /// During speculative inference, `all_positions` retains every structurally possible position
-    /// so a placement rejected in one inference round can be reconsidered in the next. Committed
-    /// inference uses only positions that survived type checking.
+    /// Returns the type context to use for bidirectional inference of a source call argument.
     ///
     /// Request the shared argument specialization only when this parameter needs it. Unmatched
     /// arguments and parameters that use their type variable's upper bound do not need one.
@@ -8055,7 +8038,7 @@ impl<'db> Binding<'db> {
     /// wrapper(put_tags, [{"Key": "k", "Value": "v"}])  # forwarded list gets `list[Tag]`
     /// ```
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn argument_type_contexts(
+    pub(crate) fn argument_type_context(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -8063,62 +8046,14 @@ impl<'db> Binding<'db> {
         binding: &CallableBinding<'db>,
         arguments_types: &CallArguments<'_, 'db>,
         argument_index: usize,
-        all_positions: bool,
-        call_expression_tcx: TypeContext<'db>,
-        specialization: impl Fn() -> Option<Specialization<'db>>,
-    ) -> SmallVec<[Option<ArgumentTypeContext<'db>>; 1]> {
-        let argument_matches = self
-            .positional_matches
-            .as_ref()
-            .filter(|_| all_positions)
-            .and_then(|positional| {
-                positional
-                    .arguments
-                    .get(argument_index + usize::from(binding.bound_type.is_some()))
-            })
-            .filter(|matched| matched.matched)
-            .or_else(|| self.matched_argument_for_call_argument(binding, argument_index));
-        let Some(argument_matches) =
-            argument_matches.filter(|matched| !matched.parameters.is_empty())
-        else {
-            return smallvec![None];
-        };
-        if self.positional_matches.is_none() && argument_matches.parameters.len() != 1 {
-            return smallvec![None];
-        }
-        argument_matches
-            .iter()
-            .map(|matched_parameter| {
-                self.argument_type_context(
-                    db,
-                    env,
-                    constraints,
-                    binding,
-                    arguments_types,
-                    argument_index,
-                    matched_parameter,
-                    call_expression_tcx,
-                    &specialization,
-                )
-            })
-            .collect()
-    }
-
-    /// Returns the context for one argument/parameter match, specializing the parameter only when
-    /// its expected type requires information from the other arguments or the call's return type.
-    #[expect(clippy::too_many_arguments)]
-    fn argument_type_context(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        binding: &CallableBinding<'db>,
-        arguments_types: &CallArguments<'_, 'db>,
-        argument_index: usize,
-        matched_parameter: MatchedParameter<'db>,
         call_expression_tcx: TypeContext<'db>,
         specialization: impl Fn() -> Option<Specialization<'db>>,
     ) -> Option<ArgumentTypeContext<'db>> {
+        let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
+        let [matched_parameter] = argument_matches.parameters.as_slice() else {
+            return None;
+        };
+
         let parameter = &self.signature.parameters()[matched_parameter.index];
         let original_parameter_type = parameter.annotated_type();
         let mut parameter_type = matched_parameter
@@ -8474,12 +8409,8 @@ impl<'db> Binding<'db> {
         }
 
         let positional_arguments_valid = if let Some(positional) = &self.positional_matches {
-            let Some(evaluated) = positional
-                .evaluate(db, env, arguments, parameters)
-                .filter(|evaluated| !evaluated.provisional)
-            else {
-                // Keep the ordinary diagnostics when no complete placement succeeds or when
-                // unresolved lambda parameters prevent us from validating it.
+            let Some(evaluated) = positional.evaluate(db, env, arguments, parameters) else {
+                // Keep the ordinary diagnostics when no complete placement succeeds.
                 self.reset(db);
                 self.match_parameters_impl(db, env, arguments, false);
                 return self.check_types(db, env, arguments, call_expression_tcx);
@@ -8491,7 +8422,7 @@ impl<'db> Binding<'db> {
                         | CallArgument::Positional(_)
                         | CallArgument::Variadic(_)
                 ) {
-                    self.argument_matches[index] = evaluated.arguments[index].clone();
+                    self.argument_matches[index] = evaluated[index].clone();
                 }
             }
             true

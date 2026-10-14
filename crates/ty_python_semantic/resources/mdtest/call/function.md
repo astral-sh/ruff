@@ -1563,21 +1563,38 @@ def _(before: tuple[int, *tuple[int, ...], bytes], after: list[int]) -> None:
     f(*before, "text", *after)  # no diagnostic
 ```
 
-### Contextual inference between variable-length unpacks
+### Typed callbacks between variable-length unpacks
 
-The callback's possible parameter supplies the type of the lambda argument. That makes `.upper()`
-valid:
+An already-typed callback can match a different parameter without being inferred again:
+
+```py
+from collections.abc import Callable
+
+def f(a: int, callback: Callable[[str], str], b: int) -> None: ...
+def _(before: list[int], callback: Callable[[str], str], after: list[int]) -> None:
+    f(*before, callback, *after)  # no diagnostic
+```
+
+### Context-dependent arguments retain ordinary matching
+
+Lambdas retain ordinary matching and contextual inference. We do not try inferring their parameters
+under alternative positional placements:
 
 ```py
 from collections.abc import Callable
 
 def f(a: int, callback: Callable[[str], str], b: int) -> None: ...
 def _(before: list[int], after: list[int]) -> None:
-    f(*before, lambda text: text.upper(), *after)  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f(*before, lambda text: text.upper(), *after)
+
+def callback_first(callback: Callable[[str], str], n: int = 0) -> None: ...
+def _(after: list[int]) -> None:
+    callback_first(lambda text: text.upper(), *after)  # no diagnostic
 ```
 
-Keyword arguments still receive their own expected types when a positional argument can match
-different parameters. The dictionary is checked as an `Options`:
+Collection literals also retain ordinary matching, including literals passed by keyword:
 
 ```py
 from typing import TypedDict
@@ -1587,7 +1604,31 @@ class Options(TypedDict):
 
 def configured(a: int, b: str, c: int, *, options: Options) -> None: ...
 def _(before: list[int], after: list[int]) -> None:
-    configured(*before, "text", *after, options={"count": 1})  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    configured(*before, "text", *after, options={"count": 1})
+
+def collection(a: int, items: list[str], b: int) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    collection(*before, ["text"], *after)
+```
+
+Generic class references can also need an expected type, even when the argument is a name:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]): ...
+
+def class_argument(a: int, cls: type[Box[int]], b: int = 0) -> None: ...
+def _(before: list[int]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    class_argument(*before, Box)
 ```
 
 ### Keyword argument, positional-or-keyword parameter

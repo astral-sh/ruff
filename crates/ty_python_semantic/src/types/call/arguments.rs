@@ -27,24 +27,6 @@ use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 /// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L566
 const MAX_TOTAL_EXPANSION: usize = 256;
 
-/// A lambda's parameters must be known before they can establish a new argument placement.
-/// Its return type can still be provisional while its body is inferred from those parameters.
-pub(super) fn is_provisional_argument_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> bool {
-    match ty {
-        Type::Callable(callable) => callable.signatures(db).overloads.iter().any(|signature| {
-            signature
-                .parameters()
-                .iter()
-                .any(|parameter| parameter.annotated_type().has_provisional_marker(db, env))
-        }),
-        _ => ty.has_provisional_marker(db, env),
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Argument<'a> {
     /// The synthetic `self` or `cls` argument, which doesn't appear explicitly at the call site.
@@ -63,6 +45,8 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     items: Vec<CallArgument<'a, 'db>>,
+    /// Whether argument inference may depend on which parameter receives an expression.
+    has_context_dependent_arguments: bool,
 }
 
 /// An argument to a call and its inferred types, when available.
@@ -534,6 +518,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
+            has_context_dependent_arguments: true,
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
@@ -591,7 +576,11 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 }
             })
             .collect();
-        call_arguments.with_known_unpacking(arguments, infer_argument_type)
+        let mut call_arguments =
+            call_arguments.with_known_unpacking(arguments, infer_argument_type);
+        // LSP callers can supply incomplete types, without performing contextual inference.
+        call_arguments.has_context_dependent_arguments = true;
+        call_arguments
     }
 
     /// Retain the elements of collections constructed directly at an unpacking site.
@@ -704,6 +693,27 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    /// Restrict alternative placements to arguments inferred independently of their parameters.
+    pub(crate) fn with_context_independent_arguments(mut self, independent: bool) -> Self {
+        self.has_context_dependent_arguments = !independent;
+        self
+    }
+
+    /// Whether argument types can be reused when trying a different positional placement.
+    pub(super) fn supports_positional_alternatives(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        !self.has_context_dependent_arguments
+            && self.items.iter().all(|argument| {
+                argument
+                    .source_types()
+                    .iter()
+                    .all(|(_, ty)| !ty.has_provisional_marker(db, env))
+            })
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.items.len()
     }
@@ -719,20 +729,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     pub(crate) fn get(&self, index: usize) -> Option<&CallArgument<'a, 'db>> {
         self.items.get(index)
-    }
-
-    /// Whether some argument still depends on a placeholder from contextual inference.
-    pub(super) fn has_provisional_types(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        self.items.iter().any(|argument| {
-            argument
-                .source_types()
-                .iter()
-                .any(|(_, ty)| is_provisional_argument_type(db, env, ty))
-        })
     }
 
     /// The inferred source expression types, before any argument unpacking.
@@ -776,7 +772,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             let mut items = Vec::with_capacity(self.items.len() + 1);
             items.push(CallArgument::new(Argument::Synthetic, bound_self));
             items.extend(self.items.iter().cloned());
-            Cow::Owned(CallArguments { items })
+            Cow::Owned(CallArguments {
+                items,
+                has_context_dependent_arguments: self.has_context_dependent_arguments,
+            })
         } else {
             Cow::Borrowed(self)
         }
@@ -790,6 +789,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
+            has_context_dependent_arguments: self.has_context_dependent_arguments,
         }
     }
 
@@ -810,6 +810,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         prefix_len: usize,
     ) -> Self {
         Self {
+            has_context_dependent_arguments: self.has_context_dependent_arguments,
             items: indices
                 .iter()
                 .map(|index| {
@@ -1101,6 +1102,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument::new(argument, ty));
         }
 
-        Self { items }
+        Self {
+            items,
+            has_context_dependent_arguments: false,
+        }
     }
 }

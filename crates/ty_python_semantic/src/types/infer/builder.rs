@@ -5908,7 +5908,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Enable the expression cache if we are going to perform multi-inference.
         let teardown_expression_cache = if !generic_arguments.is_empty()
             || requires_overload_evaluation(&overload_candidates)
-            || bindings.has_ambiguous_positional_arguments()
         {
             self.setup_expression_cache()
         } else {
@@ -6081,8 +6080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
         let env = self.program_environment();
-        let requires_overload_evaluation = requires_overload_evaluation(candidates)
-            || bindings.has_ambiguous_positional_arguments();
+        let requires_overload_evaluation = requires_overload_evaluation(candidates);
         let arguments_tcx = self.collect_call_arguments_type_context(
             baseline_argument_types,
             bindings,
@@ -6176,8 +6174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         candidates: &OverloadSet,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
-        let requires_overload_evaluation = requires_overload_evaluation(candidates)
-            || bindings.has_ambiguous_positional_arguments();
+        let requires_overload_evaluation = requires_overload_evaluation(candidates);
 
         let mut arguments_tcx = self.collect_call_arguments_type_context(
             argument_types,
@@ -6358,14 +6355,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     |overload: &Binding<'db>,
                      binding: &CallableBinding<'db>,
                      specialization: &OnceCell<Option<Specialization<'db>>>| {
-                        overload.argument_type_contexts(
+                        overload.argument_type_context(
                             db,
                             env,
                             constraints,
                             binding,
                             argument_types,
                             argument_index,
-                            candidates.is_some(),
                             call_expression_tcx,
                             || {
                                 *specialization.get_or_init(|| {
@@ -6380,15 +6376,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     };
 
-                let contexts: SmallVec<[_; 1]> = overloads_with_binding
-                    .iter()
-                    .flat_map(|(overload, binding, specialization)| {
-                        parameter_tcx(overload, binding, specialization)
-                    })
-                    .collect();
-                let parameter_contexts = match contexts.as_slice() {
-                    [context] => MatchingArgumentTypeContext::Unique(*context),
-                    _ => MatchingArgumentTypeContext::Many(contexts.into_vec()),
+                let parameter_contexts = if let Ok((overload, binding, specialization)) =
+                    overloads_with_binding.iter().exactly_one()
+                {
+                    MatchingArgumentTypeContext::Unique(parameter_tcx(
+                        overload,
+                        binding,
+                        specialization,
+                    ))
+                } else {
+                    MatchingArgumentTypeContext::Many(
+                        overloads_with_binding
+                            .iter()
+                            .map(|(overload, binding, specialization)| {
+                                parameter_tcx(overload, binding, specialization)
+                            })
+                            .collect(),
+                    )
                 };
 
                 Some(parameter_contexts)
@@ -9127,12 +9131,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Whether positional matching can reuse argument types across different parameter positions.
+    ///
+    /// Keep expressions that need expected types, such as lambdas, collection literals, and calls,
+    /// on the ordinary matcher. Even a name can need context when it refers to a generic class.
+    fn call_arguments_are_context_independent(&mut self, arguments: &ast::Arguments) -> bool {
+        arguments.args.iter().any(ast::Expr::is_starred_expr)
+            && arguments.iter_source_order().all(|argument| {
+                let expression = match argument {
+                    ast::ArgOrKeyword::Arg(ast::Expr::Starred(_)) => return true,
+                    ast::ArgOrKeyword::Arg(expression) => expression,
+                    ast::ArgOrKeyword::Keyword(keyword) => &keyword.value,
+                };
+                if matches!(
+                    expression,
+                    ast::Expr::NumberLiteral(_)
+                        | ast::Expr::StringLiteral(_)
+                        | ast::Expr::BytesLiteral(_)
+                        | ast::Expr::BooleanLiteral(_)
+                        | ast::Expr::NoneLiteral(_)
+                ) {
+                    return true;
+                }
+                if !matches!(expression, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+                    return false;
+                }
+                let ty = self
+                    .speculate_without_diagnostics()
+                    .infer_expression(expression, TypeContext::default());
+                !matches!(ty, Type::ClassLiteral(_))
+                    && !ty.has_provisional_marker(self.db(), self.program_environment())
+            })
+    }
+
     /// Infer the variadic argument types needed for call binding and emit the shared diagnostics
     /// for invalid `*args` and `**kwargs` inputs.
     fn prepare_call_arguments<'a>(
         &mut self,
         arguments: &'a ast::Arguments,
     ) -> CallArguments<'a, 'db> {
+        let context_independent = self.call_arguments_are_context_independent(arguments);
         let db = self.db();
         let env = self.program_environment();
         let call_arguments =
@@ -9148,7 +9186,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 ty
             })
-            .with_known_unpacking(arguments, |expression| self.try_expression_type(expression));
+            .with_known_unpacking(arguments, |expression| self.try_expression_type(expression))
+            .with_context_independent_arguments(context_independent);
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {

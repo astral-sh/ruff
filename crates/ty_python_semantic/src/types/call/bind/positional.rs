@@ -3,8 +3,9 @@ use rustc_hash::FxHashSet;
 use super::{InvalidArgumentTypeProvenance, MatchedArgument, MatchedParameter};
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgument, CallArguments, is_provisional_argument_type};
+use crate::types::call::arguments::{CallArgument, CallArguments};
 use crate::types::tuple::{TupleSpec, VariableSegment};
+use crate::types::visitor::any_over_type;
 use crate::types::{Parameters, Type};
 
 /// Bound the dense tables used for matching. Larger calls use the ordinary matcher, whose memory
@@ -56,17 +57,12 @@ pub(super) struct PositionalMatches<'db> {
     pub(super) arguments: Box<[MatchedArgument<'db>]>,
 }
 
-pub(super) struct PositionalEvaluation<'db> {
-    pub(super) arguments: Box<[MatchedArgument<'db>]>,
-    pub(super) provisional: bool,
-}
-
 impl<'db> PositionalMatches<'db> {
     /// Builds the possible placements from argument lengths, before checking their types.
     ///
     /// Returns `None` when the ordinary matcher should handle the call, including unsupported
-    /// unpacking forms and argument counts that cannot fit. The initial matches retain every
-    /// possible parameter for argument inference; [`Self::evaluate`] then checks complete placements.
+    /// unpacking forms and argument counts that cannot fit. The initial matches describe possible
+    /// parameters before argument types are known; [`Self::evaluate`] checks complete placements.
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -74,7 +70,13 @@ impl<'db> PositionalMatches<'db> {
         parameters: &Parameters<'db>,
         explicit_keywords: &FxHashSet<usize>,
     ) -> Option<Self> {
-        if arguments.has_provisional_types(db, env)
+        if !arguments.supports_positional_alternatives(db, env)
+            // A name or string literal can become a type expression in a `TypeForm` context.
+            || parameters.iter().any(|parameter| {
+                any_over_type(db, env, parameter.annotated_type(), false, |ty| {
+                    matches!(ty, Type::TypeForm(_))
+                })
+            })
             || parameters.variadic().is_some()
             || !arguments
                 .iter()
@@ -268,14 +270,6 @@ impl<'db> PositionalMatches<'db> {
         }
     }
 
-    /// Whether a non-unpacked argument has more than one possible contextual parameter type.
-    pub(super) fn has_ambiguous_argument_contexts(&self) -> bool {
-        self.segments.iter().any(|segment| {
-            segment.argument_type.is_none()
-                && self.arguments[segment.argument_index].parameters.len() > 1
-        })
-    }
-
     /// Checks argument types and retains matches that belong to a valid complete placement.
     ///
     /// Returns `None` when the ordinary matcher should diagnose the call.
@@ -285,11 +279,10 @@ impl<'db> PositionalMatches<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
         parameters: &Parameters<'db>,
-    ) -> Option<PositionalEvaluation<'db>> {
+    ) -> Option<Box<[MatchedArgument<'db>]>> {
         // Check each segment's element type against each parameter once. Different unpack
         // lengths may use the same match.
         let mut edges = vec![false; self.state(self.segments.len(), 0)];
-        let mut provisional_edges = vec![false; edges.len()];
         for (index, segment) in self.segments.iter().enumerate() {
             for position in 0..self.parameter_count {
                 let current = self.state(index, position);
@@ -300,11 +293,7 @@ impl<'db> PositionalMatches<'db> {
                 edges[current] = arguments
                     .get(segment.argument_index)
                     .and_then(|argument| argument.matched_type(expected, segment.argument_type))
-                    .is_none_or(|actual| {
-                        provisional_edges[current] = is_provisional_argument_type(db, env, actual)
-                            && !actual.is_subtype_of(db, env, expected);
-                        actual.is_assignable_to(db, env, expected)
-                    });
+                    .is_none_or(|actual| actual.is_assignable_to(db, env, expected));
             }
         }
 
@@ -336,7 +325,6 @@ impl<'db> PositionalMatches<'db> {
 
         // Keep a match only when we can reach it from the start and complete the call after it.
         let mut matched = Self::empty_matches(arguments);
-        let mut provisional = false;
         let mut reachable = vec![false; self.can_finish.len()];
         reachable[0] = true;
         for (index, segment) in self.segments.iter().enumerate() {
@@ -352,16 +340,12 @@ impl<'db> PositionalMatches<'db> {
                     && edges[current]
                     && suffix[next]
                 {
-                    provisional |= provisional_edges[current];
                     segment.add_match(&mut matched, position);
                     reachable[next] = true;
                 }
             }
         }
         Self::deduplicate_matches(&mut matched);
-        Some(PositionalEvaluation {
-            arguments: matched,
-            provisional,
-        })
+        Some(matched)
     }
 }
