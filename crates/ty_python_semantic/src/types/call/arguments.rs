@@ -20,7 +20,7 @@ use crate::types::typed_dict::{
 use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
-/// in [`CallArgumentExpansions::iter`].
+/// in [`CallArgumentExpansions::iter`] and [`CallArguments::expand_tuple_unions`].
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
@@ -847,6 +847,57 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             env,
             types: OnceCell::new(),
         }
+    }
+
+    /// Returns every combination of tuple-union members in starred arguments.
+    ///
+    /// Each member keeps its length and element types. Here, `1.0` binds to `b` or `c`:
+    ///
+    /// ```python
+    /// def f(a: int, b: str | float, c: float = 0.0) -> None: ...
+    /// def g(args: tuple[int] | tuple[int, str]) -> None:
+    ///     f(*args, 1.0)
+    /// ```
+    ///
+    /// The caller must check every combination. Other arguments retain their inferred types.
+    /// Returns `None` if a starred argument lacks an inferred type, a union contains a non-tuple
+    /// member, or the number of combinations exceeds [`MAX_TOTAL_EXPANSION`].
+    pub(super) fn expand_tuple_unions(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Cow<'_, [Self]>> {
+        let mut combinations = Cow::Borrowed(std::slice::from_ref(self));
+        for (index, argument) in self.iter().enumerate() {
+            if !matches!(argument, CallArgument::Variadic(_)) {
+                continue;
+            }
+            let Some(union) = argument.source_type()?.resolve_type_alias(db).as_union() else {
+                continue;
+            };
+            let members = union.elements(db);
+            if members.len().checked_mul(combinations.len())? > MAX_TOTAL_EXPANSION
+                || members
+                    .iter()
+                    .any(|member| member.tuple_instance_spec(db, env).is_none())
+            {
+                return None;
+            }
+            combinations = Cow::Owned(
+                combinations
+                    .iter()
+                    .flat_map(|arguments| {
+                        members.iter().map(move |member| {
+                            let mut arguments = arguments.clone();
+                            arguments.items[index] =
+                                CallArgument::new(Argument::Variadic, Some(*member));
+                            arguments
+                        })
+                    })
+                    .collect(),
+            );
+        }
+        Some(combinations)
     }
 
     pub(super) fn display<'env>(
