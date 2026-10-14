@@ -2716,9 +2716,11 @@ reveal_type(WithOverloadedMethod[int].method)
 
 ## Ambiguous overloads preserve generic return types
 
-When a gradual receiver matches overloads returning different specializations of the same class, the
-result retains that class. Only the differing type arguments become unknown. This covers the
-operator overloads in [#4055](https://github.com/astral-sh/ty/issues/4055).
+Here, a `Series[Any]` receiver matches both `__add__` overloads, whose return types are
+`Series[int]` and `Series[str]`. We preserve the common `Series` class and replace only its
+differing type argument with `Unknown`, so the result is `Series[Unknown]` instead of `Unknown`.
+
+Regression test for [#4055](https://github.com/astral-sh/ty/issues/4055).
 
 ```py
 from __future__ import annotations
