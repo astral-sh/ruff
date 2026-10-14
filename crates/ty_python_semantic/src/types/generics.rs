@@ -4313,26 +4313,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // that is a strict subtype (e.g. `bool` vs `int`) would allow
                         // the callee to return a widened type that violates the caller's
                         // constraint.
-                        if let Type::TypeVar(actual_typevar) = ty
-                            && let Some(actual_constraints) =
-                                actual_typevar.typevar(db).constraints(db, self.env)
+                        if let Type::TypeVar(actual_typevar) = ty.resolve_type_alias(db)
+                            && let Some(TypeVarBoundOrConstraints::Constraints(actual_constraints)) =
+                                actual_typevar
+                                    .typevar(db)
+                                    .bound_or_constraints(db, self.env)
+                            && actual_constraints.is_subset_of(db, self.env, typevar_constraints)
                         {
-                            let all_satisfied =
-                                actual_constraints.iter().all(|actual_constraint| {
-                                    typevar_constraints.elements(db).iter().any(
-                                        |formal_constraint| {
-                                            actual_constraint.is_equivalent_to(
-                                                db,
-                                                self.env,
-                                                *formal_constraint,
-                                            )
-                                        },
-                                    )
-                                });
-                            if all_satisfied {
-                                self.add_type_mapping(bound_typevar, ty, polarity);
-                                return Ok(());
-                            }
+                            self.add_type_mapping(bound_typevar, ty, polarity);
+                            return Ok(());
                         }
 
                         for constraint in typevar_constraints.elements(db) {
@@ -4405,36 +4394,72 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, visitor)?;
                 }
             }
+            (_, Type::Intersection(actual_intersection))
+                if polarity.is_covariant()
+                    && let Ok(positive) = actual_intersection.iter_positive(db).exactly_one() =>
+            {
+                // Dropping negative elements upcasts the argument. In particular, truthiness
+                // narrowing must not send a callable with a ParamSpec or TypeVarTuple through
+                // the new solver, which does not support those variables yet.
+                return self.infer_map_impl(formal, positive, polarity, visitor);
+            }
             (_, Type::Intersection(actual_intersection)) => {
-                // Try to infer type mappings by checking against each intersection element. This
-                // is the dual of the `union_formal` arm above, and it handles cases like:
-                //
-                // ```py
-                // def f[T](t: P[T]) -> T: ...
-                //
-                // def _(x: P[str] & Q[str]):
-                //     reveal_type(f(x))  # revealed: str
-                // ```
-                //
-                // It's important that this arm comes after the `TypeVar` arm above, so that a bare
-                // typevar bound to an intersection gets the whole thing.
-                //
-                // It's sufficient for one intersection element to satisfy the constraints here.
-                // They don't all have to.
-                let mut first_error = None;
-                let mut found_matching_element = false;
-                for positive in actual_intersection.iter_positive(db) {
-                    let result = self.infer_map_impl(formal, positive, polarity, visitor);
-                    if let Err(err) = result {
-                        // TODO: `infer_map_impl` can have side effects even in the error case, so
-                        // to be fully correct here we'd need to snapshot `self.types` before each
-                        // call and roll it back if we get an error. The `Union` arm has the same
-                        // issue above.
-                        first_error.get_or_insert(err);
-                    } else {
-                        // The recursive call to `infer_map_impl` may succeed even if the actual
-                        // type is not assignable to the formal element.
-                        if !positive
+                // Use correlated constraints to keep alternative specializations separate. This
+                // follows the TypeVar arm so a bare variable still receives the entire intersection.
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                let analysis = self.analyze_constraint_set(when);
+                let is_gradual = |ty: Type<'db>| {
+                    // `Type::is_fully_static` can miss `Any` in original function signatures. It also
+                    // treats `Top[list[Any]]` as gradual, although its materializations are equal.
+                    ty.bottom_materialization(db, self.env) != ty.top_materialization(db, self.env)
+                };
+                let use_legacy_inference = polarity.is_covariant()
+                    && match &analysis {
+                        // An unconditional relation may already have discarded gradual evidence.
+                        ConstraintSetAnalysis::Unconstrained => true,
+                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(paths)) => paths
+                            .iter()
+                            .flat_map(|solution| &solution.solved_typevars)
+                            .any(|binding| is_gradual(binding.solution)),
+                        ConstraintSetAnalysis::Unsatisfiable(failures) => {
+                            failures.iter().any(|failure| match &failure.error {
+                                SpecializationError::MismatchedBound { argument, .. }
+                                | SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::Lower(argument),
+                                    ..
+                                } => is_gradual(*argument),
+                                SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::Upper(bounds),
+                                    ..
+                                } => bounds.iter().copied().any(is_gradual),
+                                SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::UpperUnknown,
+                                    ..
+                                } => false,
+                            })
+                        }
+                        // Do not bypass exhausted budgets by retrying recursive inference.
+                        ConstraintSetAnalysis::Constrained(SolutionPaths::BudgetExceeded(_))
+                        | ConstraintSetAnalysis::BudgetExceeded => false,
+                    };
+                if use_legacy_inference {
+                    // TODO: Remove this compatibility path once gradual materialization evidence
+                    // is preserved (https://github.com/astral-sh/ruff/pull/28307). For example,
+                    // `Any & Source[str] <= Source[T]` becomes unconditionally true, losing the
+                    // `str` contribution. Inferring each positive separately retains that evidence.
+                    // Inspecting inferred types also catches gradual specializations inherited
+                    // through an MRO, which may not appear directly in the argument type.
+                    let mut first_error = None;
+                    let mut found_matching_element = false;
+                    // One matching positive makes errors from other positives irrelevant;
+                    // successful recursive inference alone does not establish assignability.
+                    for positive in actual_intersection.iter_positive(db) {
+                        if let Err(error) = self.infer_map_impl(formal, positive, polarity, visitor)
+                        {
+                            // TODO: Failed inference can modify both `self.types` and `self.pending`.
+                            // Isolate alternatives before mutating shared state.
+                            first_error.get_or_insert(error);
+                        } else if !positive
                             .when_assignable_to(
                                 db,
                                 self.env,
@@ -4447,10 +4472,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             found_matching_element = true;
                         }
                     }
+                    if !found_matching_element && let Some(error) = first_error {
+                        return Err(error);
+                    }
+                } else {
+                    self.record_constraint_set(when);
+                    if let Some(error) = analysis.specialization_error(db, self.env) {
+                        return Err(error);
+                    }
+                    self.project_for_legacy_fallback(&analysis);
                 }
-                if !found_matching_element && let Some(error) = first_error {
-                    return Err(error);
-                }
+                return Ok(());
             }
 
             (
