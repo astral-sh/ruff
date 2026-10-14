@@ -4488,10 +4488,7 @@ matches the annotation:
 def set_module(obj: object):
     obj.__module__ = "custom"  # error: [invalid-assignment] "Cannot assign to attribute `__module__` on type `object`"
 
-def set_metadata(obj: object):
-    obj.__doc__ = None  # error: [invalid-assignment]
-    obj.__annotations__ = {}  # error: [invalid-assignment]
-    obj.__dict__ = {}  # error: [invalid-assignment]
+def set_class(obj: object):
     obj.__class__ = object  # error: [invalid-assignment]
 ```
 
@@ -4515,14 +4512,9 @@ class Writable: ...
 
 def set_writable_metadata(obj: Writable):
     obj.__module__ = "custom"  # no diagnostic
-    obj.__doc__ = None  # no diagnostic
-    obj.__annotations__ = {}  # no diagnostic
-    obj.__dict__ = {}  # no diagnostic
     obj.__class__ = Writable  # no diagnostic
 
 Writable.__module__ = "custom"  # no diagnostic
-Writable.__doc__ = None  # no diagnostic
-Writable.__annotations__ = {}  # no diagnostic
 ```
 
 `NewType` preserves the storage limitations of its underlying type:
@@ -4534,6 +4526,34 @@ WrappedObject = NewType("WrappedObject", object)
 
 def set_wrapped_module(obj: WrappedObject):
     obj.__module__ = "custom"  # error: [invalid-assignment]
+```
+
+### Setting metadata attributes on `Callable`
+
+`Callable` does not guarantee writable metadata either: a callable object can expose `__module__` as
+a read-only property.
+
+```py
+from typing import Callable
+
+def set_module(obj: Callable[[], None]):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+class ReadOnlyCallable:
+    def __call__(self) -> None: ...
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnlyCallable())  # no diagnostic
+```
+
+Function objects do provide writable metadata:
+
+```py
+def function() -> None: ...
+
+function.__module__ = "custom"  # no diagnostic
 ```
 
 ### Setting attributes on `Never` / `Any`
