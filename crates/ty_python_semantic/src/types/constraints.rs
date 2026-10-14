@@ -3550,7 +3550,7 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
-        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node);
+        let walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -3564,8 +3564,7 @@ impl<'db> CandidateSolutions<'db> {
             node_support.as_ref(),
             Polarity::Positive,
             node,
-        )?;
-        ControlFlow::Continue(walker.finish())
+        )
     }
 
     /// Solves a constraint set when it represents a _simple conjunction_: it can be expressed as a

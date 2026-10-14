@@ -1344,7 +1344,7 @@ mod tests {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(
+            let walker = SolutionWalker::new(
                 db,
                 &mut storage,
                 source_orders.clone(),
@@ -1364,10 +1364,9 @@ mod tests {
                 ),
                 ControlFlow::Break(error)
             );
-            drop(walker);
 
             let limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(
+            let walker = SolutionWalker::new(
                 db,
                 &mut storage,
                 source_orders.clone(),
@@ -1375,7 +1374,7 @@ mod tests {
                 limits,
                 set.node,
             );
-            let ControlFlow::Continue(()) = walker.visit_node(
+            let ControlFlow::Continue(solutions) = walker.visit_node(
                 db,
                 &env,
                 &mut storage,
@@ -1384,7 +1383,7 @@ mod tests {
                 Polarity::Positive,
                 set.node,
             );
-            assert_eq!(walker.finish(), expected);
+            assert_eq!(solutions, expected);
         }
     }
 }

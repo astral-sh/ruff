@@ -1329,6 +1329,27 @@ class NameAttribute(Generic[T]):
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+### Constrained class and constructor type variables
+
+An explicit receiver annotation can require the class and constructor type variables to agree.
+Although `True` matches the constructor's `bool` constraint, satisfying both declarations requires
+choosing `int`.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bool, int)
+U = TypeVar("U", int, str)
+
+class Box(Generic[U]):
+    value: U
+
+    def __init__(self: "Box[T]", value: T) -> None:
+        self.value = value
+
+reveal_type(Box(True))  # revealed: Box[int]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
