@@ -155,7 +155,7 @@ fn create_lexicon_and_offsets(
                 // insert the suffixes of this word which saves about
                 // 10KB (we could theoretically insert all substrings,
                 // upto a certain length, but this only saves ~300
-                // bytes or so and is noticably slower).
+                // bytes or so and is noticeably slower).
                 for i in 1..n.len() {
                     if t.insert(n[i..].bytes(), Some(offset + i), true).0 {
                         // once we've found a string that's already
