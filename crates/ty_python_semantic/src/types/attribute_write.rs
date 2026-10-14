@@ -403,7 +403,9 @@ pub(super) fn attribute_write_requirement<'db>(
                         receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
-                _ => member_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                TypeVarBoundOrConstraints::UpperBound(_) => {
+                    member_attribute_write_requirement(db, env, object_ty, attribute, receiver)
+                }
             }
         }
 
