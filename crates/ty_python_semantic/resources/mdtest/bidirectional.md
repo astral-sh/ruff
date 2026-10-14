@@ -810,6 +810,16 @@ def _(value: Any):
     reveal_type(bounded_consumer(consumer(value)))  # revealed: (Any | int, /) -> None
 ```
 
+However, it does not restrict the range of a gradual declared type:
+
+```py
+def preserve_shape[T: (int, str), S: tuple[int, ...]](shape: S, value: T) -> S:
+    return shape
+
+def _(shape: tuple[Any, ...]):
+    result: tuple[Any, ...] = reveal_type(preserve_shape(shape, 1))  # revealed: tuple[Any, ...]
+```
+
 The argument of a callable is narrowed based on outer type context:
 
 ```py

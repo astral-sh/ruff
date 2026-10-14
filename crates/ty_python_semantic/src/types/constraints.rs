@@ -3096,10 +3096,10 @@ impl<'db> CandidateTypeVarSolver<'db> {
             has_declared_evidence,
         } = self;
 
-        let evidence_lower = |source: EvidenceSource, with_validity| {
+        let iter_lower_bounds = |source: EvidenceSource, include_validity| {
             lower.iter().filter_map(move |&(provenance, ty)| {
                 if source.includes(provenance)
-                    && provenance.contains(ConstraintProvenance::VALIDITY) == with_validity
+                    && (include_validity || !provenance.contains(ConstraintProvenance::VALIDITY))
                 {
                     Some(ty)
                 } else {
@@ -3114,7 +3114,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         // Note that we only compute this flag for constrained type variables.
         let has_only_non_concrete_evidence =
             bound_typevar.typevar(db).is_constrained(db).then(|| {
-                let mut evidence = evidence_lower(EvidenceSource::All, false)
+                let mut evidence = iter_lower_bounds(EvidenceSource::All, false)
                     .chain(upper.iter_evidence_without_validity(EvidenceSource::All))
                     .filter(|ty| !ty.has_unspecialized_type_var(db, env))
                     .peekable();
@@ -3126,28 +3126,16 @@ impl<'db> CandidateTypeVarSolver<'db> {
                     })
             });
 
-        let collect_lower_bound = |source| {
-            // Normalize each group before merging the two lower bounds.
-            let union_bounds = |with_validity| {
-                let bounds: FxIndexSet<_> = evidence_lower(source, with_validity).collect();
-                (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
-            };
-
-            match (union_bounds(false), union_bounds(true)) {
-                (Some(evidence), Some(with_validity)) => Some(UnionType::from_two_elements(
-                    db,
-                    env,
-                    evidence,
-                    with_validity,
-                )),
-
-                (lower, None) | (None, lower) => lower,
-            }
+        let union_lower_bounds = |source, include_validity| {
+            let bounds: FxIndexSet<_> = iter_lower_bounds(source, include_validity).collect();
+            (!bounds.is_empty()).then(|| UnionType::from_elements(db, env, bounds))
         };
 
-        let evidence_lower = collect_lower_bound(EvidenceSource::All);
-        let inferred_lower = collect_lower_bound(EvidenceSource::Inferred);
-        let declared_lower = collect_lower_bound(EvidenceSource::Declared);
+        // Exclude bounds derived using validity constraints from the declared candidate, so as to
+        // prefer the declared type as written by the caller.
+        let declared_lower = union_lower_bounds(EvidenceSource::Declared, false);
+        let evidence_lower = union_lower_bounds(EvidenceSource::All, true);
+        let inferred_lower = union_lower_bounds(EvidenceSource::Inferred, true);
         let validity_lower = UnionType::from_elements(
             db,
             env,
@@ -3353,7 +3341,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         }
         .filter(|candidate| !candidate.has_provisional_marker(db, env));
 
-        let declared = match self.declared_candidate(db, env, builder, inferable) {
+        let declared = match self.declared_candidate(db, env) {
             PathBoundSolution::Solved(declared) => Some(declared),
             PathBoundSolution::Unsolved | PathBoundSolution::Unsatisfiable => None,
             PathBoundSolution::BudgetExceeded { .. } => return default_solution,
@@ -3386,27 +3374,19 @@ impl<'db> CandidateTypeVarSolution<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
     ) -> PathBoundSolution<'db> {
-        self.raw_declared_candidate(db, env, builder, inferable)
-            .unwrap_or_else(|| self.solve_from_evidence(db, env, builder, EvidenceSource::Declared))
-    }
-
-    fn raw_declared_candidate(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> Option<PathBoundSolution<'db>> {
-        // Avoid intersecting the declared candidate with validity bounds, preferring any gradual
-        // types in the declared candidate without restricting their gradual range.
+        // Avoid restricting the range of a gradual declared type using validity bounds, preferring
+        // the declared type as written by the caller.
         let candidate = match self.lower_bound(EvidenceSource::Declared) {
             Some(lower) => lower,
 
-            None if self.upper.has_inference(EvidenceSource::Declared) => {
-                let upper_bounds = self.upper.iter_evidence(EvidenceSource::Declared);
+            None if self
+                .upper
+                .has_evidence_without_validity(EvidenceSource::Declared) =>
+            {
+                let upper_bounds = self
+                    .upper
+                    .iter_evidence_without_validity(EvidenceSource::Declared);
 
                 let candidate =
                     UpperBound::single_bound_from_iterator(db, env, upper_bounds.clone())
@@ -3414,20 +3394,19 @@ impl<'db> CandidateTypeVarSolution<'db> {
 
                 match candidate {
                     Some(candidate) => candidate,
-                    None => return Some(PathBoundSolution::BudgetExceeded { fallback: None }),
+                    None => return PathBoundSolution::BudgetExceeded { fallback: None },
                 }
             }
 
-            None => return None,
+            None => return PathBoundSolution::Unsolved,
         };
 
         // Static candidates are promoted to the selected type variable constraint.
         if self.selected_declared_constraint.is_some() && candidate.is_fully_static(db, env) {
-            return None;
+            return PathBoundSolution::Unsolved;
         }
 
-        self.accepts_candidate(db, env, builder, inferable, candidate)
-            .then_some(PathBoundSolution::Solved(candidate))
+        PathBoundSolution::Solved(candidate)
     }
 
     /// Checks whether a given candidate solution satisfies this path.
