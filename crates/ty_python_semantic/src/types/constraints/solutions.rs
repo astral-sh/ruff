@@ -117,6 +117,15 @@ fn never_prune<'db, L, B>(
     ControlFlow::Continue(PathIs::Uncertain)
 }
 
+type ProcessNode<'a, 'db, L, B, R> = dyn Fn(
+        &mut SolutionWalker<'db, L>,
+        &mut ConstraintSetStorage<'db>,
+        &mut PathAssignments,
+        Polarity,
+        NodeId,
+    ) -> ControlFlow<B, R>
+    + 'a;
+
 /// A callback that is invoked by [`visit_node_and_then`][SolutionWalker::visit_node_and_then]
 /// whenever a satisfied path to the `true` terminal is found.
 type ProcessSatisfied<'a, 'db, L, B> = dyn Fn(
@@ -431,23 +440,27 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         }
 
         // At this point we actually have to walk the outgoing edges of this node.
-        let interior = storage.interior_node_data(node);
-        let constraint_id = interior.constraint;
-        let constraint = storage.constraint_data(constraint_id);
-        match constraint {
-            Constraint::Atomic(_) => self.visit_atomic_constraint(
-                db,
-                env,
-                storage,
-                path,
-                polarity,
-                interior,
-                AtomicConstraintId(constraint_id),
-                check_cache,
-                prune_path,
-                process_satisfied,
-            ),
-        }
+        self.visit_constraint(
+            db,
+            env,
+            storage,
+            path,
+            polarity,
+            node,
+            &|this, storage, path, polarity, child| {
+                this.visit_node_and_then(
+                    db,
+                    env,
+                    storage,
+                    path,
+                    polarity,
+                    child,
+                    check_cache,
+                    prune_path,
+                    process_satisfied,
+                )
+            },
+        )
     }
 
     /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
@@ -502,6 +515,34 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     #[expect(clippy::too_many_arguments)]
+    fn visit_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+        process_node: &ProcessNode<'_, 'db, L, Break<L::Break>, ()>,
+    ) -> ControlFlow<Break<L::Break>> {
+        let interior = storage.interior_node_data(node);
+        let constraint_id = interior.constraint;
+        let constraint = storage.constraint_data(constraint_id);
+        match constraint {
+            Constraint::Atomic(_) => self.visit_atomic_constraint(
+                db,
+                env,
+                storage,
+                path,
+                polarity,
+                interior,
+                AtomicConstraintId(constraint_id),
+                process_node,
+            ),
+        }
+    }
+
+    #[expect(clippy::too_many_arguments)]
     fn visit_atomic_constraint(
         &mut self,
         db: &'db dyn Db,
@@ -511,9 +552,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         interior: InteriorNodeData,
         constraint: AtomicConstraintId,
-        check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
-        prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
+        process_node: &ProcessNode<'_, 'db, L, Break<L::Break>, ()>,
     ) -> ControlFlow<Break<L::Break>> {
         // The repetitive nature of the visit_atomic_edge calls is intentional; in the negative
         // polarity case, it's important that we not construct the `if_false` edge sink unless we
@@ -531,9 +570,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             polarity,
             constraint.when_true(),
             if_true,
-            check_cache,
-            prune_path,
-            process_satisfied,
+            process_node,
         )?;
 
         if polarity == Polarity::Positive {
@@ -545,9 +582,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 polarity,
                 constraint.when_unconstrained(),
                 interior.if_uncertain,
-                check_cache,
-                prune_path,
-                process_satisfied,
+                process_node,
             )?;
         }
 
@@ -564,9 +599,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             polarity,
             constraint.when_false(),
             if_false,
-            check_cache,
-            prune_path,
-            process_satisfied,
+            process_node,
         )?;
 
         ControlFlow::Continue(())
@@ -586,9 +619,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         assignment: Assignment<AtomicConstraintId>,
         child: NodeId,
-        check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
-        prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
+        process_node: &ProcessNode<'_, 'db, L, Break<L::Break>, ()>,
     ) -> ControlFlow<Break<L::Break>> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
@@ -604,20 +635,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             storage,
             assignment,
             |storage, path, _new_range, found_conflict| {
-                if !found_conflict {
-                    self.visit_node_and_then(
-                        db,
-                        env,
-                        storage,
-                        path,
-                        polarity,
-                        child,
-                        check_cache,
-                        prune_path,
-                        process_satisfied,
-                    )?;
+                if found_conflict {
+                    return ControlFlow::Continue(());
                 }
-                ControlFlow::Continue(())
+                process_node(self, storage, path, polarity, child)
             },
         )
     }
