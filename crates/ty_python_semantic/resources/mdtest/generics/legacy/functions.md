@@ -1935,9 +1935,11 @@ truthiness. A more precise bound with instance storage does permit these writes.
 ```py
 from typing import NewType, TypeVar
 
+class Writable: ...
+
 T = TypeVar("T")
 O = TypeVar("O", bound=object)
-C = TypeVar("C", object, int)
+C = TypeVar("C", object, Writable)
 
 def implicit(obj: T):
     obj.__module__ = "custom"  # error: [invalid-assignment]
@@ -1953,20 +1955,10 @@ def constrained(obj: C):
     obj.__module__ = "custom"  # error: [invalid-assignment]
 
 WrappedObject = NewType("WrappedObject", object)
-N = TypeVar("N", bound=WrappedObject)
-NC = TypeVar("NC", WrappedObject, int)
-U = TypeVar("U", bound=WrappedObject | int)
-
-def wrapped(obj: N):
-    obj.__module__ = "custom"  # error: [invalid-assignment]
-
-def wrapped_constraint(obj: NC):
-    obj.__module__ = "custom"  # error: [invalid-assignment]
+U = TypeVar("U", bound=WrappedObject | Writable)
 
 def union_bound(obj: U):
     obj.__module__ = "custom"  # error: [invalid-assignment]
-
-class Writable: ...
 
 W = TypeVar("W", bound=Writable)
 

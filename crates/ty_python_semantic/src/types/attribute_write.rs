@@ -379,8 +379,8 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeVar(typevar) => {
             // Normal member lookup combines raw member types. Resolve each receiver separately
             // so writable instance storage is not mistaken for a descriptor alternative.
-            match typevar.typevar(db).bound_or_constraints(db, env) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) if bound != object_ty => {
+            match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) if bound != object_ty => {
                     attribute_write_requirement(
                         db,
                         env,
@@ -389,7 +389,7 @@ pub(super) fn attribute_write_requirement<'db>(
                         Some(receiver.unwrap_or(object_ty)),
                     )
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
                     AttributeWriteRequirement::All {
                         object_ty,
                         element_tys: constraints.elements(db),
@@ -513,26 +513,16 @@ fn instance_attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
-    // `object` has no writable instance storage, even though typeshed annotates metadata such
-    // as `__module__` as ordinary instance attributes. Truthiness does not establish storage.
-    let is_object_receiver = |ty: Type<'db>| {
-        ty.nominal_class(db, env)
-            .is_some_and(|class| class.is_object(db))
-            || matches!(ty, Type::AlwaysTruthy | Type::AlwaysFalsy)
-    };
-    let has_object_bound = match object_ty {
-        // Explicit bounds and constraints are expanded by `attribute_write_requirement`.
-        Type::TypeVar(typevar) => matches!(
-            typevar.require_bound_or_constraints(db, env),
-            TypeVarBoundOrConstraints::UpperBound(bound) if is_object_receiver(bound)
-        ),
-        _ => is_object_receiver(object_ty),
-    };
-    if has_object_bound
-        && !object_ty
-            .class_member(db, env, attribute)
-            .place
-            .is_undefined()
+    // Class-member lookup through `type[object]` (normalized to `type`) falls back to `object`.
+    // This does not guarantee writable storage, even though typeshed annotates metadata such as
+    // `__module__` as ordinary instance attributes.
+    if matches!(
+        object_ty.to_meta_type(db, env),
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type)
+    ) && !object_ty
+        .class_member(db, env, attribute)
+        .place
+        .is_undefined()
     {
         return AttributeWriteRequirement::CannotAssign;
     }

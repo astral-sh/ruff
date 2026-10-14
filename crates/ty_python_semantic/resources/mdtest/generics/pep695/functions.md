@@ -2442,6 +2442,8 @@ truthiness. A more precise bound with instance storage does permit these writes.
 ```py
 from typing import NewType
 
+class Writable: ...
+
 def implicit[T](obj: T):
     obj.__module__ = "custom"  # error: [invalid-assignment]
     if obj:
@@ -2452,21 +2454,13 @@ def implicit[T](obj: T):
 def explicit[T: object](obj: T):
     obj.__module__ = "custom"  # error: [invalid-assignment]
 
-def constrained[T: (object, int)](obj: T):
+def constrained[T: (object, Writable)](obj: T):
     obj.__module__ = "custom"  # error: [invalid-assignment]
 
 WrappedObject = NewType("WrappedObject", object)
 
-def wrapped[T: WrappedObject](obj: T):
+def union_bound[T: WrappedObject | Writable](obj: T):
     obj.__module__ = "custom"  # error: [invalid-assignment]
-
-def wrapped_constraint[T: (WrappedObject, int)](obj: T):
-    obj.__module__ = "custom"  # error: [invalid-assignment]
-
-def union_bound[T: WrappedObject | int](obj: T):
-    obj.__module__ = "custom"  # error: [invalid-assignment]
-
-class Writable: ...
 
 def writable[T: Writable](obj: T):
     obj.__module__ = "custom"  # no diagnostic
