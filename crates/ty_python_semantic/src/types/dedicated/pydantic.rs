@@ -16,7 +16,7 @@ use crate::diagnostic::format_enumeration;
 use crate::place::{DefinedPlace, Definedness, Place, Provenance, known_module_symbol};
 use crate::reachability::DeclarationsIteratorExtension;
 use crate::types::call::Bindings;
-use crate::types::class::CodeGeneratorKind;
+use crate::types::class::{CodeGeneratorKind, FieldKind};
 use crate::types::context::InferContext;
 use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
 use crate::types::diagnostic::PYDANTIC_DISCARDED_EXTRA_ARGUMENT;
@@ -95,6 +95,7 @@ pub(in crate::types) struct FieldMetadata<'db> {
     pub(in crate::types) init: bool,
     pub(in crate::types) alias: Option<Box<str>>,
     pub(in crate::types) strict: ConfigBoolean,
+    pub(in crate::types) frozen: ConfigBoolean,
 }
 
 impl Default for FieldMetadata<'_> {
@@ -104,6 +105,7 @@ impl Default for FieldMetadata<'_> {
             init: true,
             alias: None,
             strict: ConfigBoolean::Unspecified,
+            frozen: ConfigBoolean::Unspecified,
         }
     }
 }
@@ -280,6 +282,9 @@ impl<'db> FieldMetadata<'db> {
         if !field.strict(db).is_unspecified() {
             self.strict = field.strict(db);
         }
+        if !field.frozen(db).is_unspecified() {
+            self.frozen = field.frozen(db);
+        }
     }
 
     fn merge_field_call(
@@ -321,6 +326,15 @@ impl<'db> FieldMetadata<'db> {
             if !strict.is_none(db) {
                 self.merge_strict(ConfigBoolean::from_type(strict));
             }
+        }
+
+        if let Some(frozen) = call.arguments.find_keyword("frozen") {
+            let frozen = definition_expression_type(db, definition, &frozen.value);
+            self.frozen = if frozen.is_none(db) {
+                ConfigBoolean::Disabled
+            } else {
+                ConfigBoolean::from_type(frozen)
+            };
         }
     }
 }
@@ -451,7 +465,7 @@ impl ConfigBoolean {
         matches!(self, Self::Disabled)
     }
 
-    const fn is_enabled(self) -> bool {
+    pub(in crate::types) const fn is_enabled(self) -> bool {
         matches!(self, Self::Enabled)
     }
 
@@ -507,16 +521,18 @@ pub(in crate::types) enum SetAttrBehavior {
     CustomSetAttr,
 }
 
-/// Return the model's assignment behavior, or `None` if it cannot be determined.
+/// Return the model's assignment behavior for `attribute`, or `None` if it cannot be determined.
 pub(in crate::types) fn setattr_behavior(
     db: &dyn Db,
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,
+    attribute: &str,
 ) -> Option<SetAttrBehavior> {
     let (class, _) = ty
         .nominal_class(db, env)
         .and_then(|class| class.static_class_literal(db))?;
-    let metadata = CodeGeneratorKind::from_class(db, class.into())?.pydantic_metadata()?;
+    let field_policy = CodeGeneratorKind::from_class(db, class.into())?;
+    let metadata = field_policy.pydantic_metadata()?;
 
     // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
     // generating a setter on each frozen model. A custom setter can replace that behavior.
@@ -527,7 +543,18 @@ pub(in crate::types) fn setattr_behavior(
         let base_class = base.into_class()?;
         let (base, _) = base_class.static_class_literal(db)?;
         if base.is_known(db, KnownClass::PydanticBaseModel) {
-            return Some(if metadata.is_frozen(db) {
+            // Pydantic only checks the field's own `frozen` setting if the model is not frozen,
+            // so `Field(frozen=False)` cannot make a field of a frozen model mutable. Private
+            // attributes are not model fields, so their assignments are never checked.
+            let is_frozen = metadata.is_frozen(db)
+                || !is_private_attribute(attribute)
+                    && class
+                        .fields(db, None, field_policy)
+                        .get(attribute)
+                        .is_some_and(|field| {
+                            matches!(field.kind, FieldKind::Pydantic { frozen: true, .. })
+                        });
+            return Some(if is_frozen {
                 SetAttrBehavior::Frozen
             } else {
                 SetAttrBehavior::NonFrozen

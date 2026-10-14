@@ -11,7 +11,7 @@ impl Context {
     where
         F: Fn(&T) -> String,
     {
-        w!(self, "pub static {}: &'static [{}] = &[", name, ty);
+        w!(self, "pub static {}: &[{}] = &[", name, ty);
 
         let mut width = LINE_LIMIT;
         for e in elements.iter() {
@@ -41,7 +41,7 @@ impl Context {
     pub fn write_plain_string(&mut self, name: &str, data: &str) {
         assert!(!data.contains('\\'));
 
-        w!(self, "pub static {}: &'static str = \"", name);
+        w!(self, "pub static {}: &str = \"", name);
 
         for chunk in data.as_bytes().chunks(LINE_LIMIT - 6) {
             w!(self, "\\\n    ");

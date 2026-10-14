@@ -1,9 +1,7 @@
 //! Convert between characters and their standard names.
 //!
 //! This crate provides two functions for mapping from a `char` to the
-//! name given by the Unicode standard (17.0). There are no runtime
-//! requirements so this is usable with only `core` (this requires
-//! specifying the `no_std` cargo feature). The tables are heavily
+//! name given by the Unicode standard (17.0). The tables are heavily
 //! compressed, but still large (500KB), and still offer efficient
 //! `O(1)` look-ups in both directions (more precisely, `O(length of
 //! name)`).
@@ -47,37 +45,24 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "no_std", no_std)]
 #![cfg_attr(test, feature(test))]
 #![deny(missing_docs, unsafe_code)]
 
-#[cfg(all(test, feature = "no_std"))]
-#[macro_use]
-extern crate std;
-
 use core::{char, fmt};
 use generated::{
-    MAX_NAME_LENGTH, PHRASEBOOK_OFFSETS1, PHRASEBOOK_OFFSETS2, PHRASEBOOK_OFFSET_SHIFT,
+    MAX_NAME_LENGTH, PHRASEBOOK_OFFSET_SHIFT, PHRASEBOOK_OFFSETS1, PHRASEBOOK_OFFSETS2,
 };
 
-#[allow(dead_code)]
-#[rustfmt::skip]
-#[allow(clippy::all)]
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
-#[allow(dead_code)]
-#[rustfmt::skip]
-#[allow(clippy::all)]
 mod generated_phf {
     include!(concat!(env!("OUT_DIR"), "/generated_phf.rs"));
 }
-#[allow(dead_code)]
 mod jamo;
 
 /// A map of unicode aliases to their corresponding values.
 /// Generated in generator
-#[allow(dead_code)]
 static ALIASES: phf::Map<&'static [u8], char> =
     include!(concat!(env!("OUT_DIR"), "/generated_alias.rs"));
 
@@ -363,10 +348,7 @@ pub fn character(search_name: &str) -> Option<char> {
                 _ => return None,
             }
         }
-        let ch = match char::from_u32(v) {
-            Some(ch) => ch,
-            None => return None,
-        };
+        let ch = char::from_u32(v)?;
 
         // check if the resulting code is indeed in the known ranges
         if is_cjk_unified_ideograph(ch) {
@@ -422,7 +404,7 @@ pub fn character(search_name: &str) -> Option<char> {
 mod tests {
     use super::*;
     use rand::{
-        distributions::{Distribution, Standard},
+        distr::{Distribution, StandardUniform},
         prelude::{SeedableRng, StdRng},
     };
     use std::char;
@@ -616,7 +598,7 @@ mod tests {
     fn name_10000_invalid(b: &mut Bencher) {
         // be consistent across runs, but avoid sequential/caching.
         let mut rng = StdRng::seed_from_u64(0x12345678);
-        let chars: Vec<char> = Standard
+        let chars: Vec<char> = StandardUniform
             .sample_iter(&mut rng)
             .take(10000)
             .filter_map(|c| match c {
@@ -655,7 +637,7 @@ mod tests {
         // be consistent across runs, but avoid sequential/caching.
         let mut rng = StdRng::seed_from_u64(0x12345678);
 
-        let names: Vec<_> = Standard
+        let names: Vec<_> = StandardUniform
             .sample_iter(&mut rng)
             .take(10000)
             .filter_map(name)
@@ -668,9 +650,4 @@ mod tests {
             }
         })
     }
-}
-
-#[cfg(all(feature = "no_std", not(test)))]
-mod std {
-    pub use core::{clone, fmt, marker};
 }

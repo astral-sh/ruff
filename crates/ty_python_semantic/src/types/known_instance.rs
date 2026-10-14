@@ -746,6 +746,10 @@ pub struct FieldInstance<'db> {
     /// The mode selected by Pydantic's `strict` argument.
     #[returns(copy)]
     pub strict: ConfigBoolean,
+
+    /// Whether Pydantic's `frozen` argument makes this field immutable.
+    #[returns(copy)]
+    pub frozen: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.
@@ -777,6 +781,7 @@ impl<'db> FieldInstance<'db> {
             self.alias(db),
             converter,
             self.strict(db),
+            self.frozen(db),
         )
     }
 
@@ -821,6 +826,7 @@ impl<'db> FieldInstance<'db> {
             self.alias(db),
             converter,
             self.strict(db),
+            self.frozen(db),
         ))
     }
 }

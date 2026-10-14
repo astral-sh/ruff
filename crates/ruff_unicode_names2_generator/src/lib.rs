@@ -1,10 +1,9 @@
 use formatting::Context;
 use std::{
     char, cmp,
-    collections::{hash_map, HashMap},
+    collections::{HashMap, hash_map},
     fs::{self, File},
-    io::{self, prelude::*, BufWriter},
-    iter::repeat,
+    io::{self, BufWriter, prelude::*},
     path::Path,
 };
 
@@ -156,7 +155,7 @@ fn create_lexicon_and_offsets(
                 // insert the suffixes of this word which saves about
                 // 10KB (we could theoretically insert all substrings,
                 // upto a certain length, but this only saves ~300
-                // bytes or so and is noticably slower).
+                // bytes or so and is noticeably slower).
                 for i in 1..n.len() {
                     if t.insert(n[i..].bytes(), Some(offset + i), true).0 {
                         // once we've found a string that's already
@@ -238,7 +237,7 @@ fn bin_data(dat: &[u32]) -> (Vec<u32>, Vec<u32>, usize) {
 fn write_codepoint_maps(ctxt: &mut Context, codepoint_names: Vec<(char, &str)>) {
     let (lexicon_string, mut lexicon_words) = create_lexicon_and_offsets(codepoint_names.clone());
 
-    let num_escapes = (lexicon_words.len() + 255) / 256;
+    let num_escapes = lexicon_words.len().div_ceil(256);
 
     // we reserve the high bit (end of word) and 127,126... for
     // non-space splits.  The high bit saves about 10KB, and doing the
@@ -293,9 +292,11 @@ fn write_codepoint_maps(ctxt: &mut Context, codepoint_names: Vec<(char, &str)>) 
             previous_len = len;
         }
 
-        assert!(word_encodings
-            .insert(word, vec![hi as u32, lo as u32])
-            .is_none());
+        assert!(
+            word_encodings
+                .insert(word, vec![hi as u32, lo as u32])
+                .is_none()
+        );
     }
     // don't forget the last one.
     lexicon_ordered_lengths.push((lexicon_offsets.len(), previous_len));
@@ -306,7 +307,7 @@ fn write_codepoint_maps(ctxt: &mut Context, codepoint_names: Vec<(char, &str)>) 
     // this is a map from `char` -> the index in phrasebook. it is
     // currently huge, but it has a lot of 0's, so we compress it
     // using the binning, below.
-    let mut phrasebook_offsets = repeat(0).take(0x10FFFF + 1).collect::<Vec<_>>();
+    let mut phrasebook_offsets: Vec<_> = std::iter::repeat_n(0, 0x10FFFF + 1).collect();
     let mut longest_name = 0;
     for &(cp, name) in codepoint_names.iter() {
         longest_name = cmp::max(name.len(), longest_name);

@@ -65,7 +65,7 @@ dev = [
     "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=2.0.0",
-    "prek==0.5.2",
+    "prek==0.5.3",
 ]
 release = [
     "rooster==0.1.1",

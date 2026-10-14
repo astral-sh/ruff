@@ -92,12 +92,12 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+          version: "0.13.1"
+          checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -151,12 +151,12 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "75d05de6762778c31ee183398de7dd15093fad0ed90b1f236d8205ea5ec00c90"
+          version: "0.13.1"
+          checksum: "3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -196,12 +196,12 @@ jobs:
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544"
+          version: "0.13.1"
+          checksum: "cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -274,12 +274,12 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+          version: "0.13.1"
+          checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps

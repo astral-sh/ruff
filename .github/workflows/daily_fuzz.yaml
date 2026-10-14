@@ -34,6 +34,9 @@ jobs:
     name: Fuzz
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    env:
+      # Keep in sync with the job's timeout-minutes.
+      FUZZ_JOB_TIMEOUT_MINUTES: 20
     permissions:
       contents: read
     outputs:
@@ -41,14 +44,16 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
+      - name: Record job start time
+        run: echo "FUZZ_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.12.23"
-          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+          version: "0.13.1"
+          checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
@@ -73,6 +78,8 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
+            --budget-minutes="${FUZZ_JOB_TIMEOUT_MINUTES}" \
+            --job-started-at="${FUZZ_JOB_STARTED_AT}" \
             --bin=ruff \
             "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)

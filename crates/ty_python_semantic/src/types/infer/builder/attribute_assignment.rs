@@ -591,7 +591,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
         if assignment_blocked {
             if emit_diagnostics {
-                let pydantic_setattr = pydantic::setattr_behavior(db, env, object_ty);
+                let pydantic_setattr =
+                    pydantic::setattr_behavior(db, env, object_ty, self.attribute);
                 let is_read_only =
                     matches!(pydantic_setattr, Some(pydantic::SetAttrBehavior::Frozen))
                         || !matches!(
