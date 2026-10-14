@@ -312,6 +312,12 @@ fn convert_to_dict_comprehension(
 ) -> Option<Fix> {
     let locator = checker.locator();
 
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
+    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
+        return None;
+    }
+
     let if_str = match if_test {
         Some(test) => {
             // If the test is an assignment expression,
@@ -332,21 +338,23 @@ fn convert_to_dict_comprehension(
         None => String::new(),
     };
 
-    // if the loop target was an implicit tuple, add parentheses around it
+    // A comprehension's iterable can't be an unparenthesized tuple, lambda, or conditional
+    // expression, so add parentheses around it. Parentheses in the original source (e.g.,
+    // `for x in (a if b else c)`) are outside the expression's range, so they're added back.
     // ```python
     //  for i in a, b:
     //      ...
     // ```
     // becomes
     // {... for i in (a, b)}
-    let iter_str = if let Expr::Tuple(ast::ExprTuple {
-        parenthesized: false,
-        ..
-    }) = &*for_stmt.iter
-    {
-        format!("({})", locator.slice(for_stmt.iter.range()))
-    } else {
-        locator.slice(for_stmt.iter.range()).to_string()
+    let iter_str = match &*for_stmt.iter {
+        Expr::Tuple(ast::ExprTuple {
+            parenthesized: false,
+            ..
+        })
+        | Expr::Lambda(_)
+        | Expr::If(_) => format!("({})", locator.slice(for_stmt.iter.range())),
+        _ => locator.slice(for_stmt.iter.range()).to_string(),
     };
 
     let target_str = locator.slice(for_stmt.target.range());

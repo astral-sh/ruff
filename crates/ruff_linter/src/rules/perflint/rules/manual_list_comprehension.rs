@@ -369,6 +369,15 @@ fn convert_to_list_extend(
 ) -> Result<Fix> {
     let semantic = checker.semantic();
     let locator = checker.locator();
+
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
+    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
+        return Err(anyhow!(
+            "Cannot move an assignment expression into a comprehension iterable"
+        ));
+    }
+
     let if_str = match if_test {
         Some(test) => {
             // If the test is an assignment expression,
@@ -389,22 +398,23 @@ fn convert_to_list_extend(
         None => String::new(),
     };
 
-    // if the loop target was an implicit tuple, add parentheses around it
+    // A comprehension's iterable can't be an unparenthesized tuple, lambda, or conditional
+    // expression, so add parentheses around it. Parentheses in the original source (e.g.,
+    // `for x in (a if b else c)`) are outside the expression's range, so they're added back.
     // ```python
     //  for i in a, b:
     //      ...
     // ```
     // becomes
     // [... for i in (a, b)]
-    let for_iter_str = if for_stmt
-        .iter
-        .as_ref()
-        .as_tuple_expr()
-        .is_some_and(|expr| !expr.parenthesized)
-    {
-        format!("({})", locator.slice(for_stmt.iter.range()))
-    } else {
-        locator.slice(for_stmt.iter.range()).to_string()
+    let for_iter_str = match &*for_stmt.iter {
+        Expr::Tuple(ast::ExprTuple {
+            parenthesized: false,
+            ..
+        })
+        | Expr::Lambda(_)
+        | Expr::If(_) => format!("({})", locator.slice(for_stmt.iter.range())),
+        _ => locator.slice(for_stmt.iter.range()).to_string(),
     };
 
     let for_type = if for_stmt.is_async {
