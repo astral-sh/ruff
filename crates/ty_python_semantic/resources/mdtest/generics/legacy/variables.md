@@ -1273,6 +1273,7 @@ if f():
 else:
     Default = choose(f())
 
+# error: [invalid-type-form] "Variable of type `type[Unknown]` is not allowed in a type expression"
 T = TypeVar("T", default=Default)
 
 reveal_type(f())  # revealed: Unknown

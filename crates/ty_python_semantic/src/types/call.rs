@@ -8,6 +8,7 @@ use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
 
+mod ambiguous;
 mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
