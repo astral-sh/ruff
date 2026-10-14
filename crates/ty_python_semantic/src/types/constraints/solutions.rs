@@ -87,6 +87,9 @@ pub(super) struct SolutionWalker<'db, L> {
     /// we only want to consider the ones that are relevant to the node and its descendants.
     explored_nodes: FxHashSet<ExploredNodeKey>,
 
+    /// Nodes that we have already checked the satisfiability of.
+    node_is_satisfiable_on_path_cache: FxHashMap<ExploredNodeKey, bool>,
+
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
     /// We will check these solutions against the declared upper bounds (TODO and constraints) of
@@ -126,6 +129,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             limits,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
+            node_is_satisfiable_on_path_cache: FxHashMap::default(),
             pending: Vec::default(),
             _phantom: PhantomData,
         }
@@ -221,27 +225,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // See if we've already visited this node on an "equivalent" path, where we only
         // consider the typevars that can affect the solutions we'd find if we were to
         // continue walking down the node.
-        let mut relevant_typevars = self.inferable_support.clone();
-        // Declared domains can invalidate a path even when their typevars neither
-        // contribute a solution nor occur in the remaining subtree. Such paths must
-        // not share a cache entry with paths that satisfy those domains.
-        if let Some(validations) = validations {
-            relevant_typevars |= &validations.support;
-        }
-        let node_support = storage.node_support(node);
-        if let Some(node_support) = node_support {
-            relevant_typevars |= node_support;
-        }
-        relevant_typevars.close_over_constraints(
-            storage,
-            Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
-        );
-        let mut relevant_path: Box<[_]> =
-            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
-        relevant_path.sort_unstable_by_key(|(assignment, _)| {
-            assignment.constraint().into_inner().ordering()
-        });
-        let key = (polarity, node, relevant_path);
+        let key = self.explored_node_key(storage, path, polarity, node, validations);
         let is_new = self.explored_nodes.insert(key);
         if !is_new {
             return ControlFlow::Continue(());
@@ -377,31 +361,48 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<Break<L::Break>, ()> {
         self.limits.visit_node().map_break(Break::Limits)?;
-        match (polarity, node) {
-            (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) => {
+        let break_into_bool = |result: &ControlFlow<Break<L::Break>, ()>| match result {
+            ControlFlow::Break(Break::Limits(_)) => None,
+            ControlFlow::Break(Break::EarlyBreak) => Some(true),
+            ControlFlow::Continue(()) => Some(false),
+        };
+        let bool_into_break = |result: bool| {
+            if result {
+                // break when we find the first solution
+                ControlFlow::Break(Break::EarlyBreak)
+            } else {
                 ControlFlow::Continue(())
             }
-            (Polarity::Positive, ALWAYS_TRUE) | (Polarity::Negative, ALWAYS_FALSE) => {
-                self.validate_satisfied_path(
-                    db,
-                    env,
-                    storage,
-                    path,
-                    validations,
-                    &|this, storage, path| {
-                        if this
-                            .pending_candidate_solution(db, env, storage, path, None)
-                            .is_some()
-                        {
-                            // break when we find the first solution
-                            ControlFlow::Break(Break::EarlyBreak)
-                        } else {
-                            ControlFlow::Continue(())
-                        }
-                    },
-                )
-            }
-            _ => self.visit_constraint(
+        };
+
+        if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
+            (polarity, node)
+        {
+            return ControlFlow::Continue(());
+        }
+
+        let key = self.explored_node_key(storage, path, polarity, node, validations);
+        if let Some(result) = self.node_is_satisfiable_on_path_cache.get(&key) {
+            return bool_into_break(*result);
+        }
+        let result = if let (Polarity::Positive, ALWAYS_TRUE) | (Polarity::Negative, ALWAYS_FALSE) =
+            (polarity, node)
+        {
+            self.validate_satisfied_path(
+                db,
+                env,
+                storage,
+                path,
+                validations,
+                &|this, storage, path| {
+                    let has_solution = this
+                        .pending_candidate_solution(db, env, storage, path, None)
+                        .is_some();
+                    bool_into_break(has_solution)
+                },
+            )
+        } else {
+            self.visit_constraint(
                 db,
                 env,
                 storage,
@@ -419,8 +420,44 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                         validations,
                     )
                 },
-            ),
+            )
+        };
+
+        if let Some(cached) = break_into_bool(&result) {
+            self.node_is_satisfiable_on_path_cache.insert(key, cached);
         }
+        result
+    }
+
+    fn explored_node_key(
+        &mut self,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+        validations: Option<&Validations<'db>>,
+    ) -> ExploredNodeKey {
+        let mut relevant_typevars = self.inferable_support.clone();
+        // Declared domains can invalidate a path even when their typevars neither
+        // contribute a solution nor occur in the remaining subtree. Such paths must
+        // not share a cache entry with paths that satisfy those domains.
+        if let Some(validations) = validations {
+            relevant_typevars |= &validations.support;
+        }
+        let node_support = storage.node_support(node);
+        if let Some(node_support) = node_support {
+            relevant_typevars |= node_support;
+        }
+        relevant_typevars.close_over_constraints(
+            storage,
+            Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
+        );
+        let mut relevant_path: Box<[_]> =
+            Self::constrained_assignments_mentioning(storage, path, &relevant_typevars).collect();
+        relevant_path.sort_unstable_by_key(|(assignment, _)| {
+            assignment.constraint().into_inner().ordering()
+        });
+        (polarity, node, relevant_path)
     }
 
     #[expect(clippy::too_many_arguments)]
