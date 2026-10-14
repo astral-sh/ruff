@@ -253,7 +253,6 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncIterable",
     "AsyncIterator",
     "Awaitable",
-    "ByteString",
     "Collection",
     "Container",
     "Coroutine",
@@ -416,6 +415,11 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 // Members of typing_extensions that were moved to `warnings`
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
+// Python 3.15+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_315: &[&str] = &["TypeForm"];
+
 struct ImportReplacer<'a> {
     import_from_stmt: &'a StmtImportFrom,
     module: &'a str,
@@ -552,6 +556,9 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::PY313 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_313);
                 }
+                if self.version >= PythonVersion::PY315 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_315);
+                }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
                 }
@@ -644,7 +651,7 @@ impl<'a> ImportReplacer<'a> {
         }
 
         if unmatched_names.is_empty() {
-            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            let matched = self.format_import_from(&matched_names, target);
             let operation = WithoutRename {
                 target: target.to_string(),
                 members: matched_names
@@ -674,7 +681,7 @@ impl<'a> ImportReplacer<'a> {
                 return Some((operation, fix));
             };
 
-            let matched = ImportReplacer::format_import_from(&matched_names, target);
+            let matched = self.format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
                 self.locator,
                 self.import_from_stmt,
@@ -724,7 +731,7 @@ impl<'a> ImportReplacer<'a> {
 
     /// Converts a list of names and a module into an `import from`-style
     /// import.
-    fn format_import_from(names: &[&Alias], module: &str) -> String {
+    fn format_import_from(&self, names: &[&Alias], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.
         let qualified_names: String = names
@@ -734,7 +741,12 @@ impl<'a> ImportReplacer<'a> {
                 None => format!("{}", name.name),
             })
             .join(", ");
-        format!("from {module} import {qualified_names}")
+        let prefix = if self.import_from_stmt.is_lazy {
+            "lazy "
+        } else {
+            ""
+        };
+        format!("{prefix}from {module} import {qualified_names}")
     }
 }
 
@@ -770,6 +782,8 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     );
 
     for (operation, fix) in fixer.without_renames() {
+        let preserves_laziness = import_from_stmt.is_lazy
+            || checker.import_rewrite_preserves_laziness(module, &operation.target);
         let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
@@ -777,7 +791,9 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
             import_from_stmt.range(),
         );
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-        if let Some(content) = fix {
+        if let Some(content) = fix
+            && preserves_laziness
+        {
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                 content,
                 import_from_stmt.range(),

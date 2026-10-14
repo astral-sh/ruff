@@ -457,7 +457,7 @@ reason = "the public semantic model retains node navigation for downstream analy
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
-item = "model::SemanticModel::<'a>::in_runtime_required_annotation"
+item = "model::SemanticModel::<'a>::in_runtime_ambiguous_annotation"
 kind = "inherent_method"
 level = "expect"
 reason = "semantic model predicates intentionally expose each annotation context"
@@ -581,14 +581,6 @@ item = "size::TextSize::saturating_sub"
 kind = "inherent_method"
 level = "expect"
 reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_project"
-item = "db::changes::ChangeResult::custom_stdlib_changed"
-kind = "inherent_method"
-level = "expect"
-reason = "change results expose both project and custom-stdlib invalidation state"
 
 [[override]]
 lint = "hawk::dead_public"
@@ -1399,3 +1391,13 @@ reason = "kept compatible with the upstream annotate-snippets crate"
 crate = "annotate_snippets"
 file = "crates/ruff_annotate_snippets/src/snippet.rs"
 reason = "kept compatible with the upstream annotate-snippets crate"
+
+[[exclude]]
+crate = "unicode_names2"
+file = "crates/ruff_unicode_names2/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2 crate"
+
+[[exclude]]
+crate = "unicode_names2_generator"
+file = "crates/ruff_unicode_names2_generator/src/lib.rs"
+reason = "kept compatible with the upstream unicode_names2_generator crate"

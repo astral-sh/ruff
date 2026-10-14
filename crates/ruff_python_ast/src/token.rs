@@ -133,8 +133,11 @@ impl fmt::Debug for Token {
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum TokenKind {
-    /// Token kind for a name, commonly known as an identifier.
-    Name,
+    /// Token kind for an identifier.
+    ///
+    /// The lexer emits separate token kinds for keywords and soft keywords. The parser
+    /// converts soft keyword tokens to this kind when they are used as identifiers.
+    Identifier,
     /// Token kind for an integer.
     Int,
     /// Token kind for a floating point number.
@@ -642,7 +645,7 @@ impl fmt::Display for TokenKind {
             TokenKind::Indent => "indent",
             TokenKind::Dedent => "dedent",
             TokenKind::EndOfFile => "end of file",
-            TokenKind::Name => "name",
+            TokenKind::Identifier => "identifier",
             TokenKind::Int => "int",
             TokenKind::Float => "float",
             TokenKind::Complex => "complex",
@@ -771,8 +774,8 @@ bitflags! {
         const RAW_STRING_UPPERCASE = 1 << 7;
         /// String without matching closing quote(s)
         const UNCLOSED_STRING = 1 << 8;
-        /// The token is a name containing at least one non-ASCII codepoint.
-        const NON_ASCII_NAME = 1 << 9;
+        /// The token is an identifier containing at least one non-ASCII codepoint.
+        const NON_ASCII_IDENTIFIER = 1 << 9;
 
         /// The token is a raw string i.e., prefixed with `r` or `R`
         const RAW_STRING = Self::RAW_STRING_LOWERCASE.bits() | Self::RAW_STRING_UPPERCASE.bits();
@@ -867,9 +870,9 @@ impl TokenFlags {
         self.intersects(TokenFlags::RAW_STRING)
     }
 
-    /// Returns `true` if the token is a name containing at least one non-ASCII codepoint.
+    /// Returns `true` if the token is an identifier containing at least one non-ASCII codepoint.
     #[inline]
-    pub const fn is_non_ascii_name(self) -> bool {
-        self.intersects(TokenFlags::NON_ASCII_NAME)
+    pub const fn is_non_ascii_identifier(self) -> bool {
+        self.intersects(TokenFlags::NON_ASCII_IDENTIFIER)
     }
 }

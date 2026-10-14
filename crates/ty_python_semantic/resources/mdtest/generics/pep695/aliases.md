@@ -279,7 +279,7 @@ def _(x: Outer[str]):
 Self-referential defaults should not crash type inference:
 
 ```py
-# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+# error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
 type A[T = A] = A[int]
 ```
 

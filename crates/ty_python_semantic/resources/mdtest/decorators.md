@@ -933,7 +933,7 @@ Reporting a dynamic return must not eagerly infer a self-referential default. Ev
 assertion on the same name, the diagnostic identifies the function's signature.
 
 ```py
-def dynamic(function: object):
+def dynamic(function):
     return function
 
 f = lambda: f
@@ -955,8 +955,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/mdtest_snippet.py:1:5
   |
-1 | def dynamic(function: object):
-  |     ------------------------- `dynamic` defined here
+1 | def dynamic(function):
+  |     ----------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -967,7 +967,7 @@ annotation when that method is unannotated.
 
 ```py
 class CallableDecorator:
-    def __call__(self, function: object):
+    def __call__(self, function):
         return function
 
 # snapshot: dynamic-function-decorator-return
@@ -987,8 +987,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/mdtest_snippet.py:2:9
   |
-2 |     def __call__(self, function: object):
-  |         -------------------------------- `CallableDecorator.__call__` defined here
+2 |     def __call__(self, function):
+  |         ------------------------ `CallableDecorator.__call__` defined here
 help: Add a return type annotation to `CallableDecorator.__call__`
 ```
 
@@ -1025,7 +1025,7 @@ triggered due to a missing return-type annotation, we suggest adding one:
 `decorator.py`:
 
 ```py
-def dynamic(value: object):
+def dynamic(value):
     return value
 ```
 
@@ -1051,8 +1051,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/decorator.py:1:5
   |
-1 | def dynamic(value: object):
-  |     ---------------------- `dynamic` defined here
+1 | def dynamic(value):
+  |     -------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1227,7 +1227,7 @@ python = "/.venv"
 `/.venv/<path-to-site-packages>/dependency.py`:
 
 ```py
-def dynamic(value: object):
+def dynamic(value):
     return value
 ```
 
@@ -1253,8 +1253,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: .venv/<path-to-site-packages>/dependency.py:1:5
   |
-1 | def dynamic(value: object):
-  |     ---------------------- `dynamic` defined here
+1 | def dynamic(value):
+  |     -------------- `dynamic` defined here
 ```
 
 ### Edge case: dynamic decorators defined in non-module scripts
@@ -1267,7 +1267,7 @@ path", but we nonetheless recognise it as a first-party file and offer the sugge
 `typed-script.py`:
 
 ```py
-def dynamic(function: object):
+def dynamic(function):
     return function
 
 # snapshot: dynamic-function-decorator-return
@@ -1287,8 +1287,8 @@ info[dynamic-function-decorator-return]: Decorator returns `Unknown`
   |
  ::: src/typed-script.py:1:5
   |
-1 | def dynamic(function: object):
-  |     ------------------------- `dynamic` defined here
+1 | def dynamic(function):
+  |     ----------------- `dynamic` defined here
 help: Add a return type annotation to `dynamic`
 ```
 
@@ -1304,7 +1304,7 @@ from typing import Any
 def annotated_dynamic(function: Callable[..., object]) -> Any:
     return function
 
-def unannotated_dynamic(function: Callable[..., object]):
+def unannotated_dynamic(function):
     return function
 
 def condition() -> bool:

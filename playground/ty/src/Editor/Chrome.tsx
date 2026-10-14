@@ -192,6 +192,18 @@ export default function Chrome({
                       onBackToUserFile={handleBackToUserFile}
                     />
                   )}
+                  {files.currentVendoredFile == null &&
+                    selectedFileName === "ty.json" &&
+                    session.hasConfigurationFile() && (
+                      <div
+                        role="status"
+                        className="bg-amber-50 dark:bg-amber-900 px-3 py-2 border-b border-amber-200 dark:border-amber-700 text-sm text-amber-900 dark:text-amber-100"
+                      >
+                        <code>ty.json</code> is ignored while{" "}
+                        <code>ty.toml</code> or <code>pyproject.toml</code>{" "}
+                        exists.
+                      </div>
+                    )}
                   <Editor
                     theme={theme}
                     visible={true}

@@ -438,24 +438,6 @@ help: Import from `collections.abc`
 54 | from typing import ByteString
    |
 
-UP035 [*] Import from `collections.abc` instead: `ByteString`
-  --> UP035.py:54:1
-   |
-52 | from typing_extensions import OrderedDict
-53 | from typing import Callable
-54 | from typing import ByteString
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | from typing import Container
-56 | from typing import Hashable
-   |
-help: Import from `collections.abc`
-   |
-53 | from typing import Callable
-   - from typing import ByteString
-54 + from collections.abc import ByteString
-55 | from typing import Container
-   |
-
 UP035 [*] Import from `collections.abc` instead: `Container`
   --> UP035.py:55:1
    |

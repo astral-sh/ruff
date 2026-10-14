@@ -52,7 +52,7 @@ We can then run the Ruff linter over our project via `uv run ruff check`:
 $ uv run ruff check
 src/numbers/calculate.py:3:8: F401 [*] `os` imported but unused
 Found 1 error.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 ```
 
 !!! note
@@ -243,7 +243,7 @@ the use of the deprecated `typing.Iterable` instead of `collections.abc.Iterable
 $ uv run ruff check
 src/numbers/calculate.py:1:1: UP035 [*] Import from `collections.abc` instead: `Iterable`
 Found 1 error.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 ```
 
 Over time, we may choose to enforce additional rules. For example, we may want to enforce that
@@ -294,7 +294,7 @@ src/numbers/calculate.py:1:1: UP035 [*] Import from `collections.abc` instead: `
 
 src/numbers/calculate.py:1:1: D100 Missing docstring in public module
 Found 3 errors.
-[*] 1 fixable with the `--fix` option.
+[*] 1 fixable with `--fix`.
 ```
 
 ### Ignoring Errors
@@ -372,7 +372,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.16.7
+  rev: v0.17.0
   hooks:
     # Run the linter.
     - id: ruff-check

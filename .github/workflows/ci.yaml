@@ -1,6 +1,7 @@
 name: CI
 
-permissions: {}
+permissions:
+  contents: read
 
 on:
   push:
@@ -24,7 +25,7 @@ env:
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=astral-sh/hawk
-  HAWK_VERSION: 0.1.13
+  HAWK_VERSION: 0.1.15
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
@@ -33,8 +34,32 @@ env:
   MDTEST_EXTERNAL: "1"
 
 jobs:
+  security-review:
+    needs: determine_changes
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
+    uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@45c506043c254690f2612686e5d5a72c81c251a4
+    with:
+      runner: depot-ubuntu-22.04-16
+      helper-runner: github-ubuntu-24.04-x86_64-4
+      # renovate: datasource=github-release-attachments depName=astral-sh/uv
+      uv-version: "0.12.23"
+      uv-checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+      # Keep the review tools outside the checkout when switching to the PR head.
+      setup-command: |
+        export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/pull-request-review-tools"
+        uv sync --locked --only-dev
+        echo "$UV_PROJECT_ENVIRONMENT/bin" >> "$GITHUB_PATH"
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      contents: read
+      id-token: write
+      issues: read
+      pull-requests: read
+
   determine_changes:
     name: "Determine changes"
+    # CI on main is redundant in the security repository.
+    if: ${{ github.repository != 'astral-sh/ruff-security' || github.ref != 'refs/heads/main' }}
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     outputs:
       comparison_base: ${{ steps.merge_base.outputs.sha }}
@@ -66,7 +91,11 @@ jobs:
 
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git fetch --no-tags --filter=blob:none --unshallow origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
 
       - name: Determine merge base
         id: merge_base
@@ -275,6 +304,7 @@ jobs:
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -287,6 +317,7 @@ jobs:
   shellcheck:
     name: "shellcheck"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -294,7 +325,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.26.5"
+          go-version: "1.27.1"
       - name: "Run ShellCheck"
         env:
           GOSUMDB: sum.golang.org
@@ -314,6 +345,8 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
+    env:
+      CARGO_BUILD_WARNINGS: deny
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -326,9 +359,9 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - name: "Clippy"
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked
 
   hawk:
     name: "cargo hawk"
@@ -346,13 +379,13 @@ jobs:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
-        run: rustup toolchain install 1.98.0
+        run: rustup toolchain install 1.99.0
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
       - name: "Hawk"
-        run: cargo +1.98.0 hawk check --target-dir target/hawk -D warnings
+        run: cargo +1.99.0 hawk check --target-dir target/hawk --color=always -D warnings
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
@@ -392,9 +425,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
           enable-cache: "true"
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
@@ -417,7 +452,9 @@ jobs:
           # Enable experimental support for installing PEP 723 script dependencies.
           TY_UV: scripts
           UV_LOCKED: "true"
-        run: cargo run --quiet -p ty check scripts/*.py --color=always
+        run: |
+          uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
+          cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -456,9 +493,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
           enable-cache: "true"
       - name: "Run tests"
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
@@ -490,10 +529,22 @@ jobs:
           cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install uv"
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      # Renovate needs a separate version/checksum pair for each archive.
+      - name: "Install uv (Windows)"
+        if: runner.os == 'Windows'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "75d05de6762778c31ee183398de7dd15093fad0ed90b1f236d8205ea5ec00c90"
+          enable-cache: "true"
+      - name: "Install uv (macOS)"
+        if: runner.os == 'macOS'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544"
           enable-cache: "true"
       - name: "Run tests"
         run: |
@@ -517,7 +568,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24.19.0
+          node-version: 24.20.0
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
@@ -582,9 +633,11 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - run: uv run --only-dev cargo fuzz build -s none
 
   fuzz-parser:
@@ -599,9 +652,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: ruff-linux-debug
@@ -641,9 +696,11 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
       # Run all code generation scripts, and verify that the current output is
@@ -686,11 +743,13 @@ jobs:
           ref: ${{ needs.determine_changes.outputs.comparison_base }}
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           activate-environment: true
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -788,23 +847,29 @@ jobs:
           fi
 
   fuzz-ty:
-    name: "Fuzz for new ty panics"
+    name: "Fuzz for new ty panics/timeouts"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
-    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 10 || 20 }}
+    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
       - name: Fetch full history without tags
-        run: git fetch --no-tags --filter=blob:none --unshallow origin
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -830,6 +895,8 @@ jobs:
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-old
 
+          git checkout --detach "$GITHUB_SHA"
+
           (
             uv run \
             --python="${PYTHON_VERSION}" \
@@ -843,6 +910,30 @@ jobs:
             0-1000
           )
 
+  cargo-deny:
+    name: "cargo deny"
+    timeout-minutes: 10
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
+    if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
+      - name: "Check licenses"
+        run: uv run --only-dev cargo deny --locked --all-features check licenses
+      - name: "Check sources"
+        run: uv run --only-dev cargo deny --locked --all-features check sources
+      - name: "Check workspace dependency features and build-script allowlist"
+        run: uv run --no-project --locked scripts/check-cargo-bans.py
+      - name: "Check bans"
+        run: uv run --only-dev cargo deny --locked --all-features check bans
+
   cargo-shear:
     name: "cargo shear"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -852,9 +943,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - run: uv run --only-dev cargo shear --deny-warnings
 
   ty-completion-evaluation:
@@ -869,9 +962,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -887,6 +982,7 @@ jobs:
   python-package:
     name: "python package"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 20
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
     steps:
@@ -939,14 +1035,17 @@ jobs:
   prek:
     name: "prek"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
@@ -969,6 +1068,7 @@ jobs:
   docs:
     name: "mkdocs"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -980,10 +1080,12 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: 3.13
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
       - name: "Update README File"
         run: uv run scripts/transform_readme.py --target mkdocs
       - name: "Generate docs"
@@ -1015,59 +1117,6 @@ jobs:
       - name: "Remove checkouts from cache"
         run: rm -r target/formatter-ecosystem
 
-  check-ruff-lsp:
-    name: "test ruff-lsp"
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
-    env:
-      # Line-tables-only debug info: faster builds, backtraces still work.
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        name: "Checkout ruff source"
-        with:
-          persist-credentials: false
-
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: ruff-linux-debug
-          save-if: false
-
-      - name: "Install Rust toolchain"
-        run: rustup show
-
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-
-      - name: Build Ruff binary
-        run: cargo build -p ruff --bin ruff
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        name: "Checkout ruff-lsp source"
-        with:
-          persist-credentials: false
-          repository: "astral-sh/ruff-lsp"
-          path: ruff-lsp
-
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
-        with:
-          # ruff-lsp's archived CI only tested through Python 3.12.
-          python-version: "3.12"
-
-      - name: Install ruff-lsp dependencies
-        run: uv sync --locked --only-group ruff-lsp-test --python 3.12
-
-      - name: Run ruff-lsp tests
-        run: |
-          # Setup development binary
-          export PATH="${PWD}/target/debug:${PWD}/.venv/bin:${PATH}"
-          ruff version
-
-          cd ruff-lsp
-          pytest
-
   check-playground:
     name: "check playground"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1086,7 +1135,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24.19.0
+          node-version: 24.20.0
           cache: "npm"
           cache-dependency-path: |
             playground/package-lock.json
@@ -1140,9 +1189,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1161,7 +1212,7 @@ jobs:
             | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
           mode: "simulation,memory"
           run: uv run --only-dev cargo codspeed run
@@ -1188,9 +1239,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1260,9 +1313,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1286,7 +1341,7 @@ jobs:
             | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
           mode: ${{ matrix.mode }}
           run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
@@ -1317,15 +1372,17 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
 
       - name: "Install Rust toolchain"
         run: rustup show
 
       - name: "Build benchmarks"
-        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script
+        run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_ide,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script --bench ty_ide
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1349,6 +1406,9 @@ jobs:
         benchmark:
           - name: script
             target: ty_script
+          - name: ide
+            target: ty_ide
+            filter: auto_import
           - name: sympy
             target: ty_walltime
             filter: sympy
@@ -1367,9 +1427,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.23"
+          checksum: "6524bd338177ed50d035d39354e12545e993bbeba2ecbddf0480c5b3a81d313f"
 
       - name: "Download benchmark binary"
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -1382,7 +1444,7 @@ jobs:
         run: find target/codspeed -type f -exec chmod +x {} +
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         env:
           # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
           # appear to provide much useful insight for our walltime benchmarks right now
@@ -1396,10 +1458,12 @@ jobs:
 
   required-checks-passed:
     name: "all required checks passed"
-    if: always()
+    if: ${{ always() && github.ref != 'refs/heads/main' }}
     needs:
+      - determine_changes
       - cargo-fmt
       - cargo-clippy
+      - cargo-deny
       - hawk
       - cargo-test-linux
       - cargo-test-wasm

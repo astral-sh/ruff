@@ -11,6 +11,8 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 env:
   UV_LOCKED: 1
   ACTIONS_CACHE_MODE: none
@@ -20,12 +22,24 @@ jobs:
     name: Notify dependents
     environment:
       name: release
+    permissions:
+      id-token: write # for the credential broker
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     steps:
+      - name: "Get pre-commit token"
+        id: token
+        uses: open-security-tools/ost-simple-sts@88f85462c7e9c9e2fb2745bd5ce4ee163aec0420 # v0.0.5
+        with:
+          exchange-url: ${{ secrets.RELEASES_STS_API_URL }}/exchange
+          audience: ${{ secrets.RELEASES_STS_API_URL }}
+          repository: astral-sh/ruff-pre-commit
+          permissions: |
+            actions: write
+
       - name: "Update pre-commit mirror"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          github-token: ${{ secrets.RUFF_PRE_COMMIT_PAT }}
+          github-token: ${{ steps.token.outputs.token }}
           script: |
             github.rest.actions.createWorkflowDispatch({
               owner: 'astral-sh',

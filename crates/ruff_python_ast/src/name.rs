@@ -173,11 +173,6 @@ impl salsa::Lookup<Name> for &str {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&str> for Name {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-
-    #[inline]
     fn eq(&self, data: &&str) -> bool {
         self == *data
     }
@@ -216,11 +211,6 @@ impl salsa::Lookup<compact_str::CompactString> for &Name {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<Name> for compact_str::CompactString {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
-    #[inline]
     fn eq(&self, data: &Name) -> bool {
         self.as_str() == data.as_str()
     }
@@ -228,11 +218,6 @@ impl salsa::HashEqLike<Name> for compact_str::CompactString {
 
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&Name> for compact_str::CompactString {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
     #[inline]
     fn eq(&self, data: &&Name) -> bool {
         self.as_str() == data.as_str()
@@ -878,7 +863,7 @@ mod tests {
         let lookup = "member";
 
         let mut name_hasher = DefaultHasher::new();
-        salsa::HashEqLike::<&str>::hash(&name, &mut name_hasher);
+        name.hash(&mut name_hasher);
         let mut lookup_hasher = DefaultHasher::new();
         lookup.hash(&mut lookup_hasher);
 

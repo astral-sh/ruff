@@ -1423,7 +1423,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-fn find_goto_target_impl<'a>(
+pub(crate) fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,
@@ -1433,7 +1433,7 @@ fn find_goto_target_impl<'a>(
         tokens
             .at_offset(offset)
             .max_by_key(|token| match token.kind() {
-                TokenKind::Name
+                TokenKind::Identifier
                 | TokenKind::String
                 | TokenKind::Complex
                 | TokenKind::Float

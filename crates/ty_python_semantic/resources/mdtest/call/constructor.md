@@ -154,10 +154,12 @@ Foo(1, 2)
 def _(flag: bool) -> None:
     class Foo:
         if flag:
-            def __new__(cls, x: int): ...
+            def __new__(cls, x: int):
+                return super().__new__(cls)
 
         else:
-            def __new__(cls, x: int, y: int = 1): ...
+            def __new__(cls, x: int, y: int = 1):
+                return super().__new__(cls)
 
     reveal_type(Foo(1))  # revealed: Foo
     # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"
@@ -626,6 +628,30 @@ class Bar:
 
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `Bar.__new__`: expected 0, got 1"
 reveal_type(Bar())  # revealed: Bar
+```
+
+## `__new__` borrowed from another class
+
+A borrowed `__new__` method retains the upper bound on its `Self` receiver. The class being
+constructed must be a subclass of the class that defined the method.
+
+```py
+from typing_extensions import Self
+
+class A:
+    value: int = 1
+
+    def __new__(cls: type[Self]) -> int:
+        return cls.value
+
+class B:
+    __new__ = A.__new__
+
+class C(A):
+    __new__ = A.__new__
+
+B()  # error: [invalid-argument-type] "Argument type `B` does not satisfy upper bound `A` of type variable `Self`"
+reveal_type(C())  # revealed: int
 ```
 
 ## A callable instance in place of `__new__`
@@ -1765,11 +1791,7 @@ class C[T: (str | None, int | None)]:
         raise NotImplementedError
 
 reveal_type(C("a"))  # revealed: C[str | None]
-
-# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
-# `C[int | None]` without an error.
-# error: [invalid-argument-type]
-reveal_type(C(1))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
 ```
 
 ## Union `self` annotations with variadic constructor parameters
@@ -2127,6 +2149,34 @@ reveal_type(Foo(1))  # revealed: Foo
 reveal_type(Foo())  # revealed: Foo
 ```
 
+An explicit `Self` annotation on the callable's receiver refers to the callable instance, not the
+class being constructed:
+
+```py
+from typing_extensions import Self
+
+class SelfCallable:
+    def __call__(self: Self, x: int) -> None: ...
+
+class WithSelfCallable:
+    __init__ = SelfCallable()
+
+reveal_type(WithSelfCallable(1))  # revealed: WithSelfCallable
+```
+
+For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class:
+
+```py
+class ClassmethodCallable:
+    @classmethod
+    def __call__(cls: type[Self], x: int) -> None: ...
+
+class WithClassmethodCallable:
+    __init__ = ClassmethodCallable()
+
+reveal_type(WithClassmethodCallable(1))  # revealed: WithClassmethodCallable
+```
+
 ### Possibly Unbound
 
 ```py
@@ -2268,4 +2318,32 @@ reveal_type(C())  # revealed: C
 
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
+```
+
+## Covariant constructors retain outer type variables from arguments
+
+A holder argument supplies its outer type variable to a covariant constructor, even without an
+expected return type. The constructor's bound and default must not replace that outer variable. Both
+the standalone expression and the return expression infer `RelatedBox[T]`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import TypeVar
+
+class Client: ...
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # revealed: RelatedBox[T@Holder]
+        reveal_type(RelatedBox(self))
+        # revealed: RelatedBox[T@Holder]
+        return reveal_type(RelatedBox(self))
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
 ```

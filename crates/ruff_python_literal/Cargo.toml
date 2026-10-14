@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python_literal"
-version = "0.0.13"
+version = "0.0.17"
 description = "This is an internal component crate of Ruff"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>", "RustPython Team"]
 edition = { workspace = true }
@@ -17,6 +17,7 @@ doctest = false
 ruff_python_ast = { workspace = true }
 
 bitflags = { workspace = true }
+icu_normalizer = { workspace = true }
 icu_properties = { workspace = true }
 itertools = { workspace = true }
 

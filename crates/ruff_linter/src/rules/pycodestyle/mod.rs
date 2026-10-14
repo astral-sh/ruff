@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501_3.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501_4.py"))]
+    #[test_case(Rule::LineTooLong, Path::new("E501_5.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
@@ -75,7 +76,6 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::LineTooLong, Path::new("E501_5.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_0.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402_1.py"))]

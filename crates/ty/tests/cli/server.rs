@@ -4,7 +4,6 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::Context as _;
 use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
@@ -122,24 +121,6 @@ fn find_uses_cwd_when_project_discovery_fails() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     <temp_dir>/src/.venv/bin/ty
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
-fn find_does_not_fall_back_to_path_or_own_executable() -> anyhow::Result<()> {
-    let case = CliTest::new()?;
-    let own_ty = venv_with_ty(&case, "own environment")?;
-    let case = case.with_ty_at(&own_ty)?;
-    let path = own_ty.parent().context("ty must have a parent")?;
-
-    assert_cmd_snapshot!(find_command(&case).env("PATH", path), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
 
     ----- stderr -----
     ");

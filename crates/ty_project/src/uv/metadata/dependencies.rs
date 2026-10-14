@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, Severity, SubDiagnostic, SubDiagnosticSeverity,
 };
@@ -71,7 +71,7 @@ impl UvMetadata {
             }
         }
 
-        let package_id = |id: &CompactString| {
+        let package_id = |id: &CharStr| {
             if distributions.contains_key(id) {
                 Ok(id.clone())
             } else {
@@ -206,7 +206,7 @@ impl UvMetadata {
             return Err(DependencyMetadataError::MissingProjects);
         }
 
-        let mut module_owners: BTreeMap<ModuleName, Box<[CompactString]>> = BTreeMap::new();
+        let mut module_owners: BTreeMap<ModuleName, Box<[CharStr]>> = BTreeMap::new();
         for (module, owners) in &self.module_owners {
             let Some(module) = ModuleName::new(module) else {
                 continue;
@@ -233,7 +233,7 @@ impl UvMetadata {
             // has no modules to attribute, so its empty ownership map is valid.
             && distributions
                 .keys()
-                .any(|id| !self.members.iter().any(|member| member.id == id))
+                .any(|id| !self.members.iter().any(|member| member.id == *id))
         {
             return Err(DependencyMetadataError::MissingModuleOwnership);
         }
@@ -247,7 +247,7 @@ impl UvMetadata {
         })
     }
 
-    fn node(&self, id: &CompactString) -> Result<&ResolutionNode, DependencyMetadataError> {
+    fn node(&self, id: &CharStr) -> Result<&ResolutionNode, DependencyMetadataError> {
         self.resolution
             .get(id)
             .ok_or_else(|| DependencyMetadataError::MissingNode(id.clone()))
@@ -258,26 +258,23 @@ impl UvMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Error, get_size2::GetSize)]
 pub(crate) enum DependencyMetadataError {
     #[error("resolution node `{0}` is missing")]
-    MissingNode(CompactString),
+    MissingNode(CharStr),
     #[error("package node `{0}` is missing its name")]
-    MissingPackageName(CompactString),
+    MissingPackageName(CharStr),
     #[error("resolution node `{id}` is not a {expected} node")]
-    UnexpectedNodeKind {
-        id: CompactString,
-        expected: &'static str,
-    },
+    UnexpectedNodeKind { id: CharStr, expected: &'static str },
     #[error("dependency `{0}` is not a known package or extra")]
-    UnknownDependency(CompactString),
+    UnknownDependency(CharStr),
     #[error("extra node `{id}` belongs to both package `{first}` and package `{second}`")]
     SharedExtra {
-        id: CompactString,
-        first: CompactString,
-        second: CompactString,
+        id: CharStr,
+        first: CharStr,
+        second: CharStr,
     },
     #[error("{kind} `{id}` has a non-absolute path `{path}`")]
     RelativePath {
         kind: &'static str,
-        id: CompactString,
+        id: CharStr,
         path: SystemPathBuf,
     },
     #[error("multiple workspace members use path `{0}`")]
@@ -349,7 +346,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use anyhow::Context;
-    use compact_str::CompactString;
+    use char_str::CharStr;
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use serde_json::{Value, json};
     use ty_module_resolver::ModuleName;
@@ -444,8 +441,8 @@ mod tests {
             .context("expected a project at this path")
     }
 
-    fn ids<const N: usize>(ids: [&str; N]) -> BTreeSet<CompactString> {
-        ids.into_iter().map(CompactString::from).collect()
+    fn ids<const N: usize>(ids: [&str; N]) -> BTreeSet<CharStr> {
+        ids.into_iter().map(CharStr::from).collect()
     }
 
     #[test]
@@ -485,7 +482,7 @@ mod tests {
                 .get(&name)
                 .context("expected module ownership")?;
             assert_eq!(
-                owners.iter().map(CompactString::as_str).collect::<Vec<_>>(),
+                owners.iter().map(CharStr::as_str).collect::<Vec<_>>(),
                 expected
             );
         }
@@ -583,7 +580,7 @@ mod tests {
         let namespace = ModuleName::new("namespace").context("expected a valid module name")?;
         assert_eq!(
             metadata.module_owners.get(&namespace).map(AsRef::as_ref),
-            Some([CompactString::from("direct")].as_slice())
+            Some([CharStr::from("direct")].as_slice())
         );
         for child in ["namespace.indirect", "namespace.empty"] {
             let child = ModuleName::new(child).context("expected a valid module name")?;
