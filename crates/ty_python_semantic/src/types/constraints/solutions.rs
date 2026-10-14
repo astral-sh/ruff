@@ -27,9 +27,6 @@ use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 /// whether we've already processed a node in an equivalent situation. If so, we don't need to
 /// reproduce whatever results we calculated previously, and can return early.
 ///
-/// If you are performing a BDD walk where you always want to process every node, use the
-/// [`never_cache`] callback.
-///
 /// The "in an equivalent situation" part is important. We will often encounter the same BDD node
 /// multiple times when walking a BDD, and how we interpret that node will depend on which other
 /// nodes we've already processed on this path, and what partial solution we've calculated so far
@@ -48,24 +45,9 @@ type CheckCache<'a, 'db, L, B> = dyn Fn(
     ) -> ControlFlow<B, bool>
     + 'a;
 
-/// A [`CheckCache`] callback that never caches anything, and always processes every node
-/// encountered when walking a BDD.
-fn never_cache<'db, L, B>(
-    _this: &mut SolutionWalker<'db, L>,
-    _storage: &mut ConstraintSetStorage<'db>,
-    _path: &mut PathAssignments,
-    _polarity: Polarity,
-    _node: NodeId,
-) -> ControlFlow<B, bool> {
-    ControlFlow::Continue(true)
-}
-
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
 /// whether the current node can affect the partial solution that we've calculated so far for the
 /// current path. If not, we don't need to descend into the node's subtree, and can return early.
-///
-/// If you are performing a BDD walk where you always want to process every node, use the
-/// [`never_prune`] callback.
 ///
 /// The current node and its descendents have a fixed set of constraints and typevars that they
 /// check. (We track this in the node's _support_, so that we don't have to calculate it on the
@@ -103,18 +85,6 @@ enum PathIs {
     /// The current path is currently satisfied, but the current node can influence the solutions
     /// that we report, and so we must walk its outgoing edges in full.
     Uncertain,
-}
-
-/// A [`PrunePath`] callback that never prunes anything, and always processes the descendants of
-/// every node encountered when walking a BDD.
-fn never_prune<'db, L, B>(
-    _this: &mut SolutionWalker<'db, L>,
-    _storage: &mut ConstraintSetStorage<'db>,
-    _paths: &mut PathAssignments,
-    _polarity: Polarity,
-    _node: NodeId,
-) -> ControlFlow<B, PathIs> {
-    ControlFlow::Continue(PathIs::Uncertain)
 }
 
 type ProcessNode<'a, 'db, L, B, R> = dyn Fn(
@@ -477,17 +447,40 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         node: NodeId,
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break, bool> {
-        let result = self.visit_node_and_then(
+        let result = self.node_is_satisfiable_on_path_inner(
             db,
             env,
             storage,
             path,
             polarity,
             node,
-            &never_cache,
-            &never_prune,
-            &|this, storage, path| {
-                this.validate_satisfied_path(
+            validations,
+        );
+        match result {
+            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
+            ControlFlow::Break(Break::EarlyBreak) => ControlFlow::Continue(true),
+            ControlFlow::Continue(()) => ControlFlow::Continue(false),
+        }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn node_is_satisfiable_on_path_inner(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+        validations: Option<&Validations<'db>>,
+    ) -> ControlFlow<Break<L::Break>, ()> {
+        self.limits.visit_node().map_break(Break::Limits)?;
+        match (polarity, node) {
+            (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) => {
+                ControlFlow::Continue(())
+            }
+            (Polarity::Positive, ALWAYS_TRUE) | (Polarity::Negative, ALWAYS_FALSE) => {
+                self.validate_satisfied_path(
                     db,
                     env,
                     storage,
@@ -505,12 +498,26 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                         }
                     },
                 )
-            },
-        );
-        match result {
-            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
-            ControlFlow::Break(Break::EarlyBreak) => ControlFlow::Continue(true),
-            ControlFlow::Continue(()) => ControlFlow::Continue(false),
+            }
+            _ => self.visit_constraint(
+                db,
+                env,
+                storage,
+                path,
+                polarity,
+                node,
+                &|this, storage, path, polarity, child| {
+                    this.node_is_satisfiable_on_path_inner(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        child,
+                        validations,
+                    )
+                },
+            ),
         }
     }
 
@@ -808,36 +815,18 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             .cloned()
             .map(|support| Validations::from_support(db, env, storage, &support));
         let mut relation_path = node.path_assignments(db, env, storage, source_order);
-        let has_counterexample = Cell::new(false);
-        self.visit_node_and_then(
-            db,
-            env,
-            storage,
-            &mut relation_path,
-            Polarity::Negative,
-            node,
-            &|_, _, _, _, _| ControlFlow::Continue(!has_counterexample.get()),
-            &never_prune,
-            &|this, storage, path| {
-                this.validate_satisfied_path(
-                    db,
-                    env,
-                    storage,
-                    path,
-                    validations.as_ref(),
-                    &|this, storage, path| {
-                        if this
-                            .pending_candidate_solution(db, env, storage, path, None)
-                            .is_some()
-                        {
-                            has_counterexample.set(true);
-                        }
-                        ControlFlow::Continue(())
-                    },
-                )
-            },
-        )?;
-        ControlFlow::Continue(!has_counterexample.into_inner())
+        let has_counterexample = self
+            .node_is_satisfiable_on_path(
+                db,
+                env,
+                storage,
+                &mut relation_path,
+                Polarity::Negative,
+                node,
+                validations.as_ref(),
+            )
+            .map_break(Break::Limits)?;
+        ControlFlow::Continue(!has_counterexample)
     }
 
     fn evidence_satisfies_declared_constraint(

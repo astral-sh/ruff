@@ -5281,6 +5281,38 @@ mod tests {
     }
 
     #[test]
+    fn satisfiability_respects_visit_budget() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let mut set = ConstraintSet::always(&builder);
+        for index in 0..64 {
+            let t = BoundTypeVarInstance::synthetic(
+                db,
+                &env,
+                Name::new(format!("T{index}")),
+                TypeVarVariance::Invariant,
+            );
+            set = set.and(db, &builder, || {
+                create_constraint(db, &builder, t, KnownClass::Int).or(db, &builder, || {
+                    create_constraint(db, &builder, t, KnownClass::Str)
+                })
+            });
+        }
+
+        // Leave room for preprocessing, but require the satisfiability walk to respect the limit.
+        assert_eq!(
+            bounded_path_bounds(db, set, TypeVarSet::None, usize::MAX, 16),
+            Err(ProjectionError::TraversalBudgetExceeded)
+        );
+        assert_eq!(
+            bounded_path_bounds(db, set, TypeVarSet::None, usize::MAX, usize::MAX),
+            Ok(CandidateSolutions::Unconstrained)
+        );
+    }
+
+    #[test]
     fn bounded_path_fast_paths_respect_limits() {
         let db = setup_db();
         let db = &db;
