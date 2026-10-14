@@ -12,6 +12,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
+use crate::rules::pylint::helpers::else_trailing_comment;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -128,17 +129,16 @@ fn convert_to_elif(
         stylist,
     )?;
 
-    // If there's trivia, restore it
-    let trivia = if trivia_range.is_empty() {
-        None
+    // If there's a comment on the `else` line, or trivia, restore it
+    let else_comment = else_trailing_comment(else_clause.start(), indentation, locator, stylist);
+    let indented_trivia = if trivia_range.is_empty() {
+        String::new()
     } else {
-        let indented_trivia =
-            adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
-        Some(Edit::insertion(
-            indented_trivia,
-            locator.line_start(else_clause.start()),
-        ))
+        adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?
     };
+    let trivia = format!("{else_comment}{indented_trivia}");
+    let trivia = (!trivia.is_empty())
+        .then(|| Edit::insertion(trivia, locator.line_start(else_clause.start())));
 
     // Strip the indent from the first line of the `if` statement, and add `el` to the start.
     let Some(unindented) = indented.strip_prefix(indentation) else {

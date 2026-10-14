@@ -3,16 +3,46 @@ use ruff_python_ast::ExceptHandler;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
 use crate::settings::LinterSettings;
 
 /// Returns `true` if a module member is public despite having an
 /// underscore-prefixed name.
 pub(crate) fn is_underscore_prefixed_public_member(qualified_name: &QualifiedName) -> bool {
     matches!(qualified_name.segments(), ["os", "_exit"])
+}
+
+/// Returns the comment that trails the colon of the `else` starting at `else_start`, as its own
+/// line indented with `indentation`, so that a fix removing the `else` can keep it.
+///
+/// Returns an empty string if there is no such comment.
+pub(super) fn else_trailing_comment(
+    else_start: TextSize,
+    indentation: &str,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> String {
+    let mut tokenizer = SimpleTokenizer::starts_at(else_start, locator.contents());
+    if tokenizer
+        .find(|token| token.kind == SimpleTokenKind::Colon)
+        .is_none()
+    {
+        return String::new();
+    }
+    match tokenizer.find(|token| token.kind != SimpleTokenKind::Whitespace) {
+        Some(token) if token.kind == SimpleTokenKind::Comment => format!(
+            "{indentation}{}{}",
+            locator.slice(token),
+            stylist.line_ending().as_str()
+        ),
+        _ => String::new(),
+    }
 }
 
 /// Returns the value of the `name` parameter to, e.g., a `TypeVar` constructor.

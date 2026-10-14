@@ -286,4 +286,61 @@ help: Convert to `elif`
 143 +         pass
 144 +     else:
 145 +         pass  # final pass comment
+146 |
+    |
+
+PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   --> collapsible_else_if.py:152:5
+    |
+150 |       if 1:
+151 |           pass
+152 | /     else:  # trailing comment on the else line
+153 | |         if 2:
+    | |________^
+154 |               pass
+155 |           else:
+    |
+help: Convert to `elif`
+    |
+151 |         pass
+    -     else:  # trailing comment on the else line
+    -         if 2:
+    -             pass
+    -         else:
+    -             pass
+152 +     # trailing comment on the else line
+153 +     elif 2:
+154 +         pass
+155 +     else:
+156 +         pass
+157 |
+    |
+
+PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
+   --> collapsible_else_if.py:162:5
+    |
+160 |       if 1:
+161 |           pass
+162 | /     else:  # trailing comment on the else line
+163 | |         # inner comment
+164 | |         if 2:
+    | |________^
+165 |               pass
+166 |           else:
+    |
+help: Convert to `elif`
+    |
+161 |         pass
+    -     else:  # trailing comment on the else line
+    -         # inner comment
+    -         if 2:
+    -             pass
+    -         else:
+    -             pass
+162 +     # trailing comment on the else line
+163 +     # inner comment
+164 +     elif 2:
+165 +         pass
+166 +     else:
+167 +         pass
     |

@@ -16,8 +16,9 @@ help: Remove `else`
 8  |             return i
    -     else:  # [useless-else-on-loop]
    -         print("math is broken")
-9  +     print("math is broken")
-10 |     return None
+9  +     # [useless-else-on-loop]
+10 +     print("math is broken")
+11 |     return None
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -35,8 +36,9 @@ help: Remove `else`
 17 |         return 1
    -     else:  # [useless-else-on-loop]
    -         print("math is broken")
-18 +     print("math is broken")
-19 |     return None
+18 +     # [useless-else-on-loop]
+19 +     print("math is broken")
+20 |     return None
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -53,8 +55,9 @@ help: Remove `else`
 29 |
    - else:  # [useless-else-on-loop]
    -     print("or else!")
-30 + print("or else!")
-31 |
+30 + # [useless-else-on-loop]
+31 + print("or else!")
+32 |
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -71,8 +74,9 @@ help: Remove `else`
 36 |         break
    - else:  # [useless-else-on-loop]
    -     print("or else!")
-37 + print("or else!")
-38 |
+37 + # [useless-else-on-loop]
+38 + print("or else!")
+39 |
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -92,10 +96,11 @@ help: Remove `else`
    -     print("fat chance")
    -     for j in range(10):
    -         break
-42 + print("fat chance")
-43 + for j in range(10):
-44 +     break
-45 |
+42 + # [useless-else-on-loop]
+43 + print("fat chance")
+44 + for j in range(10):
+45 +     break
+46 |
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents
@@ -113,8 +118,9 @@ help: Remove `else`
 87 |                 print("all right")
    -     else:  # [useless-else-on-loop]
    -         return True
-88 +     return True
-89 |     return False
+88 +     # [useless-else-on-loop]
+89 +     return True
+90 |     return False
    |
 
 PLW0120 [*] `else` clause on loop without a `break` statement; remove the `else` and dedent its contents

@@ -144,3 +144,24 @@ def not_ok1_with_mixed_indented_comments():
             pass
         else:
             pass  # final pass comment
+
+
+def not_ok1_with_comment_on_else_line():
+    if 1:
+        pass
+    else:  # trailing comment on the else line
+        if 2:
+            pass
+        else:
+            pass
+
+
+def not_ok1_with_comment_on_else_line_and_inner_comment():
+    if 1:
+        pass
+    else:  # trailing comment on the else line
+        # inner comment
+        if 2:
+            pass
+        else:
+            pass
