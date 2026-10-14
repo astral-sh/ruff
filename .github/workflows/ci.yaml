@@ -443,8 +443,15 @@ jobs:
         run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
+      # On a PR, the annotation mdtests step above can install a Python version
+      # that uv can reuse for py-fuzzer. When the annotation step is skipped (as
+      # on pushes to `main`), uv may select a newer Python for the step below, for
+      # which py-fuzzer's locked dependencies may not have wheels. With source
+      # builds of those dependencies disabled, installation fails. We therefore set
+      # `--python` explicitly to use the version in `PYTHON_VERSION`, even if it
+      # differs from one used by the annotation mdtests.
       - name: Dogfood ty on py-fuzzer
-        run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
+        run: uv run --quiet --python="${PYTHON_VERSION}" --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
       - name: Dogfood ty on scripts
@@ -452,6 +459,11 @@ jobs:
           # Enable experimental support for installing PEP 723 script dependencies.
           TY_UV: scripts
           UV_LOCKED: "true"
+          # Set `UV_PYTHON` to select the configured Python version for both the
+          # uv command below and the uv subprocesses ty uses to install script
+          # dependencies. If a locked script dependency lacks a wheel for a newer
+          # Python version, installation fails because source builds are disabled.
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
         run: |
           uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
           cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
@@ -717,9 +729,12 @@ jobs:
       - run: cargo check
       # Lint/format/type-check py-fuzzer
       # (dogfooding with ty is done in a separate job)
-      - run: uv run --directory=./python/py-fuzzer mypy
-      - run: uv run --directory=./python/py-fuzzer ruff format --check
-      - run: uv run --directory=./python/py-fuzzer ruff check
+      # Pass `--python` explicitly because the fuzzer's locked dependencies may
+      # lack wheels for newer Python versions. Source builds of those
+      # dependencies are disabled, so installation would fail.
+      - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer mypy
+      - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff format --check
+      - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff check
 
   ecosystem:
     name: "ecosystem"
