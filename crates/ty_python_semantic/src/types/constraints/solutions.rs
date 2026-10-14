@@ -450,6 +450,57 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         }
     }
 
+    /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
+    /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
+    /// we find the first satisfied path.
+    #[expect(clippy::too_many_arguments)]
+    fn node_is_satisfiable_on_path(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        node: NodeId,
+        validations: Option<&Validations<'db>>,
+    ) -> ControlFlow<L::Break, bool> {
+        let result = self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            path,
+            polarity,
+            node,
+            &never_cache,
+            &never_prune,
+            &|this, storage, path| {
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    path,
+                    validations,
+                    &|this, storage, path| {
+                        if this
+                            .pending_candidate_solution(db, env, storage, path, None)
+                            .is_some()
+                        {
+                            // break when we find the first solution
+                            ControlFlow::Break(Break::EarlyBreak)
+                        } else {
+                            ControlFlow::Continue(())
+                        }
+                    },
+                )
+            },
+        );
+        match result {
+            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
+            ControlFlow::Break(Break::EarlyBreak) => ControlFlow::Continue(true),
+            ControlFlow::Continue(()) => ControlFlow::Continue(false),
+        }
+    }
+
     #[expect(clippy::too_many_arguments)]
     fn visit_atomic_constraint(
         &mut self,
@@ -519,57 +570,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         )?;
 
         ControlFlow::Continue(())
-    }
-
-    /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
-    /// `path` already hold. Avoids walking the entire subtree if possible, by returning early once
-    /// we find the first satisfied path.
-    #[expect(clippy::too_many_arguments)]
-    fn node_is_satisfiable_on_path(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &mut PathAssignments,
-        polarity: Polarity,
-        node: NodeId,
-        validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break, bool> {
-        let result = self.visit_node_and_then(
-            db,
-            env,
-            storage,
-            path,
-            polarity,
-            node,
-            &never_cache,
-            &never_prune,
-            &|this, storage, path| {
-                this.validate_satisfied_path(
-                    db,
-                    env,
-                    storage,
-                    path,
-                    validations,
-                    &|this, storage, path| {
-                        if this
-                            .pending_candidate_solution(db, env, storage, path, None)
-                            .is_some()
-                        {
-                            // break when we find the first solution
-                            ControlFlow::Break(Break::EarlyBreak)
-                        } else {
-                            ControlFlow::Continue(())
-                        }
-                    },
-                )
-            },
-        );
-        match result {
-            ControlFlow::Break(Break::Limits(b)) => ControlFlow::Break(b),
-            ControlFlow::Break(Break::EarlyBreak) => ControlFlow::Continue(true),
-            ControlFlow::Continue(()) => ControlFlow::Continue(false),
-        }
     }
 
     /// Visits one of the outgoing edges from a BDD node.
