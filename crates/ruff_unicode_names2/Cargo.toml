@@ -23,5 +23,4 @@ rand = { workspace = true }
 name = "unicode_names2"
 # Upstream unit tests, benchmarks, and macro doctests require nightly Rust.
 test = false
-doctest = false
 bench = false
