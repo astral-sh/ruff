@@ -144,25 +144,12 @@ pub fn create_phf(
     max_tries: usize,
 ) -> (u64, Vec<(u32, u32)>, Vec<char>) {
     let mut rng = StdRng::seed_from_u64(0xf0f0f0f0);
-    #[cfg(feature = "timing")]
-    let start = time::Instant::now();
 
     for i in 0..(max_tries) {
-        #[cfg(feature = "timing")]
-        let my_start = time::Instant::now();
-        #[cfg(feature = "timing")]
-        println!("PHF #{}: starting {:.2}", i, my_start - start);
-        #[cfg(not(feature = "timing"))]
         println!("PHF #{}", i);
 
         let seed = rng.random();
         if let Some((disp, map)) = try_phf_table(data, lambda, seed, &mut rng) {
-            #[cfg(feature = "timing")]
-            println!(
-                "PHF took: total {:.2} s, successive {:.2} s",
-                start.elapsed(),
-                my_start.elapsed()
-            );
             return (seed, disp, map);
         }
     }

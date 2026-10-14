@@ -1,9 +1,7 @@
 //! Convert between characters and their standard names.
 //!
 //! This crate provides two functions for mapping from a `char` to the
-//! name given by the Unicode standard (17.0). There are no runtime
-//! requirements so this is usable with only `core` (this requires
-//! specifying the `no_std` cargo feature). The tables are heavily
+//! name given by the Unicode standard (17.0). The tables are heavily
 //! compressed, but still large (500KB), and still offer efficient
 //! `O(1)` look-ups in both directions (more precisely, `O(length of
 //! name)`).
@@ -47,13 +45,8 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "no_std", no_std)]
 #![cfg_attr(test, feature(test))]
 #![deny(missing_docs, unsafe_code)]
-
-#[cfg(all(test, feature = "no_std"))]
-#[macro_use]
-extern crate std;
 
 use core::{char, fmt};
 use generated::{
@@ -665,9 +658,4 @@ mod tests {
             }
         })
     }
-}
-
-#[cfg(all(feature = "no_std", not(test)))]
-mod std {
-    pub use core::{clone, fmt, marker};
 }

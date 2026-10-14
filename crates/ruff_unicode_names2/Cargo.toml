@@ -19,10 +19,6 @@ ruff_unicode_names2_generator = { workspace = true }
 [dev-dependencies]
 rand = { workspace = true }
 
-[lints.rust]
-# Ruff uses std; retain upstream's optional no_std code without enabling it.
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("no_std"))'] }
-
 [lib]
 name = "unicode_names2"
 # Upstream unit tests, benchmarks, and macro doctests require nightly Rust.

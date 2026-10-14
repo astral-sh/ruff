@@ -14,8 +14,5 @@ license = "MIT OR Apache-2.0"
 phf_codegen = { workspace = true }
 rand = { workspace = true }
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("timing"))'] }
-
 [lib]
 name = "unicode_names2_generator"
