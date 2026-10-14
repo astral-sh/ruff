@@ -39,6 +39,22 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn Fn(
     ) -> ControlFlow<B>
     + 'a;
 
+/// A representation of the candidate solutions of a BDD.
+///
+/// The most common impl is [`Vec<PendingCandidateSolution>`][PendingCandidateSolution], which
+/// stores each candidate solution directly. But there are other impls that build up _summaries_ of
+/// the solutions without having to enumerate or store them all in memory at once.
+///
+/// Your type's [`Default`] impl should represent the empty set of solutions.
+trait FoldedSolutions<'db, L>: Default {
+    /// Combines two sets of solutions into one.
+    fn combine(walker: &mut SolutionWalker<'db, L>, left: &Self, right: &Self) -> Self;
+}
+
+impl<'db, L> FoldedSolutions<'db, L> for () {
+    fn combine(_walker: &mut SolutionWalker<'db, L>, _left: &Self, _right: &Self) -> Self {}
+}
+
 /// Whether [`SolutionWalker`] walks a BDD or its negation. (We can walk the negation of a BDD
 /// lazily, which is more efficient than actually constructing the negation and then walking it
 /// normally.)
@@ -461,7 +477,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn visit_constraint<B>(
+    fn visit_constraint<B, R: FoldedSolutions<'db, L>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -469,8 +485,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         polarity: Polarity,
         node: NodeId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
-    ) -> ControlFlow<B> {
+        process_node: &ProcessNode<'_, 'db, L, B, R>,
+    ) -> ControlFlow<B, R> {
         let interior = storage.interior_node_data(node);
         let constraint_id = interior.constraint;
         let constraint = storage.constraint_data(constraint_id);
@@ -489,7 +505,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn visit_atomic_constraint<B>(
+    fn visit_atomic_constraint<B, R: FoldedSolutions<'db, L>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -498,8 +514,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         interior: InteriorNodeData,
         constraint: AtomicConstraintId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
-    ) -> ControlFlow<B> {
+        process_node: &ProcessNode<'_, 'db, L, B, R>,
+    ) -> ControlFlow<B, R> {
+        let mut result;
+
         // The repetitive nature of the visit_atomic_edge calls is intentional; in the negative
         // polarity case, it's important that we not construct the `if_false` edge sink unless we
         // actually need to visit it.
@@ -508,7 +526,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         } else {
             interior.if_true.or(storage, interior.if_uncertain)
         };
-        self.visit_atomic_edge(
+        let when_true = self.visit_atomic_edge(
             db,
             env,
             storage,
@@ -518,9 +536,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             if_true,
             process_node,
         )?;
+        result = when_true;
 
         if polarity == Polarity::Positive {
-            self.visit_atomic_edge(
+            let when_uncertain = self.visit_atomic_edge(
                 db,
                 env,
                 storage,
@@ -530,6 +549,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 interior.if_uncertain,
                 process_node,
             )?;
+            result = R::combine(self, &result, &when_uncertain);
         }
 
         let if_false = if polarity == Polarity::Positive {
@@ -537,7 +557,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         } else {
             interior.if_false.or(storage, interior.if_uncertain)
         };
-        self.visit_atomic_edge(
+        let when_false = self.visit_atomic_edge(
             db,
             env,
             storage,
@@ -547,8 +567,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             if_false,
             process_node,
         )?;
+        result = R::combine(self, &result, &when_false);
 
-        ControlFlow::Continue(())
+        ControlFlow::Continue(result)
     }
 
     /// Visits one of the outgoing edges from a BDD node.
@@ -556,7 +577,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     /// (This is a helper method used by [`visit_node_and_then`][Self::visit_node_and_then]. You
     /// will probably not need to call this directly.)
     #[expect(clippy::too_many_arguments)]
-    fn visit_atomic_edge<B>(
+    fn visit_atomic_edge<B, R: FoldedSolutions<'db, L>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -565,14 +586,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         assignment: Assignment<AtomicConstraintId>,
         child: NodeId,
-        process_node: &ProcessNode<'_, 'db, L, B, ()>,
-    ) -> ControlFlow<B> {
+        process_node: &ProcessNode<'_, 'db, L, B, R>,
+    ) -> ControlFlow<B, R> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
             (polarity, child)
         {
-            return ControlFlow::Continue(());
+            return ControlFlow::Continue(R::default());
         }
 
         path.walk_edge(
@@ -582,7 +603,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             assignment,
             |storage, path, _new_range, found_conflict| {
                 if found_conflict {
-                    return ControlFlow::Continue(());
+                    return ControlFlow::Continue(R::default());
                 }
                 process_node(self, storage, path, polarity, child)
             },
