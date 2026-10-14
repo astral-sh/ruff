@@ -61,6 +61,12 @@
       description: "Weekly update of the Monaco editor",
     },
     {
+      groupName: "phf",
+      matchManagers: ["cargo"],
+      matchPackageNames: ["phf", "phf_codegen"],
+      description: "Weekly update of phf dependencies",
+    },
+    {
       groupName: "strum",
       matchManagers: ["cargo"],
       matchPackageNames: ["strum", "strum_macros"],
