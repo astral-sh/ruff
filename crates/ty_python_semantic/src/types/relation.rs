@@ -550,9 +550,10 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, env, target, &constraints)
-            .is_always_satisfied(db, env, TypeVarSet::None)
+        // Validating a generic receiver's bound can require this same relation again. Use the
+        // cached query so its existing cycle handling also covers construction-time solving.
+        self.when_constraint_set_assignable_to_owned(db, env, target)
+            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
 
     /// Return true if this type is a subtype of `target` for every specialization of the type

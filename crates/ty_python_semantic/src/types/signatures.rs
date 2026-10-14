@@ -981,7 +981,7 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn is_paramspec_value(&self) -> bool {
+    pub(super) fn is_paramspec_value(&self) -> bool {
         self.extras
             .as_ref()
             .is_some_and(|extras| extras.is_paramspec_value)
