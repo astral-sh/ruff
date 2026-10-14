@@ -4,6 +4,8 @@ version = "0.0.17"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = "2018"
+# Keep the MSRV from the upstream crate that this crate vendors, rather than
+# the newer workspace MSRV, to minimize differences from upstream.
 rust-version = "1.65.0"
 homepage = { workspace = true }
 documentation = { workspace = true }

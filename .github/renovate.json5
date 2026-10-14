@@ -118,7 +118,10 @@
     // Minimum supported Rust toolchain version
     {
       customType: "regex",
-      managerFilePatterns: ["/(^|/)Cargo\\.toml?$/"],
+      // Match only the root Cargo.toml so Renovate leaves MSRV pins in nested
+      // manifests unchanged. This lets vendored crates keep their original
+      // MSRV, minimizing differences from upstream.
+      managerFilePatterns: ["/^Cargo\\.toml$/"],
       matchStrings: [
         'rust-version\\s*=\\s*"(?<currentValue>\\d+\\.\\d+(\\.\\d+)?)"',
       ],
