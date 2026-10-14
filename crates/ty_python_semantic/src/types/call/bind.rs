@@ -353,13 +353,14 @@ impl<'db> CallableItem<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.match_parameters(db, env, arguments);
+                binding.match_parameters(db, env, arguments, mode);
             }
             CallableItem::Constructor(binding) => {
-                binding.match_parameters(db, env, arguments);
+                binding.match_parameters(db, env, arguments, mode);
             }
         }
     }
@@ -648,6 +649,15 @@ pub(crate) fn requires_overload_evaluation(candidates: &OverloadSet) -> bool {
     // that may need to be evaluated. `OverloadSet` should preserve the union-of-intersections
     // representation of callables.
     candidates.iter().any(|indices| indices.len() > 1)
+}
+
+/// Whether matching supplies context for inference or checks already-inferred arguments.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ArgumentMatchingMode {
+    /// Preserve ordinary positional matching while inferring argument expressions.
+    Ordinary,
+    /// Try alternative unpack lengths using argument types that can be reused at new positions.
+    PositionalAlternatives,
 }
 
 /// Controls the behavior of a given call to [`Bindings::check_types`].
@@ -1320,15 +1330,59 @@ impl<'db> Bindings<'db> {
     /// Once you have argument types available, you can call [`check_types`][Self::check_types] to
     /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
-        mut self,
+        self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
+        self.match_parameters_with_mode(db, env, arguments, ArgumentMatchingMode::Ordinary)
+    }
+
+    /// Match arguments with an explicit policy. Type-only callers can try alternative placements
+    /// directly; expression inference starts with ordinary matching to obtain expected types.
+    pub(crate) fn match_parameters_with_mode(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
+    ) -> Self {
         let nonce_generator = TypeVarNonceGenerator::default();
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
-        self.match_parameters_in_place(db, env, arguments);
+        self.match_parameters_in_place(db, env, arguments, mode);
         self
+    }
+
+    /// Match already-inferred arguments before type checking discards unsuccessful callables.
+    /// Ordinary mode keeps the initial matches; alternatives reuse the original type variables.
+    pub(crate) fn match_inferred_arguments(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
+    ) {
+        if mode == ArgumentMatchingMode::Ordinary {
+            return;
+        }
+        self.reset_matching(db);
+        self.match_parameters_in_place(db, env, arguments, mode);
+    }
+
+    fn reset_matching(&mut self, db: &'db dyn Db) {
+        for item in self.iter_callable_items_mut() {
+            let callable = item.callable_mut();
+            callable.overload_call_result = None;
+            callable.matching_overload_before_type_checking = None;
+            for overload in &mut callable.overloads {
+                overload.reset(db);
+            }
+            if let Some(constructor) = item.as_constructor_mut()
+                && let Some(downstream) = constructor.downstream_constructor_mut()
+            {
+                downstream.reset_matching(db);
+            }
+        }
     }
 
     fn match_parameters_in_place(
@@ -1336,9 +1390,10 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
     ) {
         for item in self.iter_callable_items_mut() {
-            item.match_parameters(db, env, arguments);
+            item.match_parameters(db, env, arguments, mode);
         }
     }
 
@@ -3431,6 +3486,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             bound_type: None,
             overload_call_result: None,
             matching_overload_before_type_checking: None,
+            argument_matching_mode: ArgumentMatchingMode::Ordinary,
             overloads: smallvec_inline![from],
         };
         callable_binding.into()
@@ -3449,6 +3505,9 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
 /// overloads, we store this error information for each overload.
 #[derive(Debug, Clone)]
 pub(crate) struct CallableBinding<'db> {
+    /// The matching policy for this evaluation, including retries after argument expansion.
+    argument_matching_mode: ArgumentMatchingMode,
+
     /// The type that is (hopefully) callable.
     pub(crate) callable_type: Type<'db>,
 
@@ -3564,6 +3623,7 @@ impl<'db> CallableBinding<'db> {
             bound_type: None,
             overload_call_result: None,
             matching_overload_before_type_checking: None,
+            argument_matching_mode: ArgumentMatchingMode::Ordinary,
             overloads,
         }
     }
@@ -3577,6 +3637,7 @@ impl<'db> CallableBinding<'db> {
             bound_type: None,
             overload_call_result: None,
             matching_overload_before_type_checking: None,
+            argument_matching_mode: ArgumentMatchingMode::Ordinary,
             overloads: smallvec![],
         }
     }
@@ -3852,13 +3913,20 @@ impl<'db> CallableBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
     ) {
+        self.argument_matching_mode = mode;
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let bound_arguments = arguments.with_self(self.bound_type);
 
         for overload in &mut self.overloads {
-            overload.match_parameters(db, env, bound_arguments.as_ref());
+            overload.match_parameters_impl(
+                db,
+                env,
+                bound_arguments.as_ref(),
+                self.argument_matching_mode,
+            );
         }
     }
 
@@ -4104,7 +4172,12 @@ impl<'db> CallableBinding<'db> {
                 for overload in &mut self.overloads {
                     // Clear the state of all overloads before re-evaluating from step 1
                     overload.reset(db);
-                    overload.match_parameters(db, env, expanded_arguments);
+                    overload.match_parameters_impl(
+                        db,
+                        env,
+                        expanded_arguments,
+                        self.argument_matching_mode,
+                    );
                 }
 
                 tracing::trace!(
@@ -8294,7 +8367,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        self.match_parameters_impl(db, env, arguments, true);
+        self.match_parameters_impl(db, env, arguments, ArgumentMatchingMode::Ordinary);
     }
 
     fn match_parameters_impl(
@@ -8302,13 +8375,13 @@ impl<'db> Binding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
-        use_positional_matching: bool,
+        mode: ArgumentMatchingMode,
     ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         // Keep generic and constructor calls on the ordinary matcher: their inference must
         // preserve the type variables belonging to each complete placement.
-        let positional_matches = if use_positional_matching
+        let positional_matches = if mode == ArgumentMatchingMode::PositionalAlternatives
             && self.constructor_context.is_none()
             && self.signature.generic_context.is_none()
         {
@@ -8412,7 +8485,7 @@ impl<'db> Binding<'db> {
             let Some(evaluated) = positional.evaluate(db, env, arguments, parameters) else {
                 // Keep the ordinary diagnostics when no complete placement succeeds.
                 self.reset(db);
-                self.match_parameters_impl(db, env, arguments, false);
+                self.match_parameters_impl(db, env, arguments, ArgumentMatchingMode::Ordinary);
                 return self.check_types(db, env, arguments, call_expression_tcx);
             };
             for (index, argument) in arguments.iter().enumerate() {
@@ -10690,7 +10763,12 @@ mod tests {
             .chain(std::iter::once((Argument::Positional, Some(last))))
             .collect::<CallArguments<'_, '_>>();
             let mut binding = Binding::single(Type::unknown(), signature.clone());
-            binding.match_parameters(&db, &env, &arguments);
+            binding.match_parameters_impl(
+                &db,
+                &env,
+                &arguments,
+                ArgumentMatchingMode::PositionalAlternatives,
+            );
             assert!(binding.positional_matches.is_none());
             binding.check_types(&db, &env, &arguments, TypeContext::default());
             assert_eq!(!binding.has_errors_affecting_overload_resolution(), valid);

@@ -1631,6 +1631,17 @@ def _(before: list[int]) -> None:
     class_argument(*before, Box)
 ```
 
+Ordinary inference can specialize a class reference before positional matching runs. That result
+still depends on the original parameter context, so it does not enable alternative placements:
+
+```py
+def class_first(cls: type[Box[int]], a: int, text: str, b: int) -> None: ...
+def _(before: list[int], after: list[int]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    class_first(Box, *before, "text", *after)
+```
+
 ### Keyword argument, positional-or-keyword parameter
 
 ```py

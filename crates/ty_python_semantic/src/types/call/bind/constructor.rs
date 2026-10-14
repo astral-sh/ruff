@@ -1,5 +1,6 @@
 use super::{
-    Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
+    ArgumentMatchingMode, Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode,
+    generic_context_has_paramspec,
 };
 use crate::Db;
 use crate::ProgramEnvironment;
@@ -205,14 +206,15 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
+        mode: ArgumentMatchingMode,
     ) {
-        self.entry.match_parameters(db, env, arguments);
+        self.entry.match_parameters(db, env, arguments, mode);
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
         // constructors; this may be needed for argument type contexts.
         if let Some(downstream) = self.downstream_constructor.as_mut() {
-            downstream.match_parameters_in_place(db, env, arguments);
+            downstream.match_parameters_in_place(db, env, arguments, mode);
         }
     }
 

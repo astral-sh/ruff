@@ -71,7 +71,7 @@ use crate::place::{
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
-use crate::types::call::bind::ConstructorCallableKind;
+use crate::types::call::bind::{ArgumentMatchingMode, ConstructorCallableKind};
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::callable::{CallableType, CallableTypes};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -8060,7 +8060,12 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let constraints = ConstraintSetBuilder::new();
         self.bindings(db, env)
-            .match_parameters(db, env, argument_types)
+            .match_parameters_with_mode(
+                db,
+                env,
+                argument_types,
+                ArgumentMatchingMode::PositionalAlternatives,
+            )
             .check_types(
                 db,
                 env,
@@ -8157,7 +8162,12 @@ impl<'db> Type<'db> {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
+                    .match_parameters_with_mode(
+                        db,
+                        env,
+                        argument_types,
+                        ArgumentMatchingMode::PositionalAlternatives,
+                    )
                     .check_types(db, env, &constraints, argument_types, tcx, &[]);
 
                 let bindings = match bindings {
@@ -8204,7 +8214,12 @@ impl<'db> Type<'db> {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
+                    .match_parameters_with_mode(
+                        db,
+                        env,
+                        argument_types,
+                        ArgumentMatchingMode::PositionalAlternatives,
+                    )
                     .check_types(db, env, &constraints, argument_types, tcx, &[]);
 
                 let bindings = match bindings {
@@ -10849,7 +10864,12 @@ impl<'db> UnionType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let bindings = match dunder_callable
             .bindings(db, env)
-            .match_parameters(db, env, argument_types)
+            .match_parameters_with_mode(
+                db,
+                env,
+                argument_types,
+                ArgumentMatchingMode::PositionalAlternatives,
+            )
             .check_types(db, env, &constraints, argument_types, tcx, &[])
         {
             Ok(bindings) => bindings,

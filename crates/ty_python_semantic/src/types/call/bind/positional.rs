@@ -62,7 +62,7 @@ impl<'db> PositionalMatches<'db> {
     ///
     /// Returns `None` when the ordinary matcher should handle the call, including unsupported
     /// unpacking forms and argument counts that cannot fit. The initial matches describe possible
-    /// parameters before argument types are known; [`Self::evaluate`] checks complete placements.
+    /// parameters based on arity; [`Self::evaluate`] checks type compatibility for complete placements.
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -70,7 +70,9 @@ impl<'db> PositionalMatches<'db> {
         parameters: &Parameters<'db>,
         explicit_keywords: &FxHashSet<usize>,
     ) -> Option<Self> {
-        if !arguments.supports_positional_alternatives(db, env)
+        if arguments.iter().any(|argument| {
+                argument.source_type().is_none_or(|ty| ty.has_provisional_marker(db, env))
+            })
             // A name or string literal can become a type expression in a `TypeForm` context.
             || parameters.iter().any(|parameter| {
                 any_over_type(db, env, parameter.annotated_type(), false, |ty| {
