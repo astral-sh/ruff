@@ -305,7 +305,7 @@ fn write_codepoint_maps(ctxt: &mut Context, codepoint_names: Vec<(char, &str)>) 
     // this is a map from `char` -> the index in phrasebook. it is
     // currently huge, but it has a lot of 0's, so we compress it
     // using the binning, below.
-    let mut phrasebook_offsets = std::iter::repeat_n(0, 0x10FFFF + 1).collect::<Vec<_>>();
+    let mut phrasebook_offsets: Vec<_> = std::iter::repeat_n(0, 0x10FFFF + 1).collect();
     let mut longest_name = 0;
     for &(cp, name) in codepoint_names.iter() {
         longest_name = cmp::max(name.len(), longest_name);
