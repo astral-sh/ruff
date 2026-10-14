@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use super::TypeVarSolution;
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
-use crate::types::generics::ApplySpecialization;
+use crate::types::generics::{ApplySpecialization, GenericContext};
 use crate::types::known_instance::walk_known_instance_type;
 use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
@@ -99,15 +99,22 @@ impl<'db> Resolver<'_, 'db> {
 
                 // Every replacement is already closed. One simultaneous substitution therefore
                 // suffices, and never substitutes a cycle with an arbitrary representative.
+                let context = GenericContext::from_typevar_instances(
+                    db,
+                    self.env,
+                    replacements
+                        .keys()
+                        .map(|index| self.solution[*index].bound_typevar),
+                );
+                let types: Vec<_> = replacements.values().copied().collect();
                 let mapped = original.apply_type_mapping(
                     db,
                     self.env,
-                    &TypeMapping::ApplySpecialization(ApplySpecialization::new(
-                        db,
-                        replacements
-                            .into_iter()
-                            .map(|(index, ty)| (self.solution[index].bound_typevar, ty)),
-                    )),
+                    &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                        generic_context: context,
+                        types: types.into(),
+                        skip: None,
+                    }),
                     TypeContext::default(),
                 );
                 // Some type forms preserve captured variables when specialized. For example, an

@@ -423,12 +423,9 @@ fn apply_type_alias_specialization<'db>(
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
     let type_mapping = match specialization.materialization_kind(db) {
-        None => TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-            db,
-            specialization,
-        )),
+        None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization)),
         Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-            specialization: ApplySpecialization::specialization(db, specialization),
+            specialization: ApplySpecialization::TypeAlias(specialization),
             materialization_kind,
         },
     };
@@ -723,11 +720,19 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::EagerExpansion => self.raw_value_type(db).expand_eagerly(db, visitor.env),
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
-            TypeMapping::ApplySpecialization(_) if self.mappings(db).is_none() => {
+            TypeMapping::ApplySpecialization(specialization)
+                if self.mappings(db).is_none()
+                    && let Some(current_specialization) = specialization.as_specialization(db) =>
+            {
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                        .apply_type_mapping_impl(db, type_mapping, &[], visitor)
+                        .apply_specialization_impl(
+                            db,
+                            current_specialization,
+                            specialization.specialize_self_domain(),
+                            visitor,
+                        )
                 }))
             }
             _ => {

@@ -317,14 +317,11 @@ impl<'db> CallableSignature<'db> {
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         ) -> Option<CallableSignature<'db>> {
-            let parameter_mapping = type_mapping.flip();
             match paramspec_value {
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     let prefix_parameters = prefix_parameters
                         .iter()
-                        .map(|param| {
-                            param.apply_type_mapping_impl(db, &parameter_mapping, tcx, visitor)
-                        })
+                        .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                         .collect::<Vec<_>>();
                     let mut parameters = if prefix_parameters.is_empty() {
                         Parameters::paramspec(db, typevar)
@@ -406,12 +403,7 @@ impl<'db> CallableSignature<'db> {
                             ),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
-                                    param.apply_type_mapping_impl(
-                                        db,
-                                        &parameter_mapping,
-                                        tcx,
-                                        visitor,
-                                    )
+                                    param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                                 }),
                             ),
                             return_ty: if self_signature.is_paramspec_value() {
@@ -431,32 +423,40 @@ impl<'db> CallableSignature<'db> {
             }
         }
 
-        Self::from_overloads(self.overloads.iter().flat_map(|signature| {
-            let type_mapping = type_mapping.excluding_bound_variables(
-                signature.generic_context.into_iter().flat_map(|context| {
-                    context.variables(db).map(|variable| variable.identity(db))
+        if let TypeMapping::ApplySpecialization(specialization)
+        | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
+            type_mapping
+        {
+            Self::from_overloads(self.overloads.iter().flat_map(|signature| {
+                if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
+                    && let Some(value) = specialization.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        signature,
+                        prefix,
+                        value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    result.overloads
+                } else {
+                    smallvec_inline![signature.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor
+                    )]
+                }
+            }))
+        } else {
+            Self::from_overloads(
+                self.overloads.iter().map(|signature| {
+                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }),
-            );
-            if let TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
-                &type_mapping
-                && let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
-                && let Some(value) = specialization.get(db, paramspec)
-                && let Some(result) = try_apply_type_mapping_for_paramspec(
-                    db,
-                    signature,
-                    prefix,
-                    value,
-                    &type_mapping,
-                    tcx,
-                    visitor,
-                )
-            {
-                result.overloads
-            } else {
-                smallvec_inline![signature.apply_type_mapping_impl(db, &type_mapping, tcx, visitor)]
-            }
-        }))
+            )
+        }
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1068,15 +1068,6 @@ impl<'db> Signature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let type_mapping = self
-            .generic_context
-            .map(|context| {
-                type_mapping.excluding_bound_variables(
-                    context.variables(db).map(|variable| variable.identity(db)),
-                )
-            })
-            .unwrap_or_else(|| type_mapping.clone());
-        let type_mapping = &type_mapping;
         let env = visitor.env;
         Self {
             generic_context: self
@@ -1478,10 +1469,8 @@ impl<'db> Signature<'db> {
             Some(Type::TypeVar(typevar))
         });
 
-        let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-            db,
-            specialization,
-        ));
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         let mut specialized = CallableSignature::single(self.clone()).apply_type_mapping_impl(
             db,
             &type_mapping,
@@ -1690,10 +1679,8 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::new(
-            db,
-            [(self_typevar, self_type)],
-        ));
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Single(self_typevar, self_type));
         Some(self.apply_type_mapping_impl(
             db,
             &mapping,
@@ -1836,10 +1823,8 @@ impl<'db> Signature<'db> {
     /// Returns this signature with the given specialization applied to parameters and return type.
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let type_mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-            db,
-            specialization,
-        ));
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         self.apply_type_mapping_impl(
             db,
             &type_mapping,
@@ -6417,7 +6402,6 @@ mod tests {
             let specialized = CallableSignature::single(signature).apply_type_mapping_impl(
                 &db,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-                    &db,
                     generic_context.identity_specialization(&db),
                 )),
                 TypeContext::default(),

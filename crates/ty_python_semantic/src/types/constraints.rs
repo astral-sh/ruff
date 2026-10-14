@@ -4913,7 +4913,7 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let mapped = set.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::new(db, [(u, int)])),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(u, int)),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
         );
@@ -5073,9 +5073,9 @@ mod tests {
 
         let mapped = set.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::new(
-                db,
-                [(t, KnownClass::Int.to_instance(db, &env))],
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                t,
+                KnownClass::Int.to_instance(db, &env),
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
@@ -5097,9 +5097,9 @@ mod tests {
 
         let mapped = set.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::new(
-                db,
-                [(t, KnownClass::Str.to_instance(db, &env))],
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                t,
+                KnownClass::Str.to_instance(db, &env),
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),

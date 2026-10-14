@@ -443,7 +443,6 @@ impl<'db> ClassBase<'db> {
             let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-                    db,
                     specialization,
                 )),
                 TypeContext::default(),

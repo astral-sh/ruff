@@ -1213,7 +1213,7 @@ impl<'db> FunctionType<'db> {
         Self::new_internal(db, self.literal(db), None, self.descriptor_kind(db))
     }
 
-    fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+    pub(super) fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.signature.as_ref())
@@ -1305,9 +1305,16 @@ impl<'db> FunctionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
+        // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_callables) = if type_mapping.is_structural()
-        {
+            || matches!(
+                type_mapping,
+                TypeMapping::ApplySpecialization(specialization)
+                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if specialization.preserves_lazy_signatures()
+            ) {
             (
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)

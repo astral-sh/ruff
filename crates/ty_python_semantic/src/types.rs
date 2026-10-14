@@ -92,9 +92,7 @@ use crate::types::function::{
     FunctionType, KnownFunction, OverloadLiteral,
 };
 pub(crate) use crate::types::generics::GenericContext;
-use crate::types::generics::{
-    ApplySpecialization, Specialization, SubstitutionScope, bind_typevar,
-};
+use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
 use crate::types::infer::InferenceFlags;
 use crate::types::known_instance::{
     InternedConstraintSet, InternedType, SentinelInstance, UnionTypeInstance,
@@ -9387,12 +9385,10 @@ impl<'db> Type<'db> {
         }
 
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let apply_specialization = ApplySpecialization::specialization(db, specialization)
-            .with_scope(if specialize_self_domain {
-                SubstitutionScope::OwnerProjection
-            } else {
-                SubstitutionScope::Instantiation
-            });
+        let apply_specialization = ApplySpecialization::Specialization {
+            specialization,
+            specialize_self_domain,
+        };
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(apply_specialization),
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
@@ -9442,46 +9438,11 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if let Type::FunctionLiteral(function) = self
-            && let TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
-                type_mapping
-        {
-            let bound = specialization.domain().filter(|variable| {
-                let Some(definition) = variable.binding_context.definition() else {
-                    return false;
-                };
-                let DefinitionKind::Function(declaration) = definition.kind(db) else {
-                    return false;
-                };
-                function
-                    .iter_overloads_and_implementation(db)
-                    .any(|overload| {
-                        let scope = overload.body_scope(db);
-                        definition.program_file(db) == scope.program_file(db)
-                            && scope
-                                .node(db)
-                                .as_function()
-                                .is_some_and(|node| declaration.node_key().index() == node.index())
-                    })
-            });
-            let nested = type_mapping.excluding_bound_variables(bound);
-            if nested != *type_mapping {
-                return self.apply_type_mapping_impl(db, &nested, tcx, visitor);
-            }
-        }
-
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
-            TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                if specialization.is_identity() =>
-            {
-                return self;
-            }
             _ => {}
         }
 
@@ -9539,12 +9500,20 @@ impl<'db> Type<'db> {
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {
+            let function_signatures = |function: FunctionType<'db>| {
+                if specialization.preserves_lazy_signatures() {
+                    function.updated_signature(db)
+                } else {
+                    Some(function.signature(db))
+                }
+            };
+
             let signatures = match self {
-                Type::FunctionLiteral(function) => Some(function.signature(db)),
+                Type::FunctionLiteral(function) => function_signatures(function),
                 Type::BoundMethod(method)
                 | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
                     match method.function(db) {
-                        Some(function) => Some(function.signature(db)),
+                        Some(function) => function_signatures(function),
                         None => method
                             .func(db)
                             .as_callable()
@@ -9561,10 +9530,6 @@ impl<'db> Type<'db> {
                 .flat_map(|signatures| signatures.iter())
                 .filter_map(|signature| {
                     let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
-                    let specialization =
-                        specialization.excluding(signature.generic_context.into_iter().flat_map(
-                            |context| context.variables(db).map(|variable| variable.identity(db)),
-                        ));
                     let Type::Union(union) = specialization.get(db, typevar)? else {
                         return None;
                     };
@@ -9604,7 +9569,10 @@ impl<'db> Type<'db> {
                     for bindings in expanded_paramspecs {
                         // Override the specialization with a specific parameter-list assigned to
                         // each `ParamSpec` from the union expansion.
-                        let specialization = specialization.with_bindings(db, &bindings);
+                        let specialization = ApplySpecialization::WithBindings {
+                            specialization: Arc::new(specialization.clone()),
+                            bindings: bindings.into(),
+                        };
 
                         let mapping = match type_mapping {
                             TypeMapping::ApplySpecializationWithMaterialization {
@@ -11210,26 +11178,6 @@ pub enum TypeMapping<'db> {
 }
 
 impl<'db> TypeMapping<'db> {
-    /// Respect nested binders when applying a free-variable substitution.
-    fn excluding_bound_variables(
-        &self,
-        variables: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> Self {
-        match self {
-            Self::ApplySpecialization(specialization) => {
-                Self::ApplySpecialization(specialization.excluding(variables))
-            }
-            Self::ApplySpecializationWithMaterialization {
-                specialization,
-                materialization_kind,
-            } => Self::ApplySpecializationWithMaterialization {
-                specialization: specialization.excluding(variables),
-                materialization_kind: *materialization_kind,
-            },
-            _ => self.clone(),
-        }
-    }
-
     /// Update the generic context of a [`Signature`] according to the current type mapping
     fn update_signature_generic_context(
         &self,
@@ -11252,9 +11200,18 @@ impl<'db> TypeMapping<'db> {
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
                 // (i.e., mapped to a non-TypeVar type)
-                let kept = context
-                    .variables(db)
-                    .filter(|bound_typevar| !specialization.removes(db, *bound_typevar));
+                let kept = context.variables(db).filter(|bound_typevar| {
+                    // Keep the type variable if it's not in the specialization
+                    // or if it's mapped to itself (still a TypeVar)
+                    match specialization.get(db, *bound_typevar) {
+                        None => true,
+                        Some(Type::TypeVar(mapped_typevar)) => {
+                            // Still a TypeVar, keep it if it's mapping to itself
+                            mapped_typevar.identity(db) == bound_typevar.identity(db)
+                        }
+                        Some(_) => false, // Specialized to a concrete type, filter out
+                    }
+                });
                 if specialization.specialize_self_domain() {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
@@ -11309,18 +11266,16 @@ impl<'db> TypeMapping<'db> {
             TypeMapping::Materialize(materialization_kind) => {
                 TypeMapping::Materialize(materialization_kind.flip())
             }
-            TypeMapping::ApplySpecialization(specialization) => {
-                TypeMapping::ApplySpecialization(specialization.flip())
-            }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
             } => TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: specialization.flip(),
+                specialization: specialization.clone(),
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
-            TypeMapping::ApplyRecursiveSubstitution(_)
+            TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
