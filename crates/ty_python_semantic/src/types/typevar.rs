@@ -4,33 +4,32 @@ use std::cell::{Cell, RefCell};
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::{
-    Db, FxIndexSet, FxOrderMap, TypeQualifiers,
+    Db, FxOrderMap, TypeQualifiers,
     place::{
         DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
         TypeOrigin,
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, ClassLiteral, CycleDetector, DynamicType,
-        GenericAlias, GenericContext, InstanceProjection, IntersectionType, KnownClass,
-        KnownInstanceType, MaterializationKind, Parameter, Parameters, RecursiveType, Signature,
-        Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
-        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
-        binding_type,
+        GenericContext, InstanceProjection, IntersectionType, KnownClass, KnownInstanceType,
+        MaterializationKind, Parameter, Parameters, PropertyInstanceClass, ProtocolInstanceType,
+        RecursiveType, Signature, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
+        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         generics::{enclosing_binding_contexts, walk_specialization_types},
-        tuple::Tuple,
+        method::KnownBoundMethodType,
+        protocol_class::{ProtocolInterfaceView, for_each_protocol_instance_member_type},
+        tuple::{Tuple, TupleSpec, VariableSegment},
         type_alias::walk_type_alias_arguments,
+        typed_dict::TypedDictType,
         variance::VarianceInferable,
-        visitor::{
-            self, NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
-            walk_type_with_recursion_guard,
-        },
-        walk_signature,
+        visitor::{self, TypeCollector, TypeKind, TypeVisitor, walk_type_with_recursion_guard},
     },
 };
 use ty_python_core::{
@@ -2009,109 +2008,488 @@ impl<'db> BoundTypeVarIdentity<'db> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct TypeVarSupports<'db> {
+    pub(super) occurrences: TypeVarSet<'db>,
+    pub(super) validation: TypeVarSet<'db>,
+    pub(super) free: TypeVarSet<'db>,
+    pub(super) occurrences_incomplete: bool,
+    pub(super) validation_incomplete: bool,
+    pub(super) free_incomplete: bool,
+}
+
+impl Default for TypeVarSupports<'_> {
+    fn default() -> Self {
+        Self {
+            occurrences: TypeVarSet::None,
+            validation: TypeVarSet::None,
+            free: TypeVarSet::None,
+            occurrences_incomplete: false,
+            validation_incomplete: false,
+            free_incomplete: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct CollectedTypeVarSupport<'db> {
+    variables: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
+    incomplete: bool,
+}
+
+impl<'db> CollectedTypeVarSupport<'db> {
+    fn from_typevars(
+        db: &'db dyn Db,
+        variables: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Self {
+        let mut result = Self::default();
+        for variable in variables {
+            result.insert(db, variable);
+        }
+        result
+    }
+    fn insert(&mut self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+        self.variables
+            .entry(variable.identity(db))
+            .or_insert(variable);
+    }
+    fn contains(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) -> bool {
+        let identity = variable.identity(db);
+        self.variables.contains_key(&identity)
+            || (variable.paramspec_attr(db).is_some()
+                && self
+                    .variables
+                    .contains_key(&identity.without_paramspec_attr(db)))
+    }
+    fn contains_more_than(&self, other: &Self) -> bool {
+        self.variables
+            .keys()
+            .any(|key| !other.variables.contains_key(key))
+    }
+    fn difference(&self, db: &'db dyn Db, other: &Self) -> Vec<BoundTypeVarInstance<'db>> {
+        self.variables
+            .values()
+            .copied()
+            .filter(|v| !other.contains(db, *v))
+            .collect()
+    }
+    fn mark_incomplete(&mut self) {
+        self.incomplete = true;
+    }
+}
+impl std::ops::BitOrAssign<&Self> for CollectedTypeVarSupport<'_> {
+    fn bitor_assign(&mut self, other: &Self) {
+        self.variables
+            .extend(other.variables.iter().map(|(k, v)| (*k, *v)));
+        self.incomplete |= other.incomplete;
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct CollectedTypeVarSupports<'db> {
+    occurrences: CollectedTypeVarSupport<'db>,
+    validation: CollectedTypeVarSupport<'db>,
+    free: CollectedTypeVarSupport<'db>,
+}
+impl<'db> CollectedTypeVarSupports<'db> {
+    fn finish(self, db: &'db dyn Db) -> TypeVarSupports<'db> {
+        TypeVarSupports {
+            occurrences: TypeVarSet::from_typevars(db, self.occurrences.variables.into_values()),
+            validation: TypeVarSet::from_typevars(db, self.validation.variables.into_values()),
+            free: TypeVarSet::from_typevars(db, self.free.variables.into_values()),
+            occurrences_incomplete: self.occurrences.incomplete,
+            validation_incomplete: self.validation.incomplete,
+            free_incomplete: self.free.incomplete,
+        }
+    }
+}
+
 impl<'db> Type<'db> {
-    /// Returns the free type variables in this type and whether any lazy attributes were skipped.
+    /// Returns occurrence, validation, and free-variable dependencies of this type.
     pub(super) fn free_typevars(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> (TypeVarSet<'db>, bool) {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| (TypeVarSet::None, false), heap_size=ruff_memory_usage::heap_size)]
-        fn non_atomic_free_typevars<'db>(
+    ) -> TypeVarSupports<'db> {
+        if matches!(TypeKind::from(self), TypeKind::Atomic) {
+            return TypeVarSupports::default();
+        }
+        collect_typevar_supports(db, env.program(db), self)
+    }
+}
+
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| TypeVarSupports::default(), heap_size=ruff_memory_usage::heap_size)]
+fn collect_typevar_supports<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    ty: Type<'db>,
+) -> TypeVarSupports<'db> {
+    let env = &ProgramEnvironment::from_program(program);
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum Source {
+        /// A type appearing directly in an atomic constraint.
+        Occurrence,
+        /// A typevar's declared upper bound or constraints.
+        Declaration,
+        /// An inner binder's definition; only its free captures escape to validation.
+        Definition,
+    }
+
+    type SeenTypes<'db> =
+        FxHashMap<(Type<'db>, Source), SmallVec<[CollectedTypeVarSupport<'db>; 1]>>;
+
+    struct AliasVisit<'db> {
+        ty: Type<'db>,
+        source: Source,
+        supports: CollectedTypeVarSupports<'db>,
+        specialization: Option<Specialization<'db>>,
+        bound: CollectedTypeVarSupport<'db>,
+        seen: SeenTypes<'db>,
+    }
+
+    struct InternMentionedTypevars<'db> {
+        supports: CollectedTypeVarSupports<'db>,
+        aliases: Vec<AliasVisit<'db>>,
+        seen: SeenTypes<'db>,
+    }
+
+    impl<'db> InternMentionedTypevars<'db> {
+        fn already_visited(
+            &mut self,
+            ty: Type<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) -> bool {
+            let seen = self
+                .aliases
+                .last_mut()
+                .map_or(&mut self.seen, |alias| &mut alias.seen);
+            let contexts = seen.entry((ty, source)).or_default();
+            // A revisit under additional binders cannot add a free dependency.
+            if contexts
+                .iter()
+                .any(|previous| !previous.contains_more_than(bound))
+            {
+                return true;
+            }
+            contexts.push(bound.clone());
+            false
+        }
+
+        fn mark_incomplete(&mut self, source: Source) {
+            if source == Source::Occurrence {
+                self.supports.occurrences.mark_incomplete();
+            }
+            self.supports.validation.mark_incomplete();
+            self.supports.free.mark_incomplete();
+        }
+
+        fn visit_declaration(
+            &mut self,
             db: &'db dyn Db,
-            program: Program<'db>,
-            ty: NonAtomicType<'db>,
-        ) -> (TypeVarSet<'db>, bool) {
-            struct AliasVisit<'db> {
-                ty: Type<'db>,
-                variables: FxIndexSet<BoundTypeVarInstance<'db>>,
-                specialization: Option<Specialization<'db>>,
-                recursion_guard: TypeCollector<'db>,
+            env: &ProgramEnvironment<'db>,
+            typevar: BoundTypeVarInstance<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            let Some(declaration) = typevar.typevar(db).bound_or_constraints(db, env) else {
+                return;
+            };
+            let id = typevar;
+            if source != Source::Definition || !bound.contains(db, id) {
+                self.supports.validation.insert(db, id);
             }
-
-            struct CollectFreeTypeVars<'a, 'db> {
-                env: &'a ProgramEnvironment<'db>,
-                variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
-                skipped_lazy: Cell<bool>,
-                aliases: RefCell<Vec<AliasVisit<'db>>>,
+            let source = match source {
+                Source::Occurrence => Source::Declaration,
+                source => source,
+            };
+            match declaration {
+                TypeVarBoundOrConstraints::UpperBound(upper) => {
+                    self.visit_type(db, env, upper, source, bound);
+                }
+                TypeVarBoundOrConstraints::Constraints(bounds) => {
+                    self.visit_types(db, env, bounds.elements(db).iter().copied(), source, bound);
+                }
             }
+        }
 
-            impl<'db> CollectFreeTypeVars<'_, 'db> {
-                fn visit_alias(
-                    &self,
-                    db: &'db dyn Db,
-                    ty: Type<'db>,
-                    specialization: Option<Specialization<'db>>,
-                    body: Type<'db>,
+        fn bind_context(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            context: Option<GenericContext<'db>>,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) -> CollectedTypeVarSupport<'db> {
+            let locals = CollectedTypeVarSupport::from_typevars(
+                db,
+                context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+                    .map(|var| var),
+            );
+            let mut inner_bound = bound.clone();
+            inner_bound |= &locals;
+            // These declarations belong to an inner type's binder, rather than to the
+            // surrounding constraint's solution problem. Only their free captures escape.
+            for local in locals.difference(db, bound) {
+                let var = local;
+                self.visit_declaration(db, env, var, Source::Definition, &inner_bound);
+            }
+            inner_bound
+        }
+
+        #[expect(clippy::too_many_arguments)]
+        fn visit_alias(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            specialization: Option<Specialization<'db>>,
+            body: Type<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            let mut previous =
+                self.aliases.iter().rev().filter(|alias| {
+                    alias.ty == ty && alias.source == source && alias.bound == *bound
+                });
+            let latest = previous.next();
+            let earlier = previous.next();
+            if let (Some(earlier), Some(latest)) = (earlier, latest)
+                && latest.supports == earlier.supports
+            {
+                return;
+            }
+            let index = self.aliases.len();
+            self.aliases.push(AliasVisit {
+                ty,
+                source,
+                supports: self.supports.clone(),
+                specialization,
+                bound: bound.clone(),
+                seen: SeenTypes::default(),
+            });
+            self.visit_type(db, env, body, source, bound);
+            self.aliases.truncate(index);
+        }
+
+        fn visit_typevar(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            typevar: BoundTypeVarInstance<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            let ty = Type::TypeVar(typevar);
+            if let Some(alias) = self.aliases.pop() {
+                // Substitute in the caller's scope. Finite use-site nesting is not a
+                // recursive reference in the alias definition.
+                if let Some(argument) = alias.specialization.map(|s| ty.apply_specialization(db, s))
+                {
+                    self.visit_type(db, env, argument, source, &alias.bound);
+                } else {
+                    self.visit_type(db, env, ty, source, bound);
+                }
+                self.aliases.push(alias);
+                return;
+            }
+            let id = typevar;
+            let is_bound = bound.contains(db, id);
+            if source == Source::Occurrence && !is_bound {
+                self.supports.occurrences.insert(db, id);
+            }
+            if source == Source::Declaration || (source == Source::Definition && !is_bound) {
+                self.supports.validation.insert(db, id);
+            }
+            if !is_bound {
+                self.supports.free.insert(db, id);
+            }
+            if !self.already_visited(ty, source, bound) {
+                self.visit_declaration(db, env, typevar, source, bound);
+            }
+            if typevar.paramspec_attr(db).is_some() {
+                self.visit_typevar(db, env, typevar.without_paramspec_attr(db), source, bound);
+            }
+        }
+
+        fn visit_signature(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            signature: &Signature<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            let bound = self.bind_context(db, env, signature.generic_context, bound);
+            self.visit_types(
+                db,
+                env,
+                signature.receiver_constraint_types(),
+                source,
+                &bound,
+            );
+            self.visit_types(
+                db,
+                env,
+                signature.parameters().iter().map(Parameter::annotated_type),
+                source,
+                &bound,
+            );
+            if !signature.is_paramspec_value() {
+                self.visit_type(db, env, signature.return_ty, source, &bound);
+            }
+        }
+
+        fn visit_protocol(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            protocol: ProtocolInstanceType<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            if let Some((class, specialization)) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            {
+                if let Some(specialization) = specialization {
+                    self.visit_specialization(db, env, specialization, source, bound);
+                }
+                let Some(origin) = class.into_protocol_class(db) else {
+                    self.mark_incomplete(source);
+                    return;
+                };
+                if source == Source::Occurrence {
+                    self.supports.occurrences.mark_incomplete();
+                }
+                let bound = self.bind_context(db, env, class.generic_context(db), bound);
+                // Walk the definition separately from its arguments. Dependencies
+                // need not unfold an expanding sequence such as P[list[T]].
+                if !self.already_visited(
+                    Type::ClassLiteral(class.into()),
+                    Source::Definition,
+                    &bound,
                 ) {
-                    let mut aliases = self.aliases.borrow_mut();
-                    let mut previous = aliases.iter().rev().filter(|alias| alias.ty == ty);
-                    if let (Some(latest), Some(earlier)) = (previous.next(), previous.next())
-                        && latest.variables == earlier.variables
-                    {
-                        return;
-                    }
-                    let index = aliases.len();
-                    aliases.push(AliasVisit {
-                        ty,
-                        variables: self.variables.borrow().clone(),
-                        specialization,
-                        recursion_guard: TypeCollector::default(),
-                    });
-                    drop(aliases);
-                    self.visit_type(db, body);
-                    self.aliases.borrow_mut().truncate(index);
+                    self.visit_protocol_interface(
+                        db,
+                        env,
+                        ProtocolInterfaceView::new(origin.interface(db), None),
+                        protocol,
+                        Source::Definition,
+                        &bound,
+                    );
+                }
+            } else {
+                self.visit_protocol_interface(
+                    db,
+                    env,
+                    protocol.interface(db),
+                    protocol,
+                    source,
+                    bound,
+                );
+            }
+        }
+
+        #[expect(clippy::too_many_arguments)]
+        fn visit_protocol_interface(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            interface: ProtocolInterfaceView<'db>,
+            protocol: ProtocolInstanceType<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            for member in interface.members(db) {
+                for_each_protocol_instance_member_type(
+                    db,
+                    env,
+                    &member,
+                    Type::ProtocolInstance(protocol),
+                    |part| match part {
+                        Either::Left(ty) => {
+                            self.visit_type(db, env, ty, source, bound);
+                        }
+                        Either::Right(signature) => {
+                            self.visit_signature(db, env, signature, source, bound);
+                        }
+                    },
+                );
+            }
+        }
+
+        fn visit_specialization(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            specialization: Specialization<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            self.visit_types(
+                db,
+                env,
+                specialization.types(db).iter().copied(),
+                source,
+                bound,
+            );
+            if let Some(tuple) = specialization.tuple(db) {
+                self.visit_tuple(db, env, tuple, source, bound);
+            }
+        }
+
+        fn visit_tuple(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            tuple: &TupleSpec<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            match tuple {
+                Tuple::Fixed(tuple) => {
+                    self.visit_types(db, env, tuple.iter_all_elements(), source, bound);
+                }
+                Tuple::Variable(tuple) => {
+                    self.visit_types(db, env, tuple.iter_prefix_elements(), source, bound);
+                    let variable = match tuple.variable() {
+                        VariableSegment::Homogeneous(ty) => ty,
+                        VariableSegment::TypeVarTuple(typevar) => Type::TypeVar(typevar),
+                    };
+                    self.visit_type(db, env, variable, source, bound);
+                    self.visit_types(db, env, tuple.iter_suffix_elements(), source, bound);
                 }
             }
+        }
 
-            impl<'db> TypeVisitor<'db> for CollectFreeTypeVars<'_, 'db> {
-                fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                    self.env
+        fn visit_types(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            types: impl IntoIterator<Item = Type<'db>>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            for ty in types {
+                self.visit_type(db, env, ty, source, bound);
+            }
+        }
+
+        fn visit_type(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            match ty {
+                Type::TypeVar(typevar) => {
+                    self.visit_typevar(db, env, typevar, source, bound);
                 }
-
-                fn should_visit_lazy_type_attributes(&self) -> bool {
-                    false
-                }
-
-                fn notify_skipped_lazy_type_attributes(&self) {
-                    self.skipped_lazy.set(true);
-                }
-
-                fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                    // Immediately return, since we don't need to recurse into the typevar's bounds,
-                    // constraints, or default. Those might contain other typevars, but those other
-                    // typevars are not free variables of this occurrence, and don't need to be added
-                    // to the final result.
-                }
-
-                fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
-                    // Each overload binds its own type variables. A captured type variable is still
-                    // free in the callable.
-                    let Some(context) = signature.generic_context else {
-                        return walk_signature(db, signature, self);
-                    };
-                    let enclosing = self.variables.take();
-                    walk_signature(db, signature, self);
-                    let locals = context.inferable_typevars(db);
-                    let candidates = self.variables.replace(enclosing);
-                    self.variables
-                        .borrow_mut()
-                        .extend(candidates.into_iter().filter(|variable| {
-                            let mut identity = variable.identity(db);
-                            if variable.paramspec_attr(db).is_some() {
-                                identity = identity.without_paramspec_attr(db);
-                            }
-                            !identity.is_inferable(db, locals)
-                        }));
-                }
-
-                fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                    for ty in alias.specialization(db).types(db) {
-                        self.visit_type(db, *ty);
-                    }
-                }
-
-                fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                Type::TypeAlias(alias) => {
                     let specialization = alias.specialization(db).or_else(|| {
                         alias
                             .generic_context(db)
@@ -2119,91 +2497,295 @@ impl<'db> Type<'db> {
                     });
                     self.visit_alias(
                         db,
+                        env,
                         Type::TypeAlias(alias.unspecialized(db)),
                         specialization,
                         alias.raw_value_type(db),
+                        source,
+                        bound,
                     );
                 }
-
-                fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                Type::Recursive(recursive) => {
                     let constructor = recursive.constructor(db);
                     self.visit_alias(
                         db,
+                        env,
                         Type::Recursive(constructor),
                         recursive.arguments(db),
-                        constructor.unfold(db, self.env).into_type(),
+                        constructor.unfold(db, env).into_type(),
+                        source,
+                        bound,
                     );
                 }
-
-                fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                    if let Type::TypeVar(_) = ty {
-                        let alias = self.aliases.borrow_mut().pop();
-                        if let Some(alias) = alias {
-                            // Visit an argument in its use-site context, outside the alias definition.
-                            let argument = alias
-                                .specialization
-                                .map(|specialization| ty.apply_specialization(db, specialization))
-                                .unwrap_or(ty);
-                            self.visit_type(db, argument);
-                            self.aliases.borrow_mut().push(alias);
-                            return;
-                        }
-                    }
-                    if !self.aliases.borrow().is_empty() {
-                        match ty {
-                            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
-                            Type::Recursive(recursive) => self.visit_recursive_type(db, recursive),
-                            _ => {
-                                let already_seen =
-                                    self.aliases.borrow().last().is_some_and(|alias| {
-                                        alias.recursion_guard.type_was_already_seen(ty)
-                                    });
-                                if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty)
-                                    && !already_seen
-                                {
-                                    walk_non_atomic_type(db, non_atomic, self);
-                                }
-                            }
-                        }
-                        return;
-                    }
-                    let (typevars, skipped_lazy) = ty.free_typevars(db, self.env);
-                    self.variables.borrow_mut().extend(typevars.iter(db));
-                    if skipped_lazy {
-                        self.notify_skipped_lazy_type_attributes();
+                Type::Divergent(_) | Type::RecursiveVar(_) => self.mark_incomplete(source),
+                Type::AlwaysFalsy
+                | Type::AlwaysTruthy
+                | Type::Never
+                | Type::LiteralValue(_)
+                | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
+                | Type::WrapperDescriptor(_)
+                | Type::ModuleLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::SpecialForm(_)
+                | Type::Dynamic(_) => {}
+                _ if self.already_visited(ty, source, bound) => {}
+                Type::Union(union) => {
+                    self.visit_types(db, env, union.elements(db).iter().copied(), source, bound);
+                }
+                Type::Intersection(intersection) => self.visit_types(
+                    db,
+                    env,
+                    intersection
+                        .iter_positive(db)
+                        .chain(intersection.iter_negative(db)),
+                    source,
+                    bound,
+                ),
+                Type::EnumComplement(complement) => {
+                    self.visit_types(db, env, complement.rest(db).iter().copied(), source, bound);
+                }
+                Type::Callable(callable) => {
+                    for signature in callable.signatures(db) {
+                        self.visit_signature(db, env, signature, source, bound);
                     }
                 }
+                Type::FunctionLiteral(function) => {
+                    for signature in function.into_callable_type(db).signatures(db) {
+                        self.visit_signature(db, env, signature, source, bound);
+                    }
+                    if let Some(specialization) = function.class_specialization(db) {
+                        self.visit_specialization(db, env, specialization, source, bound);
+                    }
+                }
+                Type::BoundMethod(method) => self.visit_types(
+                    db,
+                    env,
+                    [
+                        method.func(db),
+                        method.self_instance(db),
+                        method.signature_receiver(db),
+                    ],
+                    source,
+                    bound,
+                ),
+                Type::BoundSuper(super_type) => {
+                    self.visit_type(db, env, super_type.pivot_class(db).into(), source, bound);
+                    let owner = super_type.owner(db);
+                    self.visit_type(db, env, owner.owner_type(), source, bound);
+                    if let Some(anchor) = owner.lookup_anchor() {
+                        self.visit_type(db, env, anchor.into(), source, bound);
+                    }
+                }
+                Type::SubclassOf(subclass) => {
+                    self.visit_type(db, env, subclass.into(), source, bound);
+                }
+                Type::GenericAlias(alias) => {
+                    self.visit_specialization(db, env, alias.specialization(db), source, bound);
+                }
+                Type::NominalInstance(instance) => {
+                    if let Some(tuple) = instance.own_tuple_spec(db) {
+                        self.visit_tuple(db, env, &tuple, source, bound);
+                    } else if !instance.is_object() && !instance.is_sys_version_info() {
+                        self.visit_type(db, env, instance.class(db, env).into(), source, bound);
+                    }
+                }
+                Type::ProtocolInstance(protocol) => {
+                    self.visit_protocol(db, env, protocol, source, bound);
+                }
+                Type::PropertyInstance(property) => {
+                    if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) {
+                        self.visit_type(db, env, class.into(), source, bound);
+                    }
+                    self.visit_types(
+                        db,
+                        env,
+                        [
+                            property.getter(db),
+                            property.setter(db),
+                            property.deleter(db),
+                        ]
+                        .into_iter()
+                        .flatten(),
+                        source,
+                        bound,
+                    );
+                }
+                Type::SlotDescriptor(descriptor) => {
+                    self.visit_type(db, env, descriptor.value_type(db), source, bound);
+                }
+                Type::TypeIs(type_is) => {
+                    self.visit_type(db, env, type_is.type_argument(db), source, bound);
+                }
+                Type::TypeGuard(type_guard) => {
+                    self.visit_type(db, env, type_guard.return_type(db), source, bound);
+                }
+                Type::TypeForm(type_form) => {
+                    self.visit_type(db, env, type_form.type_argument(db), source, bound);
+                }
+                Type::TypedDict(typed_dict) => {
+                    if let TypedDictType::Class(class) = typed_dict {
+                        self.visit_type(db, env, class.into(), source, bound);
+                        self.mark_incomplete(source);
+                    } else {
+                        self.visit_types(
+                            db,
+                            env,
+                            typed_dict.items(db).values().map(|field| field.declared_ty),
+                            source,
+                            bound,
+                        );
+                        if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
+                            self.visit_type(db, env, extra_items.declared_ty, source, bound);
+                        }
+                    }
+                }
+                Type::NewTypeInstance(newtype) => {
+                    if let Some(base) = newtype.eager_base(db) {
+                        self.visit_type(db, env, base.instance_type(db, env), source, bound);
+                    } else {
+                        self.mark_incomplete(source);
+                    }
+                }
+                Type::KnownInstance(known) => {
+                    self.visit_known_instance(db, env, known, source, bound);
+                }
+                Type::KnownBoundMethod(method) => {
+                    self.visit_method_wrapper(db, env, method, source, bound);
+                }
             }
-
-            let collector = CollectFreeTypeVars {
-                env: &ProgramEnvironment::from_program(program),
-                variables: RefCell::default(),
-                skipped_lazy: Cell::new(false),
-                aliases: RefCell::default(),
-            };
-            walk_non_atomic_type(db, ty, &collector);
-            (
-                TypeVarSet::from_typevars(db, collector.variables.into_inner()),
-                collector.skipped_lazy.get(),
-            )
         }
 
-        match TypeKind::from(self) {
-            TypeKind::Atomic => (TypeVarSet::None, false),
-            TypeKind::NonAtomic(NonAtomicType::TypeVar(variable)) => {
-                // Walking `Callable[P, R]` visits P.args and P.kwargs separately. Both
-                // projections also depend on P itself.
-                let unprojected = variable
-                    .paramspec_attr(db)
-                    .map(|_| variable.without_paramspec_attr(db));
-                (
-                    TypeVarSet::from_typevars(db, std::iter::once(variable).chain(unprojected)),
-                    false,
-                )
+        fn visit_known_instance(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            known: KnownInstanceType<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            match known {
+                // Generic declarations and unbound typevars do not represent occurrences.
+                KnownInstanceType::SubscriptedProtocol(_)
+                | KnownInstanceType::SubscriptedGeneric(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Range { .. }
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
+                | KnownInstanceType::Sentinel(_) => {}
+                KnownInstanceType::TypeAliasType(alias) => {
+                    self.visit_type(db, env, Type::TypeAlias(alias), source, bound);
+                }
+                KnownInstanceType::ConstraintSetSolution(solution) => self.visit_types(
+                    db,
+                    env,
+                    solution.bindings(db).iter().map(|binding| binding.solution),
+                    source,
+                    bound,
+                ),
+                KnownInstanceType::Field(field) => {
+                    if let Some(default) = field.default_type(db) {
+                        self.visit_type(db, env, default, source, bound);
+                    }
+                    if let Some((input, output)) = field.converter(db) {
+                        self.visit_types(db, env, [input, output], source, bound);
+                    }
+                }
+                KnownInstanceType::UnionType(union) => {
+                    if let Ok(ty) = union.union_type(db, env) {
+                        self.visit_type(db, env, ty, source, bound);
+                    }
+                }
+                KnownInstanceType::Literal(ty)
+                | KnownInstanceType::Annotated(ty)
+                | KnownInstanceType::TypeGenericAlias(ty)
+                | KnownInstanceType::LiteralStringAlias(ty) => {
+                    self.visit_type(db, env, ty.inner(db), source, bound);
+                }
+                KnownInstanceType::Callable(callable) => {
+                    for signature in callable.signatures(db) {
+                        self.visit_signature(db, env, signature, source, bound);
+                    }
+                }
+                KnownInstanceType::NewType(newtype) => {
+                    self.visit_type(db, env, Type::NewTypeInstance(newtype), source, bound);
+                }
+                KnownInstanceType::NamedTupleSpec(spec) => self.visit_types(
+                    db,
+                    env,
+                    spec.fields(db).iter().map(|field| field.ty),
+                    source,
+                    bound,
+                ),
+                KnownInstanceType::FunctoolsPartial(partial)
+                | KnownInstanceType::FunctoolsPartialCall(partial) => {
+                    for signature in partial.partial(db).signatures(db) {
+                        self.visit_signature(db, env, signature, source, bound);
+                    }
+                }
+                KnownInstanceType::MethodWrapper(wrapper) => {
+                    self.visit_type(db, env, wrapper.wrapped(db), source, bound);
+                }
             }
-            TypeKind::NonAtomic(ty) => non_atomic_free_typevars(db, env.program(db), ty),
+        }
+
+        fn visit_method_wrapper(
+            &mut self,
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            method: KnownBoundMethodType<'db>,
+            source: Source,
+            bound: &CollectedTypeVarSupport<'db>,
+        ) {
+            match method {
+                KnownBoundMethodType::FunctionTypeDunderGet(function)
+                | KnownBoundMethodType::DunderCall(function) => {
+                    self.visit_type(db, env, function.inner(db), source, bound);
+                }
+                KnownBoundMethodType::MethodTypeDunderGet(method) => {
+                    self.visit_type(db, env, Type::BoundMethod(method), source, bound);
+                }
+                KnownBoundMethodType::PropertyDunderGet(property)
+                | KnownBoundMethodType::PropertyDunderSet(property)
+                | KnownBoundMethodType::PropertyDunderDelete(property) => {
+                    self.visit_type(db, env, Type::PropertyInstance(property), source, bound);
+                }
+                KnownBoundMethodType::StrStartswith(_)
+                | KnownBoundMethodType::ConstraintSetLowerBound
+                | KnownBoundMethodType::ConstraintSetUpperBound
+                | KnownBoundMethodType::ConstraintSetEquality
+                | KnownBoundMethodType::ConstraintSetRange
+                | KnownBoundMethodType::ConstraintSetAlways
+                | KnownBoundMethodType::ConstraintSetNever
+                | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetSatisfies(_)
+                | KnownBoundMethodType::ConstraintSetExists(_)
+                | KnownBoundMethodType::ConstraintSetForAll(_)
+                | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
+                | KnownBoundMethodType::ConstraintSetSolutions(_)
+                | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {}
+            }
         }
     }
+    let mut visitor = InternMentionedTypevars {
+        supports: CollectedTypeVarSupports::default(),
+        aliases: Vec::new(),
+        seen: SeenTypes::default(),
+    };
+    visitor.visit_type(
+        db,
+        env,
+        ty,
+        Source::Occurrence,
+        &CollectedTypeVarSupport::default(),
+    );
+    visitor.supports.finish(db)
 }
 
 /// A set of bound typevar occurrences.
