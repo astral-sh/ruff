@@ -798,14 +798,30 @@ def collect(value: Late[int, int]):
     widened = [value][0]
     reveal_type(widened[1][1][1][1][0])  # revealed: tuple[tuple[int, None | Unknown], None | Unknown]
 
-type Materialized[T] = tuple[T, Top[Materialized[list[T]]] | None]
+def transform(value: Any, /) -> Any:
+    return value
+
+type Materialized[T] = tuple[T, Top[Materialized[list[T]]] | None, Any, TypeOf[transform], list[Any], TypeOf[list]]
 
 def collect_materialized(value: Materialized[TypeOf[1]], flag: bool):
     widened = [value][0]
     while flag:
         widened = [widened][0]
     reveal_type(widened[0])  # revealed: int
+    reveal_type(widened[2])  # revealed: Any
     next = widened[1]
     if next is not None:
         reveal_type(next[0])  # revealed: list[Literal[1]]
+        reveal_type(next[2])  # revealed: object
+        reveal_type(next[3])  # revealed: (value: Never, /) -> object
+        reveal_type(next[4])  # revealed: Top[list[Any]]
+        reveal_type(next[5])  # revealed: <class 'list'>
+        tail = next[1]
+        if tail is not None:
+            reveal_type(tail[0])  # revealed: list[list[int]]
+            reveal_type(tail[2])  # revealed: object
+
+def collect_parameters[U: int, V: (int, str)](value: Materialized[tuple[U, V]]):
+    widened = [value][0]
+    reveal_type(widened[0])  # revealed: tuple[U@collect_parameters, V@collect_parameters]
 ```

@@ -60,22 +60,28 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
+use super::callable::walk_callable_type;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::cyclic::TypeIdentity;
-use super::generics::{ApplySpecialization, Specialization};
+use super::function::FunctionType;
+use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
+use super::known_instance::walk_known_instance_type;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::{DynamicContentMode, dynamic_content_impl};
+use super::visitor::{
+    DynamicContentMode, TypeCollector, TypeVisitor, dynamic_content_impl,
+    walk_type_with_recursion_guard,
+};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+    GenericAlias, GenericContext, KnownInstanceType, MaterializationKind, PromotionKind, Type,
+    TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment};
 
@@ -132,15 +138,17 @@ impl<'db> MappingStep<'db> {
 }
 
 /// Checks alias bodies and the arguments reaching their exposed parameters without rebuilding
-/// recursive types. Growing aliases share a formal body; parameter uses propagate to arguments
+/// recursive types. Generic aliases share a formal body; parameter uses propagate to arguments
 /// until no new mapping state is discovered.
 #[derive(Default)]
 pub(super) struct MappingProbe<'db> {
     bodies: RefCell<FxIndexSet<(Type<'db>, MappingStep<'db>)>>,
     constructors: RefCell<FxIndexMap<Type<'db>, Type<'db>>>,
+    mapping_depths: RefCell<FxHashMap<Type<'db>, usize>>,
     parameters: RefCell<ProbeParameters<'db>>,
     calls: RefCell<FxIndexSet<(usize, Specialization<'db>)>>,
     uses: RefCell<FxIndexSet<(ProbeParameter<'db>, MappingStep<'db>)>>,
+    inconclusive: Cell<bool>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -304,6 +312,18 @@ impl<'db> MappingProbe<'db> {
         let mut checked_uses = 0;
         loop {
             loop {
+                if probe.inconclusive.get() {
+                    // Retaining an irrelevant substitution can prevent specialization from
+                    // reaching a fixed point. Check its domain without expanding mapped bodies.
+                    return match &step.operation {
+                        TypeMapping::ApplySpecialization(substitution)
+                        | TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization: substitution,
+                            ..
+                        } => SubstitutionSearch::is_used(db, visitor.env, ty, substitution),
+                        _ => true,
+                    };
+                }
                 let Some((source, step)) = probe.bodies.borrow().get_index(next_body).cloned()
                 else {
                     break;
@@ -370,11 +390,10 @@ impl<'db> MappingProbe<'db> {
     }
 
     fn record_alias(&self, db: &'db dyn Db, ty: Type<'db>, step: &MappingStep<'db>) -> Type<'db> {
-        let (source, arguments) = match ty.to_type_identity(db) {
-            TypeIdentity::GrowingRecursive(..) => {
-                let Type::Recursive(alias) = ty else {
-                    return ty;
-                };
+        // Determining whether arguments grow can itself unfold aliases and start another probe.
+        // Share a formal body for every generic alias instead.
+        let (source, arguments) = match ty {
+            Type::Recursive(alias) => {
                 let arguments = alias.arguments(db);
                 (
                     Type::Recursive(alias.with_arguments(
@@ -386,10 +405,7 @@ impl<'db> MappingProbe<'db> {
                     arguments,
                 )
             }
-            TypeIdentity::GrowingTypeAlias(..) => {
-                let Type::TypeAlias(alias) = ty else {
-                    return ty;
-                };
+            Type::TypeAlias(alias) => {
                 let arguments = alias.specialization(db).or_else(|| {
                     alias
                         .generic_context(db)
@@ -404,10 +420,40 @@ impl<'db> MappingProbe<'db> {
             }
             _ => (ty, None),
         };
-        let source = if let Some(arguments) = arguments {
-            let existing = self.constructors.borrow().get_index_of(&source);
-            let index = existing.unwrap_or_else(|| {
-                let index = self.constructors.borrow().len();
+        let (constructor, mappings) = match source {
+            Type::Recursive(alias) => (
+                Type::Recursive(alias.with_mappings(db, None)),
+                alias.mappings(db),
+            ),
+            Type::TypeAlias(alias) => {
+                (Type::TypeAlias(alias.unspecialized(db)), alias.mappings(db))
+            }
+            _ => return ty,
+        };
+        let mut depth = 0;
+        let mut cursor = mappings;
+        while let Some(mapping) = cursor {
+            depth += 1;
+            cursor = mapping.previous(db);
+        }
+        // Intrinsic mappings such as Top[R[list[T]]] can extend the history on every unfolding.
+        // Stop that exploration, but still inspect distinct polarities at the same depth.
+        let grows = *self
+            .mapping_depths
+            .borrow_mut()
+            .entry(constructor)
+            .or_insert(depth)
+            < depth;
+        if grows {
+            self.inconclusive.set(true);
+            return ty;
+        }
+        let existing = self.constructors.borrow().get_index_of(&source);
+        let index = if let Some(index) = existing {
+            index
+        } else {
+            let index = self.constructors.borrow().len();
+            let body_source = if let Some(arguments) = arguments {
                 let parameters = arguments.generic_context(db);
                 let variables = parameters
                     .variables(db)
@@ -423,7 +469,7 @@ impl<'db> MappingProbe<'db> {
                     })
                     .collect::<Vec<_>>();
                 let formal = parameters.specialize(db, variables);
-                let body_source = match source {
+                match source {
                     Type::Recursive(alias) => {
                         Type::Recursive(alias.with_arguments(db, Some(formal)))
                     }
@@ -431,15 +477,17 @@ impl<'db> MappingProbe<'db> {
                         Type::TypeAlias(alias.apply_specialization(db, |_| formal))
                     }
                     _ => source,
-                };
-                self.constructors.borrow_mut().insert(source, body_source);
-                index
-            });
-            self.calls.borrow_mut().insert((index, arguments));
-            self.constructors.borrow()[index]
-        } else {
-            source
+                }
+            } else {
+                source
+            };
+            self.constructors.borrow_mut().insert(source, body_source);
+            index
         };
+        if let Some(arguments) = arguments {
+            self.calls.borrow_mut().insert((index, arguments));
+        }
+        let source = self.constructors.borrow()[index];
         self.bodies.borrow_mut().insert((source, step.clone()));
         ty
     }
@@ -572,6 +620,186 @@ impl<'db> DeferredTypeMapping<'db> {
             self.step(db).context,
             &visitor,
         )
+    }
+}
+
+/// Conservatively locate a substitution's domain without unfolding or applying retained mappings.
+/// Constructor bodies and arguments are inspected separately, so growing aliases remain finite.
+struct SubstitutionSearch<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    substitution: &'a ApplySpecialization<'db>,
+    visited: TypeCollector<'db>,
+    found: Cell<bool>,
+}
+
+impl<'db> SubstitutionSearch<'_, 'db> {
+    fn visit_substitution(&self, db: &'db dyn Db, substitution: &ApplySpecialization<'db>) {
+        match substitution {
+            ApplySpecialization::Specialization { specialization, .. }
+            | ApplySpecialization::TypeAlias(specialization) => {
+                walk_specialization_types(db, *specialization, self);
+            }
+            ApplySpecialization::Partial { types, skip, .. } => {
+                for (index, ty) in types.iter().enumerate() {
+                    if *skip != Some(index) {
+                        self.visit_type(db, *ty);
+                    }
+                }
+            }
+            ApplySpecialization::ReturnCallables(bindings) => {
+                for variable in bindings.values() {
+                    self.visit_type(db, Type::TypeVar(*variable));
+                }
+            }
+            ApplySpecialization::Single(_, ty) => self.visit_type(db, *ty),
+            ApplySpecialization::WithBindings {
+                specialization,
+                bindings,
+            } => {
+                self.visit_substitution(db, specialization);
+                for (_, ty) in bindings.iter() {
+                    self.visit_type(db, *ty);
+                }
+            }
+        }
+    }
+
+    fn is_used(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        substitution: &ApplySpecialization<'db>,
+    ) -> bool {
+        let search = SubstitutionSearch {
+            env,
+            substitution,
+            visited: TypeCollector::default(),
+            found: Cell::new(false),
+        };
+        search.visit_type(db, ty);
+        search.found.get()
+    }
+
+    fn visit_mappings(&self, db: &'db dyn Db, mut mappings: Option<DeferredTypeMapping<'db>>) {
+        while let Some(mapping) = mappings {
+            if self.found.get() {
+                return;
+            }
+            match &mapping.step(db).operation {
+                TypeMapping::ApplySpecialization(substitution)
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: substitution,
+                    ..
+                } => {
+                    self.visit_substitution(db, substitution);
+                }
+                TypeMapping::Promote(..)
+                | TypeMapping::Materialize(_)
+                | TypeMapping::ReplaceParameterDefaults => {}
+                // Binding and freshening can change variable identities, not just insert types.
+                _ => self.found.set(true),
+            }
+            mappings = mapping.previous(db);
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for SubstitutionSearch<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        true
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+        match ty {
+            // A provisional body cannot prove absence.
+            Type::Divergent(_) => self.found.set(true),
+            Type::RecursiveVar(reference) => {
+                if let Some(arguments) = reference.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                self.visit_mappings(db, reference.mappings(db));
+            }
+            // Promotion can introduce a generic class's default arguments.
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                self.visit_type(db, class.default_specialization(db).into());
+            }
+            _ => walk_type_with_recursion_guard(db, ty, self, &self.visited),
+        }
+    }
+
+    fn visit_bound_type_var_type(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+        let variable = if variable.is_paramspec(db) {
+            variable.without_paramspec_attr(db)
+        } else {
+            variable
+        };
+        if self.substitution.get(db, variable).is_some()
+            || self.substitution.specialize_self_domain() && variable.typevar(db).is_self(db)
+        {
+            self.found.set(true);
+        } else {
+            // Earlier materialization may have exposed bounds or defaults.
+            self.visit_type_var_type(db, variable.typevar(db));
+        }
+    }
+
+    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+        walk_specialization_types(db, alias.specialization(db), self);
+    }
+
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        walk_callable_type(db, callable, self);
+        for signature in callable.signatures(db) {
+            for parameter in signature.parameters() {
+                if let Some(default) = parameter.eager_default_type() {
+                    self.visit_type(db, default);
+                }
+            }
+        }
+    }
+
+    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+        // Retained mappings can expose signatures that have not been evaluated yet.
+        self.visit_type(db, Type::Callable(function.into_callable_type(db)));
+        for callable in function.implementation_callables(db).iter() {
+            self.visit_type(db, Type::Callable(*callable));
+        }
+    }
+
+    fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+        if let KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) = known
+        {
+            self.visit_type(db, partial.wrapped(db).inner(db));
+        }
+        walk_known_instance_type(db, known, self);
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.visit_type(db, alias.raw_value_type(db));
+        if let Some(arguments) = alias.specialization(db).or_else(|| {
+            alias
+                .generic_context(db)
+                .map(|context| context.default_specialization(db, None))
+        }) {
+            walk_specialization_types(db, arguments, self);
+        }
+        self.visit_mappings(db, alias.mappings(db));
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        self.visit_type(db, recursive.body(db));
+        if let Some(arguments) = recursive.arguments(db) {
+            walk_specialization_types(db, arguments, self);
+        }
+        self.visit_mappings(db, recursive.mappings(db));
     }
 }
 
