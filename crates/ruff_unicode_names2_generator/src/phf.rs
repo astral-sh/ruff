@@ -4,7 +4,6 @@
 //! Strongly inspired by https://github.com/sfackler/rust-phf
 
 use rand::prelude::{RngExt, SeedableRng, SliceRandom, StdRng};
-use std::iter::repeat;
 
 static NOVAL: char = '\0';
 
@@ -51,7 +50,7 @@ fn try_phf_table(
         .collect();
 
     let table_len = hashes.len();
-    let buckets_len = (table_len + lambda - 1) / lambda;
+    let buckets_len = table_len.div_ceil(lambda);
 
     // group the elements into buckets of lambda (on average, for a
     // good hash) based on the suffix of their hash.
@@ -67,8 +66,8 @@ fn try_phf_table(
     // value for `foo` is "just" `map[displace(hash(foo))]`, where
     // `displace` uses the pair of displacements that we computed
     // (stored in `disps`).
-    let mut map = repeat(NOVAL).take(table_len).collect::<Vec<_>>();
-    let mut disps = repeat((0, 0)).take(buckets_len).collect::<Vec<_>>();
+    let mut map = std::iter::repeat_n(NOVAL, table_len).collect::<Vec<_>>();
+    let mut disps = std::iter::repeat_n((0, 0), buckets_len).collect::<Vec<_>>();
 
     // the set of index -> value mappings for the next bucket to be
     // placed; we need it separate because it may not work, so we may
@@ -80,7 +79,7 @@ fn try_phf_table(
     // having to clear the whole the whole array each time (just
     // compare against the generation). A u64 won't overflow.
     let mut generation = 0;
-    let mut try_map = repeat(0u64).take(table_len).collect::<Vec<_>>();
+    let mut try_map = std::iter::repeat_n(0u64, table_len).collect::<Vec<_>>();
     // the placed (index, codepoint) pairs of the current bucket, to
     // be placed into the main map if the whole bucket fits.
     let mut values_to_add = vec![];
