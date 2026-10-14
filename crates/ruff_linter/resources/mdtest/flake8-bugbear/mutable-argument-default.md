@@ -14,6 +14,8 @@ import collections
 def f(
     a=collections.ChainMap(),  # error: [mutable-argument-default]
     b=collections.UserDict(),  # error: [mutable-argument-default]
+    c=collections.UserList(),  # error: [mutable-argument-default]
+    d=collections.UserString(""),  # error: [mutable-argument-default]
 ):
     pass
 ```
