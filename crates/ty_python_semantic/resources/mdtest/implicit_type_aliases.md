@@ -2927,6 +2927,9 @@ Calling a generic function or binding a method's `Self` does not change the type
 successive depths of an unrelated recursive alias. Promoting collection elements preserves the same
 progression.
 
+TODO: Comparing growing recursive aliases currently rejects the attribute assignment and some list
+accesses below.
+
 ```toml
 [environment]
 python-version = "3.12"
@@ -2934,6 +2937,7 @@ python-version = "3.12"
 
 ```py
 from typing import Generic, Self, TypeVar
+from typing_extensions import reveal_type
 
 T = TypeVar("T")
 Growing = T | list["Growing[list[T]]"]
@@ -2953,7 +2957,7 @@ class Container:
 
 class Box(Generic[T]):
     def __init__(self, value: Growing[T]) -> None:
-        self.value = value
+        self.value = value  # error: [invalid-assignment]
 
 def inspect(container: Container):
     for tree in (fixed(1), container.get()[1]):
@@ -2962,11 +2966,14 @@ def inspect(container: Container):
             reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 
     values = [legacy(1), modern(1)]
-    reveal_type(values)  # revealed: list[int | list[Growing[list[int]]]]
-    tree = values[0]
+    # TODO: Should reveal list[int | list[Growing[list[int]]]].
+    reveal_type(values)  # error: [invalid-argument-type]
+    tree = values[0]  # error: [invalid-argument-type]
     if isinstance(tree, list):
-        reveal_type(tree[0])  # revealed: Growing[list[int]]
-        reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
+        # TODO: Should reveal Growing[list[int]].
+        reveal_type(tree[0])  # revealed: Unknown
+        # TODO: Should reveal int | Growing[list[list[int]]].
+        reveal_type(tree[0][0])  # revealed: Unknown
 ```
 
 ### Type parameters used only in recursive references
@@ -3237,15 +3244,20 @@ def inspect(top: Top[NestedDict[str, int]], bottom: Bottom[NestedDict[str, int]]
 The type arguments grow when these aliases refer back to each other. Inferring a list containing one
 of these values preserves the alias without expanding the recursive references indefinitely.
 
+TODO: We do not yet recognize equivalent growing aliases after promotion or materialization, causing
+the list check and equivalence assertions below to fail.
+
 ```py
 from typing import TypeVar
+from typing_extensions import reveal_type
 
 T = TypeVar("T")
 GrowingA = tuple[T, "GrowingB[T] | None"]
 GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
 
 def f(a: GrowingA[int]):
-    reveal_type([a])  # revealed: list[GrowingA[int]]
+    # TODO: Should reveal list[GrowingA[int]].
+    reveal_type([a])  # error: [invalid-argument-type]
 ```
 
 These aliases contain no dynamic types when specialized with `int`, so both materializations are
@@ -3255,8 +3267,8 @@ equivalent to the original type.
 from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_equivalent_to
 
-static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))
-static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))
+static_assert(is_equivalent_to(GrowingA[int], Top[GrowingA[int]]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(GrowingA[int], Bottom[GrowingA[int]]))  # error: [static-assert-error]
 ```
 
 ### Materialized recursive aliases in collections
@@ -3265,9 +3277,14 @@ Literal promotion preserves a recursive alias's materialization, including when 
 change at each level. In particular, inserting a top-materialized value into a list must not restore
 `Any` as an unconstrained leaf type.
 
+TODO: The displayed alias omits its materialization after promotion. The bottom-materialized growing
+alias also encounters an incorrect argument error during comparison.
+
 ```py
 from typing import Any, TypeVar
-from ty_extensions import Bottom, Top
+from typing_extensions import reveal_type
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 T = TypeVar("T")
 Tree = T | tuple["Tree[T]"]
@@ -3279,10 +3296,19 @@ def inspect(
     top_growing: Top[Growing[Any]],
     bottom_growing: Bottom[Growing[Any]],
 ):
-    reveal_type([top])  # revealed: list[Top[Tree[Any]]]
-    reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
-    reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
-    reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+    # TODO: Should reveal list[Top[Tree[Any]]].
+    reveal_type([top])  # revealed: list[Tree[Any]]
+    # TODO: Should reveal list[Bottom[Tree[Any]]].
+    reveal_type([bottom])  # revealed: list[Tree[Any]]
+    # TODO: Should reveal list[Top[Growing[Any]]].
+    reveal_type([top_growing])  # revealed: list[Growing[Any]]
+    # TODO: Should reveal list[Bottom[Growing[Any]]].
+    reveal_type([bottom_growing])  # error: [invalid-argument-type]
+    static_assert(is_equivalent_to(TypeOf[[top][0]], Top[Tree[Any]]))
+    static_assert(is_equivalent_to(TypeOf[[bottom][0]], Bottom[Tree[Any]]))
+    static_assert(not is_equivalent_to(TypeOf[[top][0]], Tree[Any]))
+    static_assert(not is_equivalent_to(TypeOf[[bottom][0]], Tree[Any]))
+    static_assert(is_equivalent_to(TypeOf[[top_growing][0]], Top[Growing[Any]]))
 ```
 
 ### Promotion through recursive aliases

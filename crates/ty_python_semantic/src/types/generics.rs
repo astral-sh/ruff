@@ -2261,6 +2261,7 @@ impl<'db> ApplySpecialization<'db> {
         }
     }
 
+    /// Map a specialization's parameters to its arguments.
     pub(crate) fn specialization(db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         Self::new(
             db,
@@ -2271,6 +2272,7 @@ impl<'db> ApplySpecialization<'db> {
         )
     }
 
+    /// Select the declarations this substitution may rewrite.
     pub(super) fn with_scope(mut self, scope: SubstitutionScope) -> Self {
         self.scope = scope;
         self
@@ -2297,6 +2299,7 @@ impl<'db> ApplySpecialization<'db> {
         result
     }
 
+    /// Parameters replaced by the substitution, including already-instantiated binders.
     pub(super) fn domain(&self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + '_ {
         self.bindings.keys().copied()
     }

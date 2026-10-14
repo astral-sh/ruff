@@ -60,24 +60,20 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
-use std::cell::RefCell;
-
-use rustc_hash::FxHashMap;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::cyclic::TypeIdentity;
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{DynamicContentMode, dynamic_content_impl};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
-    MaterializationKind, PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind,
+    PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, Program, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment};
 
 /// A retained operation and the inference context under which it was requested.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -87,17 +83,7 @@ pub struct MappingStep<'db> {
     materialize_bounds: bool,
 }
 
-impl<'db> MappingStep<'db> {
-    /// Start a traversal with the retained settings and the caller's comparison guards.
-    fn visitor<'a>(
-        &self,
-        visitor: &ApplyTypeMappingVisitor<'a, 'db>,
-    ) -> ApplyTypeMappingVisitor<'a, 'db> {
-        let mut visitor = visitor.for_new_materialization_root();
-        visitor.materialize_typevar_bounds_and_defaults = self.materialize_bounds;
-        visitor
-    }
-
+impl MappingStep<'_> {
     fn absorbs(&self, later: &Self) -> bool {
         self.context == later.context
             && self.materialize_bounds == later.materialize_bounds
@@ -128,320 +114,6 @@ impl<'db> MappingStep<'db> {
                     TypeMapping::Promote(_, PromotionKind::Regular)
                 )
             )
-    }
-}
-
-/// Checks alias bodies and the arguments reaching their exposed parameters without rebuilding
-/// recursive types. Growing aliases share a formal body; parameter uses propagate to arguments
-/// until no new mapping state is discovered.
-#[derive(Default)]
-pub(super) struct MappingProbe<'db> {
-    bodies: RefCell<FxIndexSet<(Type<'db>, MappingStep<'db>)>>,
-    constructors: RefCell<FxIndexMap<Type<'db>, Type<'db>>>,
-    parameters: RefCell<ProbeParameters<'db>>,
-    calls: RefCell<FxIndexSet<(usize, Specialization<'db>)>>,
-    uses: RefCell<FxIndexSet<(ProbeParameter<'db>, MappingStep<'db>)>>,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-struct ProbeParameter<'db> {
-    constructor: usize,
-    variable: BoundTypeVarInstance<'db>,
-    mappings: Option<DeferredTypeMapping<'db>>,
-}
-
-/// Interns opaque parameters and recovers their references during trial mappings.
-#[derive(Default)]
-struct ProbeParameters<'db> {
-    variables: FxHashMap<ProbeParameter<'db>, BoundTypeVarInstance<'db>>,
-    references: FxHashMap<BoundTypeVarIdentity<'db>, ProbeParameter<'db>>,
-}
-
-impl<'db> ProbeParameters<'db> {
-    fn intern(
-        &mut self,
-        db: &'db dyn Db,
-        parameter: ProbeParameter<'db>,
-    ) -> BoundTypeVarInstance<'db> {
-        if let Some(variable) = self.variables.get(&parameter) {
-            return *variable;
-        }
-        // These parameters only occur in probe bodies. The suffix cannot appear in a Python
-        // identifier, and distinct mapping states must remain distinct during simplification.
-        let variable = parameter
-            .variable
-            .with_name_suffix(db, &format!("$mapping{}", self.variables.len()));
-        self.variables.insert(parameter, variable);
-        self.references.insert(variable.identity(db), parameter);
-        variable
-    }
-}
-
-/// Deferred steps compose on opaque parameters; the requested step inspects their uses.
-#[derive(Clone, Copy)]
-pub(super) enum MappingProbeContext<'a, 'db> {
-    Inspect(&'a MappingProbe<'db>),
-    Compose(&'a MappingProbe<'db>),
-}
-
-impl<'db> MappingProbeContext<'_, 'db> {
-    fn composing(self) -> Self {
-        match self {
-            Self::Inspect(probe) | Self::Compose(probe) => Self::Compose(probe),
-        }
-    }
-
-    /// Intercept symbolic parameters and alias references during a trial mapping.
-    pub(super) fn map_type(
-        self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        mapping: &TypeMapping<'db>,
-        context: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<Type<'db>> {
-        if !matches!(
-            ty,
-            Type::TypeVar(_) | Type::Recursive(_) | Type::TypeAlias(_)
-        ) {
-            return None;
-        }
-        if matches!(
-            mapping,
-            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
-        ) {
-            return None;
-        }
-        let step = MappingStep {
-            operation: mapping.clone(),
-            context,
-            materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
-        };
-        let probe = match self {
-            Self::Inspect(probe) | Self::Compose(probe) => probe,
-        };
-        if let Type::TypeVar(variable) = ty {
-            let reference = probe
-                .parameters
-                .borrow()
-                .references
-                .get(&variable.identity(db))
-                .copied();
-            if let Some(mut reference) = reference {
-                return Some(match self {
-                    Self::Inspect(_) => {
-                        probe.uses.borrow_mut().insert((reference, step));
-                        ty
-                    }
-                    Self::Compose(_) => {
-                        reference.mappings =
-                            Some(DeferredTypeMapping::new(db, reference.mappings, step));
-                        Type::TypeVar(probe.parameters.borrow_mut().intern(db, reference))
-                    }
-                });
-            }
-            return None;
-        }
-        match self {
-            Self::Inspect(_) => Some(probe.record_alias(db, ty, &step)),
-            Self::Compose(_) => None,
-        }
-    }
-}
-
-#[salsa::tracked]
-impl<'db> MappingProbe<'db> {
-    /// Check the alias's mapped body and every argument reaching a parameter used by it.
-    fn changes(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        step: &MappingStep<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> bool {
-        if visitor.recursion_context.is_none()
-            && let Some(changes) =
-                Self::cached_changes(db, visitor.env.program(db), ty, step.clone())
-        {
-            return changes;
-        }
-        Self::changes_impl(db, ty, step, visitor)
-    }
-
-    /// A probe that never uses its comparison state is independent of the caller's state.
-    #[salsa::tracked(
-        returns(copy),
-        cycle_initial=|_, _, _, _, _| None,
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    fn cached_changes(
-        db: &'db dyn Db,
-        program: Program<'db>,
-        ty: Type<'db>,
-        step: MappingStep<'db>,
-    ) -> Option<bool> {
-        let env = ProgramEnvironment::from_program(program);
-        let visitor = ApplyTypeMappingVisitor::new(&env);
-        let changes = Self::changes_impl(db, ty, &step, &visitor);
-        visitor
-            .materialization_equivalence
-            .get()
-            .is_none_or(|visitor| visitor.is_empty())
-            .then_some(changes)
-    }
-
-    fn changes_impl(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        step: &MappingStep<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> bool {
-        let probe = Self::default();
-        let mut visitor = step.visitor(visitor);
-        visitor.mapping_probe = Some(MappingProbeContext::Inspect(&probe));
-        ty.apply_type_mapping_impl(db, &step.operation, step.context, &visitor);
-        let mut next_body = 0;
-        let mut checked_calls = 0;
-        let mut checked_uses = 0;
-        loop {
-            loop {
-                let Some((source, step)) = probe.bodies.borrow().get_index(next_body).cloned()
-                else {
-                    break;
-                };
-                next_body += 1;
-                let body_visitor = step.visitor(&visitor);
-                let body = match source {
-                    Type::Recursive(recursive) => recursive
-                        .unfold_with_mapping_visitor(db, &body_visitor)
-                        .into_type(),
-                    Type::TypeAlias(alias) => {
-                        alias.value_type_with_mapping_visitor(db, &body_visitor)
-                    }
-                    _ => continue,
-                };
-                // Inspect this body before its recursive references: a local change already
-                // proves that the mapping must be retained.
-                if body.apply_type_mapping_impl(db, &step.operation, step.context, &body_visitor)
-                    != body
-                {
-                    return true;
-                }
-            }
-            let calls = probe.calls.borrow().len();
-            let uses = probe.uses.borrow().len();
-            if checked_calls == calls && checked_uses == uses {
-                return false;
-            }
-            // Both collections only grow and contain unique entries. Pair new calls with every
-            // use, and old calls only with new uses, so each pair is inspected once.
-            for call in 0..calls {
-                let (constructor, arguments) = probe.calls.borrow()[call];
-                let first_use = if call < checked_calls {
-                    checked_uses
-                } else {
-                    0
-                };
-                for use_index in first_use..uses {
-                    let (parameter, step) = probe.uses.borrow()[use_index].clone();
-                    if parameter.constructor != constructor {
-                        continue;
-                    }
-                    let Some(argument) = arguments.get(db, parameter.variable) else {
-                        continue;
-                    };
-                    let argument = parameter
-                        .mappings
-                        .map_or(argument, |mappings| mappings.apply(db, argument, &visitor));
-                    let use_visitor = step.visitor(&visitor);
-                    if argument.apply_type_mapping_impl(
-                        db,
-                        &step.operation,
-                        step.context,
-                        &use_visitor,
-                    ) != argument
-                    {
-                        return true;
-                    }
-                }
-            }
-            checked_calls = calls;
-            checked_uses = uses;
-        }
-    }
-
-    fn record_alias(&self, db: &'db dyn Db, ty: Type<'db>, step: &MappingStep<'db>) -> Type<'db> {
-        let (source, arguments) = match ty.to_type_identity(db) {
-            TypeIdentity::GrowingRecursive(..) => {
-                let Type::Recursive(alias) = ty else {
-                    return ty;
-                };
-                let arguments = alias.arguments(db);
-                (
-                    Type::Recursive(alias.with_arguments(
-                        db,
-                        arguments.map(|arguments| {
-                            arguments.generic_context(db).identity_specialization(db)
-                        }),
-                    )),
-                    arguments,
-                )
-            }
-            TypeIdentity::GrowingTypeAlias(..) => {
-                let Type::TypeAlias(alias) = ty else {
-                    return ty;
-                };
-                let arguments = alias.specialization(db).or_else(|| {
-                    alias
-                        .generic_context(db)
-                        .map(|parameters| parameters.default_specialization(db, None))
-                });
-                (
-                    Type::TypeAlias(alias.apply_specialization(db, |parameters| {
-                        parameters.identity_specialization(db)
-                    })),
-                    arguments,
-                )
-            }
-            _ => (ty, None),
-        };
-        let source = if let Some(arguments) = arguments {
-            let existing = self.constructors.borrow().get_index_of(&source);
-            let index = existing.unwrap_or_else(|| {
-                let index = self.constructors.borrow().len();
-                let parameters = arguments.generic_context(db);
-                let variables = parameters
-                    .variables(db)
-                    .map(|variable| {
-                        Type::TypeVar(self.parameters.borrow_mut().intern(
-                            db,
-                            ProbeParameter {
-                                constructor: index,
-                                variable,
-                                mappings: None,
-                            },
-                        ))
-                    })
-                    .collect::<Vec<_>>();
-                let formal = parameters.specialize(db, variables);
-                let body_source = match source {
-                    Type::Recursive(alias) => {
-                        Type::Recursive(alias.with_arguments(db, Some(formal)))
-                    }
-                    Type::TypeAlias(alias) => {
-                        Type::TypeAlias(alias.apply_specialization(db, |_| formal))
-                    }
-                    _ => source,
-                };
-                self.constructors.borrow_mut().insert(source, body_source);
-                index
-            });
-            self.calls.borrow_mut().insert((index, arguments));
-            self.constructors.borrow()[index]
-        } else {
-            source
-        };
-        self.bodies.borrow_mut().insert((source, step.clone()));
-        ty
     }
 }
 
@@ -486,10 +158,6 @@ impl<'db> DeferredTypeMapping<'db> {
             context,
             materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
         };
-        // Symbolic arguments retain each replayed step; the outer probe checks their actual uses.
-        if matches!(visitor.mapping_probe, Some(MappingProbeContext::Compose(_))) {
-            return Some(Self::new(db, previous, step));
-        }
         if matches!(mapping, TypeMapping::Materialize(_))
             && dynamic_content_impl(
                 db,
@@ -504,12 +172,7 @@ impl<'db> DeferredTypeMapping<'db> {
         if step.context.annotation.is_none() {
             step.context = TypeContext::default();
         }
-        let mappings = Self::append_step(db, previous, step.clone(), visitor);
-        if mappings == previous || !MappingProbe::changes(db, original, &step, visitor) {
-            previous
-        } else {
-            mappings
-        }
+        Self::append_step(db, previous, step, visitor)
     }
 
     fn append_step(
@@ -601,8 +264,8 @@ impl<'db> DeferredTypeMapping<'db> {
             ty = previous.apply(db, ty, visitor);
         }
         // Each step has its own mapping identity, but materialization comparisons share a guard.
-        let mut visitor = self.step(db).visitor(visitor);
-        visitor.mapping_probe = visitor.mapping_probe.map(MappingProbeContext::composing);
+        let mut visitor = visitor.for_new_materialization_root();
+        visitor.materialize_typevar_bounds_and_defaults = self.step(db).materialize_bounds;
         ty.apply_type_mapping_impl(
             db,
             &self.step(db).operation,

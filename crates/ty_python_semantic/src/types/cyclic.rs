@@ -918,11 +918,6 @@ where
             _tag: PhantomData,
         }
     }
-
-    /// Whether there are neither active visits nor memoized results.
-    pub(super) fn is_empty(&self) -> bool {
-        self.seen.borrow().is_empty() && matches!(*self.cache.borrow(), CycleDetectorCache::Empty)
-    }
 }
 
 impl<'db, Tag, T, R: Clone, const INLINE_CAPACITY: usize>
@@ -945,7 +940,8 @@ where
     /// Visits `item`, returning it in `Err` if another active item has the same identity.
     ///
     /// The caller must convert `Err(item)` into an operation-specific conservative result. An
-    /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
+    /// exact reentry within this detector uses its configured fallback and returns `Ok`;
+    /// reentry into another detector's pending proof returns `Err`.
     ///
     /// Completed results are reused only when `reuse_cached` accepts them. Otherwise, the visit
     /// recomputes the result using the same active recursion guards, without replacing the cached
@@ -1060,7 +1056,7 @@ impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVi
 pub(super) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
-    /// A different item with the same abstract identity is already pending.
+    /// The identity is pending, without an exact recursive proof in this detector.
     Cycle(T),
     /// The caller should compute the result and finish the pending visit.
     Pending(T),
