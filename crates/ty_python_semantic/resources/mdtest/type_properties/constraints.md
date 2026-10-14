@@ -1614,6 +1614,73 @@ def correlated_noninferable[I, J, N]() -> None:
     reveal_type(constraints.solutions_for(J, inferable=tuple[I, J]))
 ```
 
+## Solving declared bounds and constraints
+
+### Fixed type variables
+
+An inferred type must satisfy the type variable's declared upper bound or constraints. An unbounded,
+caller-fixed `S` does not satisfy a bound of `str` or select one of the constraints `str` and
+`bytes`, even if the path contains an upper bound on `S`.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def fixed_upper_bound[S, T: str, U: (str, bytes)]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
+
+    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
+    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+def bounded_upper_bound[S: str, T: str]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@bounded_upper_bound]]
+
+S = TypeVar("S")
+BoundedS = TypeVar("BoundedS", bound=str)
+T = TypeVar("T", bound=str)
+U = TypeVar("U", str, bytes)
+
+def legacy_fixed_upper_bound(source: S, target: T, constrained_target: U) -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
+
+    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
+    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+def legacy_bounded_upper_bound(source: BoundedS, target: T) -> None:
+    constraints = ConstraintSet.lower_bound(BoundedS, T)
+    # revealed: tuple[Solution[T=BoundedS@legacy_bounded_upper_bound]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+### Joint inference
+
+When both variables are inferable, the solver can specialize them together.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def joint[S, T: str]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
+
+S = TypeVar("S")
+T = TypeVar("T", bound=str)
+
+def legacy_joint(source: S, target: T) -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that

@@ -113,6 +113,7 @@ impl ProjectionTypeBudget {
 
 impl<'db> ConstraintSet<'db, '_> {
     /// Computes default solutions for each BDD path within the default projection budget.
+    /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
@@ -152,6 +153,9 @@ impl<'db> ConstraintSet<'db, '_> {
     /// The selector receives the typevar's variance and explicit lower and upper bounds. Its
     /// outcome distinguishes missing evidence, invalid paths, and exhausted solution budgets.
     /// The caller is responsible for combining the resulting paths (typically via union).
+    /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
+    /// The selector must preserve the typevar's declared bound: path validation does not
+    /// revalidate an arbitrary type selected afterward.
     ///
     /// Per-variable budget exhaustion preserves available fallback bindings and marks the path
     /// family as [`SolutionPaths::BudgetExceeded`](super::SolutionPaths::BudgetExceeded).
@@ -186,7 +190,8 @@ impl<'db> ConstraintSet<'db, '_> {
     /// as [`Self::solutions_with`]. The storage borrow is released before invoking either
     /// callback, so they can safely use the constraint builder. Each call to `fold` receives the
     /// complete bindings for one retained path, including an empty slice for a valid path on
-    /// which no variable was solved.
+    /// which no variable was solved. As with [`Self::solutions_with`], the selector must preserve
+    /// each typevar's declared bound.
     ///
     /// The accumulator is returned only if the entire projection succeeds. `fold` must charge
     /// newly accumulated types to its supplied budget and use bounded constructors for operations
