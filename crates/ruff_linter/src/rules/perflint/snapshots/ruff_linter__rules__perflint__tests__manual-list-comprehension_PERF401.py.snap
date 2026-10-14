@@ -356,3 +356,14 @@ PERF401 Use a list comprehension to create a transformed list
 367 |     return found
     |
 help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:375:9
+    |
+373 |         values if values else ()
+374 |     ):
+375 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+376 |     return found
+    |
+help: Replace for loop with list comprehension

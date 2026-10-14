@@ -9,8 +9,10 @@ use crate::{
 use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
+use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Binding, analyze::typing::is_list};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -344,8 +346,12 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         call_range,
     );
 
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
+    let iter_contains_named_expr = any_over_expr(&for_stmt.iter, &Expr::is_named_expr);
+
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) && !iter_contains_named_expr {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
@@ -369,15 +375,6 @@ fn convert_to_list_extend(
 ) -> Result<Fix> {
     let semantic = checker.semantic();
     let locator = checker.locator();
-
-    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
-    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
-    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
-        return Err(anyhow!(
-            "Cannot move an assignment expression into a comprehension iterable"
-        ));
-    }
-
     let if_str = match if_test {
         Some(test) => {
             // If the test is an assignment expression,
@@ -398,24 +395,8 @@ fn convert_to_list_extend(
         None => String::new(),
     };
 
-    // A comprehension's iterable can't be an unparenthesized tuple, lambda, or conditional
-    // expression, so add parentheses around it. Parentheses in the original source (e.g.,
-    // `for x in (a if b else c)`) are outside the expression's range, so they're added back.
-    // ```python
-    //  for i in a, b:
-    //      ...
-    // ```
-    // becomes
-    // [... for i in (a, b)]
-    let for_iter_str = match &*for_stmt.iter {
-        Expr::Tuple(ast::ExprTuple {
-            parenthesized: false,
-            ..
-        })
-        | Expr::Lambda(_)
-        | Expr::If(_) => format!("({})", locator.slice(for_stmt.iter.range())),
-        _ => locator.slice(for_stmt.iter.range()).to_string(),
-    };
+    let for_iter_str =
+        parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let for_type = if for_stmt.is_async {
         "async for"
@@ -436,7 +417,14 @@ fn convert_to_list_extend(
     let variable_name = locator.slice(binding);
     let mut ranges_to_ignore = vec![
         to_append.range(),
-        for_stmt.iter.range(),
+        // `parenthesize_loop_iter_if_necessary` keeps any parentheses around the iterable, and the
+        // comments inside them, so they must not be moved a second time.
+        parenthesized_range(
+            for_stmt.iter.as_ref().into(),
+            for_stmt.into(),
+            checker.tokens(),
+        )
+        .unwrap_or(for_stmt.iter.range()),
         for_stmt.target.range(),
     ];
     if let Some(test) = if_test {

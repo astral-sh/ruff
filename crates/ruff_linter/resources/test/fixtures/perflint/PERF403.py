@@ -266,3 +266,12 @@ def f(values):
     for key, value in dict(items := values):
         result[key] = value
     return result
+
+def f(values):
+    # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    result = {}
+    for key, value in (  # comment
+        values if values else ()
+    ):
+        result[key] = value
+    return result

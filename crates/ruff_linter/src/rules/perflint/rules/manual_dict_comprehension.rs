@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
+    token::parenthesized_range,
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
@@ -10,6 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::refurb::helpers::{IterLocation, parenthesize_loop_iter_if_necessary};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -338,24 +340,8 @@ fn convert_to_dict_comprehension(
         None => String::new(),
     };
 
-    // A comprehension's iterable can't be an unparenthesized tuple, lambda, or conditional
-    // expression, so add parentheses around it. Parentheses in the original source (e.g.,
-    // `for x in (a if b else c)`) are outside the expression's range, so they're added back.
-    // ```python
-    //  for i in a, b:
-    //      ...
-    // ```
-    // becomes
-    // {... for i in (a, b)}
-    let iter_str = match &*for_stmt.iter {
-        Expr::Tuple(ast::ExprTuple {
-            parenthesized: false,
-            ..
-        })
-        | Expr::Lambda(_)
-        | Expr::If(_) => format!("({})", locator.slice(for_stmt.iter.range())),
-        _ => locator.slice(for_stmt.iter.range()).to_string(),
-    };
+    let iter_str =
+        parenthesize_loop_iter_if_necessary(for_stmt, checker, IterLocation::Comprehension);
 
     let target_str = locator.slice(for_stmt.target.range());
     let for_type = if for_stmt.is_async {
@@ -399,7 +385,14 @@ fn convert_to_dict_comprehension(
     let mut ranges_to_ignore = vec![
         key.range(),
         value.range(),
-        for_stmt.iter.range(),
+        // `parenthesize_loop_iter_if_necessary` keeps any parentheses around the iterable, and the
+        // comments inside them, so they must not be moved a second time.
+        parenthesized_range(
+            for_stmt.iter.as_ref().into(),
+            for_stmt.into(),
+            checker.tokens(),
+        )
+        .unwrap_or(for_stmt.iter.range()),
         for_stmt.target.range(),
     ];
     if let Some(test) = if_test {

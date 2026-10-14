@@ -692,3 +692,26 @@ PERF401 Use a list comprehension to create a transformed list
 367 |     return found
     |
 help: Replace for loop with list comprehension
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:375:9
+    |
+373 |         values if values else ()
+374 |     ):
+375 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+376 |     return found
+    |
+help: Replace for loop with list comprehension
+    |
+370 |     # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    -     found = []
+    -     for value in (  # comment
+371 +     found = [value * 2 for value in (  # comment
+372 |         values if values else ()
+    -     ):
+    -         found.append(value * 2)
+373 +     )]
+374 |     return found
+    |
+note: This is an unsafe fix and may change runtime behavior

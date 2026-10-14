@@ -520,3 +520,26 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 268 |     return result
     |
 help: Replace for loop with dict comprehension
+
+PERF403 [*] Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:276:9
+    |
+274 |         values if values else ()
+275 |     ):
+276 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+277 |     return result
+    |
+help: Replace for loop with dict comprehension
+    |
+271 |     # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    -     result = {}
+    -     for key, value in (  # comment
+272 +     result = {key: value for key, value in (  # comment
+273 |         values if values else ()
+    -     ):
+    -         result[key] = value
+274 +     )}
+275 |     return result
+    |
+note: This is an unsafe fix and may change runtime behavior

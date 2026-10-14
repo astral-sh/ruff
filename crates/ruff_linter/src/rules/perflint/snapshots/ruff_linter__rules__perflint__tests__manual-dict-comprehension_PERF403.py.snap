@@ -273,3 +273,14 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 268 |     return result
     |
 help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:276:9
+    |
+274 |         values if values else ()
+275 |     ):
+276 |         result[key] = value
+    |         ^^^^^^^^^^^^^^^^^^^
+277 |     return result
+    |
+help: Replace for loop with dict comprehension

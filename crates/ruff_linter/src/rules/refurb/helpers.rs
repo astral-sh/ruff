@@ -431,7 +431,7 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
 /// - `for x in y, z: ...`                   ->  `"(y, z)"`
 /// - `for x in lambda: 0: ...`              ->  `"(lambda: 0)"`
 /// - `for x in (1,) if True else (2,): ...` ->  `"((1,) if True else (2,))"`
-pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
+pub(crate) fn parenthesize_loop_iter_if_necessary<'a>(
     for_stmt: &'a ast::StmtFor,
     checker: &'a Checker,
     location: IterLocation,
@@ -458,7 +458,7 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
 }
 
 #[derive(Copy, Clone)]
-pub(super) enum IterLocation {
+pub(crate) enum IterLocation {
     Call,
     Comprehension,
 }

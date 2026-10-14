@@ -365,3 +365,12 @@ def f(values, allowed):
         if value not in allowed:
             found.append(value)
     return found
+
+def f(values):
+    # comment inside the iterable's parentheses is kept with the iterable, not duplicated
+    found = []
+    for value in (  # comment
+        values if values else ()
+    ):
+        found.append(value * 2)
+    return found
