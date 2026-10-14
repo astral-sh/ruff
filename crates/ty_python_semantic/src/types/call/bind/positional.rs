@@ -1,4 +1,4 @@
-use super::{ArgumentMatcher, MatchedArgument};
+use super::{ArgumentMatchResult, ArgumentMatcher};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgument, CallArguments};
@@ -28,11 +28,12 @@ pub(super) fn match_arguments<'db>(
     env: &ProgramEnvironment<'db>,
     arguments: &CallArguments<'_, 'db>,
     signature: &Signature<'db>,
-) -> Option<Box<[MatchedArgument<'db>]>> {
+) -> Option<ArgumentMatchResult<'db>> {
     let parameters = signature.parameters();
+    let variadic = parameters.variadic();
     if signature.generic_context.is_some()
         || !parameters.is_standard()
-        || parameters.variadic().is_some()
+        || variadic.is_some_and(|(_, parameter)| parameter.has_starred_annotation())
         || parameters.keyword_variadic().is_some()
         || !arguments
             .iter()
@@ -122,22 +123,36 @@ pub(super) fn match_arguments<'db>(
             .enumerate()
             .skip(parameter_count)
             .all(|(index, parameter)| {
-                parameter.has_default() || matcher.explicit_keyword_parameters.contains(&index)
+                parameter.is_variadic()
+                    || parameter.has_default()
+                    || matcher.explicit_keyword_parameters.contains(&index)
             });
     for p in (0..parameter_count).rev() {
         terminal[p] = terminal[p + 1]
             && (parameters[p].has_default() || matcher.explicit_keyword_parameters.contains(&p));
     }
     for (s, segment) in segments.iter().enumerate().rev() {
+        let argument = arguments.get(segment.argument_index)?;
+        let matches_parameter = |expected| {
+            argument
+                .matched_type(expected, segment.element_type)
+                .map(|actual| actual.is_assignable_to(db, env, expected))
+        };
         for p in (0..=parameter_count).rev() {
+            if p == parameter_count
+                && let Some((_, parameter)) = variadic
+            {
+                // At *args, one comparison covers a whole homogeneous segment. Even if
+                // the unpack could be empty, its element type must match the parameter.
+                can_finish[s][p] =
+                    can_finish[s + 1][p] && matches_parameter(parameter.annotated_type())?;
+                continue;
+            }
             can_finish[s][p] = (segment.repeated && can_finish[s + 1][p])
                 || (p < parameter_count
                     && !matcher.explicit_keyword_parameters.contains(&p)
                     && can_finish[if segment.repeated { s } else { s + 1 }][p + 1]
-                    && arguments
-                        .get(segment.argument_index)?
-                        .matched_type(parameters[p].annotated_type(), segment.element_type)?
-                        .is_assignable_to(db, env, parameters[p].annotated_type()));
+                    && matches_parameter(parameters[p].annotated_type())?);
         }
     }
     if !can_finish[0][0] {
@@ -147,15 +162,22 @@ pub(super) fn match_arguments<'db>(
     // Follow one successful path and let the ordinary matcher record the chosen positions.
     let mut p = 0;
     for (s, segment) in segments.iter().enumerate() {
-        while !segment.repeated || !can_finish[s + 1][p] {
+        loop {
+            let at_variadic = p == parameter_count && variadic.is_some();
+            if segment.repeated && !at_variadic && can_finish[s + 1][p] {
+                break;
+            }
             matcher
                 .match_positional(
                     segment.argument_index,
                     arguments.get(segment.argument_index)?.kind(),
                     segment.element_type,
-                    false,
+                    segment.repeated,
                 )
                 .ok()?;
+            if at_variadic {
+                break;
+            }
             p += 1;
             if !segment.repeated {
                 break;
@@ -168,11 +190,9 @@ pub(super) fn match_arguments<'db>(
                 .match_keyword(index, argument.kind(), None, name)
                 .ok()?;
         }
+        // A successful placement can leave an unpack empty, with no parameter matches.
+        matcher.argument_matches[index].matched = true;
     }
-    let mut matches = matcher.finish(db, env);
-    for argument in &mut matches {
-        // Empty unpacks also matched successfully, despite contributing no parameters.
-        argument.matched = true;
-    }
-    errors.is_empty().then_some(matches)
+    let result = matcher.finish(db, env);
+    errors.is_empty().then_some(result)
 }
