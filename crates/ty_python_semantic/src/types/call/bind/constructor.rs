@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use super::{
-    ArgumentMatchingMode, Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, PositionalMatches,
-    generic_context_has_paramspec,
+    ArgumentMatchingMode, Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode,
+    PositionalMatches, generic_context_has_paramspec,
 };
 use crate::Db;
 use crate::ProgramEnvironment;
@@ -289,8 +289,8 @@ impl<'db> ConstructorBinding<'db> {
     ) -> bool {
         if self.entry.argument_matching_mode != ArgumentMatchingMode::PositionalAlternatives
             || !arguments
-            .iter()
-            .any(|argument| matches!(argument, CallArgument::Variadic(_)))
+                .iter()
+                .any(|argument| matches!(argument, CallArgument::Variadic(_)))
         {
             return false;
         }
@@ -304,8 +304,8 @@ impl<'db> ConstructorBinding<'db> {
                 max_length = max_length.max(parameters.positional().count());
                 supported &= PositionalMatches::supports_arguments(db, env, arguments, parameters)
                     && !parameters
-                    .variadic()
-                    .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
+                        .variadic()
+                        .is_some_and(|(_, parameter)| parameter.has_starred_annotation())
                     && overload.signature.generic_context.is_none_or(|context| {
                         context
                             .variables(db)

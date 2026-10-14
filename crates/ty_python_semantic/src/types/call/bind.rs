@@ -8512,9 +8512,9 @@ impl<'db> Binding<'db> {
         if constructor_lengths.is_some() && selected_matches.is_none() {
             matcher.errors.push(BindingError::UnmatchedOverload);
         }
-        let direct_positional_matches = positional_matches.as_ref().filter(|_| {
-            self.constructor_context.is_none() || selected_matches.is_some()
-        });
+        let direct_positional_matches = positional_matches
+            .as_ref()
+            .filter(|_| self.constructor_context.is_none() || selected_matches.is_some());
         if let Some(positional_matches) = direct_positional_matches {
             matcher.argument_matches = selected_matches
                 .as_ref()
@@ -8617,18 +8617,19 @@ impl<'db> Binding<'db> {
             .signature
             .generic_context
             .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
-        let positional_constraints = if let Some(positional) =
-            self.positional_matches.as_ref().filter(|_| self.constructor_context.is_none()) {
-            let Some(evaluated) = positional
-                .evaluate(
-                    db,
-                    env,
-                    constraints,
-                    arguments,
-                    parameters,
-                    inferable_typevars,
-                )
-            else {
+        let positional_constraints = if let Some(positional) = self
+            .positional_matches
+            .as_ref()
+            .filter(|_| self.constructor_context.is_none())
+        {
+            let Some(evaluated) = positional.evaluate(
+                db,
+                env,
+                constraints,
+                arguments,
+                parameters,
+                inferable_typevars,
+            ) else {
                 // Keep the ordinary diagnostics when no complete placement succeeds.
                 self.reset(db);
                 self.match_parameters_impl(db, env, arguments, ArgumentMatchingMode::Ordinary);

@@ -775,11 +775,33 @@ class Item:
 
     def __init__(self, a: int, callback: Callable[[str], int], b: int): ...
 
+def _(
+    before: list[int],
+    callback: Callable[[str], int],
+    wrong_return: Callable[[str], str],
+    after: list[int],
+) -> None:
+    Item(*before, callback, *after)  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    Item(*before, wrong_return, *after)
+```
+
+## Context-dependent constructor arguments
+
+Inline lambdas retain ordinary constructor matching and contextual inference. We do not infer them
+under alternative positional placements, even when a placement could make the call valid:
+
+```py
+from collections.abc import Callable
+
+class Item:
+    def __init__(self, a: int, callback: Callable[[str], int], b: int): ...
+
 def _(before: list[int], after: list[int]) -> None:
-    Item(*before, lambda x: len(x), *after)  # no diagnostic
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
-    Item(*before, lambda x: x.upper(), *after)
+    Item(*before, lambda x: len(x), *after)
 ```
 
 ## Positional unpacks through a metaclass
