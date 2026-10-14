@@ -225,8 +225,10 @@ pub fn dedent_to(text: &str, indent: &str) -> Option<String> {
 
             let indent_len = trimmed_start_of_line_formfeed.len() - trimmed.len();
 
-            if trimmed.starts_with('#') && first_comment_indent.is_none() {
-                first_comment_indent = Some(indent_len);
+            if trimmed.starts_with('#') {
+                if first_comment_indent.is_none() {
+                    first_comment_indent = Some(indent_len);
+                }
                 None
             } else {
                 Some(indent_len)
@@ -596,6 +598,30 @@ mod tests {
             "# baz"
         ].join("\n");
         assert_eq!(dedent_to(&x, "  "), Some(y));
+
+        let x = [
+            "       # foo",
+            "       # bar",
+            "        return 2",
+        ].join("\n");
+        let y = [
+            "   # foo",
+            "   # bar",
+            "    return 2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "    "), Some(y));
+
+        let x = [
+            "        # foo",
+            "          # bar",
+            "        return 2",
+        ].join("\n");
+        let y = [
+            "    # foo",
+            "      # bar",
+            "    return 2",
+        ].join("\n");
+        assert_eq!(dedent_to(&x, "    "), Some(y));
 
         let x = [
             "  # foo",
