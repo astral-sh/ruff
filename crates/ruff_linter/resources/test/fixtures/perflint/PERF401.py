@@ -351,7 +351,7 @@ def f(values):
     return found
 
 def f(values, allowed):
-    # assignment expressions are not allowed in a comprehension's iterable, so there is no fix
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
     found = []
     for value in (items := values):
         if value not in allowed:
@@ -359,7 +359,7 @@ def f(values, allowed):
     return found
 
 def f(values, allowed):
-    # assignment expressions are not allowed in a comprehension's iterable, so there is no fix
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
     found = []
     for value in list(items := values):
         if value not in allowed:

@@ -336,28 +336,6 @@ PERF401 Use a list comprehension to create a transformed list
 help: Replace for loop with list comprehension
 
 PERF401 Use a list comprehension to create a transformed list
-   --> PERF401.py:358:13
-    |
-356 |     for value in (items := values):
-357 |         if value not in allowed:
-358 |             found.append(value)
-    |             ^^^^^^^^^^^^^^^^^^^
-359 |     return found
-    |
-help: Replace for loop with list comprehension
-
-PERF401 Use a list comprehension to create a transformed list
-   --> PERF401.py:366:13
-    |
-364 |     for value in list(items := values):
-365 |         if value not in allowed:
-366 |             found.append(value)
-    |             ^^^^^^^^^^^^^^^^^^^
-367 |     return found
-    |
-help: Replace for loop with list comprehension
-
-PERF401 Use a list comprehension to create a transformed list
    --> PERF401.py:375:9
     |
 373 |         values if values else ()

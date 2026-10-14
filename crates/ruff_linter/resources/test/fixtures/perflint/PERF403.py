@@ -254,14 +254,14 @@ def f(values):
     return result
 
 def f(values):
-    # assignment expressions are not allowed in a comprehension's iterable, so there is no fix
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
     result = {}
     for key, value in (items := values):
         result[key] = value
     return result
 
 def f(values):
-    # assignment expressions are not allowed in a comprehension's iterable, so there is no fix
+    # assignment expressions are not allowed in a comprehension's iterable, so there is no diagnostic
     result = {}
     for key, value in dict(items := values):
         result[key] = value

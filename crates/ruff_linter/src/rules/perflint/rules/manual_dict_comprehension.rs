@@ -85,7 +85,10 @@ impl Violation for ManualDictComprehension {
 
 /// PERF403
 pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let ast::StmtFor { body, target, .. } = for_stmt;
+    let ast::StmtFor {
+        body, target, iter, ..
+    } = for_stmt;
+
     let body = body.as_slice();
     let target = target.as_ref();
     let (stmt, if_test) = match body {
@@ -140,6 +143,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     else {
         return;
     };
+
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
+    if any_over_expr(iter, &Expr::is_named_expr) {
+        return;
+    }
 
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError. Make sure none
@@ -312,12 +321,6 @@ fn convert_to_dict_comprehension(
     checker: &Checker,
 ) -> Option<Fix> {
     let locator = checker.locator();
-
-    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
-    // when parenthesized (e.g., `{k: v for k, v in (y := z)}`), so the loop can't be converted.
-    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
-        return None;
-    }
 
     let if_str = match if_test {
         Some(test) => {

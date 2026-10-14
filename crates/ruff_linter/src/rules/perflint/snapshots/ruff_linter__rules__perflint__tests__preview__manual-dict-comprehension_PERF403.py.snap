@@ -499,28 +499,6 @@ help: Replace for loop with dict comprehension
     |
 note: This is an unsafe fix and may change runtime behavior
 
-PERF403 Use a dictionary comprehension instead of a for-loop
-   --> PERF403.py:260:9
-    |
-258 |     result = {}
-259 |     for key, value in (items := values):
-260 |         result[key] = value
-    |         ^^^^^^^^^^^^^^^^^^^
-261 |     return result
-    |
-help: Replace for loop with dict comprehension
-
-PERF403 Use a dictionary comprehension instead of a for-loop
-   --> PERF403.py:267:9
-    |
-265 |     result = {}
-266 |     for key, value in dict(items := values):
-267 |         result[key] = value
-    |         ^^^^^^^^^^^^^^^^^^^
-268 |     return result
-    |
-help: Replace for loop with dict comprehension
-
 PERF403 [*] Use a dictionary comprehension instead of a for-loop
    --> PERF403.py:276:9
     |

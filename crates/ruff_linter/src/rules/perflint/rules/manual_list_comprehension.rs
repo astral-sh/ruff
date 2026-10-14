@@ -190,6 +190,12 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         }
     }
 
+    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
+    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
+    if any_over_expr(&for_stmt.iter, &Expr::is_named_expr) {
+        return;
+    }
+
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, |expr| {
         expr.as_name_expr()
@@ -345,12 +351,8 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         call_range,
     );
 
-    // An assignment expression is a syntax error anywhere in a comprehension's iterable, even
-    // when parenthesized (e.g., `[x for x in (y := z)]`), so the loop can't be converted.
-    let iter_contains_named_expr = any_over_expr(&for_stmt.iter, &Expr::is_named_expr);
-
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if is_fix_manual_list_comprehension_enabled(checker.settings()) && !iter_contains_named_expr {
+    if is_fix_manual_list_comprehension_enabled(checker.settings()) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,
