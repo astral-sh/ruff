@@ -2966,14 +2966,11 @@ def inspect(container: Container):
             reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 
     values = [legacy(1), modern(1)]
-    # TODO: Should reveal list[int | list[Growing[list[int]]]].
-    reveal_type(values)  # error: [invalid-argument-type]
-    tree = values[0]  # error: [invalid-argument-type]
+    reveal_type(values)  # revealed: list[int | list[Growing[list[int]]]]
+    tree = values[0]
     if isinstance(tree, list):
-        # TODO: Should reveal Growing[list[int]].
-        reveal_type(tree[0])  # revealed: Unknown
-        # TODO: Should reveal int | Growing[list[list[int]]].
-        reveal_type(tree[0][0])  # revealed: Unknown
+        reveal_type(tree[0])  # revealed: Growing[list[int]]
+        reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 ```
 
 ### Type parameters used only in recursive references
@@ -3257,7 +3254,7 @@ GrowingB = tuple[T, "GrowingA[list[T]] | None", "GrowingB[T] | None"]
 
 def f(a: GrowingA[int]):
     # TODO: Should reveal list[GrowingA[int]].
-    reveal_type([a])  # error: [invalid-argument-type]
+    reveal_type([a])  # revealed: list[GrowingA[int] | GrowingA[int]]
 ```
 
 These aliases contain no dynamic types when specialized with `int`, so both materializations are
@@ -3278,7 +3275,7 @@ change at each level. In particular, inserting a top-materialized value into a l
 `Any` as an unconstrained leaf type.
 
 TODO: The displayed alias omits its materialization after promotion. The bottom-materialized growing
-alias also encounters an incorrect argument error during comparison.
+alias also retains redundant union elements.
 
 ```py
 from typing import Any, TypeVar
@@ -3303,7 +3300,7 @@ def inspect(
     # TODO: Should reveal list[Top[Growing[Any]]].
     reveal_type([top_growing])  # revealed: list[Growing[Any]]
     # TODO: Should reveal list[Bottom[Growing[Any]]].
-    reveal_type([bottom_growing])  # error: [invalid-argument-type]
+    reveal_type([bottom_growing])  # revealed: list[Growing[Any] | Bottom[Growing[Any]]]
     static_assert(is_equivalent_to(TypeOf[[top][0]], Top[Tree[Any]]))
     static_assert(is_equivalent_to(TypeOf[[bottom][0]], Bottom[Tree[Any]]))
     static_assert(not is_equivalent_to(TypeOf[[top][0]], Tree[Any]))

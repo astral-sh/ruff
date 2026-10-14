@@ -2304,6 +2304,14 @@ impl<'db> ApplySpecialization<'db> {
         self.bindings.keys().copied()
     }
 
+    /// Types this substitution can introduce, at either polarity.
+    pub(super) fn replacement_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.bindings
+            .values()
+            .chain(self.flipped_bindings.values())
+            .map(|(ty, _)| *ty)
+    }
+
     pub(crate) fn get(
         &self,
         db: &'db dyn Db,

@@ -60,18 +60,27 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
+use std::cell::Cell;
+
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
+use super::callable::walk_callable_type;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::generics::{ApplySpecialization, Specialization};
+use super::function::FunctionType;
+use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
+use super::known_instance::walk_known_instance_type;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
-use super::visitor::{DynamicContentMode, dynamic_content_impl};
+use super::visitor::{
+    DynamicContentMode, TypeCollector, TypeVisitor, dynamic_content_impl,
+    walk_type_with_recursion_guard,
+};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind,
-    PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+    GenericAlias, GenericContext, KnownInstanceType, MaterializationKind, PromotionKind, Type,
+    TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -150,6 +159,15 @@ impl<'db> DeferredTypeMapping<'db> {
         }
         if let TypeMapping::RescopeReturnCallables(replacements) = mapping
             && replacements.is_empty()
+        {
+            return previous;
+        }
+        if let TypeMapping::ApplySpecialization(substitution)
+        | TypeMapping::ApplySpecializationWithMaterialization {
+            specialization: substitution,
+            ..
+        } = mapping
+            && !SubstitutionSearch::is_used(db, visitor.env, original, substitution)
         {
             return previous;
         }
@@ -272,6 +290,158 @@ impl<'db> DeferredTypeMapping<'db> {
             self.step(db).context,
             &visitor,
         )
+    }
+}
+
+/// Conservatively locate a substitution's domain without unfolding or applying retained mappings.
+/// Constructor bodies and arguments are inspected separately, so growing aliases remain finite.
+struct SubstitutionSearch<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    substitution: &'a ApplySpecialization<'db>,
+    visited: TypeCollector<'db>,
+    found: Cell<bool>,
+}
+
+impl<'db> SubstitutionSearch<'_, 'db> {
+    fn is_used(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        substitution: &ApplySpecialization<'db>,
+    ) -> bool {
+        let search = SubstitutionSearch {
+            env,
+            substitution,
+            visited: TypeCollector::default(),
+            found: Cell::new(false),
+        };
+        search.visit_type(db, ty);
+        search.found.get()
+    }
+
+    fn visit_mappings(&self, db: &'db dyn Db, mut mappings: Option<DeferredTypeMapping<'db>>) {
+        while let Some(mapping) = mappings {
+            if self.found.get() {
+                return;
+            }
+            match &mapping.step(db).operation {
+                TypeMapping::ApplySpecialization(substitution)
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: substitution,
+                    ..
+                } => {
+                    for ty in substitution.replacement_types() {
+                        self.visit_type(db, ty);
+                    }
+                }
+                TypeMapping::Promote(..)
+                | TypeMapping::Materialize(_)
+                | TypeMapping::ReplaceParameterDefaults => {}
+                // Binding and freshening can change variable identities, not just insert types.
+                _ => self.found.set(true),
+            }
+            mappings = mapping.previous(db);
+        }
+    }
+}
+
+impl<'db> TypeVisitor<'db> for SubstitutionSearch<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn notify_skipped_lazy_type_attributes(&self) {
+        self.found.set(true);
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get() {
+            return;
+        }
+        match ty {
+            // A provisional body cannot prove absence.
+            Type::Divergent(_) => self.found.set(true),
+            Type::RecursiveVar(reference) => {
+                if let Some(arguments) = reference.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                self.visit_mappings(db, reference.mappings(db));
+            }
+            // Promotion can introduce a generic class's default arguments.
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                self.found.set(true);
+            }
+            _ => walk_type_with_recursion_guard(db, ty, self, &self.visited),
+        }
+    }
+
+    fn visit_bound_type_var_type(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+        let variable = if variable.is_paramspec(db) {
+            variable.without_paramspec_attr(db)
+        } else {
+            variable
+        };
+        if self.substitution.get(db, variable).is_some()
+            || self.substitution.specialize_self_domain() && variable.typevar(db).is_self(db)
+        {
+            self.found.set(true);
+        } else {
+            // Earlier materialization may have exposed bounds or defaults.
+            self.visit_type_var_type(db, variable.typevar(db));
+        }
+    }
+
+    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+        walk_specialization_types(db, alias.specialization(db), self);
+    }
+
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        walk_callable_type(db, callable, self);
+        for signature in callable.signatures(db) {
+            for parameter in signature.parameters() {
+                if let Some(default) = parameter.eager_default_type() {
+                    self.visit_type(db, default);
+                }
+            }
+        }
+    }
+
+    fn visit_function_type(&self, _db: &'db dyn Db, _function: FunctionType<'db>) {
+        // The ordinary walker only visits updated signatures.
+        self.found.set(true);
+    }
+
+    fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+        if let KnownInstanceType::FunctoolsPartial(partial)
+        | KnownInstanceType::FunctoolsPartialCall(partial) = known
+        {
+            self.visit_type(db, partial.wrapped(db).inner(db));
+        }
+        walk_known_instance_type(db, known, self);
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.visit_type(db, alias.raw_value_type(db));
+        if let Some(arguments) = alias.specialization(db).or_else(|| {
+            alias
+                .generic_context(db)
+                .map(|context| context.default_specialization(db, None))
+        }) {
+            walk_specialization_types(db, arguments, self);
+        }
+        self.visit_mappings(db, alias.mappings(db));
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        self.visit_type(db, recursive.body(db));
+        if let Some(arguments) = recursive.arguments(db) {
+            walk_specialization_types(db, arguments, self);
+        }
+        self.visit_mappings(db, recursive.mappings(db));
     }
 }
 

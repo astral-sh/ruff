@@ -776,8 +776,6 @@ type Ok1[T, *Ts] = tuple[T, *Ts]
 Materialization and singleton promotion reach payloads introduced by later recursive
 specializations, even when the type arguments keep growing.
 
-TODO: Comparing growing recursive aliases currently rejects some valid list accesses below.
-
 ```py
 from typing import Any
 from ty_extensions import Bottom, Top, static_assert
@@ -797,20 +795,17 @@ def materialize_nested(value: Top[Nested[int]]): ...  # no diagnostic
 type Late[A, B] = tuple[A, Late[B, tuple[A, None]]]
 
 def collect(value: Late[int, int]):
-    widened = [value][0]  # error: [invalid-argument-type]
-    # TODO: Should reveal tuple[tuple[int, None | Unknown], None | Unknown].
-    reveal_type(widened[1][1][1][1][0])  # revealed: Unknown
+    widened = [value][0]
+    reveal_type(widened[1][1][1][1][0])  # revealed: tuple[tuple[int, None | Unknown], None | Unknown]
 
 type Materialized[T] = tuple[T, Top[Materialized[list[T]]] | None]
 
 def collect_materialized(value: Materialized[TypeOf[1]], flag: bool):
-    widened = [value][0]  # error: [invalid-argument-type]
+    widened = [value][0]
     while flag:
         widened = [widened][0]
-    # TODO: Should reveal int.
-    reveal_type(widened[0])  # revealed: Unknown
+    reveal_type(widened[0])  # revealed: int
     next = widened[1]
     if next is not None:
-        # TODO: Should reveal list[Literal[1]].
-        reveal_type(next[0])  # revealed: Unknown
+        reveal_type(next[0])  # revealed: list[Literal[1]]
 ```
