@@ -77,7 +77,7 @@ use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
     MaterializationKind, PromotionKind, Type, TypeContext, TypeMapping, VarianceTerm,
 };
-use crate::{Db, FxIndexSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
 
 /// A retained operation and the inference context under which it was requested.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -274,9 +274,57 @@ impl<'db> MappingProbeContext<'_, 'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> MappingProbe<'db> {
     /// Check the alias's mapped body and every argument reaching a parameter used by it.
     fn changes(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        mapping: &TypeMapping<'db>,
+        context: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        if visitor.recursion_context.is_none()
+            && let Some(changes) = Self::cached_changes(
+                db,
+                visitor.env.program(db),
+                ty,
+                MappingStep {
+                    operation: mapping.clone(),
+                    context,
+                    materialize_bounds: visitor.materialize_typevar_bounds_and_defaults,
+                },
+            )
+        {
+            return changes;
+        }
+        Self::changes_impl(db, ty, mapping, context, visitor)
+    }
+
+    /// A probe that never uses its comparison state is independent of the caller's state.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _, _| None,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn cached_changes(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        ty: Type<'db>,
+        step: MappingStep<'db>,
+    ) -> Option<bool> {
+        let env = ProgramEnvironment::from_program(program);
+        let mut visitor = ApplyTypeMappingVisitor::new(&env);
+        visitor.materialize_typevar_bounds_and_defaults = step.materialize_bounds;
+        let changes = Self::changes_impl(db, ty, &step.operation, step.context, &visitor);
+        visitor
+            .materialization_equivalence
+            .get()
+            .is_none_or(|visitor| visitor.is_empty())
+            .then_some(changes)
+    }
+
+    fn changes_impl(
         db: &'db dyn Db,
         ty: Type<'db>,
         mapping: &TypeMapping<'db>,
