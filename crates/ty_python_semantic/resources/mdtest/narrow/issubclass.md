@@ -434,6 +434,28 @@ def _(cls: type[Sequence[int]]) -> None:
         reveal_type(cls())  # revealed: list[int]
 ```
 
+## Generic aliases as `classinfo`
+
+Parameterized generics are invalid `classinfo` arguments, including aliases imported from stubs.
+Narrowing still uses their specialization for error recovery.
+
+`aliases.pyi`:
+
+```pyi
+IntList = list[int]
+```
+
+```py
+from aliases import IntList
+
+def narrow(cls: type[list[int]] | type[list[str]]) -> None:
+    # error: [invalid-argument-type] "Parameterized generics cannot be used with `issubclass()`"
+    if issubclass(cls, IntList):
+        reveal_type(cls)  # revealed: type[list[int]]
+    else:
+        reveal_type(cls)  # revealed: type[list[str]]
+```
+
 ## `classinfo` is a generic final class
 
 ```toml

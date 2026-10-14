@@ -645,19 +645,83 @@ isinstance(*args)  # error: [invalid-argument-type]
 
 ## Generic aliases are not supported as second argument
 
-The `classinfo` argument cannot be a generic alias:
+The `classinfo` argument cannot be a generic alias. For error recovery, narrow using the alias's
+specialization:
 
 ```py
-def _(x: list[str] | list[int] | list[bytes]):
-    # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
+def _(x: int | list[str] | list[int]):
+    # error: [invalid-argument-type] "Parameterized generics cannot be used with `isinstance()`"
     if isinstance(x, list[int]):
-        # No narrowing here:
-        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+        reveal_type(x)  # revealed: list[int]
+    else:
+        reveal_type(x)  # revealed: int | list[str]
 
     # error: [invalid-argument-type] "Invalid second argument to `isinstance`"
     if isinstance(x, list[int] | list[str]):
         # No narrowing here:
-        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+        reveal_type(x)  # revealed: int | list[str] | list[int]
+```
+
+Aliases passed through names or nested tuples are also rejected, and retain their specialization
+when narrowing:
+
+```py
+IntList = list[int]
+
+def narrow_alias(value: object) -> None:
+    # error: [invalid-argument-type]
+    if isinstance(value, IntList):
+        reveal_type(value)  # revealed: list[int]
+
+def narrow_tuple(value: int | list[int] | list[str]) -> None:
+    # error: [invalid-argument-type]
+    if isinstance(value, (int, (IntList,))):
+        reveal_type(value)  # revealed: int | list[int]
+    else:
+        reveal_type(value)  # revealed: list[str]
+```
+
+## Runtime classes represented as generic aliases in stubs
+
+A stub may model a runtime class as a specialization of a generic class, as NumPy does for its
+scalar classes. These aliases still produce an error when passed as `classinfo`, but narrowing uses
+their specialization.
+
+`scalars.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Scalar(Generic[T]): ...
+
+IntScalar = Scalar[int]
+StrScalar = Scalar[str]
+```
+
+```py
+import scalars
+from scalars import IntScalar
+
+def narrow(value: int | scalars.IntScalar) -> None:
+    # error: [invalid-argument-type]
+    if isinstance(value, scalars.IntScalar):
+        reveal_type(value)  # revealed: Scalar[int]
+    else:
+        reveal_type(value)  # revealed: int & ~Scalar[int]
+
+def narrow_specializations(value: scalars.IntScalar | scalars.StrScalar) -> None:
+    # error: [invalid-argument-type]
+    if isinstance(value, scalars.IntScalar):
+        reveal_type(value)  # revealed: Scalar[int]
+    else:
+        reveal_type(value)  # revealed: Scalar[str]
+
+def narrow_object(value: object) -> None:
+    # error: [invalid-argument-type]
+    if isinstance(value, IntScalar):
+        reveal_type(value)  # revealed: Scalar[int]
 ```
 
 ## `type[]` types are narrowed as well as class-literal types

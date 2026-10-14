@@ -2162,9 +2162,9 @@ fn call_argument_node<'a>(
 }
 
 /// Check the second argument to `isinstance()` or `issubclass()` for types that cannot be used
-/// at runtime (protocol classes, typed dicts, `typing.Any` in `isinstance`, and invalid
-/// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
-/// recursively validates each element.
+/// at runtime (protocol classes, typed dicts, parameterized generics, `typing.Any` in
+/// `isinstance`, and invalid `UnionType` elements). Handles class literals and tuples, including
+/// nested tuples, and recursively validates each element.
 ///
 /// `classinfo_expr` is the AST expression corresponding to `classinfo`, if available. It is
 /// used for precise annotation spans (e.g., highlighting just the `UnionType` inside a tuple
@@ -2202,6 +2202,15 @@ fn check_classinfo_in_isinstance<'db>(
                     }
                 }
             }
+        }
+        Type::GenericAlias(_) => {
+            let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
+                return;
+            };
+            let function_name: &str = function.into();
+            builder.into_diagnostic(format_args!(
+                "Parameterized generics cannot be used with `{function_name}()`"
+            ));
         }
         Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsInstance => {
             let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
