@@ -269,6 +269,7 @@ fn bind_attribute<'db>(
         is_method,
     } = *attribute;
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
+    let is_nested_class = qualifiers.contains(TypeQualifiers::NESTED_CLASS);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let (read, write) = if is_descriptor {
         let read = Type::resolve_descriptor_access(
@@ -307,6 +308,11 @@ fn bind_attribute<'db>(
         // The selected declaration defines the contract, including inherited annotations.
         // Inferred instance assignments do not narrow a class-body declaration.
         let read = ty.bind_self_typevars(db, env, receiver);
+        let read = if is_nested_class {
+            read.promote_class_literals(db, env)
+        } else {
+            read
+        };
         (
             read,
             Some(
@@ -328,6 +334,7 @@ fn bind_attribute<'db>(
         // writability of these attributes.
         write: if owner.is_object(db)
             || qualifiers.contains(TypeQualifiers::FINAL)
+            || is_nested_class
             || !is_class_var && is_frozen
         {
             None
@@ -431,6 +438,26 @@ fn attribute_violation<'db>(
             source: source.read,
             target: target.read,
         });
+    }
+    // Nested classes promise a class object through both class and instance access. A property
+    // that returns a compatible class on instances does not preserve the class-side operation.
+    if target.qualifiers.contains(TypeQualifiers::NESTED_CLASS)
+        && let (Some(source), Some(target)) = (
+            receiver
+                .to_meta_type(db, env)
+                .member(db, env, name)
+                .ignore_possibly_undefined(),
+            target_receiver
+                .to_meta_type(db, env)
+                .member(db, env, name)
+                .ignore_possibly_undefined(),
+        )
+    {
+        let source = source.promote_class_literals(db, env);
+        let target = target.promote_class_literals(db, env);
+        if !source.is_assignable_to(db, env, target) {
+            return Some(AttributeViolation::Read { source, target });
+        }
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its

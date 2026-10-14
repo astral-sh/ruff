@@ -654,9 +654,9 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     /// Looks up a member guaranteed to exist on every inhabitant of `type[Protocol]`.
     ///
-    /// Methods retain their unbound signatures and `ClassVar`s retain their class-side types.
-    /// Properties are only required on the constructed instance, so they are undefined even when
-    /// the nominal protocol origin provides a property descriptor.
+    /// Methods retain their unbound signatures, while `ClassVar`s and nested classes expose their
+    /// class-side types. Properties are only required on the constructed instance, so they are
+    /// undefined even when the nominal protocol origin provides a property descriptor.
     pub(super) fn meta_member(
         self,
         db: &'db dyn Db,
@@ -1475,7 +1475,7 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
                     || self
                         .declaration
                         .qualifiers
-                        .contains(TypeQualifiers::CLASS_VAR)
+                        .intersects(TypeQualifiers::CLASS_VAR | TypeQualifiers::NESTED_CLASS)
             }
         };
         supported.then_some(ProtocolMemberReadAccess { access: self })
@@ -1504,8 +1504,11 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
                     .declaration
                     .qualifiers
                     .contains(TypeQualifiers::CLASS_VAR);
-                let is_final = self.declaration.qualifiers.contains(TypeQualifiers::FINAL);
-                if is_final || is_class_var != (self.mode == ProtocolMemberAccessMode::Class) {
+                let is_read_only = self
+                    .declaration
+                    .qualifiers
+                    .intersects(TypeQualifiers::FINAL | TypeQualifiers::NESTED_CLASS);
+                if is_read_only || is_class_var != (self.mode == ProtocolMemberAccessMode::Class) {
                     return None;
                 }
                 ProtocolMemberWrite::from_type(ProtocolPropertyType::Annotation(annotation))
@@ -1640,9 +1643,19 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
             ty: self.access.materialize_type(db, env, annotation.ty),
             ..annotation
         };
-        Some(self_type.map_or(annotation.ty, |self_type| {
+        let ty = self_type.map_or(annotation.ty, |self_type| {
             annotation.bind_self(db, env, self_type)
-        }))
+        });
+        if self
+            .access
+            .declaration
+            .qualifiers
+            .contains(TypeQualifiers::NESTED_CLASS)
+        {
+            Some(ty.promote_class_literals(db, env))
+        } else {
+            Some(ty)
+        }
     }
 }
 
@@ -3018,8 +3031,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ///
     /// Ordinary instance attributes and properties are deliberately absent from this check. They
     /// are requirements on the object produced by constructing the class, not on the class object
-    /// itself. `ClassVar`s and methods are checked through class access; unlike ordinary protocol
-    /// matching, method access compares the unbound signature instead of checking only presence.
+    /// itself. `ClassVar`s, nested classes, and methods are checked through class access; unlike
+    /// ordinary protocol matching, method access compares the unbound signature instead of checking
+    /// only presence.
     pub(super) fn check_meta_protocol_members(
         &self,
         db: &'db dyn Db,
