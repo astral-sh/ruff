@@ -1635,6 +1635,68 @@ reveal_type(D(1))  # revealed: D[str, Literal[1]]
 reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
+### Specialized initializer diagnostics in constructor unions
+
+Subclasses that specialize an inherited initializer differently retain their distinct argument
+errors:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __new__(cls, value: object):
+        return object.__new__(cls)
+
+    def __init__(self, value: T) -> None: ...
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def call(factory: type[A] | type[B]) -> None:
+    # error: [invalid-argument-type] "Expected `int`, found `None`"
+    # error: [invalid-argument-type] "Expected `str`, found `None`"
+    factory(None)
+```
+
+### Receiver-specific initializer diagnostics in constructor unions
+
+Different subclasses can select different overloads of a shared initializer. Errors from both sets
+of applicable overloads remain visible, regardless of union order:
+
+```py
+from typing import Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __new__(cls, value: object):
+        return object.__new__(cls)
+
+    @overload
+    def __init__(self: "Base[int]", value: int) -> None: ...
+    @overload
+    def __init__(self: "Base[str]", value: str) -> None: ...
+    def __init__(self, value: int | str) -> None: ...
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def call(forward: type[A] | type[B], reverse: type[B] | type[A]) -> None:
+    # error: [no-matching-overload]
+    # error: [no-matching-overload]
+    forward(None)
+    forward(1)  # error: [no-matching-overload]
+    forward("text")  # error: [no-matching-overload]
+
+    # error: [no-matching-overload]
+    # error: [no-matching-overload]
+    reverse(None)
+    reverse(1)  # error: [no-matching-overload]
+    reverse("text")  # error: [no-matching-overload]
+```
+
 ### Synthesized methods with dataclasses
 
 ```py

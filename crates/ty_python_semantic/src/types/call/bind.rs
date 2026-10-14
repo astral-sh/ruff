@@ -1606,7 +1606,20 @@ impl<'db> Bindings<'db> {
                 }
                 ty => ty,
             };
-            if !reported_ctor_init_callables.insert(callable) {
+            let key = match callable {
+                Type::Callable(callable) => Either::Left((
+                    callable.kind(db),
+                    callable.deprecated(db),
+                    callable
+                        .signatures(db)
+                        .overloads
+                        .iter()
+                        .map(Signature::diagnostic_key)
+                        .collect::<SmallVec<[_; 1]>>(),
+                )),
+                ty => Either::Right(ty),
+            };
+            if !reported_ctor_init_callables.insert(key) {
                 continue;
             }
             downstream_bindings.report_diagnostics_impl(context, node);
