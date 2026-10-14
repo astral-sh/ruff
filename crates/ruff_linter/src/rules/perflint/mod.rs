@@ -45,4 +45,16 @@ mod tests {
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::ManualListComprehension, Path::new("PERF401_py312.py"))]
+    #[test_case(Rule::ManualDictComprehension, Path::new("PERF403_py312.py"))]
+    fn rules_py312(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("perflint").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY312),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
 }

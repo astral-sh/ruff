@@ -1,3 +1,6 @@
+use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::{self as ast, Expr};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_trivia::{
     BackwardsTokenizer, PythonWhitespace, SimpleToken, SimpleTokenKind, SimpleTokenizer,
 };
@@ -5,6 +8,41 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+
+struct ZeroArgSuperVisitor<'a> {
+    semantic: &'a SemanticModel<'a>,
+    found: bool,
+}
+
+impl<'a> Visitor<'a> for ZeroArgSuperVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if self.found {
+            return;
+        }
+        match expr {
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) if arguments.is_empty() && self.semantic.match_builtin_expr(func, "super") => {
+                self.found = true;
+            }
+            Expr::Lambda(ast::ExprLambda { parameters, .. }) => {
+                if let Some(parameters) = parameters {
+                    self.visit_parameters(parameters);
+                }
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+}
+
+pub(super) fn references_zero_arg_super(expr: &Expr, semantic: &SemanticModel) -> bool {
+    let mut visitor = ZeroArgSuperVisitor {
+        semantic,
+        found: false,
+    };
+    visitor.visit_expr(expr);
+    visitor.found
+}
 
 pub(super) fn comment_strings_in_range<'a>(
     checker: &'a Checker,

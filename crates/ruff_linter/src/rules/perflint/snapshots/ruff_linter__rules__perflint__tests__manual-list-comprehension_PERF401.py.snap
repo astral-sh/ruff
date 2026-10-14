@@ -298,3 +298,36 @@ PERF401 Use a list comprehension to create a transformed list
 328 |             filtered.append(i)
     |             ^^^^^^^^^^^^^^^^^^
 help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:360:13
+    |
+358 |         result = []
+359 |         for x in items:
+360 |             result.append(super(TestSuper, self).transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+361 |
+362 |     def test_nested_lambda_super(self, items):
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:365:13
+    |
+363 |         result = []
+364 |         for x in items:
+365 |             result.append(lambda self=self: super().transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+366 |
+367 |     def test_lambda_default_zero_arg_super(self, items):
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:377:9
+    |
+375 |     result = []
+376 |     for x in items:
+377 |         result.append(super().transform(x))  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension

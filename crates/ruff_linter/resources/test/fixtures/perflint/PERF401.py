@@ -326,3 +326,52 @@ def f():
     ) in original:
         if i > 0:
             filtered.append(i)
+
+
+# Tests for zero-argument super() (https://github.com/astral-sh/ruff/issues/27668)
+class Base:
+    def transform(self, x):
+        return x
+
+    def filter(self, x):
+        return True
+
+
+class TestSuper(Base):
+    def test_append_zero_arg_super(self, items):
+        result = []
+        for x in items:
+            result.append(super().transform(x))  # OK
+
+    def test_extend_zero_arg_super(self, items):
+        result = [1]
+        for x in items:
+            result.append(super().transform(x))  # OK
+
+    def test_if_zero_arg_super(self, items):
+        result = []
+        for x in items:
+            if super().filter(x):
+                result.append(x)  # OK
+
+    def test_explicit_super(self, items):
+        result = []
+        for x in items:
+            result.append(super(TestSuper, self).transform(x))  # PERF401
+
+    def test_nested_lambda_super(self, items):
+        result = []
+        for x in items:
+            result.append(lambda self=self: super().transform(x))  # PERF401
+
+    def test_lambda_default_zero_arg_super(self, items):
+        result = []
+        for x in items:
+            result.append(lambda val=super().transform(x): val)  # OK
+
+
+def test_shadowed_super(items):
+    super = object()
+    result = []
+    for x in items:
+        result.append(super().transform(x))  # PERF401

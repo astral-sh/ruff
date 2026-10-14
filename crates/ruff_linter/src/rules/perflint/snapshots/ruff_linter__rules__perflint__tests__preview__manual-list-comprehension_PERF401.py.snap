@@ -603,5 +603,65 @@ help: Replace for loop with list comprehension
     -             filtered.append(i)
 323 +     # comment
 324 +     filtered = [i for i in original if i > 0]
+325 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:360:13
+    |
+358 |         result = []
+359 |         for x in items:
+360 |             result.append(super(TestSuper, self).transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+361 |
+362 |     def test_nested_lambda_super(self, items):
+    |
+help: Replace for loop with list comprehension
+    |
+357 |     def test_explicit_super(self, items):
+    -         result = []
+    -         for x in items:
+    -             result.append(super(TestSuper, self).transform(x))  # PERF401
+358 +         result = [super(TestSuper, self).transform(x) for x in items]  # PERF401
+359 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:365:13
+    |
+363 |         result = []
+364 |         for x in items:
+365 |             result.append(lambda self=self: super().transform(x))  # PERF401
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+366 |
+367 |     def test_lambda_default_zero_arg_super(self, items):
+    |
+help: Replace for loop with list comprehension
+    |
+362 |     def test_nested_lambda_super(self, items):
+    -         result = []
+    -         for x in items:
+    -             result.append(lambda self=self: super().transform(x))  # PERF401
+363 +         result = [lambda self=self: super().transform(x) for x in items]  # PERF401
+364 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+PERF401 [*] Use a list comprehension to create a transformed list
+   --> PERF401.py:377:9
+    |
+375 |     result = []
+376 |     for x in items:
+377 |         result.append(super().transform(x))  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace for loop with list comprehension
+    |
+374 |     super = object()
+    -     result = []
+    -     for x in items:
+    -         result.append(super().transform(x))  # PERF401
+375 +     result = [super().transform(x) for x in items]  # PERF401
     |
 note: This is an unsafe fix and may change runtime behavior
