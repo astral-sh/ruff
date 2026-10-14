@@ -604,10 +604,10 @@ impl<'db> CallableSignature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::constraint_set_assignability(
             env,
             constraints,
@@ -2026,10 +2026,11 @@ impl<'db> Signature<'db> {
         let implementation = self.clone().with_return_type(Type::unknown());
         let overload = overload.clone().with_return_type(Type::unknown());
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor =
+            HasRelationToVisitor::default(&constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::constraint_set_assignability_with_context(
             env,
             &constraints,
@@ -2062,10 +2063,11 @@ impl<'db> Signature<'db> {
         debug_assert!(overload.is_non_generic());
 
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor =
+            HasRelationToVisitor::default(&constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::assignability_with_context(
             env,
             &constraints,
@@ -2149,10 +2151,10 @@ impl<'db> Signature<'db> {
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::constraint_set_assignability(
             env,
             constraints,

@@ -27,6 +27,8 @@ use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
+use std::ptr;
+use std::rc::Rc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -876,13 +878,17 @@ where
     }
 }
 
+/// Active visits shared by detectors whose cached results belong to different contexts.
+pub(super) type CycleDetectorStack<'db, T, const INLINE_CAPACITY: usize> =
+    Rc<RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>>;
+
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
     /// The active recursion stack and the lazily-computed identity of each item.
     /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
+    seen: CycleDetectorStack<'db, T, INLINE_CAPACITY>,
 
     /// Memoized results from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
@@ -897,8 +903,16 @@ where
     T: HasIdentity<'db>,
 {
     pub(crate) fn new(fallback: R) -> Self {
+        Self::with_stack(fallback, Rc::default())
+    }
+
+    /// Share active visits without sharing context-dependent cached results or cycle proofs.
+    pub(super) fn with_stack(
+        fallback: R,
+        seen: CycleDetectorStack<'db, T, INLINE_CAPACITY>,
+    ) -> Self {
         CycleDetector {
-            seen: RefCell::new(SmallVec::new()),
+            seen,
             cache: RefCell::new(CycleDetectorCache::new()),
             fallback,
             _tag: PhantomData,
@@ -977,8 +991,13 @@ where
 
     fn begin_active_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
         let seen = self.seen.borrow();
-        if seen.iter().any(|active| active.item == item) {
-            return CycleDetectorVisit::Ready(self.fallback.clone());
+        if let Some(active) = seen.iter().find(|active| active.item == item) {
+            // A nested comparison cannot use its caller's pending proof to erase a mapping.
+            return if active.owner == ptr::from_ref(self).addr() {
+                CycleDetectorVisit::Ready(self.fallback.clone())
+            } else {
+                CycleDetectorVisit::Cycle(item)
+            };
         }
 
         let mut candidates = seen
@@ -1001,6 +1020,7 @@ where
         drop(seen);
 
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
+            owner: ptr::from_ref(self).addr(),
             item: item.clone(),
             identity,
         });
@@ -1022,7 +1042,10 @@ where
     }
 }
 
-struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
+/// An active visit and the detector that owns its recursive proof.
+pub(super) struct ActiveCycleDetectorVisit<'db, T: HasIdentity<'db>> {
+    // The detector is borrowed throughout the visit, so its address remains stable.
+    owner: usize,
     item: T,
     identity: OnceCell<T::Id>,
 }

@@ -1512,10 +1512,11 @@ impl<'db> ClassType<'db> {
         relation: TypeRelation,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor =
+            HasRelationToVisitor::default(&constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::new(
             env,
             relation,

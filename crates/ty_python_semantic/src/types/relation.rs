@@ -10,7 +10,7 @@ use crate::types::constraints::{
     ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
     OptionConstraintsExtension, OwnedConstraintSet,
 };
-use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{CycleDetectorStack, HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
@@ -399,6 +399,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
         let builder = ConstraintSetBuilder::new();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker {
             env,
             constraints: &builder,
@@ -408,10 +409,10 @@ impl<'db> Type<'db> {
             context_tree: Some(ErrorContextTree::new(relation)),
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
-            relation_visitor: &HasRelationToVisitor::default(&builder),
+            relation_visitor: &HasRelationToVisitor::default(&builder, &materialization_visitor),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
-            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, target);
         checker.into_error_context()
@@ -735,10 +736,10 @@ impl<'db> Type<'db> {
         typevar_evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker {
             env,
             constraints,
@@ -874,7 +875,7 @@ impl<'db> Type<'db> {
         materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         typevar_evaluation: TypeVarEvaluation,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints, materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
@@ -925,10 +926,10 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = DisjointnessChecker {
             env,
             constraints,
@@ -953,6 +954,7 @@ impl<'db> Type<'db> {
     ) -> ErrorContextTree<'db> {
         let constraints = ConstraintSetBuilder::new();
         let context = ErrorContextTree::new(ErrorRelation::Disjointness);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = DisjointnessChecker {
             env,
             constraints: &constraints,
@@ -960,10 +962,13 @@ impl<'db> Type<'db> {
             context_tree: Some(context.clone()),
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
-            relation_visitor: &HasRelationToVisitor::default(&constraints),
+            relation_visitor: &HasRelationToVisitor::default(
+                &constraints,
+                &materialization_visitor,
+            ),
             disjointness_visitor: &IsDisjointVisitor::default(&constraints),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
-            materialization_visitor: &ApplyTypeMappingVisitor::new(env),
+            materialization_visitor: &materialization_visitor,
         };
         checker.check_type_pair(db, self, other);
         context
@@ -980,10 +985,10 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = DisjointnessChecker {
             env,
             constraints,
@@ -999,6 +1004,10 @@ impl<'db> Type<'db> {
         checker.check_type_pair(db, self, other)
     }
 }
+
+/// Type comparisons active across relation and materialization traversals.
+pub(super) type TypeRelationStack<'db> =
+    CycleDetectorStack<'db, (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation), 1>;
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
@@ -1035,8 +1044,14 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
 }
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
-    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        HasRelationToVisitor::new(ConstraintSet::from_bool(constraints, true))
+    pub(crate) fn default(
+        constraints: &'c ConstraintSetBuilder<'db>,
+        materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        Self::with_stack(
+            ConstraintSet::from_bool(constraints, true),
+            materialization_visitor.relation_stack.clone(),
+        )
     }
 }
 

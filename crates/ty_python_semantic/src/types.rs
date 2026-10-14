@@ -55,6 +55,7 @@ pub(crate) use self::match_pattern::{
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use self::recursive::MappingProbeContext;
+use self::relation::TypeRelationStack;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
@@ -521,6 +522,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     /// Results that encounter an expansion cycle depend on the active recursion stack.
     expansion_cycles: Cell<usize>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    relation_stack: TypeRelationStack<'db>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -534,6 +536,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             expanding: ActiveRecursionDetector::default(),
             expansion_cycles: Cell::default(),
             materialization_equivalence: OnceCell::default(),
+            relation_stack: TypeRelationStack::default(),
         }
     }
 
@@ -595,6 +598,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
 
         Self {
             materialization_equivalence,
+            relation_stack: self.relation_stack.clone(),
             recursion_context: self.recursion_context,
             mapping_probe: self.mapping_probe,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,

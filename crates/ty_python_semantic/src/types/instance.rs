@@ -1478,10 +1478,10 @@ fn non_recursive_protocol_constraints<'db>(
     let env = ProgramEnvironment::from_program(target.base().program(db));
     let constraints = ConstraintSetBuilder::new();
     constraints.into_owned(|constraints| {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+        let relation_visitor = HasRelationToVisitor::default(constraints, &materialization_visitor);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
         let checker = TypeRelationChecker::constraint_set_assignability(
             &env,
             constraints,
@@ -1895,10 +1895,11 @@ impl<'db> ProtocolInstanceType<'db> {
 
             let env = ProgramEnvironment::from_program(interface.base().program(db));
             let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
+            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+            let relation_visitor =
+                HasRelationToVisitor::default(&constraints, &materialization_visitor);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
             let signature_relation_visitor = SignatureRelationVisitor::default();
-            let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
             let checker = TypeRelationChecker::subtyping(
                 &env,
                 &constraints,
