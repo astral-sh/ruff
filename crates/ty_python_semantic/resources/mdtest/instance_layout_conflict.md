@@ -310,6 +310,31 @@ class Task(asyncio.Task[Any]): ...
 class SubClass(Task, Future): ...  # fine
 ```
 
+## Disjoint bases with a common ancestor
+
+Adding a base whose disjoint base is a common ancestor of two conflicting disjoint bases does not resolve the conflict. Here, `Plain` contributes the disjoint base `object`, which is an ancestor of both `int` and `str`:
+
+```py
+class Plain: ...
+class A(Plain, int, str): ...  # error: [instance-layout-conflict]
+class B(int, str, Plain): ...  # error: [instance-layout-conflict]
+```
+
+The same applies when the common ancestor is listed explicitly:
+
+```py
+class Base:
+    __slots__ = ("base",)
+
+class Left(Base):
+    __slots__ = ("left",)
+
+class Right(Base):
+    __slots__ = ("right",)
+
+class C(Left, Right, Base): ...  # error: [instance-layout-conflict]
+```
+
 ## Slot names declared in a list
 
 A list of slot names restricts the instance layout just like a tuple.
