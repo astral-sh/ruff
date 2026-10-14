@@ -14,7 +14,7 @@ use crate::{
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
-        generics::ApplySpecialization,
+        generics::{ApplySpecialization, SubstitutionScope},
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -999,9 +999,15 @@ impl<'db> CallableType<'db> {
             };
             let signatures = self.signatures(db).apply_type_mapping_impl(
                 db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(
-                    replacements.clone(),
-                )),
+                &TypeMapping::ApplySpecialization(
+                    ApplySpecialization::new(
+                        db,
+                        replacements
+                            .iter()
+                            .map(|(original, renamed)| (*original, Type::TypeVar(*renamed))),
+                    )
+                    .with_scope(SubstitutionScope::FreeVariables),
+                ),
                 tcx,
                 &visitor.for_new_materialization_root(),
             );

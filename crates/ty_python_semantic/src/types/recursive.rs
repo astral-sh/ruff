@@ -504,7 +504,7 @@ impl<'db> DeferredTypeMapping<'db> {
         if step.context.annotation.is_none() {
             step.context = TypeContext::default();
         }
-        let mappings = Self::append_step(db, previous, step.clone());
+        let mappings = Self::append_step(db, previous, step.clone(), visitor);
         if mappings == previous || !MappingProbe::changes(db, original, &step, visitor) {
             previous
         } else {
@@ -516,7 +516,44 @@ impl<'db> DeferredTypeMapping<'db> {
         db: &'db dyn Db,
         previous: Option<Self>,
         step: MappingStep<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Self> {
+        if let Some(previous) = previous
+            && previous.step(db).context == step.context
+            && previous.step(db).materialize_bounds == step.materialize_bounds
+            && let (
+                TypeMapping::ApplySpecialization(earlier),
+                TypeMapping::ApplySpecialization(later),
+            ) = (&previous.step(db).operation, &step.operation)
+            && let Some(composed) = earlier.then(db, later, visitor)
+        {
+            return Some(Self::new(
+                db,
+                previous.previous(db),
+                MappingStep {
+                    operation: TypeMapping::ApplySpecialization(composed),
+                    ..step
+                },
+            ));
+        }
+        if let Some(previous) = previous
+            && previous.step(db).context == step.context
+            && previous.step(db).materialize_bounds == step.materialize_bounds
+            && let TypeMapping::ApplySpecialization(substitution) = &previous.step(db).operation
+            && let TypeMapping::Promote(mode, PromotionKind::Regular) = step.operation
+            && let Some(substitution) = substitution.promote(db, mode, visitor)
+        {
+            let promoted = Self::append_step(db, previous.previous(db), step, visitor);
+            return Self::append_step(
+                db,
+                promoted,
+                MappingStep {
+                    operation: TypeMapping::ApplySpecialization(substitution),
+                    ..previous.step(db).clone()
+                },
+                visitor,
+            );
+        }
         let mut cursor = previous;
         while let Some(node) = cursor {
             let earlier = node.step(db);
@@ -533,7 +570,7 @@ impl<'db> DeferredTypeMapping<'db> {
             && previous.step(db).preserves_fixed_points_of(&step)
         {
             // Keep materialization last so its marker survives subsequent promotion.
-            let prefix = Self::append_step(db, previous.previous(db), step);
+            let prefix = Self::append_step(db, previous.previous(db), step, visitor);
             return Some(Self::new(db, prefix, previous.step(db).clone()));
         }
         Some(Self::new(db, previous, step))
@@ -791,11 +828,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Replace the deferred mapping sequence without changing the recursive body or arguments.
-    pub(super) fn with_mappings(
-        self,
-        db: &'db dyn Db,
-        mappings: Option<DeferredTypeMapping<'db>>,
-    ) -> Self {
+    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -913,7 +946,9 @@ impl<'db> RecursiveType<'db> {
             Some(arguments) => unfolded.apply_type_mapping(
                 db,
                 &env,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    db, arguments,
+                )),
                 TypeContext::default(),
             ),
             None => unfolded,

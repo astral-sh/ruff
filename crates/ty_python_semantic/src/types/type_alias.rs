@@ -423,9 +423,12 @@ fn apply_type_alias_specialization<'db>(
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
     let type_mapping = match specialization.materialization_kind(db) {
-        None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization)),
+        None => TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+            db,
+            specialization,
+        )),
         Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
-            specialization: ApplySpecialization::TypeAlias(specialization),
+            specialization: ApplySpecialization::specialization(db, specialization),
             materialization_kind,
         },
     };
@@ -650,11 +653,7 @@ impl<'db> TypeAliasType<'db> {
     }
 
     /// Replace deferred mappings while preserving the alias definition and specialization.
-    pub(super) fn with_mappings(
-        self,
-        db: &'db dyn Db,
-        mappings: Option<DeferredTypeMapping<'db>>,
-    ) -> Self {
+    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
         match self {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
@@ -724,19 +723,11 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::EagerExpansion => self.raw_value_type(db).expand_eagerly(db, visitor.env),
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
-            TypeMapping::ApplySpecialization(specialization)
-                if self.mappings(db).is_none()
-                    && let Some(current_specialization) = specialization.as_specialization(db) =>
-            {
+            TypeMapping::ApplySpecialization(_) if self.mappings(db).is_none() => {
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                        .apply_specialization_impl(
-                            db,
-                            current_specialization,
-                            specialization.specialize_self_domain(),
-                            visitor,
-                        )
+                        .apply_type_mapping_impl(db, type_mapping, &[], visitor)
                 }))
             }
             _ => {

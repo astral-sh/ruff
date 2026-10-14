@@ -40,9 +40,10 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    KnownInstanceType, MaterializationKind, PromotionKind, PromotionMode, RecursiveType,
+    SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -983,18 +984,19 @@ impl<'db> GenericContext<'db> {
                     continue;
                 }
 
-                let specialization = ApplySpecialization::Partial {
-                    generic_context: self,
-                    types: Arc::from(types.as_ref()),
-                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                    // check if the result is self-referential after we're done applying the
-                    // partial specialization. But when we apply a paramspec, we don't use the
-                    // callable that it maps to directly; we create a new callable that reuses
-                    // parts of it. That means we can't look for the previous type directly.
-                    // Instead we use this to skip specializing the type in itself in the first
-                    // place.
-                    skip: Some(i),
-                };
+                // Break self references explicitly; the discarded slot is not part of the
+                // substitution's identity or retained state.
+                let specialization = ApplySpecialization::new(
+                    db,
+                    variables
+                        .iter()
+                        .copied()
+                        .zip(types.iter().copied())
+                        .enumerate()
+                        .map(|(index, (variable, ty))| {
+                            (variable, if index == i { Type::Never } else { ty })
+                        }),
+                );
                 let updated = types[i].apply_type_mapping(
                     db,
                     &env,
@@ -1049,11 +1051,8 @@ impl<'db> GenericContext<'db> {
                 // Typevars are only allowed to refer to earlier typevars in their defaults.
                 // This is statically enforced for PEP 695 contexts, and explicitly required
                 // for legacy contexts.
-                let specialization = ApplySpecialization::Partial {
-                    generic_context: self,
-                    types: Arc::from(expanded.as_slice()),
-                    skip: None,
-                };
+                let specialization =
+                    ApplySpecialization::new(db, self.variables(db).zip(expanded.iter().copied()));
                 default.apply_type_mapping(
                     db,
                     &env,
@@ -1332,7 +1331,7 @@ impl<'db> Specialization<'db> {
     }
 
     /// Compose specializations while preserving the enclosing transformation's recursion guard.
-    pub(super) fn apply_specialization_impl(
+    fn apply_specialization_impl(
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
@@ -1341,10 +1340,15 @@ impl<'db> Specialization<'db> {
     ) -> Self {
         let specialized = self.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
-                specialization: other,
-                specialize_self_domain,
-            }),
+            &TypeMapping::ApplySpecialization(
+                ApplySpecialization::specialization(db, other).with_scope(
+                    if specialize_self_domain {
+                        SubstitutionScope::OwnerProjection
+                    } else {
+                        SubstitutionScope::Instantiation
+                    },
+                ),
+            ),
             &[],
             visitor,
         );
@@ -2208,164 +2212,232 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     }
 }
 
-/// A mapping between type variables and types.
+/// A simultaneous substitution of type variables, with absent entries acting as identity.
+/// Replacement types are not recursively substituted by the same substitution.
 ///
-/// You will usually use [`Specialization`] instead of this type. This type is used when we need to
-/// substitute types for type variables before we have fully constructed a [`Specialization`].
+/// Positive and negative occurrences have separate images so promotion can be composed with
+/// substitution. Entries also record instantiated binders: `T := U` followed by `U := T`
+/// restores the type, but does not restore a generic parameter already instantiated.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub enum ApplySpecialization<'db> {
-    Specialization {
-        specialization: Specialization<'db>,
-        /// Whether to substitute free owner variables in the declared domain of a retained
-        /// synthetic `Self`.
-        ///
-        /// This is only set when projecting a member from its enclosing generic owner. Ordinary
-        /// specialization preserves that domain as fixed evidence.
-        specialize_self_domain: bool,
-    },
-    TypeAlias(Specialization<'db>),
-    Partial {
-        generic_context: GenericContext<'db>,
-        types: Arc<[Type<'db>]>,
-        /// An optional typevar to _not_ substitute when applying the specialization. We use this to
-        /// avoid recursively substituting a type inside of itself.
-        skip: Option<usize>,
-    },
-    ReturnCallables(Arc<FxOrderMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>>),
-    /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
-    /// substitute a typevar nested inside another constraint's bound.
-    Single(BoundTypeVarInstance<'db>, Type<'db>),
-    /// Overrides the given type variables in an existing specialization mapping.
-    WithBindings {
-        specialization: Arc<ApplySpecialization<'db>>,
-        bindings: Arc<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
-    },
+pub struct ApplySpecialization<'db> {
+    bindings: Arc<FxOrderMap<BoundTypeVarIdentity<'db>, (Type<'db>, bool)>>,
+    flipped_bindings: Arc<FxOrderMap<BoundTypeVarIdentity<'db>, (Type<'db>, bool)>>,
+    scope: SubstitutionScope,
+}
+
+/// Which declarations are exposed to a substitution.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum SubstitutionScope {
+    /// Instantiate matching generic parameters, including those declared by signatures.
+    Instantiation,
+    /// Substitute free variables, respecting nested function and callable binders.
+    FreeVariables,
+    /// Project a member, also specializing the declared domain of synthetic Self variables.
+    OwnerProjection,
 }
 
 impl<'db> ApplySpecialization<'db> {
-    pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
-        Self::Specialization {
-            specialization,
-            specialize_self_domain: false,
+    /// Construct a substitution, discarding identity entries and unrelated inference state.
+    pub(super) fn new(
+        db: &'db dyn Db,
+        bindings: impl IntoIterator<Item = (BoundTypeVarInstance<'db>, Type<'db>)>,
+    ) -> Self {
+        let mut replacements = FxOrderMap::default();
+        for (variable, ty) in bindings {
+            let identity = variable.identity(db);
+            if ty == Type::TypeVar(variable) {
+                replacements.remove(&identity);
+            } else {
+                let removes = !matches!(ty, Type::TypeVar(other) if other.identity(db) == identity);
+                replacements.insert(identity, (ty, removes));
+            }
         }
+        replacements.shrink_to_fit();
+        let bindings = Arc::new(replacements);
+        Self {
+            flipped_bindings: Arc::clone(&bindings),
+            bindings,
+            scope: SubstitutionScope::Instantiation,
+        }
+    }
+
+    pub(crate) fn specialization(db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        Self::new(
+            db,
+            specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db).iter().copied()),
+        )
+    }
+
+    pub(super) fn with_scope(mut self, scope: SubstitutionScope) -> Self {
+        self.scope = scope;
+        self
     }
 
     pub(crate) fn specialize_self_domain(&self) -> bool {
-        match self {
-            Self::Specialization {
-                specialize_self_domain,
-                ..
-            } => *specialize_self_domain,
-            Self::WithBindings { specialization, .. } => specialization.specialize_self_domain(),
-            _ => false,
-        }
+        self.scope == SubstitutionScope::OwnerProjection
     }
 
-    /// Returns `true` if this mapping should leave unevaluated function signatures unchanged.
-    pub(super) fn preserves_lazy_signatures(&self) -> bool {
-        match self {
-            Self::ReturnCallables(_) | Self::TypeAlias(_) => true,
-            Self::WithBindings { specialization, .. } => specialization.preserves_lazy_signatures(),
-            _ => false,
+    /// Exclude variables bound by a nested declaration from a free substitution.
+    pub(super) fn excluding(
+        &self,
+        variables: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        let mut result = self.clone();
+        if self.scope == SubstitutionScope::FreeVariables {
+            for variable in variables {
+                if result.bindings.contains_key(&variable) {
+                    Arc::make_mut(&mut result.bindings).remove(&variable);
+                    Arc::make_mut(&mut result.flipped_bindings).remove(&variable);
+                }
+            }
         }
+        result
     }
 
-    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
-    /// mapping.
+    pub(super) fn domain(&self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + '_ {
+        self.bindings.keys().copied()
+    }
+
     pub(crate) fn get(
         &self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
+        variable: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
-        match self {
-            ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization) => {
-                specialization.get(db, bound_typevar)
+        self.bindings.get(&variable.identity(db)).map(|(ty, _)| *ty)
+    }
+
+    /// Whether this substitution instantiates a signature's generic parameter.
+    pub(super) fn removes(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) -> bool {
+        self.bindings
+            .get(&variable.identity(db))
+            .is_some_and(|(_, removes)| *removes)
+    }
+
+    /// An empty substitution is the identity, including on unevaluated signatures.
+    pub(super) fn is_identity(&self) -> bool {
+        self.bindings.is_empty()
+    }
+
+    /// Compose simultaneous substitutions: `(later ∘ self)(T) = later(self(T))`.
+    /// Instantiated binders remain instantiated even if their replacement returns to `T`.
+    pub(super) fn then(
+        &self,
+        db: &'db dyn Db,
+        later: &Self,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        // Owner projection also rewrites declarations of synthetic Self variables.
+        if self.scope != SubstitutionScope::Instantiation
+            || later.scope != SubstitutionScope::Instantiation
+        {
+            return None;
+        }
+        let mapping = TypeMapping::ApplySpecialization(later.clone());
+        let mut result = self.map_images(db, &mapping, visitor);
+        for (target, additions) in [
+            (&mut result.bindings, &later.bindings),
+            (&mut result.flipped_bindings, &later.flipped_bindings),
+        ] {
+            let bindings = Arc::make_mut(target);
+            for (variable, (ty, removes)) in additions.iter() {
+                bindings
+                    .entry(*variable)
+                    .and_modify(|(_, earlier_removes)| *earlier_removes |= removes)
+                    .or_insert((*ty, *removes));
             }
-            ApplySpecialization::Partial {
-                generic_context,
-                types,
-                skip,
-            } => {
-                let index = generic_context
-                    .variables_inner(db)
-                    .get_index_of(&bound_typevar.identity(db))?;
-                if skip.is_some_and(|skip| skip == index) {
-                    return Some(Type::Never);
-                }
-                types.get(index).copied()
-            }
-            ApplySpecialization::ReturnCallables(replacements) => {
-                replacements.get(&bound_typevar).copied().map(Type::TypeVar)
-            }
-            ApplySpecialization::Single(typevar, ty) => {
-                if bound_typevar.is_same_typevar_as(db, *typevar) {
-                    Some(*ty)
-                } else {
-                    None
-                }
-            }
-            ApplySpecialization::WithBindings {
-                specialization,
-                bindings,
-            } => bindings
-                .iter()
-                .find(|(typevar, _)| bound_typevar.is_same_typevar_as(db, *typevar))
-                .map(|(_, ty)| *ty)
-                .or_else(|| specialization.get(db, bound_typevar)),
+            bindings.shrink_to_fit();
+        }
+        Some(result)
+    }
+
+    /// Exchange the images used in covariant and contravariant positions.
+    pub(super) fn flip(&self) -> Self {
+        Self {
+            bindings: Arc::clone(&self.flipped_bindings),
+            flipped_bindings: Arc::clone(&self.bindings),
+            scope: self.scope,
         }
     }
 
-    /// Convert this specialization mapping to a concrete specialization over its own generic
-    /// context, preserving skipped type variables in partial specializations as identity mappings.
-    pub(crate) fn as_specialization(&self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        match self {
-            ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization) => Some(*specialization),
-            ApplySpecialization::Partial {
-                generic_context,
-                types,
-                skip,
-            } => Some(
-                generic_context.specialize(
-                    db,
-                    generic_context
-                        .variables(db)
-                        .enumerate()
-                        .map(|(index, bound_typevar)| {
-                            if skip.is_some_and(|skip| skip == index) {
-                                Type::TypeVar(bound_typevar)
-                            } else {
-                                types
-                                    .get(index)
-                                    .copied()
-                                    .unwrap_or(Type::TypeVar(bound_typevar))
-                            }
-                        })
-                        .collect::<Vec<_>>(),
-                ),
-            ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
-            ApplySpecialization::WithBindings {
-                specialization,
-                bindings,
-            } => {
-                let specialization = specialization.as_specialization(db)?;
-                let types = specialization.map_types(db, |_, variable, original| {
-                    bindings
-                        .iter()
-                        .find(|(typevar, _)| variable.is_same_typevar_as(db, *typevar))
-                        .map_or(original, |(_, ty)| *ty)
-                });
-                Some(Specialization::new(
-                    db,
-                    specialization.generic_context(db),
-                    types,
-                    specialization.materialization_kind(db),
-                    specialization.tuple_inner(db),
-                ))
-            }
+    /// Move regular promotion before a substitution, promoting each replacement at its polarity.
+    pub(super) fn promote(
+        &self,
+        db: &'db dyn Db,
+        mode: PromotionMode,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        if self.scope != SubstitutionScope::Instantiation {
+            return None;
         }
+        Some(self.map_images(
+            db,
+            &TypeMapping::Promote(mode, PromotionKind::Regular),
+            visitor,
+        ))
+    }
+
+    fn map_images(
+        &self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let visitor = visitor.for_new_materialization_root();
+        let flipped = mapping.flip();
+        let transform = |bindings: &FxOrderMap<BoundTypeVarIdentity<'db>, (Type<'db>, bool)>,
+                         mapping: &TypeMapping<'db>| {
+            let mut result: FxOrderMap<_, _> = bindings
+                .iter()
+                .map(|(variable, (ty, removes))| {
+                    (
+                        *variable,
+                        (
+                            ty.apply_type_mapping_impl(
+                                db,
+                                mapping,
+                                TypeContext::default(),
+                                &visitor,
+                            ),
+                            *removes,
+                        ),
+                    )
+                })
+                .collect();
+            result.shrink_to_fit();
+            Arc::new(result)
+        };
+        Self {
+            bindings: transform(&self.bindings, mapping),
+            flipped_bindings: transform(&self.flipped_bindings, &flipped),
+            scope: self.scope,
+        }
+    }
+
+    /// Override entries without retaining the construction history of the substitution.
+    pub(super) fn with_bindings(
+        &self,
+        db: &'db dyn Db,
+        bindings: &[(BoundTypeVarInstance<'db>, Type<'db>)],
+    ) -> Self {
+        let mut result = self.clone();
+        for target in [&mut result.bindings, &mut result.flipped_bindings] {
+            let replacements = Arc::make_mut(target);
+            for (variable, ty) in bindings {
+                let identity = variable.identity(db);
+                if *ty == Type::TypeVar(*variable) {
+                    replacements.remove(&identity);
+                } else {
+                    let removes =
+                        !matches!(ty, Type::TypeVar(other) if other.identity(db) == identity);
+                    replacements.insert(identity, (*ty, removes));
+                }
+            }
+            replacements.shrink_to_fit();
+        }
+        result
     }
 }
 
@@ -2380,9 +2452,9 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(
             db,
             env,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
-                bound_typevar,
-                replacement,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::new(
+                db,
+                [(bound_typevar, replacement)],
             )),
             TypeContext::default(),
         )

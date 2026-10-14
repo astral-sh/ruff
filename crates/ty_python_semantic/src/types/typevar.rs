@@ -8,6 +8,8 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
+use super::generics::SubstitutionScope;
+
 use crate::{
     Db, FxOrderMap, TypeQualifiers,
     place::{
@@ -17,9 +19,9 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         tuple::Tuple,
@@ -1258,11 +1260,14 @@ impl<'db> BoundTypeVarInstance<'db> {
     fn apply_specialization_to_bound_or_constraints(
         self,
         db: &'db dyn Db,
-        specialization: Specialization<'db>,
+        specialization: &ApplySpecialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
-        let mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let mapping = TypeMapping::ApplySpecialization(
+            specialization
+                .clone()
+                .with_scope(SubstitutionScope::Instantiation),
+        );
         let visitor = ApplyTypeMappingVisitor::new(env);
         self.apply_type_mapping_to_bound_or_constraints(db, &mapping, &visitor)
     }
@@ -1365,10 +1370,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             };
 
         let possibly_apply_to_self = |specialization: &ApplySpecialization<'db>| {
-            if self.typevar(db).is_self(db)
-                && specialization.specialize_self_domain()
-                && let Some(specialization) = specialization.as_specialization(db)
-            {
+            if self.typevar(db).is_self(db) && specialization.specialize_self_domain() {
                 Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
                     db,
                     specialization,
