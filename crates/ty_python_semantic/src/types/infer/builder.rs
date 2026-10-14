@@ -3152,6 +3152,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
+            Type::TypeVar(typevar) => {
+                // Other possible receivers can expose the same name through a descriptor or
+                // dynamic type. Check each receiver using its own deletion contract.
+                match typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        self.validate_attribute_deletion(target, bound, attribute, emit_diagnostics)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        constraints.elements(db).iter().all(|element_ty| {
+                            self.validate_attribute_deletion(
+                                target,
+                                *element_ty,
+                                attribute,
+                                emit_diagnostics,
+                            )
+                        })
+                    }
+                }
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
@@ -3169,7 +3189,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
@@ -5758,10 +5777,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        match object
-            .member_lookup_with_policy(db, env, name, lookup_policy)
-            .place
-        {
+        let member = object.member_lookup_with_policy(db, env, name, lookup_policy);
+        self.infer_and_try_call_dunder_member(
+            member,
+            ast_arguments,
+            argument_types,
+            infer_argument_ty,
+            call_expression_tcx,
+        )
+    }
+
+    fn infer_and_try_call_dunder_member(
+        &mut self,
+        member: PlaceAndQualifiers<'db>,
+        ast_arguments: ArgumentsIter<'_>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
+        call_expression_tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        match member.place {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
