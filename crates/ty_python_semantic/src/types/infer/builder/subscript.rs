@@ -2177,15 +2177,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         object_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) {
-        self.validate_subscript_deletion_impl(target, None, object_ty, slice_ty);
+        self.validate_subscript_deletion_impl(target, None, object_ty, slice_ty, None);
     }
 
+    /// `dunder_receiver`, if given, is what `__delitem__` binds `self`/`Self` to in place of
+    /// `object_ty` -- set when recursing into one positive element of an intersection, so the
+    /// element that defines `__delitem__` still binds to the full intersection, the same as an
+    /// explicit `obj.__delitem__(...)` call would. Union decomposition leaves it untouched: each
+    /// union member is independently either a valid receiver or not, and should bind to itself.
     fn validate_subscript_deletion_impl(
         &self,
         target: &'ast ast::ExprSubscript,
         full_object_ty: Option<Type<'db>>,
         object_ty: Type<'db>,
         slice_ty: Type<'db>,
+        dunder_receiver: Option<Type<'db>>,
     ) {
         let env = self.program_environment();
         let db = self.db();
@@ -2207,6 +2213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
                         slice_ty,
+                        dunder_receiver,
                     );
                 }
             }
@@ -2216,7 +2223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let positive = intersection.positive(db);
                 let mut any_valid = false;
                 for element_ty in positive {
-                    if self.can_delete_subscript(*element_ty, slice_ty) {
+                    if self.can_delete_subscript(*element_ty, slice_ty, Some(object_ty)) {
                         any_valid = true;
                         break;
                     }
@@ -2229,6 +2236,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         full_object_ty.or(Some(object_ty)),
                         *element_ty,
                         slice_ty,
+                        dunder_receiver.or(Some(object_ty)),
                     );
                 }
             }
@@ -2238,6 +2246,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 full_object_ty,
                 complement.remaining_literal_union(db, env),
                 slice_ty,
+                dunder_receiver,
             ),
 
             _ => {
@@ -2260,12 +2269,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                let Err(err) = object_ty.try_call_dunder(
+                let Err(err) = object_ty.try_call_dunder_with_receiver(
                     db,
                     env,
                     "__delitem__",
-                    CallArguments::positional([slice_ty]),
+                    &mut CallArguments::positional([slice_ty]),
                     TypeContext::default(),
+                    dunder_receiver,
                 ) else {
                     return;
                 };
@@ -2401,16 +2411,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Check if a type supports subscript deletion (has `__delitem__`).
-    fn can_delete_subscript(&self, object_ty: Type<'db>, slice_ty: Type<'db>) -> bool {
+    /// Check if a type supports subscript deletion (has `__delitem__`). `dunder_receiver`, if
+    /// given, is what `__delitem__` binds `self`/`Self` to in place of `object_ty`, matching
+    /// `validate_subscript_deletion_impl`'s own override.
+    fn can_delete_subscript(
+        &self,
+        object_ty: Type<'db>,
+        slice_ty: Type<'db>,
+        dunder_receiver: Option<Type<'db>>,
+    ) -> bool {
         let db = self.db();
         object_ty
-            .try_call_dunder(
+            .try_call_dunder_with_receiver(
                 db,
                 self.program_environment(),
                 "__delitem__",
-                CallArguments::positional([slice_ty]),
+                &mut CallArguments::positional([slice_ty]),
                 TypeContext::default(),
+                dunder_receiver,
             )
             .is_ok()
     }

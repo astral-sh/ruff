@@ -8180,6 +8180,37 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Same as `try_call_dunder`, but allows overriding what a bound method or `Self` return
+    /// type binds to in place of `self`. Used when `self` is one positive element of an
+    /// intersection whose caller wants the dunder bound to the full intersection, not just the
+    /// element that defines it (mirroring what `IntersectionType::try_call_dunder_with_policy`
+    /// already does for the implicit, non-decomposed case).
+    fn try_call_dunder_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        receiver: Option<Type<'db>>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Implicit calls to dunder methods never access instance members, so we pass
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies.
+        Self::try_call_dunder_member_impl(
+            db,
+            env,
+            self.member_lookup_with_policy_and_receiver(
+                db,
+                env,
+                name,
+                MemberLookupPolicy::default() | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                receiver,
+            ),
+            argument_types,
+            tcx,
+        )
+    }
+
     /// Attempt to call a dunder method defined on a class itself.
     ///
     /// This is used for methods like `__class_getitem__` which are implicitly called

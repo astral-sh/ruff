@@ -462,6 +462,38 @@ def union_mismatched(c: C | (D & Other)):
     c[0] = 1  # error: [invalid-assignment]
 ```
 
+### Subscript deletion
+
+The same full-receiver requirement applies to `__delitem__` for `del c[0]`.
+
+```py
+class Other: ...
+
+class C:
+    def __delitem__(self: "C & Other", key: int) -> None: ...
+
+def _(c: C & Other):
+    c.__delitem__(0)  # no diagnostic
+    del c[0]  # no diagnostic
+
+def mismatched(c: C):
+    del c[0]  # error: [invalid-argument-type]
+```
+
+Each member of a union retains its own intersection receiver, so a union is only a valid target as a
+whole if every member is individually valid.
+
+```py
+class D:
+    def __delitem__(self: "D & Other", key: int) -> None: ...
+
+def union(c: (C & Other) | (D & Other)):
+    del c[0]  # no diagnostic
+
+def union_mismatched(c: C | (D & Other)):
+    del c[0]  # error: [invalid-argument-type]
+```
+
 ### Context managers
 
 ```py
