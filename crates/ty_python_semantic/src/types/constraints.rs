@@ -106,7 +106,6 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarNonce, TypeVarSet,
@@ -129,13 +128,6 @@ mod sequents;
 mod solutions;
 mod support;
 mod variables;
-
-// Validating a declared protocol bound can compare generic methods and construct another
-// existential for the same relation, with fresh locals. Retain those nested nodes and let the
-// relation checker's recursion guards handle the checks during ordinary solution extraction.
-std::thread_local! {
-    static EVALUATING_CLOSED_BODY: ActiveRecursionDetector<()> = ActiveRecursionDetector::default();
-}
 
 use owned::OwnedConstraintSetBuilder;
 use paths::PathAssignments;
@@ -846,13 +838,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut storage = builder.storage.borrow_mut();
         let to_remove_support = Support::from_typevar_set(db, &mut storage, to_remove);
         drop(storage);
-        let satisfied = EVALUATING_CLOSED_BODY.with(|active| {
-            active.visit(
-                &(),
-                || None,
-                || self.evaluate_closed(db, env, to_remove, &to_remove_support),
-            )
-        });
+        let satisfied = self.evaluate_closed(db, env, to_remove, &to_remove_support);
         if let Some(satisfied) = satisfied {
             return Self::from_bool(builder, satisfied);
         }
