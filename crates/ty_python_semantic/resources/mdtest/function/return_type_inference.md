@@ -555,9 +555,8 @@ class GrandChild(Child):
 reveal_type(GrandChild().method())  # revealed: int | None
 ```
 
-The inherited return annotation takes precedence over the inferred body return type. If a subclass
-method returns an incompatible value, we report an error on the `return` statement and retain the
-inherited return type for callers:
+The inherited return annotation takes precedence over the inferred body return type, even if a
+subclass method returns an incompatible value:
 
 ```py
 class IncompatibleChild(Parent):
@@ -565,8 +564,7 @@ class IncompatibleChild(Parent):
         # TODO: This should be an invalid-return-type error.
         return "a"
 
-# TODO: Should be `int | None`
-reveal_type(IncompatibleChild().method())  # revealed: Literal["a"] | int | None
+reveal_type(IncompatibleChild().method())  # revealed: int | None
 ```
 
 ### Methods that return `None` or `Never`
@@ -924,8 +922,8 @@ C.method(instance)  # also no diagnostic
 
 ### `NotImplemented`
 
-A dunder method that returns `NotImplemented` is not treated in a special way by return type
-inference:
+An unannotated `__eq__` method inherits the `bool` return annotation from `object.__eq__`, so
+returning `NotImplemented` does not affect the inferred return type, which remains `bool`:
 
 ```py
 class C:
@@ -937,16 +935,13 @@ class C:
             return NotImplemented
         return self.x == other.x
 
-reveal_type(C.__eq__(C(1), C(2)))  # revealed: NotImplementedType | Unknown | bool
+reveal_type(C.__eq__(C(1), C(2)))  # revealed: bool
 ```
 
-However, when called implicitly through the `==` operator, a return value of `NotImplemented` is
-handled in a special way (the reverse `type(rhs).__eq__(rhs, lhs)` call is tried, and then it falls
-back to `lhs is rhs`). Therefore, the final result for the following comparisons should always be a
-`bool`:
+Consequently, the following two comparisons, which implicitly call `C.__eq__`, also have a `bool`
+result:
 
 ```py
-# TODO: These should ideally be `bool` or `bool | Unknown`
-reveal_type(C(1) == C(2))  # revealed: NotImplementedType | Unknown | bool
-reveal_type(C(1) == "something else")  # revealed: NotImplementedType | Unknown | bool
+reveal_type(C(1) == C(2))  # revealed: bool
+reveal_type(C(1) == "something else")  # revealed: bool
 ```

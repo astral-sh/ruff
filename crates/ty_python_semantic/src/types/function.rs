@@ -1705,13 +1705,9 @@ impl<'db> FunctionType<'db> {
         {
             // A base annotation already describes the values that further overrides may return.
             // Without that contract, leave room for subclasses by including Unknown.
-            inferred = UnionType::from_two_elements(
-                db,
-                &env,
-                inferred,
-                self.inherited_return_annotation(db)
-                    .unwrap_or_else(Type::unknown),
-            );
+            inferred = self.inherited_return_annotation(db).unwrap_or_else(|| {
+                UnionType::from_two_elements(db, &env, inferred, Type::unknown())
+            });
         }
         if let Some(class) = class
             && let Some(receiver) = self
