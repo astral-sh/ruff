@@ -371,6 +371,12 @@ impl<'db> OverloadLiteral<'db> {
             || is_implicit_classmethod(self.name(db))
     }
 
+    /// Constructor methods are exempt from return type inference; see `return_type_inference.md`.
+    fn is_exempt_from_return_type_inference(self, db: &'db dyn Db) -> bool {
+        matches!(self.name(db).as_str(), "__new__" | "__init__")
+            && self.body_scope(db).is_method_scope(db)
+    }
+
     /// Returns true if this overload has an implicit `self` or `cls` receiver parameter.
     pub(crate) fn has_implicit_receiver(self, db: &'db dyn Db) -> bool {
         self.body_scope(db).is_method_scope(db) && !self.is_staticmethod(db)
@@ -710,7 +716,7 @@ impl<'db> OverloadLiteral<'db> {
                     .analysis_settings(self.file(db))
                     .return_type_inference
                     .is_active()
-                && !is_exempt_from_return_type_inference(self.name(db));
+                && !self.is_exempt_from_return_type_inference(db);
 
             if method_has_explicit_self
                 || class_is_generic
@@ -1739,8 +1745,6 @@ impl<'db> FunctionType<'db> {
             // An (invalid) function with a single `@overload` could still fall through the filter above.
             // We should not replace the `@overload`'s return type with the inferred type from the implementation.
             || !self.overloads_and_implementation(db).0.is_empty()
-            // Some functions are explicitly exempt from return type inference
-            || is_exempt_from_return_type_inference(self.name(db))
         {
             return Cow::Borrowed(signature);
         }
@@ -1789,6 +1793,13 @@ impl<'db> FunctionType<'db> {
             // For free functions, we simply use the type inferred from the function body.
             return infer_complete_scope_types(db, scope).return_type();
         };
+        if self
+            .literal(db)
+            .last_definition
+            .is_exempt_from_return_type_inference(db)
+        {
+            return Type::unknown();
+        }
         let class = original_class_type(db, class_definition);
 
         // Protocol methods follow the same logic as abstract methods (see reasoning above).
@@ -2098,12 +2109,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
         self.check_callable_signature_pair(db, source.signature(db), target.signature(db))
     }
-}
-
-// Determines if a function is exempt from return type inference based on its name.
-fn is_exempt_from_return_type_inference(name: &ast::name::Name) -> bool {
-    // See explanation in `return_type_inference.md`
-    matches!(name.as_str(), "__new__" | "__init__")
 }
 
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
