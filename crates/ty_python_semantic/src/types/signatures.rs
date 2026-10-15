@@ -143,7 +143,7 @@ fn merge_receiver_constraints<'db>(
                 relations: first
                     .relations
                     .iter()
-                    .chain(second.relations.iter())
+                    .chain(&second.relations)
                     .copied()
                     .unique()
                     .collect(),
