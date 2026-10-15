@@ -1,7 +1,7 @@
 use crate::types::recursive::TypeInspector;
 use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::{
-    Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
+    Db, DisplaySettings, FxIndexMap, ProgramEnvironment, TypeOperations,
     reachability::is_end_of_scope_reachable,
     types::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
@@ -159,11 +159,7 @@ impl<'db> ExpectedReturnType<'db> {
     /// Creates the expected return type policy for `function`.
     fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
-        fn normalize<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-        ) -> Type<'db> {
+        fn normalize<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Type<'db> {
             if ty.has_outer_type(db, |ty| matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_))) {
                 KnownClass::Bool.to_instance(db, env)
             } else {
@@ -171,7 +167,8 @@ impl<'db> ExpectedReturnType<'db> {
             }
         }
 
-        let env = ProgramEnvironment::from_file(function.program_file(db));
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_file(function.program_file(db)));
         let public = normalize(
             db,
             &env,
@@ -198,7 +195,7 @@ impl<'db> ExpectedReturnType<'db> {
     fn accepts(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         relation: TypeRelation,
     ) -> bool {
@@ -2278,7 +2275,7 @@ fn check_classinfo_in_isinstance<'db>(
 /// ```
 fn is_instance_tuple_exhaustive<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     classinfo: Type<'db>,
 ) -> bool {
@@ -2347,7 +2344,7 @@ impl<'db> TypeQuery<'db> for InstanceTupleCovers<'_, 'db> {
 /// instead.
 fn is_instance_truthiness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     class: ClassLiteral<'db>,
 ) -> Truthiness {
@@ -2378,7 +2375,7 @@ impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
     ) -> Truthiness {
         let env = traversal.environment();
         let class = self.0;
-        let is_instance = |ty: &Type<'_>| {
+        let is_instance = |ty: &Type<'db>| {
             ty.as_nominal_instance().is_some_and(|instance| {
                 instance
                     .class(db, env)
@@ -2530,7 +2527,7 @@ fn report_invalid_union_type_elements<'db>(
 ) {
     fn find_invalid_elements<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         function: KnownFunction,
         ty: Type<'db>,
         invalid_elements: &mut Vec<Type<'db>>,

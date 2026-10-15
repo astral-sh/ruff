@@ -1,7 +1,7 @@
 //! Inference for subscript expressions (e.g., `x[0]`, `list[int]`).
 
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::ApplyTypeMappingVisitor;
 use std::fmt::{self, Display};
 
@@ -390,7 +390,7 @@ impl<'db> SubscriptErrorKind<'db> {
 /// Preserve a constrained type variable when each alternative's result matches that constraint.
 fn map_subscript_alternatives<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     full_object_ty: Type<'db>,
     alternatives: impl IntoIterator<Item = Type<'db>>,
     mut map_fn: impl FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
@@ -435,7 +435,7 @@ fn map_subscript_alternatives<'db>(
 
 fn map_intersection_subscript<'db, F>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     intersection: IntersectionType<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
@@ -505,7 +505,7 @@ where
 // `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
 fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
@@ -614,7 +614,7 @@ impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {

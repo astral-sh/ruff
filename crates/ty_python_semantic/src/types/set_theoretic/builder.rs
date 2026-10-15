@@ -57,7 +57,7 @@ use crate::types::{
     NegativeIntersectionElements, StringLiteralType, SubclassOfType, Type, TypePair, TypeTraversal,
     TypeVarBoundOrConstraints, TypeWalk, UnionType,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment, TypeOperations};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -72,7 +72,7 @@ use smallvec::SmallVec;
 /// This only recognizes the "single truthiness guard" forms used by truthiness narrowing.
 fn split_truthiness_guarded_intersection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let Type::Intersection(intersection) = ty else {
@@ -121,7 +121,7 @@ fn split_truthiness_guarded_intersection<'db>(
 /// Discussion: <https://github.com/astral-sh/ty/issues/224>
 fn merge_truthiness_guarded_pair<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
@@ -153,7 +153,7 @@ fn merge_truthiness_guarded_pair<'db>(
 /// from every exclusion unique to the other side.
 fn merge_disjoint_exclusions<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
@@ -210,11 +210,11 @@ fn merge_disjoint_exclusions<'db>(
 ///
 /// Hashability does not obey normal inheritance rules: subclasses of hashable classes can be
 /// unhashable. Keeping the non-final type allows downstream checks to consider it independently.
-fn should_preserve_hashable_union(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    left: Type,
-    right: Type,
+fn should_preserve_hashable_union<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    left: Type<'db>,
+    right: Type<'db>,
 ) -> bool {
     let is_hashable =
         |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
@@ -242,7 +242,7 @@ fn should_preserve_hashable_union(
 /// ```
 fn normalize_enum_complement_unions<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     types: &mut Vec<Type<'db>>,
 ) -> bool {
     for complement_index in 0..types.len() {
@@ -405,7 +405,7 @@ impl<'db> UnionElement<'db> {
     fn try_reduce(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other_type: Type<'db>,
         cycle_recovery: bool,
     ) -> ReduceResult<'db> {
@@ -622,7 +622,7 @@ impl<'a, 'db> TypeWalk<'db, (&'a mut UnionBuilder<'db>, bool), StructuralTravers
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    env: ProgramEnvironment<'db>,
+    env: TypeOperations<'db>,
     unpack_aliases: bool,
     /// This is enabled when joining types in a `cycle_recovery` function. Because recovery cannot
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
@@ -645,7 +645,7 @@ impl<'db> UnionAccumulator<'db> {
         UnionAccumulator::One(ty)
     }
 
-    pub(crate) fn add(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+    pub(crate) fn add(&mut self, db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) {
         match self {
             UnionAccumulator::One(existing) => {
                 *self = UnionAccumulator::Two(*existing, ty);
@@ -661,11 +661,7 @@ impl<'db> UnionAccumulator<'db> {
         }
     }
 
-    pub(crate) fn get_or_build(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn get_or_build(&mut self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self {
             UnionAccumulator::One(ty) => *ty,
             UnionAccumulator::Two(first, second) => {
@@ -682,7 +678,7 @@ impl<'db> UnionAccumulator<'db> {
         }
     }
 
-    pub(crate) fn into_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn into_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self {
             UnionAccumulator::One(ty) => ty,
             UnionAccumulator::Two(first, second) => {
@@ -694,7 +690,7 @@ impl<'db> UnionAccumulator<'db> {
 }
 
 impl<'db> UnionBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         Self {
             db,
             env: env.clone(),
@@ -1510,7 +1506,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
     db: &'db dyn Db,
-    env: ProgramEnvironment<'db>,
+    env: TypeOperations<'db>,
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
@@ -1518,7 +1514,7 @@ pub(crate) struct IntersectionBuilder<'db> {
 }
 
 impl<'db> IntersectionBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         Self {
             db,
             env: env.clone(),
@@ -1611,7 +1607,7 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(super) fn bounded_from_elements<I, T>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         elements: I,
     ) -> Option<Type<'db>>
     where
@@ -1648,7 +1644,7 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     /// Whether expanding a factor can introduce alternatives, including through De Morgan's law.
-    fn is_disjunctive(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+    fn is_disjunctive(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
         TypeTraversal::with_root(env, IsDisjunctive, |root| root.visit_with(db, ty, false))
     }
 
@@ -1839,7 +1835,7 @@ enum IntersectionSimplification {
 
 fn simplify_intersection_pair<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     first: Type<'db>,
     second: Type<'db>,
     polarity: IntersectionPolarity,
@@ -1916,7 +1912,7 @@ fn simplify_intersection_pair_impl<'db>(
     types: TypePair<'db>,
     polarity: IntersectionPolarity,
 ) -> IntersectionSimplification {
-    let env = ProgramEnvironment::from_program(types.program(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
     let first = types.first(db);
     let second = types.second(db);
 
@@ -1964,12 +1960,7 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
-    fn contains_positive(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
+    fn contains_positive(&self, db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
         self.positive.contains(&ty)
             || self.positive.iter().any(|existing| {
                 TypeInspector::inspect_root(
@@ -1985,7 +1976,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn remove_positive(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> bool {
         let index = self.positive.iter().position(|existing| {
@@ -2004,7 +1995,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn remove_negative(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> bool {
         let index = self.negative.iter().position(|existing| {
@@ -2039,7 +2030,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     ///     if color is not Color.RED and color is not Color.BLUE:
     ///         reveal_type(color)  # Never
     /// ```
-    fn has_empty_enum_complement(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+    fn has_empty_enum_complement(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> bool {
         for positive in &self.positive {
             let Some(enum_class_literal) = TypeInspector::inspect_root(
                 db,
@@ -2098,7 +2089,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn add_positive(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         mut new_positive: Type<'db>,
     ) {
         // `Never & T` -> `Never`
@@ -2373,7 +2364,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn add_negative(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         new_negative: Type<'db>,
     ) {
         // `Never & ~T` -> `Never`.
@@ -2568,7 +2559,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     ///
     /// - If the intersection contains negative entries for all of the constraints, the overall
     ///   intersection is `Never`.
-    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db, env: &TypeOperations<'db>) {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
 
         for ty in &self.positive {
@@ -2624,7 +2615,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn build(mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn build(mut self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         if self.has_empty_enum_complement(db, env) {
             return Type::Never;
         }

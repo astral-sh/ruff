@@ -22,8 +22,9 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
-        function::FunctionType, infer_definition_types, may_exist_at_runtime,
+        SubclassOfInner, Type, TypeOperations, TypeVarBoundOrConstraints, UnionType,
+        class::CodeGeneratorKind, function::FunctionType, infer_definition_types,
+        may_exist_at_runtime,
     },
 };
 use ty_python_core::{
@@ -37,7 +38,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let env = ProgramEnvironment::from_scope(scope_id);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -93,7 +94,7 @@ pub(crate) fn all_reachable_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let env = ProgramEnvironment::from_scope(scope_id);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -220,7 +221,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn collect_type_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> bool {
         match ty {
@@ -535,7 +536,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_class_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
@@ -572,7 +573,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_slot_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
@@ -600,7 +601,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_metaclass_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         metaclass: Type<'db>,
     ) {
@@ -618,7 +619,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_instance_members_for_class(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
@@ -667,7 +668,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_instance_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         class_literal: StaticClassLiteral<'db>,
     ) {
@@ -684,7 +685,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
     fn extend_with_synthetic_members(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
@@ -765,7 +766,7 @@ impl<'db> Member<'db> {
         db: &'db dyn Db,
         scope: ScopeId<'db>,
     ) -> impl Iterator<Item = (FunctionType<'db>, Type<'db>)> {
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         let functions = self.local_functions(db, scope);
         let retained = self.local_functions_from_type(db, scope);
         let exposed = self.ty;
@@ -986,7 +987,7 @@ pub(super) fn extract_underlying_functions<'db>(
 /// as an attribute on an object of the given type.
 pub(crate) fn all_members<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> FxHashSet<Member<'db>> {
     TypeTraversal::with_root(env, CollectMembers { db }, |root| root.visit(db, ty))

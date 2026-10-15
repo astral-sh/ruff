@@ -2,7 +2,7 @@ use super::{Bindings, ConstructorCallableKind};
 use crate::db::Db;
 use crate::types::call::CallArguments;
 use crate::types::{
-    ClassBase, KnownClass, MemberLookupPolicy, ProgramEnvironment, PropertyInstanceType, Type,
+    ClassBase, KnownClass, MemberLookupPolicy, PropertyInstanceType, Type, TypeOperations,
     is_property_method,
 };
 use itertools::Itertools;
@@ -12,7 +12,7 @@ impl<'db> Bindings<'db> {
     pub(super) fn evaluate_property_calls(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) {
         for constructor in self.iter_constructor_items_mut() {

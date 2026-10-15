@@ -7,7 +7,7 @@
 use crate::types::recursive::TypeInspector;
 use ty_python_core::definition::Definition;
 
-use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
+use crate::{AnalysisSettings, Db, TypeOperations, place::PlaceAndQualifiers};
 
 use super::{
     ApplyTypeMappingVisitor, CallArguments, EnumLiteralType, IntersectionBuilder,
@@ -128,7 +128,7 @@ impl<'db> ComparisonResult<'db> {
 /// constrain `left`.
 pub(super) fn evaluate_type_equality<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
@@ -148,7 +148,7 @@ pub(super) fn evaluate_type_equality<'db>(
 /// Return a constraint excluding every value known to compare equal to `ty`.
 pub(super) fn equality_exclusion_constraint<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
@@ -190,7 +190,7 @@ pub(super) fn equality_exclusion_constraint<'db>(
 /// ```
 pub(super) fn evaluate_type_inequality<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
@@ -210,7 +210,7 @@ pub(super) fn evaluate_type_inequality<'db>(
 /// Return a constraint for `left` in the selected branch of an equality or inequality comparison.
 fn evaluate_type_comparison<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     is_positive: bool,
@@ -305,7 +305,7 @@ fn evaluate_type_comparison_in<'db>(
 /// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
 pub(crate) fn equality_truthiness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     soundness_policy: ComparisonSoundnessPolicy,
@@ -325,7 +325,7 @@ pub(crate) fn equality_truthiness<'db>(
 /// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
 pub(super) fn inequality_truthiness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     soundness_policy: ComparisonSoundnessPolicy,
@@ -351,7 +351,7 @@ pub(super) struct ContainerElementEqualityEvaluator<'env, 'db> {
 impl<'env, 'db> ContainerElementEqualityEvaluator<'env, 'db> {
     pub(super) fn new(
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
@@ -394,7 +394,7 @@ impl<'env, 'db> ContainerElementEqualityEvaluator<'env, 'db> {
 
 fn comparison_truthiness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -462,7 +462,7 @@ impl ComparisonSoundnessPolicy {
 /// Tracks comparisons that are already in progress so recursive evaluation terminates.
 struct ComparisonEvaluator<'env, 'db> {
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     active: CycleDetector<
         'db,
         (),
@@ -478,7 +478,7 @@ struct ComparisonEvaluator<'env, 'db> {
 impl<'env, 'db> ComparisonEvaluator<'env, 'db> {
     fn new(
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
@@ -493,7 +493,7 @@ impl<'env, 'db> ComparisonEvaluator<'env, 'db> {
 
     fn for_truthiness(
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
@@ -875,11 +875,7 @@ fn all_values_compare_equal<'db>(
 ///
 /// This includes `int`, `bool`, `str`, and `bytes` literals, along with `bool` itself because its
 /// only possible values are `Literal[True]` and `Literal[False]`.
-fn is_builtin_literal_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> bool {
+fn is_builtin_literal_type<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
     TypeInspector::inspect_root(
         db,
         env,
@@ -921,7 +917,7 @@ fn is_builtin_literal_type<'db>(
 /// both `Literal[0]` and `Literal[False]`, while `x != 1` excludes `Literal[1]` and `Literal[True]`.
 fn builtin_literal_constraint<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -974,7 +970,7 @@ fn builtin_literal_constraint<'db>(
 /// Return the builtin literal values that compare equal to `literal_type`.
 fn builtin_literals_equal_to<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     literal_type: Type<'db>,
     literal: LiteralValueTypeKind<'db>,
 ) -> Option<Type<'db>> {
@@ -1000,7 +996,7 @@ fn builtin_literals_equal_to<'db>(
 /// Add finite enum members in `ty` that are known to compare equal to `right`.
 fn add_equal_enum_literals<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     right: LiteralValueTypeKind<'db>,
     operator: ComparisonOperator,
@@ -1078,7 +1074,7 @@ fn add_equal_enum_literals_in<'db>(
 /// because those methods can change whether two members compare equal.
 fn enum_literal_constraint<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -1122,7 +1118,7 @@ fn enum_literal_constraint<'db>(
 /// Return whether every possible value of `ty` belongs to the same enum as `right`.
 pub(super) fn is_same_enum_domain<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
@@ -1136,7 +1132,7 @@ pub(super) fn is_same_enum_domain<'db>(
 
     fn visit<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         right: EnumLiteralType<'db>,
         visitor: &EnumDomainVisitor<'db>,
@@ -1211,7 +1207,7 @@ fn evaluate_union_left<'db>(
 /// negative constraints for removed arms so that the result still describes the branch predicate.
 fn evaluate_target_union<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     elements: &[Type<'db>],
     branch: ComparisonBranch,
     mut evaluate: impl FnMut(Type<'db>) -> ComparisonResult<'db>,
@@ -1354,7 +1350,7 @@ fn combine_definite_truthiness<'db>(
 /// truthiness is reported only when every alternative agrees.
 fn evaluate_against_results<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     target: Type<'db>,
     branch: ComparisonBranch,
     results: impl IntoIterator<Item = ComparisonResult<'db>>,
@@ -1469,7 +1465,7 @@ fn evaluate_intersection_left<'db>(
 /// may compare equal to values outside the enum domain.
 fn finite_alternatives<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> Option<Vec<Type<'db>>> {
@@ -1534,7 +1530,7 @@ fn finite_alternatives<'db>(
 /// or a string-valued enum member without having a single statically known runtime value.
 fn narrow_literal_comparison<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     left_literal: LiteralValueTypeKind<'db>,
@@ -1561,7 +1557,7 @@ fn narrow_literal_comparison<'db>(
 /// Narrow `LiteralString` against a string-valued enum member with inherited `str` semantics.
 fn narrow_literal_string_against_enum<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     enum_literal: EnumLiteralType<'db>,
     equality_is_positive: bool,
 ) -> ComparisonResult<'db> {
@@ -1591,7 +1587,7 @@ fn narrow_literal_string_against_enum<'db>(
 /// Return the builtin comparison semantics assumed by unsafe equality narrowing.
 fn unsafe_narrowable_builtin_semantics<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<KnownComparisonSemantics> {
     TypeInspector::inspect_root(
@@ -1705,7 +1701,7 @@ fn compare_literal_to_other<'db>(
 /// semantics from narrowing unrelated classes.
 fn compare_different_semantics<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
     operator: ComparisonOperator,
@@ -1885,7 +1881,7 @@ impl KnownComparisonSemantics {
     /// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
     fn of_type<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
@@ -1902,7 +1898,7 @@ impl KnownComparisonSemantics {
     /// inherited comparison method.
     fn of_type_with_policy<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         operator: ComparisonOperator,
         soundness_policy: ComparisonSoundnessPolicy,
@@ -1962,7 +1958,7 @@ impl KnownComparisonSemantics {
     /// Return the builtin comparison implementation used by a literal value.
     fn of_literal<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         literal: LiteralValueTypeKind<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
@@ -1983,7 +1979,7 @@ impl KnownComparisonSemantics {
     /// Returns `None` when lookup finds custom comparison behavior.
     fn of_instance<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         instance: Type<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
@@ -2075,7 +2071,7 @@ fn has_reflexive_equality_semantics_in<'db>(
 /// Return whether `ty` is a singleton whose comparison uses object identity semantics.
 fn has_known_identity_comparison_semantics<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
@@ -2122,7 +2118,7 @@ fn same_member_implementation(
 /// Look up a comparison method without falling back to `object`.
 fn lookup_dunder<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     name: &'static str,
 ) -> PlaceAndQualifiers<'db> {
@@ -2136,7 +2132,7 @@ fn lookup_dunder<'db>(
 /// insufficiently known to produce a definitive result.
 fn known_literal_equality<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: LiteralValueTypeKind<'db>,
     right: LiteralValueTypeKind<'db>,
     operator: ComparisonOperator,
@@ -2256,7 +2252,7 @@ fn known_literal_equality<'db>(
 /// Custom enum construction can replace the declared value, so members of such enums return `None`.
 fn enum_literal_value<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     literal: EnumLiteralType<'db>,
 ) -> Option<Type<'db>> {
     let enum_class_literal = literal.enum_class_literal(db);

@@ -570,7 +570,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     };
     let expression = ExpressionNodeKey::from(statement.value.as_ref());
     let scope = global_scope(&db, file);
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(&db, ProgramEnvironment::from_scope(scope));
     let inference = |ty, truthiness: Option<Truthiness>| {
         (
             ExpressionInference {

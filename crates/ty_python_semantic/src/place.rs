@@ -1,6 +1,6 @@
 pub(crate) mod definitions;
 
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
@@ -95,7 +95,7 @@ impl PublicTypePolicy {
     fn apply_if_needed<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         match self {
@@ -345,7 +345,7 @@ impl<'db> Place<'db> {
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         owner: Type<'db>,
     ) -> Place<'db> {
         match self {
@@ -433,7 +433,7 @@ impl<'db> LookupError<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
         let fallback = fallback.into_lookup_result(db, env);
@@ -520,7 +520,7 @@ pub(crate) fn global_symbol<'db>(
     file: ProgramFile<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let env = ProgramEnvironment::from_file(file);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
     explicit_global_symbol(db, file, name).or_fall_back_to(db, &env, || {
         module_type_implicit_global_symbol(db, file, name)
     })
@@ -534,7 +534,7 @@ pub(crate) fn global_symbol<'db>(
 /// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     file: Option<ProgramFile<'db>>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
@@ -614,7 +614,7 @@ pub(crate) fn imported_symbol<'db>(
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::All)
@@ -636,7 +636,7 @@ pub(crate) fn builtins_symbol<'db>(
 /// ```
 pub(crate) fn implicit_builtins_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly)
@@ -650,7 +650,7 @@ pub(crate) fn implicit_builtins_symbol<'db>(
 /// resolve a private typing-only helper that type inference considers undefined.
 pub(crate) fn implicit_builtins_symbol_scope<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
 ) -> Option<ScopeId<'db>> {
     builtins_symbol_impl(db, env, symbol, BuiltinVisibility::RuntimeOnly).map(|(scope, _)| scope)
@@ -668,7 +668,7 @@ enum BuiltinVisibility {
 /// share the same resolution and visibility policy.
 fn builtins_symbol_impl<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
     visibility: BuiltinVisibility,
 ) -> Option<(ScopeId<'db>, PlaceAndQualifiers<'db>)> {
@@ -720,7 +720,7 @@ fn builtins_symbol_impl<'db>(
 /// Returns `Place::Undefined` if the given known module cannot be resolved for some reason.
 pub(crate) fn known_module_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     known_module: KnownModule,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
@@ -739,7 +739,7 @@ pub(crate) fn known_module_symbol<'db>(
 #[cfg(test)]
 pub(crate) fn typing_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, env, KnownModule::Typing, symbol)
@@ -751,7 +751,7 @@ pub(crate) fn typing_symbol<'db>(
 #[inline]
 pub(crate) fn typing_extensions_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol: &str,
 ) -> PlaceAndQualifiers<'db> {
     known_module_symbol(db, env, KnownModule::TypingExtensions, symbol)
@@ -762,7 +762,7 @@ pub(crate) fn typing_extensions_symbol<'db>(
 /// Can return `None` if a custom typeshed is used that is missing `builtins.pyi`.
 pub(crate) fn builtins_module_scope<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
 ) -> Option<ScopeId<'db>> {
     core_module_scope(db, env, KnownModule::Builtins)
 }
@@ -772,7 +772,7 @@ pub(crate) fn builtins_module_scope<'db>(
 /// Can return `None` if a custom typeshed is used that is missing the core module in question.
 fn core_module_scope<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     core_module: KnownModule,
 ) -> Option<ScopeId<'db>> {
     let program = env.program(db);
@@ -789,7 +789,7 @@ fn core_module_scope<'db>(
 /// The type will be a union if there are multiple bindings with different types.
 pub(super) fn place_from_bindings<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
@@ -803,7 +803,7 @@ pub(super) fn place_from_bindings<'db>(
 
 pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceWithDefinition<'db> {
@@ -826,7 +826,7 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
 /// [`TypeQualifiers`] that have been specified on the declaration(s).
 pub(crate) fn place_from_declarations<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     declarations: DeclarationsIterator<'_, 'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
     place_from_declarations_impl(db, env, declarations, RequiresExplicitReExport::No, None)
@@ -834,7 +834,7 @@ pub(crate) fn place_from_declarations<'db>(
 
 pub(crate) fn place_from_declarations_with_reachability_cache<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     declarations: DeclarationsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
 ) -> PlaceFromDeclarationsResult<'db> {
@@ -884,7 +884,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
     pub(crate) fn with_imported_final(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         candidates: ImportedFinalCandidatesIterator<'_, 'db>,
     ) -> Self {
         self.with_imported_final_impl(
@@ -903,7 +903,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
     pub(crate) fn with_imported_final_for_assignment(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         candidates: ImportedFinalCandidatesIterator<'_, 'db>,
         reachability_cache: &ReachabilityEvaluationCache<'db>,
     ) -> Self {
@@ -922,7 +922,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
     fn with_imported_final_impl(
         mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         candidates: ImportedFinalCandidatesIterator<'_, 'db>,
         requires_explicit_reexport: RequiresExplicitReExport,
         reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
@@ -1127,7 +1127,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn into_lookup_result(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
@@ -1160,7 +1160,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn unwrap_with_diagnostic(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         self.into_lookup_result(db, env)
@@ -1181,7 +1181,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn or_fall_back_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
         self.into_lookup_result(db, env)
@@ -1192,7 +1192,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1265,7 +1265,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     returns(copy),
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         place.cycle_normalized(db, &env, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -1278,7 +1278,7 @@ pub(crate) fn place_by_id<'db>(
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
     let use_def = use_def_map(db, scope);
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
 
     // If the place is declared, the public type is based on declarations; otherwise, it's based
     // on inference from bindings.
@@ -1822,7 +1822,7 @@ pub(crate) struct ReachableLoopBinding<'db> {
 /// access any AST nodes from the file containing the declarations.
 fn place_from_bindings_impl<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
@@ -2089,7 +2089,7 @@ struct PublicTypeBuilder<'db> {
 }
 
 impl<'db> PublicTypeBuilder<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    fn new(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         PublicTypeBuilder {
             db,
             queue: None,
@@ -2172,7 +2172,7 @@ struct DeclaredTypeBuilder<'db> {
 }
 
 impl<'db> DeclaredTypeBuilder<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    fn new(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         DeclaredTypeBuilder {
             inner: PublicTypeBuilder::new(db, env),
             qualifiers: TypeQualifiers::empty(),
@@ -2184,7 +2184,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
     fn add(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         element: TypeAndQualifiers<'db>,
         reachability: Truthiness,
     ) {
@@ -2231,7 +2231,7 @@ impl<'db> DeclaredTypeBuilder<'db> {
 /// access any AST nodes from the file containing the declarations.
 fn place_from_declarations_impl<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     declarations_iterator: DeclarationsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
@@ -2379,7 +2379,7 @@ pub(crate) mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::reachability::evaluate_reachability;
     use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
-    use crate::{Program, ProgramEnvironment};
+    use crate::{Program, ProgramEnvironment, TypeOperations};
     use ruff_python_ast::PythonVersion;
     use ty_python_core::definition::{DefinitionKind, DefinitionState};
     use ty_python_core::scope::{NodeWithScopeRef, ScopeId};
@@ -2438,7 +2438,7 @@ pub(crate) mod implicit_globals {
     /// Return the body scope of the canonical `types.ModuleType` class.
     fn module_type_body_scope<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<ScopeId<'db>> {
         module_type_body_scope_inner(db, env.program(db))
     }
@@ -2448,7 +2448,7 @@ pub(crate) mod implicit_globals {
         db: &'db dyn Db,
         program: Program<'db>,
     ) -> Option<ScopeId<'db>> {
-        let env = ProgramEnvironment::from_program(program);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
         let module_scope = core_module_scope(db, &env, KnownModule::Types)?;
         try_vendored_class_scope(db, module_scope, "ModuleType").or_else(|| {
             KnownClass::ModuleType
@@ -2459,7 +2459,7 @@ pub(crate) mod implicit_globals {
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         if !module_type_symbols(db, env)
@@ -2502,7 +2502,7 @@ pub(crate) mod implicit_globals {
         file: ProgramFile<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        let env = ProgramEnvironment::from_file(file);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
         match name {
             // We special-case `__file__` here because we know that for an internal implicit global
             // lookup in a Python module, it is always a string, even though typeshed says `str |
@@ -2619,7 +2619,7 @@ pub(crate) mod implicit_globals {
 
     fn module_type_symbols<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> &'db [ast::name::Name] {
         module_type_symbols_inner(db, env.program(db))
     }
@@ -2633,7 +2633,7 @@ pub(crate) mod implicit_globals {
         db: &'db dyn Db,
         program: Program<'db>,
     ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        let env = ProgramEnvironment::from_program(program);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
         let Some(module_type_scope) = module_type_body_scope(db, &env) else {
             // The most likely way we get here is if a user specified a `--custom-typeshed-dir`
             // without a resolvable `ModuleType` class in the `stdlib/types.pyi` stub.
@@ -2657,7 +2657,7 @@ pub(crate) mod implicit_globals {
             .map(Name::new_static);
 
         // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
-        let env = ProgramEnvironment::from_file(file);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
         let module_type_syms = module_type_symbols(db, &env).iter().cloned();
 
         // Combine and map to (name, type) pairs
@@ -2701,7 +2701,7 @@ pub(crate) mod implicit_globals {
 /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>
 pub(crate) fn class_body_implicit_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     match name {

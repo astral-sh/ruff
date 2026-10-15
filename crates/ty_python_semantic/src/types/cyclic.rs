@@ -39,7 +39,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MaterializationKind, ProtocolInstanceType,
     RecursiveType, StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, TypeOperations};
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -241,7 +241,7 @@ struct SpecializationFlowGraph<'db> {
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
     source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
-    env: ProgramEnvironment<'db>,
+    env: TypeOperations<'db>,
     visited_types: TypeCollector<'db>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
@@ -252,7 +252,7 @@ struct SpecializationFlowVisitor<'db> {
 /// Finds which parameters of the current source definition occur in one actual argument.
 struct SourceParameterCollector<'a, 'db> {
     source_parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     found: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, bool>>,
     visited_types: TypeCollector<'db>,
     in_nested_type: Cell<bool>,
@@ -580,7 +580,10 @@ impl<'db> SpecializationFlowVisitor<'db> {
     fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
         Some(Self {
             source_parameters: source.source_parameters(db)?,
-            env: ProgramEnvironment::from_definition(source.definition(db)),
+            env: TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_definition(source.definition(db)),
+            ),
             visited_types: TypeCollector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
@@ -677,7 +680,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
 }
 
 impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+    fn program_environment(&self) -> &TypeOperations<'db> {
         &self.env
     }
 
@@ -727,7 +730,7 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 impl<'a, 'db> SourceParameterCollector<'a, 'db> {
     fn classify(
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         source_parameters: &'a FxHashSet<BoundTypeVarIdentity<'db>>,
         argument: Type<'db>,
     ) -> impl Iterator<Item = (BoundTypeVarIdentity<'db>, FlowKind)> {
@@ -757,7 +760,7 @@ impl<'a, 'db> SourceParameterCollector<'a, 'db> {
 }
 
 impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+    fn program_environment(&self) -> &TypeOperations<'db> {
         self.env
     }
 
@@ -1379,7 +1382,7 @@ mod tests {
         CycleDetector, CycleDetectorVisit, CycleKind, Db, FlowEdge, FlowKind, HasIdentity,
         RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
     };
-    use crate::ProgramEnvironment;
+    use crate::TypeOperations;
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
     use crate::types::{KnownInstanceType, Type, TypeAliasType};
@@ -1455,7 +1458,7 @@ mod tests {
 
     fn global_instance_type<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> Type<'db> {
         let file = system_path_to_file(db, "/src/a.py").unwrap();
@@ -1469,7 +1472,7 @@ mod tests {
 
     fn global_type_alias<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> TypeAliasType<'db> {
         let file = system_path_to_file(db, "/src/a.py").unwrap();

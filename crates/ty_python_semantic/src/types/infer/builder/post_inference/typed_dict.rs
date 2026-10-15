@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -352,14 +352,14 @@ enum TypedDictFieldOverrideReason<'db> {
     /// A read-only inherited field's new type is not assignable to the base type.
     ReadOnlyTypeNotAssignable {
         db: &'db dyn Db,
-        env: ProgramEnvironment<'db>,
+        env: TypeOperations<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
     /// A mutable inherited field's new type is not mutually assignable with the base type.
     MutableTypeIncompatible {
         db: &'db dyn Db,
-        env: ProgramEnvironment<'db>,
+        env: TypeOperations<'db>,
         child_ty: Type<'db>,
         base_ty: Type<'db>,
     },
@@ -415,7 +415,7 @@ impl std::fmt::Display for TypedDictFieldOverrideReason<'_> {
 impl<'db> TypedDictFieldOverrideReason<'db> {
     fn from_fields(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         child_field: &TypedDictField<'db>,
         base_field: &TypedDictField<'db>,
     ) -> Option<Self> {

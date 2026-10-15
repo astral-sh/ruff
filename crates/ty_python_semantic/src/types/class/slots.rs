@@ -10,7 +10,7 @@ use crate::types::{
     ClassBase, ClassLiteral, DataclassFlags, KnownClass, SpecialFormType, Type,
     definition_expression_type, tuple::Tuple,
 };
-use crate::{Db, FxIndexSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, ProgramEnvironment, TypeOperations};
 
 /// The information that can be recovered from a class's own `__slots__` assignment.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -344,7 +344,7 @@ impl<'db> StaticClassLiteral<'db> {
         //
         //     if condition:
         //         __slots__ = ("value",)
-        let env = ProgramEnvironment::from_scope(body_scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(body_scope));
         let use_def = use_def_map(db, body_scope);
         let bindings = use_def.end_of_scope_symbol_bindings(symbol);
         let Place::Defined(DefinedPlace {
@@ -555,7 +555,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn own_slot_descriptor(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Type<'db> {

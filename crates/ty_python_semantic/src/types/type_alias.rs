@@ -1,5 +1,5 @@
-use crate::ProgramEnvironment;
 use crate::types::recursive::RecursiveReferenceMapper;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::fmt::Write;
 
 use crate::{
@@ -130,7 +130,7 @@ impl<'db> AliasCycleSummary<'db> {
 
 /// Remove unguarded recursive edges while retaining the other union alternatives.
 struct AliasCycleRecovery<'a, 'db> {
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
     context: Option<&'a TypeRecursionContext<'db>>,
     cycle: Type<'db>,
@@ -219,7 +219,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(alias.rhs_scope(db)));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
@@ -331,7 +331,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
-            let env = ProgramEnvironment::from_definition(alias.definition(db));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(alias.definition(db)));
             value.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
@@ -376,7 +376,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let file = definition.program_file(db);
-        let env = ProgramEnvironment::from_file(file);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
         let module = parsed_module(db, file.python_file(db)).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
             return None;
@@ -423,7 +423,10 @@ fn apply_type_alias_specialization<'db>(
         return ty;
     };
 
-    let env = ProgramEnvironment::from_program(generic_context.program(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_program(generic_context.program(db)),
+    );
     let specialization =
         specialization.unwrap_or_else(|| generic_context.default_specialization(db, None));
     let type_mapping = match specialization.materialization_kind(db) {
@@ -562,7 +565,10 @@ impl<'db> TypeAliasType<'db> {
         context: Option<&TypeRecursionContext<'db>>,
     ) -> Type<'db> {
         if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle {
-            let env = ProgramEnvironment::from_definition(self.definition(db));
+            let env = TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_definition(self.definition(db)),
+            );
             return AliasCycleRecovery {
                 env: &env,
                 mapping: ApplyTypeMappingVisitor::new(&env).with_recursion_context(context),
@@ -604,10 +610,13 @@ impl<'db> TypeAliasType<'db> {
             return value_type;
         };
         let env = match alias {
-            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
-            TypeAliasType::ManualPEP695(alias) => {
-                ProgramEnvironment::from_definition(alias.definition(db))
+            TypeAliasType::PEP695(alias) => {
+                TypeOperations::new_root(db, ProgramEnvironment::from_scope(alias.rhs_scope(db)))
             }
+            TypeAliasType::ManualPEP695(alias) => TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_definition(alias.definition(db)),
+            ),
         };
         value_type.materialize(
             db,
@@ -632,7 +641,8 @@ impl<'db> TypeAliasType<'db> {
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
         let value_type = self.with_materialization_kind(db, None).value_type(db);
-        let env = ProgramEnvironment::from_definition(self.definition(db));
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_definition(self.definition(db)));
         value_type.materialize(
             db,
             materialization_kind,
@@ -823,7 +833,7 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _: &ProgramEnvironment<'db>,
+        _: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         VarianceTerm::variable(db, VarianceOrigin::TypeAlias(self), typevar)
@@ -845,7 +855,8 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        let env = ProgramEnvironment::from_definition(self.definition(db));
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_definition(self.definition(db)));
         let Some(generic_context) = self.generic_context(db) else {
             return self.value_type(db).variance_of(db, &env, typevar);
         };

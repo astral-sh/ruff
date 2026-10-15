@@ -40,7 +40,7 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, ProgramEnvironment, SemanticModel, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, SemanticModel, TypeOperations, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
@@ -1588,11 +1588,11 @@ impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
 }
 
 /// Emit a diagnostic declaring that an index is out of bounds for a tuple.
-pub(super) fn report_index_out_of_bounds(
-    context: &InferContext,
+pub(super) fn report_index_out_of_bounds<'db>(
+    context: &InferContext<'db, '_>,
     kind: &'static str,
     node: AnyNodeRef,
-    tuple_ty: Type,
+    tuple_ty: Type<'db>,
     length: impl std::fmt::Display,
     index: i64,
 ) {
@@ -1608,10 +1608,10 @@ pub(super) fn report_index_out_of_bounds(
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
-pub(super) fn report_not_subscriptable(
-    context: &InferContext,
+pub(super) fn report_not_subscriptable<'db>(
+    context: &InferContext<'db, '_>,
     node: &ast::ExprSubscript,
-    not_subscriptable_ty: Type,
+    not_subscriptable_ty: Type<'db>,
     method: &str,
 ) {
     let db = context.db();
@@ -1643,7 +1643,7 @@ pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeR
 // they can only occur if we already failed to validate the dict (and emitted some diagnostic).
 pub(crate) fn is_invalid_typed_dict_literal<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     target_ty: Type<'db>,
     source: AnyNodeRef<'_>,
 ) -> bool {
@@ -1654,8 +1654,8 @@ pub(crate) fn is_invalid_typed_dict_literal<'db>(
         && matches!(source, AnyNodeRef::ExprDict(_))
 }
 
-fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
-    context: &'env InferContext,
+fn report_invalid_assignment_with_message<'db, 'env, T: Ranged>(
+    context: &'env InferContext<'db, '_>,
     node: T,
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'env>> {
@@ -1665,7 +1665,7 @@ fn report_invalid_assignment_with_message<'db, 'env: 'db, T: Ranged>(
 
 pub(super) fn note_numbers_module_not_supported<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     diag: &mut Diagnostic,
     target_ty: Type<'db>,
     value_ty: Type<'db>,
@@ -1733,7 +1733,7 @@ fn covariant_supertype_hint<'db>(
 /// that fails due to invariance.
 pub(super) fn add_invariant_generic_hints<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     diag: &mut Diagnostic,
     expected_ty: Type<'db>,
     provided_ty: Type<'db>,
@@ -2107,7 +2107,7 @@ pub(super) fn report_invalid_assignment<'db>(
     target_node: AnyNodeRef,
     definition: Definition<'db>,
     declaration: Option<Definition<'db>>,
-    target_ty: Type,
+    target_ty: Type<'db>,
     value_ty: Type<'db>,
 ) {
     let db = context.db();
@@ -2311,11 +2311,11 @@ pub(super) fn report_unsound_assignment<'db>(
     diagnostic.help("Consider using an `assert` to narrow the type before assigning it");
 }
 
-pub(super) fn report_invalid_attribute_assignment(
-    context: &InferContext,
+pub(super) fn report_invalid_attribute_assignment<'db>(
+    context: &InferContext<'db, '_>,
     range: TextRange,
-    target_ty: Type,
-    source_ty: Type,
+    target_ty: Type<'db>,
+    source_ty: Type<'db>,
     attribute_name: &'_ str,
 ) {
     let db = context.db();
@@ -2576,10 +2576,10 @@ pub(super) fn report_bad_dunder_delete_call<'db>(
     }
 }
 
-pub(super) fn report_bad_dunder_delattr_call(
-    context: &InferContext<'_, '_>,
+pub(super) fn report_bad_dunder_delattr_call<'db>(
+    context: &InferContext<'db, '_>,
     attribute: &str,
-    object_type: Type,
+    object_type: Type<'db>,
     target: &ast::ExprAttribute,
     binding_error: bool,
 ) {
@@ -2759,12 +2759,12 @@ pub(super) fn report_dynamic_function_decorator_return<'db>(
     }
 }
 
-pub(super) fn report_invalid_return_type(
-    context: &InferContext,
+pub(super) fn report_invalid_return_type<'db>(
+    context: &InferContext<'db, '_>,
     object_range: impl Ranged,
     return_type_range: impl Ranged,
-    expected_ty: Type,
-    actual_ty: Type,
+    expected_ty: Type<'db>,
+    actual_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, object_range) else {
@@ -2793,12 +2793,12 @@ pub(super) fn report_invalid_return_type(
     error_context.attach_to(db, env, &mut diag);
 }
 
-pub(super) fn report_unsound_return_statement(
-    context: &InferContext,
+pub(super) fn report_unsound_return_statement<'db>(
+    context: &InferContext<'db, '_>,
     object_range: impl Ranged,
     return_type_range: impl Ranged,
-    expected_ty: Type,
-    actual_ty: Type,
+    expected_ty: Type<'db>,
+    actual_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&UNSOUND_RETURN_STATEMENT, object_range) else {
@@ -2843,11 +2843,11 @@ pub(super) fn report_unsound_return_statement(
     diag.help("Consider using an `assert` to narrow the type prior to the `return` statement");
 }
 
-pub(super) fn report_invalid_generator_function_return_type(
-    context: &InferContext,
+pub(super) fn report_invalid_generator_function_return_type<'db>(
+    context: &InferContext<'db, '_>,
     return_type_range: TextRange,
     inferred_return: KnownClass,
-    expected_ty: Type,
+    expected_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, return_type_range) else {
@@ -2886,12 +2886,12 @@ pub(super) enum GeneratorMismatchKind {
     SendType,
 }
 
-pub(super) fn report_invalid_generator_yield_type(
-    context: &InferContext,
+pub(super) fn report_invalid_generator_yield_type<'db>(
+    context: &InferContext<'db, '_>,
     object_range: impl Ranged,
     return_type_span: Option<Span>,
-    expected_ty: Type,
-    actual_ty: Type,
+    expected_ty: Type<'db>,
+    actual_ty: Type<'db>,
     kind: GeneratorMismatchKind,
 ) {
     let db = context.db();
@@ -2946,13 +2946,13 @@ pub(super) fn report_invalid_generator_yield_type(
     error_context.attach_to(db, env, &mut diag);
 }
 
-pub(super) fn report_unsound_yield(
-    context: &InferContext,
+pub(super) fn report_unsound_yield<'db>(
+    context: &InferContext<'db, '_>,
     yield_value: impl Ranged,
     kind: YieldKind,
     return_type_span: Option<Span>,
-    expected_ty: Type,
-    actual_ty: Type,
+    expected_ty: Type<'db>,
+    actual_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&UNSOUND_YIELD, yield_value) else {
@@ -3018,12 +3018,12 @@ impl std::fmt::Display for YieldKind {
     }
 }
 
-pub(super) fn report_implicit_return_type(
-    context: &InferContext,
+pub(super) fn report_implicit_return_type<'db>(
+    context: &InferContext<'db, '_>,
     range: impl Ranged,
-    expected_ty: Type,
+    expected_ty: Type<'db>,
     has_empty_body: bool,
-    enclosing_class_of_method: Option<ClassType>,
+    enclosing_class_of_method: Option<ClassType<'db>>,
     no_return: bool,
 ) {
     let db = context.db();
@@ -3112,11 +3112,11 @@ pub(super) fn report_possibly_unresolved_reference(
     builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
-pub(super) fn report_possibly_missing_attribute(
-    context: &InferContext,
+pub(super) fn report_possibly_missing_attribute<'db>(
+    context: &InferContext<'db, '_>,
     target: &ast::ExprAttribute,
     attribute: &str,
-    object_ty: Type,
+    object_ty: Type<'db>,
 ) {
     let Some(builder) = context.report_lint(&POSSIBLY_MISSING_ATTRIBUTE, target) else {
         return;
@@ -3296,7 +3296,11 @@ pub(super) fn report_invalid_exception_tuple_caught<'db, 'ast>(
     );
 }
 
-pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
+pub(super) fn report_invalid_exception_caught<'db>(
+    context: &InferContext<'db, '_>,
+    node: &ast::Expr,
+    ty: Type<'db>,
+) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
         return;
@@ -3330,10 +3334,10 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
     );
 }
 
-pub(crate) fn report_invalid_exception_raised(
-    context: &InferContext,
+pub(crate) fn report_invalid_exception_raised<'db>(
+    context: &InferContext<'db, '_>,
     raised_node: &ast::Expr,
-    raise_type: Type,
+    raise_type: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RAISE, raised_node) else {
@@ -3354,7 +3358,11 @@ pub(crate) fn report_invalid_exception_raised(
     }
 }
 
-pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
+pub(crate) fn report_invalid_exception_cause<'db>(
+    context: &InferContext<'db, '_>,
+    node: &ast::Expr,
+    ty: Type<'db>,
+) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
         return;
@@ -3701,10 +3709,10 @@ pub(crate) fn report_invalid_arguments_to_callable(
     ));
 }
 
-pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
-    context: &InferContext,
+pub(crate) fn report_invalid_class_match_pattern<'db, T: Ranged>(
+    context: &InferContext<'db, '_>,
     pattern_cls: T,
-    cls_ty: Type,
+    cls_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
@@ -3734,11 +3742,11 @@ pub(crate) fn report_too_many_positional_patterns_for_class_pattern<T: Ranged>(
     ));
 }
 
-pub(crate) fn report_invalid_match_args_type<T: Ranged>(
-    context: &InferContext,
+pub(crate) fn report_invalid_match_args_type<'db, T: Ranged>(
+    context: &InferContext<'db, '_>,
     pattern: T,
-    match_args_ty: Type,
-    cls_ty: Type,
+    match_args_ty: Type<'db>,
+    cls_ty: Type<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern) else {
@@ -3788,10 +3796,10 @@ pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
 }
 
 pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'db>(
-    context: &'db InferContext<'db, '_>,
+    context: &InferContext<'db, '_>,
     call: &ast::ExprCall,
     protocol: ProtocolClass<'db>,
-    non_method_members: &[ProtocolMember<'db, 'db>],
+    non_method_members: &[ProtocolMember<'_, 'db>],
 ) {
     let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_PROTOCOL, call) else {
         return;
@@ -4052,20 +4060,16 @@ pub(super) enum AbstractMethodAnnotationPolicy {
     ExcludeVerboseBody,
 }
 
-pub(crate) fn report_undeclared_protocol_member(
-    context: &InferContext,
-    definition: Definition,
+pub(crate) fn report_undeclared_protocol_member<'db>(
+    context: &InferContext<'db, '_>,
+    definition: Definition<'db>,
     protocol_class: ProtocolClass,
     class_symbol_table: &PlaceTable,
 ) {
     /// We want to avoid suggesting an annotation for e.g. `x = None`,
     /// because the user almost certainly doesn't want to write `x: None = None`.
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
-    fn should_give_hint<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
+    fn should_give_hint<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
         let class = match ty {
             Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -4229,11 +4233,11 @@ pub(crate) fn report_duplicate_bases(
     }
 }
 
-pub(crate) fn report_invalid_or_unsupported_base(
-    context: &InferContext,
+pub(crate) fn report_invalid_or_unsupported_base<'db>(
+    context: &InferContext<'db, '_>,
     base_node: &ast::Expr,
-    base_type: Type,
-    class: StaticClassLiteral,
+    base_type: Type<'db>,
+    class: StaticClassLiteral<'db>,
 ) {
     let db = context.db();
     let env = &context.program_environment();
@@ -4354,11 +4358,11 @@ pub(crate) fn report_invalid_or_unsupported_base(
     }
 }
 
-pub(crate) fn report_unsupported_base(
-    context: &InferContext,
+pub(crate) fn report_unsupported_base<'db>(
+    context: &InferContext<'db, '_>,
     base_node: &ast::Expr,
-    base_type: Type,
-    class: StaticClassLiteral,
+    base_type: Type<'db>,
+    class: StaticClassLiteral<'db>,
 ) {
     let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
         return;
@@ -4385,7 +4389,7 @@ fn report_invalid_base<'env, 'db>(
     base_node: &ast::Expr,
     base_type: Type<'db>,
     class: StaticClassLiteral<'db>,
-) -> Option<LintDiagnosticGuard<'env, 'db>> {
+) -> Option<LintDiagnosticGuard<'db, 'env>> {
     let db = context.db();
     let builder = context.report_lint(&INVALID_BASE, base_node)?;
     let env = &context.program_environment();
@@ -5714,15 +5718,15 @@ impl std::fmt::Display for OperatorDisplay {
     }
 }
 
-fn report_unsupported_binary_operation_impl<'a>(
-    context: &'a InferContext<'a, 'a>,
+fn report_unsupported_binary_operation_impl<'db, 'a>(
+    context: &'a InferContext<'db, 'a>,
     range: TextRange,
     left: &ast::Expr,
     right: &ast::Expr,
-    left_ty: Type<'a>,
-    right_ty: Type<'a>,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
     operator: OperatorDisplay,
-) -> Option<LintDiagnosticGuard<'a, 'a>> {
+) -> Option<LintDiagnosticGuard<'db, 'a>> {
     let db = context.db();
     let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
     let env = &context.program_environment();
@@ -5907,7 +5911,7 @@ pub(super) fn report_invalid_total_ordering_call(
 pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
     db: &dyn Db,
     file: File,
-    env: &ProgramEnvironment<'_>,
+    env: &TypeOperations<'_>,
     diagnostic: &mut Diagnostic,
     full_submodule_name: &ModuleName,
     parent_module: Module,

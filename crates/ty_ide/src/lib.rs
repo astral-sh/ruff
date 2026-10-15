@@ -78,7 +78,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
-use ty_python_semantic::ProgramEnvironment;
+use ty_python_semantic::TypeOperations;
 use ty_python_semantic::types::{Type, TypeDefinition};
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
@@ -284,12 +284,12 @@ impl FromIterator<NavigationTarget> for NavigationTargets {
     }
 }
 
-pub trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> NavigationTargets;
+pub trait HasNavigationTargets<'db> {
+    fn navigation_targets(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> NavigationTargets;
 }
 
-impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db, env: &ProgramEnvironment<'_>) -> NavigationTargets {
+impl<'db> HasNavigationTargets<'db> for Type<'db> {
+    fn navigation_targets(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> NavigationTargets {
         match self {
             Type::Union(union) => union
                 .elements(db)
@@ -336,8 +336,8 @@ impl HasNavigationTargets for Type<'_> {
     }
 }
 
-impl HasNavigationTargets for TypeDefinition<'_> {
-    fn navigation_targets(&self, db: &dyn Db, _: &ProgramEnvironment<'_>) -> NavigationTargets {
+impl<'db> HasNavigationTargets<'db> for TypeDefinition<'db> {
+    fn navigation_targets(&self, db: &'db dyn Db, _: &TypeOperations<'db>) -> NavigationTargets {
         let Some(full_range) = self.full_range(db) else {
             return NavigationTargets::empty();
         };

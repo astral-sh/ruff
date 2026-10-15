@@ -64,7 +64,7 @@ use ruff_text_size::Ranged;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, TypeOperations,
     lint::LintMetadata,
     reachability::is_non_terminal_call,
     types::{
@@ -1349,7 +1349,7 @@ fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
 struct ExpandedType<'db>(Type<'db>);
 
 impl<'db> ExpandedType<'db> {
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+    fn new(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Self {
         Self(ty.expand_top_level_aliases(db, env))
     }
 }

@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
@@ -513,7 +513,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
 fn apply_class_decorator<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
 ) -> ClassDecoratorResult<'db> {
@@ -544,7 +544,7 @@ fn apply_class_decorator<'db>(
 /// original class object even if the decorator call produced a `SubclassOf` type internally.
 fn class_decorator_preserves_class_binding<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
@@ -582,7 +582,7 @@ fn class_decorator_preserves_class_binding<'db>(
 /// intersection members.
 fn type_retains_original_class<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
@@ -624,7 +624,7 @@ fn is_unknown_decorator_result<'db>(db: &'db dyn Db, result_ty: Type<'db>) -> bo
 /// returns the original class object again.
 fn merge_class_preserving_decorator_result<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     original_class: Type<'db>,
     current_binding: Type<'db>,
     decorated_binding: Type<'db>,

@@ -15,7 +15,7 @@
 
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::typevar::TypeVarSet;
-use crate::{Program, ProgramEnvironment};
+use crate::{Program, ProgramEnvironment, TypeOperations};
 use std::cmp::Ordering;
 use std::hash::Hash;
 use std::num::{NonZeroI32, NonZeroUsize};
@@ -209,11 +209,7 @@ impl<'db> TupleType<'db> {
         Self::new_internal(db, self.program(db), tuple)
     }
 
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        spec: &TupleSpec<'db>,
-    ) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, env: &TypeOperations<'db>, spec: &TupleSpec<'db>) -> Self {
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
         // That means this isn't a variable-length tuple after all!
         if let TupleSpec::Variable(tuple) = spec
@@ -230,7 +226,7 @@ impl<'db> TupleType<'db> {
         TupleType::new_internal(db, env.program(db), spec)
     }
 
-    pub(crate) fn empty(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    pub(crate) fn empty(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         TupleType::new_internal(
             db,
             env.program(db),
@@ -240,7 +236,7 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn heterogeneous(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         types: impl IntoIterator<Item = Type<'db>>,
     ) -> Self {
         TupleType::new(db, env, &TupleSpec::heterogeneous(types))
@@ -248,7 +244,7 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn mixed(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: Type<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
@@ -264,7 +260,7 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn mixed_with_segment(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         prefix: impl IntoIterator<Item = Type<'db>>,
         variable: VariableSegment<'db>,
         suffix: impl IntoIterator<Item = Type<'db>>,
@@ -278,7 +274,7 @@ impl<'db> TupleType<'db> {
 
     pub(crate) fn homogeneous(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         element: Type<'db>,
     ) -> Self {
         match element {
@@ -290,7 +286,7 @@ impl<'db> TupleType<'db> {
     /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
     pub(crate) fn unpacked_typevartuple(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> Self {
         debug_assert!(typevar.is_typevartuple(db));
@@ -306,7 +302,7 @@ impl<'db> TupleType<'db> {
     // from `NominalInstanceType::class()`, which is a very hot method.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        let env = &ProgramEnvironment::from_program(self.program(db));
+        let env = &TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db, env)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -324,7 +320,7 @@ impl<'db> TupleType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -355,7 +351,7 @@ impl<'db> TupleType<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -920,7 +916,7 @@ fn to_class_type_cycle_initial<'db>(
     id: salsa::Id,
     self_: TupleType<'db>,
 ) -> ClassType<'db> {
-    let env = &ProgramEnvironment::from_program(self_.program(db));
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_program(self_.program(db)));
     let tuple_class = KnownClass::Tuple
         .try_to_class_literal(db, env)
         .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");
@@ -959,11 +955,7 @@ impl<'db> VariableSegment<'db> {
     }
 
     /// Return the homogeneous element type if this segment has gradual arity, including aliases.
-    fn gradual_element_type(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
+    fn gradual_element_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Type<'db>> {
         let element = self.homogeneous_type()?;
         // A static constructor or an alias cycle rules out gradual arity, even if it contains Any.
         (!any_over_type_expanding_aliases(db, env, element, |ty| {
@@ -1043,7 +1035,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1107,7 +1099,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -1124,7 +1116,7 @@ impl<'db> PyIndex<'db> for &FixedLengthTuple<Type<'db>> {
     fn py_index(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: i32,
     ) -> Result<Self::Item, OutOfBoundsError> {
         self.0.py_index(db, env, index).copied()
@@ -1474,7 +1466,7 @@ impl VariableSlice {
     fn ty<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         tuple: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) -> Type<'db> {
         UnionType::from_elements_leave_aliases(
@@ -1500,7 +1492,7 @@ impl VariableTupleSlicePlan {
     fn into_type<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         tuple: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
     ) -> Type<'db> {
         match self {
@@ -1619,7 +1611,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn slice_fixed_position<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         slice: FixedPositionSlice,
     ) -> impl Iterator<Item = Type<'db>> + 'a
     where
@@ -1644,7 +1636,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn slice_front_forward<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         start: usize,
         exclusive_stop: usize,
         step: NonZeroUsize,
@@ -1668,7 +1660,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn slice_back<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         start: usize,
         exclusive_stop: usize,
         step: NonZeroUsize,
@@ -1721,7 +1713,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn py_slice_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
@@ -2057,7 +2049,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn type_at_nonnegative_index(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: usize,
     ) -> Option<Type<'db>> {
         (index < self.len().minimum())
@@ -2067,7 +2059,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn type_at_nonnegative_index_unbounded(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: usize,
     ) -> Type<'db> {
         if let Some(element) = self.prefix_elements().get(index) {
@@ -2081,7 +2073,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn type_at_negative_distance(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         distance: usize,
     ) -> Option<Type<'db>> {
         if distance == 0 || distance > self.len().minimum() {
@@ -2114,7 +2106,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
             .chain(self.iter_suffix_elements())
     }
 
-    fn homogeneous_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn homogeneous_type(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         let element = UnionType::from_elements_leave_aliases(db, env, self.iter_all_elements(db));
         Type::homogeneous_tuple(db, env, element)
     }
@@ -2122,7 +2114,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn variable_and_suffix_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         suffix_stop: Option<usize>,
     ) -> Type<'db> {
         UnionType::from_elements_leave_aliases(
@@ -2208,7 +2200,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -2329,7 +2321,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -2363,7 +2355,7 @@ impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>, VariableSegment<'db>>
     fn py_index(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: i32,
     ) -> Result<Self::Item, OutOfBoundsError> {
         match Nth::from_index(index) {
@@ -2617,7 +2609,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     pub(crate) fn homogeneous_element_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         match self {
             Tuple::Fixed(tuple) => {
@@ -2629,7 +2621,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         }
     }
 
-    fn tuple_class_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn tuple_class_type(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self {
             Tuple::Fixed(tuple) => {
                 UnionType::from_elements_leave_aliases(db, env, tuple.iter_all_elements())
@@ -2669,7 +2661,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     pub(crate) fn py_slice_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         start: Option<i32>,
         stop: Option<i32>,
         step: Option<i32>,
@@ -2690,7 +2682,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     pub(crate) fn resize(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         new_length: TupleLength,
     ) -> Result<Self, ResizeTupleError> {
         Ok(self
@@ -2711,7 +2703,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -2743,7 +2735,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -2909,10 +2901,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     }
 
     /// Return the `TupleSpec` for the singleton `sys.version_info`
-    pub(crate) fn version_info_spec(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> TupleSpec<'db> {
+    pub(crate) fn version_info_spec(db: &'db dyn Db, env: &TypeOperations<'db>) -> TupleSpec<'db> {
         let python_version = env.python_version(db);
         let int_instance_ty = KnownClass::Int.to_instance(db, env);
 
@@ -2958,7 +2947,7 @@ impl<'db> PyIndex<'db> for &TupleSpec<'db> {
     fn py_index(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: i32,
     ) -> Result<Self::Item, OutOfBoundsError> {
         match self {
@@ -3125,7 +3114,7 @@ impl<'db> TupleSpecBuilder<'db> {
     pub(crate) fn concat_variadic_typevar(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> Self {
         debug_assert!(typevar.is_typevartuple(db));
@@ -3137,7 +3126,7 @@ impl<'db> TupleSpecBuilder<'db> {
     pub(crate) fn concat(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &TupleSpec<'db>,
     ) -> Self {
         self.concat_with(other, |suffix, left, right, prefix| {
@@ -3182,7 +3171,7 @@ impl<'db> TupleSpecBuilder<'db> {
     pub(crate) fn union(
         mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &TupleSpec<'db>,
     ) -> Self {
         match (&mut self, other) {
@@ -3233,7 +3222,7 @@ impl<'db> TupleSpecBuilder<'db> {
     pub(crate) fn intersect(
         mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &TupleSpec<'db>,
     ) -> Option<Self> {
         match (&mut self, other) {

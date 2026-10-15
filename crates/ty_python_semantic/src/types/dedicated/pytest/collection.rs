@@ -75,7 +75,7 @@ use crate::types::function::FunctionType;
 use crate::types::infer::{function_known_decorators, original_class_type};
 use crate::types::{
     ClassBase, ClassLiteral, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type,
-    binding_type, definition_expression_type,
+    TypeOperations, binding_type, definition_expression_type,
 };
 
 /// Returns the tests that pytest collects from `file` under the default collection conventions.
@@ -368,7 +368,10 @@ fn pytest_test_class_kind<'db>(
     }
 
     let class = original_class_type(db, definition)?;
-    let env = ProgramEnvironment::from_file(definition.program_file(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(definition.program_file(db)),
+    );
     if place_value_type(
         db,
         class
@@ -408,11 +411,11 @@ fn pytest_test_class_kind<'db>(
 }
 
 /// Returns whether `class` inherits both constructors from `object`.
-fn has_default_pytest_constructors(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+fn has_default_pytest_constructors<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
     let Some(class) = class.as_static() else {
         return false;
     };
-    let env = ProgramEnvironment::from_file(class.program_file(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
     let Some(object) = KnownClass::Object.try_to_class_literal(db, &env) else {
         return false;
     };
@@ -442,7 +445,7 @@ fn is_unittest_test_case(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
 
 /// Unittest uses `runTest` only when no named test methods are available, including inherited ones.
 fn has_unittest_test_methods<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    let env = ProgramEnvironment::from_file(class.program_file(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
@@ -463,7 +466,7 @@ fn has_unittest_test_methods<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> 
         })
 }
 
-fn is_default_pytest_test_file(db: &dyn Db, file: ProgramFile<'_>) -> bool {
+fn is_default_pytest_test_file<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
     let Some(file_name) = file
         .file(db)
         .path(db)
@@ -481,7 +484,7 @@ fn is_default_pytest_test_file(db: &dyn Db, file: ProgramFile<'_>) -> bool {
         return false;
     }
 
-    let env = ProgramEnvironment::from_file(file);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
     !place_value_type(
         db,
         symbol(

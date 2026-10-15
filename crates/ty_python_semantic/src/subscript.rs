@@ -2,21 +2,22 @@
 //! operations (`PySlice`) on iterators, following the semantics of equivalent
 //! operations in Python.
 
+use crate::types::TypeOperations;
 use std::num::NonZeroI32;
 
-use crate::{Db, ProgramEnvironment};
+use crate::Db;
 use itertools::Either;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct OutOfBoundsError;
 
 pub(crate) trait PyIndex<'db> {
-    type Item: 'db;
+    type Item;
 
     fn py_index(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         index: i32,
     ) -> Result<Self::Item, OutOfBoundsError>;
 }
@@ -83,15 +84,15 @@ impl Nth {
     }
 }
 
-impl<'db, T> PyIndex<'db> for &'db [T] {
-    type Item = &'db T;
+impl<'db, 'a, T> PyIndex<'db> for &'a [T] {
+    type Item = &'a T;
 
     fn py_index(
         self,
         _db: &'db dyn Db,
-        _ctx: &ProgramEnvironment<'db>,
+        _ctx: &TypeOperations<'db>,
         index: i32,
-    ) -> Result<&'db T, OutOfBoundsError> {
+    ) -> Result<&'a T, OutOfBoundsError> {
         match Nth::from_index(index) {
             Nth::FromStart(nth) => self.get(nth).ok_or(OutOfBoundsError),
             Nth::FromEnd(nth_rev) => (self.len().checked_sub(nth_rev + 1))
@@ -110,7 +111,7 @@ where
     fn py_index(
         self,
         _db: &'db dyn Db,
-        _ctx: &ProgramEnvironment<'db>,
+        _ctx: &TypeOperations<'db>,
         index: i32,
     ) -> Result<I, OutOfBoundsError> {
         match Nth::from_index(index) {

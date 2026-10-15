@@ -70,8 +70,8 @@ use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
 use crate::types::signatures::Parameter as SignatureParameter;
 use crate::types::{
-    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
-    extract_fixed_length_iterable_element_types, may_exist_at_runtime,
+    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, TypeOperations,
+    definition_expression_type, extract_fixed_length_iterable_element_types, may_exist_at_runtime,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -1425,7 +1425,10 @@ fn is_known_class_instance(
     let Some(Type::NominalInstance(instance)) = ty else {
         return false;
     };
-    let environment = ProgramEnvironment::from_file(definition.program_file(db));
+    let environment = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(definition.program_file(db)),
+    );
     let Some(class) = instance
         .class(db, &environment)
         .class_literal(db)
@@ -1483,7 +1486,10 @@ fn statically_known_parametrize_names<'db>(
         );
     }
 
-    let environment = ProgramEnvironment::from_file(definition.program_file(db));
+    let environment = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(definition.program_file(db)),
+    );
     extract_fixed_length_iterable_element_types(db, &environment, expression, |element| {
         expression_type(element).unwrap_or_else(Type::unknown)
     })?
@@ -1551,7 +1557,7 @@ fn static_string_sequence_from_expression<'db>(
         return Some(strings);
     }
 
-    let environment = ProgramEnvironment::from_definition(definition);
+    let environment = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
     extract_fixed_length_iterable_element_types(db, &environment, expression, |element| {
         definition_expression_type(db, definition, element)
     })?

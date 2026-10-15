@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::TextRange;
@@ -114,7 +114,7 @@ impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -204,7 +204,7 @@ impl<'db> DynamicClassLiteral<'db> {
         ) -> Box<[Type<'db>]> {
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
-            let env = ProgramEnvironment::from_file(program_file);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
             let module = parsed_module(db, python_file).load(db);
 
             let value = definition
@@ -261,7 +261,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         self.inferred_metaclass(db).to_type(db, &env)
     }
 
@@ -289,7 +289,7 @@ impl<'db> DynamicClassLiteral<'db> {
         db: &'db dyn Db,
     ) -> Result<ClassMetaclass<'db>, DynamicMetaclassConflict<'db>> {
         let original_bases = self.explicit_bases(db);
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
@@ -389,7 +389,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn instance_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
@@ -411,7 +411,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -481,7 +481,7 @@ impl<'db> DynamicClassLiteral<'db> {
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(db, &ProgramEnvironment::from_scope(self_.scope(db))),
+                ClassBase::object(db, &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db)))),
             ]))
         },
         heap_size=ruff_memory_usage::heap_size
@@ -505,7 +505,10 @@ impl<'db> DynamicClassLiteral<'db> {
                 let is_non_empty = match ty {
                     // __slots__ = ("a", "b")
                     Type::NominalInstance(nominal) => {
-                        let env = ProgramEnvironment::from_scope(self.scope(db));
+                        let env = TypeOperations::new_root(
+                            db,
+                            ProgramEnvironment::from_scope(self.scope(db)),
+                        );
                         nominal.tuple_spec(db, &env).is_some_and(|spec| {
                             spec.len().into_fixed_length().is_some_and(|len| len > 0)
                         })
@@ -559,7 +562,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {

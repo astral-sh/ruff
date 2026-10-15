@@ -133,13 +133,12 @@ use crate::types::{
     ClassType, CycleKind, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet,
     InternedType, IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
-    ParamSpecAttrKind, Parameter, Parameters, ProgramEnvironment, PropertyDeprecations,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeQuery, TypeQueryContext,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
-    UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    ParamSpecAttrKind, Parameter, Parameters, PropertyDeprecations, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeOperations, TypeQualifiers, TypeQuery, TypeQueryContext, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, extract_fixed_length_iterable_element_types,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -406,7 +405,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
 fn transparent_callable_decorator_result<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     bindings: &Bindings<'db>,
     decorated_ty: Type<'db>,
 ) -> Option<Type<'db>> {
@@ -429,7 +428,7 @@ fn transparent_callable_decorator_result<'db>(
 
     fn callable_paramspec_and_return<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> Option<(BoundTypeVarInstance<'db>, TransparentCallableReturn<'db>)> {
         TypeInspector::inspect_root(
@@ -574,7 +573,7 @@ impl<'db> AttributeDeletion<'_> {
     fn check_final(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         object_ty: Type<'db>,
     ) -> Result<(), Option<AttributeDeletionError<'db>>> {
         if let Some(object_ty) =
@@ -592,7 +591,7 @@ impl<'db> AttributeDeletion<'_> {
     fn check_leaf(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         object_ty: Type<'db>,
     ) -> Result<(), Option<AttributeDeletionError<'db>>> {
         let attribute = self.attribute;
@@ -753,7 +752,7 @@ impl<'db> AttributeDeletion<'_> {
     /// when called for deletion on `object_ty`.
     fn property_deleter_returns_never(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         property_ty: Type<'db>,
         object_ty: Type<'db>,
     ) -> bool {
@@ -778,7 +777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
-        env: &'ast ProgramEnvironment<'db>,
+        env: &'ast TypeOperations<'db>,
         region: InferenceRegion<'db>,
         file: File,
         program_file: ProgramFile<'db>,
@@ -1142,7 +1141,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[inline]
-    fn program_environment(&self) -> &'ast ProgramEnvironment<'db> {
+    fn program_environment(&self) -> &'ast TypeOperations<'db> {
         self.context.program_environment()
     }
 
@@ -13184,7 +13183,7 @@ fn is_empty_collection_type_context(tcx: TypeContext<'_>) -> bool {
 
 fn prefer_collection_literal_peer_context<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     tcx: TypeContext<'db>,
 ) -> bool {
     is_empty_collection_type_context(tcx)
@@ -13638,11 +13637,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
     /// pyright. TODO: Other standard library classes may also be considered safe. Also,
     /// subclasses of these safe classes that do not override `__getitem__/__setitem__`
     /// may be considered safe.
-    fn is_safe_mutable_class(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
+    fn is_safe_mutable_class(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
         const SAFE_MUTABLE_CLASSES: &[KnownClass] = &[
             KnownClass::List,
             KnownClass::Dict,

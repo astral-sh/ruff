@@ -1,7 +1,7 @@
 use crate::Db;
 use itertools::Itertools;
 
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::enums::enum_member_literals;
 use crate::types::tuple::Tuple;
 use crate::types::{ApplyTypeMappingVisitor, CycleDetector, IntersectionType, KnownClass, Type};
@@ -18,7 +18,7 @@ const MAX_ELEMENT_EXPANSION: usize = 64;
 /// Returns [`None`] if the type cannot be expanded.
 pub(crate) fn expand_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<Vec<Type<'db>>> {
     TypeExpander {
@@ -33,7 +33,7 @@ pub(crate) fn expand_type<'db>(
 /// Expands a sequence of element types, bounding the size of their Cartesian product.
 pub(crate) fn expand_elements<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     elements: impl IntoIterator<Item = Type<'db>>,
 ) -> Option<Vec<Vec<Type<'db>>>> {
     TypeExpander {
@@ -49,7 +49,7 @@ pub(crate) fn expand_elements<'db>(
 /// element so argument expansion does not enumerate an infinite recursive unfolding.
 struct TypeExpander<'a, 'db> {
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
     visitor: CycleDetector<'db, (), Type<'db>, Option<Vec<Type<'db>>>, 3>,
 }

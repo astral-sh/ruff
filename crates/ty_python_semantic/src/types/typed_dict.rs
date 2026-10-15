@@ -32,7 +32,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::variance::VarianceOrigin;
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, TypeOperations};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
@@ -151,7 +151,7 @@ impl<'db> TypedDictOpenness<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -279,7 +279,7 @@ impl<'db> TypedDictType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -339,7 +339,7 @@ impl<'db> TypedDictType<'db> {
 
             let program_file = static_class.program_file(db);
             let python_file = program_file.python_file(db);
-            let env = ProgramEnvironment::from_file(program_file);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
             let module = parsed_module(db, python_file).load(db);
             let class_definition = static_class.definition(db);
             let class_stmt = class_definition
@@ -418,7 +418,7 @@ impl<'db> TypedDictType<'db> {
     ///
     /// A projection with a source declaration stays deferred so a mapping comparison can inspect its
     /// values under the same recursion guard as the enclosing relation.
-    pub(crate) fn value_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn value_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         if let Some(class) = self.defining_class()
             && let Some(recursive) = RecursiveType::typed_dict_values(db, class)
         {
@@ -457,7 +457,7 @@ impl<'db> TypedDictType<'db> {
     ///
     /// A closed `TypedDict` has a finite set of literal keys. Open and extra-items `TypedDict`s may
     /// contain arbitrary string keys.
-    pub(crate) fn key_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn key_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         if !self.openness(db).is_closed() {
             return KnownClass::Str.to_instance(db, env);
         }
@@ -509,7 +509,7 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn arbitrary_key_initialization_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         self.arbitrary_key_initialization_type_excluding(db, env, &OrderSet::new())
     }
@@ -522,7 +522,7 @@ impl<'db> TypedDictType<'db> {
     fn arbitrary_key_initialization_type_excluding(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         excluded_keys: &OrderSet<Name>,
     ) -> Option<Type<'db>> {
         let extra_items = self.explicit_extra_items(db)?;
@@ -546,7 +546,7 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn arbitrary_key_mutation_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         if self
             .explicit_extra_items(db)
@@ -584,7 +584,7 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn dict_value_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         self.dict_value_type_if(db, |field_ty, extra_items_ty| {
             field_ty.is_equivalent_to(db, env, extra_items_ty)
@@ -664,7 +664,7 @@ impl<'db> TypedDictType<'db> {
     pub(super) fn variance_of_items(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let variances = self
@@ -1500,7 +1500,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self {
@@ -1529,7 +1529,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 ) -> TypedDictSchema<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
-    let env = ProgramEnvironment::from_file(program_file);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
@@ -1594,7 +1594,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
 ) -> TypedDictOpenness<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
-    let env = ProgramEnvironment::from_file(program_file);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
     let module = parsed_module(db, python_file).load(db);
     let node = definition
         .kind(db)
@@ -1789,7 +1789,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
     fn add_object_type_annotation(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         diagnostic: &mut Diagnostic,
     ) {
         if let Some(full_object_ty) = self.full_object_ty {
@@ -1902,7 +1902,7 @@ pub(crate) struct UnpackedTypedDict<'db> {
 /// writes through the synthesized policy.
 fn intersect_unpacked_typed_dict_openness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
 ) -> TypedDictOpenness<'db> {
     let mut explicit_value_types = Vec::new();
@@ -1941,7 +1941,7 @@ fn intersect_unpacked_typed_dict_openness<'db>(
 /// observes its values.
 fn union_unpacked_typed_dict_openness<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
 ) -> TypedDictOpenness<'db> {
     let mut value_types = UnionBuilder::new(db, env);
@@ -1981,7 +1981,7 @@ fn union_unpacked_typed_dict_openness<'db>(
 /// and a key is only considered required if every arm requires it.
 pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
     extract_unpacked_typed_dict_from_value_type(db, env, ty).map(|unpacked| unpacked.keys)
@@ -1990,7 +1990,7 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
 /// Extracts the declared keys and openness from a `TypedDict`-shaped value.
 pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
     TypeQueryContext::with_root(env, UnpackTypedDict, |root| root.visit(db, ty))
@@ -2235,7 +2235,7 @@ fn merge_unpacked_key_definitions<'db>(
 /// `TypedDict` target, or a type alias resolving to one.
 pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     annotated_type: Type<'db>,
     annotation_flags: TypeExpressionFlags,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
@@ -2291,7 +2291,7 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
 
 fn unpacked_keyword_is_gradual<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> bool {
     TypeInspector::inspect_root(
@@ -2317,7 +2317,7 @@ fn unpacked_keyword_is_gradual<'db>(
 /// key diagnostics for the positional mapping.
 pub(super) fn collect_guaranteed_keyword_keys<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     arguments: &Arguments,
     unpacked_keyword_types: &[Option<Type<'db>>],
@@ -2365,7 +2365,7 @@ pub(super) fn collect_guaranteed_keyword_keys<'db>(
 /// Collects keys guaranteed by one unpacked constructor argument.
 fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     expr: &ast::Expr,
     unpacked_type: Type<'db>,
@@ -3311,7 +3311,7 @@ impl<'db> TypedDictSchema<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {

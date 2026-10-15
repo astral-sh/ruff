@@ -36,7 +36,7 @@ use crate::types::{
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionType, UnionTypeInstance,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxOrderSet, TypeOperations};
 use ty_python_core::definition::Definition;
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
@@ -73,7 +73,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         fn imp<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             visitor: &TypedDictKeyExpectedTypeVisitor<'_, 'db>,
         ) -> Option<Type<'db>> {
@@ -2484,7 +2484,7 @@ enum LegacyGenericContextError<'db> {
 #[expect(clippy::too_many_arguments)]
 fn infer_legacy_generic_subscript<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     index: &'db SemanticIndex<'db>,
     file_scope_id: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
@@ -2531,7 +2531,7 @@ fn infer_legacy_generic_subscript<'db>(
 /// that each argument is a type variable.
 fn legacy_generic_class_context<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     index: &'db SemanticIndex<'db>,
     file_scope_id: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,

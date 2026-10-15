@@ -124,10 +124,10 @@ pub fn goto_implementation(
 }
 
 /// Select and prepare the appropriate `ImplementationsFinder` for `goto_target`.
-fn prepare_implementations_finder_for_goto_target<'a>(
-    model: &SemanticModel<'a>,
-    goto_target: &GotoTarget<'a>,
-) -> Option<ImplementationsFinder<'a>> {
+fn prepare_implementations_finder_for_goto_target<'db, 'ast>(
+    model: &SemanticModel<'db>,
+    goto_target: &GotoTarget<'ast>,
+) -> Option<ImplementationsFinder<'db, 'ast>> {
     let db = model.db();
     let env = model.program_environment();
     match goto_target {
@@ -145,7 +145,7 @@ fn prepare_implementations_finder_for_goto_target<'a>(
                 .and_then(|definitions| {
                     ImplementationsFinder::for_class_reference(
                         db,
-                        &env,
+                        env,
                         definitions.iter().as_slice(),
                     )
                 })
@@ -159,7 +159,7 @@ fn prepare_implementations_finder_for_goto_target<'a>(
         GotoTarget::StringAnnotationSubexpr { .. } => goto_target
             .definitions(model, ImportAliasResolution::ResolveAliases)
             .and_then(|definitions| {
-                ImplementationsFinder::for_class_reference(db, &env, definitions.iter().as_slice())
+                ImplementationsFinder::for_class_reference(db, env, definitions.iter().as_slice())
             }),
         GotoTarget::FunctionDef(function) => ImplementationsFinder::for_method(model, function),
         GotoTarget::ClassDef(class) => ImplementationsFinder::for_class(model, class),

@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
@@ -248,11 +248,7 @@ impl<'db> LiteralValueType<'db> {
         matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
-    pub(crate) fn fallback_instance(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn fallback_instance(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
                 KnownClass::Str.to_instance(db, env)
@@ -410,7 +406,7 @@ impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db, env)
     }

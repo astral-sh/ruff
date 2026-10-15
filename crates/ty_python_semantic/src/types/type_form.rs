@@ -4,7 +4,7 @@ use super::{
     UnionType, visitor,
 };
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
@@ -37,11 +37,7 @@ impl<'db> Type<'db> {
     /// bounds or constraints, using cycle detection for recursive types. Union and intersection
     /// elements that do not represent type forms are ignored, as are negative intersection
     /// elements. If no type-form component can be projected, this returns the original type.
-    pub(crate) fn project_type_form(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn project_type_form(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         TypeQueryContext::with_root(env, TypeFormArgument, |root| root.visit(db, self))
             .unwrap_or(self)
     }
@@ -114,7 +110,7 @@ impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         self.type_argument(db).variance_of(db, env, typevar)

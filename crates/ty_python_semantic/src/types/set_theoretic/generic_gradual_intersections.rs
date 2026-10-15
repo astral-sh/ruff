@@ -5,7 +5,7 @@ use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 
 pub(super) enum GenericIntersection<'db> {
     /// Replace both intersection elements with this equivalent type.
@@ -40,7 +40,7 @@ pub(super) enum GenericIntersection<'db> {
 /// A recursive pair is returned separately so callers can also skip relation-based reductions.
 pub(super) fn generic_gradual_intersection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<GenericIntersection<'db>> {
@@ -60,7 +60,7 @@ pub(super) fn generic_gradual_intersection<'db>(
 /// Subclass arguments that do not specialize the base retain their gradualness.
 fn base_top_intersection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     base: Type<'db>,
     subclass: Type<'db>,
 ) -> Option<GenericIntersection<'db>> {
@@ -204,7 +204,7 @@ fn base_top_intersection<'db>(
 /// For example, `list[Any]` dynamically generalizes `list[int]`, while `list[str]` does not.
 fn dynamic_generalization_intersection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     general: Type<'db>,
     specific: Type<'db>,
 ) -> Option<Type<'db>> {

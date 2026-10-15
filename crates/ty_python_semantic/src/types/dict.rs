@@ -1,7 +1,7 @@
 use ruff_python_ast as ast;
 
 use crate::types::{Type, UnionBuilder};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 
 /// Recover the key and value types of an immediately consumed dictionary literal, without
 /// promoting its elements. The dictionary and its elements must already have been inferred:
@@ -11,13 +11,13 @@ use crate::{Db, ProgramEnvironment};
 /// length, iteration order, or the relationship between individual keys and values.
 pub(super) fn dict_literal_key_value_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     dict: &ast::ExprDict,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     fn extend<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         dict: &ast::ExprDict,
         expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
         keys: &mut UnionBuilder<'db>,

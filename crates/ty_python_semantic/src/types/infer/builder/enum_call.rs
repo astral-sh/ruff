@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, TypeOperations,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
@@ -138,7 +138,7 @@ fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersi
 ///
 /// This includes the string form, iterables of strings, iterables of
 /// iterable-like `(name, value)` pairs, and mappings from `str` to values.
-fn enum_names_type<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+fn enum_names_type<'db>(db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
     let str_type = KnownClass::Str.to_instance(db, env);
     let iterable_str = KnownClass::Iterable.to_specialized_instance(db, env, &[str_type]);
     let iterable_object = KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);

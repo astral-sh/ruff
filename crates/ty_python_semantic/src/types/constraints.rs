@@ -118,7 +118,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
     TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment, TypeOperations};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
@@ -473,7 +473,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns a constraint set that constrains a typevar to an explicit range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
@@ -503,7 +503,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns a constraint set that constrains a typevar to be a supertype of `lower`.
     pub(crate) fn constrain_typevar_lower_bound(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
@@ -518,7 +518,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns a constraint set that constrains a typevar to be a subtype of `upper`.
     pub(crate) fn constrain_typevar_upper_bound(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
@@ -533,7 +533,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns a constraint set that constrains a typevar to be equivalent to `bound`.
     pub(crate) fn constrain_typevar_equivalence_bound(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
@@ -562,7 +562,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn is_never_satisfied(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
     ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
@@ -579,11 +579,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ///
     /// If the solver reaches its computation limit, we do not know whether a valid solution exists.
     /// This returns `false` in that case: stopping the search is not proof that there is no solution.
-    pub(crate) fn has_no_valid_solutions(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
+    pub(crate) fn has_no_valid_solutions(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> bool {
         if self.is_never_satisfied(db, env, TypeVarSet::None) {
             return true;
         }
@@ -618,7 +614,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn is_always_satisfied(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
     ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
@@ -648,7 +644,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
@@ -773,7 +769,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
     ) -> Self {
@@ -909,7 +905,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn for_all(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
     ) -> Self {
@@ -928,7 +924,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     pub(crate) fn display(
         self,
         db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
+        env: &'c TypeOperations<'db>,
     ) -> impl Display + 'c {
         std::fmt::from_fn(move |f| {
             let storage = self.builder.storage.borrow();
@@ -940,7 +936,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn display_graph<'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a
     where
@@ -1301,7 +1297,7 @@ impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn load<'c>(
         &'c self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let mut storage = self.storage.borrow_mut();
@@ -1313,7 +1309,7 @@ impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn load_with_provenance<'c>(
         &'c self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
@@ -1342,19 +1338,19 @@ impl<'db> ConstraintSetStorage<'db> {
     fn intern_mentioned_typevars_in_type(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         support: &mut Support,
     ) {
         struct InternMentionedTypevars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
+            env: &'a TypeOperations<'db>,
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
             support: RefCell<&'a mut Support>,
             recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            fn program_environment(&self) -> &TypeOperations<'db> {
                 self.env
             }
 
@@ -1409,7 +1405,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn intern_constraint_typevars(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         constraint: Constraint<'db>,
     ) -> Support {
         let mut support = Support::default();
@@ -1441,7 +1437,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn intern_constraint(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         data: Constraint<'db>,
     ) -> ConstraintId {
         self.ensure_overlay_identity_caches();
@@ -1503,7 +1499,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn cached_constraint_bound_depth(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         constraint: ConstraintId,
     ) -> (u16, u16) {
         if let Some(depth) = self.constraint_bound_depth_cache.get(&constraint) {
@@ -1680,7 +1676,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn load(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
         self.load_with_provenance(db, env, other, None)
@@ -1689,7 +1685,7 @@ impl<'db> ConstraintSetStorage<'db> {
     fn load_with_provenance(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &OwnedConstraintSet<'db>,
         provenance: Option<ConstraintProvenance>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -1933,7 +1929,7 @@ impl<'db> UpperBound<'db> {
     /// effective bound. Returns `None` instead of materializing intersections when no existing
     /// clause dominates the others. An unconstrained validity bound remains distinct from an
     /// explicit evidence bound of `object`.
-    fn as_single_bound(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+    fn as_single_bound(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Type<'db>> {
         let mut clauses = self.iter_clauses().peekable();
         if clauses.peek().is_none() {
             Some(Type::object())
@@ -1944,7 +1940,7 @@ impl<'db> UpperBound<'db> {
 
     fn single_bound_from_iterator(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         mut clauses: impl Iterator<Item = Type<'db>> + Clone,
     ) -> Option<Type<'db>> {
         let candidate = clauses.clone().reduce(|candidate, clause| {
@@ -2006,12 +2002,7 @@ impl<'db> UpperBound<'db> {
         self.validity.shrink_to_fit();
     }
 
-    fn is_satisfied_by(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-    ) -> bool {
+    fn is_satisfied_by(&self, db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
         self.iter_clauses()
             .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause))
     }
@@ -2020,7 +2011,7 @@ impl<'db> UpperBound<'db> {
     fn when_satisfied_by(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         lower: Type<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -2046,17 +2037,17 @@ impl<'db> UpperBound<'db> {
 /// does not contain any typevars.
 fn max_constructor_and_typevar_depth<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> (u16, u16) {
     fn max_constructor_and_typevar_depth_impl<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         _dummy: (),
     ) -> (u16, u16) {
         struct TypeDepthVisitor<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
+            env: &'a TypeOperations<'db>,
             active: RefCell<FxHashSet<Type<'db>>>,
             current_depth: Cell<u16>,
             max_constructor_depth: Cell<u16>,
@@ -2064,7 +2055,7 @@ fn max_constructor_and_typevar_depth<'db>(
         }
 
         impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            fn program_environment(&self) -> &TypeOperations<'db> {
                 self.env
             }
 
@@ -2174,7 +2165,7 @@ impl ConstraintId {
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
         self.when_true().display(db, env, storage)
@@ -2487,7 +2478,7 @@ impl NodeId {
     fn is_always_satisfied<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
@@ -2508,7 +2499,7 @@ impl NodeId {
     fn is_never_satisfied<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
@@ -2789,7 +2780,7 @@ impl NodeId {
     fn exists<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
@@ -2883,7 +2874,7 @@ impl NodeId {
     fn path_assignments<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
@@ -2896,7 +2887,7 @@ impl NodeId {
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
         // Render the BDD directly as an unsimplified DNF formula. Each root-to-true path becomes
@@ -2933,13 +2924,13 @@ impl NodeId {
     fn display_graph<'db, 'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         storage: &'a ConstraintSetStorage<'db>,
         prefix: &'a dyn Display,
     ) -> impl Display + 'a {
         fn format_node<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             storage: &ConstraintSetStorage<'db>,
             node: NodeId,
             prefix: &dyn Display,
@@ -3139,7 +3130,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
     fn finish(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
@@ -3271,11 +3262,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         }
     }
 
-    pub(crate) fn as_exact(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
+    pub(crate) fn as_exact(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Type<'db>> {
         let lower = self.inference_lower(db, env)?;
         if self.has_upper_inference()
             && let Some(upper) = self.as_single_upper_bound(db, env)
@@ -3291,7 +3278,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     pub(crate) fn inference_lower(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         match (self.evidence_lower, self.mixed_lower) {
             (inference, None) | (None, inference) => inference,
@@ -3305,12 +3292,12 @@ impl<'db> CandidateTypeVarSolution<'db> {
     fn as_single_upper_bound(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         self.upper.as_single_bound(db, env)
     }
 
-    fn effective_lower(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn effective_lower(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         if self.evidence_lower.is_none() && self.mixed_lower.is_none() {
             return self.validity_lower;
         }
@@ -3354,7 +3341,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     fn restrict_gradual_solution(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         solution: Type<'db>,
     ) -> Option<Type<'db>> {
         if self.selected_declared_constraint.is_some()
@@ -3427,7 +3414,7 @@ impl<'db> Type<'db> {
     pub(crate) fn assignable_solutions_with_inferable(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> &'db CandidateSolutions<'db> {
@@ -3443,7 +3430,7 @@ impl<'db> Type<'db> {
             target: Type<'db>,
             inferable: TypeVarSet<'db>,
         ) -> CandidateSolutions<'db> {
-            let env = &ProgramEnvironment::from_program(program);
+            let env = &TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
             let when = source.when_constraint_set_assignable_to_owned(db, env, target);
             when.query(|builder, when| {
                 let mut storage = builder.storage.borrow_mut();
@@ -3470,7 +3457,7 @@ impl<'db> Type<'db> {
 )]
 fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
     let program = types.program(db);
-    let env = &ProgramEnvironment::from_program(program);
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(db, env, types.second(db))
@@ -3547,7 +3534,7 @@ impl<'db> CandidateSolutions<'db> {
     /// typevar that appears in the path's constraints.
     fn compute(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
         inferable: TypeVarSet<'db>,
@@ -3572,7 +3559,7 @@ impl<'db> CandidateSolutions<'db> {
     /// path allowance. No partially collected family is returned when either limit is exhausted.
     fn compute_bounded(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
         inferable: TypeVarSet<'db>,
@@ -3599,7 +3586,7 @@ impl<'db> CandidateSolutions<'db> {
 
     fn compute_with_limits<L: SolutionLimits>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
         inferable: TypeVarSet<'db>,
@@ -3649,7 +3636,7 @@ impl<'db> CandidateSolutions<'db> {
     /// the BDD itself, the declared upper bound of each type cannot mention any other typevars.
     fn compute_simple_bound_conjunction<L: SolutionLimits>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: &FxIndexSet<ConstraintId>,
         node: NodeId,
@@ -3824,7 +3811,7 @@ impl<'db> CandidateSolutions<'db> {
     pub(crate) fn solve(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
         self.solve_with(|_variance, path_bound| {
@@ -3935,7 +3922,7 @@ impl<'db> CandidateSolutions<'db> {
     /// they are not selected as inferred solutions.
     pub(crate) fn default_solve(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
@@ -3964,7 +3951,7 @@ impl<'db> CandidateSolutions<'db> {
     /// upper bounds, as the inferred types may not have stabilized yet.
     pub(crate) fn preliminary_solve(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &ConstraintSetBuilder<'db>,
         path_bound: &CandidateTypeVarSolution<'db>,
     ) -> PathBoundSolution<'db> {
@@ -4193,7 +4180,7 @@ impl InteriorNode {
     fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
@@ -4218,7 +4205,7 @@ impl InteriorNode {
     fn abstract_inner<'db, F, L>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
         limits: &mut L,
@@ -4397,7 +4384,7 @@ impl InteriorNode {
     fn path_assignments<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
@@ -4606,7 +4593,7 @@ impl ConstraintAssignment {
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
         let holds = match self {
@@ -4749,7 +4736,7 @@ impl SatisfiedClause {
     fn display<'db>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &ConstraintSetStorage<'db>,
     ) -> String {
         if self.constraints.is_empty() {
@@ -4798,7 +4785,7 @@ impl SatisfiedClauses {
     fn display<'db>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &ConstraintSetStorage<'db>,
     ) -> String {
         // This is a bit heavy-handed, but we need to output the clauses in a consistent order
@@ -4871,7 +4858,7 @@ mod tests {
 
     fn create_constraint_set_with_bounds<'db, 'c>(
         db: &'db TestDb,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Option<Type<'db>>,
@@ -5822,7 +5809,7 @@ class E: ...
         fn constraints(
             self,
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
         ) -> impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>> {
             let PermutedConstraint(typevar, provenance, lower, upper) = self;
             iter::chain(
@@ -5838,7 +5825,7 @@ class E: ...
         fn node(
             self,
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             storage: &mut ConstraintSetStorage<'db>,
         ) -> NodeId {
             let constraints = self.constraints(db, env);

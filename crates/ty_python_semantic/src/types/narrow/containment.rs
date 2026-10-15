@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use crate::types::{ClassBase, IntersectionBuilder, KnownClass, Type, UnionBuilder};
 
@@ -16,7 +16,7 @@ enum ContainmentBehavior<'db> {
 /// Return the containment behavior known for this type.
 fn containment_behavior<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> ContainmentBehavior<'db> {
     TypeInspector::scope(env, |inspector| containment_behavior_in(db, inspector, ty))
@@ -163,7 +163,7 @@ fn containment_behavior_in<'db>(
 /// Return the type whose iterated elements may satisfy membership for `ty`.
 pub(super) fn elements_of<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
     match containment_behavior(db, env, ty) {
@@ -178,7 +178,7 @@ const MAX_STRING_MEMBERSHIP_EXCLUSIONS: usize = 128;
 /// Narrow membership in a known string literal using substring semantics.
 pub(super) fn narrow_string_membership<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     lhs_ty: Type<'db>,
     haystack: &str,
     is_contained: bool,

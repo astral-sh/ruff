@@ -16,7 +16,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, ProgramEnvironment, TypeOperations,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -354,7 +354,7 @@ fn check_inherited_method_conflicts<'db>(
 /// Returns a source-defined method bound to the class whose MRO is being checked.
 fn source_method_contract<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     owner: ClassType<'db>,
     receiver: Type<'db>,
     name: &Name,
@@ -399,7 +399,7 @@ fn enum_class_creation_manages_conflict<'db>(
     selected_owner: ClassType<'db>,
     contract_owner: ClassType<'db>,
 ) -> bool {
-    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
     if !is_enum_class_by_inheritance(db, &env, class) {
         return false;
     }
@@ -1089,7 +1089,7 @@ fn check_class_declaration<'db>(
 /// until they are bound for the override comparison.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassType<'db>,
     name: &Name,
 ) -> PlaceAndQualifiers<'db> {
@@ -1105,7 +1105,7 @@ fn lookup_override_member<'db>(
 /// callable instance's `__call__` receiver first, as for constructor calls.
 fn bind_new_for_override<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassType<'db>,
     name: &Name,
     ty: Type<'db>,
@@ -1135,7 +1135,7 @@ fn bind_new_for_override<'db>(
 /// combine conflicting contracts that are absent from the method-defining class's hierarchy.
 fn is_inherited_method_violation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     bases: &[ClassBase<'db>],
     method_owner: ClassType<'db>,
     superclass: ClassType<'db>,
@@ -1211,7 +1211,7 @@ fn is_inherited_method_violation<'db>(
 /// ```
 fn is_assignable_method_override<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
 ) -> bool {
@@ -1222,7 +1222,7 @@ fn is_assignable_method_override<'db>(
 
 fn method_override_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
@@ -1318,7 +1318,10 @@ pub(super) fn effective_superclass_variable_kind<'db>(
     superclass: ClassType<'db>,
     name: Name,
 ) -> Option<VariableKind> {
-    let env = &ProgramEnvironment::from_file(superclass.class_literal(db).program_file(db));
+    let env = &TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(superclass.class_literal(db).program_file(db)),
+    );
     let inherited_variable_kind = || {
         superclass
             .iter_mro(db)
@@ -1427,7 +1430,7 @@ fn is_function_definition<'db>(
 /// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
 fn variable_kind<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {

@@ -742,7 +742,7 @@ pub(crate) mod testing {
     use ty_python_core::ProgramFile;
     use ty_python_core::program::{FallibleStrategy, ProgramSettings};
     #[cfg(feature = "testing")]
-    use ty_python_semantic::ProgramEnvironment;
+    use ty_python_semantic::TypeOperations;
     use ty_python_semantic::dependency::DependencyMetadata;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{AnalysisSettings, PythonVersionWithSource};
@@ -829,8 +829,8 @@ pub(crate) mod testing {
 
     impl TestDb {
         #[cfg(feature = "testing")]
-        pub fn program_environment(&self) -> ProgramEnvironment<'_> {
-            ProgramEnvironment::from_program(self.project().program(self))
+        pub fn program_environment(&self) -> TypeOperations<'_> {
+            TypeOperations::for_test_program(self, self.project().program(self))
         }
 
         /// Takes the salsa events.

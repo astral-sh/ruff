@@ -1,6 +1,6 @@
-use crate::ProgramEnvironment;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspector;
+use crate::{ProgramEnvironment, TypeOperations};
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -68,7 +68,7 @@ impl KnownEnumDataTypeMixin {
     fn normalize_value<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         value: Type<'db>,
     ) -> Type<'db> {
         if let Type::Union(union) = value {
@@ -172,7 +172,7 @@ impl<'db> EnumValueConstruction<'db> {
     fn normalize_value(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         value: Type<'db>,
     ) -> Option<Type<'db>> {
         match self.data_type {
@@ -196,7 +196,7 @@ impl<'db> EnumValueConstruction<'db> {
     fn alias_detection_value(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         value_ty: Type<'db>,
         is_auto: bool,
     ) -> Option<Type<'db>> {
@@ -260,7 +260,7 @@ impl get_size2::GetSize for EnumMetadata<'_> {}
 
 pub(super) fn class_defines_property<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
     name: &str,
 ) -> bool {
@@ -334,7 +334,7 @@ fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let env = ProgramEnvironment::from_file(class.program_file(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
     let metadata = enum_metadata(db, class)?;
     let members = metadata
         .members
@@ -418,7 +418,7 @@ impl<'db> EnumClassLiteral<'db> {
 /// expand through the remaining literal union so descriptor lookup sees ordinary enum literals.
 pub(super) fn instance_member_for_enum_complement<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     complement: EnumComplement<'db>,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
@@ -437,7 +437,7 @@ pub(super) fn instance_member_for_enum_complement<'db>(
 /// general member lookup so descriptor and class-variable policy is still applied.
 pub(super) fn member_lookup_for_enum_complement<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     complement: EnumComplement<'db>,
     name: &str,
     policy: MemberLookupPolicy,
@@ -458,7 +458,7 @@ pub(super) fn member_lookup_for_enum_complement<'db>(
 /// directly from the remaining canonical members.
 fn special_member_for_enum_complement<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     complement: EnumComplement<'db>,
     name: &str,
 ) -> Option<PlaceAndQualifiers<'db>> {
@@ -480,7 +480,7 @@ fn special_member_for_enum_complement<'db>(
 /// are normalized to the annotated class by constructors such as `int.__new__`.
 fn known_constructor_preserves_value_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     value: Type<'db>,
     annotation: Type<'db>,
 ) -> bool {
@@ -517,7 +517,7 @@ fn known_constructor_preserves_value_type_in<'db>(
 /// constructor may return an instance of the built-in base.
 fn value_has_exact_known_class<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     value: Type<'db>,
     data_type: KnownClass,
 ) -> bool {
@@ -579,7 +579,7 @@ impl<'db> EnumMetadata<'db> {
     fn value_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         member_name: &Name,
     ) -> Option<Type<'db>> {
         if !self.members.contains_key(member_name) {
@@ -609,7 +609,7 @@ impl<'db> EnumMetadata<'db> {
     pub(super) fn concrete_value_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         member_name: &Name,
     ) -> Option<Type<'db>> {
         let declared_value = self.members.get(member_name).copied()?;
@@ -651,7 +651,7 @@ impl<'db> EnumMetadata<'db> {
     pub(crate) fn instance_value_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         if self.members.is_empty() {
             return None;
@@ -683,7 +683,7 @@ impl<'db> EnumMetadata<'db> {
     pub(crate) fn instance_name_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         if self.members.is_empty() {
             return None;
@@ -755,7 +755,7 @@ impl<'db> EnumComplementType<'db> {
     /// Recognize the compact enum-complement shape inside an intersection.
     pub(crate) fn from_intersection_parts(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         positive: &FxOrderSet<Type<'db>>,
         negative: &NegativeIntersectionElements<'db>,
     ) -> Option<Self> {
@@ -841,7 +841,7 @@ impl<'db> EnumComplementType<'db> {
     pub fn remaining_literal_types(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Vec<Type<'db>> {
         self.remaining_member_names(db)
             .map(|name| self.remaining_literal_type(db, env, name))
@@ -852,7 +852,7 @@ impl<'db> EnumComplementType<'db> {
     pub(crate) fn remaining_literal_union(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         let alternatives = self.remaining_literal_types(db, env);
         match alternatives.as_slice() {
@@ -873,7 +873,7 @@ impl<'db> EnumComplementType<'db> {
     fn remaining_literal_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &Name,
     ) -> Type<'db> {
         let literal =
@@ -896,7 +896,7 @@ impl<'db> EnumComplementType<'db> {
     pub(crate) fn remaining_literal_types_for_display(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         max_literals: usize,
     ) -> Option<Vec<Type<'db>>> {
         if !self.rest(db).is_empty() {
@@ -918,7 +918,7 @@ impl<'db> EnumComplementType<'db> {
     fn member_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         member_name: &str,
     ) -> Option<Type<'db>> {
         let enum_class_literal = self.enum_class_literal(db);
@@ -973,11 +973,7 @@ impl<'db> EnumComplementType<'db> {
     }
 
     /// Reconstruct the equivalent set-theoretic intersection.
-    pub(crate) fn to_intersection(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn to_intersection(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         let enum_class = self.enum_class(db);
         let mut positive = FxOrderSet::from_iter([enum_class.to_non_generic_instance(db, env)]);
         positive.extend(self.rest(db).iter().copied());
@@ -1006,7 +1002,7 @@ pub(crate) fn enum_ignored_names<'db>(db: &'db dyn Db, scope_id: ScopeId<'db>) -
     };
 
     let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
-    let env = ProgramEnvironment::from_scope(scope_id);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
     let ignore_place = place_from_bindings(db, &env, ignore_bindings).place;
 
     match ignore_place {
@@ -1080,7 +1076,8 @@ pub(crate) fn enum_metadata<'db>(
             if !spec.has_known_members(db) {
                 return None;
             }
-            let env = ProgramEnvironment::from_scope(enum_lit.scope(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_scope(enum_lit.scope(db)));
             let value_construction = EnumValueConstruction {
                 data_type: inherited_enum_data_type(db, &env, ClassLiteral::DynamicEnum(enum_lit)),
                 ..EnumValueConstruction::default()
@@ -1129,7 +1126,7 @@ pub(crate) fn enum_metadata<'db>(
     // As a fast path, avoid looking up base classes if the class body is empty
     use_def_map.all_end_of_scope_symbol_bindings().next()?;
 
-    let env = ProgramEnvironment::from_file(class.program_file(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;
@@ -1426,7 +1423,7 @@ fn enum_metaclass_may_transform_values<'db>(
 /// which declare `_value_` annotations that normally should be inherited.
 fn iter_parent_enum_classes<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
 ) -> impl Iterator<Item = StaticClassLiteral<'db>> + 'db {
     let env = env.clone();
@@ -1450,7 +1447,7 @@ fn iter_parent_enum_classes<'db>(
 /// Returns the `_value_` annotation type if one is declared in the given scope.
 fn custom_value_annotation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     scope: ScopeId<'db>,
 ) -> Option<Type<'db>> {
     let symbol_id = place_table(db, scope).symbol_id("_value_")?;
@@ -1463,7 +1460,7 @@ fn custom_value_annotation<'db>(
 /// Looks up an inherited `_value_` annotation from parent enum classes in the MRO.
 fn inherited_value_annotation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, env, class)
@@ -1473,7 +1470,7 @@ fn inherited_value_annotation<'db>(
 /// Looks up an inherited `_value_` annotation from user-defined parent enum classes in the MRO.
 fn inherited_user_defined_value_annotation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
     iter_parent_enum_classes(db, env, class)
@@ -1496,7 +1493,7 @@ enum InheritedEnumDataType {
 /// precisely when no user-defined non-enum base can affect member construction or attribute access.
 fn inherited_enum_data_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
 ) -> InheritedEnumDataType {
     let mut selected = InheritedEnumDataType::None;
@@ -1581,7 +1578,7 @@ fn custom_enum_method<'db>(
 /// Looks up the first user-defined enum method in the MRO.
 fn inherited_user_defined_enum_method<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
     name: &str,
 ) -> Option<EnumMethodBinding<'db>> {
@@ -1593,7 +1590,7 @@ fn inherited_user_defined_enum_method<'db>(
 /// Looks up the first user-defined enum member constructor in the MRO.
 fn inherited_user_defined_enum_new<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
 ) -> Option<EnumMethodBinding<'db>> {
     iter_parent_enum_classes(db, env, class)
@@ -1644,7 +1641,7 @@ fn inherited_user_defined_mixin_new<'db>(
 /// Looks up a resolvable method inherited from a known enum class.
 fn inherited_known_enum_method<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
     name: &str,
 ) -> Option<FunctionType<'db>> {
@@ -1714,7 +1711,7 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// verifies that the class has members.
 pub(crate) fn is_enum_class_by_inheritance<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
 ) -> bool {
     Type::ClassLiteral(ClassLiteral::Static(class)).is_subtype_of(
@@ -1734,7 +1731,7 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
 /// Returns `Some(value_type)` if the type is a `nonmember[T]`, otherwise `None`.
 pub(crate) fn try_unwrap_nonmember_value<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
     match ty {

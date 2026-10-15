@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -87,7 +87,7 @@ impl<'db> BinaryInferenceState<'db> {
     pub(super) fn try_map_union<E>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         union: UnionType<'db>,
         mut transform: impl FnMut(Type<'db>, &mut Self) -> Result<Type<'db>, E>,
     ) -> Result<Type<'db>, E> {
@@ -114,7 +114,7 @@ impl<'db> BinaryInferenceState<'db> {
     fn limit_tuple_addition_result(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
         if !self.used_tuple_addition {
@@ -402,7 +402,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// otherwise returns the union of all results.
     pub(super) fn map_constrained_typevar_constraints(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: Type<'db>,
         constraints: TypeVarConstraints<'db>,
         mut op: impl FnMut(Type<'db>) -> Option<Type<'db>>,

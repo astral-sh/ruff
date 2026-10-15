@@ -26,7 +26,7 @@ use ty_python_core::{
 
 use crate::place::implicit_builtins_symbol_scope;
 use crate::types::{ClassBase, ClassLiteral, ClassType, SubclassOfInner, Type, binding_type};
-use crate::{Db, FxIndexSet, ProgramEnvironment, module_docstring};
+use crate::{Db, FxIndexSet, ProgramEnvironment, TypeOperations, module_docstring};
 
 /// Controls whether local import aliases should be resolved to their targets or returned as-is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,7 +173,7 @@ pub(crate) fn definitions_for_name<'db>(
     if !definitions.is_empty() {
         return definitions;
     }
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     implicit_builtins_symbol_scope(db, &env, name)
         .map(|scope| definitions_for_builtin(db, scope, name))
         .unwrap_or_default()
@@ -186,7 +186,7 @@ pub(crate) fn scoped_definitions_for_name<'db>(
     name_str: &str,
     alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     let file = scope.program_file(db);
     let index = semantic_index(db, file);
     let file_scope = scope.file_scope_id(db);
@@ -297,7 +297,7 @@ pub(crate) fn definitions_for_builtin<'db>(
     scope: ScopeId<'db>,
     name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     find_symbol_in_scope(db, scope, name)
         .into_iter()
         .filter(|def| def.is_reexported(db))
@@ -332,7 +332,7 @@ pub(crate) fn definitions_for_builtin<'db>(
 /// handle this case through the use of mode flags.
 pub(crate) fn definitions_for_attribute<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     lhs_ty: Type<'db>,
     name_str: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
@@ -448,7 +448,7 @@ pub(crate) fn definitions_for_attribute<'db>(
 
 fn definitions_for_attribute_in_class_hierarchy<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class_literal: &ClassLiteral<'db>,
     attribute_name: &str,
 ) -> Vec<ResolvedDefinition<'db>> {
@@ -568,7 +568,7 @@ pub(super) fn user_visible_definitions<'db>(
 
 fn resolve_reachable_definitions<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     symbol_name: &str,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
@@ -592,7 +592,7 @@ fn resolve_reachable_definitions<'db>(
 /// Always returns at least the original definition as a fallback if resolution fails.
 pub(crate) fn resolve_definition<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
     symbol_name: Option<&str>,
     alias_resolution: ImportAliasResolution,
@@ -618,7 +618,7 @@ pub(crate) fn resolve_definition<'db>(
 /// Helper function to resolve import definitions recursively.
 fn resolve_definition_recursive<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
     visited: &mut FxHashSet<Definition<'db>>,
     symbol_name: Option<&str>,
@@ -719,7 +719,7 @@ fn resolve_definition_recursive<'db>(
 /// Helper function to resolve import definitions for `ImportFrom` and `StarImport` cases.
 pub(crate) fn resolve_from_import_definitions<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     importing_file: ImportingFile<'db>,
     import_node: &ast::StmtImportFrom,
     symbol_name: &str,
@@ -800,7 +800,7 @@ pub(crate) fn resolve_from_import_definitions<'db>(
 // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
 fn resolve_from_import_submodule_definitions<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     importing_file: ImportingFile<'db>,
     symbol_name: &str,
     module_name: &ModuleName,

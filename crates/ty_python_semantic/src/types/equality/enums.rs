@@ -10,7 +10,7 @@ use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
     LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
 };
-use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment, TypeOperations};
 
 use super::{
     ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
@@ -52,7 +52,7 @@ pub(super) fn evaluate_enum_comparison<'db>(
 /// the other.
 fn evaluate_enum_domains<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     target: Type<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
@@ -107,7 +107,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// Return `None` if either enum has unsupported comparison behavior.
     fn new(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         other: Type<'db>,
         branch: ComparisonBranch,
@@ -317,7 +317,7 @@ impl<'db> SameEnumComparison<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
@@ -392,13 +392,13 @@ impl<'db> EnumValueSet<'db> {
     /// transferred to the other comparison operand.
     fn from_type(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         fn from_type_inner<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             visitor: &EnumDomainVisitor<'_, 'db>,
         ) -> Option<EnumValueSet<'db>> {
@@ -450,7 +450,7 @@ impl<'db> EnumValueSet<'db> {
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         elements: &[Type<'db>],
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
@@ -518,7 +518,7 @@ impl<'db> EnumValueSet<'db> {
     /// Extract the enum restriction while discarding unrelated positive intersection state.
     fn from_intersection(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         intersection: IntersectionType<'db>,
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
@@ -628,7 +628,7 @@ impl<'db> EnumValueSet<'db> {
     }
 
     /// Reconstruct a constraint containing only this enum value restriction.
-    fn restriction_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn restriction_type(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match &self.members {
             EnumValueSetMembers::All => self
                 .enum_class
@@ -700,10 +700,10 @@ impl<'db> EnumDomainPartition<'db> {
     /// Combine enum values while keeping other values in their original order.
     ///
     /// Return `None` when there is no enum or a type alias refers to itself.
-    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             enum_types: &mut Vec<Type<'db>>,
             alternatives: &mut Vec<Type<'db>>,
@@ -773,10 +773,10 @@ struct EnumDomainSet<'db> {
 }
 
 impl<'db> EnumDomainSet<'db> {
-    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Option<Self> {
         fn collect<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             visitor: &EnumDomainVisitor<'_, 'db>,
@@ -793,7 +793,7 @@ impl<'db> EnumDomainSet<'db> {
 
         fn collect_union<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
             visitor: &EnumDomainVisitor<'_, 'db>,
@@ -833,7 +833,7 @@ impl<'db> EnumDomainSet<'db> {
         Some(projection)
     }
 
-    fn restriction_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn restriction_type(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         self.domains
             .iter()
             .fold(UnionBuilder::new(db, env), |builder, domain| {
@@ -845,7 +845,7 @@ impl<'db> EnumDomainSet<'db> {
     fn restrict_for_equality(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
@@ -866,7 +866,7 @@ impl<'db> EnumDomainSet<'db> {
     fn known_equal_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         operator: ComparisonOperator,
         other: &EnumKeyProjection<'db>,
     ) -> Option<Type<'db>> {
@@ -926,7 +926,7 @@ impl<'db> ProjectedEnumComparison<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
@@ -1115,7 +1115,10 @@ fn enum_class_key_profile<'db>(
     enum_class: EnumClassLiteral<'db>,
     operator: ComparisonOperator,
 ) -> EnumClassKeyProfile<'db> {
-    let env = ProgramEnvironment::from_file(enum_class.class_literal(db).program_file(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(enum_class.class_literal(db).program_file(db)),
+    );
     let semantics = KnownComparisonSemantics::of_instance(
         db,
         &env,

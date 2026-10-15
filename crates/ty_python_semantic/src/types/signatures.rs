@@ -10,9 +10,9 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
-use crate::ProgramEnvironment;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspector;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -121,7 +121,7 @@ pub struct CallableSignature<'db> {
 
 fn merge_receiver_constraints<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     first: Option<&OwnedConstraintSet<'db>>,
     second: Option<&OwnedConstraintSet<'db>>,
 ) -> Option<OwnedConstraintSet<'db>> {
@@ -189,11 +189,7 @@ impl<'db> CallableSignature<'db> {
         Self::single(Signature::bottom())
     }
 
-    pub(crate) fn cycle_initial(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        id: salsa::Id,
-    ) -> Self {
+    pub(crate) fn cycle_initial(db: &'db dyn Db, env: &TypeOperations<'db>, id: salsa::Id) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
             Type::divergent(id).bottom_materialization(db, env),
@@ -230,7 +226,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn overload_return_type_or_unknown(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         match self.overloads.as_slice() {
             [] => Type::unknown(),
@@ -280,7 +276,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn cycle_normalized(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -302,7 +298,7 @@ impl<'db> CallableSignature<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -476,7 +472,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -497,7 +493,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn bind_self_with_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
@@ -517,7 +513,7 @@ impl<'db> CallableSignature<'db> {
     pub(super) fn bind_method_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Self {
@@ -574,7 +570,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn apply_self_with_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> Self {
@@ -614,7 +610,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -648,7 +644,7 @@ impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         VarianceTerm::join(
@@ -1009,7 +1005,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn should_hide_self_from_display(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> bool {
         !self.return_ty.contains_self(db, env)
             && !self.parameters().iter().any(|p| {
@@ -1036,7 +1032,7 @@ impl<'db> Signature<'db> {
     fn cycle_normalized(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -1070,7 +1066,7 @@ impl<'db> Signature<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1131,7 +1127,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn freshen_bound_typevars(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         delta: u32,
     ) -> Self {
         let Some(generic_context) = self.generic_context else {
@@ -1173,7 +1169,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -1210,7 +1206,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn add_implicit_self_annotation(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
         if let Some(first_parameter) = self.parameters.data.value.first()
@@ -1266,7 +1262,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn bind_self(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         self_type: Option<Type<'db>>,
     ) -> Self {
         self.bind_self_with_receiver(db, env, self_type, self_type)
@@ -1279,7 +1275,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn bind_self_with_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
@@ -1414,7 +1410,7 @@ impl<'db> Signature<'db> {
     /// ```
     fn receiver_violates_typevar_domain(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
@@ -1447,7 +1443,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn specialize_for_bound_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableSignature<'db>> {
@@ -1534,7 +1530,7 @@ impl<'db> Signature<'db> {
     fn can_bind_self_to(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         self_type: Type<'db>,
     ) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
@@ -1606,7 +1602,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn has_receiver_determined_method_typevar(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> bool {
         let Some(receiver) = self
             .parameters
@@ -1662,7 +1658,7 @@ impl<'db> Signature<'db> {
     pub(super) fn bind_unused_self(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
@@ -1732,7 +1728,7 @@ impl<'db> Signature<'db> {
     fn apply_self_with_receiver(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> Self {
@@ -1862,7 +1858,10 @@ impl<'db> Signature<'db> {
 
     /// Returns this signature with the given specialization applied to parameters and return type.
     fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+        let env = &TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(specialization.generic_context(db).program(db)),
+        );
         let type_mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         self.apply_type_mapping_impl(
@@ -1877,7 +1876,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn specialize_for_partial_application(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         partial_application: &PartialApplication<'db>,
         inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
@@ -1970,7 +1969,7 @@ impl<'db> Signature<'db> {
     fn partial_application_specialization(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         partial_application: &PartialApplication<'db>,
         inference: Option<TypeVarInference<'db>>,
     ) -> Option<Specialization<'db>> {
@@ -2013,7 +2012,7 @@ impl<'db> Signature<'db> {
     fn needs_self_mapping(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         parameters: &[Parameter<'db>],
     ) -> bool {
         self.return_ty.contains_self(db, env)
@@ -2042,7 +2041,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn non_generic_implementation_parameters_consistency_with(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         overload: &Self,
     ) -> ParameterConsistency<'db> {
         debug_assert!(self.is_non_generic());
@@ -2080,7 +2079,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn non_generic_implementation_return_type_consistency_with(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         overload: &Self,
     ) -> ReturnTypeConsistency<'db> {
         debug_assert!(self.is_non_generic());
@@ -2114,7 +2113,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &CallableSignature<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -2170,7 +2169,7 @@ impl<'db> Signature<'db> {
     fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: &Self,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -2251,7 +2250,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         tracing::trace!(
@@ -4772,7 +4771,7 @@ impl<'db> Parameters<'db> {
     /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
     pub(crate) fn from_annotation(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
         let parameters = parameters.into_iter();
@@ -5325,7 +5324,7 @@ impl<'db> Parameters<'db> {
 
         Self::from_annotation(
             db,
-            &ProgramEnvironment::from_definition(definition),
+            &TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition)),
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -5950,7 +5949,7 @@ impl<'db> Parameter<'db> {
     fn cycle_normalized(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -5973,7 +5972,7 @@ impl<'db> Parameter<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -6043,7 +6042,10 @@ impl<'db> Parameter<'db> {
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
             && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                 db,
-                &ProgramEnvironment::from_definition(function_definition),
+                &TypeOperations::new_root(
+                    db,
+                    ProgramEnvironment::from_definition(function_definition),
+                ),
                 annotated_type,
                 annotation_flags,
             )
@@ -6118,7 +6120,7 @@ impl<'db> Parameter<'db> {
     fn unpacked_typed_dict(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<TypedDictType<'db>> {
         (self.is_keyword_variadic()
             && matches!(
@@ -6267,7 +6269,7 @@ impl<'db> ParameterDefault<'db> {
     returns(copy),
     cycle_initial=|_, id, _| Type::divergent(id),
     cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
-        ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
+        ty.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_definition(parameter)), *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -6290,7 +6292,10 @@ fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> T
     // Nested callable defaults still need the existing cycle-breaking normalization.
     infer_function_default_types(db, function)
         .expression_type(default)
-        .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
+        .replace_parameter_defaults(
+            db,
+            &TypeOperations::new_root(db, ProgramEnvironment::from_definition(function)),
+        )
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -6336,7 +6341,7 @@ impl<'db> ParameterKind<'db> {
     #[expect(clippy::ref_option)]
     fn cycle_normalized_default(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         current: &Option<ParameterDefault<'db>>,
         previous: &Option<ParameterDefault<'db>>,
         cycle: &salsa::Cycle,
@@ -6352,7 +6357,7 @@ impl<'db> ParameterKind<'db> {
     fn cycle_normalized(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous: &Self,
         cycle: &salsa::Cycle,
     ) -> Self {

@@ -6,7 +6,7 @@ use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, TypeOperations};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::assert_function_query_was_not_run_by_name;
@@ -298,7 +298,7 @@ fn typing_vs_typeshed_no_default() {
 
 fn list_alias<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     argument: Type<'db>,
 ) -> GenericAlias<'db> {
     KnownClass::List
@@ -315,7 +315,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     current: Type<'db>,
     program: Program<'db>,
 ) -> Type<'db> {
-    let env = ProgramEnvironment::from_program(program);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
     current.cycle_normalized(db, &env, *previous, cycle)
 }
 
@@ -325,7 +325,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     cycle_fn=oscillating_generic_alias_cycle_recover,
 )]
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
-    let env = ProgramEnvironment::from_program(program);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
     let previous = oscillating_generic_alias(db, program);
     let argument = if let Type::GenericAlias(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]

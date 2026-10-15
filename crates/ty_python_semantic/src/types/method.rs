@@ -5,7 +5,7 @@ use itertools::Either;
 use ruff_python_ast::name::Name;
 
 use crate::{
-    Db, Program, ProgramEnvironment,
+    Db, Program, ProgramEnvironment, TypeOperations,
     types::{
         ApplyTypeMappingVisitor, CallableType, CallableTypes, InternedType, KnownClass,
         LiteralValueType, LiteralValueTypeKind, Parameter, Parameters, PropertyInstanceType,
@@ -232,7 +232,8 @@ impl<'db> BoundMethodType<'db> {
         let self_instance = self.self_instance(db);
 
         if self.class_method(db) {
-            let env = ProgramEnvironment::from_program(self.program(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
             self_instance
                 .to_instance_approximation(db, &env)
                 .unwrap_or(Type::unknown())
@@ -281,7 +282,7 @@ impl<'db> BoundMethodType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn callables(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
-        let env = ProgramEnvironment::from_program(self.program(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
         self.callables_with_receiver(
             db,
             &env,
@@ -293,7 +294,7 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn callables_with_receiver(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableTypes<'db>> {
@@ -321,7 +322,7 @@ impl<'db> BoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -478,7 +479,7 @@ impl<'db> KnownBoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -572,7 +573,7 @@ impl<'db> KnownBoundMethodType<'db> {
     pub(super) fn callables(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<CallableTypes<'db>> {
         let object_type_form = || TypeFormType::from_type_expression(db, Type::object());
 
@@ -1032,7 +1033,7 @@ impl WrapperDescriptorKind {
     pub(super) fn signatures<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> impl Iterator<Item = Signature<'db>> {
         /// Similar to what we do in [`KnownBoundMethod::signatures`],
         /// here we also model `types.FunctionType.__get__` (or builtins.property.__get__),
@@ -1044,7 +1045,7 @@ impl WrapperDescriptorKind {
         /// with the `self` parameters removed.
         fn dunder_get_signatures<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             class: KnownClass,
         ) -> [Signature<'db>; 2] {
             let type_instance = KnownClass::Type.to_instance(db, env);

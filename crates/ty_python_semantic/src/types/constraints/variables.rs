@@ -14,7 +14,7 @@ use crate::types::constraints::{
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 
 /// The _provenance_ of a BDD constraint.
 ///
@@ -112,7 +112,7 @@ impl<'db> Constraint<'db> {
     pub(super) fn new_node(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
         let constraint_id = storage.intern_constraint(db, env, self);
@@ -121,7 +121,7 @@ impl<'db> Constraint<'db> {
 
     pub(super) fn new_nodes(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraints: impl IntoIterator<Item = Result<Self, UnsatisfiableBound>>,
     ) -> (NodeId, Option<SourceOrderId>) {
@@ -230,7 +230,7 @@ impl<'db> Constraint<'db> {
     /// comparing a typevar with itself).
     pub(super) fn new_upper_bound(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
@@ -308,7 +308,7 @@ impl<'db> Constraint<'db> {
     /// be removed without discarding the other half.
     pub(super) fn new_equivalence_bound(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
@@ -523,7 +523,7 @@ impl<'db> Constraint<'db> {
         }
     }
 
-    pub(crate) fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
+    pub(crate) fn bound_depth(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> (u16, u16) {
         match self {
             Constraint::ConcreteLower(this) => {
                 max_constructor_and_typevar_depth(db, env, this.bound)
@@ -581,7 +581,7 @@ impl<'db> Constraint<'db> {
     pub(super) fn display<'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         holds: Option<bool>,
     ) -> impl Display + 'a {
         std::fmt::from_fn(move |f| match self {
@@ -683,7 +683,7 @@ impl<'db> ConcreteLowerBound<'db> {
     fn display<'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         holds: Option<bool>,
     ) -> impl Display + 'a {
         let range_prefix = match holds {
@@ -801,7 +801,7 @@ impl<'db> ConcreteUpperBound<'db> {
     fn display<'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         holds: Option<bool>,
     ) -> impl Display + 'a {
         let range_prefix = match holds {
@@ -917,7 +917,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
     fn display<'a>(
         self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         holds: Option<bool>,
     ) -> impl Display + 'a {
         let equality_sign = match holds {

@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
@@ -62,7 +62,7 @@ impl<'db> Type<'db> {
     pub(super) fn function_like_dunder_get(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
@@ -125,7 +125,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_upcast_to_callable(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy(db, env, UpcastPolicy::default())
     }
@@ -133,7 +133,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_upcast_to_callable_with_recursive_fallback(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         recursive_definition: Option<Definition<'db>>,
     ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
@@ -148,7 +148,7 @@ impl<'db> Type<'db> {
     pub(crate) fn try_upcast_to_callable_with_policy(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         policy: UpcastPolicy,
     ) -> Option<CallableTypes<'db>> {
         self.try_upcast_to_callable_with_policy_and_context(
@@ -163,7 +163,7 @@ impl<'db> Type<'db> {
     fn try_upcast_to_callable_with_policy_and_context(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         policy: UpcastPolicy,
         context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
@@ -184,7 +184,7 @@ impl<'db> Type<'db> {
     fn try_upcast_to_callable_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         policy: UpcastPolicy,
         context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
@@ -451,10 +451,7 @@ struct CallableUpcastContext<'env, 'db> {
 }
 
 impl<'env, 'db> CallableUpcastContext<'env, 'db> {
-    fn new(
-        env: &'env ProgramEnvironment<'db>,
-        recursive_definition: Option<Definition<'db>>,
-    ) -> Self {
+    fn new(env: &'env TypeOperations<'db>, recursive_definition: Option<Definition<'db>>) -> Self {
         Self {
             recursive_definition,
             active: crate::types::CycleDetector::new(()),
@@ -911,7 +908,7 @@ impl<'db> CallableType<'db> {
     pub(crate) fn into_functools_partial_instance(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         let return_ty = self.signatures(db).overload_return_type_or_unknown(db, env);
         KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[return_ty])
@@ -935,7 +932,7 @@ impl<'db> CallableType<'db> {
     pub(super) fn bind_self(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
@@ -959,7 +956,7 @@ impl<'db> CallableType<'db> {
     pub(crate) fn apply_self_with_receiver(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> CallableType<'db> {
@@ -981,7 +978,7 @@ impl<'db> CallableType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1015,7 +1012,7 @@ impl<'db> CallableType<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -1079,7 +1076,7 @@ impl<'db> CallableTypes<'db> {
             .flat_map(move |callable| callable.signatures(db))
     }
 
-    pub(crate) fn to_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(crate) fn to_type(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         assert!(!self.0.is_empty(), "CallableTypes should not be empty");
         UnionType::from_elements(db, env, self.0.iter().copied().map(Type::Callable))
     }

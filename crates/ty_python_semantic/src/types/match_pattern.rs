@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -65,7 +65,7 @@ type PatternTypeCache<'pattern, 'db> = FxHashMap<PatternCacheKey<'pattern, 'db>,
 
 pub(crate) fn singleton_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     singleton: ast::Singleton,
 ) -> Type<'db> {
     let ty = match singleton {
@@ -77,10 +77,7 @@ pub(crate) fn singleton_pattern_type<'db>(
     ty
 }
 
-pub(crate) fn mapping_pattern_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-) -> Type<'db> {
+pub(crate) fn mapping_pattern_type<'db>(db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
     KnownClass::Mapping
         .to_instance(db, env)
         .top_materialization(db, env)
@@ -93,7 +90,7 @@ pub(crate) fn mapping_pattern_type<'db>(
 /// `Mapping()`, and `MutableMapping()`.
 pub(crate) fn typed_dict_matches_class_pattern<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
 ) -> bool {
     let Some(dict) = KnownClass::Dict
@@ -112,7 +109,7 @@ pub(crate) fn typed_dict_matches_class_pattern<'db>(
 /// Return whether every value in `ty` belongs to a `TypedDict` domain accepted by `predicate`.
 fn typed_dict_pattern_domain_satisfies<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     predicate: &mut impl FnMut(TypedDictType<'db>) -> bool,
 ) -> bool {
@@ -173,17 +170,17 @@ where
 }
 
 /// Return whether every value in `ty` is represented by a `TypedDict` schema at runtime.
-pub(super) fn is_typed_dict_runtime_domain(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    ty: Type<'_>,
+pub(super) fn is_typed_dict_runtime_domain<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
 ) -> bool {
     typed_dict_pattern_domain_satisfies(db, env, ty, &mut |_| true)
 }
 
 pub(crate) fn sequence_pattern_type_builder<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
 ) -> IntersectionBuilder<'db> {
     IntersectionBuilder::new(db, env)
         .add_positive(
@@ -200,7 +197,7 @@ pub(crate) fn sequence_pattern_type_builder<'db>(
 
 fn sequence_pattern_getitem_method<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
     fallback_return_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
@@ -251,7 +248,7 @@ fn sequence_pattern_getitem_method<'db>(
 /// and element types.
 pub(crate) fn exact_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     let Ok(length) = i64::try_from(element_types.len()) else {
@@ -294,7 +291,7 @@ pub(crate) fn exact_sequence_pattern_type<'db>(
 /// negative indices. Other integer indices retain the sequence's element type.
 pub(crate) fn starred_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     prefix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
     suffix_element_types: impl ExactSizeIterator<Item = Type<'db>>,
 ) -> Type<'db> {
@@ -334,7 +331,7 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
 /// ```
 fn class_pattern_is_exhaustive<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
     subject_ty: Type<'db>,
     kind: &'pattern ClassPatternPredicateKind<'db>,
@@ -417,7 +414,7 @@ pub(crate) enum ClassPatternPositionalSource {
 /// absent `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
 ) -> ClassMatchArgs<'db> {
     match Type::ClassLiteral(class)
@@ -486,7 +483,7 @@ pub(crate) enum ClassPatternPositionalResult<'db> {
 /// Validate positional subpatterns against a statically known `__match_args__` type.
 pub(crate) fn class_pattern_positional_result<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
     match class_match_args_type(db, env, class) {
@@ -548,10 +545,10 @@ pub(crate) fn class_pattern_positional_result<'db>(
 ///     case int(_):  # The positional subpattern receives `number` itself.
 ///         pass
 /// ```
-pub(crate) fn class_pattern_positional_sources(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    class: ClassLiteral<'_>,
+pub(crate) fn class_pattern_positional_sources<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: ClassLiteral<'db>,
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
     let fixed = match class_match_args_type(db, env, class) {
@@ -592,7 +589,7 @@ pub(crate) fn class_pattern_positional_sources(
 /// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.
 fn member_pattern_is_exhaustive<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     instance_ty: Type<'db>,
     name: &str,
     pattern: &'pattern PatternPredicateKind<'db>,
@@ -608,7 +605,7 @@ fn member_pattern_is_exhaustive<'pattern, 'db>(
 /// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
 fn pattern_is_exhaustive_for_subject<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     pattern: &'pattern PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
@@ -627,7 +624,7 @@ fn pattern_is_exhaustive_for_subject<'pattern, 'db>(
 /// guarantee that a particular key is present.
 fn mapping_pattern_is_exhaustive<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &'pattern MappingPatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
@@ -658,7 +655,7 @@ fn mapping_pattern_is_exhaustive<'pattern, 'db>(
 /// tuple element's actual static type.
 fn sequence_pattern_is_exhaustive_for_subject<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &'pattern SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
@@ -732,7 +729,7 @@ fn sequence_pattern_is_exhaustive_for_subject<'pattern, 'db>(
 /// ```
 pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
@@ -767,7 +764,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 /// where the database and program environment remain the same.
 fn definite_match_pattern_type_for_subject_cached<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &'pattern PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
@@ -845,7 +842,7 @@ impl<'a, 'pattern, 'db> TypeWalk<'db, (&'a mut PatternTypeCache<'pattern, 'db>, 
 
 fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &'pattern PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     resolved_subject_ty: Type<'db>,
@@ -970,7 +967,7 @@ fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
 /// ```
 fn pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
@@ -1041,7 +1038,7 @@ fn pattern_fallthrough_type<'db>(
 /// ```
 pub(crate) fn pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
@@ -1057,7 +1054,7 @@ pub(crate) fn pattern_binding_fallthrough_type<'db>(
 /// complete pattern conservatively.
 fn try_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
@@ -1084,7 +1081,7 @@ fn try_pattern_binding_fallthrough_type<'db>(
 /// used when the precise traversal exceeds its expansion budget.
 fn conservative_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
@@ -1107,7 +1104,7 @@ fn conservative_pattern_binding_fallthrough_type<'db>(
 /// expansion cannot exceed the configured limits.
 fn try_sequence_pattern_binding_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
@@ -1241,7 +1238,7 @@ impl ExactTuplePatternExpansionBudget {
 /// representation used by the general fallthrough path.
 fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     budget: &mut ExactTuplePatternExpansionBudget,
@@ -1293,7 +1290,7 @@ fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
 /// bounded type variables nested inside unions or intersections.
 fn is_same_enum_pattern_domain<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
@@ -1353,7 +1350,7 @@ impl<'db> TypeQuery<'db> for EnumPatternDomain<'db> {
 /// the static subject type.
 fn subject_independent_definite_match_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Type<'db>> {
     match kind {
@@ -1405,7 +1402,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
 /// Reachability and negative narrowing can only subtract this under-approximation.
 pub(crate) fn definite_match_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Type<'db> {
     match kind {
@@ -1461,7 +1458,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
 /// Return the values that are guaranteed to match a sequence pattern.
 fn definite_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
     build_definite_sequence_pattern_type(db, env, kind, |pattern| {
@@ -1472,7 +1469,7 @@ fn definite_sequence_pattern_type<'db>(
 
 fn build_definite_sequence_pattern_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     kind: &SequencePatternPredicateKind<'db>,
     mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
 ) -> Option<Type<'db>> {
