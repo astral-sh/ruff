@@ -143,6 +143,7 @@ impl<'db> Mro<'db> {
                     && !matches!(
                         single_base,
                         Type::SpecializedClass(_)
+                            | Type::GenericAlias(_)
                             | Type::KnownInstance(
                                 KnownInstanceType::SubscriptedGeneric(_)
                                     | KnownInstanceType::SubscriptedProtocol(_)

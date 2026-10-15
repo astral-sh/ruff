@@ -1967,7 +1967,7 @@ impl KnownFunction {
                 let mut good_argument = true;
                 let classes = match param_type {
                     Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
-                    Type::SpecializedClass(generic_alias) => {
+                    Type::SpecializedClass(generic_alias) | Type::GenericAlias(generic_alias) => {
                         vec![ClassType::Generic(*generic_alias)]
                     }
                     Type::Union(union) => {
@@ -1978,7 +1978,8 @@ impl KnownFunction {
                                 Type::ClassLiteral(class) => {
                                     classes.push(ClassType::NonGeneric(*class));
                                 }
-                                Type::SpecializedClass(generic_alias) => {
+                                Type::SpecializedClass(generic_alias)
+                                | Type::GenericAlias(generic_alias) => {
                                     classes.push(ClassType::Generic(*generic_alias));
                                 }
                                 _ => {
@@ -2150,7 +2151,9 @@ impl KnownFunction {
 
                 let class = match class_type {
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::SpecializedClass(generic) => ClassType::Generic(*generic),
+                    Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
+                        ClassType::Generic(*generic)
+                    }
                     _ => return,
                 };
 
@@ -2464,6 +2467,7 @@ fn is_instance_truthiness<'db>(
         | Type::DataclassDecorator(..)
         | Type::DataclassTransformer(..)
         | Type::SpecializedClass(..)
+        | Type::GenericAlias(..)
         | Type::SubclassOf(..)
         | Type::ProtocolInstance(..)
         | Type::SpecialForm(..)

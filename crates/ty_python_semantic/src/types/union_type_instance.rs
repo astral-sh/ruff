@@ -3,8 +3,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{definition::Definition, scope::ScopeId};
 
 use super::{
-    ApplyTypeMappingVisitor, ClassSpecialization, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-    KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder, visitor::TypeVisitor,
+    ApplyTypeMappingVisitor, ClassSpecialization, InferenceFlags, InvalidTypeExpressionError,
+    KnownClass, KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder,
+    visitor::TypeVisitor,
 };
 use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
 
@@ -92,7 +93,7 @@ fn same_generic_operand<'db>(
     left: ClassSpecialization<'db>,
     right: ClassSpecialization<'db>,
 ) -> bool {
-    Type::SpecializedClass(left).is_equivalent_to(db, env, Type::SpecializedClass(right))
+    Type::GenericAlias(left).is_equivalent_to(db, env, Type::GenericAlias(right))
 }
 
 #[salsa::tracked]
@@ -193,7 +194,7 @@ impl<'db> UnionTypeInstance<'db> {
         left.value_expression_types(db, env)
             .zip_longest(right.value_expression_types(db, env))
             .all(|pair| match pair {
-                EitherOrBoth::Both(Type::SpecializedClass(a), Type::SpecializedClass(b)) => {
+                EitherOrBoth::Both(Type::GenericAlias(a), Type::GenericAlias(b)) => {
                     same_generic_operand(db, env, a, b)
                 }
                 EitherOrBoth::Both(a, b) => a == b,
@@ -394,7 +395,7 @@ impl<'db> UnionTypeInstance<'db> {
                 }
                 let Type::KnownInstance(KnownInstanceType::UnionType(union)) = value else {
                     // Group aliases by origin to avoid comparing specializations of unrelated classes.
-                    if let Type::SpecializedClass(alias) = value {
+                    if let Type::GenericAlias(alias) = value {
                         let aliases: &mut Vec<_> =
                             aliases_by_origin.entry(alias.origin(db)).or_default();
                         if aliases

@@ -299,7 +299,7 @@ impl<'db> Type<'db> {
                 allow_short_circuit,
                 visitor,
             )?,
-            Type::SpecializedClass(alias) => ClassType::from(*alias)
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => ClassType::from(*alias)
                 .metaclass_instance_type(db, env)
                 .try_bool_impl(db, env, allow_short_circuit, visitor)?,
 
