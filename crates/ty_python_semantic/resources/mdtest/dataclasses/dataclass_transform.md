@@ -2103,10 +2103,9 @@ reveal_type(B)  # revealed: <class 'A'>
 B(1)
 ```
 
-### Passing a specialized generic class
+### Passing a generic alias
 
-When calling a `@dataclass_transform()` decorated function with a specialized generic class, the
-specialization should be preserved.
+A generic alias is not a class object and cannot be passed to a dataclass decorator.
 
 ```py
 from typing_extensions import dataclass_transform
@@ -2118,11 +2117,7 @@ def my_dataclass[T](cls: type[T]) -> type[T]:
 class A[T]:
     x: T
 
-B = my_dataclass(A[int])
-
-reveal_type(B)  # revealed: <class 'A[int]'>
-
-B(1)
+my_dataclass(A[int])  # error: [invalid-argument-type]
 ```
 
 ### Decorator factory with class parameter

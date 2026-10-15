@@ -267,9 +267,9 @@ reveal_type(isinstance(RejectingChild(), RejectingBase))  # revealed: Literal[Tr
 reveal_type(isinstance(RejectingChild(), (RejectingBase,)))  # revealed: Literal[True]
 ```
 
-The same limitation applies to `type`: `list[int]` is accepted where `type` is expected, but
-`isinstance(list[int], type)` is false at runtime. Single-class and tuple checks both infer
-`Literal[True]` for a bare `type` and a type variable bound to `type`.
+Generic aliases such as `list[int]` are not instances of `type`. Parameters annotated as `type`, or
+as a type variable bound to `type`, reject them. Within these functions, both single-class and tuple
+checks infer `Literal[True]`.
 
 ```py
 T_bound_type = TypeVar("T_bound_type", bound=type)
@@ -278,13 +278,13 @@ def bare_type(x: type):
     reveal_type(isinstance(x, type))  # revealed: Literal[True]
     reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
 
-bare_type(list[int])
+bare_type(list[int])  # error: [invalid-argument-type]
 
 def type_variable_bound_to_type(x: T_bound_type):
     reveal_type(isinstance(x, type))  # revealed: Literal[True]
     reveal_type(isinstance(x, (type,)))  # revealed: Literal[True]
 
-type_variable_bound_to_type(list[int])
+type_variable_bound_to_type(list[int])  # error: [invalid-argument-type]
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
@@ -328,6 +328,30 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 
 # The same applies when `Any` is nested inside a tuple
 isinstance("", (int, t.Any))  # error: [invalid-argument-type]
+```
+
+## Generic aliases as `classinfo`
+
+Parameterized generics are invalid as `classinfo`, including aliases imported from stubs.
+
+`aliases.pyi`:
+
+```pyi
+IntList = list[int]
+```
+
+```py
+from aliases import IntList
+
+isinstance([], list[int])  # error: [invalid-argument-type]
+issubclass(list, IntList)  # error: [invalid-argument-type]
+isinstance([], (str, (IntList,)))  # error: [invalid-argument-type]
+args = ([], IntList)
+isinstance(*args)  # error: [invalid-argument-type]
+
+def accepts_class(cls: type[list[int]]) -> None:
+    isinstance([], cls)  # no diagnostic
+    issubclass(list, cls)  # no diagnostic
 ```
 
 ## Calls to `isinstance` with tuple-covered aliases and type variables

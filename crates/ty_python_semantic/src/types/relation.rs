@@ -1804,12 +1804,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
-            (Type::GenericAlias(alias), _) => {
-                self.check_type_pair(db, Type::SpecializedClass(alias), target)
-            }
-            (_, Type::GenericAlias(alias)) => {
-                self.check_type_pair(db, source, Type::SpecializedClass(alias))
-            }
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -1945,12 +1939,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     target_typeform.type_argument(db),
                 ),
 
-            (Type::SpecializedClass(source_alias), Type::TypeForm(target_typeform)) => self
-                .check_type_pair(
-                    db,
-                    Type::instance(db, env, ClassType::Generic(source_alias)),
-                    target_typeform.type_argument(db),
-                ),
+            (
+                Type::SpecializedClass(source_alias) | Type::GenericAlias(source_alias),
+                Type::TypeForm(target_typeform),
+            ) => self.check_type_pair(
+                db,
+                Type::instance(db, env, ClassType::Generic(source_alias)),
+                target_typeform.type_argument(db),
+            ),
 
             (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
                 if let Some(source_argument) = source_instance.type_form_argument(db, env) =>
@@ -1964,10 +1960,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
                 }),
 
-            (Type::SpecializedClass(_), Type::NominalInstance(target_instance))
-                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
-            {
-                self.always()
+            (Type::GenericAlias(source), Type::GenericAlias(target)) => {
+                self.check_class_pair(db, ClassType::Generic(source), ClassType::Generic(target))
             }
 
             (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
@@ -2990,6 +2984,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::KnownInstance(source), _) => {
                 self.check_type_pair(db, source.instance_fallback(db, env), target)
             }
+            (Type::GenericAlias(_), _) => {
+                self.check_type_pair(db, KnownClass::GenericAlias.to_instance(db, env), target)
+            }
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
@@ -3466,12 +3463,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let env = self.env;
 
         match (left, right) {
-            (Type::GenericAlias(alias), _) => {
-                self.check_type_pair(db, Type::SpecializedClass(alias), right)
-            }
-            (_, Type::GenericAlias(alias)) => {
-                self.check_type_pair(db, left, Type::SpecializedClass(alias))
-            }
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -3810,6 +3801,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.never()
             }
 
+            (Type::SpecializedClass(left_alias), Type::SpecializedClass(right_alias))
+            | (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
+                ConstraintSet::from_bool(
+                    self.constraints,
+                    left_alias.origin(db) != right_alias.origin(db),
+                )
+                .or(db, self.constraints, || {
+                    nontrivial_check(self, || {
+                        self.check_specialization_pair(
+                            db,
+                            left_alias.specialization(db),
+                            right_alias.specialization(db),
+                        )
+                    })
+                })
+            }
+
             // These types are disjoint whenever their represented objects differ.
             (
                 // `LiteralString` can represent different strings and is handled above.
@@ -3819,6 +3827,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::SpecialForm(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::FunctionLiteral(..)
                 | Type::KnownBoundMethod(..)
@@ -3826,6 +3835,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
                 | Type::SpecialForm(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
             ) => ConstraintSet::from_bool(self.constraints, left != right),
 
@@ -3928,7 +3938,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::SpecializedClass(..)),
+                | Type::SpecializedClass(..)
+                | Type::GenericAlias(_)),
                 Type::ProtocolInstance(protocol),
             )
             | (
@@ -3937,7 +3948,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
-                | Type::SpecializedClass(..)),
+                | Type::SpecializedClass(..)
+                | Type::GenericAlias(_)),
             ) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
                     self.any_protocol_members_absent_or_disjoint(db, protocol, ty)
@@ -3993,22 +4005,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         })
                 })
             }),
-
-            (Type::SpecializedClass(left_alias), Type::SpecializedClass(right_alias)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    left_alias.origin(db) != right_alias.origin(db),
-                )
-                .or(db, self.constraints, || {
-                    nontrivial_check(self, || {
-                        self.check_specialization_pair(
-                            db,
-                            left_alias.specialization(db),
-                            right_alias.specialization(db),
-                        )
-                    })
-                })
-            }
 
             (Type::ClassLiteral(class), Type::SpecializedClass(alias_b))
             | (Type::SpecializedClass(alias_b), Type::ClassLiteral(class)) => {
@@ -4103,6 +4099,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     ConstraintSet::from_bool(
                         self.constraints,
                         !known_instance.is_instance_of(db, env, instance.class(db, env)),
+                    )
+                })
+            }
+            (Type::GenericAlias(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::GenericAlias(_)) => {
+                nontrivial_check(self, || {
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        !KnownClass::GenericAlias.is_subclass_of(db, env, instance.class(db, env)),
                     )
                 })
             }

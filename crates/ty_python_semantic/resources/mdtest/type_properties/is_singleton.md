@@ -56,6 +56,25 @@ static_assert(not is_singleton(UnionType))
 static_assert(not is_singleton(TypeOf[list[int]]))
 ```
 
+## Final generic classes
+
+The exact class object for a final generic class has one inhabitant. Subscribing that class creates
+a distinct runtime alias object.
+
+```py
+from typing import Generic, TypeVar, final
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_singleton
+
+T = TypeVar("T")
+
+@final
+class Box(Generic[T]): ...
+
+static_assert(is_singleton(type[Box[int]]))
+static_assert(not is_singleton(TypeOf[Box[int]]))
+```
+
 ## `NoDefault`
 
 ### 3.12

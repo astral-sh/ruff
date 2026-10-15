@@ -2123,6 +2123,20 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, builder.program_file(), module));
             }
 
+            KnownFunction::SingleDispatchRegister => {
+                // The overload for bare decorator usage accepts any callable. Generic aliases
+                // are callable, but cannot supply a dispatch type or an annotated implementation.
+                if let [_, Some(Type::GenericAlias(_)), ..] = parameter_types
+                    && let Some(diagnostic) = builder
+                        .context
+                        .report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                {
+                    diagnostic.into_diagnostic(
+                        "Generic aliases cannot be registered with `singledispatch`",
+                    );
+                }
+            }
+
             KnownFunction::TotalOrdering => {
                 // When `total_ordering(cls)` is called as a function (not as a decorator),
                 // check that the class defines at least one ordering method.
@@ -2132,9 +2146,7 @@ impl KnownFunction {
 
                 let class = match class_type {
                     Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
-                        ClassType::Generic(*generic)
-                    }
+                    Type::SpecializedClass(generic) => ClassType::Generic(*generic),
                     _ => return,
                 };
 

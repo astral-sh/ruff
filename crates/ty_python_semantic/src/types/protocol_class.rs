@@ -2643,10 +2643,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         }
 
-        let implementation_self_binding_ty = ty
-            .to_instance_approximation(db, env)
-            .or_else(|| ty.literal_fallback_instance(db, env))
-            .unwrap_or(ty);
+        let implementation_self_binding_ty = match ty {
+            Type::GenericAlias(alias) => Type::SpecializedClass(alias),
+            ty => ty,
+        }
+        .to_instance_approximation(db, env)
+        .or_else(|| ty.literal_fallback_instance(db, env))
+        .unwrap_or(ty);
         let (implementation_receiver_binding_ty, protocol_receiver_binding_ty) =
             if member.is_class_method() {
                 (

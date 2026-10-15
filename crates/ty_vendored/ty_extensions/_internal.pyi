@@ -341,7 +341,7 @@ def all_members(obj: Any) -> tuple[LiteralString, ...]:
 def has_member(obj: Any, name: LiteralString) -> bool:
     """Returns `True` if the given object has a member with the given name."""
 
-def reveal_protocol_interface(protocol: type) -> None:
+def reveal_protocol_interface(protocol: type | types.GenericAlias) -> None:
     """
     Passing a protocol type to this function will cause ty to emit an info-level
     diagnostic describing the protocol's interface.
