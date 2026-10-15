@@ -401,27 +401,29 @@ impl<'db> CodeGeneratorKind<'db> {
     }
 }
 
-/// A specialization of a generic class with a particular assignment of types to typevars.
+/// A generic class and an assignment of types to its type parameters.
+///
+/// This describes the specialization, independently of the kind of Python object it represents.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct GenericAlias<'db> {
+pub struct ClassSpecialization<'db> {
     #[returns(copy)]
     pub(crate) origin: StaticClassLiteral<'db>,
     #[returns(copy)]
     pub(crate) specialization: Specialization<'db>,
 }
 
-pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_class_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    alias: GenericAlias<'db>,
+    class: ClassSpecialization<'db>,
     visitor: &V,
 ) {
-    walk_specialization(db, alias.specialization(db), visitor);
+    walk_specialization(db, class.specialization(db), visitor);
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for GenericAlias<'_> {}
+impl get_size2::GetSize for ClassSpecialization<'_> {}
 
-impl<'db> GenericAlias<'db> {
+impl<'db> ClassSpecialization<'db> {
     /// Merge two cycle iterations that specialize the same class origin.
     ///
     /// A semantic union of these class objects is not a valid class base. Keep the shared class
@@ -507,13 +509,7 @@ impl<'db> GenericAlias<'db> {
     }
 }
 
-impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(alias: GenericAlias<'db>) -> Type<'db> {
-        Type::GenericAlias(alias)
-    }
-}
-
-impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
+impl<'db> VarianceInferable<'db> for ClassSpecialization<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
@@ -533,17 +529,17 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
                 };
                 VarianceTerm::join(db, elements.map(|ty| ty.variance_of(db, env, typevar)))
             }
-            None => VarianceTerm::variable(db, VarianceOrigin::GenericAlias(self), typevar),
+            None => VarianceTerm::variable(db, VarianceOrigin::ClassSpecialization(self), typevar),
         }
     }
 }
 
 #[salsa::tracked]
-impl<'db> GenericAlias<'db> {
-    /// Resolve the MRO with this alias's type arguments applied to its base classes.
+impl<'db> ClassSpecialization<'db> {
+    /// Resolve the MRO with this class's type arguments applied to its base classes.
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, alias: GenericAlias<'db>| {
+        cycle_initial=|db, _, alias: ClassSpecialization<'db>| {
             let origin = alias.origin(db);
             let env = ProgramEnvironment::from_scope(origin.body_scope(db));
             Err(Box::new(StaticMroError::cycle(
@@ -559,7 +555,7 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
     ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         let origin = self.origin(db);
-        tracing::trace!("GenericAlias::try_mro: {}", origin.name(db));
+        tracing::trace!("ClassSpecialization::try_mro: {}", origin.name(db));
         Mro::of_static_class(db, origin, Some(self.specialization(db))).map_err(Box::new)
     }
 
@@ -1190,7 +1186,7 @@ pub enum ClassType<'db> {
     // should use `StaticClassLiteral::default_specialization` instead of assuming
     // `ClassType::NonGeneric`.
     NonGeneric(ClassLiteral<'db>),
-    Generic(GenericAlias<'db>),
+    Generic(ClassSpecialization<'db>),
 }
 
 #[salsa::tracked]
@@ -1204,7 +1200,7 @@ impl<'db> ClassType<'db> {
         matches!(self, Self::Generic(_))
     }
 
-    pub(super) const fn into_generic_alias(self) -> Option<GenericAlias<'db>> {
+    pub(super) const fn into_class_specialization(self) -> Option<ClassSpecialization<'db>> {
         match self {
             Self::NonGeneric(_) => None,
             Self::Generic(generic) => Some(generic),
@@ -1710,12 +1706,12 @@ impl<'db> ClassType<'db> {
         let other_generic_bases: Vec<_> = other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
+            .filter_map(ClassType::into_class_specialization)
             .collect();
 
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .filter_map(ClassType::into_generic_alias)
+            .filter_map(ClassType::into_class_specialization)
             .any(|self_alias| {
                 other_generic_bases.iter().any(|other_alias| {
                     self_alias.origin(db) == other_alias.origin(db)
@@ -2619,8 +2615,8 @@ impl<'db> ClassType<'db> {
     }
 }
 
-impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
-    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
+impl<'db> From<ClassSpecialization<'db>> for ClassType<'db> {
+    fn from(generic: ClassSpecialization<'db>) -> ClassType<'db> {
         ClassType::Generic(generic)
     }
 }
@@ -2647,7 +2643,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     fn from(class: ClassType<'db>) -> Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
-            ClassType::Generic(generic) => generic.into(),
+            ClassType::Generic(generic) => Type::GenericAlias(generic),
         }
     }
 }
@@ -2754,7 +2750,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         result.or(db, self.constraints, || {
             source
                 .iter_explicit_ancestors(db, self.env)
-                .filter_map(ClassType::into_generic_alias)
+                .filter_map(ClassType::into_class_specialization)
                 .filter(|ancestor| ancestor.origin(db) == target.origin(db))
                 .when_any(db, self.constraints, |ancestor| {
                     self.check_specialization_pair(

@@ -4002,7 +4002,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     class
                         .default_specialization(db)
-                        .into_generic_alias()
+                        .into_class_specialization()
                         .when_none_or(db, self.constraints, |alias| {
                             self.check_type_pair(
                                 db,
