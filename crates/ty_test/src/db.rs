@@ -20,8 +20,8 @@ use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, ReturnTypeInference,
-    check_file_unwrap, default_lint_registry,
+    AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
+    default_lint_registry,
 };
 
 #[salsa::db]
@@ -289,13 +289,8 @@ impl std::ops::Deref for MdtestRuleSelection {
 }
 
 fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
-    let defaults = AnalysisSettings {
-        // TODO: Change this back to just using the default when return type inference is enabled by default.
-        return_type_inference: ReturnTypeInference::Always,
-        ..AnalysisSettings::default()
-    };
     let Some(options) = options else {
-        return defaults;
+        return AnalysisSettings::default();
     };
 
     let AnalysisSettings {
@@ -305,7 +300,7 @@ fn mdtest_analysis_settings(options: Option<&Analysis>) -> AnalysisSettings {
         respect_type_ignore_comments: respect_type_ignore_comments_default,
         allowed_unresolved_imports: allowed_unresolved_imports_default,
         replace_imports_with_any: replace_imports_with_any_default,
-    } = defaults;
+    } = AnalysisSettings::default();
 
     let allowed_unresolved_imports =
         if let Some(allowed_unresolved_imports) = options.allowed_unresolved_imports.as_deref() {
