@@ -1,10 +1,9 @@
 # Migrating from `ruff-lsp`
 
-[`ruff-lsp`][ruff-lsp] is a [Language Server Protocol] implementation that powers Ruff's editor
-integrations. It is written in Python and is a separate package from Ruff itself. The **native
-server** is a [Language Server Protocol] implementation **written in Rust** and available through
-the `ruff server` command. This guide helps users migrate from
-[`ruff-lsp`][ruff-lsp] to the native server.
+Ruff's previous [Language Server Protocol] implementation, [`ruff-lsp`][ruff-lsp], was written in
+Python and distributed separately from Ruff. It is no longer supported. This guide explains how to
+migrate to Ruff's **native server**, which is written in Rust and available through the
+`ruff server` command.
 
 !!! note
 

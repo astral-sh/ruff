@@ -14,8 +14,8 @@ our previous language server. You can read more about `ruff server` in the
 [`v0.4.5` blog post](https://astral.sh/blog/ruff-v0.4.5).
 
 The server provides Ruff diagnostics, Code Actions to fix them, and formatting using Ruff's built-in
-formatter. Currently, it is intended to be used alongside another Python Language Server for
-features like navigation and autocompletion.
+formatter. For features like navigation and autocompletion, we recommend using the
+[ty language server](https://docs.astral.sh/ty/features/language-server/) alongside Ruff.
 
 The Ruff Language Server was available first in Ruff [v0.4.5](https://astral.sh/blog/ruff-v0.4.5)
 in beta and stabilized in Ruff [v0.5.3](https://github.com/astral-sh/ruff/releases/tag/0.5.3).

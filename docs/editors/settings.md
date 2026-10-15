@@ -45,7 +45,7 @@ For example, if the line length is specified in all three sources, Ruff will use
 
 **Default value**: `null`
 
-**Type**: `string | object`
+**Type**: `string` (path to a configuration file) or `object` (inline configuration)
 
 **Example usage**:
 

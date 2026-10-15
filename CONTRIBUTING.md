@@ -476,9 +476,7 @@ As of now, Ruff has an ad hoc release process: releases are cut frequently via G
 Actions, which automatically generates the appropriate wheels across architectures and publishes
 them to [PyPI](https://pypi.org/project/ruff/).
 
-Ruff uses a [custom versioning scheme](https://docs.astral.sh/ruff/versioning/). Breaking changes
-generally require a minor release. Patch releases can include bug fixes, backwards-compatible
-additions, and preview changes.
+See Ruff's [versioning policy](https://docs.astral.sh/ruff/versioning/).
 
 ### Installing tools
 
