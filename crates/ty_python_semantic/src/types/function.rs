@@ -1712,13 +1712,25 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let mut return_type = infer_complete_scope_types(db, scope).return_type();
+        // Abstract methods often have a no-op body, and even if they contain an implementation,
+        // we treat their return type as unknown, based on the assumption that these default
+        // implementations are often not a reliable indicator of the actual contract that subclass
+        // methods are expected to fulfill.
+        if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
+            return Type::unknown();
+        }
+
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
             // For free functions, we simply use the type inferred from the function body.
-            return return_type;
+            return infer_complete_scope_types(db, scope).return_type();
         };
         let class = original_class_type(db, class_definition);
+
+        // Protocol methods follow the same logic as abstract methods (see reasoning above).
+        if class.is_some_and(|class| class.is_protocol(db)) {
+            return Type::unknown();
+        }
 
         // We currently skip return type inference for the `__call__` method of metaclasses.
         if self.name(db) == "__call__"
@@ -1732,6 +1744,7 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
+        let mut return_type = infer_complete_scope_types(db, scope).return_type();
         if let Some(inherited) = self.inherited_return_annotation(db) {
             return_type = inherited;
         } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)

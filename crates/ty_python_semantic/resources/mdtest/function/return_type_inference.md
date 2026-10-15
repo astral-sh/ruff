@@ -607,6 +607,70 @@ reveal_type(IntTask().compute())  # revealed: Literal[1] | Unknown
 reveal_type(IntJob().run())  # revealed: Literal[1] | Unknown
 ```
 
+### Abstract methods
+
+Abstract methods often have a no-op body, and even if they contain an implementation, we treat their
+return type as unknown, based on the assumption that these default implementations are often not a
+reliable indicator of the actual contract that subclass methods are expected to fulfill.
+
+```py
+from abc import ABC, abstractmethod
+
+class Abstract(ABC):
+    @abstractmethod
+    def get(self): ...
+    @abstractmethod
+    def get_with_default_implementation(self):
+        return 1
+
+def _(abstract: Abstract):
+    reveal_type(abstract.get())  # revealed: Unknown
+    reveal_type(abstract.get_with_default_implementation())  # revealed: Unknown
+```
+
+Concrete overrides still infer their own return types:
+
+```py
+class Concrete(Abstract):
+    def get(self):
+        return 1
+
+    def get_with_default_implementation(self):
+        return "a string"
+
+def _(concrete: Concrete):
+    reveal_type(concrete.get())  # revealed: Literal[1] | Unknown
+    reveal_type(concrete.get_with_default_implementation())  # revealed: Literal["a string"] | Unknown
+```
+
+### Protocol methods
+
+The same reasoning applies for methods on protocols.
+
+```py
+from typing import Protocol
+
+class Abstract(Protocol):
+    def get(self): ...
+    def get_with_default_implementation(self):
+        return 1
+
+def _(abstract: Abstract):
+    reveal_type(abstract.get())  # revealed: Unknown
+    reveal_type(abstract.get_with_default_implementation())  # revealed: Unknown
+
+class Concrete(Abstract):
+    def get(self):
+        return 1
+
+    def get_with_default_implementation(self):
+        return 1
+
+def _(concrete: Concrete):
+    reveal_type(concrete.get())  # revealed: Literal[1] | Unknown
+    reveal_type(concrete.get_with_default_implementation())  # revealed: Literal[1] | Unknown
+```
+
 ### `__new__`
 
 `__new__` methods are currently excluded from return type inference, for two reasons. First, there
