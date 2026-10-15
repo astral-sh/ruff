@@ -106,6 +106,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarNonce, TypeVarSet,
@@ -128,6 +129,13 @@ mod sequents;
 mod solutions;
 mod support;
 mod variables;
+
+// Validating a declared protocol bound can compare generic methods and construct another
+// existential for the same relation, with fresh locals. Retain those nested nodes and let the
+// relation checker's recursion guards handle the checks during ordinary solution extraction.
+std::thread_local! {
+    static EVALUATING_CLOSED_BODY: ActiveRecursionDetector<()> = ActiveRecursionDetector::default();
+}
 
 use owned::OwnedConstraintSetBuilder;
 use paths::PathAssignments;
@@ -832,29 +840,23 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         to_remove: TypeVarSet<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        if to_remove == TypeVarSet::None {
+        if to_remove == TypeVarSet::None || self.node.is_terminal() {
             return self;
         }
         let mut storage = builder.storage.borrow_mut();
         let to_remove_support = Support::from_typevar_set(db, &mut storage, to_remove);
-        // A body mentioning only its fresh locals cannot constrain the surrounding BDD. Evaluate
-        // it once here instead of repeatedly during solution extraction. Declared upper bounds and
-        // constraints are checked later and can mention additional typevars that are not in the
-        // body's support, so leave those on the normal validation path.
-        // TODO: If we start calcaluting support so that it includes any typevars mentioned in
-        // declared upper bounds and constraints, we'll only need the contains_more_than check.
-        if let Some(body_support) = storage.node_support(self.node)
-            && body_support.is_complete()
-            && !body_support.contains_more_than(&to_remove_support)
-            && to_remove
-                .iter(db)
-                .all(|typevar| typevar.typevar(db).bound_or_constraints(db, env).is_none())
-        {
-            drop(storage);
-            let body_is_satisfiable = !self.is_never_satisfied(db, env, TypeVarSet::None);
-            return Self::from_bool(builder, body_is_satisfiable);
+        drop(storage);
+        let satisfied = EVALUATING_CLOSED_BODY.with(|active| {
+            active.visit(
+                &(),
+                || None,
+                || self.evaluate_closed(db, env, to_remove, &to_remove_support),
+            )
+        });
+        if let Some(satisfied) = satisfied {
+            return Self::from_bool(builder, satisfied);
         }
-
+        let mut storage = builder.storage.borrow_mut();
         let Some(existential) = ExistentialBound::new(
             &storage,
             ConstraintProvenance::Evidence,
@@ -867,6 +869,33 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let existential = Constraint::Existential(existential);
         let (node, source_order) = existential.new_node(db, env, &mut storage);
         Self::from_node(builder, node, source_order)
+    }
+
+    fn evaluate_closed(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        locals: TypeVarSet<'db>,
+        support: &Support,
+    ) -> Option<bool> {
+        let mut storage = self.builder.storage.borrow_mut();
+        // A closed body cannot constrain the surrounding BDD. Validate its declared domains as
+        // well as its explicit constraints before replacing it with a Boolean terminal.
+        if !support::is_closed(db, env, &mut storage, self.node, support) {
+            return None;
+        }
+        drop(storage);
+        match self.solutions(db, env, locals) {
+            Ok(Solutions::Unconstrained) => Some(true),
+            Ok(Solutions::Constrained(SolutionPaths::Complete(paths)))
+                if paths.iter().any(Solution::is_valid) =>
+            {
+                Some(true)
+            }
+            Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(_))) => Some(false),
+            // Incomplete solving is not evidence for either terminal.
+            _ => None,
+        }
     }
 
     #[expect(dead_code, reason = "XXX: to be removed")]

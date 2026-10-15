@@ -104,9 +104,8 @@ valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
 
 invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
 
-# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
-invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
-invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
@@ -1413,6 +1412,79 @@ def infer[A, B](value: Required[A, B]) -> tuple[A, B]:
     return value.first(1), value.second("a")
 
 reveal_type(infer(Implementation()))  # revealed: tuple[int, str]
+```
+
+## Callable specialization with protocol bounds
+
+A generic callback must satisfy its declared bound. The bound's generic methods have their own
+independent type parameters.
+
+```py
+from typing import Callable, Protocol
+
+class Token(Protocol):
+    def identity[T](self, value: T) -> T: ...
+
+class Concrete:
+    def identity[T](self, value: T) -> T:
+        return value
+
+def bounded[T: Token](value: T) -> T:
+    return value
+
+accepted: Callable[[Concrete], Concrete] = bounded  # no diagnostic
+rejected: Callable[[int], int] = bounded  # error: [invalid-assignment]
+```
+
+## Inferring through protocol-valued callback returns
+
+Specializing the callback also constrains the protocol's type argument.
+
+```py
+from typing import Callable, Protocol
+
+class Value[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+class IntValue:
+    value: int = 1
+
+def identity[U](value: U) -> U:
+    return value
+
+def infer[T](callback: Callable[[IntValue], Value[T]]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(identity))  # revealed: int
+```
+
+## Protocol bounds that capture outer type variables
+
+A protocol defined inside a generic function can refer to that function's type parameter.
+Specializing a callback bounded by the protocol does not choose a new value for that parameter.
+
+```py
+from typing import Callable, Protocol
+
+class IntValue:
+    value: int = 1
+
+def check[T](value: T):
+    class Captured(Protocol):
+        @property
+        def value(self) -> T: ...
+
+    class Matching:
+        @property
+        def value(self) -> T:
+            return value
+
+    def bounded[U: Captured](value: U) -> U:
+        return value
+
+    accepted: Callable[[Matching], Matching] = bounded  # no diagnostic
+    rejected: Callable[[IntValue], IntValue] = bounded  # error: [invalid-assignment]
 ```
 
 ## Specializing generic protocol methods

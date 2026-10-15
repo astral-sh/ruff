@@ -25,6 +25,7 @@ use crate::types::{
     newtype::{NewType, walk_newtype_instance_type},
     protocol_class::walk_protocol_instance_interface,
     set_theoretic::{walk_intersection_type, walk_union},
+    signatures::{Signature, walk_signature},
     subclass_of::walk_subclass_of_type,
     type_alias::walk_type_alias_type,
     type_form::walk_typeform_type,
@@ -65,6 +66,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
         walk_callable_type(db, callable, self);
+    }
+
+    fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+        walk_signature(db, signature, self);
     }
 
     fn visit_property_instance_type(&self, db: &'db dyn Db, property: PropertyInstanceType<'db>) {
