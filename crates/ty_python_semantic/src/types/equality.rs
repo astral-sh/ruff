@@ -4,17 +4,17 @@
 //! constraints and definite truthiness while remaining conservative around custom comparison
 //! methods.
 
-use rustc_hash::FxHashSet;
+use crate::types::recursive::TypeInspector;
 use ty_python_core::definition::Definition;
 
 use crate::{AnalysisSettings, Db, ProgramEnvironment, place::PlaceAndQualifiers};
 
 use super::{
-    CallArguments, EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    ApplyTypeMappingVisitor, CallArguments, EnumLiteralType, IntersectionBuilder,
+    KnownBoundMethodType, KnownClass, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
     bool::BoolError,
-    cyclic::ActiveRecursionDetector,
+    cyclic::{ActiveRecursionDetector, CycleDetector},
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -152,12 +152,20 @@ pub(super) fn equality_exclusion_constraint<'db>(
     ty: Type<'db>,
     soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
-    let ty = ty.resolve_type_alias(db);
-    builtin_literal_constraint(db, env, ty, ty, ComparisonOperator::Equality, false).or_else(|| {
-        let mut evaluator = ComparisonEvaluator::new(db, env, soundness_policy);
-        all_values_compare_equal(&mut evaluator, ty, ComparisonOperator::Equality)
-            .then(|| ty.negate(db, env))
-    })
+    TypeInspector::inspect_root(
+        db,
+        env,
+        ty,
+        |_, _| None,
+        |_, ty| {
+            builtin_literal_constraint(db, env, ty, ty, ComparisonOperator::Equality, false)
+                .or_else(|| {
+                    let evaluator = ComparisonEvaluator::new(db, env, soundness_policy);
+                    all_values_compare_equal(&evaluator, ty, ComparisonOperator::Equality)
+                        .then(|| ty.negate(db, env))
+                })
+        },
+    )
 }
 
 /// Return a constraint for `left` in a branch where `left != right` has the given truthiness.
@@ -209,28 +217,55 @@ fn evaluate_type_comparison<'db>(
     operator: ComparisonOperator,
     soundness_policy: ComparisonSoundnessPolicy,
 ) -> Option<Type<'db>> {
-    let right = right.resolve_type_alias(db);
-    let branch = ComparisonBranch::from(is_positive);
-    let condition_expects_equality = operator.condition_expects_equality(branch);
+    TypeInspector::scope(env, |inspector| {
+        evaluate_type_comparison_in(
+            db,
+            inspector,
+            left,
+            right,
+            is_positive,
+            operator,
+            soundness_policy,
+        )
+    })
+}
 
-    // Preserve the shared specialization of a constrained TypeVar. Expanding it before comparing
-    // with `left` would lose the correlation with other occurrences in the function.
-    if condition_expects_equality
-        && let Type::TypeVar(typevar) = right
-        && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-            typevar.typevar(db).bound_or_constraints(db, env)
-        && constraints.elements(db).iter().all(|constraint| {
-            evaluate_type_comparison(
-                db,
-                env,
-                left,
-                *constraint,
-                is_positive,
-                operator,
-                soundness_policy,
-            )
-            .is_some_and(|narrowed| {
-                equality_truthiness(db, env, narrowed, *constraint, soundness_policy)
+fn evaluate_type_comparison_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    left: Type<'db>,
+    right: Type<'db>,
+    is_positive: bool,
+    operator: ComparisonOperator,
+    soundness_policy: ComparisonSoundnessPolicy,
+) -> Option<Type<'db>> {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        right,
+        |_, _| None,
+        |inspector, right| {
+            let branch = ComparisonBranch::from(is_positive);
+            let condition_expects_equality = operator.condition_expects_equality(branch);
+
+            // Preserve the shared specialization of a constrained TypeVar. Expanding it before comparing
+            // with `left` would lose the correlation with other occurrences in the function.
+            if condition_expects_equality
+                && let Type::TypeVar(typevar) = right
+                && let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                    typevar.typevar(db).bound_or_constraints(db, env)
+                && constraints.elements(db).iter().all(|constraint| {
+                    evaluate_type_comparison_in(
+                        db,
+                        inspector,
+                        left,
+                        *constraint,
+                        is_positive,
+                        operator,
+                        soundness_policy,
+                    )
+                    .is_some_and(|narrowed| {
+                        equality_truthiness(db, env, narrowed, *constraint, soundness_policy)
                     == Truthiness::AlwaysTrue
                     // Equal values need not have the same type: `False == 0` does not make
                     // `Literal[False]` a valid specialization of a `Literal[0]` constraint.
@@ -239,21 +274,30 @@ fn evaluate_type_comparison<'db>(
                         .add_positive(narrowed)
                         .build()
                         .is_subtype_of(db, env, *constraint)
-            })
-        })
-    {
-        return Some(right);
-    }
+                    })
+                })
+            {
+                return Some(right);
+            }
 
-    enum_literal_constraint(db, env, left, right, operator, condition_expects_equality)
-        .or_else(|| {
-            builtin_literal_constraint(db, env, left, right, operator, condition_expects_equality)
-        })
-        .or_else(|| {
-            ComparisonEvaluator::new(db, env, soundness_policy)
-                .evaluate(left, right, branch, operator)
-                .constraint(branch)
-        })
+            enum_literal_constraint(db, env, left, right, operator, condition_expects_equality)
+                .or_else(|| {
+                    builtin_literal_constraint(
+                        db,
+                        env,
+                        left,
+                        right,
+                        operator,
+                        condition_expects_equality,
+                    )
+                })
+                .or_else(|| {
+                    ComparisonEvaluator::new(db, env, soundness_policy)
+                        .evaluate(left, right, branch, operator)
+                        .constraint(branch)
+                })
+        },
+    )
 }
 
 /// Return the truthiness of `left == right` when it is known for every represented runtime value.
@@ -300,14 +344,14 @@ pub(super) fn inequality_truthiness<'db>(
 ///
 /// Reuses the active-comparison set across element comparisons. The set only detects recursive
 /// comparisons; results are not cached between elements.
-pub(super) struct ContainerElementEqualityEvaluator<'db> {
-    evaluator: ComparisonEvaluator<'db>,
+pub(super) struct ContainerElementEqualityEvaluator<'env, 'db> {
+    evaluator: ComparisonEvaluator<'env, 'db>,
 }
 
-impl<'db> ContainerElementEqualityEvaluator<'db> {
+impl<'env, 'db> ContainerElementEqualityEvaluator<'env, 'db> {
     pub(super) fn new(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
@@ -316,19 +360,19 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
     }
 
     pub(super) fn element_truthiness(
-        &mut self,
+        &self,
         left: Type<'db>,
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
-        let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
+        let truthiness = evaluate_container_element_equality(&self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
         }
 
         let Some(result) = Type::try_call_rich_comparison_dunder(
             db,
-            &self.evaluator.env,
+            self.evaluator.env,
             left,
             right,
             "__eq__",
@@ -339,7 +383,7 @@ impl<'db> ContainerElementEqualityEvaluator<'db> {
         };
 
         // Identity can turn a false equality result true, but cannot turn a true result false.
-        Ok(match result.try_bool(db, &self.evaluator.env)? {
+        Ok(match result.try_bool(db, self.evaluator.env)? {
             Truthiness::AlwaysTrue => Truthiness::AlwaysTrue,
             // If equality cannot return, shared identity is the only completing path.
             Truthiness::Uninhabited => Truthiness::AlwaysTrue,
@@ -415,36 +459,33 @@ impl ComparisonSoundnessPolicy {
     }
 }
 
-/// Identifies an active comparison evaluation.
-///
-/// Operand order and branch are significant because the left operand is the narrowing target.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-struct ComparisonKey<'db> {
-    left: Type<'db>,
-    right: Type<'db>,
-    branch: ComparisonBranch,
-    operator: ComparisonOperator,
-}
-
 /// Tracks comparisons that are already in progress so recursive evaluation terminates.
-struct ComparisonEvaluator<'db> {
+struct ComparisonEvaluator<'env, 'db> {
     db: &'db dyn Db,
-    env: ProgramEnvironment<'db>,
-    active: FxHashSet<ComparisonKey<'db>>,
+    env: &'env ProgramEnvironment<'db>,
+    active: CycleDetector<
+        'db,
+        (),
+        (Type<'db>, (ComparisonBranch, ComparisonOperator), Type<'db>),
+        (),
+        3,
+    >,
+    mapping: ApplyTypeMappingVisitor<'env, 'db>,
     goal: ComparisonGoal,
     soundness_policy: ComparisonSoundnessPolicy,
 }
 
-impl<'db> ComparisonEvaluator<'db> {
+impl<'env, 'db> ComparisonEvaluator<'env, 'db> {
     fn new(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
             db,
-            env: env.clone(),
-            active: FxHashSet::default(),
+            env,
+            active: CycleDetector::new(()),
+            mapping: ApplyTypeMappingVisitor::new(env),
             goal: ComparisonGoal::Constraint,
             soundness_policy,
         }
@@ -452,13 +493,14 @@ impl<'db> ComparisonEvaluator<'db> {
 
     fn for_truthiness(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         soundness_policy: ComparisonSoundnessPolicy,
     ) -> Self {
         Self {
             db,
-            env: env.clone(),
-            active: FxHashSet::default(),
+            env,
+            active: CycleDetector::new(()),
+            mapping: ApplyTypeMappingVisitor::new(env),
             goal: ComparisonGoal::Truthiness,
             soundness_policy,
         }
@@ -472,7 +514,7 @@ impl<'db> ComparisonEvaluator<'db> {
         let db = self.db;
         KnownComparisonSemantics::of_type_with_policy(
             db,
-            &self.env,
+            self.env,
             ty,
             operator,
             self.soundness_policy,
@@ -500,31 +542,26 @@ impl<'db> ComparisonEvaluator<'db> {
     /// on the comparison result. Re-entering an active comparison conservatively returns an
     /// ambiguous result instead of recursing indefinitely.
     fn evaluate(
-        &mut self,
+        &self,
         left: Type<'db>,
         right: Type<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> ComparisonResult<'db> {
         let db = self.db;
-        let left = left.resolve_type_alias(db);
-        let right = right.resolve_type_alias(db);
-        let key = ComparisonKey {
-            left,
-            right,
-            branch,
-            operator,
-        };
-
-        // A repeated key means that the result depends on itself. Treating it as ambiguous is
-        // conservative: callers only narrow from definite truthiness or an explicit constraint.
-        if !self.active.insert(key) {
-            return ComparisonResult::Ambiguous;
-        }
-
-        let result = evaluate_comparison_once(self, left, right, branch, operator);
-        self.active.remove(&key);
-        result
+        self.active.visit_active_with_expansion(
+            db,
+            (left, (branch, operator), right),
+            &self.mapping,
+            |expansion| {
+                let Ok(expansion) = expansion else {
+                    return ComparisonResult::Ambiguous;
+                };
+                let left = expansion.normalize(db, left);
+                let right = expansion.normalize(db, right);
+                evaluate_comparison_once(self, left, right, branch, operator)
+            },
+        )
     }
 }
 
@@ -535,7 +572,7 @@ impl<'db> ComparisonEvaluator<'db> {
 ///
 /// Recursive comparisons must use [`ComparisonEvaluator::evaluate`] so cycles are detected.
 fn evaluate_comparison_once<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     right: Type<'db>,
     branch: ComparisonBranch,
@@ -552,14 +589,14 @@ fn evaluate_comparison_once<'db>(
 /// A one-member enum can exclude that member from `Any`. An enum with several members must not
 /// exclude all of its members one at a time.
 fn evaluate_dynamic_comparison<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     right: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     match (left, right) {
         (Type::Dynamic(_), other)
             if !operator.condition_expects_equality(branch)
@@ -589,14 +626,14 @@ fn evaluate_dynamic_comparison<'db>(
 ///
 /// Start with the side being narrowed so its restrictions are not applied to the other side.
 fn evaluate_finite_comparison<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     right: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     finite_alternatives(db, &env, left, operator)
         .map(|alternatives| evaluate_union_left(evaluator, &alternatives, right, branch, operator))
         .or_else(|| {
@@ -608,14 +645,14 @@ fn evaluate_finite_comparison<'db>(
 
 /// Compare values not handled by the enum, dynamic, or finite-value stages.
 fn evaluate_structural_comparison<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     right: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     let env = &env;
 
     match (left, right) {
@@ -826,7 +863,7 @@ fn evaluate_structural_comparison<'db>(
 /// Comparison evaluation is reused so this stays aligned with all modeled equality semantics.
 /// Cyclic self-comparisons recover as ambiguous, so only a definite acyclic proof returns true.
 fn all_values_compare_equal<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
@@ -838,18 +875,28 @@ fn all_values_compare_equal<'db>(
 ///
 /// This includes `int`, `bool`, `str`, and `bytes` literals, along with `bool` itself because its
 /// only possible values are `Literal[True]` and `Literal[False]`.
-fn is_builtin_literal_type(db: &dyn Db, ty: Type) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::LiteralValue(literal) => matches!(
-            literal.kind(),
-            LiteralValueTypeKind::Int(_)
-                | LiteralValueTypeKind::Bool(_)
-                | LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-        ),
-        Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Bool),
-        _ => false,
-    }
+fn is_builtin_literal_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    TypeInspector::inspect_root(
+        db,
+        env,
+        ty,
+        |_, _| false,
+        |_, ty| match ty {
+            Type::LiteralValue(literal) => matches!(
+                literal.kind(),
+                LiteralValueTypeKind::Int(_)
+                    | LiteralValueTypeKind::Bool(_)
+                    | LiteralValueTypeKind::String(_)
+                    | LiteralValueTypeKind::Bytes(_)
+            ),
+            Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Bool),
+            _ => false,
+        },
+    )
 }
 
 /// Return a constraint for comparison with an `int`, `bool`, `str`, or `bytes` literal.
@@ -880,34 +927,48 @@ fn builtin_literal_constraint<'db>(
     operator: ComparisonOperator,
     condition_expects_equality: bool,
 ) -> Option<Type<'db>> {
-    let Type::LiteralValue(right) = right.resolve_type_alias(db) else {
-        return None;
-    };
+    TypeInspector::inspect_root(
+        db,
+        env,
+        right,
+        |_, _| None,
+        |inspector, right| {
+            let Type::LiteralValue(right) = right else {
+                return None;
+            };
 
-    let equal_to_right =
-        builtin_literals_equal_to(db, env, Type::LiteralValue(right), right.kind())?;
+            let equal_to_right =
+                builtin_literals_equal_to(db, env, Type::LiteralValue(right), right.kind())?;
 
-    if !condition_expects_equality {
-        let equal_to_right = add_equal_enum_literals(
-            db,
-            env,
-            left,
-            right.kind(),
-            operator,
-            UnionBuilder::new(db, env).add(equal_to_right),
-        );
-        return Some(equal_to_right.build().negate(db, env));
-    }
+            if !condition_expects_equality {
+                let equal_to_right = add_equal_enum_literals(
+                    db,
+                    env,
+                    left,
+                    right.kind(),
+                    operator,
+                    UnionBuilder::new(db, env).add(equal_to_right),
+                );
+                return Some(equal_to_right.build().negate(db, env));
+            }
 
-    match left.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .copied()
-            .all(|element| is_builtin_literal_type(db, element)),
-        left => is_builtin_literal_type(db, left),
-    }
-    .then_some(equal_to_right)
+            inspector
+                .inspect(
+                    db,
+                    left,
+                    |_, _| false,
+                    |_, left| match left {
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .copied()
+                            .all(|element| is_builtin_literal_type(db, env, element)),
+                        left => is_builtin_literal_type(db, env, left),
+                    },
+                )
+                .then_some(equal_to_right)
+        },
+    )
 }
 
 /// Return the builtin literal values that compare equal to `literal_type`.
@@ -945,27 +1006,54 @@ fn add_equal_enum_literals<'db>(
     operator: ComparisonOperator,
     mut builder: UnionBuilder<'db>,
 ) -> UnionBuilder<'db> {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => {
-            for element in union.elements(db) {
-                builder = add_equal_enum_literals(db, env, *element, right, operator, builder);
-            }
-        }
-        Type::LiteralValue(literal) => {
-            if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
-                && known_literal_equality(db, env, literal.kind(), right, operator) == Some(true)
-            {
-                builder = builder.add(Type::LiteralValue(literal));
-            }
-        }
-        ty if let Some(alternatives) = finite_alternatives(db, env, ty, operator) => {
-            for alternative in alternatives {
-                builder = add_equal_enum_literals(db, env, alternative, right, operator, builder);
-            }
-        }
-        _ => {}
-    }
+    TypeInspector::scope(env, |inspector| {
+        add_equal_enum_literals_in(db, inspector, ty, right, operator, &mut builder);
+    });
     builder
+}
+
+fn add_equal_enum_literals_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    ty: Type<'db>,
+    right: LiteralValueTypeKind<'db>,
+    operator: ComparisonOperator,
+    builder: &mut UnionBuilder<'db>,
+) {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        ty,
+        |_, _| (),
+        |inspector, ty| match ty {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    add_equal_enum_literals_in(db, inspector, *element, right, operator, builder);
+                }
+            }
+            Type::LiteralValue(literal) => {
+                if matches!(literal.kind(), LiteralValueTypeKind::Enum(_))
+                    && known_literal_equality(db, env, literal.kind(), right, operator)
+                        == Some(true)
+                {
+                    builder.add_in_place(Type::LiteralValue(literal));
+                }
+            }
+            ty if let Some(alternatives) = finite_alternatives(db, env, ty, operator) => {
+                for alternative in alternatives {
+                    add_equal_enum_literals_in(
+                        db,
+                        inspector,
+                        alternative,
+                        right,
+                        operator,
+                        builder,
+                    );
+                }
+            }
+            _ => {}
+        },
+    );
 }
 
 /// Return a constraint when every possible value of `left` is a member of the same enum as `right`.
@@ -996,31 +1084,39 @@ fn enum_literal_constraint<'db>(
     operator: ComparisonOperator,
     condition_expects_equality: bool,
 ) -> Option<Type<'db>> {
-    let Type::LiteralValue(right_literal) = right.resolve_type_alias(db) else {
-        return None;
-    };
-    let LiteralValueTypeKind::Enum(right) = right_literal.kind() else {
-        return None;
-    };
-    if !is_same_enum_domain(db, env, left, right)
-        || KnownComparisonSemantics::of_instance(
-            db,
-            env,
-            right.enum_class_instance(db, env),
-            operator,
-        )
-        .is_none()
-    {
-        return None;
-    }
+    TypeInspector::inspect_root(
+        db,
+        env,
+        right,
+        |_, _| None,
+        |_, right| {
+            let Type::LiteralValue(right_literal) = right else {
+                return None;
+            };
+            let LiteralValueTypeKind::Enum(right) = right_literal.kind() else {
+                return None;
+            };
+            if !is_same_enum_domain(db, env, left, right)
+                || KnownComparisonSemantics::of_instance(
+                    db,
+                    env,
+                    right.enum_class_instance(db, env),
+                    operator,
+                )
+                .is_none()
+            {
+                return None;
+            }
 
-    let enum_class_literal = right.enum_class_literal(db);
-    let name = enum_class_literal.resolve_member(db, right.name(db))?;
-    let equal_to_right = Type::from(LiteralValueType::new(
-        EnumLiteralType::new(db, enum_class_literal, name),
-        right_literal.is_promotable(),
-    ));
-    Some(equal_to_right.negate_if(db, env, !condition_expects_equality))
+            let enum_class_literal = right.enum_class_literal(db);
+            let name = enum_class_literal.resolve_member(db, right.name(db))?;
+            let equal_to_right = Type::from(LiteralValueType::new(
+                EnumLiteralType::new(db, enum_class_literal, name),
+                right_literal.is_promotable(),
+            ));
+            Some(equal_to_right.negate_if(db, env, !condition_expects_equality))
+        },
+    )
 }
 
 /// Return whether every possible value of `ty` belongs to the same enum as `right`.
@@ -1088,7 +1184,7 @@ pub(super) fn is_same_enum_domain<'db>(
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.
 fn evaluate_union_left<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     elements: &[Type<'db>],
     other: Type<'db>,
     branch: ComparisonBranch,
@@ -1103,7 +1199,7 @@ fn evaluate_union_left<'db>(
         );
     }
 
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     evaluate_target_union(db, &env, elements, branch, |element| {
         evaluator.evaluate(element, other, branch, operator)
     })
@@ -1197,7 +1293,7 @@ fn evaluate_target_union<'db>(
 
 /// Evaluate the target against each alternative of a union on the non-target side.
 fn evaluate_union_right<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     elements: &[Type<'db>],
     branch: ComparisonBranch,
@@ -1212,7 +1308,7 @@ fn evaluate_union_right<'db>(
         );
     }
 
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     evaluate_against_results(
         db,
         &env,
@@ -1309,7 +1405,7 @@ fn evaluate_against_results<'db>(
 
 /// Combine compatible comparison results from the positive elements of an intersection target.
 fn evaluate_intersection_left<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     original: Type<'db>,
     positive: &crate::FxOrderSet<Type<'db>>,
     other: Type<'db>,
@@ -1329,7 +1425,7 @@ fn evaluate_intersection_left<'db>(
     let mut any_false = false;
     let mut any_ambiguous = false;
     let mut any_narrowing = false;
-    let mut builder = IntersectionBuilder::new(db, &evaluator.env).add_positive(original);
+    let mut builder = IntersectionBuilder::new(db, evaluator.env).add_positive(original);
 
     for element in positive {
         match evaluator.evaluate(*element, other, branch, operator) {
@@ -1340,9 +1436,9 @@ fn evaluate_intersection_left<'db>(
                 // untrusted string can therefore equal a literal even when their static types
                 // are disjoint. Keep its original proof instead of making that branch unreachable.
                 if operator.condition_expects_equality(branch)
-                    && original.is_disjoint_from(db, &evaluator.env, narrowed)
+                    && original.is_disjoint_from(db, evaluator.env, narrowed)
                     && original
-                        .identity_comparison_truthiness(db, &evaluator.env, narrowed)
+                        .identity_comparison_truthiness(db, evaluator.env, narrowed)
                         .may_be_true()
                 {
                     return ComparisonResult::Ambiguous;
@@ -1390,7 +1486,7 @@ fn finite_alternatives<'db>(
                 (ty, complement)
             } else {
                 if !intersection.positive(db).iter().any(|positive| {
-                    matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_))
+                    positive.has_outer_type(db, |ty| matches!(ty, Type::NewTypeInstance(_)))
                 }) {
                     return None;
                 }
@@ -1493,20 +1589,32 @@ fn narrow_literal_string_against_enum<'db>(
 }
 
 /// Return the builtin comparison semantics assumed by unsafe equality narrowing.
-fn unsafe_narrowable_builtin_semantics(db: &dyn Db, ty: Type) -> Option<KnownComparisonSemantics> {
-    let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
-        return None;
-    };
+fn unsafe_narrowable_builtin_semantics<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<KnownComparisonSemantics> {
+    TypeInspector::inspect_root(
+        db,
+        env,
+        ty,
+        |_, _| None,
+        |_, ty| {
+            let Type::NominalInstance(instance) = ty else {
+                return None;
+            };
 
-    if instance.has_known_class(db, KnownClass::Int) {
-        Some(KnownComparisonSemantics::Int)
-    } else if instance.has_known_class(db, KnownClass::Str) {
-        Some(KnownComparisonSemantics::Str)
-    } else if instance.has_known_class(db, KnownClass::Bytes) {
-        Some(KnownComparisonSemantics::Bytes)
-    } else {
-        None
-    }
+            if instance.has_known_class(db, KnownClass::Int) {
+                Some(KnownComparisonSemantics::Int)
+            } else if instance.has_known_class(db, KnownClass::Str) {
+                Some(KnownComparisonSemantics::Str)
+            } else if instance.has_known_class(db, KnownClass::Bytes) {
+                Some(KnownComparisonSemantics::Bytes)
+            } else {
+                None
+            }
+        },
+    )
 }
 
 /// Compare a literal with a non-literal type using their known runtime comparison semantics.
@@ -1514,7 +1622,7 @@ fn unsafe_narrowable_builtin_semantics(db: &dyn Db, ty: Type) -> Option<KnownCom
 /// A literal on the non-target side can constrain the target only when the types overlap; matching
 /// comparison implementations alone do not establish that the literal inhabits the target type.
 fn compare_literal_to_other<'db>(
-    evaluator: &ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     literal_type: Type<'db>,
     literal: LiteralValueTypeKind<'db>,
     other: Type<'db>,
@@ -1523,7 +1631,7 @@ fn compare_literal_to_other<'db>(
     literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
     let db = evaluator.db;
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     let env = &env;
 
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
@@ -1546,7 +1654,7 @@ fn compare_literal_to_other<'db>(
     if evaluator.soundness_policy.allow_unsafe_equality
         && condition_expects_equality
         && literal_operand == LiteralOperand::Other
-        && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
+        && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, env, other)
     {
         return if literal_semantics == other_semantics {
             ComparisonResult::CanNarrow(literal_type)
@@ -1636,7 +1744,7 @@ fn compare_different_semantics<'db>(
 /// The result is definite only when the implementations cannot compare equal, or when both types
 /// denote the same singleton, or when their fixed tuple elements have a definite comparison.
 fn compare_nominal_instances<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left_instance: super::NominalInstanceType<'db>,
     right_instance: super::NominalInstanceType<'db>,
     operator: ComparisonOperator,
@@ -1694,12 +1802,12 @@ fn compare_nominal_instances<'db>(
 }
 
 fn evaluate_container_element_equality<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
     let db = evaluator.db;
-    if left == right && left.is_singleton(db, &evaluator.env) {
+    if left == right && left.is_singleton(db, evaluator.env) {
         return Truthiness::AlwaysTrue;
     }
 
@@ -1930,22 +2038,38 @@ impl KnownComparisonSemantics {
 
 /// Return whether equality on `ty` is reflexive and therefore rules out shared identity when false.
 fn has_reflexive_equality_semantics<'db>(
-    evaluator: &ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     ty: Type<'db>,
 ) -> bool {
-    // `comparison_semantics` identifies a single builtin comparison implementation. The evaluator
-    // normally distributes unions before that lookup, but this check receives the original operands.
-    // A union such as `Literal[1, "a"]` has reflexive equality in every alternative without sharing
-    // one comparison implementation, so check each alternative here.
-    if let Type::Union(union) = ty.resolve_type_alias(evaluator.db) {
-        return union
-            .elements(evaluator.db)
-            .iter()
-            .all(|element| has_reflexive_equality_semantics(evaluator, *element));
-    }
-    evaluator
-        .comparison_semantics(ty, ComparisonOperator::Equality)
-        .is_some()
+    TypeInspector::scope(evaluator.env, |inspector| {
+        has_reflexive_equality_semantics_in(evaluator, inspector, ty)
+    })
+}
+
+fn has_reflexive_equality_semantics_in<'db>(
+    evaluator: &ComparisonEvaluator<'_, 'db>,
+    inspector: &TypeInspector<'_, 'db>,
+    ty: Type<'db>,
+) -> bool {
+    inspector.inspect(
+        evaluator.db,
+        ty,
+        |_, _| false,
+        |inspector, ty| {
+            // `comparison_semantics` identifies a single builtin comparison implementation. The evaluator
+            // normally distributes unions before that lookup, but this check receives the original operands.
+            // A union such as `Literal[1, "a"]` has reflexive equality in every alternative without sharing
+            // one comparison implementation, so check each alternative here.
+            if let Type::Union(union) = ty {
+                return union.elements(evaluator.db).iter().all(|element| {
+                    has_reflexive_equality_semantics_in(evaluator, inspector, *element)
+                });
+            }
+            evaluator
+                .comparison_semantics(ty, ComparisonOperator::Equality)
+                .is_some()
+        },
+    )
 }
 
 /// Return whether `ty` is a singleton whose comparison uses object identity semantics.

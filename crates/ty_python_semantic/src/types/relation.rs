@@ -13,6 +13,7 @@ use crate::types::constraints::{
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::recursive::TypeExpansionContext;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
@@ -1650,13 +1651,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+        work: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let collect_context = self.is_context_collection_enabled();
         self.relation_visitor
-            .try_visit(
+            .try_visit_with_expansion(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
+                self.materialization_visitor,
                 // Cached constraints do not retain explanations. When collecting context,
                 // recompute unsatisfiable comparisons while preserving the active recursion
                 // guards. Satisfiable constraints remain reusable, including those that
@@ -1846,6 +1848,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
+        // A union contains each of its elements. Check this before unfolding recursive types,
+        // which can otherwise replace the matching element with a larger specialization.
+        if let Type::Union(union) = target
+            && self.relation.can_safely_assume_reflexivity(source)
+            && union.elements(db).contains(&source)
+        {
+            return self.always();
+        }
+
         match (source, target) {
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -1875,7 +1886,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::Recursive(source_recursive), _) => {
                 // Both comparing arguments and unfolding can revisit this pair.
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |expansion| {
                     let by_arguments = if let Type::Recursive(target_recursive) = target {
                         self.when_recursive_types_relate_by_arguments(
                             db,
@@ -1886,8 +1897,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         self.never()
                     };
                     by_arguments.or(db, self.constraints, || {
-                        source_recursive
-                            .unfold(db, self.env)
+                        expansion
+                            .expand_recursive(db, source_recursive)
                             .map(|source_unfolded| {
                                 self.check_type_pair(db, source_unfolded, target)
                             })
@@ -1900,9 +1911,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::Recursive(target_recursive)) => {
-                self.with_recursion_guard(db, source, target, || {
-                    target_recursive
-                        .unfold(db, self.env)
+                self.with_recursion_guard(db, source, target, |expansion| {
+                    expansion
+                        .expand_recursive(db, target_recursive)
                         .map(|target_unfolded| self.check_type_pair(db, source, target_unfolded))
                         .unwrap_or(ConstraintSet::from_bool(
                             self.constraints,
@@ -1920,13 +1931,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::TypeAlias(source_alias), _) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_type_pair(db, source_alias.value_type(db), target)
                 })
             }
 
             (_, Type::TypeAlias(target_alias)) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_type_pair(db, source, target_alias.value_type(db))
                 })
             }
@@ -1934,27 +1945,47 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Mapped negations retain alias references to avoid repeatedly unfolding recursive
             // types. Expand direct aliases for comparison so `~A` and `~list[Any]` compare
             // identically when `type A = list[Any]`.
-            (Type::Intersection(intersection), _) if intersection.has_aliases(db) => self
-                .with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, intersection.expand_aliases(db, env), target)
-                }),
+            (Type::Intersection(intersection), _)
+                if intersection.needs_alias_expansion(db, self.materialization_visitor) =>
+            {
+                self.with_recursion_guard(db, source, target, |_| {
+                    self.check_type_pair(
+                        db,
+                        intersection.expand_aliases(db, self.materialization_visitor),
+                        target,
+                    )
+                })
+            }
 
-            (_, Type::Intersection(intersection)) if intersection.has_aliases(db) => self
-                .with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, intersection.expand_aliases(db, env))
-                }),
+            (_, Type::Intersection(intersection))
+                if intersection.needs_alias_expansion(db, self.materialization_visitor) =>
+            {
+                self.with_recursion_guard(db, source, target, |_| {
+                    self.check_type_pair(
+                        db,
+                        source,
+                        intersection.expand_aliases(db, self.materialization_visitor),
+                    )
+                })
+            }
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db, env))
+            (_, Type::Union(union))
+                if union.needs_alias_expansion(db, self.materialization_visitor) =>
+            {
+                self.with_recursion_guard(db, source, target, |_| {
+                    self.check_type_pair(
+                        db,
+                        source,
+                        union.expand_aliases(db, self.materialization_visitor),
+                    )
                 })
             }
 
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
-                .with_recursion_guard(db, source, target, || {
+                .with_recursion_guard(db, source, target, |_| {
                     self.check_type_pair(
                         db,
                         source_typeform.type_argument(db),
@@ -2082,7 +2113,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(source_wrapper)),
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(target_wrapper)),
             ) if source_wrapper.kind(db) == target_wrapper.kind(db) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_type_pair(db, source_wrapper.wrapped(db), target_wrapper.wrapped(db))
                 })
             }
@@ -2094,7 +2125,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             | (
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(source_partial)),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
-            ) => self.with_recursion_guard(db, source, target, || {
+            ) => self.with_recursion_guard(db, source, target, |_| {
                 // The reduced signature of `partial(boolean)` is `() -> bool`, which is a
                 // subtype of the `() -> int` signature of `partial(integer)`. The wrapped
                 // functions still differ, and `.func` exposes which one was chosen:
@@ -2151,7 +2182,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .class(db, env)
                 .is_known(db, wrapper.class(db)) =>
             {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     let Some(target_function) = target
                         .member_lookup_with_policy(
                             db,
@@ -2219,21 +2250,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 },
             ),
 
-            // In general, a TypeVar `T` is not redundant with a type `S` unless one of the two conditions is satisfied:
-            // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
-            //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
-            // 2. `T` is a constrained TypeVar and all of `T`'s constraints are subtypes of `S`.
-            //
-            // However, there is one exception to this general rule: for any given typevar `T`,
-            // `T` will always be a subtype of any union containing `T`.
-            (_, Type::Union(union))
-                if self.relation.can_safely_assume_reflexivity(source)
-                    && union.elements(db).contains(&source) =>
-            {
-                self.always()
-            }
-
-            // A similar rule applies in reverse to intersection types.
+            // An intersection is a subtype of each of its positive elements.
             (Type::Intersection(intersection), _)
                 if self.relation.can_safely_assume_reflexivity(target)
                     && intersection.positive(db).contains(&target) =>
@@ -2438,7 +2455,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         UpcastPolicy::from(self.relation),
                     )
                 {
-                    self.with_recursion_guard(db, source, target, || {
+                    self.with_recursion_guard(db, source, target, |_| {
                         self.check_callables_vs_callable(db, &callables, target_callable)
                     })
                 } else {
@@ -2486,7 +2503,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_type_pair(db, Type::object(), target)
                 })
             }
@@ -2506,7 +2523,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ),
                 Type::FunctionLiteral(target_function),
             ) if matches!(self.relation, TypeRelation::Assignability) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_callable_signature_pair(
                         db,
                         source_partial.partial(db).signatures(db),
@@ -2559,7 +2576,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             ) => self.never(),
 
             (Type::Callable(source_callable), Type::Callable(target_callable)) => self
-                .with_recursion_guard(db, source, target, || {
+                .with_recursion_guard(db, source, target, |_| {
                     self.check_callable_pair(db, source_callable, target_callable)
                 }),
 
@@ -2567,13 +2584,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
             ) if self.relation.is_assignability() => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_callable_pair(db, source_callable, target_partial.partial(db))
                 })
             }
 
             (_, Type::Callable(target_callable)) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     // Bound methods can be assigned to inferred function-like callback types,
                     // but are not nominal subtypes of functions.
                     let target_callable = if self.relation.is_assignability()
@@ -2622,7 +2639,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::ProtocolInstance(target_proto)) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_type_satisfies_protocol(db, source, target_proto)
                 })
             }
@@ -2631,13 +2648,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(_), _) => self.never(),
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     self.check_typeddict_pair(db, source_td, target_td)
                 })
             }
 
             (Type::TypedDict(typed_dict), _) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_recursion_guard(db, source, target, |_| {
                     let dict_value_type =
                         typed_dict.dict_value_type_if(db, |field_ty, extra_ty| {
                             let result = if self.relation.is_assignability() {
@@ -3040,14 +3057,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 {
                     self.check_nominal_instance_pair(db, source_i, target_i)
                 } else {
-                    self.with_recursion_guard(db, source, target, || {
+                    self.with_recursion_guard(db, source, target, |_| {
                         self.check_nominal_instance_pair(db, source_i, target_i)
                     })
                 }
             }
 
             (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => self
-                .with_recursion_guard(db, source, target, || {
+                .with_recursion_guard(db, source, target, |_| {
                     self.check_property_instance_pair(db, source_p, target_p)
                 }),
 
@@ -3333,9 +3350,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+        work: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        self.disjointness_visitor.visit(db, (source, target), work)
+        self.disjointness_visitor.visit_with_expansion(
+            db,
+            (source, target),
+            self.materialization_visitor,
+            work,
+        )
     }
 
     fn any_protocol_members_absent_or_disjoint(
@@ -3420,7 +3442,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         intersection: IntersectionType<'db>,
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.with_recursion_guard(db, left, right, || {
+        self.with_recursion_guard(db, left, right, |_| {
             let negative_elements = intersection.negative(db);
             let subtyping_checker = self.as_relation_checker(TypeRelation::Subtyping);
 
@@ -3511,34 +3533,34 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::Recursive(left_recursive), _) => left_recursive
-                .unfold(db, env)
-                .map(|left_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left_unfolded, right)
-                    })
+            (Type::Recursive(left_recursive), _) => {
+                self.with_recursion_guard(db, left, right, |expansion| {
+                    expansion
+                        .expand_recursive(db, left_recursive)
+                        .map(|left_unfolded| self.check_type_pair(db, left_unfolded, right))
+                        .unwrap_or(self.never())
                 })
-                .unwrap_or(self.never()),
+            }
 
-            (_, Type::Recursive(right_recursive)) => right_recursive
-                .unfold(db, env)
-                .map(|right_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left, right_unfolded)
-                    })
+            (_, Type::Recursive(right_recursive)) => {
+                self.with_recursion_guard(db, left, right, |expansion| {
+                    expansion
+                        .expand_recursive(db, right_recursive)
+                        .map(|right_unfolded| self.check_type_pair(db, left, right_unfolded))
+                        .unwrap_or(self.never())
                 })
-                .unwrap_or(self.never()),
+            }
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.check_type_pair(db, left_alias_ty, right)
                 })
             }),
 
             (_, Type::TypeAlias(alias)) => nontrivial_check(self, || {
                 let right_alias_ty = alias.value_type(db);
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.check_type_pair(db, left, right_alias_ty)
                 })
             }),
@@ -3666,7 +3688,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     {
                         self.check_type_pair(db, left, alternatives)
                     } else {
-                        self.with_recursion_guard(db, left, right, || {
+                        self.with_recursion_guard(db, left, right, |_| {
                             left_intersection
                                 .positive(db)
                                 .iter()
@@ -3808,7 +3830,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(left_wrapper)),
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(right_wrapper)),
             ) if left_wrapper.kind(db) == right_wrapper.kind(db) => nontrivial_check(self, || {
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.check_type_pair(db, left_wrapper.wrapped(db), right_wrapper.wrapped(db))
                 })
             }),
@@ -3821,7 +3843,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(left_partial)),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(right_partial)),
             ) => nontrivial_check(self, || {
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.check_type_pair(
                         db,
                         left_partial.wrapped(db).inner(db),
@@ -3895,7 +3917,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::ProtocolInstance(left_proto), Type::ProtocolInstance(right_proto)) => {
                 nontrivial_check(self, || {
-                    self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, |_| {
                         self.check_protocol_instance_pair(db, left_proto, right_proto)
                     })
                 })
@@ -3904,7 +3926,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
                 nontrivial_check(self, || {
-                    self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, |_| {
                         self.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
@@ -3917,7 +3939,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
                 nontrivial_check(self, || {
-                    self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, |_| {
                         self.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
@@ -3970,7 +3992,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)),
             ) => nontrivial_check(self, || {
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.any_protocol_members_absent_or_disjoint(db, protocol, ty)
                 })
             }),
@@ -3983,7 +4005,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if self.perform_expensive_checks && nominal.class(db, env).is_final(db) =>
             {
                 nontrivial_check(self, || {
-                    self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, |_| {
                         self.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
@@ -3995,7 +4017,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => nontrivial_check(self, || {
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     protocol
                         .interface(db)
                         .members(db)
@@ -4439,7 +4461,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::NominalInstance(left_i), Type::NominalInstance(right_i)) => {
                 nontrivial_check(self, || {
-                    self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, |_| {
                         self.check_nominal_instance_pair(db, left_i, right_i)
                     })
                 })
@@ -4486,7 +4508,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 
             (Type::TypedDict(left_td), Type::TypedDict(right_td)) => nontrivial_check(self, || {
-                self.with_recursion_guard(db, left, right, || {
+                self.with_recursion_guard(db, left, right, |_| {
                     self.check_typeddict_pair(db, left_td, right_td)
                 })
             }),

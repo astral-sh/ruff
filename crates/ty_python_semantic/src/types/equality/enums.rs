@@ -1,5 +1,6 @@
 //! Equality reasoning for enum value domains without expanding member unions.
 
+use crate::types::recursive::{TypeExpansionContext, TypeVisitorState};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_python_core::Truthiness;
@@ -23,19 +24,19 @@ use super::{
 ///
 /// Return `None` when the enum comparison does not apply.
 pub(super) fn evaluate_enum_comparison<'db>(
-    evaluator: &mut ComparisonEvaluator<'db>,
+    evaluator: &ComparisonEvaluator<'_, 'db>,
     target: Type<'db>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
-    let env = evaluator.env.clone();
+    let env = (*evaluator.env).clone();
     evaluate_enum_domains(db, &env, target, other, branch, operator).or_else(|| {
         PartitionedEnumComparison::new(db, &env, target, other, branch, operator).map(
             |comparison| match comparison.evaluate(evaluator, branch, operator) {
                 ComparisonResult::CanNarrow(narrowed)
-                    if narrowed == target.resolve_type_alias(db) =>
+                    if narrowed.is_same_resolved_type(db, target) =>
                 {
                     ComparisonResult::Ambiguous
                 }
@@ -112,8 +113,8 @@ impl<'db> PartitionedEnumComparison<'db> {
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        if !matches!(target.resolve_type_alias(db), Type::Union(_))
-            && !matches!(other.resolve_type_alias(db), Type::Union(_))
+        if !target.has_outer_type(db, super::super::Type::is_union)
+            && !other.has_outer_type(db, super::super::Type::is_union)
         {
             return None;
         }
@@ -140,7 +141,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// Reuse the saved enum result and compare all other values normally.
     fn evaluate_pair(
         &self,
-        evaluator: &mut ComparisonEvaluator<'db>,
+        evaluator: &ComparisonEvaluator<'_, 'db>,
         target: Type<'db>,
         other: Type<'db>,
         branch: ComparisonBranch,
@@ -160,7 +161,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// Return whether the result is certain or which values can still match.
     fn evaluate_against_other(
         &self,
-        evaluator: &mut ComparisonEvaluator<'db>,
+        evaluator: &ComparisonEvaluator<'_, 'db>,
         target: Type<'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
@@ -179,8 +180,8 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
-        let env = evaluator.env.clone();
-        if matches!(target.resolve_type_alias(db), Type::Dynamic(_)) {
+        let env = (*evaluator.env).clone();
+        if target.has_outer_type(db, |ty| ty.is_dynamic()) {
             return evaluator.evaluate(target, self.other_type, branch, operator);
         }
 
@@ -203,7 +204,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// Return whether the result is certain or which values can still match.
     fn evaluate(
         &self,
-        evaluator: &mut ComparisonEvaluator<'db>,
+        evaluator: &ComparisonEvaluator<'_, 'db>,
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> ComparisonResult<'db> {
@@ -220,7 +221,7 @@ impl<'db> PartitionedEnumComparison<'db> {
             );
         }
 
-        let env = evaluator.env.clone();
+        let env = (*evaluator.env).clone();
         let mut narrowed_enum = None;
         let result = evaluate_target_union(db, &env, &self.target.alternatives, branch, |target| {
             let result = self.evaluate_against_other(evaluator, target, branch, operator);
@@ -358,6 +359,8 @@ impl<'db> SameEnumComparison<'db> {
     }
 }
 
+type EnumDomainVisitor<'env, 'db> = TypeVisitorState<'env, 'db, (), Type<'db>, (), 3>;
+
 /// The enum-member values represented by an operand, excluding non-enum intersection state.
 ///
 /// This is an upper bound on the operand's enum values. Gradual and nominal rest components can
@@ -391,15 +394,15 @@ impl<'db> EnumValueSet<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-        active_types: &mut FxHashSet<Type<'db>>,
+        visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         fn from_type_inner<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            active_types: &mut FxHashSet<Type<'db>>,
+            visitor: &EnumDomainVisitor<'_, 'db>,
         ) -> Option<EnumValueSet<'db>> {
-            let value_set = match ty.resolve_type_alias(db) {
+            let value_set = match ty {
                 Type::LiteralValue(literal) => {
                     let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
                         return None;
@@ -419,30 +422,27 @@ impl<'db> EnumValueSet<'db> {
                     members: EnumValueSetMembers::All,
                 },
                 Type::NewTypeInstance(newtype) => {
-                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), active_types)?
+                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), visitor)?
                 }
                 Type::EnumComplement(complement) => EnumValueSet {
                     enum_class: complement.enum_class_literal(db),
                     members: EnumValueSetMembers::AllExcept(complement),
                 },
                 Type::Union(union) => {
-                    EnumValueSet::from_union(db, env, union.elements(db), active_types)?
+                    EnumValueSet::from_union(db, env, union.elements(db), visitor)?
                 }
                 Type::Intersection(intersection) => {
-                    EnumValueSet::from_intersection(db, env, intersection, active_types)?
+                    EnumValueSet::from_intersection(db, env, intersection, visitor)?
                 }
                 _ => return None,
             };
             (value_set.member_count(db) > 0).then_some(value_set)
         }
 
-        // A cycle prevents extracting a finite enum domain, so fall back to general comparison.
-        if !active_types.insert(ty) {
-            return None;
-        }
-        let value_set = from_type_inner(db, env, ty, active_types);
-        active_types.remove(&ty);
-        value_set
+        visitor.visit_active_with_expansion(db, ty, |expansion| {
+            let expansion = expansion.ok()?;
+            from_type_inner(db, env, expansion.normalize(db, ty), visitor)
+        })
     }
 
     /// Extract an exact included-member set from a union of enum domains.
@@ -452,12 +452,12 @@ impl<'db> EnumValueSet<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         elements: &[Type<'db>],
-        active_types: &mut FxHashSet<Type<'db>>,
+        visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderMap::default();
         for element in elements {
-            let value_set = Self::from_type(db, env, *element, active_types)?;
+            let value_set = Self::from_type(db, env, *element, visitor)?;
             if let Some(enum_class) = enum_class
                 && enum_class != value_set.enum_class
             {
@@ -520,18 +520,16 @@ impl<'db> EnumValueSet<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         intersection: IntersectionType<'db>,
-        active_types: &mut FxHashSet<Type<'db>>,
+        visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         if let Some(complement) = intersection.enum_complement(db, env) {
-            return Self::from_type(db, env, Type::EnumComplement(complement), active_types);
+            return Self::from_type(db, env, Type::EnumComplement(complement), visitor);
         }
 
-        if intersection
-            .positive(db)
-            .iter()
-            .any(|positive| matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_)))
-            && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
-            && let Some(value_set) = Self::from_type(db, env, expanded, active_types)
+        if intersection.positive(db).iter().any(|positive| {
+            positive.has_outer_type(db, |ty| matches!(ty, Type::NewTypeInstance(_)))
+        }) && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
+            && let Some(value_set) = Self::from_type(db, env, expanded, visitor)
         {
             return Some(value_set);
         }
@@ -541,7 +539,7 @@ impl<'db> EnumValueSet<'db> {
         let mut value_sets = intersection
             .positive(db)
             .iter()
-            .filter_map(|positive| Self::from_type(db, env, *positive, active_types));
+            .filter_map(|positive| Self::from_type(db, env, *positive, visitor));
         let value_set = value_sets.next()?;
         value_sets
             .all(|other| other.enum_class == value_set.enum_class)
@@ -710,42 +708,38 @@ impl<'db> EnumDomainPartition<'db> {
             enum_types: &mut Vec<Type<'db>>,
             alternatives: &mut Vec<Type<'db>>,
             enum_position: &mut Option<usize>,
-            active_types: &mut FxHashSet<Type<'db>>,
+            visitor: &EnumDomainVisitor<'_, 'db>,
         ) -> Option<()> {
-            if EnumValueSet::from_type(db, env, ty, active_types).is_some() {
+            if EnumValueSet::from_type(db, env, ty, visitor).is_some() {
                 enum_position.get_or_insert(alternatives.len());
                 enum_types.push(ty);
                 return Some(());
             }
 
-            let Type::Union(union) = ty.resolve_type_alias(db) else {
-                alternatives.push(ty);
-                return Some(());
-            };
-
-            if !active_types.insert(ty) {
-                return None;
-            }
-
-            let result = union.elements(db).iter().try_for_each(|element| {
-                collect(
-                    db,
-                    env,
-                    *element,
-                    enum_types,
-                    alternatives,
-                    enum_position,
-                    active_types,
-                )
-            });
-            active_types.remove(&ty);
-            result
+            visitor.visit_active_with_expansion(db, ty, |expansion| {
+                let expansion = expansion.ok()?;
+                let Type::Union(union) = expansion.normalize(db, ty) else {
+                    alternatives.push(ty);
+                    return Some(());
+                };
+                union.elements(db).iter().try_for_each(|element| {
+                    collect(
+                        db,
+                        env,
+                        *element,
+                        enum_types,
+                        alternatives,
+                        enum_position,
+                        visitor,
+                    )
+                })
+            })
         }
 
         let mut enum_types = Vec::new();
         let mut alternatives = Vec::new();
         let mut enum_position = None;
-        let mut active_types = FxHashSet::default();
+        let visitor = EnumDomainVisitor::new(env, ());
         collect(
             db,
             env,
@@ -753,7 +747,7 @@ impl<'db> EnumDomainPartition<'db> {
             &mut enum_types,
             &mut alternatives,
             &mut enum_position,
-            &mut active_types,
+            &visitor,
         )?;
         let enum_position = enum_position?;
         let enum_type = enum_types
@@ -785,19 +779,16 @@ impl<'db> EnumDomainSet<'db> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
-            active_types: &mut FxHashSet<Type<'db>>,
+            visitor: &EnumDomainVisitor<'_, 'db>,
         ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(db, env, ty, active_types) {
+            if let Some(domain) = EnumValueSet::from_type(db, env, ty, visitor) {
                 domains.push(domain);
                 return Some(());
             }
 
-            if !active_types.insert(ty) {
-                return None;
-            }
-            let result = collect_union(db, env, ty, domains, active_types);
-            active_types.remove(&ty);
-            result
+            visitor.visit_active_with_expansion(db, ty, |expansion| {
+                collect_union(db, env, ty, domains, visitor, expansion.ok()?)
+            })
         }
 
         fn collect_union<'db>(
@@ -805,20 +796,21 @@ impl<'db> EnumDomainSet<'db> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
             domains: &mut Vec<EnumValueSet<'db>>,
-            active_types: &mut FxHashSet<Type<'db>>,
+            visitor: &EnumDomainVisitor<'_, 'db>,
+            expansion: &TypeExpansionContext<'_, '_, 'db>,
         ) -> Option<()> {
-            let Type::Union(union) = ty.resolve_type_alias(db) else {
+            let Type::Union(union) = expansion.normalize(db, ty) else {
                 return None;
             };
             for element in union.elements(db) {
-                collect(db, env, *element, domains, active_types)?;
+                collect(db, env, *element, domains, visitor)?;
             }
             Some(())
         }
 
         let mut domains = Vec::new();
-        let mut active_types = FxHashSet::default();
-        collect(db, env, ty, &mut domains, &mut active_types)?;
+        let visitor = EnumDomainVisitor::new(env, ());
+        collect(db, env, ty, &mut domains, &visitor)?;
         (!domains.is_empty()).then_some(Self { domains })
     }
 

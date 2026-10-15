@@ -5,6 +5,8 @@
 //! listing all members on a nominal-instance type or a class-literal type requires
 //! listing all members in the class's body scope.
 
+use crate::types::recursive::TypeInspector;
+use crate::types::{CycleKind, TypeTraversal, TypeWalk};
 use std::cmp::Ordering;
 
 use itertools::Itertools;
@@ -160,20 +162,67 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__dataclass_params__",
 ];
 
-struct AllMembers<'db> {
+struct CollectMembers<'db> {
+    db: &'db dyn Db,
+}
+
+impl<'db> TypeWalk<'db> for CollectMembers<'db> {
+    type Output = Option<FxHashSet<Member<'db>>>;
+
+    fn on_cycle(
+        &self,
+        traversal: &TypeTraversal<'_, 'db, Self>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        match kind {
+            CycleKind::Exact => None,
+            CycleKind::MatchingIdentity => Some(all_members(
+                self.db,
+                traversal.environment(),
+                Type::object(),
+            )),
+        }
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeTraversal<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Self::Output {
+        let mut collector = AllMembers {
+            traversal,
+            members: FxHashSet::default(),
+        };
+        collector
+            .collect_type_members(db, traversal.environment(), ty)
+            .then_some(collector.members)
+    }
+}
+
+struct AllMembers<'a, 'env, 'db> {
+    traversal: &'a TypeTraversal<'env, 'db, CollectMembers<'db>>,
     members: FxHashSet<Member<'db>>,
 }
 
-impl<'db> AllMembers<'db> {
-    fn of(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
-        let mut all_members = Self {
-            members: FxHashSet::default(),
+impl<'db> AllMembers<'_, '_, 'db> {
+    fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let Some(members) = self.traversal.visit(db, ty) else {
+            return false;
         };
-        all_members.extend_with_type(db, env, ty);
-        all_members
+        self.members.extend(members);
+        true
     }
 
-    fn extend_with_type(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
+    fn collect_type_members(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
         match ty {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -194,29 +243,30 @@ impl<'db> AllMembers<'db> {
 
                 let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
                     Type::Union(union) => union,
-                    ty => return self.extend_with_type(db, env, ty),
+                    ty => return self.extend_with_type(db, ty),
                 };
-                self.members.extend(
-                    union
-                        .elements(db)
-                        .iter()
-                        .map(|ty| AllMembers::of(db, env, *ty).members)
-                        .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                        .unwrap_or_default(),
-                );
+                let Some(members) = union
+                    .elements(db)
+                    .iter()
+                    .filter_map(|ty| self.traversal.visit(db, *ty))
+                    .reduce(|acc, members| acc.intersection(&members).cloned().collect())
+                else {
+                    return false;
+                };
+                self.members.extend(members);
             }
 
             Type::Intersection(intersection) => self.members.extend(
                 intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| AllMembers::of(db, env, *ty).members)
+                    .filter_map(|ty| self.traversal.visit(db, *ty))
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
                     .unwrap_or_default(),
             ),
 
             Type::EnumComplement(complement) => {
-                self.extend_with_type(db, env, complement.to_intersection(db, env));
+                self.extend_with_type(db, complement.to_intersection(db, env));
             }
 
             Type::NominalInstance(instance) => {
@@ -237,31 +287,19 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, env, newtype.concrete_base_type(db));
+                self.extend_with_type(db, newtype.concrete_base_type(db));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
-                self.extend_with_type(
-                    db,
-                    env,
-                    KnownClass::TypedDictFallback.to_class_literal(db, env),
-                );
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db, env));
             }
 
             Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
-                self.extend_with_type(
-                    db,
-                    env,
-                    KnownClass::TypedDictFallback.to_class_literal(db, env),
-                );
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db, env));
             }
 
             Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db, env) => {
-                self.extend_with_type(
-                    db,
-                    env,
-                    KnownClass::TypedDictFallback.to_class_literal(db, env),
-                );
+                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db, env));
             }
 
             Type::ClassLiteral(class_literal) => {
@@ -284,7 +322,7 @@ impl<'db> AllMembers<'db> {
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(_) => {
-                    self.extend_with_type(db, env, KnownClass::Type.to_instance(db, env));
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db, env));
                 }
                 SubclassOfInner::Protocol(protocol) => {
                     if let Some((class_literal, _)) = protocol
@@ -306,7 +344,7 @@ impl<'db> AllMembers<'db> {
                     }
                     // A structural implementation can use any metaclass, so only members of
                     // `type` itself are guaranteed in addition to the protocol interface.
-                    self.extend_with_type(db, env, KnownClass::Type.to_instance(db, env));
+                    self.extend_with_type(db, KnownClass::Type.to_instance(db, env));
                 }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db, env)
@@ -325,35 +363,28 @@ impl<'db> AllMembers<'db> {
                 }
             },
 
-            Type::Dynamic(_)
+            Type::Recursive(_)
+            | Type::TypeAlias(_)
+            | Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeForm(_) => {
-                self.extend_with_type(db, env, Type::object());
-            }
-
-            Type::TypeAlias(alias) => {
-                self.extend_with_type(db, env, alias.value_type(db));
-            }
-
-            Type::Recursive(recursive) => {
-                let unfolded = recursive.unfold(db, env).unwrap_or_else(Type::object);
-                self.extend_with_type(db, env, unfolded);
+                self.extend_with_type(db, Type::object());
             }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.extend_with_type(db, env, bound);
+                        self.extend_with_type(db, bound);
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
                         self.members.extend(
                             constraints
                                 .elements(db)
                                 .iter()
-                                .map(|ty| AllMembers::of(db, env, *ty).members)
+                                .filter_map(|ty| self.traversal.visit(db, *ty))
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
@@ -434,10 +465,10 @@ impl<'db> AllMembers<'db> {
                     is_type_check_only: false,
                 });
 
-                self.extend_with_type(db, env, KnownClass::ModuleType.to_instance(db, env));
+                self.extend_with_type(db, KnownClass::ModuleType.to_instance(db, env));
 
                 let Some(file) = module.file(db) else {
-                    return;
+                    return true;
                 };
                 let program_file = ProgramFile::new(db, file, env.program(db));
 
@@ -477,6 +508,7 @@ impl<'db> AllMembers<'db> {
                     ));
             }
         }
+        true
     }
 
     /// Add members from `class_literal` (including following its
@@ -659,15 +691,10 @@ impl<'db> AllMembers<'db> {
         match CodeGeneratorKind::from_class(db, class_literal) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
-                    self.extend_with_type(
-                        db,
-                        env,
-                        KnownClass::NamedTupleFallback.to_instance(db, env),
-                    );
+                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db, env));
                 } else {
                     self.extend_with_type(
                         db,
-                        env,
                         KnownClass::NamedTupleFallback.to_class_literal(db, env),
                     );
                 }
@@ -748,24 +775,54 @@ impl<'db> Member<'db> {
             .unique()
             .filter_map(move |function| {
                 let definition = function.definition(db);
-                let binding = infer_definition_types(db, definition)
-                    .binding_type(definition)
-                    .resolve_type_alias(db);
-                let exposed_union = exposed.as_union_like(db);
-                let exposed_alternatives = exposed_union
-                    .map_or(std::slice::from_ref(&exposed), |union| union.elements(db));
-                let binding_union = binding.as_union_like(db);
-                let binding_alternatives = binding_union
-                    .map_or(std::slice::from_ref(&binding), |union| union.elements(db));
-                let retained = UnionType::from_elements(
+                let binding = infer_definition_types(db, definition).binding_type(definition);
+                TypeInspector::inspect_root(
                     db,
                     &env,
-                    binding_alternatives
-                        .iter()
-                        .copied()
-                        .filter(|ty| exposed_alternatives.contains(ty)),
-                );
-                (!retained.is_never()).then_some((function, retained))
+                    binding,
+                    |_, _| None,
+                    |_, binding| {
+                        TypeInspector::inspect_root(
+                            db,
+                            &env,
+                            exposed,
+                            |_, _| None,
+                            |_, exposed_type| {
+                                let exposed_union = match exposed_type {
+                                    Type::Union(union) => Some(union),
+                                    Type::NewTypeInstance(newtype) => {
+                                        newtype.concrete_base_type(db).as_union()
+                                    }
+                                    _ => None,
+                                };
+                                let exposed_alternatives = exposed_union
+                                    .map_or(std::slice::from_ref(&exposed), |union| {
+                                        union.elements(db)
+                                    });
+                                let binding_union = match binding {
+                                    Type::Union(union) => Some(union),
+                                    Type::NewTypeInstance(newtype) => {
+                                        newtype.concrete_base_type(db).as_union()
+                                    }
+                                    _ => None,
+                                };
+                                let binding_alternatives = binding_union
+                                    .map_or(std::slice::from_ref(&binding), |union| {
+                                        union.elements(db)
+                                    });
+                                let retained = UnionType::from_elements(
+                                    db,
+                                    &env,
+                                    binding_alternatives
+                                        .iter()
+                                        .copied()
+                                        .filter(|ty| exposed_alternatives.contains(ty)),
+                                );
+                                (!retained.is_never()).then_some((function, retained))
+                            },
+                        )
+                    },
+                )
             })
     }
 
@@ -932,5 +989,6 @@ pub(crate) fn all_members<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, env, ty).members
+    TypeTraversal::with_root(env, CollectMembers { db }, |root| root.visit(db, ty))
+        .unwrap_or_default()
 }

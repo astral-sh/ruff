@@ -2,6 +2,7 @@
 
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::ApplyTypeMappingVisitor;
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
@@ -14,6 +15,7 @@ use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
+use super::cyclic::{CycleDetector, CycleKind};
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
@@ -556,6 +558,58 @@ fn typed_dict_subscript<'db>(
     )
 }
 
+/// A subscript operation keeps both operands in its recursion key. Expanding either operand
+/// can revisit the pair, and alias normalization must reuse the same mapping state.
+struct SubscriptChecker<'env, 'db> {
+    mapping: ApplyTypeMappingVisitor<'env, 'db>,
+    expr_context: ast::ExprContext,
+    active: CycleDetector<'db, ast::ExprContext, (Type<'db>, Type<'db>), (), 1>,
+}
+
+impl<'db> SubscriptChecker<'_, 'db> {
+    fn check(
+        &self,
+        db: &'db dyn Db,
+        value_ty: Type<'db>,
+        slice_ty: Type<'db>,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
+        // Normalizing a concrete union can revisit it after recording its completed expansion.
+        // Only deferred definitions and bounds introduce recursive edges.
+        if ![value_ty, slice_ty].into_iter().any(|ty| {
+            ty.is_alias_like() || matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_))
+        }) {
+            return value_ty.subscript_impl(db, self, slice_ty);
+        }
+        self.active
+            .visit_active_with_expansion(db, (value_ty, slice_ty), &self.mapping, |visit| {
+                match visit {
+                    Err(CycleKind::Exact) => Ok(Type::Never),
+                    Err(CycleKind::MatchingIdentity) => Ok(Type::unknown()),
+                    Ok(expansion) => match (value_ty, slice_ty) {
+                        (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => {
+                            value_ty.subscript_impl(db, self, slice_ty)
+                        }
+                        (Type::Recursive(recursive), _) => expansion
+                            .expand_recursive(db, recursive)
+                            .map(|body| self.check(db, body, slice_ty))
+                            .unwrap_or(Ok(value_ty)),
+                        (_, Type::Recursive(recursive)) => expansion
+                            .expand_recursive(db, recursive)
+                            .map(|body| self.check(db, value_ty, body))
+                            .unwrap_or(Ok(value_ty)),
+                        (Type::TypeAlias(alias), _) => {
+                            self.check(db, alias.value_type(db), slice_ty)
+                        }
+                        (_, Type::TypeAlias(alias)) => {
+                            self.check(db, value_ty, alias.value_type(db))
+                        }
+                        _ => value_ty.subscript_impl(db, self, slice_ty),
+                    },
+                }
+            })
+    }
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -564,12 +618,28 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        SubscriptChecker {
+            mapping: ApplyTypeMappingVisitor::new(env),
+            expr_context,
+            active: CycleDetector::new(()),
+        }
+        .check(db, self, slice_ty)
+    }
+
+    fn subscript_impl(
+        self,
+        db: &'db dyn Db,
+        checker: &SubscriptChecker<'_, 'db>,
+        slice_ty: Type<'db>,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
+        let env = checker.mapping.env;
+        let expr_context = checker.expr_context;
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(db, env, slice_ty, expr_context);
+            return checker.check(db, fallback, slice_ty);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(db, env, fallback, expr_context);
+            return checker.check(db, self, fallback);
         }
 
         let value_ty = self;
@@ -578,42 +648,22 @@ impl<'db> Type<'db> {
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
-
-            (Type::Recursive(recursive), _) => Some(
-                recursive
-                    .unfold(db, env)
-                    .map(|unfolded| unfolded.subscript(db, env, slice_ty, expr_context))
-                    .unwrap_or(Ok(value_ty)),
-            ),
-
-            (_, Type::Recursive(recursive)) => Some(
-                recursive
-                    .unfold(db, env)
-                    .map(|unfolded| value_ty.subscript(db, env, unfolded, expr_context))
-                    .unwrap_or(Ok(value_ty)),
-            ),
-
-            (Type::TypeAlias(alias), _) => Some(alias.value_type(db).subscript(
-                db,
-                env,
-                slice_ty,
-                expr_context,
-            )),
-
-            (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, env, alias.value_type(db), expr_context))
-            }
+            (
+                Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Never
+                | Type::Recursive(_)
+                | Type::TypeAlias(_),
+                _,
+            ) => Some(Ok(value_ty)),
 
             // Expand overlapping alternatives before collecting their subscript errors.
-            (Type::Union(union), _) if union.has_aliases(db) => Some(
-                union
-                    .expand_aliases(db, env)
-                    .subscript(db, env, slice_ty, expr_context),
-            ),
+            (Type::Union(union), _) if union.needs_alias_expansion(db, &checker.mapping) => {
+                Some(checker.check(db, union.expand_aliases(db, &checker.mapping), slice_ty))
+            }
 
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                Some(value_ty.subscript(db, env, union.expand_aliases(db, env), expr_context))
+            (_, Type::Union(union)) if union.needs_alias_expansion(db, &checker.mapping) => {
+                Some(checker.check(db, value_ty, union.expand_aliases(db, &checker.mapping)))
             }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
@@ -621,7 +671,7 @@ impl<'db> Type<'db> {
                 env,
                 value_ty,
                 union.elements(db).iter().copied(),
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| checker.check(db, element, slice_ty),
             )),
 
             (_, Type::Union(union)) => Some(map_subscript_alternatives(
@@ -629,37 +679,29 @@ impl<'db> Type<'db> {
                 env,
                 slice_ty,
                 union.elements(db).iter().copied(),
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| checker.check(db, value_ty, element),
             )),
 
             (Type::EnumComplement(complement), _) => {
-                Some(complement.remaining_literal_union(db, env).subscript(
-                    db,
-                    env,
-                    slice_ty,
-                    expr_context,
-                ))
+                Some(checker.check(db, complement.remaining_literal_union(db, env), slice_ty))
             }
 
-            (_, Type::EnumComplement(complement)) => Some(value_ty.subscript(
-                db,
-                env,
-                complement.remaining_literal_union(db, env),
-                expr_context,
-            )),
+            (_, Type::EnumComplement(complement)) => {
+                Some(checker.check(db, value_ty, complement.remaining_literal_union(db, env)))
+            }
 
             (Type::Intersection(intersection), _) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| element.subscript(db, env, slice_ty, expr_context),
+                |element| checker.check(db, element, slice_ty),
             )),
 
             (_, Type::Intersection(intersection)) => Some(map_intersection_subscript(
                 db,
                 env,
                 intersection,
-                |element| value_ty.subscript(db, env, element, expr_context),
+                |element| checker.check(db, value_ty, element),
             )),
 
             (Type::TypeVar(typevar), _)
@@ -671,7 +713,7 @@ impl<'db> Type<'db> {
                     env,
                     value_ty,
                     constraints.elements(db).iter().copied(),
-                    |constraint| constraint.subscript(db, env, slice_ty, expr_context),
+                    |constraint| checker.check(db, constraint, slice_ty),
                 ))
             }
 
@@ -855,14 +897,14 @@ impl<'db> Type<'db> {
                 if (lhs_literal.is_string() || lhs_literal.is_bytes())
                     && let Some(bool) = rhs_literal.as_bool() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(checker.check(db, value_ty, Type::int_literal(i64::from(bool))))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if let Some(bool) = literal.as_bool()
                     && nominal.tuple_spec(db, env).is_some() =>
             {
-                Some(value_ty.subscript(db, env, Type::int_literal(i64::from(bool)), expr_context))
+                Some(checker.check(db, value_ty, Type::int_literal(i64::from(bool))))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {

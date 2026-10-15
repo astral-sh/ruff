@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspector;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -18,15 +19,17 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
-    definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, RecursiveType,
+    Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, UnionType, VarianceInferable,
+    VarianceTerm, definition_expression_annotation, definition_expression_type, visitor,
 };
+use super::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
@@ -80,7 +83,7 @@ impl<'db> TypedDictOpenness<'db> {
     /// class ByClosed(TypedDict, closed=True): ...
     /// ```
     pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
-        if declared_ty.resolve_type_alias(db).is_never() {
+        if declared_ty.has_outer_type(db, |ty| ty.is_never()) {
             Self::Closed
         } else {
             Self::Extra(TypedDictExtraItems {
@@ -302,11 +305,25 @@ impl<'db> TypedDictType<'db> {
                 .expect("StaticClassLiteral definition should be a class")
                 .node(&module);
 
+            // The extra-item type is part of the schema being constructed. Comparing its union
+            // elements here can ask for another specialization of this same schema.
+            let visitor = ApplyTypeMappingVisitor::new_without_union_normalization(&env);
+            let specialize = |ty: Type<'db>| {
+                specialization.map_or(ty, |specialization| {
+                    ty.apply_type_mapping_impl(
+                        db,
+                        &TypeMapping::from_specialization(db, specialization, false),
+                        TypeContext::default(),
+                        &visitor,
+                    )
+                })
+            };
+
             if let Some(arguments) = &class_stmt.arguments {
                 if let Some(extra_items) = arguments.find_keyword("extra_items") {
                     let annotation =
                         definition_expression_annotation(db, class_definition, &extra_items.value)
-                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
+                            .map_type(specialize);
                     return TypedDictOpenness::extra(
                         db,
                         annotation.inner_type(),
@@ -325,7 +342,7 @@ impl<'db> TypedDictType<'db> {
             }
 
             for base in static_class.explicit_bases(db) {
-                let base = base.apply_optional_specialization(db, specialization);
+                let base = specialize(*base);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
                     Type::GenericAlias(base) => ClassType::Generic(base),
@@ -356,22 +373,41 @@ impl<'db> TypedDictType<'db> {
 
     /// Returns a type that contains every value that may be stored in this `TypedDict`.
     ///
-    /// An implicitly open `TypedDict` immediately returns `object` because hidden items may have
-    /// any value type. This also avoids unnecessarily materializing its declared items.
+    /// A projection with a source declaration stays deferred so a mapping comparison can inspect its
+    /// values under the same recursion guard as the enclosing relation.
     pub(crate) fn value_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        if let Some(class) = self.defining_class()
+            && let Some(recursive) = RecursiveType::typed_dict_values(db, class)
+        {
+            Type::Recursive(recursive)
+        } else {
+            UnionBuilder::new(db, env)
+                .add(self.unfold_value_type(db))
+                .build()
+        }
+    }
+
+    /// Expose the value alternatives without starting another relation during construction.
+    /// An implicitly open `TypedDict` returns `object` without inspecting its declared items,
+    /// because its hidden items may have any value type.
+    pub(super) fn unfold_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let openness = self.openness(db);
         if openness.is_implicitly_open() {
             return Type::object();
         }
 
-        let mut builder = UnionBuilder::new(db, env);
-        for field in self.items(db).values() {
-            builder = builder.add(field.declared_ty);
-        }
-        if let Some(extra_items) = openness.explicit_extra_items() {
-            builder = builder.add(extra_items.declared_ty);
-        }
-        builder.build()
+        UnionType::from_elements_structural(
+            db,
+            self.items(db)
+                .values()
+                .map(|field| field.declared_ty)
+                .chain(
+                    openness
+                        .explicit_extra_items()
+                        .map(|extra| extra.declared_ty),
+                ),
+            RecursivelyDefined::No,
+        )
     }
 
     /// Returns the type of keys that may be present in this `TypedDict`.
@@ -1914,197 +1950,231 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
-    match ty {
-        Type::Recursive(recursive) => {
-            let unfolded = recursive.unfold(db, env).into_unfolded()?;
-            extract_unpacked_typed_dict_from_value_type(db, env, unfolded)
-        }
-        Type::RecursiveVar(_) => {
-            unreachable!("semantic operation on an unbound recursive variable")
-        }
-        Type::TypedDict(td) => {
-            let keys = td
-                .items(db)
-                .iter()
-                .map(|(name, field)| {
-                    (
-                        name.clone(),
-                        UnpackedTypedDictKey {
-                            value_ty: field.declared_ty,
-                            is_required: field.is_required(),
-                            definition: field.first_declaration(),
-                        },
-                    )
-                })
-                .collect();
-            Some(UnpackedTypedDict {
-                keys,
-                openness: td.openness(db),
-            })
-        }
-        Type::Intersection(intersection) => {
-            // Collect TypedDict shapes from all TypedDicts in the intersection.
-            let unpacked_elements: Vec<_> = intersection
-                .positive(db)
-                .iter()
-                .filter_map(|element| {
-                    extract_unpacked_typed_dict_from_value_type(db, env, *element)
-                })
-                .collect();
+    TypeQueryContext::with_root(env, UnpackTypedDict, |root| root.visit(db, ty))
+        .ok()
+        .flatten()
+}
 
-            if unpacked_elements.is_empty() {
-                return None;
+struct UnpackTypedDict;
+
+impl<'db> TypeQuery<'db> for UnpackTypedDict {
+    // `Ok(None)` adds no union alternatives. `Err(())` means an alternative is not known to be
+    // a TypedDict, so the whole union cannot be unpacked as a TypedDict.
+    type Output = Result<Option<UnpackedTypedDict<'db>>, ()>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        match kind {
+            // Revisiting an exact union alternative adds no new possible keys. A changing
+            // specialization can introduce other value types, so it cannot be skipped.
+            CycleKind::Exact => Ok(None),
+            CycleKind::MatchingIdentity => Err(()),
+        }
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Self::Output {
+        let env = traversal.environment();
+        match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
             }
+            Type::TypedDict(td) => {
+                let keys = td
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| {
+                        (
+                            name.clone(),
+                            UnpackedTypedDictKey {
+                                value_ty: field.declared_ty,
+                                is_required: field.is_required(),
+                                definition: field.first_declaration(),
+                            },
+                        )
+                    })
+                    .collect();
+                Ok(Some(UnpackedTypedDict {
+                    keys,
+                    openness: td.openness(db),
+                }))
+            }
+            Type::Intersection(intersection) => {
+                // Collect TypedDict shapes from all TypedDicts in the intersection.
+                let unpacked_elements: Vec<_> = intersection
+                    .positive(db)
+                    .iter()
+                    .filter_map(|element| traversal.visit(db, *element).ok().flatten())
+                    .collect();
 
-            // Union all keys from all TypedDicts, intersecting value types for shared keys.
-            let mut result: BTreeMap<Name, UnpackedTypedDictKey<'db>> = BTreeMap::new();
+                if unpacked_elements.is_empty() {
+                    return Err(());
+                }
 
-            for unpacked in &unpacked_elements {
-                for (key, unpacked_key) in &unpacked.keys {
-                    result
-                        .entry(key.clone())
-                        .and_modify(|existing| {
-                            existing.value_ty = IntersectionType::from_two_elements(
+                // Union all keys from all TypedDicts, intersecting value types for shared keys.
+                let mut result: BTreeMap<Name, UnpackedTypedDictKey<'db>> = BTreeMap::new();
+
+                for unpacked in &unpacked_elements {
+                    for (key, unpacked_key) in &unpacked.keys {
+                        result
+                            .entry(key.clone())
+                            .and_modify(|existing| {
+                                existing.value_ty = IntersectionType::from_two_elements(
+                                    db,
+                                    env,
+                                    existing.value_ty,
+                                    unpacked_key.value_ty,
+                                );
+                                existing.is_required |= unpacked_key.is_required;
+                                existing.definition = merge_unpacked_key_definitions(
+                                    existing.definition,
+                                    unpacked_key.definition,
+                                );
+                            })
+                            .or_insert(*unpacked_key);
+                    }
+                }
+
+                for (key, unpacked_key) in &mut result {
+                    for unpacked in &unpacked_elements {
+                        if unpacked.keys.contains_key(key) {
+                            continue;
+                        }
+                        if let Some(extra_items) = unpacked.openness.effective_extra_items() {
+                            unpacked_key.value_ty = IntersectionType::from_two_elements(
                                 db,
                                 env,
-                                existing.value_ty,
                                 unpacked_key.value_ty,
+                                extra_items.declared_ty,
                             );
-                            existing.is_required |= unpacked_key.is_required;
-                            existing.definition = merge_unpacked_key_definitions(
-                                existing.definition,
-                                unpacked_key.definition,
-                            );
-                        })
-                        .or_insert(*unpacked_key);
-                }
-            }
-
-            for (key, unpacked_key) in &mut result {
-                for unpacked in &unpacked_elements {
-                    if unpacked.keys.contains_key(key) {
-                        continue;
-                    }
-                    if let Some(extra_items) = unpacked.openness.effective_extra_items() {
-                        unpacked_key.value_ty = IntersectionType::from_two_elements(
-                            db,
-                            env,
-                            unpacked_key.value_ty,
-                            extra_items.declared_ty,
-                        );
-                        unpacked_key.definition = None;
+                            unpacked_key.definition = None;
+                        }
                     }
                 }
+
+                let openness = intersect_unpacked_typed_dict_openness(
+                    db,
+                    env,
+                    unpacked_elements.iter().map(|unpacked| unpacked.openness),
+                );
+
+                Ok(Some(UnpackedTypedDict {
+                    keys: result,
+                    openness,
+                }))
             }
+            Type::Union(union) => {
+                let unpacked_elements: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .filter_map(|element| traversal.visit(db, *element).transpose())
+                    .collect::<Result<_, _>>()?;
 
-            let openness = intersect_unpacked_typed_dict_openness(
-                db,
-                env,
-                unpacked_elements.iter().map(|unpacked| unpacked.openness),
-            );
+                if unpacked_elements.is_empty() {
+                    return Ok(None);
+                }
 
-            Some(UnpackedTypedDict {
-                keys: result,
-                openness,
-            })
-        }
-        Type::Union(union) => {
-            let unpacked_elements: Vec<_> = union
-                .elements(db)
-                .iter()
-                .map(|element| extract_unpacked_typed_dict_from_value_type(db, env, *element))
-                .collect::<Option<_>>()?;
+                let all_keys: OrderSet<Name> = unpacked_elements
+                    .iter()
+                    .flat_map(|unpacked| unpacked.keys.keys().cloned())
+                    .collect();
+                let mut result = BTreeMap::new();
 
-            let all_keys: OrderSet<Name> = unpacked_elements
-                .iter()
-                .flat_map(|unpacked| unpacked.keys.keys().cloned())
-                .collect();
-            let mut result = BTreeMap::new();
+                for key in all_keys {
+                    let mut value_ty = UnionBuilder::new(db, env);
+                    let mut is_required = true;
+                    let mut definition = None;
+                    let mut saw_key = false;
 
-            for key in all_keys {
-                let mut value_ty = UnionBuilder::new(db, env);
-                let mut is_required = true;
-                let mut definition = None;
-                let mut saw_key = false;
-
-                for unpacked in &unpacked_elements {
-                    if let Some(unpacked_key) = unpacked.keys.get(key.as_str()) {
-                        saw_key = true;
-                        value_ty.add_in_place(unpacked_key.value_ty);
-                        is_required &= unpacked_key.is_required;
-                        definition = Some(if let Some(definition) = definition {
-                            merge_unpacked_key_definitions(definition, unpacked_key.definition)
+                    for unpacked in &unpacked_elements {
+                        if let Some(unpacked_key) = unpacked.keys.get(key.as_str()) {
+                            saw_key = true;
+                            value_ty.add_in_place(unpacked_key.value_ty);
+                            is_required &= unpacked_key.is_required;
+                            definition = Some(if let Some(definition) = definition {
+                                merge_unpacked_key_definitions(definition, unpacked_key.definition)
+                            } else {
+                                unpacked_key.definition
+                            });
+                        } else if let Some(extra_items) = unpacked.openness.effective_extra_items()
+                        {
+                            saw_key = true;
+                            value_ty.add_in_place(extra_items.declared_ty);
+                            is_required = false;
+                            definition = Some(None);
                         } else {
-                            unpacked_key.definition
-                        });
-                    } else if let Some(extra_items) = unpacked.openness.effective_extra_items() {
-                        saw_key = true;
-                        value_ty.add_in_place(extra_items.declared_ty);
-                        is_required = false;
-                        definition = Some(None);
-                    } else {
-                        is_required = false;
-                        definition = Some(None);
+                            is_required = false;
+                            definition = Some(None);
+                        }
+                    }
+
+                    if saw_key {
+                        result.insert(
+                            key,
+                            UnpackedTypedDictKey {
+                                value_ty: value_ty.build(),
+                                is_required,
+                                definition: definition.flatten(),
+                            },
+                        );
                     }
                 }
 
-                if saw_key {
-                    result.insert(
-                        key,
-                        UnpackedTypedDictKey {
-                            value_ty: value_ty.build(),
-                            is_required,
-                            definition: definition.flatten(),
-                        },
-                    );
-                }
+                let openness = union_unpacked_typed_dict_openness(
+                    db,
+                    env,
+                    unpacked_elements.iter().map(|unpacked| unpacked.openness),
+                );
+
+                Ok(Some(UnpackedTypedDict {
+                    keys: result,
+                    openness,
+                }))
             }
-
-            let openness = union_unpacked_typed_dict_openness(
-                db,
-                env,
-                unpacked_elements.iter().map(|unpacked| unpacked.openness),
-            );
-
-            Some(UnpackedTypedDict {
-                keys: result,
-                openness,
-            })
+            Type::Never => Ok(None),
+            // All other types cannot contain a TypedDict
+            Type::Recursive(_)
+            | Type::TypeAlias(_)
+            | Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::EnumComplement(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::SpecialForm(_)
+            | Type::KnownInstance(_)
+            | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::LiteralValue(_)
+            | Type::TypeVar(_)
+            | Type::BoundSuper(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeForm(_)
+            | Type::NewTypeInstance(_) => Err(()),
         }
-        Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_from_value_type(db, env, alias.value_type(db))
-        }
-        // All other types cannot contain a TypedDict
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::EnumComplement(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::SlotDescriptor(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::TypeForm(_)
-        | Type::NewTypeInstance(_) => None,
     }
 }
 
@@ -2122,28 +2192,37 @@ fn merge_unpacked_key_definitions<'db>(
 /// `TypedDict` target, or a type alias resolving to one.
 pub(crate) fn extract_unpacked_typed_dict_keys_from_kwargs_annotation<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     annotated_type: Type<'db>,
     annotation_flags: TypeExpressionFlags,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
-    let typed_dict = annotation_flags
-        .contains(TypeExpressionFlags::UNPACK)
-        .then(|| annotated_type.resolve_type_alias(db).as_typed_dict())??;
+    TypeInspector::inspect_root(
+        db,
+        env,
+        annotated_type,
+        |_, _| None,
+        |_, annotated_type| {
+            let typed_dict = annotation_flags
+                .contains(TypeExpressionFlags::UNPACK)
+                .then(|| annotated_type.as_typed_dict())??;
 
-    Some(
-        typed_dict
-            .items(db)
-            .iter()
-            .map(|(name, field)| {
-                (
-                    name.clone(),
-                    UnpackedTypedDictKey {
-                        value_ty: field.declared_ty,
-                        is_required: field.is_required(),
-                        definition: field.first_declaration(),
-                    },
-                )
-            })
-            .collect(),
+            Some(
+                typed_dict
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| {
+                        (
+                            name.clone(),
+                            UnpackedTypedDictKey {
+                                value_ty: field.declared_ty,
+                                is_required: field.is_required(),
+                                definition: field.first_declaration(),
+                            },
+                        )
+                    })
+                    .collect(),
+            )
+        },
     )
 }
 
@@ -2167,15 +2246,25 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
         .collect()
 }
 
-fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        ty if ty.is_never() || ty.is_dynamic() => true,
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| element.resolve_type_alias(db).is_dynamic()),
-        _ => false,
-    }
+fn unpacked_keyword_is_gradual<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    TypeInspector::inspect_root(
+        db,
+        env,
+        ty,
+        |_, _| false,
+        |_, ty| match ty {
+            ty if ty.is_never() || ty.is_dynamic() => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| element.has_outer_type(db, |ty| ty.is_dynamic())),
+            _ => false,
+        },
+    )
 }
 
 /// Collects constructor keys that are guaranteed to be provided by keyword arguments.
@@ -2263,7 +2352,7 @@ fn collect_guaranteed_keys_from_merged_unpacked_keyword<'db>(
         return;
     }
 
-    if unpacked_keyword_is_gradual(db, unpacked_type) {
+    if unpacked_keyword_is_gradual(db, env, unpacked_type) {
         provided_keys.extend(typed_dict.items(db).keys().cloned());
     } else if let Some(unpacked_keys) =
         extract_unpacked_typed_dict_keys_from_value_type(db, env, unpacked_type)
@@ -2999,7 +3088,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
 
     // Never and Dynamic types are special: they can have any keys, so we skip validation and mark
     // all target keys as provided.
-    if unpacked_keyword_is_gradual(db, unpacked_type) {
+    if unpacked_keyword_is_gradual(db, env, unpacked_type) {
         shadowed_keys.extend(items.keys().cloned());
         for key_name in items.keys() {
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
@@ -3248,7 +3337,7 @@ impl<'db> TypedDictField<'db> {
 
     /// Returns `false` for optional fields whose declared type is uninhabited.
     pub(crate) fn may_be_present(&self, db: &'db dyn Db) -> bool {
-        self.is_required() || !self.declared_ty.resolve_type_alias(db).is_never()
+        self.is_required() || !self.declared_ty.has_outer_type(db, |ty| ty.is_never())
     }
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {

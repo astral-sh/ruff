@@ -6,11 +6,11 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use super::TypeInferenceBuilder;
 use crate::types::call::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
 use crate::types::function::OverloadLiteral;
+use crate::types::recursive::TypeVisitorState;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
@@ -25,8 +25,14 @@ enum BinaryExpressionOperandTypes<'db> {
     TypedDictResult(Type<'db>),
 }
 
-type BinaryExpressionVisitor<'db> =
-    CycleDetector<'db, ast::Operator, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>, 1>;
+type BinaryExpressionVisitor<'env, 'db> = TypeVisitorState<
+    'env,
+    'db,
+    ast::Operator,
+    (Type<'db>, ast::Operator, Type<'db>),
+    Option<Type<'db>>,
+    1,
+>;
 
 fn is_union_type_operand(ty: Type<'_>) -> bool {
     matches!(
@@ -455,7 +461,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             left_ty,
             right_ty,
             op,
-            &BinaryExpressionVisitor::new(Some(Type::Never)),
+            &BinaryExpressionVisitor::new(self.program_environment(), Some(Type::Never)),
             state,
         )?;
         Some(state.limit_tuple_addition_result(self.db(), self.program_environment(), result))
@@ -467,7 +473,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
-        visitor: &BinaryExpressionVisitor<'db>,
+        visitor: &BinaryExpressionVisitor<'_, 'db>,
         state: &mut BinaryInferenceState<'db>,
     ) -> Option<Type<'db>> {
         let env = self.program_environment();
@@ -520,15 +526,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .ok(),
 
             (Type::Recursive(recursive), rhs, _) => {
-                visitor.visit(db, (left_ty, op, right_ty), || {
-                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
+                    let unfolded = expansion.expand_recursive(db, recursive).into_unfolded()?;
                     self.infer_binary_expression_type_impl(node, unfolded, rhs, op, visitor, state)
                 })
             }
 
             (lhs, Type::Recursive(recursive), _) => {
-                visitor.visit(db, (left_ty, op, right_ty), || {
-                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
+                    let unfolded = expansion.expand_recursive(db, recursive).into_unfolded()?;
                     self.infer_binary_expression_type_impl(node, lhs, unfolded, op, visitor, state)
                 })
             }

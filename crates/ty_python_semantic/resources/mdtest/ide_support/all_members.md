@@ -494,6 +494,29 @@ def f(x: Intersection[Any, A] | B):
     static_assert(has_member(x, "only_on_b"))
 ```
 
+### Recursive TypedDict values
+
+The `child` field refers to all of `Node`'s value types, including `Payload`. A value still exposes
+the `visible` attribute declared on `Payload`:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, has_member
+
+class Payload:
+    visible: int
+
+class Node(TypedDict, closed=True):
+    leaf: Payload
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def check(node: Node):
+    value = next(iter(node.values()))
+    static_assert(has_member(value, "visible"))
+```
+
 ### Intersections
 
 #### Only positive types

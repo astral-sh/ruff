@@ -20,6 +20,7 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
+use crate::types::recursive::{TypeExpansionContext, TypeInspector};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
@@ -38,10 +39,11 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
+    ClassLiteral, CycleKind, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
     KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    TypeContext, TypeMapping, TypeTraversal, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypeWalk, UnionAccumulator, UnionType, binding_type, infer_definition_types,
+    inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -746,6 +748,7 @@ impl<'db> GenericContext<'db> {
         /// whether each typevar appears inside and/or outside of a return type `Callable`.
         struct FindTypeVarLocations<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
+            mapping: ApplyTypeMappingVisitor<'a, 'db>,
             locations: RefCell<TypeVarLocations<'db>>,
             recursion_guard: TypeCollector<'db>,
             active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
@@ -812,10 +815,13 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-                self.active_aliases.visit(
+                self.active_aliases.visit_structure(
                     &Type::Recursive(recursive).to_type_identity(db),
+                    &self.mapping,
                     || (),
-                    || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                    |expansion| {
+                        self.visit_type(db, expansion.recursive_body(db, recursive).into_type());
+                    },
                 );
             }
 
@@ -834,6 +840,7 @@ impl<'db> GenericContext<'db> {
         // Find whether each typevar appears inside and/or outside a return type Callable.
         let mut find_typevar_locations = FindTypeVarLocations {
             env: &env,
+            mapping: ApplyTypeMappingVisitor::new(&env),
             locations: RefCell::default(),
             recursion_guard: TypeCollector::default(),
             active_aliases: ActiveRecursionDetector::default(),
@@ -1679,7 +1686,7 @@ impl<'db> Specialization<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         if let Some(tuple) = self.tuple_inner(db) {
             tuple.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -2188,8 +2195,8 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => {
-                    let left_type = left_type.resolve_type_alias(db);
-                    let right_type = right_type.resolve_type_alias(db);
+                    let left_type = *left_type;
+                    let right_type = *right_type;
 
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite
@@ -2429,13 +2436,27 @@ impl<'db> Type<'db> {
 }
 
 /// Tracks recursive inference separately for each pair of types and variance polarity.
-type InferSpecializationVisitor<'db> = CycleDetector<
+type InferSpecializationCycles<'db> = CycleDetector<
     'db,
     InferSpecialization<'db>,
     InferSpecialization<'db>,
     Result<(), SpecializationError<'db>>,
     1,
 >;
+
+struct InferSpecializationVisitor<'env, 'db> {
+    cycles: InferSpecializationCycles<'db>,
+    mapping: ApplyTypeMappingVisitor<'env, 'db>,
+}
+
+impl<'env, 'db> InferSpecializationVisitor<'env, 'db> {
+    fn new(env: &'env ProgramEnvironment<'db>) -> Self {
+        Self {
+            cycles: InferSpecializationCycles::new(Ok(())),
+            mapping: ApplyTypeMappingVisitor::new(env),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct InferSpecialization<'db> {
@@ -3669,11 +3690,17 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> bool {
-            let Type::NominalInstance(instance) = ty.resolve_type_alias(db) else {
-                return false;
-            };
+            TypeInspector::inspect_root(
+                db,
+                env,
+                ty,
+                |_, _| false,
+                |_, ty| {
+                    let Type::NominalInstance(instance) = ty else {
+                        return false;
+                    };
 
-            matches!(
+                    matches!(
                 instance.class(db, env).known(db),
                 Some(
                     KnownClass::Dict
@@ -3689,118 +3716,121 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .is_some_and(|alias| {
                     matches!(
                         alias.specialization(db).types(db),
-                        [key, _] if key.resolve_type_alias(db) == KnownClass::Str.to_instance(db, env)
+                        [key, _] if key.is_same_resolved_type(db, KnownClass::Str.to_instance(db, env))
                     )
                 })
+                },
+            )
         }
 
-        fn collect_typed_dicts<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            resolving: &mut FxHashSet<Type<'db>>,
-            completed: &mut FxHashMap<Type<'db>, bool>,
-            typed_dicts: &mut FxHashSet<Type<'db>>,
-            other_types: &mut FxOrderSet<Type<'db>>,
-        ) -> bool {
-            let ty = ty.resolve_type_alias(db);
-            if let Some(result) = completed.get(&ty) {
-                return *result;
+        #[derive(Default)]
+        struct MappingUnionTypes<'db> {
+            completed: FxHashMap<Type<'db>, bool>,
+            typed_dicts: FxHashSet<Type<'db>>,
+            other_types: FxOrderSet<Type<'db>>,
+        }
+
+        struct CollectMappingUnionTypes;
+
+        impl<'a, 'db> TypeWalk<'db, &'a mut MappingUnionTypes<'db>> for CollectMappingUnionTypes {
+            type Output = bool;
+
+            fn on_cycle(
+                &self,
+                _traversal: &TypeTraversal<'_, 'db, Self>,
+                _ty: Type<'db>,
+                _kind: CycleKind,
+                _types: &'a mut MappingUnionTypes<'db>,
+            ) -> bool {
+                false
             }
 
-            let result = match ty {
-                Type::TypedDict(_) => {
-                    typed_dicts.insert(ty);
-                    true
+            fn visit(
+                &self,
+                db: &'db dyn Db,
+                traversal: &TypeTraversal<'_, 'db, Self>,
+                ty: Type<'db>,
+                types: &'a mut MappingUnionTypes<'db>,
+            ) -> bool {
+                let env = traversal.environment();
+                if let Some(result) = types.completed.get(&ty) {
+                    return *result;
                 }
-                Type::Union(union) => {
-                    if !resolving.insert(ty) {
-                        return false;
+                let result = match ty {
+                    Type::TypedDict(_) => {
+                        types.typed_dicts.insert(ty);
+                        true
                     }
-                    let result = union.elements(db).iter().all(|element| {
-                        collect_typed_dicts(
-                            db,
-                            env,
-                            *element,
-                            resolving,
-                            completed,
-                            typed_dicts,
-                            other_types,
-                        )
-                    });
-                    resolving.remove(&ty);
-                    result
-                }
-                Type::Intersection(intersection)
-                    if intersection.negative(db).is_empty()
-                        && intersection
-                            .iter_positive(db)
-                            .any(|element| element.resolve_type_alias(db).is_typed_dict())
-                        && intersection.iter_positive(db).all(|element| {
-                            let element = element.resolve_type_alias(db);
-                            element.is_typed_dict()
-                                || element
-                                    == KnownClass::Dict
-                                        .to_instance_unknown(db, env)
-                                        .top_materialization(db, env)
-                        }) =>
-                {
-                    // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
-                    // constraints that the shared mapping would erase.
-                    typed_dicts.insert(ty);
-                    true
-                }
-                Type::Intersection(intersection)
-                    if intersection.negative(db).is_empty()
-                        && intersection
-                            .iter_positive(db)
-                            .any(|element| is_string_keyed_mapping(db, env, element))
-                        && intersection.iter_positive(db).all(|element| {
-                            let element = element.resolve_type_alias(db);
-                            is_string_keyed_mapping(db, env, element)
-                                || element
-                                    == KnownClass::Dict
-                                        .to_instance_unknown(db, env)
-                                        .top_materialization(db, env)
-                        }) =>
-                {
-                    // `isinstance(value, dict)` can also narrow a mapping to an intersection with
-                    // `Top[dict[Unknown, Unknown]]`. Retain the full intersection so its original
-                    // key and value constraints are preserved.
-                    other_types.insert(ty);
-                    true
-                }
-                Type::NominalInstance(_) if is_string_keyed_mapping(db, env, ty) => {
-                    other_types.insert(ty);
-                    true
-                }
-                _ => false,
-            };
-            completed.insert(ty, result);
-            result
+                    Type::Union(union) => union
+                        .elements(db)
+                        .iter()
+                        .all(|element| traversal.visit_with(db, *element, &mut *types)),
+                    Type::Intersection(intersection)
+                        if intersection.negative(db).is_empty()
+                            && intersection.iter_positive(db).any(|element| {
+                                element.has_outer_type(db, |ty| ty.is_typed_dict())
+                            })
+                            && intersection.iter_positive(db).all(|element| {
+                                element.has_outer_type(db, |ty| ty.is_typed_dict())
+                                    || element.is_same_resolved_type(
+                                        db,
+                                        KnownClass::Dict
+                                            .to_instance_unknown(db, env)
+                                            .top_materialization(db, env),
+                                    )
+                            }) =>
+                    {
+                        // `isinstance(value, dict)` narrows a `TypedDict` to an intersection with
+                        // `Top[dict[Unknown, Unknown]]`. Other conjuncts may contribute gradual
+                        // constraints that the shared mapping would erase.
+                        types.typed_dicts.insert(ty);
+                        true
+                    }
+                    Type::Intersection(intersection)
+                        if intersection.negative(db).is_empty()
+                            && intersection
+                                .iter_positive(db)
+                                .any(|element| is_string_keyed_mapping(db, env, element))
+                            && intersection.iter_positive(db).all(|element| {
+                                is_string_keyed_mapping(db, env, element)
+                                    || element.is_same_resolved_type(
+                                        db,
+                                        KnownClass::Dict
+                                            .to_instance_unknown(db, env)
+                                            .top_materialization(db, env),
+                                    )
+                            }) =>
+                    {
+                        // `isinstance(value, dict)` can also narrow a mapping to an intersection with
+                        // `Top[dict[Unknown, Unknown]]`. Retain the full intersection so its original
+                        // key and value constraints are preserved.
+                        types.other_types.insert(ty);
+                        true
+                    }
+                    Type::NominalInstance(_) if is_string_keyed_mapping(db, env, ty) => {
+                        types.other_types.insert(ty);
+                        true
+                    }
+                    _ => false,
+                };
+                types.completed.insert(ty, result);
+                result
+            }
         }
         let db = self.db;
 
-        let mut resolving = FxHashSet::default();
-        let mut completed = FxHashMap::default();
-        let mut typed_dicts = FxHashSet::default();
-        let mut other_types = FxOrderSet::default();
         let env = self.env;
-
-        if !actual.elements(db).iter().all(|element| {
-            collect_typed_dicts(
-                db,
-                env,
-                *element,
-                &mut resolving,
-                &mut completed,
-                &mut typed_dicts,
-                &mut other_types,
-            )
+        let mut types = MappingUnionTypes::default();
+        if !TypeTraversal::with_root(env, CollectMappingUnionTypes, |root| {
+            root.visit_with(db, Type::Union(actual), &mut types)
         }) {
             return None;
         }
+        let MappingUnionTypes {
+            typed_dicts,
+            other_types,
+            ..
+        } = types;
         if typed_dicts.is_empty() {
             return None;
         }
@@ -3948,7 +3978,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             formal,
             actual,
             TypeVarVariance::Covariant,
-            &InferSpecializationVisitor::new(Ok(())),
+            &InferSpecializationVisitor::new(self.env),
         )
     }
 
@@ -3957,7 +3987,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
         polarity: TypeVarVariance,
-        visitor: &InferSpecializationVisitor<'db>,
+        visitor: &InferSpecializationVisitor<'_, 'db>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
             return Ok(());
@@ -3969,9 +3999,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             polarity,
             generic_context: self.generic_context,
         };
-        visitor.visit(self.db, comparison, || {
-            self.infer_map_inner(formal, actual, polarity, visitor)
-        })
+        visitor
+            .cycles
+            .visit_with_expansion(self.db, comparison, &visitor.mapping, |expansion| {
+                self.infer_map_inner(formal, actual, polarity, visitor, expansion)
+            })
     }
 
     /// Infer constraints for a pair already protected by `infer_map_impl`'s recursion guard.
@@ -3980,7 +4012,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
         polarity: TypeVarVariance,
-        visitor: &InferSpecializationVisitor<'db>,
+        visitor: &InferSpecializationVisitor<'_, 'db>,
+        expansion: &TypeExpansionContext<'_, '_, 'db>,
     ) -> Result<(), SpecializationError<'db>> {
         let db = self.db;
         // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
@@ -4004,7 +4037,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         //
         // If no elements survive, keep the original union: inferring from `Never` would discard
         // its type variables and skip the bound checks that reject the argument.
-        let actual = if actual.resolve_type_alias(db).is_union() {
+        let actual = if expansion.normalize(db, actual).is_union() {
             let formal = formal
                 .apply_specialization(db, self.generic_context.unknown_specialization(db, None));
             actual
@@ -4049,7 +4082,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (Type::Recursive(recursive), _) => {
                 return self.infer_map_impl(
-                    recursive.unfold(db, self.env).into_type(),
+                    expansion.expand_recursive(db, recursive).into_type(),
                     actual,
                     polarity,
                     visitor,
@@ -4331,13 +4364,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // that is a strict subtype (e.g. `bool` vs `int`) would allow
                         // the callee to return a widened type that violates the caller's
                         // constraint.
-                        if let Type::TypeVar(actual_typevar) = ty.resolve_type_alias(db)
-                            && let Some(TypeVarBoundOrConstraints::Constraints(actual_constraints)) =
-                                actual_typevar
-                                    .typevar(db)
-                                    .bound_or_constraints(db, self.env)
-                            && actual_constraints.is_subset_of(db, self.env, typevar_constraints)
-                        {
+                        if TypeInspector::inspect_root(
+                            db,
+                            self.env,
+                            ty,
+                            |_, _| false,
+                            |_, ty| {
+                                let Type::TypeVar(actual_typevar) = ty else {
+                                    return false;
+                                };
+                                matches!(actual_typevar.typevar(db).bound_or_constraints(db, self.env),
+                                Some(TypeVarBoundOrConstraints::Constraints(actual_constraints))
+                                if actual_constraints.is_subset_of(db, self.env, typevar_constraints))
+                            },
+                        ) {
                             self.add_type_mapping(bound_typevar, ty, polarity);
                             return Ok(());
                         }
@@ -4836,7 +4876,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal, Type::Recursive(recursive)) => {
                 return self.infer_map_impl(
                     formal,
-                    recursive.unfold(db, self.env).into_type(),
+                    expansion.expand_recursive(db, recursive).into_type(),
                     polarity,
                     visitor,
                 );

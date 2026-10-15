@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspector;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
@@ -706,72 +707,100 @@ fn collect_implementation_root_classes<'db>(
     seen: &mut FxHashSet<ClassLiteral<'db>>,
     roots: &mut Vec<ClassLiteral<'db>>,
 ) {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => {
-            // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
-            for element in union.elements(db) {
-                collect_implementation_root_classes(db, env, *element, seen, roots);
-            }
-        }
-        Type::Intersection(intersection) => {
-            // Finite intersections can stand for alternatives like `Dog` or `Cat`.
-            if let Some(alternatives) = intersection.finite_alternatives(db, env) {
-                for alternative in alternatives {
-                    collect_implementation_root_classes(db, env, alternative, seen, roots);
-                }
-            }
-        }
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
-            // `T: Animal` can dispatch through the `Animal` bound.
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                collect_implementation_root_classes(db, env, bound, seen, roots);
-            }
-            // `T: (Dog, Cat)` can dispatch through either constraint.
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                collect_implementation_root_classes(
-                    db,
-                    env,
-                    constraints.as_type(db, env),
-                    seen,
-                    roots,
-                );
-            }
-            None => {}
-        },
-        Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
-            // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
-            // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
-            collect_implementation_root_classes(
-                db,
-                env,
-                subclass_of.to_instance(db, env),
-                seen,
-                roots,
-            );
-        }
-        ty => {
-            // `dog: Dog` maps directly to the `Dog` class root.
-            let root = match ty {
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    extract_class_literal(db, env, ty)
-                }
-                Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::KnownInstance(_)
-                | Type::LiteralValue(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => extract_class_literal(db, env, ty)
-                    .or_else(|| extract_class_literal(db, env, ty.to_meta_type(db, env))),
-                _ => None,
-            };
+    TypeInspector::scope(env, |inspector| {
+        collect_implementation_root_classes_in(db, inspector, ty, seen, roots);
+    });
+}
 
-            if let Some(root) = root
-                && seen.insert(root)
-            {
-                roots.push(root);
+fn collect_implementation_root_classes_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    ty: Type<'db>,
+    seen: &mut FxHashSet<ClassLiteral<'db>>,
+    roots: &mut Vec<ClassLiteral<'db>>,
+) {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        ty,
+        |_, _| (),
+        |inspector, ty| {
+            match ty {
+                Type::Union(union) => {
+                    // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
+                    for element in union.elements(db) {
+                        collect_implementation_root_classes_in(
+                            db, inspector, *element, seen, roots,
+                        );
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    // Finite intersections can stand for alternatives like `Dog` or `Cat`.
+                    if let Some(alternatives) = intersection.finite_alternatives(db, env) {
+                        for alternative in alternatives {
+                            collect_implementation_root_classes_in(
+                                db,
+                                inspector,
+                                alternative,
+                                seen,
+                                roots,
+                            );
+                        }
+                    }
+                }
+                Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
+                    // `T: Animal` can dispatch through the `Animal` bound.
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        collect_implementation_root_classes_in(db, inspector, bound, seen, roots);
+                    }
+                    // `T: (Dog, Cat)` can dispatch through either constraint.
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        collect_implementation_root_classes_in(
+                            db,
+                            inspector,
+                            constraints.as_type(db, env),
+                            seen,
+                            roots,
+                        );
+                    }
+                    None => {}
+                },
+                Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
+                    // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
+                    // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
+                    collect_implementation_root_classes_in(
+                        db,
+                        inspector,
+                        subclass_of.to_instance(db, env),
+                        seen,
+                        roots,
+                    );
+                }
+                ty => {
+                    // `dog: Dog` maps directly to the `Dog` class root.
+                    let root = match ty {
+                        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                            extract_class_literal(db, env, ty)
+                        }
+                        Type::NominalInstance(_)
+                        | Type::ProtocolInstance(_)
+                        | Type::KnownInstance(_)
+                        | Type::LiteralValue(_)
+                        | Type::TypedDict(_)
+                        | Type::NewTypeInstance(_) => extract_class_literal(db, env, ty)
+                            .or_else(|| extract_class_literal(db, env, ty.to_meta_type(db, env))),
+                        _ => None,
+                    };
+
+                    if let Some(root) = root
+                        && seen.insert(root)
+                    {
+                        roots.push(root);
+                    }
+                }
             }
-        }
-    }
+        },
+    );
 }
 
 fn reachable_implementation_definitions<'db>(

@@ -4,6 +4,7 @@ use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
+use crate::types::recursive::TypeInspector;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
@@ -95,6 +96,10 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     /// Returns the unsupported component if conversion fails, including inside unions and intersections.
+    ///
+    /// This constructor leaves aliases and recursive types opaque. Specialization uses it before
+    /// projecting through the existing mapping visitor; unfolding here would restart that projection
+    /// with a fresh recursion guard. Callers interpreting annotations inspect aliases separately.
     pub(crate) fn try_from_instance(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -199,8 +204,17 @@ impl<'db> SubclassOfType<'db> {
         self.into_type_var()
             .and_then(|typevar| typevar.typevar(db).upper_bound(db, env))
             .and_then(|bound| {
-                let bound = Self::try_from_instance(db, env, bound.resolve_type_alias(db)).ok()?;
-                matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
+                TypeInspector::inspect_root(
+                    db,
+                    env,
+                    bound,
+                    |_, _| None,
+                    |_, bound| {
+                        let bound = Self::try_from_instance(db, env, bound).ok()?;
+                        matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_))
+                            .then_some(bound)
+                    },
+                )
             })
     }
 
@@ -244,7 +258,7 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         match self.subclass_of {
             SubclassOfInner::Dynamic(_) => {}

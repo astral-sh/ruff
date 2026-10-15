@@ -3472,6 +3472,34 @@ class Unannotated(Inferred, Right):
 reveal_type(Unannotated.value)  # revealed: int
 ```
 
+## Attributes of recursive TypedDict values
+
+The `child` field refers to the types of all values in `Node`, including the `Payload` in `leaf`:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Payload:
+    value: int
+
+class Node(TypedDict, closed=True):
+    leaf: Payload
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+```
+
+Reading a value's attribute preserves its declared type. Assignments to that attribute must also
+match the declaration:
+
+```py
+def check(node: Node):
+    value = next(iter(node.values()))
+    reveal_type(value.value)  # revealed: int
+    value.value = 1  # no diagnostic
+    value.value = "wrong"  # error: [invalid-assignment]
+```
+
 ## Intersections of attributes
 
 ### Attribute only available on one element
@@ -3544,6 +3572,18 @@ class B: ...
 def _(a_and_b: Intersection[A, B], b_and_a: Intersection[B, A]):
     reveal_type(a_and_b.desc)  # revealed: A & B
     reveal_type(b_and_a.desc)  # revealed: B & A
+```
+
+The same descriptor can be reached with different intersection receivers in one union. Each
+alternative retains its own receiver:
+
+```py
+from typing import assert_type
+
+class C: ...
+
+def different_receivers(value: Intersection[A, B] | Intersection[A, C]):
+    assert_type(value.desc, Intersection[A, B] | Intersection[A, C])
 ```
 
 ### Negation types

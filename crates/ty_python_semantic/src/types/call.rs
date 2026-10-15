@@ -360,7 +360,7 @@ impl<'db> Type<'db> {
 /// unsuccessful.
 ///
 /// The bindings are boxed so that we do not pass around large `Err` variants on the stack.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct CallError<'db>(pub(crate) CallErrorKind, pub(crate) Box<Bindings<'db>>);
 
 impl<'db> CallError<'db> {
@@ -451,7 +451,7 @@ pub(crate) enum CallErrorKind {
     PossiblyNotCallable,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///

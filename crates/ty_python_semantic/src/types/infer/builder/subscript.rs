@@ -1,3 +1,4 @@
+use crate::types::recursive::{TypeInspector, TypeVisitorState};
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
@@ -29,8 +30,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
 use crate::types::{
-    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
-    DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
+    BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, DisplaySettings,
+    DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     UnionType, UnionTypeInstance,
@@ -67,14 +68,14 @@ fn string_literal_values<'db>(
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
-        type TypedDictKeyExpectedTypeVisitor<'db> =
-            CycleDetector<'db, TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
+        type TypedDictKeyExpectedTypeVisitor<'env, 'db> =
+            TypeVisitorState<'env, 'db, TypedDictKeyExpectedType, Type<'db>, Option<Type<'db>>, 3>;
 
         fn imp<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            visitor: &TypedDictKeyExpectedTypeVisitor<'db>,
+            visitor: &TypedDictKeyExpectedTypeVisitor<'_, 'db>,
         ) -> Option<Type<'db>> {
             match ty {
                 Type::TypedDict(typed_dict) => {
@@ -105,7 +106,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, env, keys))
                 }
                 Type::TypeAlias(_) | Type::Recursive(_) => {
-                    visitor.visit(db, ty, || imp(db, env, ty.resolve_type_alias(db), visitor))
+                    visitor.visit_with_expansion(db, ty, |expansion| {
+                        imp(db, env, expansion.normalize(db, ty), visitor)
+                    })
                 }
                 _ => None,
             }
@@ -116,7 +119,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             self.program_environment(),
             ty,
-            &TypedDictKeyExpectedTypeVisitor::default(),
+            &TypedDictKeyExpectedTypeVisitor::new(self.program_environment(), None),
         )
     }
 
@@ -1296,6 +1299,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     Parameters::from_annotation(
                         db,
+                        self.program_environment(),
                         parameter_types.iter().map(|param_type| {
                             Parameter::positional_only(None).with_annotated_type(*param_type)
                         }),
@@ -1369,6 +1373,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             db,
                             Parameters::from_annotation(
                                 db,
+                                self.program_environment(),
                                 [
                                     Parameter::positional_only(None)
                                         .with_annotated_type(param_type),
@@ -1400,6 +1405,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // be normalized instead of growing another parameter type.
                             Parameters::from_annotation(
                                 db,
+                                self.program_environment(),
                                 [
                                     Parameter::positional_only(None)
                                         .with_annotated_type(param_type),
@@ -1730,6 +1736,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostic: bool,
     ) -> bool {
+        TypeInspector::scope(self.program_environment(), |inspector| {
+            self.validate_subscript_assignment_in(
+                inspector,
+                target,
+                full_object_ty,
+                object_ty,
+                infer_slice_ty,
+                rhs_value_node,
+                infer_rhs_value,
+                emit_diagnostic,
+            )
+        })
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn validate_subscript_assignment_in(
+        &mut self,
+        inspector: &TypeInspector<'_, 'db>,
+        target: &ast::ExprSubscript,
+        full_object_ty: Option<Type<'db>>,
+        object_ty: Type<'db>,
+        infer_slice_ty: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        rhs_value_node: &ast::Expr,
+        infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+        emit_diagnostic: bool,
+    ) -> bool {
         let env = self.program_environment();
         let db = self.db();
 
@@ -1743,7 +1775,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Aliases must use the same union and TypedDict checks as their underlying types.
-        match object_ty.resolve_type_alias(db) {
+        // Preserve the declared receiver type when reporting an error on its expanded body.
+        let original_object_ty = object_ty;
+        inspector.inspect(db, object_ty, |_, _| true, |inspector, object_ty| {
+        match object_ty {
             Type::Union(union) => {
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
@@ -1757,9 +1792,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // We need to keep iterating to emit all diagnostics.
                 let mut valid = true;
                 for element_ty in union.elements(db) {
-                    valid &= self.validate_subscript_assignment_impl(
+                    valid &= self.validate_subscript_assignment_in(inspector,
                         target,
-                        full_object_ty.or(Some(object_ty)),
+                        full_object_ty.or(Some(original_object_ty)),
                         *element_ty,
                         &mut |builder, tcx| infer_slice_ty.infer_silent(builder, tcx),
                         rhs_value_node,
@@ -1778,9 +1813,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut check_positive_elements = |emit_diagnostic_and_short_circuit| {
                     let mut valid = false;
                     for element_ty in intersection.positive(db) {
-                        valid |= self.validate_subscript_assignment_impl(
+                        valid |= self.validate_subscript_assignment_in(inspector,
                             target,
-                            full_object_ty.or(Some(object_ty)),
+                            full_object_ty.or(Some(original_object_ty)),
                             *element_ty,
                             &mut |builder, tcx| infer_slice_ty.infer_silent(builder, tcx),
                             rhs_value_node,
@@ -1811,7 +1846,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 valid
             }
 
-            Type::EnumComplement(complement) => self.validate_subscript_assignment_impl(
+            Type::EnumComplement(complement) => self.validate_subscript_assignment_in(inspector,
                 target,
                 full_object_ty,
                 complement.remaining_literal_union(db, env),
@@ -1857,7 +1892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 on TypedDict `{}`",
                                 rhs_value_ty.display(db, env),
                                 slice_ty.display(db, env),
-                                object_ty.display(db, env),
+                                original_object_ty.display(db, env),
                             ));
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "Expected value assignable to `{}`",
@@ -1870,7 +1905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
                     let assigned_d = rhs_value_ty.display(db, env);
-                    let value_d = object_ty.display(db, env);
+                    let value_d = original_object_ty.display(db, env);
 
                     if slice_ty.is_assignable_to(db, env, Type::literal_string())
                         && !slice_ty.is_equivalent_to(db, env, Type::literal_string())
@@ -1982,7 +2017,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Method `__setitem__` of type `{}` may be missing",
-                                object_ty.display(db, env),
+                                original_object_ty.display(db, env),
                             ));
                             attach_original_type_info(&mut diagnostic);
                         }
@@ -2002,7 +2037,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__setitem__` of type `{}` is not callable \
                                              on object of type `{}`",
                                         bindings.callable_type().display(db, env),
-                                        object_ty.display(db, env),
+                                        original_object_ty.display(db, env),
                                     ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
@@ -2036,12 +2071,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             DisplaySettings::from_possibly_ambiguous_types(
                                                 db,
                                                 env,
-                                                [rhs_value_ty, object_ty, slice_ty],
+                                                [rhs_value_ty, original_object_ty, slice_ty],
                                             );
                                         let assigned_d =
                                             rhs_value_ty.display_with(db, env, settings.clone());
                                         let object_d =
-                                            object_ty.display_with(db, env, settings.clone());
+                                            original_object_ty.display_with(db, env, settings.clone());
 
                                         let mut diagnostic = builder.into_diagnostic(format_args!(
                                             "Invalid subscript assignment with key of type `{}` \
@@ -2099,7 +2134,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Method `__setitem__` of type `{}` may not be callable \
                                         on object of type `{}`",
                                         bindings.callable_type().display(db, env),
-                                        object_ty.display(db, env),
+                                        original_object_ty.display(db, env),
                                     ));
                                     attach_original_type_info(&mut diagnostic);
                                 }
@@ -2114,7 +2149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Cannot assign to a subscript on an object of type `{}`",
-                                object_ty.display(db, env),
+                                original_object_ty.display(db, env),
                             ));
                             attach_original_type_info(&mut diagnostic);
 
@@ -2133,12 +2168,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             {
                                 diagnostic.help(format_args!(
                                     "Consider adding a `__setitem__` method to `{}`.",
-                                    object_ty.display(db, env),
+                                    original_object_ty.display(db, env),
                                 ));
                             } else {
                                 diagnostic.info(format_args!(
                                     "`{}` does not have a `__setitem__` method.",
-                                    object_ty.display(db, env),
+                                    original_object_ty.display(db, env),
                                 ));
                             }
                         }
@@ -2147,6 +2182,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+        })
     }
 
     /// Validate a subscript deletion of the form `del object[key]`.

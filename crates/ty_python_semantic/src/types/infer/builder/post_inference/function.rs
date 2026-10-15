@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspector;
 use crate::{
     Db,
     diagnostic::format_enumeration,
@@ -101,37 +102,45 @@ pub(super) fn check_class_method_typevar_variance<'db>(
         else {
             continue;
         };
-        member.ty = ty.resolve_type_alias(db);
-        if let Type::PropertyInstance(property) = member.ty {
-            // Each retained accessor has its own exclusions. Checking bound accessor signatures
-            // includes the setter's input, which an ordinary property read would not expose.
-            for (accessor, function) in property.accessors_with_functions(db) {
-                if function.definition(db).scope(db) == class.body_scope(db)
-                    && !exclude_from_variance(db, function)
+        TypeInspector::inspect_root(
+            db,
+            env,
+            ty,
+            |_, _| (),
+            |_, ty| {
+                member.ty = ty;
+                if let Type::PropertyInstance(property) = member.ty {
+                    // Each retained accessor has its own exclusions. Checking bound accessor signatures
+                    // includes the setter's input, which an ordinary property read would not expose.
+                    for (accessor, function) in property.accessors_with_functions(db) {
+                        if function.definition(db).scope(db) == class.body_scope(db)
+                            && !exclude_from_variance(db, function)
+                        {
+                            check_method_typevar_variance(
+                                context,
+                                generic_context,
+                                function,
+                                MemberVariance::accessor(db, env, accessor, instance),
+                                &mut reported,
+                            );
+                        }
+                    }
+                    return;
+                }
+                for (function, ty) in member
+                    .local_function_bindings(db, class.body_scope(db))
+                    .filter(|(function, _)| !exclude_from_variance(db, *function))
                 {
                     check_method_typevar_variance(
                         context,
                         generic_context,
                         function,
-                        MemberVariance::accessor(db, env, accessor, instance),
+                        MemberVariance::of(db, env, ty, instance),
                         &mut reported,
                     );
                 }
-            }
-            continue;
-        }
-        for (function, ty) in member
-            .local_function_bindings(db, class.body_scope(db))
-            .filter(|(function, _)| !exclude_from_variance(db, *function))
-        {
-            check_method_typevar_variance(
-                context,
-                generic_context,
-                function,
-                MemberVariance::of(db, env, ty, instance),
-                &mut reported,
-            );
-        }
+            },
+        );
     }
 }
 

@@ -1,3 +1,5 @@
+use crate::types::recursive::TypeInspector;
+use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::{
     Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
     reachability::is_end_of_scope_reachable,
@@ -9,7 +11,6 @@ use crate::{
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
-        cyclic::ActiveRecursionDetector,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
             FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
@@ -163,9 +164,10 @@ impl<'db> ExpectedReturnType<'db> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> Type<'db> {
-            match ty.resolve_type_alias(db) {
-                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
-                _ => ty,
+            if ty.has_outer_type(db, |ty| matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_))) {
+                KnownClass::Bool.to_instance(db, env)
+            } else {
+                ty
             }
         }
 
@@ -623,30 +625,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => None,
             };
             if let Some(kind) = descriptor_kind {
-                let wrap = |ty: Type<'db>| match ty.resolve_type_alias(db) {
-                    Type::FunctionLiteral(function)
-                        if function.callable_type_kind(db) == CallableTypeKind::FunctionLike
-                            || function.callable_type_kind(db) == kind =>
-                    {
-                        Some(Type::FunctionLiteral(
-                            function.with_descriptor_kind(db, kind),
-                        ))
-                    }
-                    Type::Callable(callable)
-                        if matches!(
-                            callable.kind(db),
-                            CallableTypeKind::Regular | CallableTypeKind::FunctionLike
-                        ) || callable.kind(db) == kind =>
-                    {
-                        Some(Type::Callable(callable.with_kind(db, kind)))
-                    }
-                    _ => None,
-                };
-                let wrapped = if let Some(union) = inferred_ty.as_union_like(db) {
-                    union.try_map(db, self.program_environment(), |ty| wrap(*ty))
-                } else {
-                    wrap(inferred_ty)
-                };
+                fn wrap<'db>(
+                    db: &'db dyn Db,
+                    inspector: &TypeInspector<'_, 'db>,
+                    ty: Type<'db>,
+                    kind: CallableTypeKind,
+                ) -> Option<Type<'db>> {
+                    inspector.inspect(
+                        db,
+                        ty,
+                        |_, _| None,
+                        |inspector, ty| match ty {
+                            Type::Union(union) => {
+                                union.try_map(db, inspector.environment(), |ty| {
+                                    wrap(db, inspector, *ty, kind)
+                                })
+                            }
+                            Type::FunctionLiteral(function)
+                                if function.callable_type_kind(db)
+                                    == CallableTypeKind::FunctionLike
+                                    || function.callable_type_kind(db) == kind =>
+                            {
+                                Some(Type::FunctionLiteral(
+                                    function.with_descriptor_kind(db, kind),
+                                ))
+                            }
+                            Type::Callable(callable)
+                                if matches!(
+                                    callable.kind(db),
+                                    CallableTypeKind::Regular | CallableTypeKind::FunctionLike
+                                ) || callable.kind(db) == kind =>
+                            {
+                                Some(Type::Callable(callable.with_kind(db, kind)))
+                            }
+                            _ => None,
+                        },
+                    )
+                }
+                let wrapped = TypeInspector::scope(self.program_environment(), |inspector| {
+                    wrap(db, inspector, inferred_ty, kind)
+                });
                 if let Some(wrapped) = wrapped {
                     inferred_ty = wrapped;
                     continue;
@@ -998,6 +1016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let annotated_type = self.file_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
             db,
+            env,
             annotated_type,
             annotation_flags,
         ) else {
@@ -1398,6 +1417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             } else if extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                 db,
+                env,
                 annotated_type,
                 self.file_type_expression_flags(annotation),
             )
@@ -2269,46 +2289,55 @@ fn is_instance_tuple_exhaustive<'db>(
         return false;
     }
 
-    is_instance_tuple_covers(db, env, &tuple, ty, &ActiveRecursionDetector::default())
+    TypeQueryContext::with_root(env, InstanceTupleCovers(&tuple), |root| root.visit(db, ty))
 }
 
-fn is_instance_tuple_covers<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    tuple: &TupleSpec<'db>,
-    ty: Type<'db>,
-    recursion_guard: &ActiveRecursionDetector<Type<'db>>,
-) -> bool {
-    match ty {
-        Type::TypeAlias(_) | Type::Recursive(_) => recursion_guard.visit(
-            &ty,
-            || true,
-            || is_instance_tuple_covers(db, env, tuple, ty.resolve_type_alias(db), recursion_guard),
-        ),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_instance_tuple_covers(db, env, tuple, *element, recursion_guard)),
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| is_instance_tuple_covers(db, env, tuple, *element, recursion_guard)),
-        Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                is_instance_tuple_covers(db, env, tuple, bound, recursion_guard)
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                constraints.elements(db).iter().all(|constraint| {
-                    is_instance_tuple_covers(db, env, tuple, *constraint, recursion_guard)
-                })
-            }
-        },
-        ty => tuple.fixed_elements().any(|element| {
-            let Type::ClassLiteral(class) = element else {
-                return false;
-            };
-            is_instance_truthiness(db, env, ty, *class).is_always_true()
-        }),
+struct InstanceTupleCovers<'a, 'db>(&'a TupleSpec<'db>);
+
+impl<'db> TypeQuery<'db> for InstanceTupleCovers<'_, 'db> {
+    type Output = bool;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        _state: (),
+    ) -> bool {
+        kind == CycleKind::Exact
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> bool {
+        let env = traversal.environment();
+        match ty {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| traversal.visit(db, *element)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| traversal.visit(db, *element)),
+            Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) => traversal.visit(db, bound),
+                TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| traversal.visit(db, *constraint)),
+            },
+            ty => self.0.fixed_elements().any(|element| {
+                let Type::ClassLiteral(class) = element else {
+                    return false;
+                };
+                is_instance_truthiness(db, env, ty, *class).is_always_true()
+            }),
+        }
     }
 }
 
@@ -2322,147 +2351,169 @@ fn is_instance_truthiness<'db>(
     ty: Type<'db>,
     class: ClassLiteral<'db>,
 ) -> Truthiness {
-    let is_instance = |ty: &Type<'_>| {
-        ty.as_nominal_instance().is_some_and(|instance| {
-            instance
-                .class(db, env)
-                .is_subtype_of_class_literal(db, class)
-        })
-    };
+    TypeQueryContext::with_root(env, InstanceTruthiness(class), |root| root.visit(db, ty))
+}
 
-    let always_true_if = |test: bool| {
-        if test {
-            Truthiness::AlwaysTrue
-        } else {
-            Truthiness::Ambiguous
-        }
-    };
+struct InstanceTruthiness<'db>(ClassLiteral<'db>);
 
-    match ty {
-        Type::Recursive(recursive) => recursive
-            .unfold(db, env)
-            .map(|unfolded| is_instance_truthiness(db, env, unfolded, class))
-            .unwrap_or(Truthiness::Ambiguous),
-        Type::RecursiveVar(_) => {
-            unreachable!("semantic operation on an unbound recursive variable")
-        }
-        Type::Union(..) => {
-            // We do not handle unions specifically here, because something like `A | SubclassOfA` would
-            // have been simplified to `A` anyway
-            Truthiness::Ambiguous
-        }
+impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
+    type Output = Truthiness;
 
-        // Create a new intersection that maps type variables to their upper bounds,
-        // and evaluate the truthiness of the `isinstance()` check with that type.
-        // Along the way, short-circuit to `AlwaysTrue` if we find any positive element
-        // that is always true.
-        Type::Intersection(intersection) => {
-            let mut effective = IntersectionBuilder::new(db, env);
-            let mut found_tvars_or_newtypes = false;
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _state: (),
+    ) -> Truthiness {
+        Truthiness::Ambiguous
+    }
 
-            for &positive in intersection.positive(db) {
-                if is_instance_truthiness(db, env, positive, class).is_always_true() {
-                    return Truthiness::AlwaysTrue;
-                } else if let Type::TypeVar(tvar) = positive {
-                    match tvar.require_bound_or_constraints(db, env) {
-                        TypeVarBoundOrConstraints::UpperBound(bound) => {
-                            effective.add_positive_in_place(bound);
-                        }
-                        TypeVarBoundOrConstraints::Constraints(constraints) => {
-                            effective.add_positive_in_place(constraints.as_type(db, env));
-                        }
-                    }
-                    found_tvars_or_newtypes = true;
-                } else if let Type::NewTypeInstance(newtype) = positive {
-                    found_tvars_or_newtypes = true;
-                    effective.add_positive_in_place(newtype.concrete_base_type(db));
-                } else {
-                    effective.add_positive_in_place(positive);
-                }
-            }
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Truthiness {
+        let env = traversal.environment();
+        let class = self.0;
+        let is_instance = |ty: &Type<'_>| {
+            ty.as_nominal_instance().is_some_and(|instance| {
+                instance
+                    .class(db, env)
+                    .is_subtype_of_class_literal(db, class)
+            })
+        };
 
-            if !found_tvars_or_newtypes {
-                return Truthiness::Ambiguous;
-            }
-
-            for &negative in intersection.negative(db) {
-                if is_instance_truthiness(db, env, negative, class).is_always_true() {
-                    return Truthiness::AlwaysFalse;
-                }
-                effective.add_negative_in_place(negative);
-            }
-
-            let effective = effective.build();
-
-            if effective == ty {
-                Truthiness::Ambiguous
+        let always_true_if = |test: bool| {
+            if test {
+                Truthiness::AlwaysTrue
             } else {
-                is_instance_truthiness(db, env, effective, class)
+                Truthiness::Ambiguous
             }
-        }
+        };
 
-        Type::EnumComplement(complement) => {
-            is_instance_truthiness(db, env, complement.to_intersection(db, env), class)
-        }
-
-        Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
-
-        Type::NewTypeInstance(newtype) => {
-            always_true_if(is_instance(&newtype.concrete_base_type(db)))
-        }
-
-        Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
-            always_true_if(
-                ty.literal_fallback_instance(db, env)
-                    .as_ref()
-                    .is_some_and(is_instance),
-            )
-        }
-
-        Type::ClassLiteral(..) => {
-            always_true_if(is_instance(&KnownClass::Type.to_instance(db, env)))
-        }
-
-        Type::TypeAlias(alias) => is_instance_truthiness(db, env, alias.value_type(db), class),
-
-        Type::TypeVar(bound_typevar) => match bound_typevar.require_bound_or_constraints(db, env) {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                is_instance_truthiness(db, env, bound, class)
+        match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
             }
-            TypeVarBoundOrConstraints::Constraints(constraints) => always_true_if(
-                constraints
-                    .elements(db)
-                    .iter()
-                    .all(|c| is_instance_truthiness(db, env, *c, class).is_always_true()),
-            ),
-        },
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::Union(..) => {
+                // We do not handle unions specifically here, because something like `A | SubclassOfA` would
+                // have been simplified to `A` anyway
+                Truthiness::Ambiguous
+            }
 
-        Type::BoundMethod(..)
-        | Type::KnownBoundMethod(..)
-        | Type::WrapperDescriptor(..)
-        | Type::DataclassDecorator(..)
-        | Type::DataclassTransformer(..)
-        | Type::GenericAlias(..)
-        | Type::SubclassOf(..)
-        | Type::ProtocolInstance(..)
-        | Type::SpecialForm(..)
-        | Type::KnownInstance(..)
-        | Type::PropertyInstance(..)
-        | Type::SlotDescriptor(..)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::BoundSuper(..)
-        | Type::TypeIs(..)
-        | Type::TypeGuard(..)
-        | Type::TypeForm(..)
-        | Type::Callable(..)
-        | Type::Dynamic(..)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::TypedDict(_) => {
-            // We could probably try to infer more precise types in some of these cases, but it's unclear
-            // if it's worth the effort.
-            Truthiness::Ambiguous
+            // Create a new intersection that maps type variables to their upper bounds,
+            // and evaluate the truthiness of the `isinstance()` check with that type.
+            // Along the way, short-circuit to `AlwaysTrue` if we find any positive element
+            // that is always true.
+            Type::Intersection(intersection) => {
+                let mut effective = IntersectionBuilder::new(db, env);
+                let mut found_tvars_or_newtypes = false;
+
+                for &positive in intersection.positive(db) {
+                    if traversal.visit(db, positive).is_always_true() {
+                        return Truthiness::AlwaysTrue;
+                    } else if let Type::TypeVar(tvar) = positive {
+                        match tvar.require_bound_or_constraints(db, env) {
+                            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                                effective.add_positive_in_place(bound);
+                            }
+                            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                effective.add_positive_in_place(constraints.as_type(db, env));
+                            }
+                        }
+                        found_tvars_or_newtypes = true;
+                    } else if let Type::NewTypeInstance(newtype) = positive {
+                        found_tvars_or_newtypes = true;
+                        effective.add_positive_in_place(newtype.concrete_base_type(db));
+                    } else {
+                        effective.add_positive_in_place(positive);
+                    }
+                }
+
+                if !found_tvars_or_newtypes {
+                    return Truthiness::Ambiguous;
+                }
+
+                for &negative in intersection.negative(db) {
+                    if traversal.visit(db, negative).is_always_true() {
+                        return Truthiness::AlwaysFalse;
+                    }
+                    effective.add_negative_in_place(negative);
+                }
+
+                let effective = effective.build();
+
+                if effective == ty {
+                    Truthiness::Ambiguous
+                } else {
+                    traversal.visit(db, effective)
+                }
+            }
+
+            Type::EnumComplement(complement) => {
+                traversal.visit(db, complement.to_intersection(db, env))
+            }
+
+            Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
+
+            Type::NewTypeInstance(newtype) => {
+                always_true_if(is_instance(&newtype.concrete_base_type(db)))
+            }
+
+            Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
+                always_true_if(
+                    ty.literal_fallback_instance(db, env)
+                        .as_ref()
+                        .is_some_and(is_instance),
+                )
+            }
+
+            Type::ClassLiteral(..) => {
+                always_true_if(is_instance(&KnownClass::Type.to_instance(db, env)))
+            }
+
+            Type::TypeVar(bound_typevar) => {
+                match bound_typevar.require_bound_or_constraints(db, env) {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => traversal.visit(db, bound),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => always_true_if(
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .all(|c| traversal.visit(db, *c).is_always_true()),
+                    ),
+                }
+            }
+
+            Type::BoundMethod(..)
+            | Type::KnownBoundMethod(..)
+            | Type::WrapperDescriptor(..)
+            | Type::DataclassDecorator(..)
+            | Type::DataclassTransformer(..)
+            | Type::GenericAlias(..)
+            | Type::SubclassOf(..)
+            | Type::ProtocolInstance(..)
+            | Type::SpecialForm(..)
+            | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
+            | Type::SlotDescriptor(..)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::BoundSuper(..)
+            | Type::TypeIs(..)
+            | Type::TypeGuard(..)
+            | Type::TypeForm(..)
+            | Type::Callable(..)
+            | Type::Dynamic(..)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::TypedDict(_) => {
+                // We could probably try to infer more precise types in some of these cases, but it's unclear
+                // if it's worth the effort.
+                Truthiness::Ambiguous
+            }
         }
     }
 }

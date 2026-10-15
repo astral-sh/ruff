@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::recursive::{TypeInspector, TypeVisitorState};
 use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
@@ -10,7 +11,6 @@ use crate::ProgramEnvironment;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
-use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, ContainerElementEqualityEvaluator, equality_truthiness,
     inequality_truthiness,
@@ -19,10 +19,10 @@ use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
-    BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
-    LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
-    TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
+    ApplyTypeMappingVisitor, BoundMethodType, CallableType, DynamicType, FunctionType,
+    IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type,
+    TypeContext, TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -211,8 +211,8 @@ impl<'db> Type<'db> {
         /// [`TypeTransformer`] returns the original type on a recursive revisit; if
         /// no negation rule has been computed for that type, its negation cannot
         /// be retained.
-        #[derive(Default)]
-        struct UpcastingVisitor<'db> {
+        struct UpcastingVisitor<'env, 'db> {
+            mapping: ApplyTypeMappingVisitor<'env, 'db>,
             types: TypeTransformer<'db, IdentityComparisonUpcasting>,
             negative_retention: RefCell<FxHashMap<Type<'db>, NegativeRetention>>,
         }
@@ -220,17 +220,22 @@ impl<'db> Type<'db> {
         fn visit_type<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
-            visitor: &UpcastingVisitor<'db>,
-            compute: impl FnOnce() -> UpcastResult<'db>,
+            visitor: &UpcastingVisitor<'_, 'db>,
+            compute: impl FnOnce(
+                &crate::types::recursive::TypeExpansionContext<'_, '_, 'db>,
+            ) -> UpcastResult<'db>,
         ) -> UpcastResult<'db> {
-            let upcast_type = visitor.types.visit_type(db, ty, || {
-                let upcast_result = compute();
+            let upcast_type =
                 visitor
-                    .negative_retention
-                    .borrow_mut()
-                    .insert(ty, upcast_result.negative_retention);
-                upcast_result.ty
-            });
+                    .types
+                    .visit_type_with_expansion(db, ty, &visitor.mapping, |expansion| {
+                        let upcast_result = compute(expansion);
+                        visitor
+                            .negative_retention
+                            .borrow_mut()
+                            .insert(ty, upcast_result.negative_retention);
+                        upcast_result.ty
+                    });
             UpcastResult::new(
                 upcast_type,
                 visitor
@@ -254,7 +259,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             method: BoundMethodType<'db>,
-            visitor: &UpcastingVisitor<'db>,
+            visitor: &UpcastingVisitor<'_, 'db>,
         ) -> BoundMethodType<'db> {
             method
                 .with_func(db, upcast(db, env, method.func(db), visitor).ty)
@@ -269,7 +274,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             property: PropertyInstanceType<'db>,
-            visitor: &UpcastingVisitor<'db>,
+            visitor: &UpcastingVisitor<'_, 'db>,
         ) -> PropertyInstanceType<'db> {
             property.with_accessors(
                 db,
@@ -288,11 +293,12 @@ impl<'db> Type<'db> {
         fn upcast_partial<'db>(
             db: &'db dyn Db,
             partial: FunctoolsPartialInstance<'db>,
+            expansion: &crate::types::recursive::TypeExpansionContext<'_, '_, 'db>,
         ) -> Option<FunctoolsPartialInstance<'db>> {
             // A partial's wrapped function is fixed, but its reduced signature can differ between
             // views. A structural callable does not identify a particular wrapped function.
             let Type::FunctionLiteral(function) =
-                partial.wrapped(db).inner(db).resolve_type_alias(db)
+                expansion.normalize(db, partial.wrapped(db).inner(db))
             else {
                 return None;
             };
@@ -310,22 +316,22 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
-            visitor: &UpcastingVisitor<'db>,
+            visitor: &UpcastingVisitor<'_, 'db>,
         ) -> UpcastResult<'db> {
             match ty {
-                Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
-                    recursive
-                        .unfold(db, env)
+                Type::Recursive(recursive) => visit_type(db, ty, visitor, |expansion| {
+                    expansion
+                        .expand_recursive(db, recursive)
                         .map(|unfolded| upcast(db, env, unfolded, visitor))
                         .unwrap_or(UpcastResult::unstable(ty))
                 }),
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
-                Type::TypeAlias(alias) => visit_type(db, ty, visitor, || {
+                Type::TypeAlias(alias) => visit_type(db, ty, visitor, |_| {
                     upcast(db, env, alias.value_type(db), visitor)
                 }),
-                Type::NewTypeInstance(newtype) => visit_type(db, ty, visitor, || {
+                Type::NewTypeInstance(newtype) => visit_type(db, ty, visitor, |_| {
                     UpcastResult::unstable(
                         upcast(db, env, newtype.concrete_base_type(db), visitor).ty,
                     )
@@ -333,12 +339,12 @@ impl<'db> Type<'db> {
                 Type::FunctionLiteral(function) => UpcastResult::unstable(Type::FunctionLiteral(
                     unspecialized_function(db, function),
                 )),
-                Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
+                Type::BoundMethod(method) => visit_type(db, ty, visitor, |_| {
                     UpcastResult::unstable(Type::BoundMethod(upcast_bound_method(
                         db, env, method, visitor,
                     )))
                 }),
-                Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, || {
+                Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, |_| {
                     let (method, retention) = match method {
                         KnownBoundMethodType::FunctionTypeDunderGet(function) => (
                             KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(
@@ -399,13 +405,13 @@ impl<'db> Type<'db> {
                     };
                     UpcastResult::new(Type::KnownBoundMethod(method), retention)
                 }),
-                Type::PropertyInstance(property) => visit_type(db, ty, visitor, || {
+                Type::PropertyInstance(property) => visit_type(db, ty, visitor, |_| {
                     UpcastResult::unstable(Type::PropertyInstance(upcast_property(
                         db, env, property, visitor,
                     )))
                 }),
                 Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                    visit_type(db, ty, visitor, || {
+                    visit_type(db, ty, visitor, |_| {
                         UpcastResult::unstable(Type::KnownInstance(
                             KnownInstanceType::MethodWrapper(MethodWrapper::new(
                                 db,
@@ -416,28 +422,36 @@ impl<'db> Type<'db> {
                     })
                 }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
-                    UpcastResult::unstable(
-                        upcast_partial(db, partial)
-                            .map(|partial| {
-                                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial))
-                            })
-                            .unwrap_or_else(|| {
-                                KnownClass::FunctoolsPartial
-                                    .to_instance(db, env)
-                                    .top_materialization(db, env)
-                            }),
-                    )
+                    visit_type(db, ty, visitor, |expansion| {
+                        UpcastResult::unstable(
+                            upcast_partial(db, partial, expansion)
+                                .map(|partial| {
+                                    Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                                        partial,
+                                    ))
+                                })
+                                .unwrap_or_else(|| {
+                                    KnownClass::FunctoolsPartial
+                                        .to_instance(db, env)
+                                        .top_materialization(db, env)
+                                }),
+                        )
+                    })
                 }
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(partial)) => {
-                    UpcastResult::unstable(
-                        upcast_partial(db, partial)
-                            .map(|partial| {
-                                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
-                                    partial,
-                                ))
-                            })
-                            .unwrap_or_else(|| KnownClass::MethodWrapperType.to_instance(db, env)),
-                    )
+                    visit_type(db, ty, visitor, |expansion| {
+                        UpcastResult::unstable(
+                            upcast_partial(db, partial, expansion)
+                                .map(|partial| {
+                                    Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
+                                        partial,
+                                    ))
+                                })
+                                .unwrap_or_else(|| {
+                                    KnownClass::MethodWrapperType.to_instance(db, env)
+                                }),
+                        )
+                    })
                 }
                 Type::KnownInstance(
                     KnownInstanceType::SubscriptedProtocol(_)
@@ -461,7 +475,7 @@ impl<'db> Type<'db> {
                     | KnownInstanceType::NamedTupleSpec(_)
                     | KnownInstanceType::Range { .. },
                 ) => UpcastResult::stable(ty),
-                Type::TypeVar(typevar) => visit_type(db, ty, visitor, || {
+                Type::TypeVar(typevar) => visit_type(db, ty, visitor, |_| {
                     UpcastResult::unstable(
                         upcast(
                             db,
@@ -543,7 +557,17 @@ impl<'db> Type<'db> {
             }
         }
 
-        upcast(db, env, self, &UpcastingVisitor::default()).ty
+        upcast(
+            db,
+            env,
+            self,
+            &UpcastingVisitor {
+                mapping: ApplyTypeMappingVisitor::new(env),
+                types: TypeTransformer::default(),
+                negative_retention: RefCell::default(),
+            },
+        )
+        .ty
     }
 
     /// Return whether values of these types always, never, or possibly identify the same object.
@@ -555,25 +579,44 @@ impl<'db> Type<'db> {
     ) -> Truthiness {
         let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
             ty.is_singleton(db, env)
-                || ty
-                    .resolve_type_alias(db)
-                    .as_intersection()
-                    .is_some_and(|intersection| {
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .any(|ty| ty.is_singleton(db, env))
-                    })
+                || TypeInspector::inspect_root(
+                    db,
+                    env,
+                    ty,
+                    |_, _| false,
+                    |_, ty| {
+                        ty.as_intersection().is_some_and(|intersection| {
+                            intersection
+                                .positive(db)
+                                .iter()
+                                .any(|ty| ty.is_singleton(db, env))
+                        })
+                    },
+                )
         };
 
         // Two occurrences of the same constrained `TypeVar` require separate handling. Although
         // different specializations can choose different singleton constraints, every occurrence in
         // one specialization shares the same selected constraint and therefore the same object.
-        if let Type::TypeVar(left) = self.resolve_type_alias(db)
-            && let Type::TypeVar(right) = other.resolve_type_alias(db)
-            && left.is_same_typevar_as(db, right)
-            && is_singleton_or_intersection_with_singleton(Type::TypeVar(left))
-        {
+        if TypeInspector::inspect_root(
+            db,
+            env,
+            self,
+            |_, _| false,
+            |_, left| {
+                TypeInspector::inspect_root(
+                    db,
+                    env,
+                    other,
+                    |_, _| false,
+                    |_, right| {
+                        matches!((left, right), (Type::TypeVar(left), Type::TypeVar(right))
+                    if left.is_same_typevar_as(db, right)
+                        && is_singleton_or_intersection_with_singleton(Type::TypeVar(left)))
+                    },
+                )
+            },
+        ) {
             return Truthiness::AlwaysTrue;
         }
 
@@ -607,8 +650,9 @@ enum IntersectionOn {
     Right,
 }
 
-/// A [`CycleDetector`] that is used in [`infer_binary_type_comparison`].
-type BinaryComparisonVisitor<'db> = CycleDetector<
+/// State shared by recursive calls to [`infer_binary_type_comparison`].
+type BinaryComparisonVisitor<'env, 'db> = TypeVisitorState<
+    'env,
     'db,
     ast::CmpOp,
     (Type<'db>, NonIdentityOperator, Type<'db>),
@@ -772,7 +816,7 @@ fn fixed_membership_truthiness<'db>(
     let env = context.program_environment();
     let soundness_policy =
         ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
-    let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
+    let equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
     let mut truthiness = Truthiness::AlwaysFalse;
     for &element in elements {
         // It's okay to ignore errors here because Python doesn't call `__bool__`
@@ -827,7 +871,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         op,
         right,
         range,
-        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
+        &BinaryComparisonVisitor::new(env, Ok(Type::bool_literal(true))),
     )
 }
 
@@ -837,7 +881,7 @@ fn infer_binary_type_comparison_inner<'db>(
     op: NonIdentityOperator,
     right: Type<'db>,
     range: TextRange,
-    visitor: &BinaryComparisonVisitor<'db>,
+    visitor: &BinaryComparisonVisitor<'_, 'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
     let env = &context.program_environment();
@@ -990,29 +1034,33 @@ fn infer_binary_type_comparison_inner<'db>(
         ),
 
         (Type::TypeAlias(_) | Type::Recursive(_), right) => {
-            Some(visitor.visit(db, (left, op, right), || {
-                infer_binary_type_comparison_inner(
-                    context,
-                    left.resolve_type_alias(db),
-                    op,
-                    right,
-                    range,
-                    visitor,
-                )
-            }))
+            Some(
+                visitor.visit_with_expansion(db, (left, op, right), |expansion| {
+                    infer_binary_type_comparison_inner(
+                        context,
+                        expansion.normalize(db, left),
+                        op,
+                        right,
+                        range,
+                        visitor,
+                    )
+                }),
+            )
         }
 
         (left, Type::TypeAlias(_) | Type::Recursive(_)) => {
-            Some(visitor.visit(db, (left, op, right), || {
-                infer_binary_type_comparison_inner(
-                    context,
-                    left,
-                    op,
-                    right.resolve_type_alias(db),
-                    range,
-                    visitor,
-                )
-            }))
+            Some(
+                visitor.visit_with_expansion(db, (left, op, right), |expansion| {
+                    infer_binary_type_comparison_inner(
+                        context,
+                        left,
+                        op,
+                        expansion.normalize(db, right),
+                        range,
+                        visitor,
+                    )
+                }),
+            )
         }
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and
@@ -1329,7 +1377,7 @@ fn infer_binary_intersection_type_comparison<'db>(
     other: Type<'db>,
     intersection_on: IntersectionOn,
     range: TextRange,
-    visitor: &BinaryComparisonVisitor<'db>,
+    visitor: &BinaryComparisonVisitor<'_, 'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     enum State<'db> {
         // We have not seen any positive elements (yet)
@@ -1658,7 +1706,7 @@ fn infer_tuple_rich_comparison<'db>(
     op: RichCompareOperator,
     right: &TupleSpec<'db>,
     range: TextRange,
-    visitor: &BinaryComparisonVisitor<'db>,
+    visitor: &BinaryComparisonVisitor<'_, 'db>,
 ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
     let db = context.db();
     let env = &context.program_environment();
@@ -1672,7 +1720,7 @@ fn infer_tuple_rich_comparison<'db>(
             let soundness_policy = ComparisonSoundnessPolicy::from_analysis_settings(
                 db.analysis_settings(context.file()),
             );
-            let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
+            let equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
                 let eq_truthiness = equality

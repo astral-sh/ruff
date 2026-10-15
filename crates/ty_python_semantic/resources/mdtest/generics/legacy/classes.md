@@ -1103,6 +1103,465 @@ reveal_type(GenericSubclass[bytes]())  # revealed: GenericSubclass[bytes]
 NonGenericSubclass[bytes]
 ```
 
+## Reading recursively specialized extra items
+
+For `Node[int]`, each extra item is a `Node[list[int]]`. A declared key retains its own type:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import ReadOnly, TypedDict
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], extra_items=ReadOnly["Node[list[T]]"]):
+    value: T
+
+def read_value(node: Node[int]):
+    reveal_type(node.get("value"))  # revealed: int
+```
+
+An arbitrary key can select the declared field or an extra item, or be absent:
+
+```py
+def read_key(node: Node[int], key: str):
+    reveal_type(node.get(key))  # revealed: int | Node[list[int]] | None
+```
+
+The corresponding `Mapping` includes both value types. Omitting the extra-item type is an error:
+
+```py
+from collections.abc import Mapping
+
+def as_mapping(node: Node[int]):
+    values: Mapping[str, int | Node[list[int]]] = node  # no diagnostic
+    invalid: Mapping[str, int] = node  # error: [invalid-assignment]
+```
+
+## Unions in recursively specialized extra items
+
+An extra-item union can combine a type argument with a recursive specialization. Reading an
+arbitrary key includes each alternative once:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import ReadOnly, TypedDict
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], extra_items=ReadOnly["Node[list[T]] | T"]):
+    value: T
+
+def read(node: Node[int], key: str):
+    reveal_type(node.get(key))  # revealed: int | Node[list[int]] | None
+```
+
+## Specializing extra-item types to Never
+
+An extra-item type that specializes to `Never` makes the `TypedDict` closed. Its keys are limited to
+the declared fields:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Record(TypedDict, Generic[T], extra_items=ReadOnly[Intersection[T, str]]):
+    value: int
+
+def check(record: Record[int]):
+    reveal_type(record.keys())  # revealed: dict_keys[Literal["value"], int]
+```
+
+## Reading recursively specialized fields in a closed TypedDict
+
+A closed `TypedDict` has no extra items, but its declared fields can still specialize the same
+`TypedDict` recursively:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    value: T
+    child: "Node[list[T]]"
+```
+
+Reading `child` preserves its specialization. For an arbitrary key, `get` combines both field types
+and `None`:
+
+```py
+def read(node: Node[int], key: str):
+    reveal_type(node.get("child"))  # revealed: Node[list[int]]
+    reveal_type(node.get(key))  # revealed: Node[list[int]] | int | None
+```
+
+## Materialized extra items
+
+Materializing `Record[Any]` applies to its extra items as well as its fields, even though `T` is
+invariant:
+
+```py
+from typing import Any, Generic, TypeVar
+from typing_extensions import NotRequired, ReadOnly, TypedDict
+from ty_extensions import Top, Bottom
+
+T = TypeVar("T")
+
+class Record(TypedDict, Generic[T], extra_items=ReadOnly[T]):
+    value: NotRequired[T]
+
+def check(maximum: Top[Record[Any]], minimum: Bottom[Record[Any]]):
+    reveal_type(maximum.get("other"))  # revealed: object
+    reveal_type(minimum.get("other"))  # revealed: None
+```
+
+## Displaying nested TypedDict values
+
+Finite nesting is displayed in full. Each tuple element also gets its own complete display:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+class Record(TypedDict, Generic[T], closed=True):
+    value: T
+
+def check(node: Record[int]):
+    nested = Record(value=node.values())
+    # revealed: tuple[dict_values[Literal["value"], dict_values[str, int]], dict_values[Literal["value"], dict_values[str, int]]]
+    reveal_type((nested.values(), nested.values()))
+```
+
+## Reusing TypedDict values in a loop
+
+Each iteration puts the previous dictionary view into a new `Node`. Inference retains the initial
+specialization and uses `Divergent` for the type argument that would otherwise keep growing:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    value: T
+
+def check(condition: bool):
+    node = Node(value=0)
+    while condition:
+        node = Node(value=node.values())
+    reveal_type(node)  # revealed: Node[int] | Node[Divergent]
+```
+
+## Displaying recursive TypedDict values
+
+Each recursive reference below adds another `list` to the type argument. Display abbreviates the
+recursive view even though the specialization changes:
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    value: TypeOf[cast("Node[list[T]]", {}).values()]
+
+def check(node: Node[int]):
+    reveal_type(node["value"])  # revealed: dict_values[Literal["value"], dict_values[Literal["value"], ...]]
+```
+
+## Recursive TypedDict values containing class objects
+
+Both fields below contain class objects, though one field refers to the dictionary's value type:
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    leaf: type[T]
+    child: TypeOf[next(iter(cast("Node[T]", {}).values()))]
+```
+
+Reading the known field preserves its type argument:
+
+```py
+def read(node: Node[int]):
+    reveal_type(node.get("leaf"))  # revealed: type[int]
+```
+
+## Recursive value types used as class attributes
+
+The `child` field refers to the same value union with another `list` around its type argument.
+Looking up a class attribute with that type does not require expanding every specialization.
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    leaf: int
+    child: TypeOf[next(iter(cast("Node[list[T]]", {}).values()))]
+
+class Holder:
+    attr = cast(Node[int], {})["child"]
+
+Holder.attr  # no diagnostic
+```
+
+The recursive alternative does not make these values assignable to `str`.
+
+```py
+text: str = Holder.attr  # error: [invalid-assignment]
+```
+
+## Mutually recursive TypedDict value types
+
+These declarations are accepted even though checking either field refers to the other class's
+values. Every trip through both classes wraps the type argument in another `list`:
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Left(TypedDict, Generic[T], closed=True):
+    # no diagnostic
+    value: TypeOf[next(iter(cast("Right[list[T]]", {}).values()))]
+
+class Right(TypedDict, Generic[T], closed=True):
+    # no diagnostic
+    value: TypeOf[next(iter(cast("Left[T]", {}).values()))]
+```
+
+These fields have no non-recursive alternative. Inference leaves their value type unresolved, so
+accessing an attribute does not produce an error:
+
+```py
+def check(left: Left[int]):
+    left["value"].missing  # no diagnostic
+```
+
+## Mutually recursive TypedDict values inside tuples
+
+The values returned by `Right.values()` can contain the recursive reference inside a tuple. We still
+accept both declarations:
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Left(TypedDict, Generic[T], closed=True):
+    # no diagnostic
+    value: TypeOf[next(iter(cast("Right[list[T]]", {}).values()))]
+
+class Right(TypedDict, Generic[T], closed=True):
+    # no diagnostic
+    value: tuple[TypeOf[next(iter(cast("Left[T]", {}).values()))]]
+```
+
+## Recursive TypedDict values with fixed arguments
+
+A recursive reference can replace the type argument with a fixed type. Here `Right` always refers to
+`Left[int]`, so `Left[str]`'s `value` field still contains `int`:
+
+```py
+from typing import Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Left(TypedDict, Generic[T], closed=True):
+    item: T
+    value: TypeOf[next(iter(cast("Right[list[T]]", {}).values()))]
+
+class Right(TypedDict, Generic[T], closed=True):
+    value: TypeOf[next(iter(cast("Left[int]", {}).values()))]
+
+def check(left: Left[str]):
+    reveal_type(left["value"])  # revealed: int
+```
+
+## Iterating recursive TypedDict values with `Any`
+
+The recursive field contains lists of values from another specialization of `Node`. We can iterate
+over the values even when the type argument is `Any`:
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    leaf: T
+    value: list[TypeOf[next(iter(cast("Node[list[T]]", {}).values()))]]
+
+def check(node: Node[Any]):
+    iter(node.values())  # no diagnostic
+```
+
+## Iterating mutually recursive TypedDict values with `Any`
+
+Iteration also works when the recursive references pass through two TypedDicts. Here a value from
+`Left[Any]` can be a list containing values from another specialization of `Left`:
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Left(TypedDict, Generic[T], closed=True):
+    leaf: T
+    value: TypeOf[next(iter(cast("Right[list[T]]", {}).values()))]
+
+class Right(TypedDict, Generic[T], closed=True):
+    leaf: T
+    value: list[TypeOf[next(iter(cast("Left[T]", {}).values()))]]
+
+def check(node: Left[Any]):
+    iter(node.values())  # no diagnostic
+```
+
+## Materializing recursive TypedDict values
+
+Each recursive reference adds a `list` to the type argument and takes the top materialization of the
+resulting value type:
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_assignable_to
+
+T = TypeVar("T")
+
+class Node(TypedDict, Generic[T], closed=True):
+    leaf: T
+    child: Top[TypeOf[next(iter(cast("Node[list[T]]", {}).values()))]]
+```
+
+A generic function accepts these values. Keyword unpacking rejects them because they include types
+that are not mappings:
+
+```py
+U = TypeVar("U")
+
+def consume(value: U): ...
+def check(node: Node[Any]):
+    value = next(iter(node.values()))
+    consume(value)  # no diagnostic
+    dict(**value)  # error: [invalid-argument-type]
+```
+
+The value may also lack the methods that `reversed` needs:
+
+```py
+def reverse_values(node: Node[Any]):
+    value = next(iter(node.values()))
+    reversed(value)  # error: [no-matching-overload]
+```
+
+The bottom materialization is assignable to the top materialization:
+
+```py
+def materialize(node: Node[Any]):
+    value = next(iter(node.values()))
+    static_assert(is_assignable_to(Bottom[TypeOf[value]], Top[TypeOf[value]]))
+```
+
+Inside the `isinstance` branch, the value is a dictionary or a list:
+
+```py
+def narrow(node: Node[Any]):
+    value = next(iter(node.values()))
+    if isinstance(value, (dict, list)):
+        number: int = value  # error: [invalid-assignment]
+```
+
+The `**rest` capture in a mapping pattern remains a dictionary:
+
+```py
+def match_mapping(node: Node[Any]):
+    value = next(iter(node.values()))
+    match value:
+        case {"child": _, **rest}:
+            rest.clear()  # no diagnostic
+            rest.append(1)  # error: [unresolved-attribute]
+```
+
+## Materializing recursive values with two type parameters
+
+Recursive references can also change the order of the type arguments. Applying `Top` still leaves
+values that cannot be unpacked as keyword arguments:
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Node(TypedDict, Generic[T, U], closed=True):
+    leaf: T
+    child: Top[TypeOf[next(iter(cast("Node[list[U], T]", {}).values()))]]
+
+def check(node: Node[Any, int]):
+    value = next(iter(node.values()))
+    dict(**value)  # error: [invalid-argument-type]
+```
+
+## Materializing mutually recursive TypedDict values
+
+Materialization can also occur between two recursive declarations. Their values can include lists,
+so assigning a value to `int` is rejected:
+
+```py
+from typing import Any, Generic, TypeVar, cast
+from typing_extensions import TypedDict
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Left(TypedDict, Generic[T], closed=True):
+    leaf: T
+    value: TypeOf[next(iter(cast("Right[list[T]]", {}).values()))]
+
+class Right(TypedDict, Generic[T], closed=True):
+    leaf: T
+    value: Top[TypeOf[next(iter(cast("Left[T]", {}).values()))]]
+
+def check(node: Left[Any]):
+    value = next(iter(node.values()))
+    number: int = value  # error: [invalid-assignment]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't

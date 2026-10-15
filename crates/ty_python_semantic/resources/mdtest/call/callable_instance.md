@@ -125,3 +125,30 @@ def outer(cond1: bool):
         # error: [call-non-callable] "Object of type `Test` is not callable (possibly missing `__call__` method)"
         a()
 ```
+
+## Recursive TypedDict values
+
+The `child` field refers to the types of all values in `Node`, including the callable in `leaf`:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Payload:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+class Node(TypedDict, closed=True):
+    leaf: Payload
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+```
+
+Calling a value still requires an `int` argument and returns `str`:
+
+```py
+def check(node: Node):
+    value = next(iter(node.values()))
+    reveal_type(value(1))  # revealed: str
+    value("wrong")  # error: [invalid-argument-type]
+```

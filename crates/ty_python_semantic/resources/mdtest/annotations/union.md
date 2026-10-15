@@ -121,6 +121,30 @@ staticmethod(f) | None  # error: [unsupported-operator]
 range(5) | None  # error: [unsupported-operator]
 ```
 
+## Recursive values containing union objects
+
+The `leaf` field holds a union object such as `int | str`. The `child` field refers to the types of
+all values in the same dictionary:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: TypeOf[int | str]
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+```
+
+Using one of its values as an annotation preserves the types represented by the union object:
+
+```py
+value = next(iter(cast(Node, {}).values()))
+
+def check(x: value):
+    reveal_type(x)  # revealed: int | str
+```
+
 ## Recursive assignments to invalid union operands
 
 An invalid operation still produces a diagnostic when its operand is inferred recursively:

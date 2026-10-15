@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
@@ -25,9 +26,9 @@ use crate::types::known_instance::FieldInstance;
 use crate::types::member::class_member;
 use crate::types::special_form::SpecialFormType;
 use crate::types::{
-    ClassBase, ClassType, DataclassTransformerParams, FunctionType, KnownClass, KnownFunction,
-    KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral, Type, UnionType,
-    definition_expression_type,
+    ClassBase, ClassType, CycleKind, DataclassTransformerParams, FunctionType, KnownClass,
+    KnownFunction, KnownInstanceType, KnownUnion, Parameter, Specialization, StaticClassLiteral,
+    Type, TypeWalk, UnionType, definition_expression_type,
 };
 
 /// Pydantic treats underscore-prefixed annotations as private instance attributes.
@@ -1019,40 +1020,56 @@ fn lax_input_type<'db>(
     env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
 ) -> Type<'db> {
-    lax_input_type_impl(db, env, field_type, &mut FxHashSet::default())
+    LaxInputTraversal::with_root(env, LaxInputType, |traversal| {
+        traversal.visit_with(db, field_type, &mut FxHashSet::default())
+    })
 }
 
-fn lax_input_type_impl<'db>(
+struct LaxInputType;
+
+type LaxInputTraversal<'env, 'db> = StructuralTypeTraversal<'env, 'db, LaxInputType>;
+
+impl<'db> TypeWalk<'db, &mut FxHashSet<Type<'db>>, StructuralTraversal> for LaxInputType {
+    type Output = Type<'db>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &LaxInputTraversal<'_, 'db>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _expanding_types: &mut FxHashSet<Type<'db>>,
+    ) -> Type<'db> {
+        Type::any()
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &LaxInputTraversal<'_, 'db>,
+        field_type: Type<'db>,
+        expanding_types: &mut FxHashSet<Type<'db>>,
+    ) -> Type<'db> {
+        // This transformation descends into type arguments. Preserve recursive alias edges
+        // such as the element in `type Tree = list[int | Tree]` so their guards stay active.
+        lax_input_type_body(
+            db,
+            traversal.environment(),
+            field_type,
+            expanding_types,
+            traversal,
+        )
+    }
+}
+
+fn lax_input_type_body<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
+    traversal: &LaxInputTraversal<'_, 'db>,
 ) -> Type<'db> {
     if field_type.is_none(db) || matches!(field_type, Type::LiteralValue(_) | Type::SubclassOf(_)) {
         return field_type;
-    }
-
-    if let Type::TypeAlias(alias) = field_type {
-        if !expanding_types.insert(field_type) {
-            return Type::any();
-        }
-        let result = lax_input_type_impl(db, env, alias.value_type(db), expanding_types);
-        expanding_types.remove(&field_type);
-        return result;
-    }
-
-    if let Type::Recursive(recursive) = field_type {
-        // Guard the constructor: recursive arguments can grow without repeating a specialization.
-        let constructor = Type::Recursive(recursive.constructor(db));
-        if !expanding_types.insert(constructor) {
-            return Type::any();
-        }
-        let result = recursive
-            .unfold(db, env)
-            .map(|unfolded| lax_input_type_impl(db, env, unfolded, expanding_types))
-            .unwrap_or(Type::any());
-        expanding_types.remove(&constructor);
-        return result;
     }
 
     if field_type.as_union().and_then(|union| union.known(db)) == Some(KnownUnion::Float) {
@@ -1066,11 +1083,12 @@ fn lax_input_type_impl<'db>(
             union
                 .elements(db)
                 .iter()
-                .map(|element| lax_input_type_impl(db, env, *element, expanding_types)),
+                .map(|element| traversal.visit_with(db, *element, &mut *expanding_types)),
         );
     }
 
-    if let Some(input_type) = root_model_input_type(db, env, field_type, expanding_types) {
+    if let Some(input_type) = root_model_input_type(db, env, field_type, expanding_types, traversal)
+    {
         return input_type;
     }
 
@@ -1097,9 +1115,8 @@ fn lax_input_type_impl<'db>(
         let Ok(elements) = field_type.try_iterate(db, env) else {
             return Type::any();
         };
-        let element_type = lax_input_type_impl(
+        let element_type = traversal.visit_with(
             db,
-            env,
             elements.homogeneous_element_type(db, env),
             expanding_types,
         );
@@ -1115,7 +1132,7 @@ fn lax_input_type_impl<'db>(
         let [key_type, value_type] = specialization.types(db) else {
             return Type::any();
         };
-        let value_type = lax_input_type_impl(db, env, *value_type, expanding_types);
+        let value_type = traversal.visit_with(db, *value_type, expanding_types);
         return KnownClass::Mapping.to_specialized_instance(db, env, &[*key_type, value_type]);
     }
 
@@ -1192,6 +1209,7 @@ fn root_model_input_type<'db>(
     env: &ProgramEnvironment<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
+    traversal: &LaxInputTraversal<'_, 'db>,
 ) -> Option<Type<'db>> {
     let (class, specialization) = field_type
         .nominal_class(db, env)?
@@ -1212,7 +1230,7 @@ fn root_model_input_type<'db>(
     if !expanding_types.insert(field_type) {
         return Some(Type::any());
     }
-    let root_input_type = lax_input_type_impl(db, env, root_field.declared_ty, expanding_types);
+    let root_input_type = traversal.visit_with(db, root_field.declared_ty, &mut *expanding_types);
 
     expanding_types.remove(&field_type);
     // In lax mode, Pydantic accepts a Box[str] when a Box[int] is expected, so we widen

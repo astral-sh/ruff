@@ -59,20 +59,888 @@
 //! ```
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
+//!
+//! A constructor can also defer a type derived from a declaration. The value projection of a
+//! `TypedDict` is the union of its declared field types and extra-item types. Storing that
+//! projection without expanding it lets a mapping comparison establish the class relationship
+//! before inspecting the values. These projections have no source alias name; ordinary union
+//! construction and type display expand their completed bodies.
 
+use std::cell::{Cell, OnceCell, RefCell};
+use std::hash::Hash;
+use std::marker::PhantomData;
+
+use rustc_hash::FxHashSet;
+use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use super::cyclic::{
+    ActiveRecursionDetector, CycleDetector, CycleDetectorCache, CycleKind, HasIdentity,
+    TypeTransformer,
+};
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ClassLiteral, ClassType, GenericContext,
+    MaterializationKind, Type, TypeContext, TypeMapping, TypeRecursionContext, TypedDictType,
+    VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
+
+/// Access to recursive bodies while a caller's recursion guard is active.
+///
+/// A mapping visitor alone does not establish a recursion guard for the operation that reads the
+/// unfolded body. This context is borrowed inside a guarded visit and cannot be constructed by a
+/// type operation. The caller's mapping visitor remains shared throughout that visit.
+pub(super) struct TypeExpansionContext<'a, 'env, 'db, Mode = SemanticTraversal> {
+    mapping: &'a ApplyTypeMappingVisitor<'env, 'db>,
+    mode: PhantomData<Mode>,
+}
+
+impl<'a, 'env, 'db, Mode> TypeExpansionContext<'a, 'env, 'db, Mode> {
+    fn new(mapping: &'a ApplyTypeMappingVisitor<'env, 'db>) -> Self {
+        Self {
+            mapping,
+            mode: PhantomData,
+        }
+    }
+}
+
+impl<'db> TypeExpansionContext<'_, '_, 'db> {
+    /// Inspect a recursive body's outer alternatives without revisiting shared union edges.
+    pub(super) fn expand_recursive(
+        &self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> UnfoldResult<'db> {
+        recursive
+            .unfold(db, self.mapping)
+            .map(|body| self.normalize(db, body))
+    }
+
+    /// Normalize outer aliases and unions under the caller's active recursion guard.
+    pub(super) fn normalize(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        TypeInspector::with_mapping_visitor(self.mapping, |inspector| {
+            inspector.inspect(db, ty, |ty, _| ty, |_, ty| ty)
+        })
+    }
+}
+
+/// Normalize the alternatives exposed by a semantic operation, retaining growing constructors.
+///
+/// Cycle guards stop a path that returns to an ancestor. They do not prevent visiting every path
+/// through a shared graph. Expanding the outer union once preserves that sharing for queries,
+/// stateful walks, and operations whose guard includes more than one operand.
+fn normalize_outer_union<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+) -> Type<'db> {
+    match ty {
+        Type::Union(union) if union.needs_alias_expansion(db, mapping) => {
+            union.expand_aliases(db, mapping)
+        }
+        _ => ty,
+    }
+}
+
+/// Whether a traversal consumes semantic alternatives or rebuilds the original type structure.
+pub(crate) trait TypeTraversalMode: traversal_mode::Sealed {
+    const NORMALIZE_UNIONS: bool;
+}
+
+pub(crate) struct SemanticTraversal;
+
+mod traversal_mode {
+    pub(crate) trait Sealed {}
+
+    impl Sealed for super::SemanticTraversal {}
+    impl Sealed for super::StructuralTraversal {}
+}
+
+impl TypeTraversalMode for SemanticTraversal {
+    const NORMALIZE_UNIONS: bool = true;
+}
+
+/// Structural transformations must observe the original edges, including redundant alternatives.
+pub(super) struct StructuralTraversal;
+
+impl TypeTraversalMode for StructuralTraversal {
+    const NORMALIZE_UNIONS: bool = false;
+}
+
+pub(super) type StructuralTypeTraversal<'env, 'db, O> =
+    TypeTraversal<'env, 'db, O, StructuralTraversal>;
+
+pub(super) type StructuralExpansionContext<'a, 'env, 'db> =
+    TypeExpansionContext<'a, 'env, 'db, StructuralTraversal>;
+
+impl<'db> StructuralExpansionContext<'_, '_, 'db> {
+    /// Observe the original body when collecting dependencies or rebuilding type structure.
+    /// Normalization can remove redundant alternatives that still contain relevant parameters.
+    pub(super) fn recursive_body(
+        &self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> UnfoldResult<'db> {
+        recursive.unfold(db, self.mapping)
+    }
+}
+
+impl<'db, Tag, T, R: Clone, const N: usize> CycleDetector<'db, Tag, T, R, N>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+{
+    /// Inspect recursive bodies under this detector's existing key and cycle policy.
+    pub(super) fn visit_with_expansion(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        compute: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.visit(db, item, || compute(&TypeExpansionContext::new(mapping)))
+    }
+
+    pub(super) fn visit_structure(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        compute: impl FnOnce(&StructuralExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.visit(db, item, || {
+            compute(&StructuralExpansionContext::new(mapping))
+        })
+    }
+
+    pub(super) fn try_visit_with_expansion(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        reuse_cached: impl FnOnce(&R) -> bool,
+        compute: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> R,
+    ) -> Result<R, T> {
+        self.try_visit(db, item, reuse_cached, || {
+            compute(&TypeExpansionContext::new(mapping))
+        })
+    }
+}
+
+impl<'db, Tag, T, const N: usize> CycleDetector<'db, Tag, T, (), N>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+{
+    pub(super) fn visit_active_with_expansion<R>(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        compute: impl FnOnce(Result<&TypeExpansionContext<'_, '_, 'db>, CycleKind>) -> R,
+    ) -> R {
+        self.visit_active(db, item, |cycle| match cycle {
+            Some(kind) => compute(Err(kind)),
+            None => compute(Ok(&TypeExpansionContext::new(mapping))),
+        })
+    }
+}
+
+impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
+    pub(super) fn visit_structure<'db, R>(
+        &self,
+        item: &T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        on_cycle: impl FnOnce() -> R,
+        compute: impl FnOnce(&StructuralExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.visit(item, on_cycle, || {
+            compute(&StructuralExpansionContext::new(mapping))
+        })
+    }
+
+    pub(super) fn visit_with_expansion<'db, R>(
+        &self,
+        item: &T,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        on_cycle: impl FnOnce() -> R,
+        compute: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.visit(item, on_cycle, || {
+            compute(&TypeExpansionContext::new(mapping))
+        })
+    }
+}
+
+impl<'db, Tag> TypeTransformer<'db, Tag> {
+    pub(super) fn visit_type_with_expansion(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        compute: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.visit_type(db, ty, || compute(&TypeExpansionContext::new(mapping)))
+    }
+}
+
+/// Recursion and mapping state owned by a complete walk with operation-specific keys.
+pub(crate) struct TypeVisitorState<'env, 'db, Tag, T: HasIdentity<'db>, R, const N: usize> {
+    cycles: CycleDetector<'db, Tag, T, R, N>,
+    mapping: ApplyTypeMappingVisitor<'env, 'db>,
+}
+
+impl<'env, 'db, Tag, T: HasIdentity<'db>, R, const N: usize>
+    TypeVisitorState<'env, 'db, Tag, T, R, N>
+{
+    pub(super) fn new(env: &'env ProgramEnvironment<'db>, fallback: R) -> Self {
+        Self {
+            cycles: CycleDetector::new(fallback),
+            mapping: ApplyTypeMappingVisitor::new(env),
+        }
+    }
+}
+
+impl<'db, Tag, T, R: Clone, const N: usize> TypeVisitorState<'_, 'db, Tag, T, R, N>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+{
+    pub(super) fn visit(&self, db: &'db dyn Db, item: T, compute: impl FnOnce() -> R) -> R {
+        self.cycles.visit(db, item, compute)
+    }
+
+    pub(super) fn visit_with_expansion(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        compute: impl FnOnce(&TypeExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.cycles
+            .visit_with_expansion(db, item, &self.mapping, compute)
+    }
+
+    pub(super) fn visit_structure(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        compute: impl FnOnce(&StructuralExpansionContext<'_, '_, 'db>) -> R,
+    ) -> R {
+        self.cycles
+            .visit_structure(db, item, &self.mapping, compute)
+    }
+}
+
+impl<'db, Tag, T, const N: usize> TypeVisitorState<'_, 'db, Tag, T, (), N>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+{
+    pub(super) fn visit_active_with_expansion<R>(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        compute: impl FnOnce(Result<&TypeExpansionContext<'_, '_, 'db>, CycleKind>) -> R,
+    ) -> R {
+        self.cycles
+            .visit_active_with_expansion(db, item, &self.mapping, compute)
+    }
+}
+
+/// A walk over outer type alternatives that can borrow mutable state.
+///
+/// [`TypeTraversal`] expands aliases and recursive types, and normalizes outer unions, before
+/// calling [`Self::visit`]. Transformations that descend into type arguments use
+/// [`StructuralTypeTraversal`] to retain recursive alias edges and the original alternatives.
+/// A recursive reference whose body is still unavailable is passed through unchanged.
+/// Implementations select which other children to inspect by calling the traversal's `visit`
+/// method. They never unfold recursive bodies or manage the active recursion stack themselves.
+/// `State` passes per-visit inputs, including mutable builders, without storing them in the traversal.
+/// Walk results are not cached; use [`TypeQuery`] when completed results can be reused.
+pub(crate) trait TypeWalk<'db, State = (), Mode: TypeTraversalMode = SemanticTraversal>:
+    Sized
+{
+    type Output;
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeTraversal<'_, 'db, Self, Mode>,
+        ty: Type<'db>,
+        state: State,
+    ) -> Self::Output;
+
+    /// Return the result of revisiting an active type, including a growing specialization.
+    fn on_cycle(
+        &self,
+        _traversal: &TypeTraversal<'_, 'db, Self, Mode>,
+        ty: Type<'db>,
+        kind: CycleKind,
+        state: State,
+    ) -> Self::Output;
+
+    /// Consume one unfolded body while its binder remains active.
+    ///
+    /// Most operations continue inspecting its outer shape. Structural visitors can instead
+    /// visit the body themselves so their callbacks still observe aliases and other containers.
+    fn visit_recursive_body(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeTraversal<'_, 'db, Self, Mode>,
+        body: Type<'db>,
+        state: State,
+    ) -> Self::Output {
+        traversal.visit_with(db, body, state)
+    }
+
+    /// Process an alias or recursive type with its traversal guard active.
+    ///
+    /// Operations that can start another projection while expanding an alias can retain their
+    /// additional context here. Calling `visit_body` unfolds and visits the body under that guard;
+    /// an operation can also retain the reference without invoking the callback.
+    fn visit_alias_like(
+        &self,
+        _db: &'db dyn Db,
+        _traversal: &TypeTraversal<'_, 'db, Self, Mode>,
+        _ty: Type<'db>,
+        state: State,
+        visit_body: impl FnOnce(State) -> Self::Output,
+    ) -> Self::Output {
+        visit_body(state)
+    }
+}
+
+struct TypeTraversalTag;
+
+/// Owns the recursion and materialization state for one type operation.
+///
+/// A recursive body can expose a union that contains the same recursive type again. The guard
+/// therefore covers both unfolding and the operation's subsequent traversal of that body.
+/// This is a walk: callbacks can mutate builders or collect occurrences. Use [`TypeQueryContext`]
+/// for operations that compute a reusable result from a type and immutable input.
+pub(crate) struct TypeTraversal<'env, 'db, O, Mode = SemanticTraversal> {
+    operation: O,
+    env: &'env ProgramEnvironment<'db>,
+    recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    mapping: TraversalMapping<'env, 'db>,
+    active: CycleDetector<'db, TypeTraversalTag, Type<'db>, (), 3>,
+    mode: PhantomData<Mode>,
+}
+
+impl<'env, 'db, O, Mode: TypeTraversalMode> TypeTraversal<'env, 'db, O, Mode> {
+    fn new(env: &'env ProgramEnvironment<'db>, operation: O) -> Self {
+        Self {
+            operation,
+            env,
+            recursion_context: None,
+            mapping: TraversalMapping::Owned(OnceCell::new()),
+            active: CycleDetector::new(()),
+            mode: PhantomData,
+        }
+    }
+
+    /// Run an operation with one borrowed traversal for its entire recursion.
+    pub(crate) fn with_root<R>(
+        env: &'env ProgramEnvironment<'db>,
+        operation: O,
+        visit: impl FnOnce(&Self) -> R,
+    ) -> R {
+        visit(&Self::new(env, operation))
+    }
+
+    pub(crate) fn environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn mapping(&self) -> &ApplyTypeMappingVisitor<'env, 'db> {
+        match &self.mapping {
+            TraversalMapping::Owned(mapping) => mapping.get_or_init(|| {
+                ApplyTypeMappingVisitor::new(self.env)
+                    .with_recursion_context(self.recursion_context)
+            }),
+            TraversalMapping::Borrowed(mapping) => mapping,
+        }
+    }
+
+    fn new_with_recursion_context(
+        env: &'env ProgramEnvironment<'db>,
+        operation: O,
+        context: &'env TypeRecursionContext<'db>,
+    ) -> Self {
+        Self {
+            recursion_context: Some(context),
+            ..Self::new(env, operation)
+        }
+    }
+
+    /// Start a traversal inside a transformation without replacing that transformation's guards.
+    fn from_mapping_visitor(
+        visitor: &'env ApplyTypeMappingVisitor<'env, 'db>,
+        operation: O,
+    ) -> Self {
+        Self {
+            operation,
+            env: visitor.env,
+            recursion_context: visitor.recursion_context,
+            mapping: TraversalMapping::Borrowed(visitor),
+            active: CycleDetector::new(()),
+            mode: PhantomData,
+        }
+    }
+
+    pub(super) fn with_mapping_visitor<R>(
+        visitor: &'env ApplyTypeMappingVisitor<'env, 'db>,
+        operation: O,
+        visit: impl FnOnce(&Self) -> R,
+    ) -> R {
+        visit(&Self::from_mapping_visitor(visitor, operation))
+    }
+
+    pub(crate) fn visit(&self, db: &'db dyn Db, ty: Type<'db>) -> O::Output
+    where
+        O: TypeWalk<'db, (), Mode>,
+    {
+        self.visit_with(db, ty, ())
+    }
+
+    /// Visit a type while passing operation-specific state, such as a mutable type builder.
+    pub(crate) fn visit_with<State>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        state: State,
+    ) -> O::Output
+    where
+        O: TypeWalk<'db, State, Mode>,
+    {
+        self.with_active_type(db, ty, |cycle| {
+            if let Some(kind) = cycle {
+                return self.operation.on_cycle(self, ty, kind, state);
+            }
+            match ty {
+                Type::Recursive(recursive) => {
+                    self.operation
+                        .visit_alias_like(db, self, ty, state, |state| {
+                            match recursive.unfold(db, self.mapping()) {
+                                UnfoldResult::Unfolded(body) => {
+                                    self.operation.visit_recursive_body(db, self, body, state)
+                                }
+                                UnfoldResult::Unchanged(_) => {
+                                    self.operation.visit(db, self, ty, state)
+                                }
+                            }
+                        })
+                }
+                Type::TypeAlias(alias) => {
+                    self.operation
+                        .visit_alias_like(db, self, ty, state, |state| {
+                            self.visit_with(
+                                db,
+                                alias.value_type_with_recursion(db, self.recursion_context),
+                                state,
+                            )
+                        })
+                }
+                Type::Union(_) if Mode::NORMALIZE_UNIONS => {
+                    let normalized = normalize_outer_union(db, ty, self.mapping());
+                    if normalized == ty {
+                        self.operation.visit(db, self, ty, state)
+                    } else {
+                        self.visit_with(db, normalized, state)
+                    }
+                }
+                _ => self.operation.visit(db, self, ty, state),
+            }
+        })
+    }
+
+    fn with_active_type<R>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visit: impl FnOnce(Option<CycleKind>) -> R,
+    ) -> R {
+        // These outer-shape operations recurse through deferred definitions, bounds, and newtype
+        // bases. Revisiting a concrete type during normalization is not a recursive unfolding.
+        if needs_traversal_guard(ty) {
+            self.active.visit_active(db, ty, visit)
+        } else {
+            visit(None)
+        }
+    }
+}
+
+impl<'env, 'db, O> StructuralTypeTraversal<'env, 'db, O> {
+    pub(super) fn mapping_visitor(&self) -> &ApplyTypeMappingVisitor<'env, 'db> {
+        self.mapping()
+    }
+}
+
+fn needs_traversal_guard(ty: Type<'_>) -> bool {
+    matches!(
+        ty,
+        Type::TypeAlias(_) | Type::Recursive(_) | Type::TypeVar(_) | Type::NewTypeInstance(_)
+    )
+}
+
+/// A query of a type's outer alternatives, with immutable operation-specific input.
+///
+/// The context unfolds aliases, expands outer unions, and memoizes recursive queries. A query
+/// must return the same result for the same type and input under the same recursion guards.
+/// Parameters shared by all recursive calls, such as an attribute name, belong on `Self`.
+/// Parameters that change between calls, such as a descriptor's receiver, belong in `Input`.
+/// Keep mutable collectors and builders in a separate walk.
+pub trait TypeQuery<'db, Input = ()>: Sized
+where
+    Input: Clone + Eq + Hash,
+{
+    type Output: Clone;
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryContext<'_, 'db, Self, Input>,
+        ty: Type<'db>,
+        input: Input,
+    ) -> Self::Output;
+
+    fn on_cycle(
+        &self,
+        context: &TypeQueryContext<'_, 'db, Self, Input>,
+        ty: Type<'db>,
+        kind: CycleKind,
+        input: Input,
+    ) -> Self::Output;
+
+    /// Keep guards shared with other operations active while inspecting an alias body.
+    fn visit_alias_like(
+        &self,
+        _db: &'db dyn Db,
+        _context: &TypeQueryContext<'_, 'db, Self, Input>,
+        _ty: Type<'db>,
+        input: Input,
+        visit_body: impl FnOnce(Input) -> Self::Output,
+    ) -> Self::Output {
+        visit_body(input)
+    }
+}
+
+type TypeQueryCache<'db, Input, R> =
+    CycleDetectorCache<(Type<'db>, Input), TypeQueryResult<'db, R>>;
+
+/// Shares completed queries as well as recursion and materialization state.
+///
+/// A cycle result can depend on the enclosing types. Each cached answer therefore records the
+/// guards consulted by its computation. Reuse requires those guards to give the same answers
+/// in the current context, including guards reached through another cached query.
+/// Changes to guards shared with other operations invalidate the cache as well.
+pub struct TypeQueryContext<'env, 'db, Q, Input = ()>
+where
+    Q: TypeQuery<'db, Input>,
+    Input: Clone + Eq + Hash,
+{
+    traversal: TypeTraversal<'env, 'db, Q>,
+    cache: RefCell<TypeQueryCache<'db, Input, Q::Output>>,
+    recursion_revision: Cell<Option<[u64; 3]>>,
+    dependencies: RefCell<Vec<Type<'db>>>,
+    depth: Cell<usize>,
+}
+
+impl<'env, 'db, Q, Input> TypeQueryContext<'env, 'db, Q, Input>
+where
+    Q: TypeQuery<'db, Input>,
+    Input: Clone + Eq + Hash,
+{
+    fn new(traversal: TypeTraversal<'env, 'db, Q>) -> Self {
+        Self {
+            traversal,
+            cache: RefCell::new(CycleDetectorCache::new()),
+            recursion_revision: Cell::new(None),
+            dependencies: RefCell::default(),
+            depth: Cell::new(0),
+        }
+    }
+
+    /// Run a query with one cache and one set of guards for all recursive calls.
+    pub fn with_root<R>(
+        env: &'env ProgramEnvironment<'db>,
+        query: Q,
+        visit: impl FnOnce(&Self) -> R,
+    ) -> R {
+        visit(&Self::new(TypeTraversal::new(env, query)))
+    }
+
+    pub(super) fn with_recursion_context<R>(
+        env: &'env ProgramEnvironment<'db>,
+        query: Q,
+        context: &'env TypeRecursionContext<'db>,
+        visit: impl FnOnce(&Self) -> R,
+    ) -> R {
+        visit(&Self::new(TypeTraversal::new_with_recursion_context(
+            env, query, context,
+        )))
+    }
+
+    pub(crate) fn environment(&self) -> &ProgramEnvironment<'db> {
+        self.traversal.environment()
+    }
+
+    fn mapping_visitor(&self) -> &ApplyTypeMappingVisitor<'env, 'db> {
+        self.traversal.mapping()
+    }
+
+    pub(crate) fn visit_with(&self, db: &'db dyn Db, ty: Type<'db>, input: Input) -> Q::Output {
+        self.depth.set(self.depth.get() + 1);
+        let _frame = TypeQueryFrame {
+            depth: &self.depth,
+            dependencies: &self.dependencies,
+        };
+        self.validate_recursion_context();
+        let key = (ty, input.clone());
+        if let Some(cached) = self.cache.borrow().get(&key)
+            && cached.dependencies.iter().all(|(dependency, expected)| {
+                self.traversal.active.cycle_kind(db, dependency) == *expected
+            })
+        {
+            self.dependencies
+                .borrow_mut()
+                .extend(cached.dependencies.iter().map(|(ty, _)| *ty));
+            return cached.output.clone();
+        }
+
+        let start = self.dependencies.borrow().len();
+        if needs_traversal_guard(ty) {
+            self.dependencies.borrow_mut().push(ty);
+        }
+        let output = self.traversal.with_active_type(db, ty, |cycle| {
+            let query = &self.traversal.operation;
+            if let Some(kind) = cycle {
+                return query.on_cycle(self, ty, kind, input);
+            }
+            match ty {
+                Type::TypeAlias(alias) => query.visit_alias_like(db, self, ty, input, |input| {
+                    self.visit_with(
+                        db,
+                        alias.value_type_with_recursion(db, self.traversal.recursion_context),
+                        input,
+                    )
+                }),
+                Type::Recursive(recursive) => {
+                    query.visit_alias_like(db, self, ty, input, |input| {
+                        match recursive.unfold(db, self.mapping_visitor()) {
+                            UnfoldResult::Unfolded(body) => self.visit_with(db, body, input),
+                            UnfoldResult::Unchanged(_) => query.visit(db, self, ty, input),
+                        }
+                    })
+                }
+                Type::Union(_) => {
+                    let expanded = normalize_outer_union(db, ty, self.mapping_visitor());
+                    if expanded == ty {
+                        query.visit(db, self, ty, input)
+                    } else {
+                        self.visit_with(db, expanded, input)
+                    }
+                }
+                _ => query.visit(db, self, ty, input),
+            }
+        });
+
+        // Nested queries contribute their complete dependency sets, even on a cache hit. Check
+        // those dependencies after leaving this query's guards, when the enclosing stack is the
+        // same as it was on entry. In A -> B -> A, B's result cannot escape its dependency on A.
+        let dependencies: FxHashSet<_> = self.dependencies.borrow_mut().drain(start..).collect();
+        self.dependencies.borrow_mut().extend(&dependencies);
+        let dependencies = dependencies
+            .into_iter()
+            .map(|ty| (ty, self.traversal.active.cycle_kind(db, &ty)))
+            .collect();
+        self.validate_recursion_context();
+        self.cache.borrow_mut().insert(
+            key,
+            TypeQueryResult {
+                output: output.clone(),
+                dependencies,
+            },
+        );
+        output
+    }
+
+    fn validate_recursion_context(&self) {
+        let revision = self
+            .traversal
+            .recursion_context
+            .map(TypeRecursionContext::revision);
+        if self.recursion_revision.replace(revision) != revision {
+            // Shared guards can change in a nested projection or specialization without entering
+            // this query's local traversal. Discard answers computed under the previous context.
+            *self.cache.borrow_mut() = CycleDetectorCache::new();
+        }
+    }
+}
+
+impl<'db, Q: TypeQuery<'db>> TypeQueryContext<'_, 'db, Q> {
+    pub fn visit(&self, db: &'db dyn Db, ty: Type<'db>) -> Q::Output {
+        self.visit_with(db, ty, ())
+    }
+}
+
+struct TypeQueryResult<'db, R> {
+    output: R,
+    dependencies: Box<[(Type<'db>, Option<CycleKind>)]>,
+}
+
+/// The dependency log belongs to active queries; completed roots retain only their cache entries.
+struct TypeQueryFrame<'a, 'db> {
+    depth: &'a Cell<usize>,
+    dependencies: &'a RefCell<Vec<Type<'db>>>,
+}
+
+impl Drop for TypeQueryFrame<'_, '_> {
+    fn drop(&mut self) {
+        self.depth.set(self.depth.get() - 1);
+        if self.depth.get() == 0 {
+            self.dependencies.borrow_mut().clear();
+        }
+    }
+}
+
+enum TraversalMapping<'env, 'db> {
+    Owned(OnceCell<ApplyTypeMappingVisitor<'env, 'db>>),
+    Borrowed(&'env ApplyTypeMappingVisitor<'env, 'db>),
+}
+
+struct InspectType;
+
+/// A normalized type together with the outer structure needed by union transformations.
+pub(super) struct NormalizedType<'db> {
+    pub(super) ty: Type<'db>,
+    /// A union can normalize to a single type. That result is still an alternative to filter or
+    /// use as an inference context, unlike an alias whose body was never a union.
+    pub(super) was_union: bool,
+}
+
+/// A scoped inspection that keeps recursion guards active while normalizing outer alternatives.
+pub(super) struct TypeInspector<'env, 'db> {
+    traversal: StructuralTypeTraversal<'env, 'db, InspectType>,
+}
+
+struct Inspection<'a, 'env, 'db, C, F> {
+    inspector: &'a TypeInspector<'env, 'db>,
+    on_cycle: C,
+    inspect: F,
+    was_union: bool,
+}
+
+impl<'a, 'env, 'db, R, C, F> TypeWalk<'db, Inspection<'a, 'env, 'db, C, F>, StructuralTraversal>
+    for InspectType
+where
+    C: FnOnce(Type<'db>, CycleKind) -> R,
+    F: FnOnce(&TypeInspector<'_, 'db>, NormalizedType<'db>) -> R,
+{
+    type Output = R;
+
+    fn on_cycle(
+        &self,
+        _traversal: &StructuralTypeTraversal<'_, 'db, Self>,
+        ty: Type<'db>,
+        kind: CycleKind,
+        state: Inspection<'a, 'env, 'db, C, F>,
+    ) -> R {
+        (state.on_cycle)(ty, kind)
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &StructuralTypeTraversal<'_, 'db, Self>,
+        ty: Type<'db>,
+        mut state: Inspection<'a, 'env, 'db, C, F>,
+    ) -> R {
+        state.was_union |= ty.is_union();
+        let normalized = normalize_outer_union(db, ty, traversal.mapping());
+        if normalized != ty {
+            return traversal.visit_with(db, normalized, state);
+        }
+        (state.inspect)(
+            state.inspector,
+            NormalizedType {
+                ty,
+                was_union: state.was_union,
+            },
+        )
+    }
+}
+
+impl<'env, 'db> TypeInspector<'env, 'db> {
+    pub(super) fn scope<R>(
+        env: &'env ProgramEnvironment<'db>,
+        inspect: impl FnOnce(&Self) -> R,
+    ) -> R {
+        inspect(&Self {
+            traversal: StructuralTypeTraversal::new(env, InspectType),
+        })
+    }
+
+    fn with_mapping_visitor<R>(
+        mapping: &'env ApplyTypeMappingVisitor<'env, 'db>,
+        inspect: impl FnOnce(&Self) -> R,
+    ) -> R {
+        inspect(&Self {
+            traversal: StructuralTypeTraversal::from_mapping_visitor(mapping, InspectType),
+        })
+    }
+
+    pub(super) fn environment(&self) -> &ProgramEnvironment<'db> {
+        self.traversal.environment()
+    }
+
+    /// Start a complete inspection. Recursive helpers borrow the inspector passed to `inspect`.
+    pub(super) fn inspect_root<R>(
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        on_cycle: impl FnOnce(Type<'db>, CycleKind) -> R,
+        inspect: impl FnOnce(&TypeInspector<'_, 'db>, Type<'db>) -> R,
+    ) -> R {
+        Self::scope(env, |inspector| {
+            inspector.inspect(db, ty, on_cycle, inspect)
+        })
+    }
+
+    pub(super) fn inspect<R>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        on_cycle: impl FnOnce(Type<'db>, CycleKind) -> R,
+        inspect: impl FnOnce(&TypeInspector<'_, 'db>, Type<'db>) -> R,
+    ) -> R {
+        self.inspect_normalized(db, ty, on_cycle, |inspector, normalized| {
+            inspect(inspector, normalized.ty)
+        })
+    }
+
+    /// Preserve whether expansion encountered a union, including one that collapsed to one type.
+    pub(super) fn inspect_normalized<R>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        on_cycle: impl FnOnce(Type<'db>, CycleKind) -> R,
+        inspect: impl FnOnce(&TypeInspector<'_, 'db>, NormalizedType<'db>) -> R,
+    ) -> R {
+        self.traversal.visit_with(
+            db,
+            ty,
+            Inspection {
+                inspector: self,
+                on_cycle,
+                inspect,
+                was_union: false,
+            },
+        )
+    }
+}
 
 /// A recursive variable named by its binder's query cycle.
 /// An escaping reference has no type semantics; in particular, it is neither a
@@ -140,11 +1008,29 @@ impl RecursiveSubstitution<'_> {
     }
 }
 
-/// Identifies an alias query and names its recursive binder and variables.
+/// Identifies a recursive binder or a deferred value projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RecursiveCycle(salsa::Id);
+pub enum RecursiveCycle {
+    Alias(salsa::Id),
+    TypedDictValues(salsa::Id),
+}
 
 impl get_size2::GetSize for RecursiveCycle {}
+
+impl RecursiveCycle {
+    fn id(self) -> salsa::Id {
+        match self {
+            Self::Alias(id) | Self::TypedDictValues(id) => id,
+        }
+    }
+}
+
+/// A stored recursive expression or a projection that can expose another recursive type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum RecursiveBody<'db> {
+    Type(Type<'db>),
+    TypedDictValues(ClassLiteral<'db>),
+}
 
 /// An application of a structural recursive type constructor.
 /// The private body remains unspecialized; `arguments` records this application's
@@ -154,19 +1040,19 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the implicit alias, including for qualified references.
+    /// The declaration that owns this constructor, including for qualified references.
     #[returns(copy)]
     pub(super) definition: Definition<'db>,
-    /// Names the binder and distinguishes provisional types of different alias queries.
+    /// Distinguishes binders and projections, including provisional types of alias queries.
     #[returns(copy)]
     cycle: RecursiveCycle,
     #[returns(copy)]
-    body: Type<'db>,
+    body: RecursiveBody<'db>,
     /// The actual arguments for this application, which may themselves contain type variables.
     /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
     pub(super) arguments: Option<Specialization<'db>>,
-    /// The lazy materialization applied to this recursive alias, if any.
+    /// The lazy materialization applied to this recursive type, if any.
     #[returns(copy)]
     pub(super) materialization_kind: Option<MaterializationKind>,
 }
@@ -175,7 +1061,7 @@ impl get_size2::GetSize for RecursiveType<'_> {}
 
 #[salsa::tracked]
 impl<'db> RecursiveType<'db> {
-    /// Summarize the open constructor body without applying semantic substitutions.
+    /// Summarize the unspecialized constructor without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
@@ -187,11 +1073,17 @@ impl<'db> RecursiveType<'db> {
             recursive: RecursiveType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
+            let body = match recursive.body(db) {
+                RecursiveBody::Type(body) => body,
+                RecursiveBody::TypedDictValues(class) => {
+                    TypedDictType::new(class.identity_specialization(db)).unfold_value_type(db)
+                }
+            };
+            let mut summary = AliasCycleSummary::from_type(db, body);
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
             if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).0));
+                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).id()));
             }
             summary
         }
@@ -206,16 +1098,32 @@ impl<'db> RecursiveType<'db> {
         cycle: salsa::Id,
         parameters: Option<GenericContext<'db>>,
     ) -> Self {
-        let cycle = RecursiveCycle(cycle);
+        let cycle = RecursiveCycle::Alias(cycle);
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
         Self::new_internal(
             db,
             definition,
             cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
+            RecursiveBody::Type(Type::RecursiveVar(RecursiveVar::new_internal(
+                db, cycle, arguments,
+            ))),
             arguments,
             None,
         )
+    }
+
+    /// Defer the possible values of a `TypedDict` until a type operation observes them.
+    pub(super) fn typed_dict_values(db: &'db dyn Db, class: ClassType<'db>) -> Option<Self> {
+        let definition = class.definition(db)?;
+        let (origin, arguments) = class.class_literal_and_specialization(db);
+        Some(Self::new_internal(
+            db,
+            definition,
+            RecursiveCycle::TypedDictValues(definition.as_id()),
+            RecursiveBody::TypedDictValues(origin),
+            arguments,
+            None,
+        ))
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -254,7 +1162,7 @@ impl<'db> RecursiveType<'db> {
         );
         // Alias arguments can expose a reference without introducing a container.
         if body.has_unguarded_alias_cycle(db) {
-            Type::divergent_alias(self.cycle(db).0)
+            Type::divergent_alias(self.cycle(db).id())
         } else if body == original {
             // Binding changes a closed type only by introducing references to this binder.
             body
@@ -263,7 +1171,7 @@ impl<'db> RecursiveType<'db> {
                 db,
                 self.definition(db),
                 self.cycle(db),
-                body,
+                RecursiveBody::Type(body),
                 self.arguments(db),
                 None,
             ))
@@ -279,6 +1187,24 @@ impl<'db> RecursiveType<'db> {
             arguments,
             self.materialization_kind(db),
         )
+    }
+
+    /// Normalize markers from inference cycles in this application without changing its bound body.
+    /// Recursive arguments are outside the binder and can contain results from value inference.
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let arguments = match self.arguments(db) {
+            Some(arguments) => {
+                Some(arguments.recursive_type_normalized_impl(db, env, div, nested)?)
+            }
+            None => None,
+        };
+        Some(self.with_arguments(db, arguments))
     }
 
     fn with_materialization(
@@ -302,7 +1228,7 @@ impl<'db> RecursiveType<'db> {
             .map(|arguments| arguments.generic_context(db))
     }
 
-    /// The declared alias name, shared by all specializations of this constructor.
+    /// The declaration's name, shared by all specializations of this constructor.
     pub(super) fn name(self, db: &'db dyn Db) -> &'db str {
         let definition = self.definition(db);
         // Qualified uses retain the original declaration's symbol, not the access expression.
@@ -312,13 +1238,11 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The source alias's definition and name, if this binder comes from an alias.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Keep alias metadata optional for inferred recursive types"
-    )]
     pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
-        // Only implicit alias inference constructs recursive types at present.
-        Some((self.definition(db), self.name(db)))
+        match self.body(db) {
+            RecursiveBody::Type(_) => Some((self.definition(db), self.name(db))),
+            RecursiveBody::TypedDictValues(_) => None,
+        }
     }
 
     /// Restore the formal arguments and remove materialization for constructor analysis.
@@ -333,7 +1257,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The program in which the recursive type's body was constructed.
-    pub fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+    pub(crate) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         ProgramEnvironment::from_definition(self.definition(db))
     }
 
@@ -341,24 +1265,22 @@ impl<'db> RecursiveType<'db> {
     ///
     /// Report whether unfolding returns exactly `Type::Recursive(self)`. An unfolded
     /// type can still contain recursive references, so callers must retain their recursion guards.
-    pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
-        // A growing specialization cannot converge by repeating the same query key. Materialize
-        // its closed unfolding directly, under the caller's recursion guard, instead.
-        let unfolded = if self.materialization_kind(db).is_some()
-            && !self.may_have_unbounded_specialization(db)
-        {
-            materialized_unfold(db, self)
-        } else {
-            let unfolded = self.unfolded_body(db);
-            match self.materialization_kind(db) {
-                Some(kind) => unfolded.apply_type_mapping(
-                    db,
-                    env,
-                    &TypeMapping::Materialize(kind),
-                    TypeContext::default(),
-                ),
-                None => unfolded,
-            }
+    /// General type inspections use [`TypeTraversal`], which owns those guards across the visit.
+    ///
+    /// Materializing the body can compare an argument with its materialization, which can unfold
+    /// another application of this constructor. Keep the caller's equivalence guard so growing
+    /// arguments do not restart that comparison with an empty recursion stack.
+    fn unfold(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> UnfoldResult<'db> {
+        // Materialize the original body so each recursive reference is transformed according
+        // to its variance, rather than inheriting the enclosing application's materialization.
+        let unfolded = self.with_materialization(db, None).unfolded_body(db);
+        let unfolded = match self.materialization_kind(db) {
+            Some(kind) => unfolded.materialize(db, kind, visitor),
+            None => unfolded,
         };
         if unfolded == Type::Recursive(self) {
             UnfoldResult::Unchanged(self)
@@ -374,8 +1296,33 @@ impl<'db> RecursiveType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
+        let body = match self.body(db) {
+            RecursiveBody::Type(body) => body,
+            RecursiveBody::TypedDictValues(origin) => {
+                let constructor = self.constructor(db);
+                if self == constructor {
+                    return TypedDictType::new(origin.identity_specialization(db))
+                        .unfold_value_type(db);
+                }
+
+                // Specialize one shared constructor body. Reading each specialized schema can
+                // expose different inference approximations, so growth analysis and unfolding
+                // would follow different recursive references.
+                let body = constructor.unfolded_body(db);
+                let Some(arguments) = self.arguments(db) else {
+                    return body;
+                };
+                let env = self.environment(db);
+                return body.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::from_specialization(db, arguments, false),
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::new_without_union_normalization(&env),
+                );
+            }
+        };
         let env = self.environment(db);
-        let unfolded = self.body(db).apply_type_mapping_impl(
+        let unfolded = body.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(self),
@@ -413,11 +1360,11 @@ impl<'db> RecursiveType<'db> {
             }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
                 // This binder shadows the target in its body, but not in its arguments.
-                let body = if self.cycle(db) == substitution.cycle(db) {
-                    self.body(db)
-                } else {
-                    self.body(db)
-                        .apply_type_mapping_impl(db, mapping, tcx, visitor)
+                let body = match self.body(db) {
+                    RecursiveBody::Type(body) if self.cycle(db) != substitution.cycle(db) => {
+                        RecursiveBody::Type(body.apply_type_mapping_impl(db, mapping, tcx, visitor))
+                    }
+                    body => body,
                 };
                 let arguments = self
                     .arguments(db)
@@ -449,8 +1396,8 @@ impl<'db> RecursiveType<'db> {
             }
             TypeMapping::Materialize(kind) => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
-                    self.unfold(db, visitor.env)
-                        .map(|unfolded| {
+                    match self.unfold(db, visitor) {
+                        UnfoldResult::Unfolded(unfolded) => {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
                             // Preserve static aliases, including recursive references that the
@@ -460,15 +1407,20 @@ impl<'db> RecursiveType<'db> {
                             } else {
                                 self.with_materialization(db, Some(*kind))
                             })
-                        })
-                        .into_type()
+                        }
+                        // A deferred body cannot establish that materialization is a no-op.
+                        // Retain the operation so it applies when the body becomes available.
+                        UnfoldResult::Unchanged(_) => {
+                            Type::Recursive(self.with_materialization(db, Some(*kind)))
+                        }
+                    }
                 })
             }
             TypeMapping::EagerExpansion => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
                     // first can feed a recursive alias's previous approximation into its own arguments.
-                    self.unfold(db, visitor.env)
+                    self.unfold(db, visitor)
                         .map(|unfolded| {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -489,7 +1441,7 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 let recursive = self.with_arguments(db, arguments);
                 recursive
-                    .unfold(db, visitor.env)
+                    .unfold(db, visitor)
                     .map(|unfolded| {
                         let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
                         if mapped == unfolded {
@@ -503,13 +1455,44 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
+    /// Compose argument variance with the constructor's formal parameters instead of unfolding
+    /// successively larger applications such as `Values[list[T]]`.
     pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
-        self.unfold(db, &env)
+        if let Some(arguments) = self.arguments(db) {
+            let parameters = arguments.generic_context(db);
+            let constructor = self.with_arguments(
+                db,
+                Some(
+                    parameters
+                        .identity_specialization(db)
+                        .with_materialization_kind(db, arguments.materialization_kind(db)),
+                ),
+            );
+            if constructor != self {
+                let origin = VarianceOrigin::Recursive(constructor);
+                let variances = parameters.variables(db).zip(arguments.types(db)).map(
+                    |(parameter, argument)| {
+                        argument
+                            .variance_of(db, &env, typevar)
+                            .compose_thunk(db, || {
+                                VarianceTerm::variable(db, origin, parameter.identity(db))
+                            })
+                    },
+                );
+                // A constructor can also capture a type variable from an enclosing scope.
+                let captured = (!parameters
+                    .variables(db)
+                    .any(|parameter| parameter.identity(db) == typevar))
+                .then(|| VarianceTerm::variable(db, origin, typevar));
+                return VarianceTerm::join(db, variances.chain(captured));
+            }
+        }
+        self.unfold(db, &ApplyTypeMappingVisitor::new(&env))
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
     }
@@ -521,7 +1504,7 @@ impl<'db> RecursiveType<'db> {
 /// when unfolding made no progress.
 #[derive(Debug, Clone, Copy)]
 #[must_use]
-pub enum UnfoldResult<'db, T = Type<'db>> {
+pub(crate) enum UnfoldResult<'db, T = Type<'db>> {
     /// The unfolded type, or a value produced by mapping it.
     Unfolded(T),
     /// Unfolding returns the original recursive type, for example for `μa. a`.
@@ -534,7 +1517,7 @@ impl<'db> UnfoldResult<'db, Type<'db>> {
     /// Callers that recursively process the returned type must use their own recursion guards.
     /// Unfolding one layer does not eliminate cycles, even when it makes progress.
     #[inline]
-    pub fn into_type(self) -> Type<'db> {
+    pub(super) fn into_type(self) -> Type<'db> {
         match self {
             Self::Unfolded(ty) => ty,
             Self::Unchanged(recursive) => Type::Recursive(recursive),
@@ -565,34 +1548,12 @@ impl<'db, T> UnfoldResult<'db, T> {
         }
     }
 
-    /// Return whether unfolding made no progress or the contained value satisfies `predicate`.
-    #[inline]
-    #[expect(
-        clippy::wrong_self_convention,
-        reason = "Like Option::is_none_or, the predicate consumes the contained value."
-    )]
-    pub(crate) fn is_unchanged_or(self, predicate: impl FnOnce(T) -> bool) -> bool {
-        match self {
-            Self::Unfolded(value) => predicate(value),
-            Self::Unchanged(_) => true,
-        }
-    }
-
     /// Transform the contained value, preserving the original recursive type if unfolding made no progress.
     #[inline]
     pub(crate) fn map<U>(self, operation: impl FnOnce(T) -> U) -> UnfoldResult<'db, U> {
         match self {
             Self::Unfolded(value) => UnfoldResult::Unfolded(operation(value)),
             Self::Unchanged(recursive) => UnfoldResult::Unchanged(recursive),
-        }
-    }
-
-    /// Return the contained value, or call `fallback` if unfolding made no progress.
-    #[inline]
-    pub(crate) fn unwrap_or_else(self, fallback: impl FnOnce() -> T) -> T {
-        match self {
-            Self::Unfolded(value) => value,
-            Self::Unchanged(_) => fallback(),
         }
     }
 
@@ -697,37 +1658,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     }
 }
 
-/// Materialize an unfolding lazily, keeping the marked binder as the recursive fallback.
-///
-/// Comparing a recursive specialization with its materialization can request this same unfolding
-/// before it has finished materializing. Returning the marked binder closes that cycle while
-/// preserving the requested materialization polarity.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn materialized_unfold<'db>(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Type<'db> {
-    let Some(kind) = recursive.materialization_kind(db) else {
-        debug_assert!(
-            false,
-            "materialized unfolding requires a materialization kind"
-        );
-        return Type::Recursive(recursive);
-    };
-    let env = recursive.environment(db);
-    let unfolded = recursive
-        .with_materialization(db, None)
-        .unfold(db, &env)
-        .into_type();
-    unfolded.apply_type_mapping(
-        db,
-        &env,
-        &TypeMapping::Materialize(kind),
-        TypeContext::default(),
-    )
-}
-
 impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
     fn variance_of(
         self,
@@ -746,5 +1676,359 @@ impl Type<'_> {
             !matches!(self, Self::RecursiveVar(_)),
             "semantic operation on an unbound recursive variable"
         );
+    }
+}
+
+#[cfg(test)]
+mod query_tests {
+    use std::cell::{Cell, RefCell};
+
+    use ruff_db::files::{File, system_path_to_file};
+    use ruff_db::system::DbWithWritableSystem;
+    use ruff_python_ast::name::Name;
+    use rustc_hash::FxHashMap;
+    use ty_python_core::ProgramFile;
+
+    use super::{CycleKind, TypeInspector, TypeQuery, TypeQueryContext, TypeTraversal, TypeWalk};
+    use crate::Db;
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::cyclic::CycleDetector;
+    use crate::types::{
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, KnownClass, Type, TypeRecursionContext,
+        TypeVarVariance,
+    };
+
+    /// Each projection exposes the same union, whose alternatives lead back to every projection.
+    fn shared_recursive_values(db: &mut TestDb) -> anyhow::Result<File> {
+        db.write_dedented(
+            "/src/shared.py",
+            r#"
+            from typing import cast
+            from typing_extensions import TypedDict
+            from ty_extensions._internal import TypeOf
+
+            class Edges(TypedDict, closed=True):
+                leaf: int
+                a: TypeOf[next(iter(cast("A", {}).values()))]
+                b: TypeOf[next(iter(cast("B", {}).values()))]
+                c: TypeOf[next(iter(cast("C", {}).values()))]
+
+            class A(Edges): ...
+            class B(Edges): ...
+            class C(Edges): ...
+
+            value = next(iter(cast(A, {}).values()))
+            "#,
+        )?;
+        Ok(system_path_to_file(db, "/src/shared.py")?)
+    }
+
+    #[test]
+    fn semantic_walks_visit_shared_recursive_alternatives_once() -> anyhow::Result<()> {
+        struct CountAlternatives;
+
+        impl<'db> TypeWalk<'db, &Cell<usize>> for CountAlternatives {
+            type Output = Vec<Type<'db>>;
+
+            fn visit(
+                &self,
+                db: &'db dyn Db,
+                traversal: &TypeTraversal<'_, 'db, Self>,
+                ty: Type<'db>,
+                visits: &Cell<usize>,
+            ) -> Self::Output {
+                visits.set(visits.get() + 1);
+                match ty {
+                    Type::Union(union) => union
+                        .elements(db)
+                        .iter()
+                        .flat_map(|ty| traversal.visit_with(db, *ty, visits))
+                        .collect(),
+                    _ => vec![ty],
+                }
+            }
+
+            fn on_cycle(
+                &self,
+                _traversal: &TypeTraversal<'_, 'db, Self>,
+                _ty: Type<'db>,
+                _kind: CycleKind,
+                _visits: &Cell<usize>,
+            ) -> Self::Output {
+                Vec::new()
+            }
+        }
+
+        let mut db = setup_db();
+        let file = shared_recursive_values(&mut db)?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let ty = global_symbol(&db, file, "value").place.expect_type();
+        assert!(
+            ty.is_alias_like(),
+            "the fixture must retain its recursive projection"
+        );
+        let visits = Cell::new(0);
+        TypeTraversal::with_root(&env, CountAlternatives, |traversal| {
+            assert_eq!(
+                traversal.visit_with(&db, ty, &visits),
+                [KnownClass::Int.to_instance(&db, &env)],
+            );
+        });
+        assert_eq!(visits.get(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn pair_expansion_normalizes_either_operand() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let file = shared_recursive_values(&mut db)?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let ty = global_symbol(&db, file, "value").place.expect_type();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let literal = Type::int_literal(1);
+        let mapping = ApplyTypeMappingVisitor::new(&env);
+        let pairs: CycleDetector<'_, (), (Type<'_>, Type<'_>), (), 3> = CycleDetector::new(());
+        for ((left, right), expected) in [
+            ((ty, literal), (int, literal)),
+            ((literal, ty), (literal, int)),
+        ] {
+            let actual =
+                pairs.visit_active_with_expansion(&db, (left, right), &mapping, |expansion| {
+                    expansion.ok().map(|expansion| {
+                        (
+                            expansion.normalize(&db, left),
+                            expansion.normalize(&db, right),
+                        )
+                    })
+                });
+            assert_eq!(actual, Some(expected));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn normalization_distinguishes_collapsed_unions_from_single_aliases() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/aliases.py",
+            r#"
+            type First = int
+            type Second = int
+
+            single: First
+            union: First | Second
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/aliases.py")?;
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        for (name, was_union) in [("single", false), ("union", true)] {
+            let ty = global_symbol(&db, file, name).place.expect_type();
+            let normalized = TypeInspector::scope(&env, |inspector| {
+                inspector.inspect_normalized(
+                    &db,
+                    ty,
+                    |_, _| None,
+                    |_, normalized| Some((normalized.ty, normalized.was_union)),
+                )
+            });
+            assert_eq!(
+                normalized,
+                Some((KnownClass::Int.to_instance(&db, &env), was_union))
+            );
+        }
+        Ok(())
+    }
+
+    struct SumGraph<'db> {
+        edges: FxHashMap<Type<'db>, Vec<Type<'db>>>,
+        visits: RefCell<FxHashMap<(Type<'db>, u64), usize>>,
+    }
+
+    impl<'db> TypeQuery<'db, u64> for SumGraph<'db> {
+        type Output = u64;
+
+        fn visit(
+            &self,
+            db: &'db dyn Db,
+            context: &TypeQueryContext<'_, 'db, Self, u64>,
+            ty: Type<'db>,
+            value: u64,
+        ) -> u64 {
+            *self.visits.borrow_mut().entry((ty, value)).or_default() += 1;
+            value
+                + self
+                    .edges
+                    .get(&ty)
+                    .into_iter()
+                    .flatten()
+                    .map(|child| context.visit_with(db, *child, value))
+                    .sum::<u64>()
+        }
+
+        fn on_cycle(
+            &self,
+            _context: &TypeQueryContext<'_, 'db, Self, u64>,
+            _ty: Type<'db>,
+            _kind: CycleKind,
+            _value: u64,
+        ) -> u64 {
+            0
+        }
+    }
+
+    #[test]
+    fn shared_queries_are_evaluated_once_per_input() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let mut edges = FxHashMap::default();
+        let mut previous = [Type::int_literal(0), Type::int_literal(1)];
+        // Each pair shares both nodes from the preceding level. Walking every path would take
+        // millions of visits, although this graph contains only fifty distinct queries.
+        for level in 1..=24 {
+            let pair = [
+                Type::int_literal(2 * level),
+                Type::int_literal(2 * level + 1),
+            ];
+            for ty in pair {
+                edges.insert(ty, previous.to_vec());
+            }
+            previous = pair;
+        }
+        TypeQueryContext::with_root(
+            &env,
+            SumGraph {
+                edges,
+                visits: RefCell::default(),
+            },
+            |context| {
+                for value in [1, 2] {
+                    for root in previous {
+                        assert_eq!(
+                            context.visit_with(&db, root, value),
+                            ((1 << 25) - 1) * value,
+                        );
+                    }
+                }
+                let visits = context.traversal.operation.visits.borrow();
+                assert_eq!(visits.len(), 100);
+                assert!(visits.values().all(|count| *count == 1));
+            },
+        );
+    }
+
+    #[test]
+    fn cycle_dependent_answers_are_recomputed_outside_the_cycle() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let [a, b] = ["A", "B"].map(|name| {
+            Type::TypeVar(BoundTypeVarInstance::synthetic(
+                &db,
+                &env,
+                Name::new(name),
+                TypeVarVariance::Invariant,
+            ))
+        });
+        TypeQueryContext::with_root(
+            &env,
+            SumGraph {
+                edges: [(a, vec![b, Type::int_literal(0)]), (b, vec![a])]
+                    .into_iter()
+                    .collect(),
+                visits: RefCell::default(),
+            },
+            |context| {
+                // B contributes only itself while A is active. That partial answer cannot be
+                // reused when B becomes the root and can reach A and the literal as well.
+                assert_eq!(context.visit_with(&db, a, 1), 3);
+                assert_eq!(context.visit_with(&db, b, 1), 3);
+                assert_eq!(context.visit_with(&db, a, 1), 3);
+            },
+        );
+    }
+
+    #[test]
+    fn cached_dependencies_survive_cache_hits_and_new_enclosing_guards() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let [a, b] = ["A", "B"].map(|name| {
+            Type::TypeVar(BoundTypeVarInstance::synthetic(
+                &db,
+                &env,
+                Name::new(name),
+                TypeVarVariance::Invariant,
+            ))
+        });
+        let c = Type::int_literal(0);
+        TypeQueryContext::with_root(
+            &env,
+            SumGraph {
+                edges: [(c, vec![b]), (b, vec![a])].into_iter().collect(),
+                visits: RefCell::default(),
+            },
+            |context| {
+                assert_eq!(context.visit_with(&db, b, 1), 2);
+                assert_eq!(context.visit_with(&db, c, 1), 3);
+                // C reused B's answer, but still depends on being able to enter A. Even though
+                // that computation encountered no cycle, it is invalid while A is active.
+                context.traversal.with_active_type(&db, a, |cycle| {
+                    assert_eq!(cycle, None);
+                    assert_eq!(context.visit_with(&db, c, 1), 2);
+                });
+                assert_eq!(context.visit_with(&db, c, 1), 3);
+            },
+        );
+    }
+
+    #[test]
+    fn shared_guard_changes_invalidate_completed_queries() {
+        struct HasSharedGuard<'a, 'db>(&'a TypeRecursionContext<'db>);
+
+        impl<'db> TypeQuery<'db> for HasSharedGuard<'_, 'db> {
+            type Output = bool;
+
+            fn visit(
+                &self,
+                _db: &'db dyn Db,
+                _context: &TypeQueryContext<'_, 'db, Self>,
+                _ty: Type<'db>,
+                (): (),
+            ) -> bool {
+                self.0.meta_type.is_active()
+            }
+
+            fn on_cycle(
+                &self,
+                _context: &TypeQueryContext<'_, 'db, Self>,
+                _ty: Type<'db>,
+                _kind: CycleKind,
+                (): (),
+            ) -> bool {
+                false
+            }
+        }
+
+        let db = setup_db();
+        let env = db.program_environment();
+        let shared = TypeRecursionContext::default();
+        let typevar = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let key = (env.program(&db), typevar.identity(&db));
+        TypeQueryContext::with_recursion_context(&env, HasSharedGuard(&shared), &shared, |query| {
+            let ty = Type::int_literal(0);
+            assert!(!query.visit(&db, ty));
+            shared
+                .meta_type
+                .typevars
+                .visit(&key, || (), || assert!(query.visit(&db, ty)));
+            assert!(!query.visit(&db, ty));
+        });
     }
 }

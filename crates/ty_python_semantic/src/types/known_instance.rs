@@ -869,8 +869,7 @@ impl<'db> UnionTypeInstance<'db> {
         let env = ProgramEnvironment::from_scope(scope_id);
         let mut builder = UnionBuilder::new(db, &env);
         for ty in &value_expr_types {
-            match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
-            {
+            match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(

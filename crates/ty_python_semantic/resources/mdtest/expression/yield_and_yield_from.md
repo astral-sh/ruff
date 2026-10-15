@@ -544,6 +544,46 @@ async def recursive_async_iterator(child: RecursiveAsyncIterator) -> RecursiveAs
     yield 1  # error: [invalid-yield]
 ```
 
+## Generators in recursive TypedDict values
+
+The `child` field refers to all of `Node`'s value types, including a generator that yields `int`,
+receives `bytes`, and returns `str`:
+
+```py
+from collections.abc import Generator
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: Generator[int, bytes, str]
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+```
+
+Delegating to one of these generators preserves its return type:
+
+```py
+def delegate(node: Node) -> Generator[int, bytes, None]:
+    result = yield from next(iter(node.values()))
+    reveal_type(result)  # revealed: str
+```
+
+Delegation is rejected when the outer generator can receive values that the inner generator cannot:
+
+```py
+def incompatible(node: Node) -> Generator[int, int, None]:
+    yield from next(iter(node.values()))  # error: [invalid-yield]
+```
+
+The recursive value type can also supply a generator's return annotation:
+
+```py
+def produce() -> TypeOf[next(iter(cast("Node", {}).values()))]:
+    sent = yield 1
+    reveal_type(sent)  # revealed: bytes
+    return "done"
+```
+
 ## Error cases
 
 ### Non-iterable type

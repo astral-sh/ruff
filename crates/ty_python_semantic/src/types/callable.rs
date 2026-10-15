@@ -11,7 +11,6 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
-        cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
@@ -140,10 +139,7 @@ impl<'db> Type<'db> {
             db,
             env,
             UpcastPolicy::default(),
-            &CallableUpcastContext {
-                recursive_definition,
-                ..CallableUpcastContext::default()
-            },
+            &CallableUpcastContext::new(env, recursive_definition),
             None,
         )
     }
@@ -158,7 +154,7 @@ impl<'db> Type<'db> {
             db,
             env,
             policy,
-            &CallableUpcastContext::default(),
+            &CallableUpcastContext::new(env, None),
             None,
         )
     }
@@ -168,13 +164,19 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: &CallableUpcastContext<'db>,
+        context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
-        context.active.visit(
-            &self,
-            || None,
-            || self.try_upcast_to_callable_impl(db, env, policy, context, receiver),
+        context.active.visit_active_with_expansion(
+            db,
+            self,
+            &context.mapping,
+            |result| match result {
+                Ok(expansion) => {
+                    self.try_upcast_to_callable_impl(db, env, policy, context, receiver, expansion)
+                }
+                Err(_) => None,
+            },
         )
     }
 
@@ -183,8 +185,9 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         policy: UpcastPolicy,
-        context: &CallableUpcastContext<'db>,
+        context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
+        expansion: &crate::types::recursive::TypeExpansionContext<'_, '_, 'db>,
     ) -> Option<CallableTypes<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return fallback.try_upcast_to_callable_with_policy_and_context(
@@ -207,8 +210,8 @@ impl<'db> Type<'db> {
                 Signature::dynamic(self),
             ))),
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+            Type::Recursive(recursive) => expansion
+                .expand_recursive(db, recursive)
                 .into_unfolded()?
                 .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
@@ -440,13 +443,24 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug, Default)]
-struct CallableUpcastContext<'db> {
+struct CallableUpcastContext<'env, 'db> {
     recursive_definition: Option<Definition<'db>>,
-    active: ActiveRecursionDetector<Type<'db>>,
+    active: crate::types::CycleDetector<'db, (), Type<'db>, (), 3>,
+    mapping: ApplyTypeMappingVisitor<'env, 'db>,
 }
 
-impl<'db> CallableUpcastContext<'db> {
+impl<'env, 'db> CallableUpcastContext<'env, 'db> {
+    fn new(
+        env: &'env ProgramEnvironment<'db>,
+        recursive_definition: Option<Definition<'db>>,
+    ) -> Self {
+        Self {
+            recursive_definition,
+            active: crate::types::CycleDetector::new(()),
+            mapping: ApplyTypeMappingVisitor::new(env),
+        }
+    }
+
     fn is_recursive_reference(&self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
@@ -995,7 +1009,7 @@ impl<'db> CallableType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         self.signatures(db)
             .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);

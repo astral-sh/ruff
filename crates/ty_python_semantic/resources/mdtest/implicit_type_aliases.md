@@ -2884,6 +2884,21 @@ reveal_type(first_list([((1,),)]))
 reveal_type(modern_first_list([((1,),)]))
 ```
 
+### Recursive aliases in overloaded calls
+
+Overload resolution preserves recursive aliases whose bodies contain `Any`. In particular,
+`reversed` retains the element type of a list of recursive dictionaries.
+
+```py
+from typing import Any
+
+Tree = dict[str, "Tree | list[Any]"]
+
+def inspect(nodes: list[Tree]):
+    for node in reversed(nodes):
+        reveal_type(node)  # revealed: Tree
+```
+
 ### Recursive aliases returned by generic functions
 
 A recursive return type retains the inferred argument after narrowing, indexing, and insertion into

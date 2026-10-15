@@ -1,6 +1,7 @@
 //! Logic for inferring `super()`, `super(x)` and `super(x, y)` calls.
 
 use crate::ProgramEnvironment;
+use crate::types::recursive::TypeInspector;
 use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::{AnyNodeRef, name::Name};
@@ -530,8 +531,40 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
+        TypeInspector::scope(env, |inspector| {
+            Self::build_in(db, inspector, pivot_class_type, owner_type)
+        })
+    }
+
+    fn build_in(
+        db: &'db dyn Db,
+        inspector: &TypeInspector<'_, 'db>,
+        pivot_class_type: Type<'db>,
+        owner_type: Type<'db>,
+    ) -> Result<Type<'db>, BoundSuperError<'db>> {
+        inspector.inspect(
+            db,
+            owner_type,
+            |owner_type, _| {
+                Err(BoundSuperError::AbstractOwnerType {
+                    owner_type,
+                    pivot_class: pivot_class_type,
+                    typevar_context: None,
+                })
+            },
+            |inspector, owner_type| Self::build_impl(db, inspector, pivot_class_type, owner_type),
+        )
+    }
+
+    fn build_impl(
+        db: &'db dyn Db,
+        inspector: &TypeInspector<'_, 'db>,
+        pivot_class_type: Type<'db>,
+        owner_type: Type<'db>,
+    ) -> Result<Type<'db>, BoundSuperError<'db>> {
+        let env = inspector.environment();
         let delegate_to = |type_to_delegate_to| {
-            BoundSuperType::build(db, env, pivot_class_type, type_to_delegate_to)
+            BoundSuperType::build_in(db, inspector, pivot_class_type, type_to_delegate_to)
         };
 
         // Delegate but rewrite errors to preserve TypeVar context.
@@ -650,14 +683,12 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
-            Type::Recursive(recursive) => {
-                return recursive.unfold(db, env).map(delegate_to).unwrap_or(Err(
-                    BoundSuperError::AbstractOwnerType {
-                        owner_type,
-                        pivot_class: pivot_class_type,
-                        typevar_context: None,
-                    },
-                ));
+            Type::Recursive(_) | Type::TypeAlias(_) => {
+                return Err(BoundSuperError::AbstractOwnerType {
+                    owner_type,
+                    pivot_class: pivot_class_type,
+                    typevar_context: None,
+                });
             }
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
@@ -786,9 +817,6 @@ impl<'db> BoundSuperType<'db> {
             }
             Type::EnumComplement(complement) => {
                 return delegate_to(complement.to_intersection(db, env));
-            }
-            Type::TypeAlias(alias) => {
-                return delegate_to(alias.value_type(db));
             }
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {

@@ -2017,6 +2017,14 @@ impl<'db> Type<'db> {
                 false
             }
 
+            fn visit_recursive_type(
+                &self,
+                _db: &'db dyn Db,
+                _recursive: crate::types::RecursiveType<'db>,
+            ) {
+                self.notify_skipped_lazy_type_attributes();
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if !self.eligible.get() || ty.is_type_var() {
                     return;
