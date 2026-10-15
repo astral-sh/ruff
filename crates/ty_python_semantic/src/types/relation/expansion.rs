@@ -14,17 +14,43 @@ use super::{ComparisonKind, ComparisonPolicy, DisjointnessChecker, TypeRelationC
 ///
 /// Expansion returns a comparison result, never an alias body or signature. This keeps the
 /// expanded values inside the comparison that owns their recursion state.
-pub(super) struct GuardedRelation<'a, 'c, 'db> {
+/// Union branches retain the other operand's original reference: comparing an alias's body
+/// instead can lose the stable pair needed to detect growing recursive specializations.
+pub(in crate::types) struct GuardedRelation<'a, 'c, 'db> {
     checker: &'a TypeRelationChecker<'a, 'c, 'db>,
     expansion: &'a TypeExpansionContext<'a, 'a, 'db>,
+    references: (Type<'db>, Type<'db>),
 }
 
 impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     pub(super) fn new(
         checker: &'a TypeRelationChecker<'a, 'c, 'db>,
         expansion: &'a TypeExpansionContext<'a, 'a, 'db>,
+        references: (Type<'db>, Type<'db>),
     ) -> Self {
-        Self { checker, expansion }
+        Self {
+            checker,
+            expansion,
+            references,
+        }
+    }
+
+    pub(super) fn source_reference(&self) -> Type<'db> {
+        self.references.0
+    }
+
+    pub(super) fn target_reference(&self) -> Type<'db> {
+        self.references.1
+    }
+
+    pub(in crate::types) fn compare_expanded_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.checker
+            .check_type_pair_with_references(db, source, target, self.references)
     }
 
     pub(super) fn needs_intersection_expansion(
@@ -49,7 +75,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
             self.checker
                 .check_type_pair_guarded(db, self, Type::Intersection(source), target)
         } else {
-            body.relate_as_source(db, self.checker, target)
+            body.relate_as_source(db, self, target)
         }
     }
 
@@ -64,7 +90,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
             self.checker
                 .check_type_pair_guarded(db, self, source, Type::Intersection(target))
         } else {
-            body.relate_as_target(db, self.checker, source)
+            body.relate_as_target(db, self, source)
         }
     }
 
@@ -76,7 +102,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_alias_body(db, source)
-            .relate_as_source(db, self.checker, target)
+            .relate_as_source(db, self, target)
     }
 
     pub(super) fn compare_target_alias(
@@ -87,7 +113,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_alias_body(db, target)
-            .relate_as_target(db, self.checker, source)
+            .relate_as_target(db, self, source)
     }
 
     pub(super) fn compare_source_recursive(
@@ -105,7 +131,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
         by_arguments.or(db, self.checker.constraints, || {
             self.expansion
                 .comparison_recursive_body(db, source)
-                .map(|source| source.relate_as_source(db, self.checker, target))
+                .map(|source| source.relate_as_source(db, self, target))
                 .unwrap_or(ConstraintSet::from_bool(
                     self.checker.constraints,
                     self.checker.relation.is_assignability(),
@@ -121,7 +147,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_recursive_body(db, target)
-            .map(|target| target.relate_as_target(db, self.checker, source))
+            .map(|target| target.relate_as_target(db, self, source))
             .unwrap_or(ConstraintSet::from_bool(
                 self.checker.constraints,
                 self.checker.relation.is_assignability(),

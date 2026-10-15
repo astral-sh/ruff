@@ -95,7 +95,7 @@ use super::generics::{ApplySpecialization, Specialization};
 use super::generics::{InferSpecializationVisitor, SpecializationBuilder, SpecializationError};
 use super::infer::{BinaryOperand, IdentityUpcast, IdentityUpcastResult};
 use super::narrow::ClassInfoConstraint;
-use super::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use super::relation::{DisjointnessChecker, GuardedRelation, TypeRelation, TypeRelationChecker};
 use super::subscript::{SubscriptChecker, SubscriptError};
 use super::type_alias::AliasCycleSummary;
 use super::typevar::TypeVarDefaultSearch;
@@ -1581,19 +1581,19 @@ impl<'db> ComparisonBody<'_, 'db> {
     pub(super) fn relate_as_source<'c>(
         self,
         db: &'db dyn Db,
-        checker: &TypeRelationChecker<'_, 'c, 'db>,
+        comparison: &GuardedRelation<'_, 'c, 'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        checker.check_type_pair(db, self.ty, target)
+        comparison.compare_expanded_pair(db, self.ty, target)
     }
 
     pub(super) fn relate_as_target<'c>(
         self,
         db: &'db dyn Db,
-        checker: &TypeRelationChecker<'_, 'c, 'db>,
+        comparison: &GuardedRelation<'_, 'c, 'db>,
         source: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        checker.check_type_pair(db, source, self.ty)
+        comparison.compare_expanded_pair(db, source, self.ty)
     }
 
     pub(super) fn disjoint_as_source<'c>(

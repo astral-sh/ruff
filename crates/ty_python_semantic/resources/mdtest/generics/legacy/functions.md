@@ -1950,6 +1950,38 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Recursive callable bounds
+
+Each call to a `Callback[T]` can return a `T` or another callback that accepts `list[T]`.
+
+```py
+from collections.abc import Callable
+from typing_extensions import TypeAliasType, TypeVar
+
+U = TypeVar("U")
+Callback = TypeAliasType("Callback", Callable[[U], "Callback[list[U]] | U"], type_params=(U,))
+T = TypeVar("T", bound=Callback[int], default=Callback[int])
+
+def identity(value: T) -> T:
+    return value
+```
+
+Checking a lambda that passes itself to `identity` terminates even though the callback bound has
+progressively nested type arguments. We currently infer the type parameter's default as the lambda's
+return type, which is too broad to satisfy the bound.
+
+```py
+# TODO: Preserve the lambda's self-reference instead of using the default as its return type.
+f = lambda value: identity(f)  # error: [invalid-argument-type]
+```
+
+An integer return satisfies the bound and remains precise. A string return does not satisfy it.
+
+```py
+reveal_type(identity(lambda value: 1)(0))  # revealed: Literal[1]
+identity(lambda value: "wrong")  # error: [invalid-argument-type]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.
