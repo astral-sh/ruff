@@ -508,6 +508,40 @@ def _(base: HasMroEntries | NoMroEntries):
     class Foo(base): ...  # error: [invalid-base]
 ```
 
+## Conditional bases with class objects and `__mro_entries__`
+
+<!-- snapshot-diagnostics -->
+
+A conditional base can be a class object or an instance with a valid `__mro_entries__` method. Both
+alternatives are valid at runtime, but we cannot resolve their combined MRO. Class objects do not
+need `__mro_entries__`, even if they define an attribute with that name.
+
+```py
+class Base:
+    __mro_entries__ = None
+
+class BaseProvider:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> tuple[type, ...]:
+        return (Base,)
+
+def _(flag: bool):
+    base = Base if flag else BaseProvider()
+    class Child(base): ...  # error: [unsupported-base]
+```
+
+An invalid instance alternative still produces an error. The diagnostic describes that instance's
+method, without requiring the class alternative to provide one.
+
+```py
+class InvalidProvider:
+    def __mro_entries__(self, bases: tuple[type, ...]) -> int:
+        return 0
+
+def _(flag: bool):
+    base = Base if flag else InvalidProvider()
+    class Child(base): ...  # error: [invalid-base]
+```
+
 ## `__bases__` lists with duplicate bases
 
 <!-- snapshot-diagnostics -->
