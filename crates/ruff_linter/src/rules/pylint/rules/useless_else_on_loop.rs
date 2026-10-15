@@ -13,6 +13,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
+use crate::rules::pylint::helpers::else_line_comment;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -169,9 +170,14 @@ fn remove_else(
             stylist,
         )?;
 
+        // Keep a comment on the `else` line (e.g., `else:  # fallback`) by moving it to its own
+        // line, ahead of the dedented content.
+        let comment = else_line_comment(else_range.start(), desired_indentation, locator, stylist)
+            .unwrap_or_default();
+
         // Replace the content from the start of the `else` to the end of the loop.
         Ok(Fix::safe_edit(Edit::replacement(
-            indented,
+            format!("{comment}{indented}"),
             locator.line_start(else_range.start()),
             locator.full_line_end(end.end()),
         )))

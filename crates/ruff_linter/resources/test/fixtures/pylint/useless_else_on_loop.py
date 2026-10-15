@@ -146,3 +146,28 @@ def test_retain_comment():
         print("fat chance")
         for j in range(10):
             break
+
+
+def test_retain_else_line_comment(xs):
+    """Retain the comment on the `else` line"""
+    for x in xs:
+        if x:
+            return x
+    else:  # nothing found
+        return None
+
+
+def test_retain_else_line_and_block_comments():
+    """Retain the comment on the `else` line ahead of the comment within the `else` block"""
+    for j in range(10):
+        pass
+    else:  # comment on the `else` line
+        # comment within the `else` block
+        print("fat chance")
+
+
+def test_inline_else_body_comment():
+    """The comment trailing an inline `else` body belongs to its statement"""
+    for j in range(10):
+        pass
+    else: print("fat chance")  # comment on the statement

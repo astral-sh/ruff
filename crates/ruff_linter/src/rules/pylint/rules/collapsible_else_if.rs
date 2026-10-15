@@ -12,6 +12,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
+use crate::rules::pylint::helpers::else_line_comment;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -128,14 +129,18 @@ fn convert_to_elif(
         stylist,
     )?;
 
-    // If there's trivia, restore it
-    let trivia = if trivia_range.is_empty() {
+    // If there's trivia, restore it. A comment on the `else` line (e.g., `else:  # fallback`)
+    // comes first, as it precedes the comments between the `else` and the `if`.
+    let mut trivia =
+        else_line_comment(else_clause.start(), indentation, locator, stylist).unwrap_or_default();
+    if !trivia_range.is_empty() {
+        trivia += &adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
+    }
+    let trivia = if trivia.is_empty() {
         None
     } else {
-        let indented_trivia =
-            adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
         Some(Edit::insertion(
-            indented_trivia,
+            trivia,
             locator.line_start(else_clause.start()),
         ))
     };

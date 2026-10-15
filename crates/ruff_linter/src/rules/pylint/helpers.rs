@@ -3,10 +3,13 @@ use ruff_python_ast::ExceptHandler;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Arguments, Expr, Stmt, visitor};
+use ruff_python_codegen::Stylist;
 use ruff_python_semantic::analyze::function_type;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
+use ruff_text_size::{TextRange, TextSize};
 
+use crate::Locator;
 use crate::settings::LinterSettings;
 
 /// Returns `true` if a module member is public despite having an
@@ -400,6 +403,34 @@ pub(super) fn num_statements(stmts: &[Stmt]) -> usize {
         }
     }
     count
+}
+
+/// If the `else` clause that starts at `else_start` has a comment after its colon (e.g.,
+/// `else:  # fallback`), returns that comment on a line of its own, with the given `indentation`.
+///
+/// Fixes that delete the `else` line can use the result to keep the comment.
+pub(super) fn else_line_comment(
+    else_start: TextSize,
+    indentation: &str,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Option<String> {
+    let mut tokenizer = SimpleTokenizer::starts_at(else_start, locator.contents());
+
+    // The colon isn't necessarily on the same line as the `else` keyword.
+    tokenizer.find(|token| token.kind == SimpleTokenKind::Colon)?;
+
+    // With an inline body (e.g., `else: x = 1  # comment`), the next token is the start of the
+    // statement, and the comment that follows belongs to that statement instead.
+    let comment = tokenizer
+        .find(|token| token.kind != SimpleTokenKind::Whitespace)
+        .filter(|token| token.kind.is_comment())?;
+
+    Some(format!(
+        "{indentation}{}{}",
+        locator.slice(comment),
+        stylist.line_ending().as_str()
+    ))
 }
 
 #[cfg(test)]
