@@ -70,6 +70,16 @@ def runtime_checks(value: object) -> None:
     issubclass(type(value), np.float32)  # no diagnostic
 ```
 
+Explicitly subscribing a NumPy generic class still produces an alias.
+
+```py
+from typing import Any
+
+def accepts_class(cls: type) -> None: ...
+
+accepts_class(np.signedinteger[Any])  # error: [invalid-argument-type] "Expected `type`"
+```
+
 ## Iterating over an array union
 
 An array can satisfy `map`'s iterable parameter through its gradual iterator overload, even when

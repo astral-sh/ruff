@@ -785,6 +785,29 @@ class BytesBase(Base[int, bytes]): ...
 Dynamic = type("Dynamic", (Combined, BytesBase), {})
 ```
 
+## Generic aliases are not class objects
+
+A subscribed class remains valid in annotations, constructor calls, and base lists, but is not a
+class object.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]): ...
+
+def requires_type(cls: type) -> None: ...
+
+requires_type(Box)  # no diagnostic
+requires_type(Box[int])  # error: [invalid-argument-type]
+reveal_type(Box[int]())  # revealed: Box[int]
+
+class IntBox(Box[int]): ...
+
+requires_type(IntBox)  # no diagnostic
+```
+
 ## Specializing generic classes explicitly
 
 <!-- snapshot-diagnostics -->
@@ -3059,18 +3082,18 @@ class MetaBase(metaclass=Meta[str]): ...
 class Valid(Generic[T], metaclass=Meta[str]): ...
 class Invalid(Base, MetaBase, Generic[T]): ...  # error: [conflicting-metaclass]
 
-reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
-reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
-reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
-reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(type(Valid[int]()).__class__)  # revealed: type[Meta[str]]
+reveal_type(type(type(Valid[int]())))  # revealed: type[Meta[str]]
+reveal_type(type(Invalid[int]()).__class__)  # revealed: type[Unknown]
+reveal_type(type(type(Invalid[int]())))  # revealed: type[Unknown]
 reveal_type(Invalid[int].value)  # revealed: Unknown
 ```
 
 The specialized class remains a class object, so it cannot be assigned to `None`:
 
 ```py
-meta: OtherMeta = Invalid[int]
-none: None = Invalid[int]  # error: [invalid-assignment]
+meta: OtherMeta = type(Invalid[int]())
+none: None = type(Invalid[int]())  # error: [invalid-assignment]
 ```
 
 The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
@@ -3096,8 +3119,8 @@ An explicit metaclass is retained after a conflict, including its specialization
 ```py
 class Explicit(Generic[T], Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
 
-reveal_type(Explicit[int].__class__)  # revealed: <class 'Meta[str]'>
-reveal_type(type(Explicit[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(type(Explicit[int]()).__class__)  # revealed: type[Meta[str]]
+reveal_type(type(type(Explicit[int]())))  # revealed: type[Meta[str]]
 reveal_type(Explicit[int].value)  # revealed: str
 ```
 

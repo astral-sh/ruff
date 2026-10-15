@@ -7121,7 +7121,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     alias
                 }
-                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => alias,
+                Type::SpecializedClass(alias) => alias,
                 _ => return None,
             };
 
@@ -10038,6 +10038,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             known_function.check_call(self, overload, call_expression);
                         }
                     }
+                    Type::BoundMethod(method)
+                        if method.function(db).is_some_and(|function| {
+                            function.is_known(db, KnownFunction::SingleDispatchRegister)
+                        }) =>
+                    {
+                        KnownFunction::SingleDispatchRegister.check_call(
+                            self,
+                            overload,
+                            call_expression,
+                        );
+                    }
                     Type::ClassLiteral(class) => {
                         if let Some(known_class) = class.known(self.db()) {
                             known_class.check_call(
@@ -11380,11 +11391,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Class `{}` has no attribute `{attr_name}`",
                             class.name(db),
                         )),
-                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) => builder
-                            .into_diagnostic(format_args!(
-                                "Class `{}` has no attribute `{attr_name}`",
-                                alias.display(db, env),
-                            )),
+                        Type::SpecializedClass(alias) => builder.into_diagnostic(format_args!(
+                            "Class `{}` has no attribute `{attr_name}`",
+                            alias.display(db, env),
+                        )),
                         Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
                             "Function `{}` has no attribute `{attr_name}`",
                             function.name(db),

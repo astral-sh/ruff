@@ -1,5 +1,7 @@
 use super::variance::{VarianceInferable, VarianceTerm};
-use super::{BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, UnionType, visitor};
+use super::{
+    BoundTypeVarIdentity, ClassType, CycleDetector, IntersectionType, Type, UnionType, visitor,
+};
 use crate::Db;
 use crate::ProgramEnvironment;
 
@@ -86,10 +88,12 @@ impl<'db> Type<'db> {
                 Type::KnownInstance(instance) if instance.is_type_form_value() => {
                     instance.type_form_argument(db, env)
                 }
-                Type::ClassLiteral(_)
-                | Type::SpecializedClass(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_) => ty.to_instance_approximation(db, env),
+                Type::GenericAlias(alias) => {
+                    Some(Type::instance(db, env, ClassType::Generic(alias)))
+                }
+                Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_) => {
+                    ty.to_instance_approximation(db, env)
+                }
                 _ => None,
             }
         }

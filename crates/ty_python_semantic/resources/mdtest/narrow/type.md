@@ -190,10 +190,10 @@ def h(x: object):
         reveal_type(x)  # revealed: Top[list[Unknown]] | frozenset[object]
 ```
 
-## No narrowing for `type(x) is C[int]`
+## Comparing `type(x)` with a generic alias
 
 At runtime, `type(x)` will never return a generic alias object (only ever a class-literal object),
-so no narrowing can occur if `type(x)` is compared with a generic alias object.
+so a branch that requires them to be identical is unreachable.
 
 ```toml
 [environment]
@@ -206,8 +206,7 @@ class B: ...
 
 def f(x: A[int] | B):
     if type(x) is A[int]:
-        # this branch is actually unreachable -- we *could* reveal `Never` here!
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A[int] | B
 
@@ -224,8 +223,7 @@ def f(x: A[int] | B):
     if type(x) is not A[int]:
         reveal_type(x)  # revealed: A[int] | B
     else:
-        # this branch is actually unreachable -- we *could* reveal `Never` here!
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: Never
 
     if type(x) is not A:
         reveal_type(x)  # revealed: A[int] | B
@@ -347,7 +345,7 @@ class B: ...
 def _[T](x: A | B):
     if type(x) is A[str]:
         # TODO: `type()` never returns a generic alias, so `type(x)` cannot be `A[str]`
-        reveal_type(x)  # revealed: A[int] | B
+        reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: A[int] | B
 ```
