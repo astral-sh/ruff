@@ -1419,3 +1419,128 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Promotion through recursive type arguments
+
+Promotion reaches recursive results, including literals introduced by later specializations and
+callables with a parameter specification.
+
+```py
+from typing import Callable, cast
+from ty_extensions._internal import TypeOf
+
+type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
+
+def promote(value: Stream[TypeOf[2]]):
+    widened = [value][0]
+    reveal_type(widened[2]()[2]()[2]()[1])  # revealed: int
+
+type DelayedStream[T, U, V] = Callable[[], tuple[T, U, DelayedStream[list[T], V, TypeOf[1]]]]
+
+def collect_delayed(value: DelayedStream[int, int, int]):
+    widened = [value][0]
+    reveal_type(widened()[2]()[2]()[1])  # revealed: int
+
+type ParamStream[**P] = Callable[P, tuple[TypeOf[1], ParamStream[P]]]
+
+def collect_params(value: ParamStream[[int, str]]):
+    widened = [value][0]
+    reveal_type(widened(1, "first")[1](2, "second")[1](3, "third")[0])  # revealed: int
+
+# Promotion before and after specialization preserves literals in callback parameters.
+type Transform[T] = tuple[Callable[[T], T], Callable[[], Transform[T]]]
+type Promoted[T] = TypeOf[[cast(Transform[T], object())][0]]
+
+def specialize_promoted(value: Promoted[TypeOf[2]]):
+    reveal_type([value][0][1]()[0])  # revealed: (Literal[2], /) -> int
+```
+
+## Promotion through shared generic aliases
+
+The same callback alias can occur in parameter and return positions. Promotion preserves static
+recursive parameter types and widens inferred literals in results, including after recursive calls.
+
+```py
+from typing import Callable, cast
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+type Leaf[T] = Callable[[], T]
+type Tree[T] = Callable[[tuple[Tree[int], Leaf[T]]], tuple[Leaf[T], Tree[tuple[T]]]]
+
+def collect(
+    tree: Tree[TypeOf[1]],
+    first: tuple[Tree[int], Leaf[TypeOf[1]]],
+    second: tuple[Tree[int], Leaf[tuple[TypeOf[1]]]],
+    third: tuple[Tree[int], Leaf[tuple[tuple[TypeOf[1]]]]],
+):
+    widened = [tree][0]
+    reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
+
+# Static specializations are unchanged; promoted literals still differ.
+type Promoted[T] = TypeOf[[cast(Tree[T], object())][0]]
+static_assert(is_equivalent_to(Tree[int], Promoted[int]))
+
+def reject_promoted_literal(value: Promoted[TypeOf[1]]) -> Tree[TypeOf[1]]:
+    return value  # error: [invalid-return-type]
+```
+
+## Promoting materialized aliases with growing arguments
+
+Collecting a materialized stream widens its inferred literals while preserving the materialization
+of callback parameters and results. This also holds when the type argument grows at each step.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+type Stream[T] = tuple[TypeOf[1], None, Callable[[T], T], Callable[[], Stream[tuple[T]]]]
+
+def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int):
+    widened_top = [top][0]
+    widened_bottom = [bottom][0]
+    reveal_type(widened_top)  # revealed: Top[Stream[Any]]
+    reveal_type(widened_bottom)  # revealed: Bottom[Stream[Any]]
+    for _ in range(repetitions):
+        widened_top = [widened_top][0]
+        widened_bottom = [widened_bottom][0]
+    reveal_type(widened_top[0])  # revealed: int
+    reveal_type(widened_top[1])  # revealed: None | Unknown
+    reveal_type(widened_top[3]()[2])  # revealed: (tuple[Never], /) -> tuple[object]
+    reveal_type(widened_bottom[3]()[2])  # revealed: (tuple[object], /) -> tuple[Never]
+```
+
+## Display of specialization after recursive promotion
+
+After promotion and specialization, recursive references and their payloads show the specialized
+type arguments. Classes with the same name from different modules remain distinguishable.
+
+`a.py`:
+
+```py
+class Widget: ...
+```
+
+`b.py`:
+
+```py
+class Widget: ...
+```
+
+`main.py`:
+
+```py
+from typing import Any, Callable, cast
+from ty_extensions._internal import TypeOf
+import a
+import b
+
+type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
+type Promoted[T] = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
+
+def inspect(first: Promoted[a.Widget], second: Promoted[b.Widget]):
+    # revealed: tuple[() -> Stream[a.Widget], () -> Stream[b.Widget], a.Widget, b.Widget]
+    reveal_type((first[2], second[2], first[2]()[1], second[2]()[1]))
+    reveal_type((first[2], second[2]()[1]))  # revealed: tuple[() -> Stream[a.Widget], b.Widget]
+```

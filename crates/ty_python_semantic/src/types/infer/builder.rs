@@ -2282,7 +2282,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let type_alias_ty =
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
+                PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None),
             )));
 
         self.store_expression_type(&type_alias.name, type_alias_ty);
@@ -4176,7 +4176,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 name,
                 definition,
                 typing_module,
-                None,
                 None,
             )),
         ))

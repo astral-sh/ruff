@@ -4063,6 +4063,9 @@ pub(crate) fn report_undeclared_protocol_member(
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> bool {
+        if !ty.is_hintable(db, env) {
+            return false;
+        }
         let class = match ty {
             Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {

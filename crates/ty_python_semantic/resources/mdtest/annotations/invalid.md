@@ -1434,6 +1434,91 @@ info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
+#### Collection hints for widened recursive types
+
+A widened recursive alias no longer describes its original elements, so it cannot be suggested as an
+annotation, including when nested inside another collection.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions._internal import TypeOf
+
+Tree = tuple[TypeOf[1], "Tree"]
+type NamedTree = tuple[TypeOf[1], NamedTree]
+
+def collect(tree: Tree, named: NamedTree):
+    widened = [tree][0]
+    widened_named = [named][0]
+
+    def consume(
+        direct: "[TypeOf[widened]]",  # snapshot: invalid-type-form
+        nested: "(list[TypeOf[widened]], int)",  # snapshot: invalid-type-form
+        key: "{TypeOf[widened]: int}",  # snapshot: invalid-type-form
+        value: "{str: TypeOf[widened]}",  # snapshot: invalid-type-form
+        union: "{TypeOf[widened] | None}",  # snapshot: invalid-type-form
+        named: "[list[TypeOf[widened_named]]]",  # snapshot: invalid-type-form
+    ): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+  --> src/mdtest_snippet.py:11:18
+   |
+11 |         direct: "[TypeOf[widened]]",  # snapshot: invalid-type-form
+   |                  ^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Tuple literals are not allowed in this context in a parameter annotation
+  --> src/mdtest_snippet.py:12:18
+   |
+12 |         nested: "(list[TypeOf[widened]], int)",  # snapshot: invalid-type-form
+   |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in parameter annotations
+  --> src/mdtest_snippet.py:13:15
+   |
+13 |         key: "{TypeOf[widened]: int}",  # snapshot: invalid-type-form
+   |               ^^^^^^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Dict literals are not allowed in parameter annotations
+  --> src/mdtest_snippet.py:14:17
+   |
+14 |         value: "{str: TypeOf[widened]}",  # snapshot: invalid-type-form
+   |                 ^^^^^^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: Set literals are not allowed in parameter annotations
+  --> src/mdtest_snippet.py:15:17
+   |
+15 |         union: "{TypeOf[widened] | None}",  # snapshot: invalid-type-form
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+
+
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+  --> src/mdtest_snippet.py:16:17
+   |
+16 |         named: "[list[TypeOf[widened_named]]]",  # snapshot: invalid-type-form
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
 ### Special-cased diagnostic for `callable` used in a type expression
 
 <!-- snapshot-diagnostics -->

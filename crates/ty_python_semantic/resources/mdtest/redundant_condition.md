@@ -567,6 +567,35 @@ def check(value: Record):
             pass
 ```
 
+## One-element tuple hints with widened recursive elements
+
+Materializing a widened alias does not make its original name suitable for an annotation hint.
+
+```py
+from typing import Any
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+Tree = tuple[TypeOf[1], Any, "Tree"]
+
+def collect(tree: Tree):
+    widened = [tree][0]
+
+    def check(values: tuple[Top[TypeOf[widened]]]):
+        if values:  # snapshot: redundant-condition
+            pass
+```
+
+```snapshot
+warning[redundant-condition]: A 1-element tuple is always truthy
+  --> src/mdtest_snippet.py:11:12
+   |
+10 |     def check(values: tuple[Top[TypeOf[widened]]]):
+   |                       --------------------------- Inferred as a 1-element tuple due to this annotation
+11 |         if values:  # snapshot: redundant-condition
+   |            ^^^^^^ Inferred type `tuple[Top[Tree]]` is always truthy
+```
+
 ## One-element tuple annotation hints
 
 A named tuple or another tuple subclass can deliberately have exactly one element. An annotation

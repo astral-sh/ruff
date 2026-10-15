@@ -2172,3 +2172,21 @@ def f[*Ts](
     bad2: tuple[*tuple[str, ...], *Ts],  # error: [invalid-type-form]
 ) -> None: ...
 ```
+
+## Promotion through recursive variadic aliases
+
+Collecting a recursive tuple widens its inferred label while retaining the variadic payload. The
+displayed type preserves the alias name and its specialized arguments.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Tup[*Ts] = tuple[TypeOf[1], tuple[*Ts], Callable[[], Tup[*Ts]]]
+
+def collect(value: Tup[int, str]):
+    widened = [value][0]
+    reveal_type(widened)  # revealed: Tup[int, str]
+    reveal_type(widened[2]()[0])  # revealed: int
+    reveal_type(widened[2]()[1])  # revealed: tuple[int, str]
+```

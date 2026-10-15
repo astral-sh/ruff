@@ -26,7 +26,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
-use crate::types::recursive::RecursiveType;
+use crate::types::recursive::{RecursiveOperation, RecursiveType};
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
@@ -963,6 +963,39 @@ impl<'db> TypeAliasType<'db> {
     }
 }
 
+impl<'db> RecursiveType<'db> {
+    fn fmt_display(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        settings: DisplaySettings<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        if let Some((source, operation)) = self.mapping_origin(db) {
+            let RecursiveOperation::Materialize(kind) = operation else {
+                // Promotion is implicit, but must not hide an earlier Top or Bottom.
+                return source.fmt_display(db, env, settings, f);
+            };
+            let (name, form) = match kind {
+                MaterializationKind::Top => ("Top", SpecialFormType::Top),
+                MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
+            };
+            f.with_type(Type::SpecialForm(form)).write_str(name)?;
+            f.write_char('[')?;
+            source.fmt_display(db, env, settings, f)?;
+            return f.write_char(']');
+        }
+        TypeAliasDisplay {
+            db,
+            ty: Type::Recursive(self),
+            definition: self.definition(db),
+            name: self.name(db),
+            settings,
+        }
+        .fmt_specialized(env, self.arguments(db), self.materialization_kind(db), f)
+    }
+}
+
 impl<'db> Type<'db> {
     /// Displays an alias declaration with its original type parameters, if this type denotes one.
     /// Recursive types without a source alias use ordinary type display instead.
@@ -1794,25 +1827,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::TypeAlias(alias) => alias
                 .display_with(db, self.settings.clone())
-                .fmt_specialized(
-                    self.env,
-                    alias.specialization(db),
-                    alias.materialization_kind(db),
-                    f,
-                ),
-            Type::Recursive(recursive) => TypeAliasDisplay {
-                db,
-                ty: self.ty,
-                definition: recursive.definition(db),
-                name: recursive.name(db),
-                settings: self.settings.clone(),
+                .fmt_specialized(self.env, alias.specialization(db), None, f),
+            Type::Recursive(recursive) => {
+                recursive.fmt_display(db, self.env, self.settings.clone(), f)
             }
-            .fmt_specialized(
-                self.env,
-                recursive.arguments(db),
-                recursive.materialization_kind(db),
-                f,
-            ),
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
     }

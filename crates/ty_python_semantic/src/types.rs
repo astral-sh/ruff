@@ -524,6 +524,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    recursive_mapping: Option<&'env recursive::RecursiveTypeMapping<'env, 'db>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -540,6 +541,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            recursive_mapping: None,
         }
     }
 
@@ -3379,7 +3381,16 @@ impl<'db> Type<'db> {
 
     /// Return `true` if `self` is a type that is suitable for displaying
     /// in a "Did you mean...?" hint message in diagnostics
-    fn is_hintable(&self, db: &'db dyn Db) -> bool {
+    fn is_hintable(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        // A transformed recursive body can no longer be spelled using its original alias name.
+        if any_over_type_including_alias_arguments(
+            db,
+            env,
+            *self,
+            |ty| matches!(ty, Type::Recursive(recursive) if !recursive.is_alias_application(db)),
+        ) {
+            return false;
+        }
         match self {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -3426,13 +3437,13 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
                 SubclassOfInner::Protocol(_) => true,
-                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db),
-                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db),
+                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db, env),
+                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db, env),
             },
 
             Type::TypeVar(tvar) => tvar.typevar(db).definition(db).is_some(),
 
-            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db)),
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db, env)),
 
             Type::TypedDict(td) => td.defining_class().is_some(),
 
@@ -9477,6 +9488,11 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let Some(context) = visitor.recursive_mapping
+            && let Some(mapped) = context.map_reference(db, self, type_mapping, visitor)
+        {
+            return mapped;
+        }
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9490,7 +9506,7 @@ impl<'db> Type<'db> {
         if matches!(
             type_mapping,
             TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
-        ) && !matches!(self, Type::NominalInstance(_))
+        ) && !matches!(self, Type::NominalInstance(_) | Type::Recursive(_))
         {
             return self;
         }
@@ -11042,7 +11058,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,

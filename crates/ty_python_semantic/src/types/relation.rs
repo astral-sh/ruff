@@ -1797,6 +1797,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        // Discharge no-op transformations before the growth guard forgets the concrete mapping.
+        let unmapped_source = self.without_noop_recursive_mapping(db, source);
+        let unmapped_target = self.without_noop_recursive_mapping(db, target);
+        if source != unmapped_source || target != unmapped_target {
+            return self.check_type_pair(db, unmapped_source, unmapped_target);
+        }
+
         let env = self.env;
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -1869,6 +1876,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // the same pair of definitions. Collective union coverage is checked separately.
             (Type::Recursive(_) | Type::TypeAlias(_), Type::Union(union)) => {
                 self.check_target_union(db, source, union)
+            }
+
+            (Type::Recursive(_), Type::TypeAlias(alias))
+            | (Type::TypeAlias(alias), Type::Recursive(_))
+                if alias.is_recursive(db) =>
+            {
+                // Compare named and structural references before unfolding either constructor.
+                self.with_recursion_guard(db, source, target, || {
+                    let structural = alias.structural_type(db, self.materialization_visitor);
+                    if matches!(source, Type::TypeAlias(_)) {
+                        self.check_type_pair(db, structural, target)
+                    } else {
+                        self.check_type_pair(db, source, structural)
+                    }
+                })
             }
 
             (Type::Recursive(source_recursive), _) => {

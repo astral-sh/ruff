@@ -1396,6 +1396,108 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+## Materialization of recursive references
+
+Materialization reaches every recursive result, including payloads introduced by later
+specializations. It also preserves invariant materializations such as `Bottom[list[Any]]`. When
+applied to a recursive reference, it leaves the first payload unchanged.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, TypeAliasType, TypeVar
+from ty_extensions import Bottom, Top
+
+Stream = Callable[[], tuple[Any, "Stream"]]
+type NamedStream = Callable[[], tuple[Any, NamedStream]]
+ManualStream = TypeAliasType("ManualStream", Callable[[], tuple[Any, "ManualStream"]])
+MaterializedStream = Callable[[], tuple[Any, "Top[MaterializedStream]"]]
+
+def payloads(implicit: Top[Stream], explicit: Top[NamedStream], manual: Top[ManualStream], materialized: MaterializedStream):
+    reveal_type(implicit()[1]()[0])  # revealed: object
+    reveal_type(explicit()[1]()[0])  # revealed: object
+    reveal_type(manual()[1]()[1]()[0])  # revealed: object
+    reveal_type(materialized()[0])  # revealed: Any
+    reveal_type(materialized()[1]()[0])  # revealed: object
+    reveal_type(materialized()[1]()[1]()[0])  # revealed: object
+
+ListStream = Callable[[], tuple[list[Any], "ListStream"]]
+type NamedListStream = Callable[[], tuple[list[Any], NamedListStream]]
+MaterializedListStream = Callable[[], tuple[list[Any], "Bottom[MaterializedListStream]"]]
+
+def bottom_payloads(implicit: Bottom[ListStream], explicit: Bottom[NamedListStream], materialized: MaterializedListStream):
+    reveal_type(implicit()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(explicit()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(materialized()[0])  # revealed: list[Any]
+    reveal_type(materialized()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(materialized()[1]()[1]()[0])  # revealed: Bottom[list[Any]]
+
+T = TypeVar("T")
+U = TypeVar("U")
+Growing = Callable[[], tuple[T, U, "Growing[list[T], Any]"]]
+type NamedGrowing[T, U] = Callable[[], tuple[T, U, NamedGrowing[list[T], Any]]]
+MaterializedGrowing = Callable[[], tuple[T, U, "Top[MaterializedGrowing[list[T], Any]]"]]
+
+def growing_payloads(
+    implicit: Top[Growing[int, int]], explicit: Top[NamedGrowing[int, int]], materialized: MaterializedGrowing[int, int]
+):
+    reveal_type(implicit()[2]()[1])  # revealed: object
+    reveal_type(explicit()[2]()[1])  # revealed: object
+    reveal_type(materialized()[1])  # revealed: int
+    reveal_type(materialized()[2]()[1])  # revealed: object
+    reveal_type(materialized()[2]()[2]()[1])  # revealed: object
+```
+
+An explicitly materialized recursive reference stays materialized in either direction, including
+when it is a callback parameter.
+
+```py
+from typing import Never
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+Callback = tuple[Any, Callable[["Top[Callback]"], "Bottom[Callback]"]]
+Upper = tuple[object, Callable[["Upper"], "Lower"]]
+Lower = tuple[Never, Callable[[Upper], "Lower"]]
+
+static_assert(is_equivalent_to(Top[Callback], Upper))
+static_assert(is_equivalent_to(Bottom[Callback], Lower))
+```
+
+Promotion can introduce an unknown type after materialization. A subsequent materialization also
+reaches that unknown type through recursive references.
+
+```py
+from typing import cast
+from ty_extensions._internal import TypeOf
+
+SingletonStream = tuple[None, "Top[SingletonStream]"]
+
+def promote_and_materialize(value: SingletonStream):
+    promoted = [value][0]
+    reveal_type(promoted[1][0])  # revealed: None | Unknown
+    materialized = cast(Top[TypeOf[promoted]], promoted)
+    reveal_type(materialized[0])  # revealed: object
+    reveal_type(materialized[1][0])  # revealed: object
+    reveal_type(materialized[1][1][0])  # revealed: object
+```
+
+A recursive alias can pass itself as another recursive alias's type argument. Materialization still
+reaches the payload when that argument is returned.
+
+```py
+Node = tuple[Any, "Top[Chain[Node]]"]
+Chain = tuple[T, "Chain[list[T]]"]
+
+def read_chain(value: Node):
+    reveal_type(value[0])  # revealed: Any
+    reveal_type(value[1][0][0])  # revealed: object
+    reveal_type(value[1][0][1][0][0])  # revealed: object
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive
@@ -1489,12 +1591,12 @@ static_assert(is_equivalent_to(Top[Covariant[Recursive]], Bottom[Top[Covariant[R
 static_assert(is_equivalent_to(Bottom[Covariant[Recursive]], Top[Bottom[Covariant[Recursive]]]))
 ```
 
-Both branches retain the requested materialization polarity.
+The recursive alias retains the requested materialization polarity.
 
 ```py
 def recursive_materializations(top: Top[Recursive], bottom: Bottom[Recursive]) -> None:
-    reveal_type(top)  # revealed: Covariant[Top[Recursive]] | Top[Invariant[Any]]
-    reveal_type(bottom)  # revealed: Covariant[Bottom[Recursive]] | Bottom[Invariant[Any]]
+    reveal_type(top)  # revealed: Top[Recursive]
+    reveal_type(bottom)  # revealed: Bottom[Recursive]
 ```
 
 Nested recursive aliases preserve their materialization polarity in displays and diagnostics.
@@ -3866,4 +3968,38 @@ class ReadAny(Protocol):
 def _(top: Top[ReadAny], bottom: Bottom[ReadAny]) -> None:
     reveal_type(top)  # revealed: Top[ReadAny]
     reveal_type(bottom)  # revealed: Bottom[ReadAny]
+```
+
+## Materialized members with recursive alias types
+
+A property of a materialized generic object materializes the substituted type variable at each
+occurrence, including in callbacks reached through recursive aliases. Gradual types written directly
+in the alias are unchanged.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Legacy = tuple[T, Callable[[T], T], Callable[[], "Legacy[T]"], Any, list[T]]
+
+class Box[T]:
+    @property
+    def legacy(self) -> Legacy[T]:
+        raise NotImplementedError
+
+def inspect(top: Top[Box[Any]], bottom: Bottom[Box[Any]]):
+    reveal_type(top.legacy[2]()[1])  # revealed: (Never, /) -> object
+    reveal_type(bottom.legacy[2]()[1])  # revealed: (object, /) -> Never
+    reveal_type(top.legacy[2]()[3])  # revealed: Any
+    reveal_type(top.legacy[2]()[4])  # revealed: Top[list[Any]]
+    reveal_type(bottom.legacy[2]()[4])  # revealed: Bottom[list[Any]]
+    promoted = [top.legacy][0]
+    reveal_type(promoted[2]()[1])  # revealed: (Never, /) -> object
+    reveal_type(promoted[2]()[3])  # revealed: Any
 ```

@@ -60,17 +60,24 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
+use std::cell::{Cell, RefCell};
+
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
+use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use super::generics::{ApplySpecialization, Specialization};
+use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
+use super::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericAlias,
+    GenericContext, KnownClass, MaterializationKind, PromotionKind, PromotionMode, Type,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, VarianceTerm,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -88,6 +95,12 @@ pub struct RecursiveVar<'db> {
     /// Unfolding substitutes the enclosing application's arguments for the type parameters.
     #[returns(copy)]
     arguments: Option<Specialization<'db>>,
+    /// Selects the opposite-polarity body of the enclosing constructor.
+    #[returns(copy)]
+    negative: bool,
+    /// A transformation of the source binder, before transformations of its enclosing constructor.
+    #[returns(copy)]
+    operation: Option<RecursiveOperation>,
 }
 
 impl get_size2::GetSize for RecursiveVar<'_> {}
@@ -107,11 +120,45 @@ impl<'db> RecursiveVar<'db> {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(recursive),
             )) if self.cycle(db) == recursive.cycle(db) => {
-                Type::Recursive(recursive.with_arguments(db, arguments))
+                Type::Recursive(recursive.select(db, self.negative(db)).instantiate(
+                    db,
+                    arguments,
+                    self.operation(db),
+                ))
             }
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
-                Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Escape(recursive),
+            )) if self.cycle(db) == recursive.cycle(db)
+                && let Some(context) = visitor.recursive_mapping =>
+            {
+                context.reference(
+                    db,
+                    Self::new_internal(
+                        db,
+                        self.cycle(db),
+                        arguments,
+                        self.negative(db),
+                        self.operation(db),
+                    ),
+                    None,
+                )
             }
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Rebind { from, to },
+            )) if self.cycle(db) == *from => Type::RecursiveVar(Self::new_internal(
+                db,
+                *to,
+                arguments,
+                self.negative(db),
+                self.operation(db),
+            )),
+            TypeMapping::ApplyRecursiveSubstitution(_) => Type::RecursiveVar(Self::new_internal(
+                db,
+                self.cycle(db),
+                arguments,
+                self.negative(db),
+                self.operation(db),
+            )),
             _ => unreachable!("semantic operation on an unbound recursive variable"),
         }
     }
@@ -123,20 +170,139 @@ pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum RecursiveSubstitution<'db> {
+    /// Resolve named aliases into closed structural constructors before semantic mapping.
+    ResolveAliases,
     /// Replace references to a binder with applications of its recursive constructor.
     /// In the module example, this replaces `F[list[T]]` with `Tree[list[T]]`.
     Unfold(RecursiveType<'db>),
     /// Replace applications of the target binder with variables to form an open body.
     /// In the module example, this replaces `Tree[list[T]]` with `F[list[T]]`.
-    Bind(RecursiveCycle),
+    Bind(RecursiveType<'db>),
+    Escape(RecursiveType<'db>),
+    Restore(RecursiveType<'db>),
+    Rebind {
+        from: RecursiveCycle,
+        to: RecursiveCycle,
+    },
 }
 
 impl RecursiveSubstitution<'_> {
-    fn cycle(self, db: &dyn Db) -> RecursiveCycle {
+    fn cycle(self, db: &dyn Db) -> Option<RecursiveCycle> {
         match self {
-            Self::Unfold(recursive) => recursive.cycle(db),
-            Self::Bind(cycle) => cycle,
+            Self::ResolveAliases => None,
+            Self::Unfold(recursive)
+            | Self::Bind(recursive)
+            | Self::Escape(recursive)
+            | Self::Restore(recursive) => Some(recursive.cycle(db)),
+            Self::Rebind { from, .. } => Some(from),
         }
+    }
+}
+
+impl<'db> RecursiveMapping<'db> {
+    /// Resolve alias constructors or substitute only their stored arguments.
+    pub(super) fn apply_alias(
+        self,
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        match self.0 {
+            RecursiveSubstitution::ResolveAliases => alias.structural_type(db, visitor),
+            RecursiveSubstitution::Bind(recursive)
+                if alias.definition(db) == recursive.definition(db) =>
+            {
+                let arguments = alias
+                    .specialization(db)
+                    .or_else(|| {
+                        alias
+                            .generic_context(db)
+                            .map(|parameters| parameters.default_specialization(db, None))
+                    })
+                    .map(|arguments| {
+                        arguments.apply_type_mapping_impl(
+                            db,
+                            &TypeMapping::ApplyRecursiveSubstitution(self),
+                            &[],
+                            visitor,
+                        )
+                    });
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    recursive.cycle(db),
+                    arguments,
+                    false,
+                    None,
+                ))
+            }
+            _ => Type::TypeAlias(alias.map_stored_specialization(
+                db,
+                &TypeMapping::ApplyRecursiveSubstitution(self),
+                visitor,
+            )),
+        }
+    }
+}
+
+#[salsa::tracked]
+impl<'db> TypeAliasType<'db> {
+    /// Bind named references before transformations can expand them into successive approximations.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        cycle_fn=|db, cycle: &salsa::Cycle, _, result, alias: TypeAliasType<'db>, parameters| {
+            RecursiveType::recover(db, alias.definition(db), cycle.id(), parameters, result)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn recursive_constructor(
+        self,
+        db: &'db dyn Db,
+        parameters: Option<GenericContext<'db>>,
+    ) -> Type<'db> {
+        // The caller resolves parameters before entering the cycle; only recovery uses them.
+        let _ = parameters;
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        self.raw_value_type(db).apply_type_mapping(
+            db,
+            &env,
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::ResolveAliases,
+            )),
+            TypeContext::default(),
+        )
+    }
+
+    /// Close alias references before mapping, sharing one constructor across specializations.
+    pub(super) fn structural_type(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        let resolve = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::ResolveAliases,
+        ));
+        let parameters = self.generic_context(db);
+        let constructor = self.unspecialized(db).recursive_constructor(db, parameters);
+        // Helpers remain opaque so specialization cannot normalize recursive arguments
+        // before binding. Members of a mutual cycle must expose their constructor bodies.
+        if !self.is_recursive(db) {
+            return Type::TypeAlias(self.map_stored_specialization(db, &resolve, visitor));
+        }
+        let mut ty = constructor;
+        if let Some(arguments) = self
+            .specialization(db)
+            .or_else(|| parameters.map(|parameters| parameters.default_specialization(db, None)))
+        {
+            let arguments = arguments.apply_type_mapping_impl(db, &resolve, &[], visitor);
+            ty = ty.apply_type_mapping_impl(
+                db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
+                TypeContext::default(),
+                visitor,
+            );
+        }
+        ty
     }
 }
 
@@ -147,10 +313,11 @@ pub struct RecursiveCycle(salsa::Id);
 impl get_size2::GetSize for RecursiveCycle {}
 
 /// An application of a structural recursive type constructor.
-/// The private body remains unspecialized; `arguments` records this application's
-/// substitution for the constructor's type parameters. Unfolding replaces recursive
-/// references with closed types, then applies that substitution before exposing the
-/// result to ordinary type operations.
+/// An original constructor's private body remains unspecialized. A mapped constructor
+/// stores specialized bodies for both polarities and retains its origin to reconstruct
+/// them when a recursive occurrence supplies different arguments.
+/// Unfolding replaces recursive references with closed types before exposing the result
+/// to ordinary type operations.
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
@@ -169,12 +336,544 @@ pub struct RecursiveType<'db> {
     /// The lazy materialization applied to this recursive alias, if any.
     #[returns(copy)]
     pub(super) materialization_kind: Option<MaterializationKind>,
+    /// The body reached after crossing an odd number of contravariant positions.
+    #[returns(copy)]
+    opposite_body: Option<Type<'db>>,
+    #[returns(copy)]
+    negative: bool,
+    /// The constructor before mapping, used when a recursive occurrence supplies new arguments.
+    #[returns(copy)]
+    origin: Option<RecursiveMappingOrigin<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveType<'_> {}
 
+/// A closed placeholder for one recursive occurrence while its body is transformed.
+#[salsa::interned(debug)]
+struct EscapedRecursiveVar<'db> {
+    #[returns(copy)]
+    source: RecursiveType<'db>,
+    #[returns(copy)]
+    variable: RecursiveVar<'db>,
+    #[returns(copy)]
+    negative: Option<bool>,
+}
+
+/// Names a transformed binder independently of provisional bodies and type arguments.
+#[salsa::interned(debug)]
+struct MappedRecursiveCycle<'db> {
+    source: RecursiveCycle,
+    operation: RecursiveOperation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+/// An operation that can be reapplied when a recursive occurrence supplies new arguments.
+pub enum RecursiveOperation {
+    Promote(PromotionMode, PromotionKind),
+    Materialize(MaterializationKind),
+}
+
+impl RecursiveOperation {
+    fn mapping<'db>(self) -> TypeMapping<'static, 'db> {
+        match self {
+            Self::Promote(mode, kind) => TypeMapping::Promote(mode, kind),
+            Self::Materialize(kind) => TypeMapping::Materialize(kind),
+        }
+    }
+
+    fn flip(self) -> Self {
+        match self {
+            Self::Promote(mode, kind) => Self::Promote(mode.flip(), kind),
+            Self::Materialize(kind) => Self::Materialize(kind.flip()),
+        }
+    }
+}
+
+/// Retains the source constructor needed to transform later recursive applications.
+#[salsa::interned(debug)]
+pub struct RecursiveMappingOrigin<'db> {
+    /// Binding can temporarily replace the constructor with a reference to an enclosing binder.
+    #[returns(copy)]
+    source: Type<'db>,
+    #[returns(copy)]
+    operation: RecursiveOperation,
+}
+
+impl get_size2::GetSize for RecursiveMappingOrigin<'_> {}
+
+impl<'db> RecursiveMappingOrigin<'db> {
+    /// Access the source after references to enclosing binders have been substituted.
+    fn constructor(self, db: &'db dyn Db) -> RecursiveType<'db> {
+        match self.source(db) {
+            Type::Recursive(source) => source,
+            _ => unreachable!("semantic operation on an unbound recursive mapping source"),
+        }
+    }
+}
+
+/// Maps one constructor layer without following its recursive occurrences.
+pub(super) struct RecursiveTypeMapping<'a, 'db> {
+    parent: Option<&'a RecursiveTypeMapping<'a, 'db>>,
+    source: RecursiveType<'db>,
+    operation: RecursiveOperation,
+    references: RefCell<FxHashMap<Type<'db>, EscapedRecursiveVar<'db>>>,
+}
+
+impl<'db> RecursiveTypeMapping<'_, 'db> {
+    fn polarity(mapping: &TypeMapping<'_, 'db>) -> bool {
+        matches!(
+            mapping,
+            TypeMapping::Promote(PromotionMode::Off, _)
+                | TypeMapping::Materialize(MaterializationKind::Bottom)
+        )
+    }
+
+    fn reference(
+        &self,
+        db: &'db dyn Db,
+        variable: RecursiveVar<'db>,
+        negative: Option<bool>,
+    ) -> Type<'db> {
+        let reference = EscapedRecursiveVar::new(db, self.source, variable, negative);
+        let fresh = Type::TypeVar(BoundTypeVarInstance::synthetic(
+            db,
+            &self.source.environment(db),
+            Name::new(format!("$recursive:{:?}", reference.as_id())),
+            TypeVarVariance::Invariant,
+        ));
+        self.references.borrow_mut().insert(fresh, reference);
+        fresh
+    }
+
+    pub(super) fn map_reference(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let Some(reference) = self.references.borrow().get(&ty).copied() else {
+            return self.parent?.map_reference(db, ty, mapping, visitor);
+        };
+        let variable = reference.variable(db);
+        if let TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Restore(target),
+        )) = mapping
+        {
+            // Nested mappings leave references owned by an enclosing binder escaped.
+            if *target != self.source {
+                return None;
+            }
+            if reference.negative(db).is_none()
+                && self.source.origin(db).is_none()
+                && let Some(operation) = variable.operation(db)
+                && (operation == self.operation || operation == self.operation.flip())
+            {
+                // This state is being constructed; refer to its binder instead of rebuilding it.
+                return Some(Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    variable.cycle(db),
+                    variable.arguments(db),
+                    operation != self.operation,
+                    None,
+                )));
+            }
+            return Some(match reference.negative(db) {
+                Some(negative) => Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    variable.cycle(db),
+                    variable.arguments(db),
+                    negative,
+                    variable.operation(db),
+                )),
+                None => Type::Recursive(self.source.select(db, variable.negative(db)).instantiate(
+                    db,
+                    variable.arguments(db),
+                    variable.operation(db),
+                )),
+            });
+        }
+        if mapping.is_structural() {
+            return None;
+        }
+        if matches!(
+            mapping,
+            TypeMapping::ApplySpecialization(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. }
+        ) {
+            let arguments = variable
+                .arguments(db)
+                .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
+            let variable = RecursiveVar::new_internal(
+                db,
+                variable.cycle(db),
+                arguments,
+                variable.negative(db),
+                variable.operation(db),
+            );
+            return Some(self.reference(db, variable, reference.negative(db)));
+        }
+        let negative = if self.source.opposite_body(db).is_some() {
+            variable.negative(db)
+        } else {
+            Self::polarity(mapping) != Self::polarity(&self.operation.mapping())
+        };
+        Some(self.reference(db, variable, Some(negative)))
+    }
+
+    fn apply(
+        db: &'db dyn Db,
+        source: RecursiveType<'db>,
+        operation: RecursiveOperation,
+        outer: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> RecursiveType<'db> {
+        if matches!(operation, RecursiveOperation::Materialize(_))
+            && (source.materialization_kind(db).is_some()
+                || source.mapping_is_noop(db, operation, outer))
+        {
+            return source;
+        }
+        let positive_operation = if source.negative(db) {
+            operation.flip()
+        } else {
+            operation
+        };
+        if let Some(origin) = source.origin(db)
+            && origin.operation(db) == positive_operation
+        {
+            return source;
+        }
+        let context = RecursiveTypeMapping {
+            parent: outer.recursive_mapping,
+            source,
+            operation: positive_operation,
+            references: RefCell::default(),
+        };
+        let visitor = ApplyTypeMappingVisitor {
+            recursive_mapping: Some(&context),
+            recursion_context: outer.recursion_context,
+            ..ApplyTypeMappingVisitor::new(outer.env)
+        };
+        let escape = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Escape(source),
+        ));
+        let restore = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Restore(source),
+        ));
+        let mut positive =
+            source
+                .body(db)
+                .apply_type_mapping_impl(db, &escape, TypeContext::default(), &visitor);
+        let mut negative = source
+            .opposite_body(db)
+            .unwrap_or(source.body(db))
+            .apply_type_mapping_impl(db, &escape, TypeContext::default(), &visitor);
+        if source.origin(db).is_none()
+            && let Some(arguments) = source.arguments(db)
+        {
+            let specialization = match arguments.materialization_kind(db) {
+                None => TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
+                Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::TypeAlias(arguments),
+                    materialization_kind,
+                },
+            };
+            let specialization_visitor = ApplyTypeMappingVisitor {
+                recursive_mapping: Some(&context),
+                ..ApplyTypeMappingVisitor::new(outer.env)
+            };
+            positive = positive.apply_type_mapping_impl(
+                db,
+                &specialization,
+                TypeContext::default(),
+                &specialization_visitor,
+            );
+            negative = negative.apply_type_mapping_impl(
+                db,
+                &specialization,
+                TypeContext::default(),
+                &specialization_visitor,
+            );
+        }
+        // Structural substitutions and semantic transformations must not share result caches.
+        let mapping_visitor = ApplyTypeMappingVisitor {
+            recursive_mapping: Some(&context),
+            recursion_context: outer.recursion_context,
+            ..ApplyTypeMappingVisitor::new(outer.env)
+        };
+        let positive_mapping = positive_operation.mapping();
+        let negative_mapping = positive_mapping.flip();
+        let mapped_positive = positive.apply_type_mapping_impl(
+            db,
+            &positive_mapping,
+            TypeContext::default(),
+            &mapping_visitor,
+        );
+        let mapped_negative = negative.apply_type_mapping_impl(
+            db,
+            &negative_mapping,
+            TypeContext::default(),
+            &mapping_visitor,
+        );
+        if mapped_positive == positive && mapped_negative == negative {
+            return source;
+        }
+        let restore_visitor = ApplyTypeMappingVisitor {
+            recursive_mapping: Some(&context),
+            ..ApplyTypeMappingVisitor::new(outer.env)
+        };
+        let positive = mapped_positive.apply_type_mapping_impl(
+            db,
+            &restore,
+            TypeContext::default(),
+            &restore_visitor,
+        );
+        let negative = mapped_negative.apply_type_mapping_impl(
+            db,
+            &restore,
+            TypeContext::default(),
+            &restore_visitor,
+        );
+        let arguments = source.arguments(db);
+        let cycle = RecursiveCycle(
+            MappedRecursiveCycle::new(db, source.cycle(db), positive_operation).as_id(),
+        );
+        let rebind = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Rebind {
+                from: source.cycle(db),
+                to: cycle,
+            },
+        ));
+        let rebind_visitor = ApplyTypeMappingVisitor::new(outer.env);
+        let positive =
+            positive.apply_type_mapping_impl(db, &rebind, TypeContext::default(), &rebind_visitor);
+        let negative =
+            negative.apply_type_mapping_impl(db, &rebind, TypeContext::default(), &rebind_visitor);
+        let materialization = match operation {
+            RecursiveOperation::Materialize(kind) => Some(kind),
+            RecursiveOperation::Promote(..) => None,
+        };
+        let origin = RecursiveMappingOrigin::new(
+            db,
+            Type::Recursive(source.select(db, false)),
+            positive_operation,
+        );
+        RecursiveType::new_internal(
+            db,
+            source.definition(db),
+            cycle,
+            positive,
+            arguments,
+            materialization,
+            Some(negative),
+            source.negative(db),
+            Some(origin),
+        )
+    }
+}
+
 #[salsa::tracked]
 impl<'db> RecursiveType<'db> {
+    /// Prove that both polarities preserve this instantiation and its recursive unfoldings.
+    /// Promotion treats free variables as opaque; later specializing them requires a new proof.
+    fn mapping_is_noop(
+        self,
+        db: &'db dyn Db,
+        operation: RecursiveOperation,
+        outer: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        struct UnchangedConstructorVisitor<'a, 'db> {
+            outer: &'a ApplyTypeMappingVisitor<'a, 'db>,
+            operation: RecursiveOperation,
+            recursion_guard: TypeCollector<'db>,
+            parameters: RefCell<Vec<GenericContext<'db>>>,
+            unchanged: Cell<bool>,
+        }
+
+        impl<'db> UnchangedConstructorVisitor<'_, 'db> {
+            fn visit_body(
+                &self,
+                db: &'db dyn Db,
+                parameters: Option<GenericContext<'db>>,
+                body: Type<'db>,
+            ) {
+                if let Some(parameters) = parameters {
+                    self.parameters.borrow_mut().push(parameters);
+                }
+                self.visit_type(db, body);
+                if parameters.is_some() {
+                    self.parameters.borrow_mut().pop();
+                }
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for UnchangedConstructorVisitor<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.outer.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn notify_skipped_lazy_type_attributes(&self) {
+                self.unchanged.set(false);
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.unchanged.get() {
+                    return;
+                }
+                let mut context = self.outer.recursive_mapping;
+                while let Some(mapping) = context {
+                    if mapping.references.borrow().contains_key(&ty) {
+                        // The enclosing binder's escaped reference has not been proved unchanged.
+                        self.unchanged.set(false);
+                        return;
+                    }
+                    context = mapping.parent;
+                }
+                // Singleton promotion stops at non-nominal types. Generic aliases are visited
+                // here through a nominal instance's class specialization.
+                if matches!(
+                    self.operation,
+                    RecursiveOperation::Promote(_, PromotionKind::SingletonsOnly)
+                ) && !matches!(
+                    ty,
+                    Type::NominalInstance(_)
+                        | Type::GenericAlias(_)
+                        | Type::Recursive(_)
+                        | Type::RecursiveVar(_)
+                ) {
+                    return;
+                }
+                match ty {
+                    Type::TypeVar(variable) => {
+                        // Promotion preserves an unspecialized variable in a comparison. The
+                        // stored mapping still applies if it is later specialized to a literal.
+                        // Materialization additionally transforms variable bounds and defaults.
+                        self.unchanged.set(
+                            matches!(self.operation, RecursiveOperation::Promote(..))
+                                || self.parameters.borrow().iter().any(|parameters| {
+                                    parameters.contains(db, variable.identity(db))
+                                }),
+                        );
+                    }
+                    Type::RecursiveVar(variable) => {
+                        if variable.operation(db).is_some() {
+                            self.unchanged.set(false);
+                        } else if let Some(arguments) = variable.arguments(db) {
+                            walk_specialization_types(db, arguments, self);
+                        }
+                    }
+                    Type::Dynamic(_) => {
+                        self.unchanged
+                            .set(matches!(self.operation, RecursiveOperation::Promote(..)));
+                    }
+                    Type::ClassLiteral(_)
+                        if matches!(
+                            self.operation,
+                            RecursiveOperation::Promote(_, PromotionKind::ClassLiteralsOnly)
+                        ) =>
+                    {
+                        self.unchanged.set(false);
+                    }
+                    Type::LiteralValue(_)
+                        if matches!(
+                            self.operation,
+                            RecursiveOperation::Promote(_, PromotionKind::Regular)
+                        ) =>
+                    {
+                        self.unchanged.set(false);
+                    }
+                    Type::NominalInstance(instance)
+                        if match self.operation {
+                            RecursiveOperation::Promote(_, PromotionKind::Regular) => matches!(
+                                instance.known_class(db),
+                                Some(KnownClass::Float | KnownClass::Complex)
+                            ),
+                            RecursiveOperation::Promote(_, PromotionKind::SingletonsOnly) => {
+                                instance.is_singleton(db)
+                            }
+                            _ => false,
+                        } =>
+                    {
+                        self.unchanged.set(false);
+                    }
+                    Type::Recursive(_)
+                    | Type::TypeAlias(_)
+                    | Type::Never
+                    | Type::ClassLiteral(_)
+                    | Type::LiteralValue(_)
+                    | Type::NominalInstance(_)
+                    | Type::GenericAlias(_)
+                    | Type::Callable(_)
+                    | Type::Union(_)
+                    | Type::Intersection(_) => {
+                        walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                    }
+                    _ => self.unchanged.set(false),
+                }
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                if matches!(self.operation, RecursiveOperation::Materialize(_))
+                    && recursive.materialization_kind(db).is_some()
+                {
+                    return;
+                }
+                if let Some(origin) = recursive.origin(db) {
+                    // Materialization replaces dynamic leaves with object/Never, which are not
+                    // promoted. Singleton promotion differs: a union can expose a singleton.
+                    if matches!(
+                        self.operation,
+                        RecursiveOperation::Promote(
+                            _,
+                            PromotionKind::Regular | PromotionKind::ClassLiteralsOnly
+                        )
+                    ) && matches!(origin.operation(db), RecursiveOperation::Materialize(_))
+                    {
+                        self.visit_type(db, origin.source(db));
+                    } else {
+                        self.unchanged.set(false);
+                    }
+                    return;
+                }
+                if let Some(arguments) = recursive.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                // Inspect the parameterized body and edge arguments, not successive unfoldings:
+                // R[list[T]] preserves the assumption, but R[tuple[T, Any]] may not.
+                self.visit_body(db, recursive.parameters(db), recursive.body(db));
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                if let Some(arguments) = alias.specialization(db).or_else(|| {
+                    alias
+                        .generic_context(db)
+                        .map(|parameters| parameters.default_specialization(db, None))
+                }) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                self.visit_body(db, alias.generic_context(db), alias.raw_value_type(db));
+            }
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                walk_specialization_types(db, alias.specialization(db), self);
+            }
+        }
+
+        let visitor = UnchangedConstructorVisitor {
+            outer,
+            operation,
+            recursion_guard: TypeCollector::default(),
+            parameters: RefCell::default(),
+            unchanged: Cell::new(true),
+        };
+        visitor.visit_type(db, Type::Recursive(self));
+        visitor.unchanged.get()
+    }
+
     /// Summarize the open constructor body without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
@@ -212,8 +911,13 @@ impl<'db> RecursiveType<'db> {
             db,
             definition,
             cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
+            Type::RecursiveVar(RecursiveVar::new_internal(
+                db, cycle, arguments, false, None,
+            )),
             arguments,
+            None,
+            None,
+            false,
             None,
         )
     }
@@ -247,7 +951,7 @@ impl<'db> RecursiveType<'db> {
         let body = original.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Bind(self.cycle(db)),
+                RecursiveSubstitution::Bind(self),
             )),
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
@@ -266,19 +970,76 @@ impl<'db> RecursiveType<'db> {
                 body,
                 self.arguments(db),
                 None,
+                None,
+                false,
+                None,
             ))
         }
     }
 
     fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
-        Self::new_internal(
+        self.instantiate(db, arguments, None)
+    }
+
+    /// Instantiate a source reference before replaying transformations of the enclosing constructor.
+    fn instantiate(
+        self,
+        db: &'db dyn Db,
+        arguments: Option<Specialization<'db>>,
+        operation: Option<RecursiveOperation>,
+    ) -> Self {
+        if arguments == self.arguments(db) && operation.is_none() {
+            return self;
+        }
+        if let Some(origin) = self.origin(db) {
+            let source = origin.constructor(db).instantiate(db, arguments, operation);
+            let env = self.environment(db);
+            let operation = if self.negative(db) {
+                origin.operation(db).flip()
+            } else {
+                origin.operation(db)
+            };
+            return RecursiveTypeMapping::apply(
+                db,
+                source,
+                operation,
+                &ApplyTypeMappingVisitor::new(&env),
+            );
+        }
+        let recursive = Self::new_internal(
             db,
             self.definition(db),
             self.cycle(db),
             self.body(db),
             arguments,
             self.materialization_kind(db),
-        )
+            self.opposite_body(db),
+            self.negative(db),
+            self.origin(db),
+        );
+        match operation {
+            Some(operation) => {
+                let env = self.environment(db);
+                RecursiveTypeMapping::apply(
+                    db,
+                    recursive,
+                    operation,
+                    &ApplyTypeMappingVisitor::new(&env),
+                )
+            }
+            None => recursive,
+        }
+    }
+
+    /// Recover the input to the outer materialization, retaining earlier transformations.
+    fn before_materialization(self, db: &'db dyn Db) -> Self {
+        if let Some(origin) = self.origin(db)
+            && matches!(origin.operation(db), RecursiveOperation::Materialize(_))
+        {
+            origin.constructor(db).select(db, self.negative(db))
+        } else {
+            self.with_materialization(db, None)
+        }
     }
 
     fn with_materialization(
@@ -293,7 +1054,39 @@ impl<'db> RecursiveType<'db> {
             self.body(db),
             self.arguments(db),
             materialization,
+            self.opposite_body(db),
+            self.negative(db),
+            self.origin(db),
         )
+    }
+
+    fn select(self, db: &'db dyn Db, negative: bool) -> Self {
+        let materialization = self.materialization_kind(db).map(|kind| {
+            if self.negative(db) == negative {
+                kind
+            } else {
+                kind.flip()
+            }
+        });
+        Self::new_internal(
+            db,
+            self.definition(db),
+            self.cycle(db),
+            self.body(db),
+            self.arguments(db),
+            materialization,
+            self.opposite_body(db),
+            negative,
+            self.origin(db),
+        )
+    }
+
+    fn selected_body(self, db: &'db dyn Db) -> Type<'db> {
+        if self.negative(db) {
+            self.opposite_body(db).unwrap_or(self.body(db))
+        } else {
+            self.body(db)
+        }
     }
 
     /// Parameters bound by this recursive type constructor.
@@ -311,6 +1104,27 @@ impl<'db> RecursiveType<'db> {
             .name()
     }
 
+    /// Whether the alias name and materialization still describe this constructor's body.
+    pub(super) fn is_alias_application(self, db: &'db dyn Db) -> bool {
+        self.origin(db).is_none_or(|origin| {
+            matches!(origin.operation(db), RecursiveOperation::Materialize(_))
+                && origin.constructor(db).is_alias_application(db)
+        })
+    }
+
+    /// The source and operation producing the selected polarity, without unfolding recursion.
+    pub(super) fn mapping_origin(self, db: &'db dyn Db) -> Option<(Self, RecursiveOperation)> {
+        let origin = self.origin(db)?;
+        Some((
+            origin.constructor(db).select(db, self.negative(db)),
+            if self.negative(db) {
+                origin.operation(db).flip()
+            } else {
+                origin.operation(db)
+            },
+        ))
+    }
+
     /// The source alias's definition and name, if this binder comes from an alias.
     #[expect(
         clippy::unnecessary_wraps,
@@ -323,6 +1137,9 @@ impl<'db> RecursiveType<'db> {
 
     /// Restore the formal arguments and remove materialization for constructor analysis.
     pub(super) fn constructor(self, db: &'db dyn Db) -> Self {
+        if let Some(origin) = self.origin(db) {
+            return origin.constructor(db).constructor(db);
+        }
         // Like an unspecialized PEP 695 alias, parameter-flow analysis must not
         // re-enter materialization while deriving the constructor's identity.
         self.with_materialization(db, None).with_arguments(
@@ -344,7 +1161,9 @@ impl<'db> RecursiveType<'db> {
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
         // A growing specialization cannot converge by repeating the same query key. Materialize
         // its closed unfolding directly, under the caller's recursion guard, instead.
-        let unfolded = if self.materialization_kind(db).is_some()
+        let unfolded = if self.opposite_body(db).is_some() {
+            self.unfolded_body(db)
+        } else if self.materialization_kind(db).is_some()
             && !self.may_have_unbounded_specialization(db)
         {
             materialized_unfold(db, self)
@@ -375,7 +1194,7 @@ impl<'db> RecursiveType<'db> {
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
         let env = self.environment(db);
-        let unfolded = self.body(db).apply_type_mapping_impl(
+        let unfolded = self.selected_body(db).apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(self),
@@ -383,13 +1202,25 @@ impl<'db> RecursiveType<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(&env),
         );
+        if self.origin(db).is_some() {
+            return unfolded;
+        }
         match self.arguments(db) {
-            Some(arguments) => unfolded.apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
-                TypeContext::default(),
-            ),
+            Some(arguments) => {
+                // Materialize substituted arguments at their occurrences, preserving variance.
+                let mapping = match arguments.materialization_kind(db) {
+                    None => {
+                        TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments))
+                    }
+                    Some(materialization_kind) => {
+                        TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization: ApplySpecialization::TypeAlias(arguments),
+                            materialization_kind,
+                        }
+                    }
+                };
+                unfolded.apply_type_mapping(db, &env, &mapping, TypeContext::default())
+            }
             None => unfolded,
         }
     }
@@ -404,16 +1235,47 @@ impl<'db> RecursiveType<'db> {
     ) -> Type<'db> {
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Bind(cycle),
-            )) if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() => {
+                RecursiveSubstitution::Bind(binding),
+            )) if let Some(origin) = self.origin(db)
+                && let Type::Recursive(source) = origin.source(db)
+                && source.cycle(db) == binding.cycle(db) =>
+            {
+                // A mapped provisional alias still refers to the source query's eventual body.
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::RecursiveVar(RecursiveVar::new_internal(db, self.cycle(db), arguments))
+                let operation = if self.negative(db) {
+                    origin.operation(db).flip()
+                } else {
+                    origin.operation(db)
+                };
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    binding.cycle(db),
+                    arguments,
+                    false,
+                    Some(operation),
+                ))
+            }
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(binding),
+            )) if self.cycle(db) == binding.cycle(db)
+                && self.materialization_kind(db).is_none() =>
+            {
+                let arguments = self
+                    .arguments(db)
+                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    self.cycle(db),
+                    arguments,
+                    self.negative(db),
+                    None,
+                ))
             }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(substitution)) => {
                 // This binder shadows the target in its body, but not in its arguments.
-                let body = if self.cycle(db) == substitution.cycle(db) {
+                let body = if Some(self.cycle(db)) == substitution.cycle(db) {
                     self.body(db)
                 } else {
                     self.body(db)
@@ -422,6 +1284,22 @@ impl<'db> RecursiveType<'db> {
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
+                let opposite_body = self.opposite_body(db).map(|body| {
+                    if Some(self.cycle(db)) == substitution.cycle(db) {
+                        body
+                    } else {
+                        body.apply_type_mapping_impl(db, mapping, tcx, visitor)
+                    }
+                });
+                let origin = self.origin(db).map(|origin| {
+                    RecursiveMappingOrigin::new(
+                        db,
+                        origin
+                            .source(db)
+                            .apply_type_mapping_impl(db, mapping, tcx, visitor),
+                        origin.operation(db),
+                    )
+                });
                 Type::Recursive(Self::new_internal(
                     db,
                     self.definition(db),
@@ -429,6 +1307,9 @@ impl<'db> RecursiveType<'db> {
                     body,
                     arguments,
                     self.materialization_kind(db),
+                    opposite_body,
+                    self.negative(db),
+                    origin,
                 ))
             }
             TypeMapping::ApplySpecialization(_)
@@ -444,26 +1325,18 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(self.with_arguments(db, arguments))
             }
-            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => {
-                Type::Recursive(self)
-            }
-            TypeMapping::Materialize(kind) => {
-                visitor.visit(db, Type::Recursive(self), mapping, || {
-                    self.unfold(db, visitor.env)
-                        .map(|unfolded| {
-                            let mapped =
-                                unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                            // Preserve static aliases, including recursive references that the
-                            // visitor leaves unchanged while materializing their enclosing body.
-                            Type::Recursive(if mapped == unfolded {
-                                self
-                            } else {
-                                self.with_materialization(db, Some(*kind))
-                            })
-                        })
-                        .into_type()
-                })
-            }
+            TypeMapping::Promote(mode, kind) => Type::Recursive(RecursiveTypeMapping::apply(
+                db,
+                self,
+                RecursiveOperation::Promote(*mode, *kind),
+                visitor,
+            )),
+            TypeMapping::Materialize(kind) => Type::Recursive(RecursiveTypeMapping::apply(
+                db,
+                self,
+                RecursiveOperation::Materialize(*kind),
+                visitor,
+            )),
             TypeMapping::EagerExpansion => {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
@@ -607,6 +1480,35 @@ impl<'db, T> UnfoldResult<'db, T> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Remove a mapped constructor only after proving its operation preserves all unfoldings.
+    pub(super) fn without_noop_recursive_mapping(
+        &self,
+        db: &'db dyn Db,
+        mut ty: Type<'db>,
+    ) -> Type<'db> {
+        while let Type::Recursive(recursive) = ty {
+            let Some(origin) = recursive.origin(db) else {
+                break;
+            };
+            let Type::Recursive(source) =
+                self.without_noop_recursive_mapping(db, Type::Recursive(origin.constructor(db)))
+            else {
+                break;
+            };
+            if !source.mapping_is_noop(db, origin.operation(db), self.materialization_visitor) {
+                break;
+            }
+            ty = Type::Recursive(
+                if source.opposite_body(db).is_some() || source.materialization_kind(db).is_some() {
+                    source.select(db, recursive.negative(db))
+                } else {
+                    source
+                },
+            );
+        }
+        ty
+    }
+
     /// Prove a relation between applications of the same recursive constructor
     /// (same unspecialized body) based on inclusion or overlap of their type
     /// arguments' materialization families.
@@ -629,8 +1531,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if !matches!(
             self.relation,
             TypeRelation::Subtyping | TypeRelation::Assignability
-        ) || source.constructor(db) != target.constructor(db)
-        {
+        ) {
             return self.never();
         }
         let (Some(source_arguments), Some(target_arguments)) =
@@ -645,6 +1546,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             || target_arguments.materialization_kind(db).is_some()
             || source_arguments.tuple(db).is_some()
             || target_arguments.tuple(db).is_some()
+        {
+            return self.never();
+        }
+        let source_base = source.before_materialization(db);
+        let target_base = target.before_materialization(db);
+        let parameters = Some(
+            source_arguments
+                .generic_context(db)
+                .identity_specialization(db),
+        );
+        // Materializations share a family only when their pre-materialization bodies agree.
+        // The declaration alone is insufficient: promotion can change that body.
+        if source_base.with_arguments(db, parameters) != target_base.with_arguments(db, parameters)
         {
             return self.never();
         }
@@ -666,7 +1580,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         // Top-to-bottom also requires a static body: equal arguments do not rule
         // out a fixed `Any`. Unchanged materializations retain the original binder.
-        let unmaterialized_target = Type::Recursive(target.with_materialization(db, None));
+        let unmaterialized_target = Type::Recursive(target_base);
         if matches!(
             (source_kind, target_kind),
             (MaterializationKind::Top, MaterializationKind::Bottom)

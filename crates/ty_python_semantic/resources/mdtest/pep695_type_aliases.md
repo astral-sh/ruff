@@ -1846,3 +1846,64 @@ def foo(x: A):
     reveal_type(x + 1)  # revealed: int
     reveal_type(1 + x)  # revealed: int
 ```
+
+### Promotion through recursive aliases
+
+Collecting a recursive value widens inferred literals and `None` at every depth, including through
+returned callables. Repeated collection preserves the resulting type.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Stream = tuple[TypeOf[1], Callable[[], Stream]]
+
+def collect(value: Stream, flag: bool):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: Stream
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+    while flag:
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+
+type Node = tuple[None, tuple[Node]]
+
+def collect_node(value: Node):
+    widened = [value][0]
+    reveal_type(widened[1][0][1][0][0])  # revealed: None | Unknown
+
+type CallableStream = Callable[[], tuple[TypeOf[1], CallableStream]]
+
+def collect_callable(value: CallableStream):
+    widened = [value][0]
+    reveal_type(widened()[1]()[1]()[0])  # revealed: int
+```
+
+### Promotion across recursive callable parameters
+
+Promotion preserves inferred literals in callable parameters and widens them in results. Top
+materialization also reaches recursive calls, becoming bottom materialization in parameter
+positions.
+
+```py
+from typing import Any, Callable, Literal
+from typing_extensions import Never
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+type Consumer = tuple[TypeOf[1], Callable[[Consumer], Consumer]]
+type Promoted = tuple[int, Callable[[Flipped], Promoted]]
+type Flipped = tuple[Literal[1], Callable[[Promoted], Flipped]]
+
+def collect(value: Consumer):
+    widened = [value][0]
+    static_assert(is_equivalent_to(TypeOf[widened], Promoted))
+
+type Recursive = Callable[[Recursive], tuple[TypeOf[1], Any, Recursive]]
+type Positive = Callable[[Negative], tuple[int, object, Positive]]
+type Negative = Callable[[Positive], tuple[TypeOf[1], Never, Negative]]
+
+def materialize(value: Recursive):
+    widened = [value][0]
+    static_assert(is_equivalent_to(Top[TypeOf[widened]], Positive))
+```

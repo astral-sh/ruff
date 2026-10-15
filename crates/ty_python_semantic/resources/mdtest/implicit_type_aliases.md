@@ -2914,8 +2914,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3239,6 +3239,7 @@ of these values preserves the alias without expanding the recursive references i
 
 ```py
 from typing import TypeVar
+from typing_extensions import reveal_type
 
 T = TypeVar("T")
 GrowingA = tuple[T, "GrowingB[T] | None"]
@@ -3267,7 +3268,9 @@ change at each level. In particular, inserting a top-materialized value into a l
 
 ```py
 from typing import Any, TypeVar
-from ty_extensions import Bottom, Top
+from typing_extensions import reveal_type
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
 
 T = TypeVar("T")
 Tree = T | tuple["Tree[T]"]
@@ -3283,4 +3286,70 @@ def inspect(
     reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+    static_assert(is_equivalent_to(TypeOf[[top][0]], Top[Tree[Any]]))
+    static_assert(is_equivalent_to(TypeOf[[bottom][0]], Bottom[Tree[Any]]))
+    static_assert(not is_equivalent_to(TypeOf[[top][0]], Tree[Any]))
+    static_assert(not is_equivalent_to(TypeOf[[bottom][0]], Tree[Any]))
+    static_assert(is_equivalent_to(TypeOf[[top_growing][0]], Top[Growing[Any]]))
+```
+
+### Promotion through recursive aliases
+
+Collecting a recursive value widens inferred literals and `None` at every depth, including through
+returned callables. Repeated collection preserves the resulting type.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
+
+def collect(value: Stream, flag: bool):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: Stream
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+    while flag:
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+
+Node = tuple[None, tuple["Node"]]
+
+def collect_node(value: Node):
+    widened = [value][0]
+    reveal_type(widened[1][0][1][0][0])  # revealed: None | Unknown
+
+CallableStream = Callable[[], tuple[TypeOf[1], "CallableStream"]]
+
+def collect_callable(value: CallableStream):
+    widened = [value][0]
+    reveal_type(widened()[1]()[1]()[0])  # revealed: int
+```
+
+### Promotion across recursive callable parameters
+
+Promotion preserves inferred literals in callable parameters and widens them in results. Top
+materialization also reaches recursive calls, becoming bottom materialization in parameter
+positions.
+
+```py
+from typing import Any, Callable, Literal
+from typing_extensions import Never
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+Consumer = tuple[TypeOf[1], Callable[["Consumer"], "Consumer"]]
+Promoted = tuple[int, Callable[["Flipped"], "Promoted"]]
+Flipped = tuple[Literal[1], Callable[[Promoted], "Flipped"]]
+
+def collect(value: Consumer):
+    widened = [value][0]
+    static_assert(is_equivalent_to(TypeOf[widened], Promoted))
+
+Recursive = Callable[["Recursive"], tuple[TypeOf[1], Any, "Recursive"]]
+Positive = Callable[["Negative"], tuple[int, object, "Positive"]]
+Negative = Callable[[Positive], tuple[TypeOf[1], Never, "Negative"]]
+
+def materialize(value: Recursive):
+    widened = [value][0]
+    static_assert(is_equivalent_to(Top[TypeOf[widened]], Positive))
 ```

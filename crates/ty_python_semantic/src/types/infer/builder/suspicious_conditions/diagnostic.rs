@@ -1053,7 +1053,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .display(db, env)
                         .to_string_parts();
 
-                    if suggested_type.is_valid_syntax {
+                    if suggested_type.is_valid_syntax && sole_element.is_hintable(db, env) {
                         let maybe_star = if annotation.is_starred_expr() {
                             "*"
                         } else {
