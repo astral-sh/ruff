@@ -1638,13 +1638,8 @@ impl<'db> IntersectionBuilder<'db> {
                 // Pass the original alias to preserve recursive self-references.
                 // `InnerIntersectionBuilder::add_negative` resolves it for simplification
                 // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
-                let element = if original.is_alias_like() {
-                    original
-                } else {
-                    ty
-                };
                 for inner in &mut self.intersections {
-                    inner.add_negative(db, &self.env, element);
+                    inner.add_negative(db, &self.env, original);
                 }
             }
         }
