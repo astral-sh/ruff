@@ -33,7 +33,7 @@ fn is_union_type_operand(ty: Type<'_>) -> bool {
         ty,
         Type::ClassLiteral(_)
             | Type::SubclassOf(_)
-            | Type::GenericAlias(_)
+            | Type::SpecializedClass(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(
                 KnownInstanceType::UnionType(_)
@@ -1124,13 +1124,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // that custom method as we'd take one of the earlier branches.
             // This seems like it's probably rare enough that it's acceptable, however.
             (
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                Type::ClassLiteral(..) | Type::SpecializedClass(..) | Type::SubclassOf(..),
                 _,
                 ast::Operator::BitOr,
             )
             | (
                 _,
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                Type::ClassLiteral(..) | Type::SpecializedClass(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
             ) => Type::try_call_bin_op_with_policy(
                 db,
@@ -1162,7 +1162,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
@@ -1190,7 +1190,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)

@@ -2643,7 +2643,7 @@ impl<'db> From<ClassType<'db>> for Type<'db> {
     fn from(class: ClassType<'db>) -> Type<'db> {
         match class {
             ClassType::NonGeneric(non_generic) => non_generic.into(),
-            ClassType::Generic(generic) => Type::GenericAlias(generic),
+            ClassType::Generic(generic) => Type::SpecializedClass(generic),
         }
     }
 }

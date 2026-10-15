@@ -2521,7 +2521,7 @@ fn descriptor_decorated_protocol_member<'db>(
 fn is_class_object_type(ty: Type<'_>) -> bool {
     matches!(
         ty,
-        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+        Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_)
     )
 }
 

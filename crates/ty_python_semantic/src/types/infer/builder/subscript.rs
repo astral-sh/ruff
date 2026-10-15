@@ -180,7 +180,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we have an implicit type alias like `MyList = list[T]`, and if `MyList` is being
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
-        if value_ty.is_generic_alias() {
+        if value_ty.is_specialized_class_or_alias() {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
@@ -1159,10 +1159,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_ty.display(db, env)
                     ));
                     let already_specialized = match value_ty {
-                        Type::GenericAlias(_) => true,
+                        Type::SpecializedClass(_) => true,
                         Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
                             .value_expression_types(db, env)
-                            .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
+                            .is_ok_and(|mut tys| tys.any(|ty| ty.is_specialized_class_or_alias())),
                         _ => false,
                     };
                     if already_specialized {

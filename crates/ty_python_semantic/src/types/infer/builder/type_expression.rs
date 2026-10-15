@@ -467,8 +467,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     {
                                         Some(literal)
                                     }
-                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
+                                    (Type::SpecializedClass(_), Type::LiteralValue(literal))
+                                    | (Type::LiteralValue(literal), Type::SpecializedClass(_)) => {
                                         Some(literal)
                                     }
                                     _ => None,
@@ -1725,7 +1725,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         | SpecialFormType::Intersection,
                     )
                     | Type::KnownInstance(_)
-                    | Type::GenericAlias(_)
+                    | Type::SpecializedClass(_)
                     | Type::Callable(_)) => {
                         let slice_ty = self.infer_subscript_type_expression(subscript, value_ty);
                         subclass_of_type_argument(self, slice, slice_ty)
@@ -2137,7 +2137,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            Type::GenericAlias(_) => {
+            Type::SpecializedClass(_) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
             Type::LiteralValue(literal) if literal.is_string() => {

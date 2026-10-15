@@ -4068,7 +4068,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (
                 Type::TypeForm(formal_typeform),
-                actual @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)),
+                actual @ (Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_)),
             ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 if let Some(actual_instance) = actual.to_instance_approximation(db, self.env) {
@@ -4488,7 +4488,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (
                 Type::SubclassOf(formal_subclass),
                 actual @ (Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_)),
             ) if let SubclassOfInner::Protocol(protocol) = formal_subclass.subclass_of() => {
@@ -4513,12 +4513,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                formal @ (Type::SubclassOf(_) | Type::GenericAlias(_)),
+                formal @ (Type::SubclassOf(_) | Type::SpecializedClass(_)),
                 Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_),
-            ) if formal.is_generic_alias()
+            ) if formal.is_specialized_class_or_alias()
                 || matches!(formal, Type::SubclassOf(subclass)
                     if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
             {

@@ -673,7 +673,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
 
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
-            Type::GenericAlias(_) => None,
+            Type::SpecializedClass(_) => None,
 
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db, env) => {
                 UnionType::try_from_elements(
@@ -5509,7 +5509,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::Callable(_)
         | Type::ModuleLiteral(_)
         | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
+        | Type::SpecializedClass(_)
         | Type::SubclassOf(_)
         | Type::NominalInstance(_)
         | Type::ProtocolInstance(_)
