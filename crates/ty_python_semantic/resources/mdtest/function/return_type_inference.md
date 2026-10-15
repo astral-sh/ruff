@@ -3,6 +3,9 @@
 ```toml
 [environment]
 python-version = "3.14"  # I like using modern syntax
+
+[analysis]
+return-type-inference = "always"
 ```
 
 ## Basic

@@ -39,8 +39,8 @@ use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonE
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
-    inferred_python_version_source_annotation,
+    PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
+    SysPrefixPathOrigin, inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -1555,6 +1555,31 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// This setting controls when ty infers return types for functions without an explicit
+    /// return type annotation.
+    ///
+    /// - `"never"`: Do not infer return types from function bodies. Unannotated functions
+    ///   will have an inferred return type of `Unknown`.
+    /// - `"always"`: Infer return types for unannotated functions and methods.
+    ///
+    /// Enabling return type inference will never override explicit return type annotations.
+    /// Lambda functions are not affected by this setting and their return type will always
+    /// be inferred.
+    ///
+    /// Return types for generator functions and asynchronous functions are currently not
+    /// inferred, but we plan to change this soon.
+    ///
+    /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+    /// inference.
+    #[option(
+        default = r#""never""#,
+        value_type = r#""never" | "always""#,
+        example = r#"
+            return-type-inference = "always"
+        "#
+    )]
+    pub return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether ty should use strict narrowing for unspecialized generic classes in
     /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
@@ -1747,6 +1772,7 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            return_type_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
@@ -1755,6 +1781,7 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
+            return_type_inference: return_type_inference_default,
             strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
@@ -1785,6 +1812,7 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
             strict_generic_narrowing: strict_generic_narrowing
                 .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics
