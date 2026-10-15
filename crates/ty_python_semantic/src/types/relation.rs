@@ -2033,6 +2033,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        match (source, target) {
+            (Type::Callable(source), Type::Callable(target)) => {
+                self.check_callable_pair_inner(db, source, target, comparison)
+            }
+            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
+            // which means that all instances of `bool` are also instances of `int`.
+            (Type::NominalInstance(source), Type::NominalInstance(target)) => {
+                self.check_nominal_instance_pair(db, source, target)
+            }
+            _ => self.check_type_pair_general(db, comparison, source, target),
+        }
+    }
+
+    /// Compare other type pairs without retaining this dispatcher's local state while
+    /// recursively comparing callable signatures or nominal type arguments.
+    fn check_type_pair_general(
+        &self,
+        db: &'db dyn Db,
+        comparison: &GuardedRelation<'_, 'c, 'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
@@ -2722,10 +2744,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(_),
             ) => self.never(),
 
-            (Type::Callable(source_callable), Type::Callable(target_callable)) => {
-                self.check_callable_pair_inner(db, source_callable, target_callable, comparison)
-            }
-
             (
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),
@@ -2997,12 +3015,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::KnownInstance(source), _) => {
                 self.check_type_pair(db, source.instance_fallback(db, env), target)
-            }
-
-            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
-            // which means that all instances of `bool` are also instances of `int`
-            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => {
-                self.check_nominal_instance_pair(db, source_i, target_i)
             }
 
             (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => {
