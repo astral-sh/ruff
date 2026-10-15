@@ -13,8 +13,6 @@ STDOUT: int
 DEVNULL: int
 
 class SubprocessStreamProtocol(streams.FlowControlMixin, protocols.SubprocessProtocol):
-    """Like StreamReaderProtocol, but for a subprocess."""
-
     stdin: streams.StreamWriter | None
     stdout: streams.StreamReader | None
     stderr: streams.StreamReader | None
@@ -31,9 +29,7 @@ class Process:
     ) -> None: ...
     @property
     def returncode(self) -> int | None: ...
-    async def wait(self) -> int:
-        """Wait until the process exit and return the process return code."""
-
+    async def wait(self) -> int: ...
     def send_signal(self, signal: int) -> None: ...
     def terminate(self) -> None: ...
     def kill(self) -> None: ...
@@ -65,9 +61,9 @@ if sys.version_info >= (3, 11):
         restore_signals: bool = True,
         start_new_session: bool = False,
         pass_fds: Collection[int] = (),
-        group: None | str | int = None,
-        extra_groups: None | Collection[str | int] = None,
-        user: None | str | int = None,
+        group: str | int | None = None,
+        extra_groups: Collection[str | int] | None = None,
+        user: str | int | None = None,
         umask: int = -1,
         process_group: int | None = None,
         pipesize: int = -1,
@@ -97,9 +93,9 @@ if sys.version_info >= (3, 11):
         restore_signals: bool = True,
         start_new_session: bool = False,
         pass_fds: Collection[int] = (),
-        group: None | str | int = None,
-        extra_groups: None | Collection[str | int] = None,
-        user: None | str | int = None,
+        group: str | int | None = None,
+        extra_groups: Collection[str | int] | None = None,
+        user: str | int | None = None,
         umask: int = -1,
         process_group: int | None = None,
         pipesize: int = -1,
@@ -131,9 +127,9 @@ else:
         restore_signals: bool = True,
         start_new_session: bool = False,
         pass_fds: Collection[int] = (),
-        group: None | str | int = None,
-        extra_groups: None | Collection[str | int] = None,
-        user: None | str | int = None,
+        group: str | int | None = None,
+        extra_groups: Collection[str | int] | None = None,
+        user: str | int | None = None,
         umask: int = -1,
         pipesize: int = -1,
     ) -> Process: ...
@@ -162,9 +158,9 @@ else:
         restore_signals: bool = True,
         start_new_session: bool = False,
         pass_fds: Collection[int] = (),
-        group: None | str | int = None,
-        extra_groups: None | Collection[str | int] = None,
-        user: None | str | int = None,
+        group: str | int | None = None,
+        extra_groups: Collection[str | int] | None = None,
+        user: str | int | None = None,
         umask: int = -1,
         pipesize: int = -1,
     ) -> Process: ...

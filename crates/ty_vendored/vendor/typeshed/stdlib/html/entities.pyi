@@ -1,5 +1,3 @@
-"""HTML character entity references."""
-
 from typing import Final
 
 __all__ = ["html5", "name2codepoint", "codepoint2name", "entitydefs"]

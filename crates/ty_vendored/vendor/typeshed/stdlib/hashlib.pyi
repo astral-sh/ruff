@@ -1,59 +1,12 @@
-"""hashlib module - A common interface to many hash functions.
-
-new(name, data=b'', **kwargs) - returns a new hash object implementing the
-                                given hash function; initializing the hash
-                                using the given binary data.
-
-Named constructor functions are also available, these are faster
-than using new(name):
-
-md5(), sha1(), sha224(), sha256(), sha384(), sha512(), blake2b(), blake2s(),
-sha3_224(), sha3_256(), sha3_384(), sha3_512(), shake_128(), and shake_256().
-
-More algorithms may be available on your platform but the above are guaranteed
-to exist.  See the algorithms_guaranteed and algorithms_available attributes
-to find out what algorithm names can be passed to new().
-
-NOTE: If you want the adler32 or crc32 hash functions they are available in
-the zlib module.
-
-Choose your hash function wisely.  Some have known collision weaknesses,
-while others may be slower depending on the CPU architecture.
-
-Hash objects have these methods:
- - update(data): Update the hash object with the bytes in data. Repeated calls
-                 are equivalent to a single call with the concatenation of all
-                 the arguments.
- - digest():     Return the digest of the bytes passed to the update() method
-                 so far as a bytes object.
- - hexdigest():  Like digest() except the digest is returned as a string
-                 of double length, containing only hexadecimal digits.
- - copy():       Return a copy (clone) of the hash object. This can be used to
-                 efficiently compute the digests of data that share a common
-                 initial substring.
-
-Assuming that Python has been built with SHA-2 support, the SHA-256 digest
-of the byte string b'Nobody inspects the spammish repetition' is computed
-as follows:
-
-    >>> import hashlib
-    >>> m = hashlib.sha256()
-    >>> m.update(b"Nobody inspects")
-    >>> m.update(b" the spammish repetition")
-    >>> m.digest()  # doctest: +ELLIPSIS
-    b'\\x03\\x1e\\xdd}Ae\\x15\\x93\\xc5\\xfe\\\\\\x00o\\xa5u+7...'
-
-More condensed:
-
-    >>> hashlib.sha256(b"Nobody inspects the spammish repetition").hexdigest()
-    '031edd7d41651593c5fe5c006fa5752b37fddff7bc4e843aa6af0c950f4b9406'
-"""
-
 import sys
 from _blake2 import blake2b as blake2b, blake2s as blake2s
 from _hashlib import (
     HASH,
+    HASHXOF,
+    _FixedDigestName,
     _HashObject,
+    _HashObjectWithOptionalLength,
+    _XofDigestName,
     openssl_md5 as md5,
     openssl_sha1 as sha1,
     openssl_sha3_224 as sha3_224,
@@ -71,7 +24,9 @@ from _hashlib import (
 )
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Set as AbstractSet
-from typing import Protocol, type_check_only
+from typing import Protocol, TypeVar, overload, type_check_only
+
+_HashT = TypeVar("_HashT", bound=_HashObject)
 
 if sys.version_info >= (3, 15):
     __all__ = (
@@ -140,10 +95,12 @@ else:
         "pbkdf2_hmac",
     )
 
-def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASH:
-    """new(name, data=b'') - Return a new hashing object using the named algorithm;
-    optionally initialized with data (which must be a bytes-like object).
-    """
+@overload
+def new(name: _XofDigestName, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASHXOF: ...
+@overload
+def new(name: _FixedDigestName, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> HASH: ...
+@overload
+def new(name: str, data: ReadableBuffer = b"", *, usedforsecurity: bool = True) -> _HashObjectWithOptionalLength: ...
 
 algorithms_guaranteed: AbstractSet[str]
 algorithms_available: AbstractSet[str]
@@ -158,19 +115,12 @@ if sys.version_info >= (3, 11):
         def readinto(self, buf: bytearray, /) -> int: ...
         def readable(self) -> bool: ...
 
+    @overload
+    def file_digest(fileobj: _BytesIOLike | _FileDigestFileObj, digest: str, /, *, _bufsize: int = 262144) -> HASH: ...
+    @overload
     def file_digest(
-        fileobj: _BytesIOLike | _FileDigestFileObj, digest: str | Callable[[], _HashObject], /, *, _bufsize: int = 262144
-    ) -> HASH:
-        """Hash the contents of a file-like object. Returns a digest object.
-
-        *fileobj* must be a file-like object opened for reading in binary mode.
-        It accepts file objects from open(), io.BytesIO(), and SocketIO objects.
-        The function may bypass Python's I/O and use the file descriptor *fileno*
-        directly.
-
-        *digest* must either be a hash algorithm name as a *str*, a hash
-        constructor, or a callable that returns a hash object.
-        """
+        fileobj: _BytesIOLike | _FileDigestFileObj, digest: Callable[[], _HashT], /, *, _bufsize: int = 262144
+    ) -> _HashT: ...
 
 # Legacy typing-only alias
 _Hash = HASH
