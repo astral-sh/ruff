@@ -9481,38 +9481,6 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if let TypeMapping::ExportInferredReturn(scope) = type_mapping {
-            let is_local = |definition: Definition<'db>| {
-                definition.program_file(db) == scope.program_file(db)
-                    && semantic_index(db, scope.program_file(db))
-                        .ancestor_scopes(definition.file_scope(db))
-                        .any(|(id, _)| id == scope.file_scope_id(db))
-            };
-            let local_class = match self {
-                Type::ClassLiteral(class) => Some(class),
-                Type::GenericAlias(alias) => Some(alias.origin(db).into()),
-                Type::NominalInstance(instance) => Some(instance.class_literal(db, visitor.env)),
-                _ => None,
-            };
-            if local_class
-                .and_then(|class| class.definition(db))
-                .is_some_and(is_local)
-            {
-                // Each invocation creates a distinct nominal class, which cannot be represented
-                // by the one class literal associated with its source definition.
-                return Type::unknown();
-            }
-            if let Type::FunctionLiteral(function) = self
-                && is_local(function.definition(db))
-            {
-                return Type::Callable(function.into_callable_type(db)).apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                );
-            }
-        }
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9834,8 +9802,7 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => alias.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
             Type::LiteralValue(_) => match type_mapping {
-                TypeMapping::ExportInferredReturn(_)
-                | TypeMapping::ApplySpecialization(_)
+                TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
@@ -9857,8 +9824,7 @@ impl<'db> Type<'db> {
             },
 
             Type::Dynamic(_) => match type_mapping {
-                TypeMapping::ExportInferredReturn(_)
-                | TypeMapping::ApplySpecialization(_)
+                TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
@@ -11195,8 +11161,6 @@ impl<'db> SelfBinding<'db> {
 /// literal).
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
-    /// Prevent locally created class and function identities from escaping an inferred return.
-    ExportInferredReturn(ScopeId<'db>),
     /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Applies a specialization and materializes only substituted typevars.
@@ -11287,8 +11251,7 @@ impl<'db> TypeMapping<'_, 'db> {
                     GenericContext::from_typevar_instances(db, env, kept)
                 }
             }
-            TypeMapping::ExportInferredReturn(_)
-            | TypeMapping::Promote(..)
+            TypeMapping::Promote(..)
             | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -11334,8 +11297,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 materialization_kind: materialization_kind.flip(),
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
-            TypeMapping::ExportInferredReturn(_)
-            | TypeMapping::ApplySpecialization(_)
+            TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }

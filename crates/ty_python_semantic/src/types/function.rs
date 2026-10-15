@@ -1682,14 +1682,7 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let mut inferred = infer_complete_scope_types(db, scope)
-            .return_type()
-            .apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ExportInferredReturn(scope),
-                TypeContext::default(),
-            );
+        let mut inferred = infer_complete_scope_types(db, scope).return_type();
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
             return inferred;

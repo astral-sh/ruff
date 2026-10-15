@@ -600,8 +600,7 @@ impl<'db> KnownInstanceType<'db> {
                         TypeVarNonce::NONE,
                     ))
                 }
-                TypeMapping::ExportInferredReturn(_)
-                | TypeMapping::ApplySpecialization(_)
+                TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
                 | TypeMapping::FreshenBoundTypeVars { .. }
