@@ -3306,18 +3306,18 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Callable(_)
             | Type::WrapperDescriptor(_)
-            | Type::TypeAlias(_)
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
-                IntersectionBuilder::new(db, env)
-                    .add_negative(*self)
-                    .build()
-            }
+            Type::TypeAlias(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_) => IntersectionBuilder::new(db, env)
+                .add_negative(*self)
+                .build(),
         }
     }
 
