@@ -117,7 +117,7 @@ use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
 use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
+pub(crate) use class::{ClassLiteral, ClassSpecialization, ClassType, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -772,7 +772,7 @@ impl TypingModule {
 /// Whether a type represents the upper or lower bound of a gradual type.
 ///
 /// For generic specializations, this matters only if there is at least one invariant or constrained
-/// type parameter. For example, we represent `Top[list[Any]]` as a `GenericAlias` with
+/// type parameter. For example, we represent `Top[list[Any]]` as a `ClassSpecialization` with
 /// `MaterializationKind` set to Top, which we denote as `Top[list[Any]]`.
 /// A type `Top[list[T]]` includes all fully static list types `list[U]` where `U` is
 /// a supertype of `Bottom[T]` and a subtype of `Top[T]`.
@@ -2110,7 +2110,7 @@ pub enum Type<'db> {
     /// A specific class object (either from a `class` statement or `type()` call)
     ClassLiteral(ClassLiteral<'db>),
     /// A specialization of a generic class
-    GenericAlias(GenericAlias<'db>),
+    GenericAlias(ClassSpecialization<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order.

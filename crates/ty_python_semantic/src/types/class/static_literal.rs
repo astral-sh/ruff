@@ -22,8 +22,8 @@ use crate::{
     reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallArguments,
-        CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
-        DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
+        CallableType, ClassBase, ClassLiteral, ClassSpecialization, ClassType, DATACLASS_FLAGS,
+        DataclassFlags, DataclassParams, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
         StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
@@ -557,7 +557,7 @@ impl<'db> StaticClassLiteral<'db> {
                 self.typevars.borrow_mut().insert(bound_typevar);
             }
 
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            fn visit_class_specialization(&self, db: &'db dyn Db, alias: ClassSpecialization<'db>) {
                 // The generic context contains the base class's formal type parameters, not type
                 // variables referenced by this class's base expression.
                 for ty in alias.specialization(db).types(db) {
@@ -624,7 +624,7 @@ impl<'db> StaticClassLiteral<'db> {
             Some(generic_context) => {
                 let specialization = f(generic_context);
 
-                ClassType::Generic(GenericAlias::new(db, self, specialization))
+                ClassType::Generic(ClassSpecialization::new(db, self, specialization))
             }
         }
     }
@@ -869,7 +869,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
         match specialization {
             None => self.try_mro_unspecialized(db),
-            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
+            Some(specialization) => ClassSpecialization::new(db, self, specialization).try_mro(db),
         }
         .map_err(Box::as_ref)
     }

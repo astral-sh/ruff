@@ -262,12 +262,12 @@ fn list_alias<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     argument: Type<'db>,
-) -> GenericAlias<'db> {
+) -> ClassSpecialization<'db> {
     KnownClass::List
         .to_specialized_class_type(db, env, &[argument])
         .expect("`list` should accept one type argument")
-        .into_generic_alias()
-        .expect("a specialized `list` should be a generic alias")
+        .into_class_specialization()
+        .expect("a specialized `list` should have a class specialization")
 }
 
 fn oscillating_generic_alias_cycle_recover<'db>(
@@ -297,7 +297,7 @@ fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Typ
         Type::unknown()
     };
 
-    list_alias(db, &env, argument).into()
+    Type::GenericAlias(list_alias(db, &env, argument))
 }
 
 #[test]

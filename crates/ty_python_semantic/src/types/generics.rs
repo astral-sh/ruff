@@ -3754,7 +3754,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 )
             ) && instance
                 .class(db, env)
-                .into_generic_alias()
+                .into_class_specialization()
                 .is_some_and(|alias| {
                     matches!(
                         alias.specialization(db).types(db),
@@ -4865,7 +4865,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (Type::NominalInstance(formal_nominal), Type::NominalInstance(actual_nominal)) => {
-                if let Some(formal_alias) = formal_nominal.class(db, self.env).into_generic_alias()
+                if let Some(formal_alias) = formal_nominal
+                    .class(db, self.env)
+                    .into_class_specialization()
                 {
                     let formal_origin = formal_alias.origin(db);
                     for base in actual_nominal.class(db, self.env).iter_mro(db) {

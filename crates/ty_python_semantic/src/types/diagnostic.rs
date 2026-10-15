@@ -6,7 +6,7 @@ use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, ClassSpecialization, KnownClass,
     ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::dependency::is_direct_dependency;
@@ -4886,7 +4886,7 @@ struct GenericBaseParameter<'db> {
 #[derive(Debug)]
 struct GenericBaseConstraint<'db> {
     argument: Type<'db>,
-    alias: GenericAlias<'db>,
+    alias: ClassSpecialization<'db>,
     /// The index in the class's explicit bases list, used to locate the diagnostic annotation.
     base_index: usize,
 }

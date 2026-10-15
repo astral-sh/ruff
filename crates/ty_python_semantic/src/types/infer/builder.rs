@@ -7806,7 +7806,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let collection_alias = collection_class
                 .try_to_class_literal(db, env)?
                 .identity_specialization(db)
-                .into_generic_alias()?;
+                .into_class_specialization()?;
 
             let generic_context = collection_alias
                 .specialization(self.db())

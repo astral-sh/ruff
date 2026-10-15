@@ -22,7 +22,7 @@ use ty_module_resolver::file_to_module;
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassSpecialization, ClassType};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
@@ -2109,7 +2109,7 @@ impl Display for DisplayFunctionType<'_, '_> {
     }
 }
 
-impl<'db> GenericAlias<'db> {
+impl<'db> ClassSpecialization<'db> {
     pub(crate) fn display<'env>(
         self,
         db: &'db dyn Db,
