@@ -248,6 +248,10 @@ impl<'db> AllMembers<'db> {
                 );
             }
 
+            Type::GenericAlias(alias) => {
+                self.extend_with_type(db, env, Type::SpecializedClass(alias));
+            }
+
             Type::SpecializedClass(generic_alias) if generic_alias.is_typed_dict(db) => {
                 self.extend_with_type(
                     db,

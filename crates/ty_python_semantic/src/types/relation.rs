@@ -265,6 +265,7 @@ impl<'db> Type<'db> {
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::SpecializedClass(_)
+            | Type::GenericAlias(_)
             | Type::SubclassOf(_)
             | Type::Union(_)
             | Type::Intersection(_)
@@ -1803,6 +1804,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
+            (Type::GenericAlias(alias), _) => {
+                self.check_type_pair(db, Type::SpecializedClass(alias), target)
+            }
+            (_, Type::GenericAlias(alias)) => {
+                self.check_type_pair(db, source, Type::SpecializedClass(alias))
+            }
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -2885,9 +2892,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
             }
 
-            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
+            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a specialized class type)
             // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
-            // with final generic types, where `type[C[...]]` is simplified to the generic-alias
+            // with final generic types, where `type[C[...]]` is simplified to the specialized-class
             // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
             (Type::ClassLiteral(source_cls), Type::SpecializedClass(target_alias)) => self
                 .check_class_pair(
@@ -2896,7 +2903,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     ClassType::Generic(target_alias),
                 ),
 
-            // For generic aliases, we delegate to the underlying class type.
+            // For specialized class objects, we delegate to the underlying class type.
             (Type::SpecializedClass(source_alias), Type::SpecializedClass(target_alias)) => self
                 .check_class_pair(
                     db,
@@ -3459,6 +3466,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let env = self.env;
 
         match (left, right) {
+            (Type::GenericAlias(alias), _) => {
+                self.check_type_pair(db, Type::SpecializedClass(alias), right)
+            }
+            (_, Type::GenericAlias(alias)) => {
+                self.check_type_pair(db, left, Type::SpecializedClass(alias))
+            }
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

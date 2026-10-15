@@ -92,6 +92,34 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn generic_alias_and_specialized_class() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing import final
+
+        @final
+        class Box[T]: ...
+
+        def get_class() -> type[Box[int]]: ...
+
+        alias = Box[int]
+        class_object = get_class()
+        "#,
+    )?;
+
+    assert_matches!(
+        (
+            get_symbol(&db, "/src/main.py", &[], "alias").expect_type(),
+            get_symbol(&db, "/src/main.py", &[], "class_object").expect_type(),
+        ),
+        (Type::GenericAlias(alias), Type::SpecializedClass(class)) if alias == class
+    );
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)

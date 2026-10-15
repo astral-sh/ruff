@@ -934,6 +934,7 @@ impl<'db> Type<'db> {
                 | Type::NewTypeInstance(_)
                 | Type::NominalInstance(_)
                 | Type::SpecialForm(_)
+                | Type::GenericAlias(_)
                 | Type::KnownInstance(_)
                 | Type::LiteralValue(_)
                 | Type::TypeVar(_)

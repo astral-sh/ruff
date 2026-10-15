@@ -64,6 +64,14 @@ fn string_literal_values<'db>(
     }
 }
 
+/// Convert a class specialization produced by subscripting into its runtime alias value.
+fn into_runtime_generic_alias(ty: Type<'_>) -> Type<'_> {
+    match ty {
+        Type::SpecializedClass(alias) => Type::GenericAlias(alias),
+        ty => ty,
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
@@ -181,7 +189,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // used in another implicit type alias like `Numbers = MyList[int]`, then we infer the
         // right hand side as a value expression, and need to handle the specialization here.
         if value_ty.is_specialized_class_or_alias() {
-            return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
+            return Ok(into_runtime_generic_alias(
+                self.infer_explicit_type_alias_specialization(subscript, value_ty, false),
+            ));
         }
 
         let result = self.infer_subscript_load_impl(value_ty, subscript)?;
@@ -243,7 +253,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db));
+        let tuple_generic_alias =
+            |tuple: TupleType<'db>| into_runtime_generic_alias(Type::from(tuple.to_class_type(db)));
 
         match value_ty {
             Type::ClassLiteral(class) => {
@@ -267,11 +278,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(generic_context) = class.generic_context(db)
                     && let Some(class) = class.as_static()
                 {
-                    return Ok(self.infer_explicit_class_specialization(
-                        subscript,
-                        value_ty,
-                        class,
-                        generic_context,
+                    return Ok(into_runtime_generic_alias(
+                        self.infer_explicit_class_specialization(
+                            subscript,
+                            value_ty,
+                            class,
+                            generic_context,
+                        ),
                     ));
                 }
             }
@@ -459,7 +472,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     return Ok(class
                         .to_specialized_class_type(db, env, arg_types)
-                        .map(Type::from)
+                        .map(|class| into_runtime_generic_alias(Type::from(class)))
                         .unwrap_or_else(Type::unknown));
                 }
                 _ => {}
@@ -1159,7 +1172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_ty.display(db, env)
                     ));
                     let already_specialized = match value_ty {
-                        Type::SpecializedClass(_) => true,
+                        Type::SpecializedClass(_) | Type::GenericAlias(_) => true,
                         Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
                             .value_expression_types(db, env)
                             .is_ok_and(|mut tys| tys.any(|ty| ty.is_specialized_class_or_alias())),

@@ -539,7 +539,8 @@ impl<'db> Type<'db> {
                 | Type::AlwaysFalsy
                 | Type::BoundSuper(_)
                 | Type::TypeForm(_)
-                | Type::TypedDict(_) => UpcastResult::stable(ty),
+                | Type::TypedDict(_)
+                | Type::GenericAlias(_) => UpcastResult::stable(ty),
             }
         }
 

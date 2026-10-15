@@ -485,6 +485,9 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::ClassLiteral(..) | Type::SpecializedClass(..) => {
             class_attribute_write_requirement(db, env, object_ty, attribute)
         }
+        Type::GenericAlias(alias) => {
+            class_attribute_write_requirement(db, env, Type::SpecializedClass(alias), attribute)
+        }
 
         Type::ModuleLiteral(module) => {
             let resolved_module = module.module(db);
@@ -1055,6 +1058,9 @@ pub(super) fn assignment_attribute_members<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<AssignmentAttributeMembers<'db>> {
+    if let Type::GenericAlias(alias) = object_ty {
+        return assignment_attribute_members(db, env, Type::SpecializedClass(alias), attribute);
+    }
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
     let type_member = if attribute == "__call__"
@@ -1091,6 +1097,7 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::ProtocolInstance(_)
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
+            | Type::GenericAlias(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::SlotDescriptor(..)

@@ -439,7 +439,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .explicit_bases(db)
                     .iter()
                     .copied()
-                    .filter(|ty| matches!(ty, Type::SpecializedClass(_))),
+                    .filter(Type::is_specialized_class_or_alias),
             )
         }
 
@@ -1218,7 +1218,13 @@ impl<'db> StaticClassLiteral<'db> {
 
             let module = parsed_module(db, python_file).load(db);
 
-            let explicit_metaclass = class.explicit_metaclass(db, &module);
+            let explicit_metaclass =
+                class
+                    .explicit_metaclass(db, &module)
+                    .map(|metaclass| match metaclass {
+                        Type::GenericAlias(alias) => Type::SpecializedClass(alias),
+                        metaclass => metaclass,
+                    });
 
             // Generic metaclasses parameterized by type variables are not supported.
             // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
@@ -3200,7 +3206,8 @@ impl<'db> StaticClassLiteral<'db> {
                 for explicit_base in class.explicit_bases(db) {
                     let explicit_base_class_literal = match explicit_base {
                         Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::SpecializedClass(generic_alias) => Some(generic_alias.origin(db)),
+                        Type::SpecializedClass(generic_alias)
+                        | Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
                         _ => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {
