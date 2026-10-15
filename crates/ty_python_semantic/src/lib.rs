@@ -149,7 +149,7 @@ pub enum ReturnTypeInference {
 }
 
 impl ReturnTypeInference {
-    pub(crate) const fn is_active(self) -> bool {
+    const fn is_active(self) -> bool {
         matches!(self, Self::Always)
     }
 }
