@@ -7041,6 +7041,50 @@ mod tests {
     }
 
     #[test]
+    fn return_refinement_handles_reordered_keyword_parameters() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.pyi",
+            "
+            from typing import overload
+
+            @overload
+            def f(x: int, y: str) -> int: ...
+            @overload
+            def f(y: str, x: int) -> str: ...
+            ",
+        )?;
+        let env = db.program_environment();
+        let source = Type::FunctionLiteral(get_function_f(&db, "/src/a.pyi"));
+        for (positional_only, expected) in [(true, Some(true)), (false, None)] {
+            let parameters =
+                [("y", KnownClass::Str), ("x", KnownClass::Int)].map(|(name, class)| {
+                    let parameter = if positional_only {
+                        Parameter::positional_only(None)
+                    } else {
+                        Parameter::positional_or_keyword(Name::new_static(name))
+                    };
+                    parameter.with_annotated_type(class.to_instance(&db, &env))
+                });
+            let target = Type::Callable(CallableType::single(
+                &db,
+                Signature::new(
+                    Parameters::standard(parameters),
+                    KnownClass::Str.to_instance(&db, &env),
+                ),
+            ));
+            // Positional calls select the second overload, but `f(x=1, y="")` selects the
+            // first. Disjoint positional parameter types cannot rule out keyword overlap.
+            assert_eq!(
+                source.is_subtype_for_return_refinement(&db, &env, target),
+                expected,
+                "positional_only={positional_only}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn return_refinement_preserves_policy_through_equivalence_and_caching() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
