@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::ops::ControlFlow;
 
 use indexmap::map::Slice;
+use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
@@ -40,9 +41,9 @@ type ProcessSatisfied<'a, 'db, L, B, R> = dyn Fn(
 
 /// A representation of the candidate solutions of a BDD.
 ///
-/// The most common impl is [`Vec<PendingCandidateSolution>`][PendingCandidateSolution], which
-/// stores each candidate solution directly. But there are other impls that build up _summaries_ of
-/// the solutions without having to enumerate or store them all in memory at once.
+/// The most common impl is [`InternedSolutionsId`], which stores (an interned copy of) each
+/// candidate solution directly. But there are other impls that build up _summaries_ of the
+/// solutions without having to enumerate or store them all in memory at once.
 ///
 /// Your type's [`Default`] impl should represent the empty set of solutions.
 trait FoldedSolutions<'db, L>: Default {
@@ -53,10 +54,10 @@ trait FoldedSolutions<'db, L>: Default {
     /// new solutions won't change the representation, and would be wasted work. (The canonical
     /// example is [`IsEverSatisfied`]: once we know that there is at least one satisfiable
     /// solution, we don't need to know how many _more_ there are.)
-    fn is_saturated(&self) -> bool;
+    fn is_saturated(&self, walker: &SolutionWalker<'db, L>) -> bool;
 
     /// Returns whether this set of solutions is non-empty.
-    fn is_satisfied(&self) -> bool;
+    fn is_satisfied(&self, walker: &SolutionWalker<'db, L>) -> bool;
 
     /// Creates a new instance representing a single candidate solution.
     ///
@@ -67,27 +68,6 @@ trait FoldedSolutions<'db, L>: Default {
         walker: &mut SolutionWalker<'db, L>,
         solution: PendingCandidateSolution<'db>,
     ) -> Self;
-}
-
-impl<'db, L> FoldedSolutions<'db, L> for Vec<PendingCandidateSolution<'db>> {
-    fn combine(_walker: &mut SolutionWalker<'db, L>, left: &Self, right: &Self) -> Self {
-        std::iter::chain(left, right).cloned().collect()
-    }
-
-    fn is_saturated(&self) -> bool {
-        false
-    }
-
-    fn is_satisfied(&self) -> bool {
-        !self.is_empty()
-    }
-
-    fn from_solution(
-        _walker: &mut SolutionWalker<'db, L>,
-        solution: PendingCandidateSolution<'db>,
-    ) -> Self {
-        vec![solution]
-    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -104,11 +84,11 @@ impl<'db, L> FoldedSolutions<'db, L> for IsEverSatisfied {
         IsEverSatisfied(left.0 || right.0)
     }
 
-    fn is_saturated(&self) -> bool {
+    fn is_saturated(&self, _walker: &SolutionWalker<'db, L>) -> bool {
         self.0
     }
 
-    fn is_satisfied(&self) -> bool {
+    fn is_satisfied(&self, _walker: &SolutionWalker<'db, L>) -> bool {
         self.0
     }
 
@@ -117,6 +97,66 @@ impl<'db, L> FoldedSolutions<'db, L> for IsEverSatisfied {
         _solution: PendingCandidateSolution<'db>,
     ) -> Self {
         IsEverSatisfied(true)
+    }
+}
+
+#[newtype_index]
+struct InternedSolutionsId;
+
+enum InternedSolutions<'db> {
+    Single(PendingCandidateSolution<'db>),
+    Combined(InternedSolutionsId, InternedSolutionsId),
+}
+
+impl InternedSolutionsId {
+    fn as_vec<'db, L>(self, walker: &SolutionWalker<'db, L>) -> Vec<PendingCandidateSolution<'db>> {
+        fn visit<'db, L>(
+            walker: &SolutionWalker<'db, L>,
+            interned: InternedSolutionsId,
+            dest: &mut Vec<PendingCandidateSolution<'db>>,
+        ) {
+            let interned = &walker.interned_solutions[interned];
+            match interned {
+                InternedSolutions::Single(pending) => dest.push(pending.clone()),
+                InternedSolutions::Combined(left, right) => {
+                    visit(walker, *left, dest);
+                    visit(walker, *right, dest);
+                }
+            }
+        }
+
+        let mut result = Vec::default();
+        visit(walker, self, &mut result);
+        result
+    }
+}
+
+impl<'db, L> FoldedSolutions<'db, L> for Option<InternedSolutionsId> {
+    fn combine(walker: &mut SolutionWalker<'db, L>, left: &Self, right: &Self) -> Self {
+        match (*left, *right) {
+            (None, None) => None,
+            (other @ Some(_), None) | (None, other @ Some(_)) => other,
+            (Some(left), Some(right)) => {
+                let combined = InternedSolutions::Combined(left, right);
+                Some(walker.interned_solutions.push(combined))
+            }
+        }
+    }
+
+    fn is_saturated(&self, _walker: &SolutionWalker<'db, L>) -> bool {
+        false
+    }
+
+    fn is_satisfied(&self, _walker: &SolutionWalker<'db, L>) -> bool {
+        self.is_some()
+    }
+
+    fn from_solution(
+        walker: &mut SolutionWalker<'db, L>,
+        solution: PendingCandidateSolution<'db>,
+    ) -> Self {
+        let single = InternedSolutions::Single(solution);
+        Some(walker.interned_solutions.push(single))
     }
 }
 
@@ -156,6 +196,8 @@ pub(super) struct SolutionWalker<'db, L> {
     /// Nodes that we have already checked the satisfiability of.
     node_is_satisfiable_on_path_cache: FxHashMap<ExploredNodeKey, IsEverSatisfied>,
 
+    interned_solutions: IndexVec<InternedSolutionsId, InternedSolutions<'db>>,
+
     _phantom: PhantomData<&'db ()>,
 }
 
@@ -188,6 +230,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
             node_is_satisfiable_on_path_cache: FxHashMap::default(),
+            interned_solutions: IndexVec::default(),
             _phantom: PhantomData,
         }
     }
@@ -250,7 +293,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let validations = validations.as_ref();
         let solutions =
             self.visit_node_inner(db, env, storage, path, polarity, node, validations)?;
-        ControlFlow::Continue(Self::finish(solutions))
+        ControlFlow::Continue(self.finish(solutions))
     }
 
     /// Visit a BDD node and all of its descendants, invoking the `process_satisfied` callback for
@@ -265,12 +308,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break, Vec<PendingCandidateSolution<'db>>> {
+    ) -> ControlFlow<L::Break, Option<InternedSolutionsId>> {
         self.limits.visit_node()?;
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
             (polarity, node)
         {
-            return ControlFlow::Continue(Vec::default());
+            return ControlFlow::Continue(None);
         }
 
         // See if we've already visited this node on an "equivalent" path, where we only
@@ -279,7 +322,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let key = self.explored_node_key(storage, path, polarity, node, validations);
         let is_new = self.explored_nodes.insert(key);
         if !is_new {
-            return ControlFlow::Continue(Vec::default());
+            return ControlFlow::Continue(None);
         }
 
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
@@ -315,7 +358,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             )? {
                 return self.validate_solutions(db, env, storage, path, validations);
             }
-            return ControlFlow::Continue(Vec::default());
+            return ControlFlow::Continue(None);
         }
 
         // At this point we actually have to walk the outgoing edges of this node.
@@ -332,17 +375,16 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         )
     }
 
-    fn validate_solutions(
+    fn validate_solutions<R: FoldedSolutions<'db, L>>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         validations: Option<&Validations<'db>>,
-    ) -> ControlFlow<L::Break, Vec<PendingCandidateSolution<'db>>> {
-        let solutions: Vec<PendingCandidateSolution<'db>> =
-            self.validate_satisfied_path(db, env, storage, path, validations)?;
-        if !solutions.is_empty() {
+    ) -> ControlFlow<L::Break, R> {
+        let solutions: R = self.validate_satisfied_path(db, env, storage, path, validations)?;
+        if solutions.is_satisfied(self) {
             return ControlFlow::Continue(solutions);
         }
 
@@ -352,12 +394,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         if let Some(validations) = validations {
             let upper_bounds = validations.upper_bounds.as_slice();
             let constrained = validations.constrained.as_slice();
-            let attributed =
-                self.attribute_typevar_failures(db, env, storage, path, upper_bounds, constrained)?;
-            return ControlFlow::Continue(Vec::from_iter(attributed));
+            if let Some(attributed) =
+                self.attribute_typevar_failures(db, env, storage, path, upper_bounds, constrained)?
+            {
+                return ControlFlow::Continue(R::from_solution(self, attributed));
+            }
         }
 
-        ControlFlow::Continue(Vec::default())
+        ControlFlow::Continue(R::default())
     }
 
     /// Returns whether there is _any_ satisfiable path in `node`, assuming that the assignments in
@@ -522,7 +566,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             process_node,
         )?;
         result = when_true;
-        if result.is_saturated() {
+        if result.is_saturated(self) {
             return ControlFlow::Continue(result);
         }
 
@@ -538,7 +582,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 process_node,
             )?;
             result = R::combine(self, &result, &when_uncertain);
-            if result.is_saturated() {
+            if result.is_saturated(self) {
                 return ControlFlow::Continue(result);
             }
         }
@@ -1200,7 +1244,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 // If we found at least one valid family solution, we can go ahead and return them.
                 // If every valid assignment for the remaining typevars admitted a family
                 // solution, there is no need to also record the individual constraints.
-                if family_solutions.is_satisfied() && !individual_solution_is_required.into_inner()
+                if family_solutions.is_satisfied(self)
+                    && !individual_solution_is_required.into_inner()
                 {
                     return ControlFlow::Continue(family_solutions);
                 }
@@ -1239,7 +1284,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 constrained,
                 process_satisfied,
             )?
-            && solutions.is_satisfied()
+            && solutions.is_satisfied(self)
         {
             return ControlFlow::Continue(solutions);
         }
@@ -1268,7 +1313,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 constrained,
                 process_satisfied,
             )?;
-            if solutions.is_satisfied() {
+            if solutions.is_satisfied(self) {
                 arbitrary_satisfied_constraint = Some(idx);
                 satisfied_constraint_count += 1;
             }
@@ -1297,7 +1342,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // one of them is preferred over all of the others. If so, we prefer that single solution.
         let preferred =
             constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
-                constraint_solutions[idx].is_satisfied()
+                constraint_solutions[idx].is_satisfied(self)
             });
 
         // If there was a single preferred constraint, remove the solutions from the other
@@ -1658,16 +1703,19 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         ControlFlow::Continue(pending)
     }
 
-    fn finish(mut pending: Vec<PendingCandidateSolution<'db>>) -> CandidateSolutions<'db> {
-        if pending.is_empty() {
+    fn finish(self, pending: Option<InternedSolutionsId>) -> CandidateSolutions<'db> {
+        let Some(pending) = pending else {
             return CandidateSolutions::Unsatisfiable;
-        }
-        if let [single] = pending.as_slice()
+        };
+
+        let interned = &self.interned_solutions[pending];
+        if let InternedSolutions::Single(single) = interned
             && single.candidate.typevars.is_empty()
         {
             return CandidateSolutions::Unconstrained;
         }
 
+        let mut pending = pending.as_vec(&self);
         pending.sort_by(|pending1, pending2| {
             let source_orders1 = pending1.source_orders.iter().copied();
             let source_orders2 = pending2.source_orders.iter().copied();
