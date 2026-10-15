@@ -78,8 +78,8 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, ClassSpecialization, CycleDetector,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, TypeContext,
     TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
@@ -1959,7 +1959,7 @@ impl<'db> Bindings<'db> {
                             let new_origin = generic_alias
                                 .origin(db)
                                 .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                            overload.set_return_type(Type::GenericAlias(ClassSpecialization::new(
                                 db,
                                 new_origin,
                                 generic_alias.specialization(db),
@@ -2914,7 +2914,7 @@ impl<'db> Bindings<'db> {
                                                 .origin(db)
                                                 .with_dataclass_params(db, Some(dataclass_params));
                                             overload.set_return_type(Type::GenericAlias(
-                                                GenericAlias::new(
+                                                ClassSpecialization::new(
                                                     db,
                                                     new_origin,
                                                     generic_alias.specialization(db),

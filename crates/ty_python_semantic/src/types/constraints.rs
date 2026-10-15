@@ -103,7 +103,7 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
+use crate::types::class::ClassSpecialization;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
@@ -1308,7 +1308,7 @@ impl<'db> ConstraintSetStorage<'db> {
                 // constraint itself and must not contribute to its support.
             }
 
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            fn visit_class_specialization(&self, db: &'db dyn Db, alias: ClassSpecialization<'db>) {
                 for ty in alias.specialization(db).types(db) {
                     self.visit_type(db, *ty);
                 }
