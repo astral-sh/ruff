@@ -1157,11 +1157,11 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
                 }
-                if ty.is_redundant_with(db, &self.env, element_type) {
+                if ty.is_redundant_with_distinct(db, &self.env, element_type) {
                     return;
                 }
 
-                if element_type.is_redundant_with(db, &self.env, ty) {
+                if element_type.is_redundant_with_distinct(db, &self.env, ty) {
                     to_remove.push(i);
                     continue;
                 }
