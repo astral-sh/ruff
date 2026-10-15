@@ -2993,12 +2993,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        let mut result = self.always();
+        let target_has_paramspec = target_parameters.as_paramspec_with_prefix().is_some();
 
-        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
-        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
-        // if the return types are incompatible.
-        let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
+        // Check parameters before expanding recursive returns. An incompatible parameter list
+        // already rejects the callable, and ParamSpec bindings remain available even if the
+        // return types are incompatible. Keep parameter matching in a separate frame so return
+        // comparison does not retain its local state.
+        let mut result = self.check_signature_parameter_pair(
+            db,
+            source,
+            target,
+            SignatureParameterPair {
+                source: source_parameters,
+                target: target_parameters,
+                source_has_unpacked_suffix,
+                target_has_unpacked_suffix,
+                target_typevartuple,
+            },
+        );
+        if result.is_never_satisfied(db, self.env, self.inferable) {
+            return result;
+        }
+
+        let return_type_constraints = if target_has_paramspec {
             self.check_paramspec_return_pair(db, source, target)
         } else {
             self.check_signature_return_pair(db, source, target)
@@ -3017,22 +3034,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
 
-        // Parameter matching needs substantially more local state than return comparison. Keep
-        // it in a separate frame so recursive return types do not retain that state at each step.
-        self.check_signature_parameter_pair(
-            db,
-            source,
-            target,
-            SignatureParameterPair {
-                source: source_parameters,
-                target: target_parameters,
-                source_has_unpacked_suffix,
-                target_has_unpacked_suffix,
-                target_typevartuple,
-            },
-            result,
-            return_type_checks,
-        )
+        result
     }
 
     fn check_signature_parameter_pair(
@@ -3041,8 +3043,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         parameters: SignatureParameterPair<'db>,
-        mut result: ConstraintSet<'db, 'c>,
-        return_type_checks: bool,
     ) -> ConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
@@ -3120,6 +3120,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let env = self.env;
+        let mut result = self.always();
         let SignatureParameterPair {
             source: source_parameters,
             target: target_parameters,
@@ -3808,7 +3809,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        if !return_type_checks || !keyword_collision_checks {
+        if !keyword_collision_checks {
             return result;
         }
 

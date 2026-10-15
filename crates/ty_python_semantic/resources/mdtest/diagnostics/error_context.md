@@ -283,7 +283,7 @@ error[invalid-assignment]: Object of type `def source(x: int, y: str) -> None` i
   |         ----------------------------   ^^^^^^ Incompatible value of type `def source(x: int, y: str) -> None`
   |         |
   |         Declared type
-info: incompatible return types: `None` is not assignable to `bool`
+info: the second parameter has an incompatible type: `bytes` is not assignable to `str`
 ```
 
 Assigning a `Callable` to a `Callable` with wrong parameter type:
