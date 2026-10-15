@@ -671,8 +671,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 }
             }
 
-            // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-            // e.g. `isinstance(x, list[int])` fails at runtime.
+            // We do not currently narrow against specialized class objects.
             Type::SpecializedClass(_) => None,
 
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db, env) => {

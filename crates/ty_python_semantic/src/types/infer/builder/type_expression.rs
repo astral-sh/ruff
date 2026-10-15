@@ -467,10 +467,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     {
                                         Some(literal)
                                     }
-                                    (Type::SpecializedClass(_), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::SpecializedClass(_)) => {
-                                        Some(literal)
-                                    }
+                                    (
+                                        Type::SpecializedClass(_)
+                                        | Type::KnownInstance(KnownInstanceType::GenericAlias(_)),
+                                        Type::LiteralValue(literal),
+                                    )
+                                    | (
+                                        Type::LiteralValue(literal),
+                                        Type::SpecializedClass(_)
+                                        | Type::KnownInstance(KnownInstanceType::GenericAlias(_)),
+                                    ) => Some(literal),
                                     _ => None,
                                 };
                                 literal.is_some_and(|literal| !literal.is_enum())
@@ -1833,6 +1839,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_parameterized_special_form_type_expression(subscript, special_form)
             }
             Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::GenericAlias(_) => {
+                    self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
+                }
                 KnownInstanceType::SubscriptedProtocol(_) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());

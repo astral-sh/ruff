@@ -6,9 +6,9 @@ use crate::{
     Db, DisplaySettings,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        ClassSpecialization, ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError,
+        KnownClass, PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType,
+        TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -219,6 +219,9 @@ impl<'db> MethodWrapper<'db> {
 /// bases list.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum KnownInstanceType<'db> {
+    /// A runtime generic alias such as `list[int]`, distinct from the specialized class object
+    /// represented by `Type::SpecializedClass`.
+    GenericAlias(ClassSpecialization<'db>),
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Protocol` is represented by [`super::SpecialFormType::Protocol`], not this type.
@@ -306,6 +309,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     visitor: &V,
 ) {
     match known_instance {
+        KnownInstanceType::GenericAlias(alias) => {
+            visitor.visit_class_specialization(db, alias);
+        }
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
             walk_generic_context(db, context, visitor);
@@ -380,6 +386,7 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self {
+            KnownInstanceType::GenericAlias(alias) => alias.variance_of(db, env, typevar),
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, env, typevar)
             }
@@ -400,6 +407,9 @@ impl<'db> KnownInstanceType<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
+            Self::GenericAlias(alias) => alias
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Self::GenericAlias),
             // Nothing to normalize
             Self::SubscriptedProtocol(context) => Some(Self::SubscriptedProtocol(context)),
             Self::SubscriptedGeneric(context) => Some(Self::SubscriptedGeneric(context)),
@@ -467,6 +477,7 @@ impl<'db> KnownInstanceType<'db> {
 
     pub(super) fn class(self, db: &'db dyn Db) -> KnownClass {
         match self {
+            Self::GenericAlias(_) => KnownClass::GenericAlias,
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
@@ -533,6 +544,7 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Option<Type<'db>> {
         match self {
             Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
+            Self::GenericAlias(alias) => Some(Type::instance(db, env, ClassType::Generic(alias))),
             Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
             Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
                 Some(ty.inner(db))
@@ -551,7 +563,8 @@ impl<'db> KnownInstanceType<'db> {
     pub(crate) fn is_type_form_value(self) -> bool {
         matches!(
             self,
-            Self::TypeAliasType(_)
+            Self::GenericAlias(_)
+                | Self::TypeAliasType(_)
                 | Self::UnionType(_)
                 | Self::Literal(_)
                 | Self::Annotated(_)
@@ -653,6 +666,9 @@ impl<'db> KnownInstanceType<'db> {
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::GenericAlias(alias) => Type::KnownInstance(Self::GenericAlias(
+                alias.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )),
             KnownInstanceType::TypeGenericAlias(ty) => {
                 Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
                     db,

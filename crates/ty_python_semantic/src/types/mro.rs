@@ -146,6 +146,7 @@ impl<'db> Mro<'db> {
                             | Type::KnownInstance(
                                 KnownInstanceType::SubscriptedGeneric(_)
                                     | KnownInstanceType::SubscriptedProtocol(_)
+                                    | KnownInstanceType::GenericAlias(_)
                             )
                     ) =>
             {

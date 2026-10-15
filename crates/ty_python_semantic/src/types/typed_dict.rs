@@ -18,9 +18,10 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
-    definition_expression_annotation, definition_expression_type, visitor,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType,
+    KnownInstanceType, Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder,
+    VarianceInferable, VarianceTerm, definition_expression_annotation, definition_expression_type,
+    visitor,
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
@@ -328,7 +329,10 @@ impl<'db> TypedDictType<'db> {
                 let base = base.apply_optional_specialization(db, specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
-                    Type::SpecializedClass(base) => ClassType::Generic(base),
+                    Type::SpecializedClass(base)
+                    | Type::KnownInstance(KnownInstanceType::GenericAlias(base)) => {
+                        ClassType::Generic(base)
+                    }
                     _ => continue,
                 };
 

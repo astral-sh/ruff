@@ -49,6 +49,37 @@ interpolated = np.interp(values, values, values)
 reveal_type(interpolated)  # revealed: ndarray[tuple[Any, ...], dtype[float64]]
 ```
 
+## Scalar class objects
+
+NumPy's scalar types are class objects, including those represented as generic aliases in its stubs.
+Their specializations remain distinct when passed to a function accepting a class.
+
+```py
+import numpy as np
+from numpy import int64 as Integer
+
+scalar_classes: tuple[type, ...] = (np.int8, np.uint64, np.float32, np.complex64, np.int_, np.float128)
+
+def accepts_int64(cls: type[np.int64]) -> None: ...
+
+accepts_int64(Integer)  # no diagnostic
+accepts_int64(np.int32)  # error: [invalid-argument-type]
+
+def runtime_checks(value: object) -> None:
+    isinstance(value, np.int64)  # no diagnostic
+    issubclass(type(value), np.float32)  # no diagnostic
+```
+
+Explicitly subscribing a NumPy generic class still produces an alias.
+
+```py
+from typing import Any
+
+def accepts_class(cls: type) -> None: ...
+
+accepts_class(np.signedinteger[Any])  # error: [invalid-argument-type] "Expected `type`"
+```
+
 ## Iterating over an array union
 
 An array can satisfy `map`'s iterable parameter through its gradual iterator overload, even when

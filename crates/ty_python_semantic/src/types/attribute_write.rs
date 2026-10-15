@@ -341,6 +341,15 @@ pub(super) fn attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
+    if let Type::KnownInstance(KnownInstanceType::GenericAlias(alias)) = object_ty {
+        return attribute_write_requirement(
+            db,
+            env,
+            Type::SpecializedClass(alias),
+            attribute,
+            receiver,
+        );
+    }
     match object_ty {
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
@@ -1055,6 +1064,9 @@ pub(super) fn assignment_attribute_members<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<AssignmentAttributeMembers<'db>> {
+    if let Type::KnownInstance(KnownInstanceType::GenericAlias(alias)) = object_ty {
+        return assignment_attribute_members(db, env, Type::SpecializedClass(alias), attribute);
+    }
     // Precise `functools.partial` instances synthesize a refined `__call__` member instead of
     // using the broad signature from typeshed.
     let type_member = if attribute == "__call__"

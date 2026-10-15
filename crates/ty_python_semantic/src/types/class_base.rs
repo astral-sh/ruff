@@ -246,6 +246,9 @@ impl<'db> ClassBase<'db> {
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::GenericAlias(generic) => {
+                    Some(Self::Class(ClassType::Generic(generic)))
+                }
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 // A class inheriting from a newtype would make intuitive sense, but newtype

@@ -2039,6 +2039,9 @@ pub enum KnownFunction {
     RevealMro,
     /// `struct.unpack`
     Unpack,
+    /// `functools._SingleDispatchCallable.register` and `functools.singledispatchmethod.register`
+    #[strum(serialize = "register")]
+    SingleDispatchRegister,
     /// `types.new_class`
     NewClass,
 }
@@ -2066,11 +2069,23 @@ impl KnownFunction {
         }
 
         let candidate = Self::from_str(name).ok()?;
-        candidate
-            .check_module(
-                file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?,
-            )
-            .then_some(candidate)
+        if !candidate.check_module(
+            file_to_module(db, definition.program_file(db).resolver_file(db))?.known(db)?,
+        ) {
+            return None;
+        }
+        if candidate == Self::SingleDispatchRegister {
+            let scope = definition.scope(db);
+            let class = scope.scope(db).node().as_class()?;
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            if !matches!(
+                class.node(&module).name.as_str(),
+                "_SingleDispatchCallable" | "singledispatchmethod"
+            ) {
+                return None;
+            }
+        }
+        Some(candidate)
     }
 
     /// Return `true` if `self` is defined in `module`
@@ -2110,7 +2125,7 @@ impl KnownFunction {
             Self::PytestFixture | Self::PytestYieldFixture => {
                 matches!(module, KnownModule::PytestFixtures)
             }
-            Self::TotalOrdering => module.is_functools(),
+            Self::TotalOrdering | Self::SingleDispatchRegister => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::StaticAssert => module.is_ty_extensions(),
             Self::IsAssignableTo
@@ -2238,7 +2253,9 @@ pub(crate) mod tests {
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
-                KnownFunction::TotalOrdering => KnownModule::Functools,
+                KnownFunction::TotalOrdering | KnownFunction::SingleDispatchRegister => {
+                    KnownModule::Functools
+                }
                 KnownFunction::Unpack => KnownModule::Struct,
                 KnownFunction::NewClass => KnownModule::Types,
             };
@@ -2247,12 +2264,20 @@ pub(crate) mod tests {
                 continue;
             }
 
-            let function_definition =
-                known_module_symbol(&db, &db.program_environment(), module, function_name)
+            let env = db.program_environment();
+            let function_type = if function == KnownFunction::SingleDispatchRegister {
+                known_module_symbol(&db, &env, module, "_SingleDispatchCallable")
                     .place
                     .expect_type()
-                    .expect_function_literal()
-                    .definition(&db);
+                    .member(&db, &env, "register")
+                    .place
+                    .expect_type()
+            } else {
+                known_module_symbol(&db, &env, module, function_name)
+                    .place
+                    .expect_type()
+            };
+            let function_definition = function_type.expect_function_literal().definition(&db);
 
             assert_eq!(
                 KnownFunction::try_from_definition_and_name(

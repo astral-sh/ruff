@@ -11,8 +11,8 @@ use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTup
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
-    PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
+    CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownInstanceType,
+    KnownUnion, PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
 use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use ruff_db::files::FileRange;
@@ -411,7 +411,10 @@ impl<'a> ImplementationsFinder<'a> {
             let ty = binding_type(db, *definition);
 
             let root = match ty {
-                Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::SpecializedClass(_) => {
+                Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::SpecializedClass(_)
+                | Type::KnownInstance(KnownInstanceType::GenericAlias(_)) => {
                     extract_class_literal(db, env, ty)
                 }
                 _ => None,
@@ -2032,7 +2035,8 @@ fn extract_class_literal<'db>(
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
-        Type::SpecializedClass(generic_alias) => {
+        Type::SpecializedClass(generic_alias)
+        | Type::KnownInstance(KnownInstanceType::GenericAlias(generic_alias)) => {
             Some(ClassLiteral::Static(generic_alias.origin(db)))
         }
         Type::NominalInstance(instance) => Some(instance.class(db, env).class_literal(db)),

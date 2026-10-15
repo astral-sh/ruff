@@ -1350,7 +1350,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// instance attributes and properties are intentionally not required on the class object.
     ///
     /// `meta_ty` must be a class-object type represented by `ClassLiteral`, `SubclassOf`, or
-    /// `GenericAlias`. Other types are not necessarily subtypes of `type` or callable, and could
+    /// `SpecializedClass`. Other types are not necessarily subtypes of `type` or callable, and could
     /// therefore incorrectly satisfy this check through an `Unknown` constructor return type.
     pub(super) fn check_meta_type_satisfies_protocol(
         &self,

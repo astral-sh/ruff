@@ -2074,7 +2074,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             && ty
                 .nominal_class(db, env)
                 .or_else(|| {
-                    if !is_class_object_type(ty) {
+                    if !has_class_member_access(ty) {
                         return None;
                     }
 
@@ -2421,7 +2421,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         ProtocolMethodKind::Instance | ProtocolMethodKind::Static
                     )
                 )
-            ) || (is_class_object_type(ty) && self.is_method()))
+            ) || (has_class_member_access(ty) && self.is_method()))
         {
             None
         } else {
@@ -2518,10 +2518,13 @@ fn descriptor_decorated_protocol_member<'db>(
     Some(ProtocolMemberData::property(read, write, definition))
 }
 
-fn is_class_object_type(ty: Type<'_>) -> bool {
+fn has_class_member_access(ty: Type<'_>) -> bool {
     matches!(
         ty,
-        Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_)
+        Type::ClassLiteral(_)
+            | Type::SpecializedClass(_)
+            | Type::SubclassOf(_)
+            | Type::KnownInstance(KnownInstanceType::GenericAlias(_))
     )
 }
 
@@ -2547,7 +2550,7 @@ fn protocol_member_read_type<'db>(
     let place = if access == ProtocolMemberAccessMode::Instance
         && member.is_instance_method()
         && !matches!(ty, Type::ModuleLiteral(_))
-        && (!is_class_object_type(ty) || member.uses_special_method_lookup())
+        && (!has_class_member_access(ty) || member.uses_special_method_lookup())
     {
         Type::invoke_descriptor_protocol(
             db,
@@ -2640,10 +2643,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         }
 
-        let implementation_self_binding_ty = ty
-            .to_instance_approximation(db, env)
-            .or_else(|| ty.literal_fallback_instance(db, env))
-            .unwrap_or(ty);
+        let implementation_self_binding_ty = match ty {
+            Type::KnownInstance(KnownInstanceType::GenericAlias(alias)) => {
+                Type::SpecializedClass(alias)
+            }
+            ty => ty,
+        }
+        .to_instance_approximation(db, env)
+        .or_else(|| ty.literal_fallback_instance(db, env))
+        .unwrap_or(ty);
         let (implementation_receiver_binding_ty, protocol_receiver_binding_ty) =
             if member.is_class_method() {
                 (
@@ -2881,7 +2889,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_none();
             if instance_read_missing || class_read_missing {
                 if instance_read_missing
-                    && is_class_object_type(ty)
+                    && has_class_member_access(ty)
                     && member.is_instance_method()
                     && member.uses_special_method_lookup()
                 {

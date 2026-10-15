@@ -685,7 +685,8 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                     self.record_class(db, literal.enum_class(db));
                 }
             }
-            Type::SpecializedClass(alias) => {
+            Type::SpecializedClass(alias)
+            | Type::KnownInstance(KnownInstanceType::GenericAlias(alias)) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
@@ -4018,6 +4019,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 inner.inner(db).display(db, self.env).fmt_detailed(f)?;
                 f.write_str("]'>")
             }
+            KnownInstanceType::GenericAlias(alias) => Type::SpecializedClass(alias)
+                .display_with(db, self.env, self.settings.clone())
+                .fmt_detailed(f),
             KnownInstanceType::LiteralStringAlias(_) => f
                 .with_type(KnownClass::Str.to_class_literal(db, self.env))
                 .write_str("str"),

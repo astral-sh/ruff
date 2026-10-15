@@ -36,7 +36,8 @@ fn is_union_type_operand(ty: Type<'_>) -> bool {
             | Type::SpecializedClass(_)
             | Type::SpecialForm(_)
             | Type::KnownInstance(
-                KnownInstanceType::UnionType(_)
+                KnownInstanceType::GenericAlias(_)
+                    | KnownInstanceType::UnionType(_)
                     | KnownInstanceType::Literal(_)
                     | KnownInstanceType::Annotated(_)
                     | KnownInstanceType::TypeGenericAlias(_)
@@ -1124,13 +1125,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // that custom method as we'd take one of the earlier branches.
             // This seems like it's probably rare enough that it's acceptable, however.
             (
-                Type::ClassLiteral(..) | Type::SpecializedClass(..) | Type::SubclassOf(..),
+                Type::ClassLiteral(..)
+                | Type::SpecializedClass(..)
+                | Type::SubclassOf(..)
+                | Type::KnownInstance(KnownInstanceType::GenericAlias(_)),
                 _,
                 ast::Operator::BitOr,
             )
             | (
                 _,
-                Type::ClassLiteral(..) | Type::SpecializedClass(..) | Type::SubclassOf(..),
+                Type::ClassLiteral(..)
+                | Type::SpecializedClass(..)
+                | Type::SubclassOf(..)
+                | Type::KnownInstance(KnownInstanceType::GenericAlias(_)),
                 ast::Operator::BitOr,
             ) => Type::try_call_bin_op_with_policy(
                 db,

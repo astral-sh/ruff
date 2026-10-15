@@ -111,9 +111,9 @@ class MyGenericProtocol[T](Protocol):
 
 reveal_type(is_protocol(MyGenericProtocol))  # revealed: Literal[True]
 
-# We still consider this a protocol class internally,
-# but the inferred type of the call here reflects the result at runtime:
-reveal_type(is_protocol(MyGenericProtocol[int]))  # revealed: Literal[False]
+# A generic alias is not a class object.
+# error: [invalid-argument-type]
+reveal_type(is_protocol(MyGenericProtocol[int]))  # revealed: bool
 ```
 
 A type checker should follow the typeshed stubs if a non-class is passed in, and typeshed's stubs
@@ -546,7 +546,7 @@ reveal_protocol_interface(Iterator)
 
 # error: [invalid-argument-type] "Invalid argument to `reveal_protocol_interface`: Only protocol classes can be passed to `reveal_protocol_interface`"
 reveal_protocol_interface(int)
-# error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type`, found `Literal["foo"]`"
+# error: [invalid-argument-type] "Argument to function `reveal_protocol_interface` is incorrect: Expected `type | GenericAlias`, found `Literal["foo"]`"
 reveal_protocol_interface("foo")
 ```
 
@@ -556,9 +556,9 @@ do not implement any special handling for generic aliases passed to the function
 `ty_extensions._internal.reveal_protocol_interface` can be used on both, however:
 
 ```py
-# TODO: these fail at runtime, but we don't emit `[invalid-argument-type]` diagnostics
-# currently due to https://github.com/astral-sh/ty/issues/116
+# error: [invalid-argument-type]
 reveal_type(get_protocol_members(SupportsAbs[int]))  # revealed: frozenset[str]
+# error: [invalid-argument-type]
 reveal_type(get_protocol_members(Iterator[int]))  # revealed: frozenset[str]
 
 # revealed: {"__abs__": MethodMember(`(self, /) -> int`)}
@@ -689,7 +689,7 @@ does not suffice:
 ```py
 class GenericProtocol[T](Protocol): ...
 
-get_protocol_members(GenericProtocol[int])  # TODO: should emit a diagnostic here (https://github.com/astral-sh/ruff/issues/17549)
+get_protocol_members(GenericProtocol[int])  # error: [invalid-argument-type]
 ```
 
 ## Subtyping of protocols with attribute members
@@ -7879,15 +7879,17 @@ def _(f: type[GenericFoo[int]]) -> None:
     reveal_type(f())  # revealed: GenericFoo[int]
 ```
 
-Inference derives the protocol argument from exact class objects, generic aliases, and parameters
-already annotated as `type[GenericFoo[T]]`.
+Inference derives the protocol argument from exact class objects and parameters already annotated as
+`type[GenericFoo[T]]`.
 
 ```py
 def infer_meta_protocol[T](cls: type[GenericFoo[T]]) -> T:
     raise NotImplementedError
 
 reveal_type(infer_meta_protocol(IntFoo))  # revealed: int
-reveal_type(infer_meta_protocol(GenericFooImpl[int]))  # revealed: int
+
+def _(cls: type[GenericFooImpl[int]]) -> None:
+    reveal_type(infer_meta_protocol(cls))  # revealed: int
 
 def _(f: type[GenericFoo[int]]) -> None:
     reveal_type(infer_meta_protocol(f))  # revealed: int
@@ -7903,8 +7905,8 @@ class Producer[T](Protocol):
 def infer_producer[T](cls: type[Producer[T]]) -> T:
     raise NotImplementedError
 
-def _(flag: bool) -> None:
-    cls = GenericFooImpl[int] if flag else GenericFooImpl[str]
+def _(flag: bool, int_cls: type[GenericFooImpl[int]], str_cls: type[GenericFooImpl[str]]) -> None:
+    cls = int_cls if flag else str_cls
     reveal_type(infer_producer(cls))  # revealed: int | str
 ```
 
@@ -7946,10 +7948,10 @@ def infer[T](cls: type[HasValue[T]]) -> T:
 
 reveal_type(infer(Defaulted))  # revealed: int
 reveal_type(infer(NoDefault))  # revealed: Unknown
-reveal_type(infer(Defaulted[str]))  # revealed: str
+reveal_type(infer(type(Defaulted[str]())))  # revealed: str
 
-explicit: type[HasValue[str]] = Defaulted[str]
-wrong: type[HasValue[int]] = Defaulted[str]  # error: [invalid-assignment]
+explicit: type[HasValue[str]] = type(Defaulted[str]())
+wrong: type[HasValue[int]] = type(Defaulted[str]())  # error: [invalid-assignment]
 ```
 
 Inference from a union of bare classes combines their default arguments.
@@ -7987,7 +7989,7 @@ def infer_getter[T](cls: type[Getter[T]]) -> T:
     return cls().get()
 
 reveal_type(infer_getter(DefaultedGetter))  # revealed: int
-reveal_type(infer_getter(DefaultedGetter[str]))  # revealed: str
+reveal_type(infer_getter(type(DefaultedGetter[str]())))  # revealed: str
 wrong_getter: type[Getter[str]] = DefaultedGetter  # error: [invalid-assignment]
 ```
 
@@ -8004,10 +8006,11 @@ class CallableInstance[T](Protocol):
 def infer_return[T](cls: type[CallableInstance[T]]) -> T:
     raise NotImplementedError
 
-reveal_type(infer_return(partial[str]))  # revealed: str
-reveal_type(infer_return(partial))  # revealed: Unknown
+def _(cls: type[partial[str]]) -> None:
+    reveal_type(infer_return(cls))  # revealed: str
+    bad_partial: type[CallableInstance[int]] = cls  # error: [invalid-assignment]
 
-bad_partial: type[CallableInstance[int]] = partial[str]  # error: [invalid-assignment]
+reveal_type(infer_return(partial))  # revealed: Unknown
 ```
 
 ## Generic meta-protocol constructors with a custom return type
@@ -8035,7 +8038,10 @@ class Factory[T = int]:
         raise NotImplementedError
 
 defaulted: type[HasValue[int]] = Factory
-explicit: type[HasValue[str]] = Factory[str]
+
+def _(cls: type[Factory[str]]) -> None:
+    explicit: type[HasValue[str]] = cls
+
 wrong: type[HasValue[str]] = Factory  # error: [invalid-assignment]
 ```
 

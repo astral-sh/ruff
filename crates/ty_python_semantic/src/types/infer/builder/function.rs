@@ -1948,7 +1948,8 @@ impl KnownFunction {
                 let mut good_argument = true;
                 let classes = match param_type {
                     Type::ClassLiteral(class) => vec![ClassType::NonGeneric(*class)],
-                    Type::SpecializedClass(generic_alias) => {
+                    Type::SpecializedClass(generic_alias)
+                    | Type::KnownInstance(KnownInstanceType::GenericAlias(generic_alias)) => {
                         vec![ClassType::Generic(*generic_alias)]
                     }
                     Type::Union(union) => {
@@ -1959,7 +1960,10 @@ impl KnownFunction {
                                 Type::ClassLiteral(class) => {
                                     classes.push(ClassType::NonGeneric(*class));
                                 }
-                                Type::SpecializedClass(generic_alias) => {
+                                Type::SpecializedClass(generic_alias)
+                                | Type::KnownInstance(KnownInstanceType::GenericAlias(
+                                    generic_alias,
+                                )) => {
                                     classes.push(ClassType::Generic(*generic_alias));
                                 }
                                 _ => {
@@ -2122,6 +2126,24 @@ impl KnownFunction {
                 overload.set_return_type(Type::module_literal(db, builder.program_file(), module));
             }
 
+            KnownFunction::SingleDispatchRegister => {
+                // The overload for bare decorator usage accepts any callable. Generic aliases
+                // are callable, but cannot supply a dispatch type or an annotated implementation.
+                if let [
+                    _,
+                    Some(Type::KnownInstance(KnownInstanceType::GenericAlias(_))),
+                    ..,
+                ] = parameter_types
+                    && let Some(diagnostic) = builder
+                        .context
+                        .report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
+                {
+                    diagnostic.into_diagnostic(
+                        "Generic aliases cannot be registered with `singledispatch`",
+                    );
+                }
+            }
+
             KnownFunction::TotalOrdering => {
                 // When `total_ordering(cls)` is called as a function (not as a decorator),
                 // check that the class defines at least one ordering method.
@@ -2164,9 +2186,9 @@ fn call_argument_node<'a>(
 }
 
 /// Check the second argument to `isinstance()` or `issubclass()` for types that cannot be used
-/// at runtime (protocol classes, typed dicts, `typing.Any` in `isinstance`, and invalid
-/// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
-/// recursively validates each element.
+/// at runtime (protocol classes, typed dicts, `typing.Any` in
+/// `isinstance`, and invalid `UnionType` elements). Handles class literals and tuples, including
+/// nested tuples, and recursively validates each element.
 ///
 /// `classinfo_expr` is the AST expression corresponding to `classinfo`, if available. It is
 /// used for precise annotation spans (e.g., highlighting just the `UnionType` inside a tuple

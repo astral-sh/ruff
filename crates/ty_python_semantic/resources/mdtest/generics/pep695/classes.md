@@ -199,6 +199,25 @@ def _(kwargs: dict[str, int], bad_kwargs: dict[str, str]):
     class AlsoNotFine[T](Base, **bad_kwargs): ...  # error: [invalid-argument-type]
 ```
 
+## Generic aliases are not class objects
+
+A subscribed class remains valid in annotations, constructor calls, and base lists, but is not a
+class object.
+
+```py
+class Box[T]: ...
+
+def requires_type(cls: type) -> None: ...
+
+requires_type(Box)  # no diagnostic
+requires_type(Box[int])  # error: [invalid-argument-type]
+reveal_type(Box[int]())  # revealed: Box[int]
+
+class IntBox(Box[int]): ...
+
+requires_type(IntBox)  # no diagnostic
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
@@ -324,9 +343,9 @@ reveal_type(value(Box))  # revealed: int
 
 ## Narrowing class objects of final generic classes
 
-A specialized alias is distinct from the bare class object, even when the specialization matches the
-default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
-check the return type in that branch.
+A specialized alias cannot be passed as a class object, even when its specialization matches the
+default type argument. We still check the return type of a generic function independently of its
+callers.
 
 ```py
 from typing import final
@@ -340,7 +359,7 @@ def create[T: P[str]](cls: type[T]) -> int:
         return cls()  # error: [invalid-return-type]
     return 0
 
-create(P[str])
+create(P[str])  # error: [invalid-argument-type]
 ```
 
 ## Narrowing class objects against a final protocol
@@ -931,7 +950,7 @@ reveal_type(generic_context(C.__new__))
 # revealed: ty_extensions._internal.GenericContext[Self@__init__, T@C]
 reveal_type(generic_context(C.__init__))
 
-reveal_type(C.__new__(C[str], "value"))  # revealed: C[str]
+reveal_type(C.__new__(type(C[str]("value")), "value"))  # revealed: C[str]
 
 def calls(c_str: C[str], c_int: C[int]) -> None:
     C.__init__(c_str, "value")
@@ -1879,18 +1898,18 @@ class MetaBase(metaclass=Meta[str]): ...
 class Valid[T](metaclass=Meta[str]): ...
 class Invalid[T](Base, MetaBase): ...  # error: [conflicting-metaclass]
 
-reveal_type(Valid[int].__class__)  # revealed: <class 'Meta[str]'>
-reveal_type(type(Valid[int]))  # revealed: <class 'Meta[str]'>
-reveal_type(Invalid[int].__class__)  # revealed: type[Unknown]
-reveal_type(type(Invalid[int]))  # revealed: type[Unknown]
+reveal_type(type(Valid[int]()).__class__)  # revealed: type[Meta[str]]
+reveal_type(type(type(Valid[int]())))  # revealed: type[Meta[str]]
+reveal_type(type(Invalid[int]()).__class__)  # revealed: type[Unknown]
+reveal_type(type(type(Invalid[int]())))  # revealed: type[Unknown]
 reveal_type(Invalid[int].value)  # revealed: Unknown
 ```
 
 The specialized class remains a class object, so it cannot be assigned to `None`:
 
 ```py
-meta: OtherMeta = Invalid[int]
-none: None = Invalid[int]  # error: [invalid-assignment]
+meta: OtherMeta = type(Invalid[int]())
+none: None = type(Invalid[int]())  # error: [invalid-assignment]
 ```
 
 The metaclass also remains unknown when the invalid class is reached through type-variable bounds or
@@ -1913,8 +1932,8 @@ An explicit metaclass is retained after a conflict, including its specialization
 ```py
 class Explicit[T](Base, metaclass=Meta[str]): ...  # error: [conflicting-metaclass]
 
-reveal_type(Explicit[int].__class__)  # revealed: <class 'Meta[str]'>
-reveal_type(type(Explicit[int]))  # revealed: <class 'Meta[str]'>
+reveal_type(type(Explicit[int]()).__class__)  # revealed: type[Meta[str]]
+reveal_type(type(type(Explicit[int]())))  # revealed: type[Meta[str]]
 reveal_type(Explicit[int].value)  # revealed: str
 ```
 

@@ -19,9 +19,10 @@ use crate::{
     },
     reachability::ReachabilityConstraintsExtension,
     types::{
-        ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType, class::CodeGeneratorKind,
-        function::FunctionType, infer_definition_types, may_exist_at_runtime,
+        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, ProgramEnvironment,
+        StaticClassLiteral, SubclassOfInner, Type, TypeVarBoundOrConstraints, UnionType,
+        class::CodeGeneratorKind, function::FunctionType, infer_definition_types,
+        may_exist_at_runtime,
     },
 };
 use ty_python_core::{
@@ -246,6 +247,10 @@ impl<'db> AllMembers<'db> {
                     env,
                     KnownClass::TypedDictFallback.to_class_literal(db, env),
                 );
+            }
+
+            Type::KnownInstance(KnownInstanceType::GenericAlias(alias)) => {
+                self.extend_with_type(db, env, Type::SpecializedClass(alias));
             }
 
             Type::SpecializedClass(generic_alias) if generic_alias.is_typed_dict(db) => {
