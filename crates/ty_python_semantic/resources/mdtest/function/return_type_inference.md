@@ -306,17 +306,18 @@ reveal_type(Inner1 is Inner2)  # revealed: Literal[True]
 i: Inner1 = Inner2()
 ```
 
-The inferred return type currently identifies the class by its source definition, even though each
-call creates a distinct class. Using `Unknown` would avoid this incorrect identity assumption.
+Therefore, the return type of `returns_class` cannot be `<class 'Inner'>`. Instead, we currently
+just treat it as `Unknown`.
 
 ```py
-# TODO: Should be `Unknown` until we can represent the distinct classes created by each call.
+# TODO: Should be `Unknown` or maybe `type`
 reveal_type(Inner1)  # revealed: <class 'Inner'>
 ```
 
-The current type preserves attribute information, which would be lost if we used `Unknown`:
+Unfortunately, this means that we cannot infer precise types for attributes/methods on those types:
 
 ```py
+# TODO: Should be `Unknown`
 reveal_type(Inner1().attr)  # revealed: int
 ```
 
