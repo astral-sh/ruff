@@ -4941,6 +4941,9 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     Internal helper function used by the class statement.
     """
 
+# Pydantic 2.13 uses this legacy typeshed alias in Field overloads, although it does not exist at runtime.
+ellipsis = EllipsisType
+
 Ellipsis: EllipsisType
 NotImplemented: NotImplementedType
 
