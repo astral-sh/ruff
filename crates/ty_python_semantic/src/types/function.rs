@@ -1637,7 +1637,10 @@ impl<'db> FunctionType<'db> {
 
     /// Use body inference when calling an unannotated function. Keeping this separate from
     /// `signature` avoids making every reference to a function depend on its body.
-    pub(super) fn call_signature(self, db: &'db dyn Db) -> Cow<'db, CallableSignature<'db>> {
+    pub(super) fn signature_with_inferred_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Cow<'db, CallableSignature<'db>> {
         let signature = self.signature(db);
         let [overload] = signature.overloads.as_slice() else {
             return Cow::Borrowed(signature);

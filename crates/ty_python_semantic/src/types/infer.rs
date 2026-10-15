@@ -1087,7 +1087,9 @@ struct ScopeInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// The union of reachable returns and implicit fallthrough in a function body.
+    /// For function bodies, this type represents the inferred return type, a union of all types inferred
+    /// for the expressions in reachable `return` statements, and possibly `None` if control flow can
+    /// reach the end of the function. This type is `Never` if the function cannot return.
     return_type: Option<Type<'db>>,
 }
 
