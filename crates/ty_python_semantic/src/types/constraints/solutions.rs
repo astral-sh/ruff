@@ -56,6 +56,9 @@ trait FoldedSolutions<'db, L>: Default {
     /// solution, we don't need to know how many _more_ there are.)
     fn is_saturated(&self) -> bool;
 
+    /// Returns whether this set of solutions is non-empty.
+    fn is_satisfied(&self) -> bool;
+
     /// Creates a new instance representing a single candidate solution.
     ///
     /// (Note that we build up the full candidate solution, even if you don't plan to store it in
@@ -74,6 +77,10 @@ impl<'db, L> FoldedSolutions<'db, L> for Vec<PendingCandidateSolution<'db>> {
 
     fn is_saturated(&self) -> bool {
         false
+    }
+
+    fn is_satisfied(&self) -> bool {
+        !self.is_empty()
     }
 
     fn from_solution(
@@ -99,6 +106,10 @@ impl<'db, L> FoldedSolutions<'db, L> for IsEverSatisfied {
     }
 
     fn is_saturated(&self) -> bool {
+        self.0
+    }
+
+    fn is_satisfied(&self) -> bool {
         self.0
     }
 
@@ -947,7 +958,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let upper_bounds = validations.upper_bounds.as_slice();
         let constrained = validations.constrained.as_slice();
         self.validate_upper_bound(db, env, storage, path, upper_bounds, constrained)
-            .map_continue(Option::unwrap_or_default)
     }
 
     fn validate_upper_bound<R: FoldedSolutions<'db, L>>(
@@ -958,7 +968,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         path: &mut PathAssignments,
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-    ) -> ControlFlow<L::Break, Option<R>> {
+    ) -> ControlFlow<L::Break, R> {
         let Some(((&bound_typevar, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound. Next check the typevars with
             // declared constraints.
@@ -969,19 +979,21 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 path,
                 constrained,
                 &|this, storage, path| {
-                    let solution = this.found_satisfied_path(db, env, storage, path)?;
-                    ControlFlow::Continue(solution.map(|solution| R::from_solution(this, solution)))
+                    let Some(solution) = this.found_satisfied_path(db, env, storage, path)? else {
+                        return ControlFlow::Continue(R::default());
+                    };
+                    ControlFlow::Continue(R::from_solution(this, solution))
                 },
             );
         };
 
         let Some(constraints) = upper_bound.constraints.as_deref() else {
             // This upper bound is entirely unsatisfiable.
-            return ControlFlow::Continue(None);
+            return ControlFlow::Continue(R::default());
         };
 
         if !self.inferred_lower_satisfies_upper_bound(db, env, storage, path, bound_typevar)? {
-            return ControlFlow::Continue(None);
+            return ControlFlow::Continue(R::default());
         }
 
         // Verify that we can add all of the upper bound's constraints to the current path without
@@ -1006,8 +1018,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break, Option<R>>,
-    ) -> ControlFlow<L::Break, Option<R>> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break, R>,
+    ) -> ControlFlow<L::Break, R> {
         let Some(((&bound_typevar, constrained_typevar), constrained)) = constrained.split_first()
         else {
             // We've checked all constrained typevars, and we now know that the candidate solution
@@ -1053,7 +1065,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         ) else {
             // If the evidence is not satisfiable, then we can return early; none of the
             // constraints can possibly be satisfied.
-            return ControlFlow::Continue(None);
+            return ControlFlow::Continue(R::default());
         };
         let has_no_evidence = evidence.evidence_lower.is_none() && !evidence.upper.has_evidence();
         let is_preservable_typevar = |ty| {
@@ -1177,7 +1189,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                                 // constraints. It definitely cannot be used as a solution, and
                                 // also does not affect whether any other potential family
                                 // solutions can be used.
-                                ControlFlow::Continue(None)
+                                ControlFlow::Continue(R::default())
                             }
                             1 => {
                                 // This family solution satisfies exactly one declared constraint.
@@ -1186,7 +1198,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                                 // this family solution _or any other_. We'll create one or more
                                 // individual solutions below.
                                 individual_solution_is_required.set(true);
-                                ControlFlow::Continue(None)
+                                ControlFlow::Continue(R::default())
                             }
                             _ => {
                                 // This solution satisfies more than one declared constraint, so
@@ -1200,7 +1212,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 // If we found at least one valid family solution, we can go ahead and return them.
                 // If every valid assignment for the remaining typevars admitted a family
                 // solution, there is no need to also record the individual constraints.
-                if family_solutions.is_some() && !individual_solution_is_required.into_inner() {
+                if family_solutions.is_satisfied() && !individual_solution_is_required.into_inner()
+                {
                     return ControlFlow::Continue(family_solutions);
                 }
 
@@ -1227,7 +1240,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     .is_some()
             });
         if let Some(preferred) = preferred
-            && let Some(solutions) = self.validate_single_declared_constraint(
+            && let solutions = self.validate_single_declared_constraint(
                 db,
                 env,
                 storage,
@@ -1238,12 +1251,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 constrained,
                 process_satisfied,
             )?
+            && solutions.is_satisfied()
         {
-            return ControlFlow::Continue(Some(solutions));
+            return ControlFlow::Continue(solutions);
         }
 
         let constraint_count = constrained_typevar.declared_constraints.len();
-        let mut constraint_solutions = SmallVec::<[Option<R>; 4]>::with_capacity(constraint_count);
+        let mut constraint_solutions = SmallVec::<[R; 4]>::with_capacity(constraint_count);
         let mut satisfied_constraint_count = 0usize;
         let mut arbitrary_satisfied_constraint = None;
         for (idx, declared_constraint) in
@@ -1251,7 +1265,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         {
             if preferred == Some(idx) {
                 // We already checked this one above.
-                constraint_solutions.push(None);
+                constraint_solutions.push(R::default());
                 continue;
             }
 
@@ -1266,19 +1280,28 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 constrained,
                 process_satisfied,
             )?;
-            if solutions.is_some() {
+            if solutions.is_satisfied() {
                 arbitrary_satisfied_constraint = Some(idx);
                 satisfied_constraint_count += 1;
             }
             constraint_solutions.push(solutions);
+
+            // It would be tempting to add a saturation check here: If the combination of the
+            // per-constraint solutions we've seen so far becomes saturated, we wouldn't need to
+            // bother checking the remaining ones, since that couldn't affect the final result.
+            // However, that only applies to the "keep them all" solution at the very bottom. If
+            // _one_ per-constraint solution is preferred over the others, we need to keep it at
+            // full fidelity (even if it occurs last) so that we can return it as-is.
         }
 
         // Fast path: If exactly one constraint was satisfied, we can return its solutions
         // immediately. If _no_ constraints were satisfied, we can return its _lack_ of solutions
         // immediately.
-        if satisfied_constraint_count <= 1 {
-            let solutions =
-                arbitrary_satisfied_constraint.and_then(|idx| constraint_solutions[idx].take());
+        if satisfied_constraint_count == 0 {
+            return ControlFlow::Continue(R::default());
+        } else if satisfied_constraint_count == 1 {
+            let idx = arbitrary_satisfied_constraint.expect("should have a solution");
+            let solutions = std::mem::take(&mut constraint_solutions[idx]);
             return ControlFlow::Continue(solutions);
         }
 
@@ -1286,13 +1309,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // one of them is preferred over all of the others. If so, we prefer that single solution.
         let preferred =
             constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
-                constraint_solutions[idx].is_some()
+                constraint_solutions[idx].is_satisfied()
             });
 
         // If there was a single preferred constraint, remove the solutions from the other
         // constraints.
         if let Some(best) = preferred {
-            let solutions = constraint_solutions[best].take();
+            let solutions = std::mem::take(&mut constraint_solutions[best]);
             return ControlFlow::Continue(solutions);
         }
 
@@ -1300,8 +1323,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // ambiguity.
         let solutions = constraint_solutions
             .into_iter()
-            .flatten()
-            .reduce(|result, solutions| R::combine(self, &result, &solutions));
+            .fold(R::default(), |result, solutions| {
+                R::combine(self, &result, &solutions)
+            });
         ControlFlow::Continue(solutions)
     }
 
@@ -1316,10 +1340,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         evidence: &CandidateTypeVarSolution<'db>,
         declared_constraint: &DeclaredConstraint<'db>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
-        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break, Option<R>>,
-    ) -> ControlFlow<L::Break, Option<R>> {
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break, R>,
+    ) -> ControlFlow<L::Break, R> {
         let Some(constraints) = declared_constraint.constraints.as_deref() else {
-            return ControlFlow::Continue(None);
+            return ControlFlow::Continue(R::default());
         };
         self.with_declared_constraint_solution(
             db,
@@ -1342,7 +1366,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                             evidence,
                             declared_constraint.constrained_ty,
                         ) {
-                            return ControlFlow::Continue(None);
+                            return ControlFlow::Continue(R::default());
                         }
 
                         // The candidate solution satisfies this declared constraint, but we still
