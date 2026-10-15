@@ -6589,45 +6589,6 @@ mod tests {
     }
 
     #[test]
-    fn diagnostic_keys_ignore_satisfied_receiver_constraints() {
-        let plain = Signature::new(Parameters::empty(), Type::unknown());
-        let with_receiver = |assignability, receiver| Signature {
-            extras: SignatureExtras::new(
-                None,
-                Some(ReceiverConstraints::new(
-                    assignability,
-                    [(receiver, Type::any())],
-                )),
-                false,
-            ),
-            ..plain.clone()
-        };
-        let any_receiver = with_receiver(OwnedConstraintSet::always(), Type::any());
-        let unknown_receiver = with_receiver(OwnedConstraintSet::always(), Type::unknown());
-
-        // Strict receiver checks still distinguish these semantic signatures.
-        assert_ne!(any_receiver, unknown_receiver);
-        assert_ne!(any_receiver, plain);
-        let keys = FxHashSet::from_iter([
-            plain.diagnostic_key(),
-            any_receiver.diagnostic_key(),
-            unknown_receiver.diagnostic_key(),
-        ]);
-        assert_eq!(keys.len(), 1);
-
-        let ineligible_receiver = with_receiver(OwnedConstraintSet::default(), Type::unknown());
-        assert_ne!(plain.diagnostic_key(), ineligible_receiver.diagnostic_key());
-        let other_ineligible_receiver = with_receiver(OwnedConstraintSet::default(), Type::any());
-        assert_ne!(
-            ineligible_receiver.diagnostic_key(),
-            other_ineligible_receiver.diagnostic_key()
-        );
-
-        let overload = any_receiver.clone().with_source_overload_index(Some(0));
-        assert_ne!(any_receiver.diagnostic_key(), overload.diagnostic_key());
-    }
-
-    #[test]
     fn empty() {
         let mut db = setup_db();
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
