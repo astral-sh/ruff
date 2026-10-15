@@ -489,7 +489,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
-                        || value_ty.is_generic_alias()
+                        || value_ty.is_specialized_class_or_alias()
                     {
                         return Some((SemanticTokenType::Class, modifiers));
                     }
@@ -573,7 +573,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         // highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
         match ty {
             Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
+            | Type::SpecializedClass(_)
             | Type::SubclassOf(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_) => {

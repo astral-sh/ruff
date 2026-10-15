@@ -3319,7 +3319,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::Callable(_) => CompletionKind::Function,
             Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
             Type::ModuleLiteral(_) => CompletionKind::Module,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+            Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_) => {
                 CompletionKind::Class
             }
             // This is a little weird for "struct." I'm mostly interpreting

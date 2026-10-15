@@ -170,7 +170,9 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             Type::ClassLiteral(class) => {
                 Some(Type::instance(db, env, class.default_specialization(db)))
             }
-            Type::GenericAlias(alias) => Some(Type::instance(db, env, ClassType::Generic(alias))),
+            Type::SpecializedClass(alias) => {
+                Some(Type::instance(db, env, ClassType::Generic(alias)))
+            }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 Some(Type::object())
             }

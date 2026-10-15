@@ -1955,15 +1955,17 @@ impl<'db> Bindings<'db> {
                                 ));
                             }
                         }
-                        [Some(Type::GenericAlias(generic_alias))] => {
+                        [Some(Type::SpecializedClass(generic_alias))] => {
                             let new_origin = generic_alias
                                 .origin(db)
                                 .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(ClassSpecialization::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
+                            overload.set_return_type(Type::SpecializedClass(
+                                ClassSpecialization::new(
+                                    db,
+                                    new_origin,
+                                    generic_alias.specialization(db),
+                                ),
+                            ));
                         }
                         _ => {}
                     },
@@ -2890,7 +2892,7 @@ impl<'db> Bindings<'db> {
                                         matches!(
                                             overload.return_type(),
                                             Type::ClassLiteral(_)
-                                                | Type::GenericAlias(_)
+                                                | Type::SpecializedClass(_)
                                                 | Type::SubclassOf(_)
                                         )
                                     };
@@ -2907,13 +2909,13 @@ impl<'db> Bindings<'db> {
                                             ));
                                             continue;
                                         }
-                                        Some(Some(Type::GenericAlias(generic_alias)))
+                                        Some(Some(Type::SpecializedClass(generic_alias)))
                                             if returns_class() =>
                                         {
                                             let new_origin = generic_alias
                                                 .origin(db)
                                                 .with_dataclass_params(db, Some(dataclass_params));
-                                            overload.set_return_type(Type::GenericAlias(
+                                            overload.set_return_type(Type::SpecializedClass(
                                                 ClassSpecialization::new(
                                                     db,
                                                     new_origin,
@@ -6298,7 +6300,7 @@ impl<'db> CallInference<'_, 'db> {
         }
         visitor.visit(db, (left, right), || {
             let class_specialization = |ty| match ty {
-                Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
+                Type::SpecializedClass(alias) => Some((alias.origin(db), alias.specialization(db))),
                 Type::NominalInstance(_) => ty.class_specialization(db, env),
                 // A pending protocol materialization affects its members, not just its arguments.
                 Type::ProtocolInstance(protocol) if protocol.materialization_kind(db).is_none() => {
@@ -6372,7 +6374,7 @@ impl<'db> CallInference<'_, 'db> {
             if matches!(
                 (left, right),
                 (Type::NominalInstance(_), Type::NominalInstance(_))
-                    | (Type::GenericAlias(_), Type::GenericAlias(_))
+                    | (Type::SpecializedClass(_), Type::SpecializedClass(_))
                     | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
             ) && let (Some((left_class, left)), Some((right_class, right))) =
                 (class_specialization(left), class_specialization(right))

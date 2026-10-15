@@ -199,7 +199,7 @@ pub(super) fn non_alias_assignment<'db>(
         if matches!(
             base,
             Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
         ) && forwarding_alias_definition(db, definition, &subscript.value)

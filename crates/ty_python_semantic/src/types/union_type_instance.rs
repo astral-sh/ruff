@@ -3,7 +3,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::{definition::Definition, scope::ScopeId};
 
 use super::{
-    ApplyTypeMappingVisitor, GenericAlias, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+    ApplyTypeMappingVisitor, ClassSpecialization, InferenceFlags, InvalidTypeExpressionError, KnownClass,
     KnownInstanceType, Type, TypeContext, TypeMapping, UnionBuilder, visitor::TypeVisitor,
 };
 use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
@@ -89,10 +89,10 @@ fn normalize_none_operand<'db>(
 fn same_generic_operand<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    left: GenericAlias<'db>,
-    right: GenericAlias<'db>,
+    left: ClassSpecialization<'db>,
+    right: ClassSpecialization<'db>,
 ) -> bool {
-    Type::GenericAlias(left).is_equivalent_to(db, env, Type::GenericAlias(right))
+    Type::SpecializedClass(left).is_equivalent_to(db, env, Type::SpecializedClass(right))
 }
 
 #[salsa::tracked]
@@ -193,7 +193,7 @@ impl<'db> UnionTypeInstance<'db> {
         left.value_expression_types(db, env)
             .zip_longest(right.value_expression_types(db, env))
             .all(|pair| match pair {
-                EitherOrBoth::Both(Type::GenericAlias(a), Type::GenericAlias(b)) => {
+                EitherOrBoth::Both(Type::SpecializedClass(a), Type::SpecializedClass(b)) => {
                     same_generic_operand(db, env, a, b)
                 }
                 EitherOrBoth::Both(a, b) => a == b,
@@ -394,7 +394,7 @@ impl<'db> UnionTypeInstance<'db> {
                 }
                 let Type::KnownInstance(KnownInstanceType::UnionType(union)) = value else {
                     // Group aliases by origin to avoid comparing specializations of unrelated classes.
-                    if let Type::GenericAlias(alias) = value {
+                    if let Type::SpecializedClass(alias) = value {
                         let aliases: &mut Vec<_> =
                             aliases_by_origin.entry(alias.origin(db)).or_default();
                         if aliases

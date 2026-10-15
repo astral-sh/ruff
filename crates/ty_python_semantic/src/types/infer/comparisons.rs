@@ -530,7 +530,7 @@ impl<'db> Type<'db> {
                 | Type::Callable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)

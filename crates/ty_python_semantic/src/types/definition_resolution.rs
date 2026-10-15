@@ -395,7 +395,7 @@ pub(crate) fn definitions_for_attribute<'db>(
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
         let lookup_type = match ty {
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => ty,
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::SpecializedClass(_) => ty,
             _ => meta_type,
         };
 

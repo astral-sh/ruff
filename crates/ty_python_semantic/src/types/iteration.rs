@@ -262,7 +262,7 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(newtype) => {
                     non_async_special_case(db, env, newtype.concrete_base_type(db))
                 }
-                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
+                Type::SpecializedClass(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
                     TupleSpec::homogeneous(todo_type!("*tuple[] annotations")),
                 )),
                 Type::LiteralValue(literal) => match literal.kind() {
@@ -391,7 +391,7 @@ impl<'db> Type<'db> {
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::BoundMethod(_)
                 | Type::KnownBoundMethod(_)
                 | Type::WrapperDescriptor(_)
