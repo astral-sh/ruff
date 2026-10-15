@@ -2,7 +2,7 @@ use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -712,13 +712,28 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
     visitor: &V,
 ) {
     let env = visitor.program_environment();
+    for_each_protocol_instance_member_type(db, env, member, receiver_ty, |part| match part {
+        Either::Left(ty) => visitor.visit_type(db, ty),
+        Either::Right(signature) => visitor.visit_signature(db, signature),
+    });
+}
+
+/// Enumerates a member's exposed types and signatures without traversing their contents.
+/// Implicit receivers are bound, while explicit receiver annotations remain in the signature.
+pub(super) fn for_each_protocol_instance_member_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    member: &ProtocolMember<'_, 'db>,
+    receiver_ty: Type<'db>,
+    mut visit: impl FnMut(Either<Type<'db>, &Signature<'db>>),
+) {
     match member.data.kind {
         ProtocolMemberKind::Method(method, kind) => {
             let method = member
                 .materialization
                 .map_or(method, |kind| method.materialization(db, env, kind));
             let Type::Callable(callable) = method else {
-                visitor.visit_type(db, method);
+                visit(Either::Left(method));
                 return;
             };
             for signature in callable.signatures(db) {
@@ -736,18 +751,19 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                         Some(runtime_type),
                         Some(receiver_ty),
                     );
-                    visitor.visit_signature(db, &signature);
+                    visit(Either::Right(&signature));
                 } else {
-                    visitor.visit_signature(db, signature);
+                    visit(Either::Right(signature));
                 }
             }
         }
         ProtocolMemberKind::Property { .. } => {
-            walk_protocol_member_access(
+            for_each_protocol_member_access_type(
                 db,
+                env,
                 member.access(ProtocolMemberAccessMode::Instance),
                 Some(receiver_ty),
-                visitor,
+                |ty| visit(Either::Left(ty)),
             );
         }
         ProtocolMemberKind::Attribute(attribute) => {
@@ -757,7 +773,7 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                 }),
                 ..attribute
             };
-            visitor.visit_type(db, attribute.bind_self(db, env, receiver_ty));
+            visit(Either::Left(attribute.bind_self(db, env, receiver_ty)));
         }
     }
 }
@@ -1534,18 +1550,30 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
     visitor: &V,
 ) {
     let env = visitor.program_environment();
+    for_each_protocol_member_access_type(db, env, access, self_type, |ty| {
+        visitor.visit_type(db, ty);
+    });
+}
+
+fn for_each_protocol_member_access_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    access: ProtocolMemberAccess<'_, 'db>,
+    self_type: Option<Type<'db>>,
+    mut visit: impl FnMut(Type<'db>),
+) {
     let read_ty = access
         .read()
         .and_then(|read| read.result_type(db, env, self_type));
     if let Some(read_ty) = read_ty {
-        visitor.visit_type(db, read_ty);
+        visit(read_ty);
     } else if access.mode == ProtocolMemberAccessMode::Instance
         && let ProtocolMemberKind::Property {
             read: Some(read), ..
         } = access.declaration.kind
     {
         // Fall back to the accessor callable when its read type cannot be extracted.
-        visitor.visit_type(db, read.ty());
+        visit(read.ty());
     }
 
     let Some(write) = access.write() else {
@@ -1556,13 +1584,13 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
         .as_ref()
         .and_then(ProtocolMemberWriteRequirement::accepted_type);
     if let Some(write_ty) = write_ty {
-        visitor.visit_type(db, write_ty);
+        visit(write_ty);
     } else if let Some(domain) = write.declaration.domain() {
         // Apply the same accessor fallback when the write type cannot be extracted.
-        visitor.visit_type(db, domain.ty());
+        visit(domain.ty());
     }
     if let Some(ProtocolMemberWriteRequirement::Descriptor { descriptor_ty, .. }) = requirement {
-        visitor.visit_type(db, descriptor_ty);
+        visit(descriptor_ty);
     }
 }
 
