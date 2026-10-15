@@ -148,6 +148,12 @@ pub enum ReturnTypeInference {
     Always,
 }
 
+impl ReturnTypeInference {
+    const fn is_active(self) -> bool {
+        matches!(self, Self::Always)
+    }
+}
+
 impl ty_combine::Combine for ReturnTypeInference {
     fn combine_with(&mut self, _other: Self) {}
 }

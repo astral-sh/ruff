@@ -6873,7 +6873,8 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let Some(signature) = bound_method.unbound_signatures(db) else {
+                let Some(signature) = bound_method.unbound_signatures_with_inferred_return_type(db)
+                else {
                     return bound_method
                         .func(db)
                         .try_upcast_to_callable(db, env)
@@ -7119,7 +7120,11 @@ impl<'db> Type<'db> {
 
                 _ => CallableBinding::from_overloads(
                     self,
-                    function_type.signature(db).overloads.iter().cloned(),
+                    function_type
+                        .signature_with_inferred_return_type(db)
+                        .overloads
+                        .iter()
+                        .cloned(),
                 )
                 .into(),
             },
