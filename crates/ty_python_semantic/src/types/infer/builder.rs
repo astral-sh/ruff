@@ -139,10 +139,7 @@ use crate::types::{
     extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{
-    AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, ReturnTypeInference,
-    SemanticModel,
-};
+use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, BindingsOwner,
     ComprehensionDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey, DefinitionState,
@@ -12433,7 +12430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the return type of a function body based on the types of
     /// expressions in reachable `return` statements.
     fn inferred_return_type(&self) -> Option<Type<'db>> {
-        if self.settings().return_type_inference != ReturnTypeInference::Always {
+        if !self.settings().return_type_inference.is_active() {
             return None;
         }
 

@@ -87,7 +87,7 @@ use crate::types::{
     SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
     definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment, ReturnTypeInference};
+use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -702,13 +702,21 @@ impl<'db> OverloadLiteral<'db> {
             //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
             //     and so we need specialization inference to determine the "real" class that the
             //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
+            //
+            // We cannot skip creating `Self` if return type inference is active. Otherwise, a function
+            // like `def method(self): return self`, that has an inferred return type of `Self`, would
+            // not be generic.
+            let return_type_inference_is_active = function_stmt_node.returns.is_none()
+                && db
+                    .analysis_settings(self.file(db))
+                    .return_type_inference
+                    .is_active()
+                && !is_exempt_from_return_type_inference(self.name(db));
+
             if method_has_explicit_self
                 || class_is_generic
                 || class_is_fallback
-                || (function_stmt_node.returns.is_none()
-                    && db.analysis_settings(self.file(db)).return_type_inference
-                        == ReturnTypeInference::Always
-                    && !matches!(self.name(db).as_str(), "__new__" | "__init__"))
+                || return_type_inference_is_active
             {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
@@ -1645,12 +1653,15 @@ impl<'db> FunctionType<'db> {
         let [overload] = signature.overloads.as_slice() else {
             return Cow::Borrowed(signature);
         };
-        if db.analysis_settings(self.file(db)).return_type_inference == ReturnTypeInference::Never
+        if !db
+            .analysis_settings(self.file(db))
+            .return_type_inference
+            .is_active()
             || !overload.return_ty.is_unknown()
             || self.file(db).is_stub(db)
             || self.has_explicit_return_annotation(db)
             || !self.overloads_and_implementation(db).0.is_empty()
-            || matches!(self.name(db).as_str(), "__new__" | "__init__")
+            || is_exempt_from_return_type_inference(self.name(db))
         {
             return Cow::Borrowed(signature);
         }
@@ -2002,6 +2013,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
         self.check_callable_signature_pair(db, source.signature(db), target.signature(db))
     }
+}
+
+// Determines if a function is exempt from return type inference based on its name.
+fn is_exempt_from_return_type_inference(name: &ast::name::Name) -> bool {
+    // See explanation in `return_type_inference.md`
+    matches!(name.as_str(), "__new__" | "__init__")
 }
 
 /// Returns `true` if the function body is stub-like, ignoring a leading docstring.
