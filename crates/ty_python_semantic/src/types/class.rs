@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -1498,6 +1498,62 @@ impl<'db> ClassType<'db> {
         target: ClassType<'db>,
     ) -> bool {
         self.has_relation_to(db, env, target, TypeRelation::Subtyping)
+    }
+
+    /// Check nominal redundancy against a non-generic class without comparing type arguments.
+    pub(super) fn is_redundant_with_non_generic(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        target: ClassLiteral<'db>,
+    ) -> bool {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _, _| true,
+            heap_size=ruff_memory_usage::heap_size,
+            self_ty=ClassType<'db>
+        )]
+        fn is_redundant_with_non_generic_<'db>(
+            db: &'db dyn Db,
+            this: ClassType<'db>,
+            program: Program<'db>,
+            target: ClassLiteral<'db>,
+        ) -> bool {
+            this.has_relation_to(
+                db,
+                &ProgramEnvironment::from_program(program),
+                ClassType::NonGeneric(target),
+                TypeRelation::Redundancy { pure: false },
+            )
+        }
+
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _, _| true,
+            heap_size=ruff_memory_usage::heap_size,
+            self_ty=ClassType<'db>
+        )]
+        fn is_redundant_with_static_classes<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            source: StaticClassLiteral<'db>,
+            target: StaticClassLiteral<'db>,
+        ) -> bool {
+            ClassType::NonGeneric(ClassLiteral::Static(source)).has_relation_to(
+                db,
+                &ProgramEnvironment::from_program(program),
+                ClassType::NonGeneric(ClassLiteral::Static(target)),
+                TypeRelation::Redundancy { pure: false },
+            )
+        }
+
+        // Static pairs need only their interned handles in the query key.
+        match (self, target) {
+            (Self::NonGeneric(ClassLiteral::Static(source)), ClassLiteral::Static(target)) => {
+                is_redundant_with_static_classes(db, program, source, target)
+            }
+            _ => is_redundant_with_non_generic_(db, self, program, target),
+        }
     }
 
     /// Check a nominal type relation directly between classes, including their specializations.

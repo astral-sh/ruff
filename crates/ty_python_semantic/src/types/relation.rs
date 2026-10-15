@@ -694,6 +694,26 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // Without a tuple specification or generic target, nominal redundancy only
+        // depends on the classes. Avoid interning their larger instance types.
+        if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, other) {
+            if target.is_object() {
+                return true;
+            }
+            if source.is_object() {
+                return false;
+            }
+            if target.own_tuple_spec(db).is_none()
+                && let ClassType::NonGeneric(target_class) = target.class(db, env)
+            {
+                return source.class(db, env).is_redundant_with_non_generic(
+                    db,
+                    env.program(db),
+                    target_class,
+                );
+            }
+        }
+
         let program = env.program(db);
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }
