@@ -11,7 +11,6 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
-use std::borrow::Cow;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -2296,36 +2295,6 @@ impl<'db> Signature<'db> {
         self.extras
             .as_ref()
             .and_then(|extras| extras.receiver_constraints.as_ref())
-    }
-
-    /// Returns an identity for deduplicating constructor diagnostics.
-    ///
-    /// Eligible receivers can distinguish inherited methods with identical call diagnostics. Omit
-    /// their constraints only when cached assignability proves they are satisfied; otherwise retain
-    /// the receiver types so distinct receiver errors remain visible. This identity must not be used
-    /// to compare callable types.
-    pub(super) fn diagnostic_key(&self) -> Cow<'_, Self> {
-        let Some(SignatureExtras {
-            source_overload_index,
-            receiver_constraints: Some(receiver_constraints),
-            is_paramspec_value,
-        }) = self.extras.as_deref()
-        else {
-            return Cow::Borrowed(self);
-        };
-        if !receiver_constraints
-            .assignability
-            .is_trivially_always_satisfied()
-        {
-            return Cow::Borrowed(self);
-        }
-        Cow::Owned(Self {
-            generic_context: self.generic_context,
-            definition: self.definition,
-            extras: SignatureExtras::new(*source_overload_index, None, *is_paramspec_value),
-            parameters: self.parameters.clone(),
-            return_ty: self.return_ty,
-        })
     }
 
     /// Returns this signature's position in its defining function's overload list.
