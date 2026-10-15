@@ -3550,6 +3550,7 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_parser",
  "ruff_python_trivia",
+ "ruff_regex",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash",
@@ -3695,6 +3696,14 @@ dependencies = [
  "schemars",
  "serde",
  "toml 1.1.6+spec-1.1.0",
+]
+
+[[package]]
+name = "ruff_regex"
+version = "0.0.17"
+dependencies = [
+ "regex",
+ "regex-lite",
 ]
 
 [[package]]
