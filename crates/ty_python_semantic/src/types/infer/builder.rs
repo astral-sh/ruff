@@ -12430,40 +12430,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
-        self.infer_region();
+    /// Infer the return type of a function body based on the types of
+    /// expressions in reachable `return` statements.
+    fn inferred_return_type(&self) -> Option<Type<'db>> {
+        if self.settings().return_type_inference != ReturnTypeInference::Always {
+            return None;
+        }
 
         let db = self.db();
+        let function = self.scope().node(db).as_function()?.node(self.module());
+
+        // We never infer types for functions with an explicit return type annotation
+        if function.returns.is_some() {
+            return None;
+        }
+
+        // TODO: Support return type inference for async functions and generators
+        if function.is_async
+            || self
+                .scope()
+                .file_scope_id(db)
+                .is_generator_function(self.index)
+        {
+            return None;
+        }
+
         let env = self.program_environment();
-        let return_type = self
-            .scope()
-            .node(db)
-            .as_function()
-            .filter(|function| {
-                let function = function.node(self.module());
-                self.settings().return_type_inference == ReturnTypeInference::Always
-                    && function.returns.is_none()
-                    && !function.is_async
-                    && !self
-                        .scope()
-                        .file_scope_id(db)
-                        .is_generator_function(self.index)
-            })
-            .map(|_| {
-                let mut returns = UnionBuilder::new(db, env);
-                if let Some(fallback) = self.cycle_recovery {
-                    returns = returns.add(fallback);
-                }
-                for returned in &self.return_types_and_ranges {
-                    if self.context.is_range_reachable(returned.range) {
-                        returns = returns.add(returned.ty);
-                    }
-                }
-                if is_end_of_scope_reachable(db, self.scope()) {
-                    returns = returns.add(Type::none(db, env));
-                }
-                returns.build()
-            });
+        let mut return_type = UnionBuilder::new(db, env);
+
+        // During cycle recovery, include `Divergent` to avoid inferring `Never`,
+        // which could make code after a recursive call appear unreachable.
+        if let Some(fallback) = self.cycle_recovery {
+            return_type = return_type.add(fallback);
+        }
+
+        // Union the types of all expressions in reachable `return` statements
+        for returned in &self.return_types_and_ranges {
+            if self.context.is_range_reachable(returned.range) {
+                return_type = return_type.add(returned.ty);
+            }
+        }
+
+        // Add `None` if the function can implicitly return it
+        if is_end_of_scope_reachable(db, self.scope()) {
+            return_type = return_type.add(Type::none(db, env));
+        }
+
+        Some(return_type.build())
+    }
+
+    pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
+        self.infer_region();
+        let return_type = self.inferred_return_type();
 
         let Self {
             implicit_aliases,
