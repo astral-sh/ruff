@@ -3129,7 +3129,7 @@ pub(super) fn report_possibly_missing_attribute(
             "Attribute `{attribute}` may be missing on class `{}`",
             class.name(db),
         )),
-        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+        Type::SpecializedClass(alias) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
             alias.display(db, env),
         )),
@@ -4895,7 +4895,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
 
     for (base_index, base) in explicit_bases.iter().enumerate() {
         let base_class = match base {
-            Type::GenericAlias(alias) => ClassType::Generic(*alias),
+            Type::SpecializedClass(alias) => ClassType::Generic(*alias),
             Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
                 ClassType::NonGeneric(*class)
             }
@@ -4941,7 +4941,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                     ));
                     let later_is_direct = matches!(
                         base,
-                        Type::GenericAlias(alias) if alias.origin(db) == origin
+                        Type::SpecializedClass(alias) if alias.origin(db) == origin
                     );
 
                     if let (Some(earlier_base), Some(later_base)) = (

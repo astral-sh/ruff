@@ -699,7 +699,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                 Type::Never
                 | Type::Callable(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::NominalInstance(_)
                 | Type::Union(_)
                 | Type::Intersection(_)
@@ -811,7 +811,9 @@ fn specialization_argument_is_static<'db>(
         | Type::Union(_)
         | Type::Intersection(_)
         | Type::LiteralValue(_) => false,
-        Type::GenericAlias(alias) => alias.specialization(db).materialization_kind(db).is_some(),
+        Type::SpecializedClass(alias) => {
+            alias.specialization(db).materialization_kind(db).is_some()
+        }
         Type::TypeVar(variable) => {
             class_context.is_none_or(|context| !context.contains(db, variable.identity(db)))
         }
@@ -1359,7 +1361,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let env = self.env;
         debug_assert_matches!(
             meta_ty,
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::SpecializedClass(_)
         );
 
         let constructed_ty = meta_ty.instance_type_for_meta_protocol(db, env);

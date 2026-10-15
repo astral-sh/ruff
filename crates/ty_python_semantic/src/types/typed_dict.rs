@@ -328,7 +328,7 @@ impl<'db> TypedDictType<'db> {
                 let base = base.apply_optional_specialization(db, specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
-                    Type::GenericAlias(base) => ClassType::Generic(base),
+                    Type::SpecializedClass(base) => ClassType::Generic(base),
                     _ => continue,
                 };
 
@@ -2088,7 +2088,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         | Type::Callable(_)
         | Type::ModuleLiteral(_)
         | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
+        | Type::SpecializedClass(_)
         | Type::SubclassOf(_)
         | Type::NominalInstance(_)
         | Type::ProtocolInstance(_)
