@@ -18,8 +18,9 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
     SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
-use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
+use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
+use crate::types::recursive::RecursiveOperation;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
@@ -39,11 +40,11 @@ use crate::types::visitor::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    KnownInstanceType, MaterializationKind, SubclassOfInner, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType,
+    binding_type, infer_definition_types, inferred_declaration,
 };
-use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
+use crate::{Db, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKey, NodeWithScopeKind, ScopeId};
 use ty_python_core::{SemanticIndex, semantic_index};
@@ -336,6 +337,236 @@ pub(crate) fn typing_self<'db>(
         typevar_binding_context,
         typevar,
     )
+}
+
+/// Type-variable occurrences outside and inside an outermost callable.
+/// Alias summaries use formal parameters, so growing arguments cannot grow the query graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct CallableTypeVarLocations<'db> {
+    outside: TypeVarSet<'db>,
+    inside: TypeVarSet<'db>,
+}
+
+impl<'db> CallableTypeVarLocations<'db> {
+    const EMPTY: Self = Self {
+        outside: TypeVarSet::None,
+        inside: TypeVarSet::None,
+    };
+
+    fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        Self {
+            outside: self.outside.merge(db, other.outside),
+            inside: self.inside.merge(db, other.inside),
+        }
+    }
+
+    fn all(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+        self.outside.merge(db, self.inside)
+    }
+
+    fn in_callable(self, db: &'db dyn Db) -> Self {
+        Self {
+            outside: TypeVarSet::None,
+            inside: self.all(db),
+        }
+    }
+
+    fn specialize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: Specialization<'db>,
+    ) -> Self {
+        let mut result = Self::EMPTY;
+        for typevar in self.outside.iter(db) {
+            let argument = arguments.get(db, typevar).unwrap_or(Type::TypeVar(typevar));
+            result = result.merge(db, Self::of_type(db, env, argument));
+        }
+        for typevar in self.inside.iter(db) {
+            let argument = arguments.get(db, typevar).unwrap_or(Type::TypeVar(typevar));
+            result = result.merge(db, Self::of_type(db, env, argument).in_callable(db));
+        }
+        result
+    }
+
+    fn of_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _| CallableTypeVarLocations::EMPTY,
+            cycle_fn=|db, _, previous: &CallableTypeVarLocations<'db>, current, _, _| {
+                previous.merge(db, current)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn collect<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> CallableTypeVarLocations<'db> {
+            let env = ProgramEnvironment::from_program(program);
+            let visitor = CallableTypeVarCollector {
+                env: &env,
+                locations: Cell::new(CallableTypeVarLocations::EMPTY),
+                visited: TypeCollector::default(),
+            };
+            match ty {
+                Type::TypeAlias(alias) => {
+                    if let Some(arguments) = alias.specialization(db) {
+                        return collect(db, program, Type::TypeAlias(alias.unspecialized(db)))
+                            .specialize(db, &env, arguments);
+                    }
+                    visitor.visit_type(db, alias.raw_value_type(db));
+                }
+                Type::Recursive(recursive) => {
+                    if let Some((source, operation)) = recursive.mapping_origin(db) {
+                        let mut locations = collect(db, program, Type::Recursive(source));
+                        if let RecursiveOperation::RescopeReturnCallables(context) = operation {
+                            locations.inside = TypeVarSet::from_typevars(
+                                db,
+                                locations.inside.iter(db).map(|typevar| {
+                                    if context.contains(db, typevar.identity(db)) {
+                                        typevar.with_name_suffix(db, "return")
+                                    } else {
+                                        typevar
+                                    }
+                                }),
+                            );
+                        }
+                        return locations;
+                    }
+                    let constructor = recursive.constructor(db);
+                    if constructor != recursive {
+                        let locations = collect(db, program, Type::Recursive(constructor));
+                        return match recursive.arguments(db) {
+                            Some(arguments) => locations.specialize(db, &env, arguments),
+                            None => locations,
+                        };
+                    }
+                    visitor.visit_type(db, recursive.unfold(db, &env).into_type());
+                }
+                Type::Callable(callable) => {
+                    walk_callable_type(db, callable, &visitor);
+                    return visitor.locations.get().in_callable(db);
+                }
+                _ => walk_type_with_recursion_guard(db, ty, &visitor, &visitor.visited),
+            }
+            visitor.locations.get()
+        }
+
+        collect(db, env.program(db), ty)
+    }
+}
+
+struct CallableTypeVarCollector<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    locations: Cell<CallableTypeVarLocations<'db>>,
+    visited: TypeCollector<'db>,
+}
+
+impl<'db> TypeVisitor<'db> for CallableTypeVarCollector<'_, 'db> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_bound_type_var_type(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) {
+        let typevar = if typevar.is_paramspec(db) {
+            typevar.without_paramspec_attr(db)
+        } else {
+            typevar
+        };
+        let locations = CallableTypeVarLocations {
+            outside: TypeVarSet::from_typevars(db, [typevar]),
+            inside: TypeVarSet::None,
+        };
+        self.locations
+            .set(self.locations.get().merge(db, locations));
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if matches!(
+            ty,
+            Type::Callable(_) | Type::TypeAlias(_) | Type::Recursive(_)
+        ) {
+            let locations = CallableTypeVarLocations::of_type(db, self.env, ty);
+            self.locations
+                .set(self.locations.get().merge(db, locations));
+        } else {
+            walk_type_with_recursion_guard(db, ty, self, &self.visited);
+        }
+    }
+}
+
+impl<'db> CallableType<'db> {
+    /// Bind function type variables that occur only in returned callables.
+    pub(super) fn rescope_return_typevars(
+        self,
+        db: &'db dyn Db,
+        context: GenericContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let mut used =
+            CallableTypeVarLocations::of_type(db, visitor.env, Type::Callable(self)).all(db);
+        // Escaped recursive occurrences still contribute variables to the enclosing callable.
+        if let Some(mapping) = visitor.recursive_mapping {
+            let mut pending = used.iter(db).collect::<Vec<_>>();
+            pending.reverse();
+            let mut visited = FxHashSet::default();
+            let mut variables = FxOrderSet::default();
+            while let Some(typevar) = pending.pop() {
+                if !visited.insert(typevar) {
+                    continue;
+                }
+                if let Some(original) = mapping.original_reference(db, Type::TypeVar(typevar)) {
+                    let variables = CallableTypeVarLocations::of_type(db, visitor.env, original)
+                        .all(db)
+                        .iter(db)
+                        .collect::<Vec<_>>();
+                    pending.extend(variables.into_iter().rev());
+                } else {
+                    variables.insert(typevar);
+                }
+            }
+            used = TypeVarSet::from_typevars(db, variables);
+        }
+        let source = GenericContext::from_typevar_instances(
+            db,
+            visitor.env,
+            used.iter(db)
+                .filter(|typevar| context.contains(db, typevar.identity(db))),
+        );
+        if source.len(db) == 0 {
+            return self;
+        }
+        let context = GenericContext::from_typevar_instances(
+            db,
+            visitor.env,
+            source
+                .variables(db)
+                .map(|typevar| typevar.with_name_suffix(db, "return")),
+        );
+        let specialization = source.specialize(
+            db,
+            context.variables(db).map(Type::TypeVar).collect::<Vec<_>>(),
+        );
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(specialization));
+        let rename_visitor = ApplyTypeMappingVisitor {
+            recursive_mapping: visitor.recursive_mapping,
+            recursion_context: visitor.recursion_context,
+            ..ApplyTypeMappingVisitor::new(visitor.env)
+        };
+        let signatures = self.signatures(db).apply_type_mapping_impl(
+            db,
+            &mapping,
+            TypeContext::default(),
+            &rename_visitor,
+        );
+        self.with_signatures(db, signatures.with_inherited_generic_context(db, context))
+    }
 }
 
 /// A list of formal type variables for a generic function, class, type alias, or fresh callable
@@ -659,207 +890,38 @@ impl<'db> GenericContext<'db> {
         return_type: Type<'db>,
         function_definition: Definition<'db>,
     ) -> (Option<Self>, Type<'db>) {
-        #[derive(Default)]
-        struct TypeVarLocations<'db> {
-            /// The set of typevars that appear somewhere other than in a `Callable` in the return
-            /// type.
-            found_outside_callable_return: FxHashSet<BoundTypeVarInstance<'db>>,
-            /// A map containing all of the `Callable`s in the return type, along with the typevars
-            /// that appear in each. (Note that at this point, we have not yet determined if those
-            /// typevars _only_ appear there.)
-            found_inside_callable_return:
-                FxHashMap<CallableType<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
-        }
-
-        impl<'db> TypeVarLocations<'db> {
-            /// Returns a set of all of the typevars that _only_ appear in a `Callable` in the
-            /// return type, along with a "replacement map" for those `Callable`s. (The key of the
-            /// map will be a `Callable` as it originally appears in the return type — i.e., with
-            /// no generic context. The corresponding value will be the updated `Callable` with a
-            /// generic context.)
-            fn finalize(
-                self,
-                db: &'db dyn Db,
-                function_definition: Definition<'db>,
-            ) -> (
-                FxHashSet<BoundTypeVarInstance<'db>>,
-                FxHashMap<CallableType<'db>, CallableType<'db>>,
-            ) {
-                let env = ProgramEnvironment::from_definition(function_definition);
-                let mut found_only_inside_callable_return = FxHashSet::default();
-                let replacements = self
-                    .found_inside_callable_return
-                    .into_iter()
-                    .filter_map(|(callable, mut bound_typevars)| {
-                        // Only keep typevars that appear _only_ in this callable and are
-                        // actually bound by this function. If we renamed typevars bound by an
-                        // enclosing generic context (e.g., class typevars in a method), we'd
-                        // disconnect them from class specialization.
-                        bound_typevars.retain(|bound_typevar| {
-                            !self.found_outside_callable_return.contains(bound_typevar)
-                                && bound_typevar.binding_context(db).definition()
-                                    == Some(function_definition)
-                        });
-                        if bound_typevars.is_empty() {
-                            return None;
-                        }
-
-                        // We're going to use this later to trim the function's generic context. So
-                        // it's important that we do this first, so that we're tracking the
-                        // original, not-yet-renamed typevars.
-                        found_only_inside_callable_return.extend(bound_typevars.iter().copied());
-
-                        // Then create a new typevar, with a 'return suffix, for each of the
-                        // typevars that only appear in this callable, and update the callable's
-                        // signature (and generic context) to use those new typevars.
-                        let typevar_replacements: FxIndexMap<_, _> = bound_typevars
-                            .iter()
-                            .map(|bound_typevar| {
-                                (*bound_typevar, bound_typevar.with_name_suffix(db, "return"))
-                            })
-                            .collect();
-                        let apply = ApplySpecialization::ReturnCallables(&typevar_replacements);
-                        let signatures = callable.signatures(db).apply_type_mapping_impl(
-                            db,
-                            &TypeMapping::ApplySpecialization(apply),
-                            TypeContext::default(),
-                            &ApplyTypeMappingVisitor::new(&env),
-                        );
-                        let generic_context = GenericContext::from_typevar_instances(
-                            db,
-                            &env,
-                            typevar_replacements.values().copied(),
-                        );
-                        let signatures =
-                            signatures.with_inherited_generic_context(db, generic_context);
-                        let replacement = callable.with_signatures(db, signatures);
-
-                        Some((callable, replacement))
-                    })
-                    .collect();
-
-                (found_only_inside_callable_return, replacements)
-            }
-        }
-
-        /// A visitor that walks through the parameter and return type annotations, recording
-        /// whether each typevar appears inside and/or outside of a return type `Callable`.
-        struct FindTypeVarLocations<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            locations: RefCell<TypeVarLocations<'db>>,
-            recursion_guard: TypeCollector<'db>,
-            active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
-            in_return_type: bool,
-            in_callable_type: Cell<Option<CallableType<'db>>>,
-        }
-
-        impl<'db> TypeVisitor<'db> for FindTypeVarLocations<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                let bound_typevar = if bound_typevar.is_paramspec(db) {
-                    bound_typevar.without_paramspec_attr(db)
-                } else {
-                    bound_typevar
-                };
-
-                let mut locations = self.locations.borrow_mut();
-                if self.in_return_type
-                    && let Some(callable) = self.in_callable_type.get()
-                {
-                    locations
-                        .found_inside_callable_return
-                        .entry(callable)
-                        .or_default()
-                        .insert(bound_typevar);
-                } else {
-                    locations
-                        .found_outside_callable_return
-                        .insert(bound_typevar);
-                }
-            }
-
-            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-                // Note: We only consider the outermost Callables in the return type.
-                if self.in_return_type && self.in_callable_type.get().is_none() {
-                    self.in_callable_type.set(Some(callable));
-                    walk_callable_type(db, callable, self);
-                    self.in_callable_type.set(None);
-                } else {
-                    walk_callable_type(db, callable, self);
-                }
-            }
-
-            fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-                // The default implementation would do this for us if we returned `true` from
-                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
-                // attribute that we want to recurse into, so we do it by hand.
-                self.active_aliases.visit(
-                    &Type::TypeAlias(type_alias).to_type_identity(db),
-                    || (),
-                    || self.visit_type(db, type_alias.value_type(db)),
-                );
-            }
-
-            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-                self.active_aliases.visit(
-                    &Type::Recursive(recursive).to_type_identity(db),
-                    || (),
-                    || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
-                );
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        // If the function in question is not generic, then there are no typevars, and we don't
-        // have to worry about which ones appear in return type Callables.
         let Some(generic_context) = generic_context else {
             return (None, return_type);
         };
         let env = ProgramEnvironment::from_definition(function_definition);
-
-        // Find whether each typevar appears inside and/or outside a return type Callable.
-        let mut find_typevar_locations = FindTypeVarLocations {
-            env: &env,
-            locations: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
-            active_aliases: ActiveRecursionDetector::default(),
-            in_return_type: false,
-            in_callable_type: Cell::default(),
-        };
+        let mut locations = CallableTypeVarLocations::of_type(db, &env, return_type);
         for param in parameters {
-            find_typevar_locations.visit_type(db, param.annotated_type());
+            let parameter = CallableTypeVarLocations::of_type(db, &env, param.annotated_type());
+            locations.outside = locations.outside.merge(db, parameter.all(db));
         }
-        find_typevar_locations.in_return_type = true;
-        find_typevar_locations.visit_type(db, return_type);
-
-        // Then update those return type Callables to be generic, with their generic context
-        // containing the typevars that don't appear outside any return type Callable.
-        let (found_only_inside_callable_return, replacements) = find_typevar_locations
-            .locations
-            .into_inner()
-            .finalize(db, function_definition);
-        let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
-        let return_type =
-            return_type.apply_type_mapping(db, &env, &type_mapping, TypeContext::default());
+        let rescope = GenericContext::from_typevar_instances(
+            db,
+            &env,
+            generic_context.variables(db).filter(|typevar| {
+                typevar.is_inferable(db, locations.inside)
+                    && !typevar.is_inferable(db, locations.outside)
+                    && typevar.binding_context(db).definition() == Some(function_definition)
+            }),
+        );
+        if rescope.len(db) == 0 {
+            return (Some(generic_context), return_type);
+        }
+        let return_type = return_type.apply_type_mapping(
+            db,
+            &env,
+            &TypeMapping::RescopeReturnCallables(rescope),
+            TypeContext::default(),
+        );
 
         // And lastly remove those typevars from the function's generic context.
         let mut kept_typevars = generic_context
             .variables(db)
-            .filter(|bound_typevar| !found_only_inside_callable_return.contains(bound_typevar))
+            .filter(|bound_typevar| !rescope.contains(db, bound_typevar.identity(db)))
             .peekable();
         let generic_context = if kept_typevars.peek().is_none() {
             None
@@ -2273,7 +2335,7 @@ pub enum ApplySpecialization<'a, 'db> {
         /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
-    ReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
+    ReturnCallables(Specialization<'db>),
     /// Maps a single typevar to a concrete type. Used by the constraint set's sequent map to
     /// substitute a typevar nested inside another constraint's bound.
     Single(BoundTypeVarInstance<'db>, Type<'db>),
@@ -2321,7 +2383,8 @@ impl<'db> ApplySpecialization<'_, 'db> {
     ) -> Option<Type<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization) => {
+            | ApplySpecialization::TypeAlias(specialization)
+            | ApplySpecialization::ReturnCallables(specialization) => {
                 specialization.get(db, bound_typevar)
             }
             ApplySpecialization::Partial {
@@ -2336,9 +2399,6 @@ impl<'db> ApplySpecialization<'_, 'db> {
                     return Some(Type::Never);
                 }
                 types.get(index).copied()
-            }
-            ApplySpecialization::ReturnCallables(replacements) => {
-                replacements.get(&bound_typevar).copied().map(Type::TypeVar)
             }
             ApplySpecialization::Single(typevar, ty) => {
                 if bound_typevar.is_same_typevar_as(db, *typevar) {
@@ -2363,7 +2423,8 @@ impl<'db> ApplySpecialization<'_, 'db> {
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization, .. }
-            | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
+            | ApplySpecialization::TypeAlias(specialization)
+            | ApplySpecialization::ReturnCallables(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,
                 types,
@@ -2387,7 +2448,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
                         .collect::<Vec<_>>(),
                 ),
             ),
-            ApplySpecialization::ReturnCallables(_) | ApplySpecialization::Single(_, _) => None,
+            ApplySpecialization::Single(_, _) => None,
             ApplySpecialization::WithBindings {
                 specialization,
                 bindings,

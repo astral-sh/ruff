@@ -1,7 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -11208,8 +11208,8 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
-    /// Updates any `Callable` types in a function signature return type to be generic if possible.
-    RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+    /// Binds the supplied variables to each outermost callable in a function return type.
+    RescopeReturnCallables(GenericContext<'db>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {

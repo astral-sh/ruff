@@ -1455,6 +1455,84 @@ def specialize_promoted(value: Promoted[TypeOf[2]]):
     reveal_type([value][0][1]()[0])  # revealed: (Literal[2], /) -> int
 ```
 
+## Generic callables with growing recursive arguments
+
+Each callback binds the type variables it uses, including variables that first appear after a
+recursive step. Repeated occurrences of a variable still refer to the same type.
+
+```py
+from typing import Callable
+
+type Callbacks[T, U] = tuple[Callable[[T], T], list[Callbacks[tuple[T, U], U]]]
+
+def factory[T, U]() -> Callbacks[T, U]:
+    raise NotImplementedError
+
+callbacks = factory()
+reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
+# revealed: tuple[tuple[Literal[1], Literal["value", "second"]], Literal["value", "second"]]
+reveal_type(callbacks[1][0][1][0][0](((1, "value"), "second")))
+```
+
+When an enclosing callable binds the variables, recursive callbacks use the inferred arguments.
+
+```py
+def nested[T, U]() -> Callable[[T, U], Callbacks[T, U]]:
+    raise NotImplementedError
+
+def use_nested(value: int, label: str):
+    callbacks = nested()(value, label)
+    reveal_type(callbacks[1][0][0]((value, label)))  # revealed: tuple[int, str]
+    callbacks[1][0][0]((label, value))  # error: [invalid-argument-type]
+
+type Consumer[T, U] = Callable[[T], tuple[T, Consumer[U, tuple[T]]]]
+
+def consumer[T, U]() -> Consumer[T, U]:
+    raise NotImplementedError
+
+reveal_type(consumer()(1)[1]("value")[1]((1,))[0])  # revealed: tuple[Literal[1]]
+```
+
+The same rule applies across mutually recursive aliases and to parameter specifications and variadic
+type parameters.
+
+```py
+from ty_extensions._internal import generic_context
+
+type Left[T, U] = tuple[Callable[[T], T], list[Right[tuple[T, U], U]]]
+type Right[T, U] = tuple[Callable[[U], U], list[Left[T, tuple[U]]]]
+
+def mutual[T, U]() -> Left[T, U]:
+    raise NotImplementedError
+
+reveal_type(mutual()[1][0][1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
+
+type Pack[*Ts] = tuple[Callable[[*Ts], tuple[*Ts]], list[Pack[*Ts, int]]]
+type Args[**P, T] = tuple[Callable[P, T], list[Args[P, list[T]]]]
+
+def packed[*Ts]() -> Pack[*Ts]:
+    raise NotImplementedError
+
+def parametrized[**P, T]() -> Args[P, T]:
+    raise NotImplementedError
+
+reveal_type(packed()[1][0][0]("value", 1))  # revealed: tuple[Literal["value"], int]
+# revealed: ty_extensions._internal.GenericContext[P'return@parametrized, T'return@parametrized]
+reveal_type(generic_context(parametrized()[1][0][0]))
+```
+
+A variable used by a function parameter stays bound to the function even if it is only exposed after
+a recursive step.
+
+```py
+type Delayed[T, U] = tuple[T, Delayed[tuple[T, U], U] | None]
+
+def from_delayed[U](value: Delayed[int, U]) -> Callable[[U], U]:
+    raise NotImplementedError
+
+reveal_type(generic_context(from_delayed))  # revealed: ty_extensions._internal.GenericContext[U@from_delayed]
+```
+
 ## Promotion through shared generic aliases
 
 The same callback alias can occur in parameter and return positions. Promotion preserves static

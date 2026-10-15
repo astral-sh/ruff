@@ -973,7 +973,7 @@ impl<'db> RecursiveType<'db> {
     ) -> fmt::Result {
         if let Some((source, operation)) = self.mapping_origin(db) {
             let RecursiveOperation::Materialize(kind) = operation else {
-                // Promotion is implicit, but must not hide an earlier Top or Bottom.
+                // Implicit mappings must not hide an earlier Top or Bottom.
                 return source.fmt_display(db, env, settings, f);
             };
             let (name, form) = match kind {

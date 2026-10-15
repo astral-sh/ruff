@@ -100,7 +100,7 @@ pub struct RecursiveVar<'db> {
     negative: bool,
     /// A transformation of the source binder, before transformations of its enclosing constructor.
     #[returns(copy)]
-    operation: Option<RecursiveOperation>,
+    operation: Option<RecursiveOperation<'db>>,
 }
 
 impl get_size2::GetSize for RecursiveVar<'_> {}
@@ -363,21 +363,23 @@ struct EscapedRecursiveVar<'db> {
 #[salsa::interned(debug)]
 struct MappedRecursiveCycle<'db> {
     source: RecursiveCycle,
-    operation: RecursiveOperation,
+    operation: RecursiveOperation<'db>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 /// An operation that can be reapplied when a recursive occurrence supplies new arguments.
-pub enum RecursiveOperation {
+pub enum RecursiveOperation<'db> {
     Promote(PromotionMode, PromotionKind),
     Materialize(MaterializationKind),
+    RescopeReturnCallables(GenericContext<'db>),
 }
 
-impl RecursiveOperation {
-    fn mapping<'db>(self) -> TypeMapping<'static, 'db> {
+impl<'db> RecursiveOperation<'db> {
+    fn mapping(self) -> TypeMapping<'db, 'db> {
         match self {
             Self::Promote(mode, kind) => TypeMapping::Promote(mode, kind),
             Self::Materialize(kind) => TypeMapping::Materialize(kind),
+            Self::RescopeReturnCallables(context) => TypeMapping::RescopeReturnCallables(context),
         }
     }
 
@@ -385,6 +387,7 @@ impl RecursiveOperation {
         match self {
             Self::Promote(mode, kind) => Self::Promote(mode.flip(), kind),
             Self::Materialize(kind) => Self::Materialize(kind.flip()),
+            Self::RescopeReturnCallables(_) => self,
         }
     }
 }
@@ -396,7 +399,7 @@ pub struct RecursiveMappingOrigin<'db> {
     #[returns(copy)]
     source: Type<'db>,
     #[returns(copy)]
-    operation: RecursiveOperation,
+    operation: RecursiveOperation<'db>,
 }
 
 impl get_size2::GetSize for RecursiveMappingOrigin<'_> {}
@@ -415,7 +418,7 @@ impl<'db> RecursiveMappingOrigin<'db> {
 pub(super) struct RecursiveTypeMapping<'a, 'db> {
     parent: Option<&'a RecursiveTypeMapping<'a, 'db>>,
     source: RecursiveType<'db>,
-    operation: RecursiveOperation,
+    operation: RecursiveOperation<'db>,
     references: RefCell<FxHashMap<Type<'db>, EscapedRecursiveVar<'db>>>,
 }
 
@@ -443,6 +446,21 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
         ));
         self.references.borrow_mut().insert(fresh, reference);
         fresh
+    }
+
+    /// Recover a closed occurrence when discovering the variables a callable must bind.
+    pub(super) fn original_reference(&self, db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        let Some(reference) = self.references.borrow().get(&ty).copied() else {
+            return self.parent?.original_reference(db, ty);
+        };
+        let variable = reference.variable(db);
+        Some(Type::Recursive(
+            self.source.select(db, variable.negative(db)).instantiate(
+                db,
+                variable.arguments(db),
+                variable.operation(db),
+            ),
+        ))
     }
 
     pub(super) fn map_reference(
@@ -524,7 +542,7 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
     fn apply(
         db: &'db dyn Db,
         source: RecursiveType<'db>,
-        operation: RecursiveOperation,
+        operation: RecursiveOperation<'db>,
         outer: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> RecursiveType<'db> {
         if matches!(operation, RecursiveOperation::Materialize(_))
@@ -651,7 +669,7 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
             negative.apply_type_mapping_impl(db, &rebind, TypeContext::default(), &rebind_visitor);
         let materialization = match operation {
             RecursiveOperation::Materialize(kind) => Some(kind),
-            RecursiveOperation::Promote(..) => None,
+            RecursiveOperation::Promote(..) | RecursiveOperation::RescopeReturnCallables(_) => None,
         };
         let origin = RecursiveMappingOrigin::new(
             db,
@@ -679,12 +697,12 @@ impl<'db> RecursiveType<'db> {
     fn mapping_is_noop(
         self,
         db: &'db dyn Db,
-        operation: RecursiveOperation,
+        operation: RecursiveOperation<'db>,
         outer: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> bool {
         struct UnchangedConstructorVisitor<'a, 'db> {
             outer: &'a ApplyTypeMappingVisitor<'a, 'db>,
-            operation: RecursiveOperation,
+            operation: RecursiveOperation<'db>,
             recursion_guard: TypeCollector<'db>,
             parameters: RefCell<Vec<GenericContext<'db>>>,
             unchanged: Cell<bool>,
@@ -986,7 +1004,7 @@ impl<'db> RecursiveType<'db> {
         self,
         db: &'db dyn Db,
         arguments: Option<Specialization<'db>>,
-        operation: Option<RecursiveOperation>,
+        operation: Option<RecursiveOperation<'db>>,
     ) -> Self {
         if arguments == self.arguments(db) && operation.is_none() {
             return self;
@@ -1113,7 +1131,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The source and operation producing the selected polarity, without unfolding recursion.
-    pub(super) fn mapping_origin(self, db: &'db dyn Db) -> Option<(Self, RecursiveOperation)> {
+    pub(super) fn mapping_origin(self, db: &'db dyn Db) -> Option<(Self, RecursiveOperation<'db>)> {
         let origin = self.origin(db)?;
         Some((
             origin.constructor(db).select(db, self.negative(db)),
@@ -1325,6 +1343,14 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(self.with_arguments(db, arguments))
             }
+            TypeMapping::RescopeReturnCallables(context) => {
+                Type::Recursive(RecursiveTypeMapping::apply(
+                    db,
+                    self,
+                    RecursiveOperation::RescopeReturnCallables(*context),
+                    visitor,
+                ))
+            }
             TypeMapping::Promote(mode, kind) => Type::Recursive(RecursiveTypeMapping::apply(
                 db,
                 self,
@@ -1354,25 +1380,28 @@ impl<'db> RecursiveType<'db> {
                         .into_type()
                 })
             }
-            _ => visitor.visit(db, Type::Recursive(self), mapping, || {
-                // Map arguments before unfolding so recursive backedges retain their mapped
-                // arguments. Keep the application's materialization throughout the traversal.
-                let arguments = self
-                    .arguments(db)
-                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                let recursive = self.with_arguments(db, arguments);
-                recursive
-                    .unfold(db, visitor.env)
-                    .map(|unfolded| {
-                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        if mapped == unfolded {
-                            Type::Recursive(recursive)
-                        } else {
-                            mapped
-                        }
-                    })
-                    .into_type()
-            }),
+            TypeMapping::ReplaceParameterDefaults => {
+                visitor.visit(db, Type::Recursive(self), mapping, || {
+                    // Map arguments before unfolding so recursive backedges retain their mapped
+                    // arguments. Keep the application's materialization throughout the traversal.
+                    let arguments = self.arguments(db).map(|arguments| {
+                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                    });
+                    let recursive = self.with_arguments(db, arguments);
+                    recursive
+                        .unfold(db, visitor.env)
+                        .map(|unfolded| {
+                            let mapped =
+                                unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
+                            if mapped == unfolded {
+                                Type::Recursive(recursive)
+                            } else {
+                                mapped
+                            }
+                        })
+                        .into_type()
+                })
+            }
         }
     }
 

@@ -605,7 +605,9 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::ApplyRecursiveSubstitution(mapping) => {
                 mapping.apply_alias(db, self, visitor)
             }
-            TypeMapping::Promote(..) | TypeMapping::Materialize(_) => {
+            TypeMapping::Promote(..)
+            | TypeMapping::Materialize(_)
+            | TypeMapping::RescopeReturnCallables(_) => {
                 visitor.visit(db, ty, type_mapping, || {
                     // Bind recursive references before mapping so cycle fallbacks cannot retain
                     // an untransformed reference to the original alias.

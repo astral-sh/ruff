@@ -978,8 +978,8 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
-            return replacements.get(&self).copied().unwrap_or(self);
+        if let TypeMapping::RescopeReturnCallables(context) = type_mapping {
+            return self.rescope_return_typevars(db, *context, visitor);
         }
 
         self.with_signatures(
