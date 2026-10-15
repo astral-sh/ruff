@@ -4942,7 +4942,7 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     """
 
 # Temporary compatibility hack: Pydantic 2.13 uses this legacy typeshed alias in Field overloads,
-# although it does not exist at runtime. Remove after 2027-04-15.
+# although it does not exist at runtime; remove in early/mid 2027?
 ellipsis = EllipsisType
 
 Ellipsis: EllipsisType
