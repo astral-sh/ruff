@@ -278,6 +278,101 @@ def infer(cls: type[Final[T]]) -> T:
 reveal_type(infer(type(Final[int]())))  # revealed: int
 ```
 
+## Recovery from generic aliases passed as class objects
+
+Passing a generic alias where a class object is required is an error. We still use its type
+arguments to infer a return type, so subsequent calls retain useful checks.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __call__(self, value: T) -> T:
+        return value
+
+def instantiate(cls: type[T]) -> T:
+    raise NotImplementedError
+
+box = instantiate(Box[int])  # error: [invalid-argument-type]
+reveal_type(box)  # revealed: Box[int]
+box("wrong")  # error: [invalid-argument-type]
+
+def instance_or_class(cls: Box[T] | type[Box[T]]) -> Box[T]:
+    raise NotImplementedError
+
+box = instance_or_class(Box[int])  # error: [invalid-argument-type]
+reveal_type(box)  # revealed: Box[int]
+
+class Accessor(Generic[T]):
+    def __init__(self, cls: type[T]) -> None: ...
+
+accessor = Accessor(Box[int])  # error: [invalid-argument-type]
+reveal_type(accessor)  # revealed: Accessor[Box[int]]
+```
+
+Recovery still respects type-variable bounds:
+
+```py
+Bounded = TypeVar("Bounded", bound=int)
+
+def bounded(cls: type[Box[Bounded]]) -> Bounded:
+    raise NotImplementedError
+
+value = bounded(Box[str])  # error: [invalid-argument-type]
+reveal_type(value)  # revealed: Unknown
+```
+
+## Overload recovery from generic aliases
+
+If an overload fails only because generic aliases were passed as class objects, we retain its
+specialized return type. When several overloads meet this condition, the first one supplies the
+recovery type.
+
+```py
+from typing import Generic, Literal, TypeVar, overload
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __call__(self, value: T) -> T:
+        return value
+
+@overload
+def make(cls: type[Box[T]], *, precise: Literal[True] = True) -> Box[T]: ...
+@overload
+def make(cls: Box[T] | type[Box[T]], *, precise: bool = True) -> object: ...
+def make(cls, *, precise=True):
+    raise NotImplementedError
+
+box = make(Box[int])  # error: [no-matching-overload]
+reveal_type(box)  # revealed: Box[int]
+box("wrong")  # error: [invalid-argument-type]
+
+value = make(Box[int], precise=False)  # error: [no-matching-overload]
+reveal_type(value)  # revealed: object
+
+value = make(Box[int], precise="wrong")  # error: [no-matching-overload]
+reveal_type(value)  # revealed: Unknown
+```
+
+A valid overload takes precedence over recovery from an invalid one:
+
+```py
+from types import GenericAlias
+
+@overload
+def choose(cls: type[Box[T]]) -> Box[T]: ...
+@overload
+def choose(cls: GenericAlias) -> str: ...
+def choose(cls):
+    raise NotImplementedError
+
+result = choose(Box[int])  # no diagnostic
+reveal_type(result)  # revealed: str
+```
+
 ## Inferring tuple parameter types
 
 ```toml
