@@ -428,6 +428,40 @@ def _(c: C & Other):
     reveal_type(c[0])  # revealed: C
 ```
 
+### Subscript assignment
+
+`__setitem__` has no return value to reveal, so the full receiver matters for whether the call is
+accepted at all: an explicit self-type that only the full intersection satisfies is accepted for
+`c.__setitem__(...)`, and must be accepted for `c[0] = ...` the same way.
+
+```py
+class Other: ...
+
+class C:
+    def __setitem__(self: "C & Other", key: int, value: int) -> None: ...
+
+def _(c: C & Other):
+    c.__setitem__(0, 1)  # no diagnostic
+    c[0] = 1  # no diagnostic
+
+def mismatched(c: C):
+    c[0] = 1  # error: [invalid-assignment]
+```
+
+Each member of a union retains its own intersection receiver, so a union is only a valid target as a
+whole if every member is individually valid.
+
+```py
+class D:
+    def __setitem__(self: "D & Other", key: int, value: int) -> None: ...
+
+def union(c: (C & Other) | (D & Other)):
+    c[0] = 1  # no diagnostic
+
+def union_mismatched(c: C | (D & Other)):
+    c[0] = 1  # error: [invalid-assignment]
+```
+
 ### Context managers
 
 ```py

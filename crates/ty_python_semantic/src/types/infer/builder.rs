@@ -5123,6 +5123,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut call_arguments,
                     &mut |builder, (_, _, tcx)| infer_value_ty(builder, tcx),
                     TypeContext::default(),
+                    None,
                 );
                 match call {
                     Ok(outcome) => {
@@ -5766,6 +5767,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// `receiver`, if given, overrides `object` as what a bound method or `Self` return type
+    /// binds to -- used when `object` is one positive element of an intersection whose caller
+    /// wants the dunder bound to the full intersection, not just the element that defines it.
     #[expect(clippy::too_many_arguments)]
     fn infer_and_try_call_dunder(
         &mut self,
@@ -5776,10 +5780,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         argument_types: &mut CallArguments<'_, 'db>,
         infer_argument_ty: &mut dyn FnMut(&mut Self, ArgExpr<'db, '_>) -> Type<'db>,
         call_expression_tcx: TypeContext<'db>,
+        receiver: Option<Type<'db>>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let member = object.member_lookup_with_policy(db, env, name, lookup_policy);
+        let member = object
+            .member_lookup_with_policy_and_receiver(db, env, name, lookup_policy, receiver)
+            .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db);
         self.infer_and_try_call_dunder_member(
             member,
             ast_arguments,
