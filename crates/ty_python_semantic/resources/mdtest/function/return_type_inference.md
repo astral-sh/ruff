@@ -599,9 +599,11 @@ For the child classes, we can infer a stricter (wider) return type based on thei
 implementations. Unioning in the inferred return type of the child method body seems appropriate:
 
 ```py
-# TODO: Should probably be `None | int | Unknown`
+# Here, the return types could plausibly also include `None` from the base class method, but since we
+# union with `Unknown` right now, we don't impose any strict constraints on child classes of `IntTask`
+# and `IntJob`, so maybe just returning `Literal[1] | Unknown` is even better, because including `None`
+# could also lead to false positives (the actual methods here cannot actually return `None).
 reveal_type(IntTask().compute())  # revealed: Literal[1] | Unknown
-# TODO: Should probably be `int | Unknown`
 reveal_type(IntJob().run())  # revealed: Literal[1] | Unknown
 ```
 
