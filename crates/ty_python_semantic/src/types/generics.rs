@@ -431,7 +431,7 @@ impl<'db> GenericContext<'db> {
     ///
     /// For functions, this retains type variables that are moved to a returned callable in the
     /// externally visible signature. Other scope kinds have identical lexical and public contexts.
-    fn lexical_of_node(
+    pub(super) fn lexical_of_node(
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
         node: &NodeWithScopeKind,

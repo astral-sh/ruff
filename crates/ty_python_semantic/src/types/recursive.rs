@@ -2694,6 +2694,8 @@ pub(super) enum TypeQueryKey<'db> {
     SumGraph,
     #[cfg(test)]
     HasSharedGuard,
+    #[cfg(test)]
+    SignatureAvailable,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -4300,5 +4302,71 @@ mod query_tests {
                 .visit(&env, &key, || (), || assert!(query.visit(&db, ty)));
             assert!(!query.visit(&db, ty));
         });
+    }
+
+    #[test]
+    fn cached_queries_observe_signature_guards() -> anyhow::Result<()> {
+        struct SignatureAvailable;
+
+        impl<'db> TypeQuery<'db> for SignatureAvailable {
+            fn recursion_key(&self) -> TypeQueryKey<'db> {
+                TypeQueryKey::SignatureAvailable
+            }
+
+            type Output = bool;
+
+            fn visit(
+                &self,
+                db: &'db dyn Db,
+                context: &TypeQueryVisit<'_, '_, 'db, Self>,
+                ty: Type<'db>,
+                (): (),
+            ) -> bool {
+                ty.as_callable().is_some_and(|callable| {
+                    context.inspect_signatures(db, callable, |_| ()).is_some()
+                })
+            }
+
+            fn on_cycle(
+                &self,
+                _context: &TypeQueryVisit<'_, '_, 'db, Self>,
+                _ty: Type<'db>,
+                _kind: CycleKind,
+                (): (),
+            ) -> bool {
+                false
+            }
+        }
+
+        let mut db = setup_db();
+        db.write_dedented("/src/callback.py", "callback = lambda: 0")?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(
+            &db,
+            system_path_to_file(&db, "/src/callback.py")?,
+            env.program(&db),
+        );
+        let callable = global_symbol(&db, file, "callback")
+            .place
+            .expect_type()
+            .as_callable()
+            .ok_or_else(|| anyhow::anyhow!("expected a lambda"))?;
+        let ty = Type::Callable(callable);
+        TypeQueryContext::with_root(&env, SignatureAvailable, |query| {
+            assert!(query.visit(&db, ty));
+            // The query owns its recursion context. Its previous answer is invalid while
+            // another operation is expanding this signature, and becomes valid again afterward.
+            assert_eq!(
+                query
+                    .environment()
+                    .context()
+                    .expand_signature(&db, &env, callable, || {
+                        assert!(!query.visit(&db, ty));
+                    }),
+                Some(())
+            );
+            assert!(query.visit(&db, ty));
+        });
+        Ok(())
     }
 }

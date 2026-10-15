@@ -3474,6 +3474,776 @@ def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]
         reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
 ```
 
+## Lambdas passed to generic constructors
+
+A lambda passed to a generic constructor retains the specialized type of the value it captures:
+
+```py
+class Box[T]:
+    def __init__(self, value: T):
+        self.get = lambda: value
+        self.next = lambda: Box(lambda: value).get
+
+def check(box: Box[int]):
+    reveal_type(box.next()()())  # revealed: int
+```
+
+## Recursive lambda attributes
+
+Recursive lambda attributes preserve the type arguments chosen for their instance. This includes
+literal type arguments in a `Final` attribute:
+
+```py
+from typing import Final, Literal
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.fixed: Final = lambda: (value, self.fixed)
+        self.writable = lambda: (value, self.writable)
+
+node = Box[Literal[1]](1).fixed
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+```
+
+The same applies to writable attributes:
+
+```py
+node = Box[int](1).writable
+reveal_type(node()[1]()[0])  # revealed: int
+```
+
+## Growing recursive lambda attributes
+
+Each recursive return below adds another `list` around the class's type argument. Calling the
+returned lambda preserves that specialization:
+
+```py
+from typing import Final
+
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, Grow([value]).node)
+
+node = Grow(1).node
+reveal_type(node()[1]()[0])  # revealed: list[int]
+```
+
+Attribute errors include the specialized return type:
+
+```py
+# error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
+node.missing
+```
+
+## Partial application of recursive lambda attributes
+
+Partially applying a recursive lambda preserves its captured type variables. Here, each returned
+callback adds a `list` around the captured value's type.
+
+```py
+from functools import partial
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback = partial(lambda _: (value, Box([value]).callback), None)
+
+def check(box: Box[int]):
+    reveal_type(box.callback()[1]()[0])  # revealed: list[int]
+```
+
+Different captured types remain incompatible:
+
+```py
+def incompatible(left: Box[int], right: Box[str]):
+    left.callback = right.callback  # error: [invalid-assignment]
+```
+
+## Recursive partials with captured callbacks
+
+This recursive callback constructs another instance using a lambda that captures `value`. Its return
+type remains a `partial`:
+
+```py
+from functools import partial
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback = partial(lambda: Box(lambda: value).callback)
+```
+
+The returned callbacks can be called repeatedly. They cannot be assigned to an `int`:
+
+```py
+def check(box: Box[int]):
+    box.callback()()()  # no diagnostic
+    wrong: int = box.callback()  # error: [invalid-assignment]
+```
+
+## Captured values in recursive partials
+
+A recursive partial can return its captured value alongside the next callback:
+
+```py
+from functools import partial
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback = partial(lambda: (value, Box(lambda: value).callback))
+```
+
+The next callback captures a lambda returning the original value:
+
+```py
+def check(box: Box[int]):
+    _, callback = box.callback()
+    captured, _ = callback()
+    reveal_type(captured())  # revealed: int
+```
+
+## Variadic parameters in recursive partials
+
+A recursive partial can return its variadic arguments alongside the next callback. The arguments
+remain a tuple, and the next callback accepts positional arguments too:
+
+```py
+from functools import partial
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback = partial(lambda *args: (args, Box(lambda: value).callback))
+
+def check(box: Box[int]):
+    args, child = box.callback(1)
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
+    child(2)  # no diagnostic
+    box.callback(unexpected=1)  # error: [unknown-argument]
+```
+
+## Recursive callable bounds and partial defaults
+
+The callback below has a default referring to the same attribute. Its recursive return satisfies the
+`Recursive` bound:
+
+```py
+from functools import partial
+from typing import Callable, Final
+
+type Recursive = Callable[[], Recursive]
+
+class Box[T: Recursive]:
+    def __init__(self, value: T):
+        self.callback: Final = partial(
+            lambda *, captured=self.callback: Box(lambda: captured).callback,
+            captured=self.callback,
+        )
+```
+
+The returned callbacks remain callable, and incompatible values are still rejected:
+
+```py
+def check(box: Box[Recursive]):
+    box.callback()()()  # no diagnostic
+    wrong: int = box.callback()  # error: [invalid-assignment]
+
+Box(lambda: 0)  # error: [invalid-argument-type]
+```
+
+## Recursive lambdas with partial defaults
+
+The default below wraps the same callback in a `partial`. Both mutable and `Final` attributes can
+hold these recursive callbacks:
+
+```py
+from functools import partial
+from typing import Callable, Final
+
+type Recursive = Callable[[], Recursive]
+
+class Box[T: Recursive]:
+    def __init__(self, value: T):
+        self.callback = lambda captured=partial(self.callback): Box(lambda: captured).callback
+        self.fixed: Final = lambda captured=partial(self.fixed): Box(lambda: captured).fixed
+```
+
+Following either return preserves the callable type:
+
+```py
+def check(box: Box[Recursive]):
+    box.callback()()  # no diagnostic
+    box.fixed()()  # no diagnostic
+    wrong: int = box.fixed()  # error: [invalid-assignment]
+```
+
+## Class objects in recursive lambda arguments
+
+Each recursive call can include a class object in its argument. The next lambda returns a tuple
+containing the original value and the `int` class object:
+
+```py
+class WithClass[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, WithClass((value, int)).node)
+
+node = WithClass(1).node
+reveal_type(node()[1]()[0])  # revealed: tuple[int, type[int]]
+```
+
+## Unions of specialized lambda returns
+
+Specialization can make one returned lambda's type a subtype of another's. The union then
+simplifies:
+
+```py
+class Choice[T, U]:
+    def __init__(self, left: T, right: U, flag: bool):
+        self.choose = lambda: (lambda: left) if flag else (lambda: right)
+
+reveal_type(Choice(1, object(), True).choose())  # revealed: () -> object
+```
+
+## Intersections of specialized lambda returns
+
+An intersection keeps values shared by both types. Negating a type excludes its values:
+
+```py
+from typing import Final
+from ty_extensions import Intersection, Not
+
+def both[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+def neither[A, B](a: A, b: B) -> Intersection[Not[A], Not[B]]:
+    raise NotImplementedError
+
+def exclude[A, B](a: A, b: B) -> Intersection[A, Not[B]]:
+    raise NotImplementedError
+```
+
+Specializing these lambda attributes simplifies their return types. The intersection of callables
+returning `int` and `object` keeps the callable returning `int`:
+
+```py
+class Choice[T, U]:
+    def __init__(self, left: T, right: U):
+        self.both: Final = lambda: both(lambda: left, lambda: right)
+        self.neither: Final = lambda: neither(lambda: left, lambda: right)
+        self.exclude: Final = lambda: exclude(lambda: left, lambda: right)
+
+choice = Choice(1, object())
+reveal_type(choice.both())  # revealed: () -> int
+```
+
+Excluding both callable types is equivalent to excluding the broader one:
+
+```py
+reveal_type(choice.neither())  # revealed: ~(() -> object)
+```
+
+Every callable returning `int` also returns `object`. Excluding the latter leaves `Never`:
+
+```py
+reveal_type(choice.exclude())  # revealed: Never
+```
+
+## Collections of growing recursive lambdas
+
+A collection can contain different specializations of a recursive lambda. Calling an element keeps
+the possible return types from each specialization:
+
+```py
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, Grow([value]).node)
+
+nodes = [Grow(1).node, Grow("two").node]
+reveal_type(nodes[0]()[1]()[0])  # revealed: list[int] | list[str]
+```
+
+## Callbacks that return only callbacks
+
+Each call returns another callback without returning the captured value. A list can contain
+callbacks from different specializations of `Chain`:
+
+```py
+class Chain[T]:
+    def __init__(self, value: T):
+        self.next = lambda: Chain([value]).next
+
+[Chain(0).next, Chain("").next]  # no diagnostic
+```
+
+## Recursive lambdas returning collections of callbacks
+
+A returned list can contain both recursive callbacks and a callback that returns the captured value:
+
+```py
+class Branch[T]:
+    def __init__(self, value: T):
+        self.next = lambda: [Branch([value]).next, self.next, lambda: value]
+
+Branch(0).next()  # no diagnostic
+```
+
+## Intersections of recursive lambda returns
+
+A lambda can return an intersection of its own type and another specialization of the same lambda.
+Each recursive specialization below adds a list around the captured type argument:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: intersect(Branch([value]).node, self.node)
+
+Branch(0).node()  # no diagnostic
+```
+
+## Excluding recursive lambda returns
+
+A recursive return can exclude a callable that returns the captured value. The `Final` attribute
+preserves this exclusion when its return type is specialized:
+
+```py
+from typing import Final
+from ty_extensions import Intersection, Not
+
+def exclude[A, B](a: A, b: B) -> Intersection[A, Not[B]]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: exclude(Branch([value]).node, lambda: value)
+
+Branch(0).node()  # no diagnostic
+```
+
+## Excluding the current callback
+
+The excluded callable can be the current branch's callback. Both arguments remain valid inputs to
+the generic function:
+
+```py
+from typing import Final
+from ty_extensions import Intersection, Not
+
+def exclude[A, B](a: A, b: B) -> Intersection[A, Not[B]]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: exclude(Branch([value]).node, self.node)
+
+Branch(0).node()  # no diagnostic
+```
+
+## Intersections of unions containing recursive lambdas
+
+Each side of an intersection can be a union containing a recursive lambda. Simplification retains
+the shared `int` alternative while comparing the lambda alternatives:
+
+```py
+from ty_extensions import Intersection
+from ty_extensions._internal import TypeOf
+
+def intersect[A, B](a: A, b: B) -> Intersection[A | int, B | int]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: intersect(Branch([value]).node, self.node)
+
+alternative: TypeOf[Branch(0).node()] = 0  # no diagnostic
+```
+
+A string is neither an integer nor a callable, so it is rejected:
+
+```py
+invalid: TypeOf[Branch(0).node()] = ""  # error: [invalid-assignment]
+```
+
+## Intersections inside recursive collections
+
+A returned list can contain an intersection of recursive lambdas alongside a lambda that returns the
+captured value. Here, each recursive branch wraps the value in another tuple:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: [intersect(Branch((value,)).node, self.node), lambda: value]
+
+Branch(0).node()  # no diagnostic
+```
+
+## Recursive lambdas with a fixed type argument
+
+Each recursive branch below captures the `int` class object, while the sibling lambda returns the
+original value. Checking the intersection terminates even when these returns refer back to it:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: [intersect(Branch(int).node, self.node), lambda: value]
+
+Branch(0).node()  # no diagnostic
+```
+
+## Nested lambdas in recursive collections
+
+A returned list can contain an intersection of recursive lambdas alongside a lambda that returns
+another lambda capturing the value:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: [intersect(Branch([value]).node, self.node), lambda: lambda: value]
+
+Branch(0).node()  # no diagnostic
+```
+
+## Recursive callbacks that capture callbacks
+
+Each new branch takes the previous branch's second value and a callback that returns its first
+value. The returned list contains both the recursive callback and one that returns the captured
+value. An optional argument to `node` does not change those captures:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class Branch[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node = lambda _unused=None: [
+            lambda: intersect(Branch(other, lambda: value).node, self.node),
+            lambda: value,
+        ]
+
+Branch(0, "").node()  # no diagnostic
+```
+
+## Recursive lambdas returning tuples
+
+Each `node` returns a tuple containing the next branch's callback and a callback that returns `0`.
+The next branch wraps the current value in a list:
+
+```py
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (Branch([value]).node, lambda: 0)
+```
+
+The tuple is compatible with a sequence of callbacks returning `object`. Its callbacks do not all
+return strings:
+
+```py
+from collections.abc import Callable, Sequence
+
+callbacks: Sequence[Callable[[], object]] = Branch(0).node()  # no diagnostic
+invalid: Sequence[Callable[[], str]] = Branch(0).node()  # error: [invalid-assignment]
+```
+
+## Comparing nested lambda attributes
+
+The `wrap` lambda returns another lambda whose result is a tuple containing just `value`. These
+attributes can be nested a finite number of times:
+
+```py
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.value = lambda: value
+        self.wrap = lambda: Box((value,)).value
+
+integers = Box(Box(0).wrap).wrap
+objects = Box(Box(object()).wrap).wrap
+strings = Box(Box("").wrap).wrap
+```
+
+Comparisons follow the nested return types. We accept integer results where `object` is expected and
+reject them where `str` is expected:
+
+```py
+def compare(integer_factory: TypeOf[integers], object_factory: TypeOf[objects], string_factory: TypeOf[strings]):
+    object_factory = integer_factory  # no diagnostic
+    string_factory = integer_factory  # error: [invalid-assignment]
+```
+
+## Branching callbacks with equivalent signatures
+
+Each callback returns four specializations of the preceding callback. The type argument does not
+affect their eventual integer result, so all four have the same signature. Ten levels have over a
+million paths to the integer result; comparing the callbacks reuses their equivalent signatures.
+
+```py
+from collections.abc import Callable
+
+type Callback = Callable[[], int | tuple[Callback, Callback, Callback, Callback]]
+
+class Node[T]:
+    f0 = lambda: 0
+    f1 = lambda: (Node[tuple[T]].f0, Node[list[T]].f0, Node[set[T]].f0, Node[frozenset[T]].f0)
+    f2 = lambda: (Node[tuple[T]].f1, Node[list[T]].f1, Node[set[T]].f1, Node[frozenset[T]].f1)
+    f3 = lambda: (Node[tuple[T]].f2, Node[list[T]].f2, Node[set[T]].f2, Node[frozenset[T]].f2)
+    f4 = lambda: (Node[tuple[T]].f3, Node[list[T]].f3, Node[set[T]].f3, Node[frozenset[T]].f3)
+    f5 = lambda: (Node[tuple[T]].f4, Node[list[T]].f4, Node[set[T]].f4, Node[frozenset[T]].f4)
+    f6 = lambda: (Node[tuple[T]].f5, Node[list[T]].f5, Node[set[T]].f5, Node[frozenset[T]].f5)
+    f7 = lambda: (Node[tuple[T]].f6, Node[list[T]].f6, Node[set[T]].f6, Node[frozenset[T]].f6)
+    f8 = lambda: (Node[tuple[T]].f7, Node[list[T]].f7, Node[set[T]].f7, Node[frozenset[T]].f7)
+    f9 = lambda: (Node[tuple[T]].f8, Node[list[T]].f8, Node[set[T]].f8, Node[frozenset[T]].f8)
+    f10 = lambda: (Node[tuple[T]].f9, Node[list[T]].f9, Node[set[T]].f9, Node[frozenset[T]].f9)
+
+callback: Callback = Node[int].f10  # no diagnostic
+```
+
+## Specialized lambda parameter types
+
+These lambdas have the same return type, but their parameter types determine whether they accept an
+integer. Checking the first callback does not establish that the second is compatible.
+
+```py
+from collections.abc import Callable
+
+class Consumer[T]:
+    callback: Callable[[T], None] = lambda value: None
+    consume = staticmethod(callback)
+
+valid: tuple[Callable[[int], None], Callable[[int], None]] = (
+    Consumer[object].consume,
+    Consumer[int].consume,
+)  # no diagnostic
+
+# error: [invalid-assignment]
+invalid: tuple[Callable[[int], None], Callable[[int], None]] = (
+    Consumer[object].consume,
+    Consumer[str].consume,
+)
+```
+
+## Specialized lambda return types
+
+Here the type argument determines the callback's result. An integer and a boolean callback are both
+compatible with `Callable[[], int]`; a string callback is not.
+
+```py
+from collections.abc import Callable
+from typing import cast
+
+class Producer[T]:
+    produce = lambda: cast(T, None)
+
+valid: tuple[Callable[[], int], Callable[[], int]] = (
+    Producer[int].produce,
+    Producer[bool].produce,
+)  # no diagnostic
+
+# error: [invalid-assignment]
+invalid: tuple[Callable[[], int], Callable[[], int]] = (
+    Producer[int].produce,
+    Producer[str].produce,
+)
+```
+
+## Recursive lambdas with swapped type arguments
+
+Each recursive return applies the new type arguments, even when it reaches the same lambda again:
+
+```py
+from typing import Final
+
+class Swap[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node: Final = lambda: (value, Swap(other, value).node)
+
+node = Swap[int, str](1, "two").node
+reveal_type(node()[1]()[0])  # revealed: str
+reveal_type(node()[1]()[1]()[0])  # revealed: int
+```
+
+Compatibility checks follow the types through successive calls:
+
+```py
+from ty_extensions._internal import TypeOf
+
+wider = Swap[object, object](object(), object()).node
+different = Swap[int, bytes](1, b"").node
+
+def compare(source: TypeOf[node], target: TypeOf[wider], other: TypeOf[different]):
+    target = source  # no diagnostic
+    other = source  # error: [invalid-assignment]
+```
+
+## Recursive lambdas whose type arguments stop changing
+
+Each call wraps `other` in a tuple and replaces it with `None`. After two calls, the type arguments
+stop changing:
+
+```py
+from typing import Final
+from ty_extensions._internal import TypeOf
+
+class Reset[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node: Final = lambda: (value, Reset((other,), None).node)
+
+source = Reset(0, 0).node
+wider = Reset(object(), object()).node
+different = Reset(0, "").node
+```
+
+The first two results still determine compatibility:
+
+```py
+def compare(value: TypeOf[source], target: TypeOf[wider], other: TypeOf[different]):
+    target = value  # no diagnostic
+    other = value  # error: [invalid-assignment]
+```
+
+## Materializing specialized lambda returns
+
+Since `list` is invariant, both materializations of a lambda returning `list[Any]` apply to the
+whole list:
+
+```py
+from typing import Any, Final
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: [value]
+
+node = Box[Any](None).node
+
+def _(top: Top[TypeOf[node]], bottom: Bottom[TypeOf[node]]):
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Materializing a promoted lambda return
+
+A writable lambda attribute widens a returned class object to a subclass type. For `Box`, this
+introduces an `Unknown` type argument. Materializing the widened return includes that argument, even
+if the original lambda was already materialized:
+
+```py
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    item: T
+
+node = lambda: Box
+
+def check(source: Top[TypeOf[node]]):
+    class Holder:
+        def __init__(self):
+            self.node = source
+
+    holder = Holder()
+
+    def inner(top: Top[TypeOf[holder.node]]):
+        reveal_type(top())  # revealed: type[Top[Box[Unknown]]]
+```
+
+## Lambda defaults in base class annotations
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the subclass's type parameters:
+
+```py
+from typing import Annotated, cast
+
+class Base[T]: ...
+class Derived[T](Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
+## Recursive lambda methods
+
+Each call to this lambda returns a method bound to a new `Node`:
+
+```py
+class Node[T]:
+    def __init__(self, value: T): ...
+
+    next = lambda self: Node(lambda: 0).next
+
+cursor = Node("start").next
+```
+
+The returned method remains callable, and its receiver retains the constructor argument's type:
+
+```py
+cursor()()  # no diagnostic
+reveal_type(cursor().__self__)  # revealed: Node[() -> int]
+```
+
+Binding consumes the `self` parameter. The returned method is incompatible with `int`:
+
+```py
+cursor(0)  # error: [too-many-positional-arguments]
+wrong: int = cursor()  # error: [invalid-assignment]
+```
+
+## Recursive lambda class methods
+
+Wrapping the lambda in `classmethod` binds the class receiver. Its recursive return is still a
+callable with no explicit parameters:
+
+```py
+class Node[T]:
+    def __init__(self, value: T): ...
+
+    next = classmethod(lambda cls: Node(lambda: cls).next)
+
+cursor = Node[int].next
+cursor()()  # no diagnostic
+```
+
+Binding the class consumes the `cls` parameter. The returned method rejects an extra argument and
+remains incompatible with `int`:
+
+```py
+cursor(0)  # error: [too-many-positional-arguments]
+wrong: int = cursor()  # error: [invalid-assignment]
+```
+
+## Recursive class methods with growing type arguments
+
+Each call returns the same class method with `T` replaced by `list[T]`:
+
+```py
+class Growing[T]:
+    next = classmethod(lambda cls: Growing[list[T]].next)
+
+cursor = Growing[int].next
+```
+
+The returned method retains its specialized class receiver:
+
+```py
+reveal_type(cursor().__self__)  # revealed: <class 'Growing[list[int]]'>
+```
+
 ## Recursive instance attributes with growing type arguments
 
 Reading `child` adds another `list` around the type argument. Comparing the class with a recursive

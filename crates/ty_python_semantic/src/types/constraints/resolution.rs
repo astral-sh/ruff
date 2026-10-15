@@ -133,6 +133,33 @@ impl<'db> Resolver<'_, 'db> {
 
 struct VisitDependencies;
 
+/// Collect the variables occurring in types, including lazy callable returns.
+pub(in crate::types) fn type_dependencies<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
+) -> TypeVarSet<'db> {
+    let variables = RefCell::new(FxOrderMap::default());
+    let query = |variable: BoundTypeVarInstance<'db>| {
+        variables
+            .borrow_mut()
+            .entry(variable.identity(db))
+            .or_insert(variable);
+        true
+    };
+    let visitor = Dependencies {
+        env,
+        mapping: ApplyTypeMappingVisitor::new(env),
+        query: &query,
+        satisfied: Cell::new(true),
+        visited: CycleDetector::new(()),
+    };
+    for ty in types {
+        TypeVisitorContext::new(&visitor).visit_type(db, ty);
+    }
+    TypeVarSet::from_typevars(db, variables.into_inner().into_values())
+}
+
 /// Visits typevar occurrences, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
@@ -269,7 +296,20 @@ impl<'db> TypeVisitorHooks<'db> for Dependencies<'_, 'db> {
                     Self::signature(db, visit, signature);
                 }
             }
-
+            SignatureSource::Lambda(lambda) => {
+                for parameter in lambda.parameters(db) {
+                    visit.visit_type(db, parameter.annotated_type());
+                    if let Some(default) = parameter.eager_default_type() {
+                        visit.visit_type(db, default);
+                    }
+                }
+                if !self.satisfied.get() {
+                    return;
+                }
+                for variable in lambda.return_type_dependencies(db, self.env).iter(db) {
+                    visit.visit_type(db, Type::TypeVar(variable));
+                }
+            }
             SignatureSource::Projected(projection) => projection.walk_inputs(db, visit),
         }
     }

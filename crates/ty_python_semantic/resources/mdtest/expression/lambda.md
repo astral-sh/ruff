@@ -97,6 +97,51 @@ expression.
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 ```
 
+## Type variables in defaults of immediately called lambdas
+
+Calling a lambda immediately does not bind the type variables in its defaults, even when the
+enclosing function uses those type variables in its signature:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+def generic(value: T, callback=(lambda item=list[T]: item)()) -> T:
+    return value
+```
+
+## Defaults in annotation metadata
+
+Lambda defaults inside `Annotated` metadata follow the annotation's rules for type variables. An
+ordinary annotation does not bind `T`:
+
+```py
+from typing import Annotated, Callable, TypeVar
+
+T = TypeVar("T")
+
+plain: Annotated[int, lambda value=list[T]: value]  # error: [unbound-type-variable]
+```
+
+A generic `Callable` does bind `T`, so its metadata can use `T` in a lambda default:
+
+```py
+callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]  # no diagnostic
+```
+
+## Body diagnostics in invalid annotations
+
+A lambda is not a valid type annotation. We report that error along with the unresolved name in its
+body:
+
+```py
+# error: [invalid-type-form]
+# error: [unresolved-reference]
+value: lambda: missing = 1
+```
+
 ## Defaults in string annotations
 
 `Annotated` metadata can contain lambdas. Names in their default values must still be resolved in
@@ -174,4 +219,67 @@ reveal_type(x.__doc__)  # revealed: str | None
 reveal_type(x.__kwdefaults__)  # revealed: dict[str, Any] | None
 reveal_type(x.__module__)  # revealed: str
 reveal_type(x.__qualname__)  # revealed: str
+```
+
+## Recursive return types
+
+A lambda can return itself inside a tuple. Calling the returned lambda preserves the type of the
+first tuple item:
+
+```py
+node = lambda: (1, node)
+
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+```
+
+The returned lambda still takes no arguments:
+
+```py
+node()[1](0)  # error: [too-many-positional-arguments]
+```
+
+## Mutually recursive return types
+
+The return types remain distinct when two lambdas refer to each other:
+
+```py
+first = lambda: (1, second)
+second = lambda: ("two", first)
+
+reveal_type(first()[1]()[0])  # revealed: Literal["two"]
+reveal_type(second()[1]()[0])  # revealed: Literal[1]
+```
+
+## Bound recursive lambdas
+
+Access through an instance binds the lambda's first parameter to that instance:
+
+```py
+class C:
+    method = lambda self: (1, C.method)
+
+c = C()
+c.method(c)  # error: [too-many-positional-arguments]
+```
+
+The returned class attribute remains unbound, so it still requires an instance argument:
+
+```py
+reveal_type(c.method()[1](c)[0])  # revealed: int
+c.method()[1]()  # error: [missing-argument]
+```
+
+## Mutually recursive lambda methods
+
+Two lambda methods can return references to each other. Because these attributes are writable, the
+literal return types widen to `int` and `str`:
+
+```py
+class C:
+    first = lambda self: (1, C.second)
+    second = lambda self: ("two", C.first)
+
+c = C()
+reveal_type(c.first()[1](c)[0])  # revealed: str
+reveal_type(c.second()[1](c)[0])  # revealed: int
 ```

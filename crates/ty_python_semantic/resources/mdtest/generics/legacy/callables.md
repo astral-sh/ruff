@@ -1643,6 +1643,79 @@ class Wrapper(Generic[T]):
 reveal_type(Wrapper[int]()())  # revealed: int
 ```
 
+## Recursive callable aliases with changing type arguments
+
+Each call to `Callback[T]` can return a value of type `T` or another callback, whose type argument
+is `list[T]`:
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+T = TypeVar("T")
+Callback: TypeAlias = Callable[[], "Callback[list[T]] | T"]
+
+finite: Callback[int] = lambda: lambda: [1]  # no diagnostic
+```
+
+A recursive lambda still needs a compatible return type. Returning itself on one branch does not
+permit an unrelated value on the other branch:
+
+```py
+def check(flag: bool):
+    callback = lambda: callback if flag else "wrong"
+    invalid: Callback[int] = callback  # error: [invalid-assignment]
+```
+
+## Required arguments in recursive callbacks
+
+Recursive callbacks still have to accept the arguments supplied by their caller. `collect` calls its
+callback without arguments:
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+def collect(callback: Callable[[], T]) -> Callable[[], list[T]]:
+    return lambda: [callback()]
+
+Recursive: TypeAlias = Callable[..., "Recursive[list[T]]"] | T
+
+def preserve(value: Recursive[T]) -> Recursive[T]:
+    return value
+```
+
+A required parameter makes the call to `collect` invalid, even though the recursive return type adds
+another `list` at each step:
+
+```py
+required = preserve(lambda value: collect(required))  # error: [invalid-argument-type]
+```
+
+A default makes the parameter optional, so this version is accepted:
+
+```py
+optional = preserve(lambda value=0: collect(optional))  # no diagnostic
+```
+
+## Recursive constructor returns
+
+Calling this class returns another specialization of the same class. Repeated calls keep adding
+`list` around the type argument. We currently reject this recursive callable assignment, although
+each returned value remains callable.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+R = Callable[[], "R"]
+
+class C(Generic[T]):
+    __new__ = staticmethod(lambda cls: C[list[T]])
+
+recursive: R = C[int]  # error: [invalid-assignment]
+```
+
 ## Recursive constructor return annotations
 
 An explicitly annotated `__new__` can return successively larger specializations of its class. We
@@ -1657,6 +1730,24 @@ R = Callable[[], "R"]
 class C(Generic[T]):
     def __new__(cls) -> "type[C[list[T]]]":
         return C[list[T]]
+
+recursive: R = C[int]  # error: [invalid-assignment]
+```
+
+## Recursive callable instance returns
+
+The constructor returns a callable instance. Calling that instance returns another specialization of
+the class, so repeated calls alternate between classes and instances. We currently reject this
+recursive callable assignment.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+R = Callable[[], "R"]
+
+class C(Generic[T]):
+    __call__ = lambda self: C[list[T]]
 
 recursive: R = C[int]  # error: [invalid-assignment]
 ```

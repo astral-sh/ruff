@@ -198,6 +198,7 @@ impl<'db> IdentityBuilder<'db> {
             projected: matches!(callable.signature_source(db), SignatureSource::Projected(_)),
         };
         match callable.signature_source(db) {
+            SignatureSource::Lambda(_) => None,
             SignatureSource::Projected(projection) => self.compose(db, kind, [projection.source()]),
             SignatureSource::Explicit(signatures) => {
                 let mut changed = false;
