@@ -494,6 +494,57 @@ def union_mismatched(c: C | (D & Other)):
     del c[0]  # error: [invalid-argument-type]
 ```
 
+### Attribute deletion
+
+The same full-receiver requirement applies to `__delattr__` for `del c.x`. Narrowing `__delattr__`'s
+`self` type triggers `invalid-method-override`, since `__delattr__` already exists on `object`; that
+check is unrelated to receiver preservation, so it is disabled for this example.
+
+Unlike subscripting, attribute deletion falls back to ordinary field deletion when a type defines no
+`__delattr__` at all, so `Other` below defines one too; otherwise checking `__delattr__` against the
+intersection would trivially succeed through `Other` regardless of how `C`'s receiver is bound.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+invalid-method-override = "ignore"
+```
+
+```py
+class Other:
+    def __delattr__(self: "C & Other", name: str) -> None: ...
+
+class C:
+    x: int = 0
+
+    def __delattr__(self: "C & Other", name: str) -> None: ...
+
+def _(c: C & Other):
+    c.__delattr__("x")  # no diagnostic
+    del c.x  # no diagnostic
+
+def mismatched(c: C):
+    del c.x  # error: [invalid-assignment]
+```
+
+Each member of a union retains its own intersection receiver, so a union is only a valid target as a
+whole if every member is individually valid.
+
+```py
+class D:
+    x: int = 0
+
+    def __delattr__(self: "D & Other", name: str) -> None: ...
+
+def union(c: (C & Other) | (D & Other)):
+    del c.x  # no diagnostic
+
+def union_mismatched(c: C | (D & Other)):
+    del c.x  # error: [invalid-assignment]
+```
+
 ### Context managers
 
 ```py

@@ -2269,12 +2269,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                let Err(err) = object_ty.try_call_dunder_with_receiver(
+                let Err(err) = object_ty.try_call_dunder_with_policy_and_receiver(
                     db,
                     env,
                     "__delitem__",
                     &mut CallArguments::positional([slice_ty]),
                     TypeContext::default(),
+                    MemberLookupPolicy::default(),
                     dunder_receiver,
                 ) else {
                     return;
@@ -2411,8 +2412,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Check if a type supports subscript deletion (has `__delitem__`). `dunder_receiver`, if
-    /// given, is what `__delitem__` binds `self`/`Self` to in place of `object_ty`, matching
+    /// Check if a type supports subscript deletion (has `__delitem__`).
+    /// `dunder_receiver`, if given, is what `__delitem__` binds
+    /// `self`/`Self` to in place of `object_ty`, matching
     /// `validate_subscript_deletion_impl`'s own override.
     fn can_delete_subscript(
         &self,
@@ -2422,12 +2424,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> bool {
         let db = self.db();
         object_ty
-            .try_call_dunder_with_receiver(
+            .try_call_dunder_with_policy_and_receiver(
                 db,
                 self.program_environment(),
                 "__delitem__",
                 &mut CallArguments::positional([slice_ty]),
                 TypeContext::default(),
+                MemberLookupPolicy::default(),
                 dunder_receiver,
             )
             .is_ok()

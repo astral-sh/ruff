@@ -8180,18 +8180,20 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Same as `try_call_dunder`, but allows overriding what a bound method or `Self` return
-    /// type binds to in place of `self`. Used when `self` is one positive element of an
-    /// intersection whose caller wants the dunder bound to the full intersection, not just the
-    /// element that defines it (mirroring what `IntersectionType::try_call_dunder_with_policy`
+    /// Same as `try_call_dunder_with_policy`, but allows overriding what a bound method or
+    /// `Self` return type binds to in place of `self`. Used when `self` is one positive element
+    /// of an intersection whose caller wants the dunder bound to the full intersection, not just
+    /// the element that defines it (mirroring what `IntersectionType::try_call_dunder_with_policy`
     /// already does for the implicit, non-decomposed case).
-    fn try_call_dunder_with_receiver(
+    #[expect(clippy::too_many_arguments)]
+    fn try_call_dunder_with_policy_and_receiver(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
         argument_types: &mut CallArguments<'_, 'db>,
         tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         // Implicit calls to dunder methods never access instance members, so we pass
@@ -8203,7 +8205,7 @@ impl<'db> Type<'db> {
                 db,
                 env,
                 name,
-                MemberLookupPolicy::default() | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 receiver,
             ),
             argument_types,

@@ -3087,19 +3087,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
+    /// `dunder_receiver`, if given, is what `__delattr__` binds `self`/`Self` to in place of
+    /// `object_ty` -- set when recursing into one positive element of an intersection, so the
+    /// element that defines `__delattr__` still binds to the full intersection, the same as an
+    /// explicit `obj.__delattr__(...)` call would. Union decomposition leaves it untouched: each
+    /// union member is independently either a valid receiver or not, and should bind to itself.
     fn validate_attribute_deletion(
         &mut self,
         target: &ast::ExprAttribute,
         object_ty: Type<'db>,
         attribute: &str,
         emit_diagnostics: bool,
+        dunder_receiver: Option<Type<'db>>,
     ) -> bool {
         let env = self.program_environment();
         let db = self.db();
 
         match object_ty {
             Type::Recursive(recursive) => recursive.unfold(db, env).is_unchanged_or(|unfolded| {
-                self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
+                self.validate_attribute_deletion(
+                    target,
+                    unfolded,
+                    attribute,
+                    emit_diagnostics,
+                    dunder_receiver,
+                )
             }),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -3111,6 +3123,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         *element_ty,
                         attribute,
                         emit_diagnostics,
+                        dunder_receiver,
                     ) {
                         return false;
                     }
@@ -3121,7 +3134,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Intersection(intersection) => {
                 let positive = intersection.positive(db);
                 if positive.iter().any(|element_ty| {
-                    self.validate_attribute_deletion(target, *element_ty, attribute, false)
+                    self.validate_attribute_deletion(
+                        target,
+                        *element_ty,
+                        attribute,
+                        false,
+                        dunder_receiver.or(Some(object_ty)),
+                    )
                 }) {
                     !self.validate_final_attribute_deletion(
                         target,
@@ -3131,7 +3150,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 } else {
                     if emit_diagnostics && let Some(element_ty) = positive.first() {
-                        self.validate_attribute_deletion(target, *element_ty, attribute, true);
+                        self.validate_attribute_deletion(
+                            target,
+                            *element_ty,
+                            attribute,
+                            true,
+                            dunder_receiver.or(Some(object_ty)),
+                        );
                     }
                     false
                 }
@@ -3142,6 +3167,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 complement.remaining_literal_union(db, env),
                 attribute,
                 emit_diagnostics,
+                dunder_receiver,
             ),
 
             // Type aliases need their own arm so aliased unions and intersections reuse the
@@ -3152,15 +3178,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 alias.value_type(db),
                 attribute,
                 emit_diagnostics,
+                dunder_receiver,
             ),
 
             Type::TypeVar(typevar) => {
                 // Other possible receivers can expose the same name through a descriptor or
                 // dynamic type. Check each receiver using its own deletion contract.
                 match typevar.require_bound_or_constraints(db, env) {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        self.validate_attribute_deletion(target, bound, attribute, emit_diagnostics)
-                    }
+                    TypeVarBoundOrConstraints::UpperBound(bound) => self
+                        .validate_attribute_deletion(
+                            target,
+                            bound,
+                            attribute,
+                            emit_diagnostics,
+                            dunder_receiver,
+                        ),
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
                         constraints.elements(db).iter().all(|element_ty| {
                             self.validate_attribute_deletion(
@@ -3168,6 +3200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 *element_ty,
                                 attribute,
                                 emit_diagnostics,
+                                dunder_receiver,
                             )
                         })
                     }
@@ -3246,13 +3279,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Place::Undefined => Err(CallDunderError::MethodNotAvailable),
                     }
                 } else {
-                    delattr_receiver.try_call_dunder_with_policy(
+                    delattr_receiver.try_call_dunder_with_policy_and_receiver(
                         db,
                         env,
                         "__delattr__",
                         &mut delattr_arguments,
                         TypeContext::default(),
                         MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        dunder_receiver,
                     )
                 };
 
@@ -11462,6 +11496,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.expression_type(value),
                     attr.as_str(),
                     true,
+                    None,
                 );
                 Type::Never
             }
