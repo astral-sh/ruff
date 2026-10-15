@@ -21,7 +21,7 @@ use crate::{
         ClassType, CycleKind, FindLegacyTypeVarsVisitor, FunctionType, InternedType,
         KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
         MemberLookupPolicy, Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext,
-        TypeMapping, TypeQuery, TypeQueryContext, TypeVarBoundOrConstraints, UnionType,
+        TypeMapping, TypeQuery, TypeVarBoundOrConstraints, UnionType,
         function::OverloadLiteral,
         infer::{InferenceEnvironment, ScopeInference},
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
@@ -79,8 +79,8 @@ impl Default for CallableExpansionRecursion<'_> {
 }
 
 impl CallableExpansionRecursion<'_> {
-    pub(super) fn revision(&self) -> u64 {
-        self.visits.revision()
+    pub(super) fn state(&self) -> super::cyclic::RecursionGuardState<'_> {
+        self.visits.state()
     }
 }
 
@@ -185,9 +185,7 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(env, FunctionDescriptorGet { instance, owner }, |context| {
-            context.visit(db, self)
-        })
+        FunctionDescriptorGet { instance, owner }.evaluate(db, env, self, ())
     }
 
     /// Create a callable type with a single non-overloaded signature.

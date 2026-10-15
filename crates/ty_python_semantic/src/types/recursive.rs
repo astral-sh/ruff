@@ -2278,7 +2278,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(env, LiteralArgument, |context| context.visit(db, self))
+        LiteralArgument.evaluate(db, env, self, ())
     }
 }
 
@@ -2587,6 +2587,18 @@ where
 {
     type Output: Clone;
 
+    /// Evaluate one root while memoizing its recursive subqueries. The final root result is
+    /// returned directly because this context is discarded as soon as the query finishes.
+    fn evaluate(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        ty: Type<'db>,
+        input: Input,
+    ) -> Self::Output {
+        TypeQueryContext::new(env, self).visit_uncached(db, ty, input)
+    }
+
     /// Identify this query and the immutable inputs shared by its recursive calls.
     fn recursion_key(&self) -> TypeQueryKey<'db>;
 
@@ -2709,6 +2721,13 @@ type QueryGuard<'db> = CycleDetector<'db, TypeTraversalTag, Type<'db>, (), 3>;
 enum QueryDependency<'db> {
     Type(QueryGuardRef<'db>, Type<'db>),
     Visitor(VisitorGuardRef<'db>, VisitorGuardKey<'db>),
+    Comparison(super::relation::ComparisonKey<'db>),
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RecursionDecision<'db> {
+    Cycle(Option<CycleKind>),
+    Comparison(Option<(Type<'db>, Type<'db>)>),
 }
 
 type VisitorGuardKey<'db> = (Type<'db>, TypeVisitorContext<'db>, Type<'db>);
@@ -2764,14 +2783,33 @@ impl<'db> TypeQueryRecursion<'db> {
             .clone()
     }
 
-    fn cycle_kind(
+    pub(super) fn observe_comparison(&self, key: super::relation::ComparisonKey<'db>) {
+        if self.depth.get() != 0 {
+            self.dependencies
+                .borrow_mut()
+                .push(QueryDependency::Comparison(key));
+        }
+    }
+
+    fn decision(
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
         dependency: &QueryDependency<'db>,
-    ) -> Option<CycleKind> {
+    ) -> RecursionDecision<'db> {
         match dependency {
-            QueryDependency::Type(guard, ty) => guard.0.cycle_kind(db, env, ty),
-            QueryDependency::Visitor(guard, key) => guard.0.cycle_kind(db, env, key),
+            QueryDependency::Type(guard, ty) => {
+                RecursionDecision::Cycle(guard.0.cycle_kind(db, env, ty))
+            }
+            QueryDependency::Visitor(guard, key) => {
+                RecursionDecision::Cycle(guard.0.cycle_kind(db, env, key))
+            }
+            QueryDependency::Comparison(key) => RecursionDecision::Comparison(
+                env.context()
+                    .state()
+                    .comparisons
+                    .get()
+                    .and_then(|guard| guard.decision(db, env, *key)),
+            ),
         }
     }
 }
@@ -2804,6 +2842,7 @@ where
     }
 
     /// Run a query with one cache and one set of guards for all recursive calls.
+    #[cfg(test)]
     pub(super) fn with_root<R>(
         env: &'env TypeOperations<'db>,
         query: Q,
@@ -2832,47 +2871,45 @@ where
     pub(crate) fn visit_with(&self, db: &'db dyn Db, ty: Type<'db>, input: Input) -> Q::Output {
         self.memo
             .get_or_compute(db, self.environment(), (ty, input.clone()), || {
-                let traversal = &self.traversal;
-                let key = || traversal.operation.recursion_key();
-                traversal.with_shared_guard(db, ty, key, |cycle| {
-                    let visit = TypeQueryVisit { context: self };
-                    let query = &self.traversal.operation;
-                    if let Some(kind) = cycle {
-                        return query.on_cycle(&visit, ty, kind, input);
-                    }
-                    match ty {
-                        Type::TypeAlias(alias) => {
-                            query.visit_alias_like(db, &visit, ty, input, |input| {
-                                let access = BodyAccess {
-                                    env: self.environment(),
-                                };
-                                self.visit_with(db, alias.resolve_body(db, &access), input)
-                            })
-                        }
-                        Type::Recursive(recursive) => {
-                            query.visit_alias_like(db, &visit, ty, input, |input| {
-                                match recursive.unfold(db, self.mapping_visitor()) {
-                                    UnfoldResult::Unfolded(body) => {
-                                        self.visit_with(db, body, input)
-                                    }
-                                    UnfoldResult::Unchanged(_) => {
-                                        query.visit(db, &visit, ty, input)
-                                    }
-                                }
-                            })
-                        }
-                        Type::Union(_) => {
-                            let expanded = normalize_outer_union(db, ty, self.mapping_visitor());
-                            if expanded == ty {
-                                query.visit(db, &visit, ty, input)
-                            } else {
-                                self.visit_with(db, expanded, input)
-                            }
-                        }
-                        _ => query.visit(db, &visit, ty, input),
-                    }
-                })
+                self.visit_uncached(db, ty, input)
             })
+    }
+
+    fn visit_uncached(&self, db: &'db dyn Db, ty: Type<'db>, input: Input) -> Q::Output {
+        let traversal = &self.traversal;
+        let key = || traversal.operation.recursion_key();
+        traversal.with_shared_guard(db, ty, key, |cycle| {
+            let visit = TypeQueryVisit { context: self };
+            let query = &self.traversal.operation;
+            if let Some(kind) = cycle {
+                return query.on_cycle(&visit, ty, kind, input);
+            }
+            match ty {
+                Type::TypeAlias(alias) => query.visit_alias_like(db, &visit, ty, input, |input| {
+                    let access = BodyAccess {
+                        env: self.environment(),
+                    };
+                    self.visit_with(db, alias.resolve_body(db, &access), input)
+                }),
+                Type::Recursive(recursive) => {
+                    query.visit_alias_like(db, &visit, ty, input, |input| {
+                        match recursive.unfold(db, self.mapping_visitor()) {
+                            UnfoldResult::Unfolded(body) => self.visit_with(db, body, input),
+                            UnfoldResult::Unchanged(_) => query.visit(db, &visit, ty, input),
+                        }
+                    })
+                }
+                Type::Union(_) => {
+                    let expanded = normalize_outer_union(db, ty, self.mapping_visitor());
+                    if expanded == ty {
+                        query.visit(db, &visit, ty, input)
+                    } else {
+                        self.visit_with(db, expanded, input)
+                    }
+                }
+                _ => query.visit(db, &visit, ty, input),
+            }
+        })
     }
 }
 
@@ -2884,22 +2921,20 @@ impl<'db, Q: TypeQuery<'db>> TypeQueryContext<'_, 'db, Q> {
 
 /// A completed result is reusable only while every recursion decision it observed is unchanged.
 /// The dependency log spans query and visitor contexts, including cache hits in nested operations.
-struct OperationMemo<'db, K, R> {
-    cache: RefCell<CycleDetectorCache<K, TypeQueryResult<'db, R>>>,
-    recursion_revision: Cell<Option<super::TypeRecursionRevision>>,
+pub(super) struct OperationMemo<'db, K, R> {
+    cache: RefCell<CycleDetectorCache<K, Rc<TypeQueryResult<'db, R>>>>,
 }
 
 impl<K, R> Default for OperationMemo<'_, K, R> {
     fn default() -> Self {
         Self {
             cache: RefCell::new(CycleDetectorCache::new()),
-            recursion_revision: Cell::new(None),
         }
     }
 }
 
 impl<'db, K: Eq + Hash, R: Clone> OperationMemo<'db, K, R> {
-    fn get_or_compute(
+    pub(super) fn get_or_compute(
         &self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
@@ -2912,21 +2947,35 @@ impl<'db, K: Eq + Hash, R: Clone> OperationMemo<'db, K, R> {
             depth: &shared.depth,
             dependencies: &shared.dependencies,
         };
-        self.validate_recursion_context(env);
         let cached = self.cache.borrow().get(&key).cloned();
+        let operation_revision = env.context().state().operation.revision();
         if let Some(cached) = cached
-            && cached.dependencies.iter().all(|(dependency, expected)| {
-                TypeQueryRecursion::cycle_kind(db, env, dependency) == *expected
-            })
+            && cached.shared_dependencies_match(env)
+            && (cached.operation_revision.get() == operation_revision
+                || cached.dependencies.iter().all(|(dependency, expected)| {
+                    TypeQueryRecursion::decision(db, env, dependency) == *expected
+                }))
+            && cached.shared_dependencies_match(env)
         {
+            cached.operation_revision.set(operation_revision);
+            let guards = env.context().guard_states();
+            for &(index, _) in &cached.shared_dependencies {
+                if let Some(guard) = guards[index] {
+                    guard.observe();
+                }
+            }
             shared.dependencies.borrow_mut().extend(
                 cached
                     .dependencies
                     .iter()
                     .map(|(dependency, _)| dependency.clone()),
             );
-            return cached.output;
+            return cached.output.clone();
         }
+        let before = env
+            .context()
+            .guard_states()
+            .map(|guard| guard.map_or((0, 0), |guard| (guard.revision, guard.observations())));
         let start = shared.dependencies.borrow().len();
         let output = compute();
         // Evaluate dependencies after releasing this operation's guards. An answer computed in
@@ -2943,33 +2992,53 @@ impl<'db, K: Eq + Hash, R: Clone> OperationMemo<'db, K, R> {
         let dependencies = dependencies
             .into_iter()
             .map(|dependency| {
-                let cycle = TypeQueryRecursion::cycle_kind(db, env, &dependency);
-                (dependency, cycle)
+                let decision = TypeQueryRecursion::decision(db, env, &dependency);
+                (dependency, decision)
             })
             .collect();
-        self.validate_recursion_context(env);
+        let mut shared_dependencies = Vec::new();
+        for (index, guard) in env.context().guard_states().into_iter().enumerate() {
+            let Some(guard) = guard else {
+                continue;
+            };
+            let (revision, observations) = before[index];
+            if guard.observations() == observations {
+                continue;
+            }
+            // An incomplete nested computation can change an enclosing cycle's state. Its
+            // result cannot be reused without repeating that effect on the enclosing operation.
+            if guard.revision != revision {
+                return output;
+            }
+            shared_dependencies.push((index, revision));
+        }
         self.cache.borrow_mut().insert(
             key,
-            TypeQueryResult {
+            Rc::new(TypeQueryResult {
                 output: output.clone(),
                 dependencies,
-            },
+                shared_dependencies: shared_dependencies.into_boxed_slice(),
+                operation_revision: Cell::new(operation_revision),
+            }),
         );
         output
     }
-
-    fn validate_recursion_context(&self, env: &TypeOperations<'db>) {
-        let revision = Some(env.context().revision());
-        if self.recursion_revision.replace(revision) != revision {
-            *self.cache.borrow_mut() = CycleDetectorCache::new();
-        }
-    }
 }
 
-#[derive(Clone)]
 struct TypeQueryResult<'db, R> {
     output: R,
-    dependencies: Box<[(QueryDependency<'db>, Option<CycleKind>)]>,
+    dependencies: Box<[(QueryDependency<'db>, RecursionDecision<'db>)]>,
+    shared_dependencies: Box<[(usize, u64)]>,
+    operation_revision: Cell<u64>,
+}
+
+impl<R> TypeQueryResult<'_, R> {
+    fn shared_dependencies_match(&self, env: &TypeOperations<'_>) -> bool {
+        let guards = env.context().guard_states();
+        self.shared_dependencies
+            .iter()
+            .all(|&(index, expected)| guards[index].map_or(0, |guard| guard.revision) == expected)
+    }
 }
 
 /// The dependency log belongs to active queries; completed roots retain only their cache entries.
@@ -4302,6 +4371,116 @@ mod query_tests {
                 .visit(&env, &key, || (), || assert!(query.visit(&db, ty)));
             assert!(!query.visit(&db, ty));
         });
+    }
+
+    #[test]
+    fn operation_cache_tracks_only_observed_shared_guards() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let shared = env.context();
+        let [first, second] = ["T", "U"].map(|name| {
+            let typevar = BoundTypeVarInstance::synthetic(
+                &db,
+                &env,
+                Name::new(name),
+                TypeVarVariance::Invariant,
+            );
+            (env.program(&db), typevar.identity(&db))
+        });
+        let memo = super::OperationMemo::default();
+        let visits = Cell::new(0);
+        let read = || {
+            memo.get_or_compute(&db, &env, (), || {
+                visits.set(visits.get() + 1);
+                shared.meta_type().typevars.contains(&first)
+            })
+        };
+
+        assert!(!read());
+        shared
+            .state()
+            .normalization
+            .visit(&env, &(), || (), || assert!(!read()));
+        assert_eq!(visits.get(), 1);
+
+        shared
+            .meta_type()
+            .typevars
+            .visit(&env, &first, || (), || assert!(read()));
+        shared
+            .meta_type()
+            .typevars
+            .visit(&env, &second, || (), || assert!(!read()));
+        assert_eq!(visits.get(), 3);
+    }
+
+    #[test]
+    fn operation_cache_propagates_shared_dependencies_through_cache_hits() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let inner = super::OperationMemo::default();
+        let outer = super::OperationMemo::default();
+        let read = || {
+            inner.get_or_compute(&db, &env, (), || {
+                env.context().state().normalization.is_empty()
+            })
+        };
+
+        assert!(read());
+        assert!(outer.get_or_compute(&db, &env, (), read));
+        env.context().state().normalization.visit(
+            &env,
+            &(),
+            || (),
+            || assert!(!outer.get_or_compute(&db, &env, (), read)),
+        );
+    }
+
+    #[test]
+    fn operation_cache_preserves_the_global_cache_boundary() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let memo = super::OperationMemo::default();
+        let read =
+            || memo.get_or_compute(&db, &env, (), || *env.cached_or_compute(|| &true, || false));
+
+        assert!(read());
+        env.context()
+            .state()
+            .normalization
+            .visit(&env, &(), || (), || assert!(!read()));
+        assert!(read());
+    }
+
+    #[test]
+    fn operation_cache_repeats_incomplete_computations() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let guard = &env.context().state().materialized_bounds;
+        let memo = super::OperationMemo::default();
+        let visits = Cell::new(0);
+        let read = || {
+            memo.get_or_compute(&db, &env, (), || {
+                visits.set(visits.get() + 1);
+                guard.visit(&env, &typevar, || true)
+            })
+        };
+
+        assert_eq!(
+            guard.visit(&env, &typevar, || {
+                assert_eq!(read(), None);
+                assert_eq!(read(), None);
+            }),
+            None
+        );
+        assert_eq!(visits.get(), 2);
+        assert_eq!(read(), Some(true));
     }
 
     #[test]

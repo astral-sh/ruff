@@ -2,7 +2,7 @@ use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use crate::types::recursive::TypeQueryVisit;
 use crate::types::recursive::{TypeInspectionKey, TypeQueryKey};
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
+use crate::types::{CycleKind, TypeQuery};
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
@@ -71,11 +71,7 @@ fn string_literal_values<'db>(
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(
-            self.program_environment(),
-            TypedDictKeyExpectedType,
-            |context| context.visit(self.db(), ty),
-        )
+        TypedDictKeyExpectedType.evaluate(self.db(), self.program_environment(), ty, ())
     }
 
     fn store_typed_dict_key_expected_type(&mut self, slice: &ast::Expr, value_ty: Type<'db>) {

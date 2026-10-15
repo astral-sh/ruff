@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::types::recursive::TypeQueryVisit;
 use crate::types::recursive::{TypeInspectionKey, TypeQueryKey};
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
+use crate::types::{CycleKind, TypeQuery};
 use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
@@ -73,14 +73,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     }
 
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
-        TypeQueryContext::with_root(
-            self.program_environment(),
-            ContainsTypeFormValue {
-                builder: self,
-                expression,
-            },
-            |context| context.visit(self.db(), ty),
-        )
+        ContainsTypeFormValue {
+            builder: self,
+            expression,
+        }
+        .evaluate(self.db(), self.program_environment(), ty, ())
     }
 
     pub(super) fn infer_type_form_call_expression(

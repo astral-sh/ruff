@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::Db;
 use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext, TypeTraversal, TypeWalk};
+use crate::types::{CycleKind, TypeQuery, TypeTraversal, TypeWalk};
 use crate::{
     TypeQualifiers,
     types::{
@@ -398,9 +398,7 @@ pub(super) fn final_attribute_receiver<'db>(
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<Type<'db>> {
-    TypeQueryContext::with_root(env, FindFinalAttribute(attribute), |context| {
-        context.visit(db, object_ty)
-    })
+    FindFinalAttribute(attribute).evaluate(db, env, object_ty, ())
 }
 
 struct FindFinalAttribute<'a>(&'a str);

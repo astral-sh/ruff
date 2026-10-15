@@ -3,9 +3,7 @@ use crate::types::recursive::TypeQueryVisit;
 use std::borrow::Cow;
 
 use super::context::InferContext;
-use super::{
-    ClassType, CycleKind, Signature, Type, TypeContext, TypeQuery, TypeQueryContext, UnionType,
-};
+use super::{ClassType, CycleKind, Signature, Type, TypeContext, TypeQuery, UnionType};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::TypeOperations;
@@ -48,7 +46,7 @@ enum ReflectedMethodPriority {
 /// This is intentionally conservative: a false negative only widens a binary operation's result,
 /// while a false positive could discard a valid normal-method result.
 fn has_exact_runtime_class<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
-    TypeQueryContext::with_root(env, HasExactRuntimeClass, |query| query.visit(db, ty))
+    HasExactRuntimeClass.evaluate(db, env, ty, ())
 }
 
 struct HasExactRuntimeClass;

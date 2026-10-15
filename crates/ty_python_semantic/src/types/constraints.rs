@@ -116,9 +116,9 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
@@ -3423,18 +3423,55 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> CandidateSolutions<'db> {
-        let when = self.when_constraint_set_assignable_to_owned(db, env, target);
-        when.query(|builder, when| {
-            let mut storage = builder.storage.borrow_mut();
-            CandidateSolutions::compute(
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _| CandidateSolutions::Unsatisfiable,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> CandidateSolutions<'db> {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            compute(db, &env, types, inferable)
+        }
+
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> CandidateSolutions<'db> {
+            let when = types.first(db).when_constraint_set_assignable_to_owned(
                 db,
                 env,
-                &mut storage,
-                when.node,
-                inferable,
-                when.source_order,
-            )
-        })
+                types.second(db),
+            );
+            when.query(|builder, when| {
+                let mut storage = builder.storage.borrow_mut();
+                CandidateSolutions::compute(
+                    db,
+                    env,
+                    &mut storage,
+                    when.node,
+                    inferable,
+                    when.source_order,
+                )
+            })
+        }
+
+        let types = TypePair::new(db, env.program(db), self, target);
+        env.cached_or_compute(
+            || cached(db, types, inferable),
+            || {
+                env.caches().solutions.get_or_compute(db, env, (types, inferable), || {
+                    compute(db, env, types, inferable)
+                })
+            },
+        )
+        .into_owned()
     }
 }
 

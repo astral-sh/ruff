@@ -13,7 +13,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, CycleKind, DivergentType, DynamicType,
     KnownClass, KnownInstanceType, MaterializationKind, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeQuery, TypeQueryContext, TypingModule, todo_type,
+    TypeMapping, TypeQuery, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -151,9 +151,7 @@ impl<'db> ClassBase<'db> {
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
-        TypeQueryContext::with_root(env, ResolveClassBase { subclass }, |root| {
-            root.visit(db, ty)
-        })
+        ResolveClassBase { subclass }.evaluate(db, env, ty, ())
     }
 
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {

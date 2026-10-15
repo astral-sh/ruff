@@ -30,7 +30,7 @@ use super::{
     Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, UnionType, VarianceInferable,
     VarianceTerm, definition_expression_annotation, definition_expression_type, visitor,
 };
-use super::{CycleKind, TypeQuery, TypeQueryContext};
+use super::{CycleKind, TypeQuery};
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
@@ -2109,9 +2109,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
-    TypeQueryContext::with_root(env, UnpackTypedDict, |root| root.visit(db, ty))
-        .ok()
-        .flatten()
+    UnpackTypedDict.evaluate(db, env, ty, ()).ok().flatten()
 }
 
 struct UnpackTypedDict;

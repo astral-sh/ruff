@@ -25,11 +25,11 @@ use crate::types::{
     ApplyTypeMappingVisitor, BytesLiteralType, CallableType, ClassBase, ClassLiteral, ClassType,
     CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    ProtocolInstanceType, StringLiteralType, SubclassOfInner, SubclassOfType,
+    ProtocolInstanceType, StringLiteralType, SubclassOfInner, SubclassOfType, TypePair,
     TypeVarBoundOrConstraints, TypedDictType, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, ProgramEnvironment,
     types::{
         ErrorContext, ErrorContextTree, Type, constraints::ConstraintSet, typevar::TypeVarSet,
     },
@@ -48,14 +48,14 @@ enum ComparisonKind {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct ComparisonPolicy<'db> {
+pub(super) struct ComparisonPolicy<'db> {
     kind: ComparisonKind,
     inferable: TypeVarSet<'db>,
     provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
 }
 
-type ComparisonKey<'db> = (Type<'db>, (Program<'db>, ComparisonPolicy<'db>), Type<'db>);
+pub(super) type ComparisonKey<'db> = (Type<'db>, (Program<'db>, ComparisonPolicy<'db>), Type<'db>);
 
 /// Active comparisons shared by every helper in the consuming operation.
 ///
@@ -74,8 +74,15 @@ impl Default for ComparisonRecursion<'_> {
 }
 
 impl<'db> ComparisonRecursion<'db> {
-    pub(super) fn revision(&self) -> u64 {
-        self.active.revision()
+    pub(super) fn decision(
+        &self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        key: ComparisonKey<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
+        self.active
+            .cycle_pair(db, env, key)
+            .map(|(_, previous)| (previous.0, previous.2))
     }
 
     fn visit<R>(
@@ -86,12 +93,11 @@ impl<'db> ComparisonRecursion<'db> {
         policy: ComparisonPolicy<'db>,
         compute: impl FnOnce(Option<(Type<'db>, Type<'db>)>) -> R,
     ) -> R {
-        self.active.visit_active_pair(
-            db,
-            env,
-            (operands.0, (env.program(db), policy), operands.1),
-            |cycle| compute(cycle.map(|(_, previous)| (previous.0, previous.2))),
-        )
+        let key = (operands.0, (env.program(db), policy), operands.1);
+        env.context().state().type_queries.observe_comparison(key);
+        self.active.visit_active_pair(db, env, key, |cycle| {
+            compute(cycle.map(|(_, previous)| (previous.0, previous.2)))
+        })
     }
 }
 
@@ -569,18 +575,43 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.has_relation_to_with_typevar_evaluation(
-            db,
-            env,
-            target,
-            &constraints,
-            TypeVarSet::None,
-            TypeRelation::Subtyping,
-            TypeVarEvaluation::Lazy,
-            ConstraintProvenance::Evidence,
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _| false,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            compute(db, &env, types)
+        }
+
+        fn compute<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, types: TypePair<'db>) -> bool {
+            let constraints = ConstraintSetBuilder::new();
+            types
+                .first(db)
+                .has_relation_to_with_typevar_evaluation(
+                    db,
+                    env,
+                    types.second(db),
+                    &constraints,
+                    TypeVarSet::None,
+                    TypeRelation::Subtyping,
+                    TypeVarEvaluation::Lazy,
+                    ConstraintProvenance::Evidence,
+                )
+                .is_always_satisfied(db, env, TypeVarSet::None)
+        }
+
+        let types = TypePair::new(db, env.program(db), self, target);
+        *env.cached_or_compute(
+            || cached(db, types),
+            || {
+                env.caches()
+                    .constraint_set_subtyping
+                    .get_or_compute(db, env, types, || compute(db, env, types))
+            },
         )
-        .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(super) fn when_assignable_to<'c>(
@@ -591,14 +622,8 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.has_relation_to(
-            db,
-            env,
-            target,
-            constraints,
-            inferable,
-            TypeRelation::Assignability,
-        )
+        let result = self.when_assignable_to_owned(db, env, target, inferable);
+        constraints.load(db, env, &result)
     }
 
     pub(super) fn when_assignable_to_owned(
@@ -613,17 +638,15 @@ impl<'db> Type<'db> {
         if self.is_trivially_constraint_set_assignable_to(db, target) {
             return Cow::Owned(OwnedConstraintSet::always());
         }
-        let constraints = ConstraintSetBuilder::new();
-        Cow::Owned(constraints.into_owned(|constraints| {
-            self.has_relation_to(
-                db,
-                env,
-                target,
-                constraints,
-                inferable,
-                TypeRelation::Assignability,
-            )
-        }))
+        self.relation_constraints(
+            db,
+            env,
+            target,
+            inferable,
+            TypeRelation::Assignability,
+            TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
+        )
     }
 
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
@@ -668,19 +691,82 @@ impl<'db> Type<'db> {
         if self.is_trivially_constraint_set_assignable_to(db, target) {
             return Cow::Owned(OwnedConstraintSet::always());
         }
-        let constraints = ConstraintSetBuilder::new();
-        Cow::Owned(constraints.into_owned(|constraints| {
-            self.has_relation_to_with_typevar_evaluation(
-                db,
-                env,
-                target,
-                constraints,
-                TypeVarSet::None,
-                TypeRelation::Assignability,
-                TypeVarEvaluation::Lazy,
-                ConstraintProvenance::Evidence,
-            )
-        }))
+        self.relation_constraints(
+            db,
+            env,
+            target,
+            TypeVarSet::None,
+            TypeRelation::Assignability,
+            TypeVarEvaluation::Lazy,
+            ConstraintProvenance::Evidence,
+        )
+    }
+
+    /// Reuse a completed relation without sharing a constraint builder's mutable storage.
+    #[expect(clippy::too_many_arguments)]
+    fn relation_constraints(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        target: Type<'db>,
+        inferable: TypeVarSet<'db>,
+        relation: TypeRelation,
+        evaluation: TypeVarEvaluation,
+        provenance: ConstraintProvenance,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _, _, _, _| OwnedConstraintSet::always(),
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+            relation: TypeRelation,
+            evaluation: TypeVarEvaluation,
+            provenance: ConstraintProvenance,
+        ) -> OwnedConstraintSet<'db> {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            compute(db, &env, types, inferable, relation, evaluation, provenance)
+        }
+
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+            relation: TypeRelation,
+            evaluation: TypeVarEvaluation,
+            provenance: ConstraintProvenance,
+        ) -> OwnedConstraintSet<'db> {
+            ConstraintSetBuilder::new().into_owned(|constraints| {
+                types.first(db).compute_relation_constraints(
+                    db,
+                    env,
+                    types.second(db),
+                    constraints,
+                    inferable,
+                    relation,
+                    evaluation,
+                    provenance,
+                )
+            })
+        }
+
+        let types = TypePair::new(db, env.program(db), self, target);
+        env.cached_or_compute(
+            || cached(db, types, inferable, relation, evaluation, provenance),
+            || {
+                env.caches().relations.get_or_compute(
+                    db,
+                    env,
+                    (types, inferable, relation, evaluation, provenance),
+                    || compute(db, env, types, inferable, relation, evaluation, provenance),
+                )
+            },
+        )
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
@@ -728,7 +814,19 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
-        let context = env.context();
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _| true,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached_redundancy<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            types
+                .first(db)
+                .is_redundant_with_local(db, &env, types.second(db))
+        }
+
         if self == other {
             return true;
         }
@@ -740,6 +838,26 @@ impl<'db> Type<'db> {
             return false;
         }
 
+        *env.cached_or_compute(
+            || cached_redundancy(db, TypePair::new(db, env.program(db), self, other)),
+            || {
+                env.caches().redundancy.get_or_compute(
+                    db,
+                    env,
+                    (env.program(db), self, other),
+                    || self.is_redundant_with_local(db, env, other),
+                )
+            },
+        )
+    }
+
+    fn is_redundant_with_local(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        let context = env.context();
         context.check_redundancy(db, env, self, other, || {
             self.is_related_for_simplification(
                 db,
@@ -838,6 +956,30 @@ impl<'db> Type<'db> {
         typevar_evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
+        let result = self.relation_constraints(
+            db,
+            env,
+            target,
+            inferable,
+            relation,
+            typevar_evaluation,
+            provenance,
+        );
+        constraints.load(db, env, &result)
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn compute_relation_constraints<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+        provenance: ConstraintProvenance,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -920,20 +1062,49 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _| OwnedConstraintSet::always(),
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> OwnedConstraintSet<'db> {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            compute(db, &env, types)
+        }
+
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            types: TypePair<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let constraints = ConstraintSetBuilder::new();
+            let mapping = env.mapping();
+            constraints.into_owned(|constraints| {
+                types
+                    .first(db)
+                    .when_equivalent_to_with_materialization_visitor(
+                        db,
+                        types.second(db),
+                        constraints,
+                        &mapping,
+                        TypeVarEvaluation::Lazy,
+                    )
+            })
+        }
+
         if self == other {
             return Cow::Owned(OwnedConstraintSet::always());
         }
-        let constraints = ConstraintSetBuilder::new();
-        let mapping = env.mapping();
-        Cow::Owned(constraints.into_owned(|constraints| {
-            self.when_equivalent_to_with_materialization_visitor(
-                db,
-                other,
-                constraints,
-                &mapping,
-                TypeVarEvaluation::Lazy,
-            )
-        }))
+        let types = TypePair::new(db, env.program(db), self, other);
+        env.cached_or_compute(
+            || cached(db, types),
+            || {
+                env.caches()
+                    .constraint_set_equivalence
+                    .get_or_compute(db, env, types, || compute(db, env, types))
+            },
+        )
     }
 
     pub(super) fn is_constraint_set_equivalent_to(
@@ -4763,5 +4934,65 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 || check_optional_methods(left.deleter(db), right.deleter(db)),
             )
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::{ComparisonKind, ComparisonPolicy, ConstraintProvenance, Type, TypeVarSet};
+    use crate::db::tests::setup_db;
+    use crate::types::recursive::OperationMemo;
+
+    #[test]
+    fn cached_comparisons_retain_only_relevant_recursion_decisions() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let guard = env.context().state().comparisons.get_or_init(Box::default);
+        let policy = ComparisonPolicy {
+            kind: ComparisonKind::Disjointness,
+            inferable: TypeVarSet::None,
+            provenance: ConstraintProvenance::Evidence,
+            perform_expensive_checks: true,
+        };
+        let operands = (Type::int_literal(0), Type::int_literal(1));
+        let unrelated = (Type::int_literal(2), Type::int_literal(3));
+        let inner = OperationMemo::default();
+        let outer = OperationMemo::default();
+        let visits = Cell::new(0);
+        let read = || {
+            inner.get_or_compute(&db, &env, (), || {
+                visits.set(visits.get() + 1);
+                guard.visit(&db, &env, operands, policy, |cycle| cycle.is_some())
+            })
+        };
+
+        assert!(!read());
+        assert!(!outer.get_or_compute(&db, &env, (), read));
+        guard.visit(&db, &env, unrelated, policy, |_| {
+            assert!(!outer.get_or_compute(&db, &env, (), read));
+        });
+        guard.visit(
+            &db,
+            &env,
+            operands,
+            ComparisonPolicy {
+                kind: ComparisonKind::CallableReturns,
+                ..policy
+            },
+            |_| assert!(!outer.get_or_compute(&db, &env, (), read)),
+        );
+        assert_eq!(visits.get(), 1);
+
+        // The outer cache inherits the inner cache's dependency, even though it reused the
+        // completed answer. Both entries must change when the same comparison is active.
+        guard.visit(&db, &env, operands, policy, |_| {
+            assert!(outer.get_or_compute(&db, &env, (), read));
+            assert!(outer.get_or_compute(&db, &env, (), read));
+        });
+        assert_eq!(visits.get(), 2);
+        assert!(!outer.get_or_compute(&db, &env, (), read));
+        assert_eq!(visits.get(), 3);
     }
 }

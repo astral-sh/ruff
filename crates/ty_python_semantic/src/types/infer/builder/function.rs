@@ -2,7 +2,7 @@ use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use crate::types::recursive::TypeQueryVisit;
 use crate::types::recursive::{TypeInspectionKey, TypeQueryKey};
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
+use crate::types::{CycleKind, TypeQuery};
 use crate::{
     Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
     reachability::is_end_of_scope_reachable,
@@ -2307,7 +2307,7 @@ fn is_instance_tuple_exhaustive<'db>(
         return false;
     }
 
-    TypeQueryContext::with_root(env, InstanceTupleCovers(&tuple), |root| root.visit(db, ty))
+    InstanceTupleCovers(&tuple).evaluate(db, env, ty, ())
 }
 
 struct InstanceTupleCovers<'a, 'db>(&'a TupleSpec<'db>);
@@ -2373,7 +2373,7 @@ fn is_instance_truthiness<'db>(
     ty: Type<'db>,
     class: ClassLiteral<'db>,
 ) -> Truthiness {
-    TypeQueryContext::with_root(env, InstanceTruthiness(class), |root| root.visit(db, ty))
+    InstanceTruthiness(class).evaluate(db, env, ty, ())
 }
 
 struct InstanceTruthiness<'db>(ClassLiteral<'db>);

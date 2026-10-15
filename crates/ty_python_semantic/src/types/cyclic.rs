@@ -23,7 +23,7 @@
 use crate::types::TypeOperations;
 use crate::types::operations::{RecursiveOperationScope, TypeOperationIdentity};
 use crate::types::recursive::{TypeTraversal, TypeWalk, TypeWalkKey, TypeWalkVisit};
-use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
+use crate::types::visitor::{SmallSet, TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
 use std::collections::hash_map::Entry;
@@ -60,6 +60,25 @@ pub(super) struct GuardToken<'guard>(PhantomData<&'guard ()>);
 impl<'guard> GuardToken<'guard> {
     fn new<G>(_guard: &'guard G) -> Self {
         Self(PhantomData)
+    }
+}
+
+/// A shared guard's current state and the observations made by semantic operations.
+/// Cache validation reads the state without becoming a dependency itself.
+#[derive(Clone, Copy)]
+pub(super) struct RecursionGuardState<'a> {
+    pub(super) revision: u64,
+    pub(super) observations: &'a Cell<u64>,
+}
+
+impl RecursionGuardState<'_> {
+    pub(super) fn observations(self) -> u64 {
+        self.observations.get()
+    }
+
+    pub(super) fn observe(self) {
+        self.observations
+            .set(self.observations.get().wrapping_add(1));
     }
 }
 
@@ -1606,7 +1625,11 @@ pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY
     /// The active recursion stack and the lazily-computed identity of each item.
     /// Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
+    /// Identifies the active stack, restoring the previous value when a nested visit finishes.
+    /// Each new visit receives a distinct value, including visits at the same depth.
     revision: Cell<u64>,
+    next_revision: Cell<u64>,
+    observations: Cell<u64>,
 
     /// Memoized results from earlier visits in the current recursive operation.
     cache: RefCell<CycleDetectorCache<T, R>>,
@@ -1621,8 +1644,11 @@ impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R,
 where
     T: HasIdentity<'db>,
 {
-    pub(super) fn revision(&self) -> u64 {
-        self.revision.get()
+    pub(super) fn state(&self) -> RecursionGuardState<'_> {
+        RecursionGuardState {
+            revision: self.revision.get(),
+            observations: &self.observations,
+        }
     }
 
     fn validate_cache_owner(&self, env: &TypeOperations<'db>) {
@@ -1637,6 +1663,8 @@ where
         CycleDetector {
             seen: RefCell::new(SmallVec::new()),
             revision: Cell::new(0),
+            next_revision: Cell::new(0),
+            observations: Cell::new(0),
             cache: RefCell::new(CycleDetectorCache::new()),
             cache_context: RefCell::new(None),
             fallback,
@@ -1729,6 +1757,7 @@ where
         env: &TypeOperations<'db>,
         item: T,
     ) -> CycleDetectorVisit<'_, 'db, T, R, INLINE_CAPACITY> {
+        self.state().observe();
         let seen = self.seen.borrow();
         if seen.iter().any(|active| active.item == item) {
             return CycleDetectorVisit::Ready(self.fallback.clone());
@@ -1746,7 +1775,9 @@ where
 
         // Identity analysis may inspect a definition. Guard the exact input before starting
         // that work, and do not borrow the active stack across a query that can re-enter it.
-        self.revision.set(self.revision.get().wrapping_add(1));
+        let next_revision = self.next_revision.get().wrapping_add(1);
+        self.next_revision.set(next_revision);
+        let previous_revision = self.revision.replace(next_revision);
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
             item: item.clone(),
             identity: OnceCell::new(),
@@ -1754,6 +1785,7 @@ where
         let guard = ActiveTypeVisit {
             seen: &self.seen,
             revision: &self.revision,
+            previous_revision,
             item: item.clone(),
             _scope: env.enter_recursive_scope(GuardToken::new(self)),
         };
@@ -1800,11 +1832,23 @@ where
         env: &TypeOperations<'db>,
         item: &T,
     ) -> Option<CycleKind> {
+        self.state().observe();
+        if !self.has_identity_candidate(db, item) {
+            return None;
+        }
         match self.begin_active_visit(db, env, item.clone()) {
             CycleDetectorVisit::Ready(_) => Some(CycleKind::Exact),
             CycleDetectorVisit::Cycle(..) => Some(CycleKind::MatchingIdentity),
             CycleDetectorVisit::Pending(_guard) => None,
         }
+    }
+
+    /// A cache lookup needs no temporary guard when none of the active inputs can match it.
+    fn has_identity_candidate(&self, db: &'db dyn Db, item: &T) -> bool {
+        self.seen
+            .borrow()
+            .iter()
+            .any(|active| active.item == *item || item.may_share_identity(db, &active.item))
     }
 
     /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
@@ -1828,6 +1872,24 @@ impl<'db, Tag, T, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, (), I
 where
     T: Hash + Eq + Clone + HasIdentity<'db>,
 {
+    /// Find the earlier operands without consuming a body. Identity analysis still runs under
+    /// the exact input's guard, just as it does when entering the comparison.
+    pub(super) fn cycle_pair(
+        &self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        item: T,
+    ) -> Option<(T, T)> {
+        if !self.has_identity_candidate(db, &item) {
+            return None;
+        }
+        match self.begin_active_visit(db, env, item.clone()) {
+            CycleDetectorVisit::Ready(()) => Some((item.clone(), item)),
+            CycleDetectorVisit::Cycle(item, previous) => Some((item, previous)),
+            CycleDetectorVisit::Pending(_guard) => None,
+        }
+    }
+
     /// Keep a comparison active and report the earlier operands when it recurs.
     /// Completed answers belong to the consuming operation, not this shared guard.
     pub(super) fn visit_active_pair<R>(
@@ -1891,6 +1953,7 @@ struct ActiveTypeVisit<'a, 'db, T: HasIdentity<'db> + PartialEq, const INLINE_CA
     _scope: RecursiveOperationScope<'a, 'db>,
     seen: &'a RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
     revision: &'a Cell<u64>,
+    previous_revision: u64,
     item: T,
 }
 
@@ -1898,7 +1961,7 @@ impl<'db, T: HasIdentity<'db> + PartialEq, const INLINE_CAPACITY: usize> Drop
     for ActiveTypeVisit<'_, 'db, T, INLINE_CAPACITY>
 {
     fn drop(&mut self) {
-        self.revision.set(self.revision.get().wrapping_add(1));
+        self.revision.set(self.previous_revision);
         let active = self.seen.borrow_mut().pop();
         debug_assert!(
             active
@@ -2146,33 +2209,44 @@ impl<T, R> CycleDetectorCache<T, R> {
 /// the same abstract key.
 #[derive(Debug)]
 pub(crate) struct ActiveRecursionDetector<T> {
-    seen: RefCell<FxHashSet<T>>,
+    seen: RefCell<SmallSet<T, 2>>,
+    /// Completed nested visits restore this value so they do not invalidate cached queries.
     revision: Cell<u64>,
+    next_revision: Cell<u64>,
+    observations: Cell<u64>,
 }
 
 impl<T> Default for ActiveRecursionDetector<T> {
     fn default() -> Self {
         Self {
-            seen: RefCell::new(FxHashSet::default()),
+            seen: RefCell::default(),
             revision: Cell::new(0),
+            next_revision: Cell::new(0),
+            observations: Cell::new(0),
         }
     }
 }
 
 impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
-    pub(super) fn revision(&self) -> u64 {
-        self.revision.get()
+    pub(super) fn state(&self) -> RecursionGuardState<'_> {
+        RecursionGuardState {
+            revision: self.revision.get(),
+            observations: &self.observations,
+        }
     }
 
     pub(super) fn len(&self) -> usize {
+        self.state().observe();
         self.seen.borrow().len()
     }
 
     pub(super) fn contains(&self, item: &T) -> bool {
+        self.state().observe();
         self.seen.borrow().contains(item)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
+        self.state().observe();
         self.seen.borrow().is_empty()
     }
 
@@ -2183,22 +2257,36 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
         on_cycle: impl FnOnce() -> R,
         func: impl FnOnce() -> R,
     ) -> R {
+        self.state().observe();
         if !self.seen.borrow_mut().insert(item.clone()) {
             return on_cycle();
         }
 
-        self.revision.set(self.revision.get().wrapping_add(1));
+        let next_revision = self.next_revision.get().wrapping_add(1);
+        self.next_revision.set(next_revision);
+        let previous_revision = self.revision.replace(next_revision);
 
         // Keep the active-recursion state scoped even if `func` unwinds. In some cases, we catch
         // panics and continue handling later work on the same thread.
         let _guard = ActiveRecursionGuard {
             seen: &self.seen,
             revision: &self.revision,
+            previous_revision,
             item,
             _scope: env.enter_recursive_scope(GuardToken::new(self)),
         };
 
         func()
+    }
+}
+
+impl ActiveRecursionDetector<()> {
+    /// A guard with one possible key has only two observable states.
+    pub(super) fn presence_state(&self) -> RecursionGuardState<'_> {
+        RecursionGuardState {
+            revision: u64::from(!self.seen.borrow().is_empty()),
+            observations: &self.observations,
+        }
     }
 }
 
@@ -2222,8 +2310,15 @@ impl<T> Default for AcyclicRecursionDetector<T> {
 }
 
 impl<T: Hash + Eq + Clone> AcyclicRecursionDetector<T> {
-    pub(super) fn revision(&self) -> u64 {
-        self.active.revision().wrapping_add(self.cycles.get())
+    pub(super) fn states(&self) -> [RecursionGuardState<'_>; 2] {
+        // Restoring the active set must not erase an enclosing computation's incompleteness.
+        [
+            self.active.state(),
+            RecursionGuardState {
+                revision: self.cycles.get(),
+                observations: &self.active.observations,
+            },
+        ]
     }
 
     pub(super) fn visit<R>(
@@ -2250,14 +2345,15 @@ impl<T: Hash + Eq + Clone> AcyclicRecursionDetector<T> {
 
 struct ActiveRecursionGuard<'a, 'db, T: Hash + Eq> {
     _scope: RecursiveOperationScope<'a, 'db>,
-    seen: &'a RefCell<FxHashSet<T>>,
+    seen: &'a RefCell<SmallSet<T, 2>>,
     revision: &'a Cell<u64>,
+    previous_revision: u64,
     item: &'a T,
 }
 
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, '_, T> {
     fn drop(&mut self) {
-        self.revision.set(self.revision.get().wrapping_add(1));
+        self.revision.set(self.previous_revision);
         self.seen.borrow_mut().remove(self.item);
     }
 }

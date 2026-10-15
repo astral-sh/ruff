@@ -12,7 +12,7 @@ use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use crate::types::recursive::{TypeInspectionKey, TypeQueryKey, TypeWalkKey};
 use crate::types::recursive::{TypeQueryVisit, TypeWalkVisit};
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext, TypeTraversal, TypeWalk};
+use crate::types::{CycleKind, TypeQuery, TypeTraversal, TypeWalk};
 use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, use_def_map};
 
@@ -875,10 +875,9 @@ fn shadowed_descriptor_write_type<'db>(
     env: &TypeOperations<'db>,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
-    TypeQueryContext::with_root(env, ShadowedDescriptorWriteType, |context| {
-        context.visit(db, attr_ty)
-    })
-    .unwrap_or(attr_ty)
+    ShadowedDescriptorWriteType
+        .evaluate(db, env, attr_ty, ())
+        .unwrap_or(attr_ty)
 }
 
 struct ShadowedDescriptorWriteType;

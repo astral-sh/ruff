@@ -1,27 +1,36 @@
 //! Entry points for semantic type operations and the state borrowed by their recursive helpers.
 
 use std::borrow::Cow;
-use std::cell::Cell;
+use std::cell::{Cell, OnceCell};
 use std::ops::Deref;
 use std::rc::Rc;
 
 use salsa::plumbing::AsId;
-#[cfg(any(test, feature = "testing"))]
-use ty_python_core::Program;
-use ty_python_core::ProgramFile;
+use ty_python_core::{Program, ProgramFile};
 
-use super::cyclic::GuardToken;
-use super::{ApplyTypeMappingVisitor, TypeRecursionState};
+use super::constraints::{CandidateSolutions, ConstraintProvenance, OwnedConstraintSet};
+use super::cyclic::{GuardToken, RecursionGuardState};
+use super::generics::Specialization;
+use super::mro::{Mro, StaticMroError};
+use super::protocol_class::ProtocolInterface;
+use super::recursive::OperationMemo;
+use super::relation::{TypeRelation, TypeVarEvaluation};
+use super::typevar::TypeVarSet;
+use super::{
+    ApplyTypeMappingVisitor, CallableType, GenericAlias, MaterializationKind, MemberLookupKey,
+    MemberLookupResult, Type, TypePair, TypeRecursionState,
+};
+use crate::place::PlaceAndQualifiers;
 use crate::{Db, ProgramEnvironment};
 
 /// Active guards shared by every semantic operation descended from the same root.
 /// Transformation caches remain local to each mapping.
 #[derive(Clone)]
-pub(crate) struct TypeRecursionContext<'db>(Rc<TypeRecursionState<'db>>);
+pub(crate) struct TypeRecursionContext<'db>(Rc<OnceCell<Box<TypeRecursionState<'db>>>>);
 
 impl<'db> TypeRecursionContext<'db> {
     pub(super) fn state(&self) -> &TypeRecursionState<'db> {
-        &self.0
+        self.0.get_or_init(Default::default)
     }
 }
 
@@ -75,7 +84,7 @@ impl<'db> TypeOperations<'db> {
         Self {
             db,
             env,
-            context: TypeRecursionContext(Rc::new(TypeRecursionState::default())),
+            context: TypeRecursionContext(Rc::default()),
         }
     }
 
@@ -85,7 +94,12 @@ impl<'db> TypeOperations<'db> {
         cached: impl FnOnce() -> &'db T,
         compute: impl FnOnce() -> T,
     ) -> Cow<'db, T> {
-        if self.context.state().operation.is_active() {
+        if self
+            .context
+            .0
+            .get()
+            .is_some_and(|state| state.operation.is_active())
+        {
             Cow::Owned(compute())
         } else {
             Cow::Borrowed(cached())
@@ -132,9 +146,13 @@ impl<'db> TypeOperations<'db> {
     ) -> RecursiveOperationScope<'guard, 'db> {
         let operation = &self.context.state().operation;
         let previous = operation.depth.replace(operation.depth.get() + 1);
+        let revision = operation.next_revision.get().wrapping_add(1);
+        operation.next_revision.set(revision);
+        let previous_revision = operation.revision.replace(revision);
         RecursiveOperationScope {
             context: self.context.clone(),
             previous,
+            previous_revision,
             _guard: guard,
         }
     }
@@ -163,17 +181,81 @@ impl<'db> TypeOperations<'db> {
     pub(super) fn context(&self) -> &TypeRecursionContext<'db> {
         &self.context
     }
+
+    pub(super) fn caches(&self) -> &OperationCaches<'db> {
+        self.context.state().caches.get_or_init(Default::default)
+    }
+}
+
+/// Applied results remain within one source query and retain their recursion dependencies.
+#[derive(Default)]
+pub(super) struct OperationCaches<'db> {
+    pub(super) solutions:
+        OperationMemo<'db, (TypePair<'db>, TypeVarSet<'db>), CandidateSolutions<'db>>,
+    pub(super) specializations:
+        OperationMemo<'db, (Program<'db>, Type<'db>, Specialization<'db>, bool), Type<'db>>,
+    pub(super) materializations:
+        OperationMemo<'db, (Program<'db>, Type<'db>, MaterializationKind), Type<'db>>,
+    pub(super) relations: OperationMemo<
+        'db,
+        (
+            TypePair<'db>,
+            TypeVarSet<'db>,
+            TypeRelation,
+            TypeVarEvaluation,
+            ConstraintProvenance,
+        ),
+        OwnedConstraintSet<'db>,
+    >,
+    pub(super) constraint_set_subtyping: OperationMemo<'db, TypePair<'db>, bool>,
+    pub(super) constraint_set_equivalence:
+        OperationMemo<'db, TypePair<'db>, OwnedConstraintSet<'db>>,
+    pub(super) redundancy: OperationMemo<'db, (Program<'db>, Type<'db>, Type<'db>), bool>,
+    pub(super) specialized_mro: OperationMemo<
+        'db,
+        (Program<'db>, GenericAlias<'db>),
+        Result<Mro<'db>, Box<StaticMroError<'db>>>,
+    >,
+    pub(super) members:
+        OperationMemo<'db, (MemberLookupKey<'db>, Option<Type<'db>>), MemberLookupResult<'db>>,
+    pub(super) class_members: OperationMemo<'db, MemberLookupKey<'db>, PlaceAndQualifiers<'db>>,
+    pub(super) protocol_interfaces:
+        OperationMemo<'db, (Program<'db>, GenericAlias<'db>), ProtocolInterface<'db>>,
+    pub(super) protocol_bindings:
+        OperationMemo<'db, (Program<'db>, CallableType<'db>, Option<Type<'db>>), CallableType<'db>>,
+    pub(super) protocol_receivers: OperationMemo<
+        'db,
+        (Program<'db>, CallableType<'db>, Type<'db>, Type<'db>),
+        CallableType<'db>,
+    >,
 }
 
 #[derive(Default)]
 pub(super) struct OperationState {
     identity: Rc<()>,
     depth: Cell<usize>,
+    observations: Cell<u64>,
+    revision: Cell<u64>,
+    next_revision: Cell<u64>,
 }
 
 impl OperationState {
+    /// All guards enter through this owner. Equal revisions therefore identify the same
+    /// enclosing guards, including guards belonging to private traversals.
+    pub(super) fn revision(&self) -> u64 {
+        self.revision.get()
+    }
+
     fn is_active(&self) -> bool {
+        self.state().observe();
         self.depth.get() != 0
+    }
+
+    pub(super) fn state(&self) -> RecursionGuardState<'_> {
+        RecursionGuardState {
+            revision: u64::from(self.depth.get() != 0),
+            observations: &self.observations,
+        }
     }
 }
 
@@ -197,12 +279,15 @@ impl Eq for TypeOperationIdentity {}
 pub(super) struct RecursiveOperationScope<'guard, 'db> {
     context: TypeRecursionContext<'db>,
     previous: usize,
+    previous_revision: u64,
     _guard: GuardToken<'guard>,
 }
 
 impl Drop for RecursiveOperationScope<'_, '_> {
     fn drop(&mut self) {
-        self.context.state().operation.depth.set(self.previous);
+        let operation = &self.context.state().operation;
+        operation.depth.set(self.previous);
+        operation.revision.set(self.previous_revision);
     }
 }
 

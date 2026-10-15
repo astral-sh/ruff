@@ -560,17 +560,17 @@ impl<'db> TypeRecursionContext<'db> {
     }
 }
 
-type TypeRecursionRevision = [u64; 23];
-
 impl TypeRecursionContext<'_> {
-    /// Identify every shared guard that can affect a cached query.
-    fn revision(&self) -> TypeRecursionRevision {
-        // Keep this pattern exhaustive: each new guard must also invalidate cached queries.
+    /// Identify the shared guards whose observations can become cache dependencies.
+    fn guard_states(&self) -> [Option<cyclic::RecursionGuardState<'_>>; 25] {
+        // Keep this pattern exhaustive: each new guard must participate in dependency tracking.
         let TypeRecursionState {
-            operation: _,
-            // Query guards are tracked individually in each cached result's dependencies.
+            operation,
+            caches: _,
+            // These guards are tracked individually in each cached result's dependencies.
             type_queries: _,
             type_visitors: _,
+            comparisons: _,
             function_normalization,
             lambda_captures,
             lambda_return_dependencies,
@@ -596,42 +596,40 @@ impl TypeRecursionContext<'_> {
             intersections,
             alias_materialization,
             alias_definitions,
-            comparisons,
         } = self.state();
         [
-            function_normalization.revision(),
-            lambda_captures.get().map_or(0, |guard| guard.revision()),
-            lambda_return_dependencies
-                .get()
-                .map_or(0, |guard| guard.revision()),
-            protocol_queries.get().map_or(0, |guard| guard.revision()),
-            materialized_bounds.revision(),
-            typevar_defaults.revision(),
-            sequent_derivation.revision(),
-            specialized_mro.revision(),
-            class_fields.revision(),
-            callable_expansions
-                .get()
-                .map_or(0, |guard| guard.revision()),
-            abstract_methods.revision(),
-            typed_dict_openness.revision(),
-            narrowing_checkpoints.revision(),
-            aliases.revision(),
-            growing_aliases.revision(),
-            typevars.revision(),
-            normalization.revision(),
-            redundancy.get().map_or(0, |guard| guard.revision()),
-            signatures.get().map_or(0, |guard| guard.revision()),
-            intersections.get().map_or(0, |guard| guard.revision()),
-            alias_materialization.revision(),
-            alias_definitions.revision(),
-            comparisons.get().map_or(0, |guard| guard.revision()),
+            Some(operation.state()),
+            Some(function_normalization.state()),
+            lambda_captures.get().map(|guard| guard.state()),
+            lambda_return_dependencies.get().map(|guard| guard.state()),
+            protocol_queries.get().map(|guard| guard.state()),
+            Some(materialized_bounds.states()[0]),
+            Some(materialized_bounds.states()[1]),
+            Some(typevar_defaults.states()[0]),
+            Some(typevar_defaults.states()[1]),
+            Some(sequent_derivation.state()),
+            Some(specialized_mro.state()),
+            Some(class_fields.state()),
+            callable_expansions.get().map(|guard| guard.state()),
+            Some(abstract_methods.state()),
+            Some(typed_dict_openness.state()),
+            Some(narrowing_checkpoints.state()),
+            Some(aliases.state()),
+            Some(growing_aliases.state()),
+            Some(typevars.state()),
+            Some(normalization.presence_state()),
+            redundancy.get().map(|guard| guard.state()),
+            signatures.get().map(|guard| guard.state()),
+            intersections.get().map(|guard| guard.state()),
+            Some(alias_materialization.state()),
+            Some(alias_definitions.state()),
         ]
     }
 }
 
 #[derive(Default)]
 struct TypeRecursionState<'db> {
+    caches: OnceCell<Box<operations::OperationCaches<'db>>>,
     type_queries: recursive::TypeQueryRecursion<'db>,
     type_visitors: recursive::TypeVisitorRecursion<'db>,
     function_normalization: ActiveRecursionDetector<(salsa::Id, bool)>,
@@ -3028,6 +3026,27 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         materialization_kind: MaterializationKind,
     ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, id, _, _, kind| {
+                Type::Divergent(DivergentType::new(id).materialized(kind))
+            },
+            cycle_fn = |db, cycle, previous: &Type<'db>, value: Type<'db>, program, _, _| {
+                let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+                value.cycle_normalized_impl(db, &env, *previous, cycle)
+            },
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+            kind: MaterializationKind,
+        ) -> Type<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            ty.materialize(db, kind, &env.mapping())
+        }
+
         match self {
             Type::Dynamic(_) => match materialization_kind {
                 MaterializationKind::Top => Type::object(),
@@ -3048,10 +3067,17 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
             Type::NominalInstance(instance) if !instance.is_definition_generic(db) => self,
-            _ => {
-                let env = env.in_environment(ProgramEnvironment::from_program(env.program(db)));
-                self.materialize(db, materialization_kind, &env.mapping())
-            }
+            _ => *env.cached_or_compute(
+                || cached(db, env.program(db), self, materialization_kind),
+                || {
+                    env.caches().materializations.get_or_compute(
+                        db,
+                        env,
+                        (env.program(db), self, materialization_kind),
+                        || self.materialize(db, materialization_kind, &env.mapping()),
+                    )
+                },
+            ),
         }
     }
 
@@ -4120,7 +4146,7 @@ impl<'db> Type<'db> {
     /// Note: This function aims to have no false positives, but might return `false`
     /// for more complicated types that are actually singletons.
     fn is_singleton(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> bool {
-        TypeQueryContext::with_root(env, IsSingleton, |root| root.visit(db, self))
+        IsSingleton.evaluate(db, env, self, ())
     }
 
     /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
@@ -4338,9 +4364,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        TypeQueryContext::with_root(env, LookupMroMember { name, policy }, |traversal| {
-            traversal.visit(db, *self)
-        })
+        LookupMroMember { name, policy }.evaluate(db, env, *self, ())
     }
 
     fn lookup_dunder_new(
@@ -4417,7 +4441,11 @@ impl<'db> Type<'db> {
         let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
         *env.cached_or_compute(
             || type_class_member_with_policy_inner(db, env.program(db), key),
-            || compute(db, env, key),
+            || {
+                env.caches()
+                    .class_members
+                    .get_or_compute(db, env, key, || compute(db, env, key))
+            },
         )
     }
 
@@ -4959,9 +4987,9 @@ impl<'db> Type<'db> {
             }
         }
 
-        TypeQueryContext::with_root(env, LookupInstanceMember { name }, |traversal| {
-            traversal.visit(db, *self).unwrap_or_default()
-        })
+        LookupInstanceMember { name }
+            .evaluate(db, env, *self, ())
+            .unwrap_or_default()
     }
 
     /// Access an attribute of this type without invoking the descriptor protocol. This
@@ -5282,9 +5310,7 @@ impl<'db> Type<'db> {
             }
 
             let env = env.in_environment(ProgramEnvironment::from_program(env.program(db)));
-            TypeQueryContext::with_root(&env, DescriptorGet { instance, owner }, |root| {
-                root.visit(db, ty)
-            })
+            DescriptorGet { instance, owner }.evaluate(db, &env, ty, ())
         }
 
         tracing::trace!(
@@ -5563,9 +5589,7 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
     ) -> bool {
         let env = env.in_environment(ProgramEnvironment::from_program(env.program(db)));
-        TypeQueryContext::with_root(&env, IsDefinitelyNonDataDescriptor, |traversal| {
-            traversal.visit(db, self)
-        })
+        IsDefinitelyNonDataDescriptor.evaluate(db, &env, self, ())
     }
 
     // Definite data descriptors use an all-of union fold; possible data descriptors use any-of.
@@ -5577,9 +5601,7 @@ impl<'db> Type<'db> {
         any_of_union: bool,
     ) -> bool {
         let env = env.in_environment(ProgramEnvironment::from_program(env.program(db)));
-        TypeQueryContext::with_root(&env, IsDataDescriptor { any_of_union }, |traversal| {
-            traversal.visit(db, self)
-        })
+        IsDataDescriptor { any_of_union }.evaluate(db, &env, self, ())
     }
 
     /// Implementation of the descriptor protocol.
@@ -5964,7 +5986,13 @@ impl<'db> Type<'db> {
                         receiver,
                     )
                 },
-                || compute(db, env, key, receiver),
+                || {
+                    env.caches()
+                        .members
+                        .get_or_compute(db, env, (key, Some(receiver)), || {
+                            compute(db, env, key, receiver)
+                        })
+                },
             ),
             None => *lookup_member_without_receiver(db, env, key),
         }
@@ -6129,7 +6157,8 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         operation: CollectBindings<'db>,
     ) -> Bindings<'db> {
-        TypeQueryContext::with_root(env, operation, |root| root.visit_with(db, self, None))
+        operation
+            .evaluate(db, env, self, None)
             .unwrap_or_else(|| CallableBinding::not_callable(self).into())
     }
 
@@ -7758,7 +7787,8 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         mode: GeneratorTypeMode,
     ) -> Option<GeneratorTypes<'db>> {
-        TypeQueryContext::with_root(env, InspectGenerator(mode), |root| root.visit(db, self))
+        InspectGenerator(mode)
+            .evaluate(db, env, self, ())
             .ok()
             .flatten()
     }
@@ -7772,9 +7802,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(env, GeneratorAnnotationSendType, |root| {
-            root.visit(db, self)
-        })
+        GeneratorAnnotationSendType.evaluate(db, env, self, ())
     }
 
     fn generator_return_type(
@@ -7796,9 +7824,7 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         send_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(env, IncompatibleYieldFromSendType(send_ty), |root| {
-            root.visit(db, self)
-        })
+        IncompatibleYieldFromSendType(send_ty).evaluate(db, env, self, ())
     }
 
     /// Return the instance approximation, discarding whether the projection is exact.
@@ -7822,7 +7848,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Option<InstanceProjection<Type<'db>>> {
-        TypeQueryContext::with_root(env, ProjectInstance, |root| root.visit(db, self))
+        ProjectInstance.evaluate(db, env, self, ())
     }
 
     /// If we see a value of this type used as a type expression, what type does it name?
@@ -7843,15 +7869,12 @@ impl<'db> Type<'db> {
         inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         let env = env.in_environment(ProgramEnvironment::from_scope(scope_id));
-        TypeQueryContext::with_root(
-            &env,
-            TypeExpression {
-                scope_id,
-                typevar_binding_context,
-                inference_flags,
-            },
-            |root| root.visit(db, *self),
-        )
+        TypeExpression {
+            scope_id,
+            typevar_binding_context,
+            inference_flags,
+        }
+        .evaluate(db, &env, *self, ())
     }
 
     /// The type `NoneType` / `None`
@@ -7866,9 +7889,7 @@ impl<'db> Type<'db> {
     /// See `Self::dunder_class` for more details.
     #[must_use]
     fn to_meta_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
-        TypeQueryContext::with_root(env, ProjectMetaType { db, env }, |root| {
-            root.visit(db, self)
-        })
+        ProjectMetaType { db, env }.evaluate(db, env, self, ())
     }
 
     /// Get the type of the `__class__` attribute of this type.
@@ -7955,6 +7976,28 @@ impl<'db> Type<'db> {
         specialization: Specialization<'db>,
         specialize_self_domain: bool,
     ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
+            cycle_fn = |db, cycle, previous: &Type<'db>, value: Type<'db>, program, _, _, _| {
+                let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+                value.cycle_normalized_impl(db, &env, *previous, cycle)
+            },
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+            specialization: Specialization<'db>,
+            specialize_self_domain: bool,
+        ) -> Type<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            let mapping =
+                TypeMapping::from_specialization(db, specialization, specialize_self_domain);
+            ty.apply_type_mapping(db, &env, &mapping, TypeContext::default())
+        }
+
         if let Type::NominalInstance(instance) = self
             && !instance.is_definition_generic(db)
         {
@@ -8022,9 +8065,37 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        let type_mapping =
-            TypeMapping::from_specialization(db, specialization, specialize_self_domain);
-        self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
+        *env.cached_or_compute(
+            || {
+                cached(
+                    db,
+                    env.program(db),
+                    self,
+                    specialization,
+                    specialize_self_domain,
+                )
+            },
+            || {
+                env.caches().specializations.get_or_compute(
+                    db,
+                    env,
+                    (
+                        env.program(db),
+                        self,
+                        specialization,
+                        specialize_self_domain,
+                    ),
+                    || {
+                        let type_mapping = TypeMapping::from_specialization(
+                            db,
+                            specialization,
+                            specialize_self_domain,
+                        );
+                        self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
+                    },
+                )
+            },
+        )
     }
 
     fn apply_type_mapping<'a>(
@@ -9115,7 +9186,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        TypeQueryContext::with_root(env, FindDefinition, |traversal| traversal.visit(db, *self))
+        FindDefinition.evaluate(db, env, *self, ())
     }
 
     /// Returns a tuple of two spans. The first is
@@ -9321,10 +9392,9 @@ fn lookup_member<'db>(
     receiver: Option<Type<'db>>,
 ) -> MemberLookupResult<'db> {
     let env = env.in_environment(ProgramEnvironment::from_program(key.program(db)));
-    TypeQueryContext::with_root(&env, LookupMember { db, key }, |root| {
-        root.visit_with(db, key.ty(db), receiver)
-    })
-    .unwrap_or_else(|| Place::bound(Type::unknown()).into())
+    LookupMember { db, key }
+        .evaluate(db, &env, key.ty(db), receiver)
+        .unwrap_or_else(|| Place::bound(Type::unknown()).into())
 }
 
 fn distribute_member_lookup_over_bound_or_constraints<'db>(
@@ -10180,7 +10250,11 @@ fn lookup_member_without_receiver<'db>(
     }
     env.cached_or_compute(
         || type_member_lookup_with_policy_inner(db, env.program(db), key),
-        || compute(db, env, key),
+        || {
+            env.caches()
+                .members
+                .get_or_compute(db, env, (key, None), || compute(db, env, key))
+        },
     )
 }
 

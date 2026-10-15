@@ -25,8 +25,8 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, CycleKind, EnumLiteralType, IntersectionBuilder,
     KnownClass, Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext, TypeQuery,
-    TypeQueryContext, TypeTraversal, TypeVarBoundOrConstraints, TypeWalk, TypedDictType, UnionType,
-    binding_type, equality_truthiness, infer_same_file_expression_type,
+    TypeTraversal, TypeVarBoundOrConstraints, TypeWalk, TypedDictType, UnionType, binding_type,
+    equality_truthiness, infer_same_file_expression_type,
 };
 
 /// Identifies a pattern by its address and subject type without hashing the pattern subtree.
@@ -1299,7 +1299,7 @@ fn is_same_enum_pattern_domain<'db>(
     ty: Type<'db>,
     right: EnumLiteralType<'db>,
 ) -> bool {
-    TypeQueryContext::with_root(env, EnumPatternDomain(right), |root| root.visit(db, ty))
+    EnumPatternDomain(right).evaluate(db, env, ty, ())
 }
 
 struct EnumPatternDomain<'db>(EnumLiteralType<'db>);

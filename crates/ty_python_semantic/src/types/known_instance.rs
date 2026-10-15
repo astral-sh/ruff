@@ -1,7 +1,7 @@
 use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::TypeQueryKey;
-use crate::types::recursive::{RecursiveReferenceMapper, TypeQueryVisit};
+use crate::types::recursive::{RecursiveReferenceMapper, TypeQuery, TypeQueryVisit};
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -142,9 +142,7 @@ impl<'db> MethodWrapper<'db> {
         wrapped: Type<'db>,
         kind: MethodWrapperKind,
     ) -> Type<'db> {
-        super::TypeQueryContext::with_root(env, MethodDescriptor { db, kind }, |context| {
-            context.visit(db, wrapped)
-        })
+        MethodDescriptor { db, kind }.evaluate(db, env, wrapped, ())
     }
 
     fn wrap_body(

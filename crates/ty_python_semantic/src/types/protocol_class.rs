@@ -3484,7 +3484,14 @@ fn specialized_protocol_interface<'db>(
     }
     env.cached_or_compute(
         || specialized_protocol_interface(db, env.program(db), alias),
-        || compute_protocol_interface(db, env, ClassType::Generic(alias)),
+        || {
+            env.caches().protocol_interfaces.get_or_compute(
+                db,
+                env,
+                (env.program(db), alias),
+                || compute_protocol_interface(db, env, ClassType::Generic(alias)),
+            )
+        },
     )
 }
 
@@ -3621,7 +3628,14 @@ fn protocol_bind_self<'db>(
     let program = env.program(db);
     *env.cached_or_compute(
         || protocol_bind_self(db, program, callable, self_type),
-        || compute(db, env, program, callable, self_type),
+        || {
+            env.caches().protocol_bindings.get_or_compute(
+                db,
+                env,
+                (program, callable, self_type),
+                || compute(db, env, program, callable, self_type),
+            )
+        },
     )
 }
 fn bind_protocol_self_in_operation<'db>(
@@ -3675,7 +3689,14 @@ fn protocol_apply_self_with_receiver<'db>(
     let program = env.program(db);
     *env.cached_or_compute(
         || protocol_apply_self_with_receiver(db, program, callable, receiver_type, self_type),
-        || compute(db, env, program, callable, receiver_type, self_type),
+        || {
+            env.caches().protocol_receivers.get_or_compute(
+                db,
+                env,
+                (program, callable, receiver_type, self_type),
+                || compute(db, env, program, callable, receiver_type, self_type),
+            )
+        },
     )
 }
 fn apply_protocol_self_in_operation<'db>(

@@ -3,7 +3,7 @@ use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::TypeQueryKey;
 use crate::types::recursive::TypeQueryVisit;
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
+use crate::types::{CycleKind, TypeQuery};
 use crate::{
     FxOrderSet, Program,
     types::{
@@ -159,9 +159,7 @@ impl<'db> Type<'db> {
             is_async: bool,
         ) -> bool {
             let env = env.in_environment(ProgramEnvironment::from_program(program));
-            TypeQueryContext::with_root(&env, CanSuppressExceptions { is_async }, |traversal| {
-                traversal.visit(db, manager)
-            })
+            CanSuppressExceptions { is_async }.evaluate(db, &env, manager, ())
         }
 
         let program = env.program(db);

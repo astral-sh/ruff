@@ -622,7 +622,14 @@ impl<'db> GenericAlias<'db> {
         ));
         match env.cached_or_compute(
             || generic_alias_try_mro(db, env.program(db), self),
-            || compute(db, &env, self),
+            || {
+                env.caches().specialized_mro.get_or_compute(
+                    db,
+                    &env,
+                    (env.program(db), self),
+                    || compute(db, &env, self),
+                )
+            },
         ) {
             Cow::Borrowed(result) => result
                 .as_ref()
