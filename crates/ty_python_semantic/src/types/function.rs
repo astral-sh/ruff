@@ -1699,24 +1699,28 @@ impl<'db> FunctionType<'db> {
         let env = ProgramEnvironment::from_scope(scope);
         let index = semantic_index(db, scope.program_file(db));
         let module = parsed_module(db, self.python_file(db)).load(db);
-        let Some(function) = scope.node(db).as_function() else {
-            return Type::unknown();
-        };
-        // Functions defined only for type checking can have placeholder bodies, just like stubs.
+        let function = scope.node(db).expect_function();
+
+        // Do not perform return type inference for functions in `if TYPE_CHECKING` blocks.
         if index.is_in_type_checking_block(scope.file_scope_id(db), function.node(&module).range())
         {
             return Type::unknown();
         }
+
+        // TODO: Infer return types for async functions and generator functions
         if function.node(&module).is_async || scope.file_scope_id(db).is_generator_function(index) {
             return Type::unknown();
         }
 
-        let mut inferred = infer_complete_scope_types(db, scope).return_type();
+        let mut return_type = infer_complete_scope_types(db, scope).return_type();
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
-            return inferred;
+            // For free functions, we simply use the type inferred from the function body.
+            return return_type;
         };
         let class = original_class_type(db, class_definition);
+
+        // We currently skip return type inference for the `__call__` method of metaclasses.
         if self.name(db) == "__call__"
             && class.is_some_and(|class| {
                 class.iter_mro(db).any(|base| {
@@ -1725,19 +1729,19 @@ impl<'db> FunctionType<'db> {
                 })
             })
         {
-            // Constructor binding supplies the instance return and checks __new__/__init__
-            // when a metaclass __call__ has no return annotation.
             return Type::unknown();
         }
-        if !self.has_known_decorator(db, FunctionDecorators::FINAL)
+
+        if let Some(inherited) = self.inherited_return_annotation(db) {
+            return_type = inherited;
+        } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)
             && !class.is_some_and(|class| class.is_final(db))
         {
-            // A base annotation already describes the values that further overrides may return.
-            // Without that contract, leave room for subclasses by including Unknown.
-            inferred = self.inherited_return_annotation(db).unwrap_or_else(|| {
-                UnionType::from_two_elements(db, &env, inferred, Type::unknown())
-            });
+            // For non-final methods on non-final classes, we include `Unknown` in the return type
+            // to allow subclasses to widen the return type if necessary.
+            return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
+
         if let Some(class) = class
             && let Some(receiver) = self
                 .signature(db)
@@ -1761,13 +1765,13 @@ impl<'db> FunctionType<'db> {
             }) {
                 // Member lookup can specialize the signature before its body is inferred.
                 // Apply the same owner specialization to newly discovered return types.
-                inferred = inferred.apply_optional_specialization(
+                return_type = return_type.apply_optional_specialization(
                     db,
                     owner.class_literal_and_specialization(db).1,
                 );
             }
         }
-        inferred
+        return_type
     }
 
     #[salsa::tracked(
@@ -1783,8 +1787,7 @@ impl<'db> FunctionType<'db> {
             db,
             index.class_definition_of_method(scope.file_scope_id(db))?,
         )?;
-        // Walk the original MRO so generic arguments remain specialized through every
-        // intermediate unannotated override.
+
         for base_class in class.iter_mro(db).skip(1) {
             let member = class.class_member_from_mro(
                 db,
@@ -1803,12 +1806,24 @@ impl<'db> FunctionType<'db> {
             let [signature] = base.signature(db).overloads.as_slice() else {
                 return None;
             };
+
             return Some(
+                // TODO: specialization here is important for a case like
+                //
+                // class Base:
+                //     def method[T](self, x: T) -> list[T]: ...
+                // class Derived(Base):
+                //     def method(self, x): ...
+                //
+                // The inherited return type `list[T]` cannot be used as the return type of
+                // `Derived.method`, which is not generic itself. We currently use the default
+                // specialization of the base class's return type, but we should investigate
+                // this more carefully. Maybe we should instead return `None` for such cases.
                 signature.return_ty.apply_optional_specialization(
                     db,
                     signature
                         .generic_context
-                        .map(|context| context.unknown_specialization(db, None)),
+                        .map(|context| context.default_specialization(db, None)),
                 ),
             );
         }

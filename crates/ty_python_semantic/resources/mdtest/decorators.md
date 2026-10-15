@@ -543,7 +543,11 @@ When a class decorator returns `Unknown`, we preserve the current binding. Unann
 have an `Unknown` return type because we do not infer returned classes from decorator bodies:
 
 ```py
-def personify(cls):
+from ty_extensions._internal import Unknown
+
+# TODO: remove this explicit `Unknown` return type when type inference does not expose
+# the internal `Wrapped` class anymore.
+def personify(cls) -> Unknown:
     class Wrapped(cls):
         full_name: str
 
