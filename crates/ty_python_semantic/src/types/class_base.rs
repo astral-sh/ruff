@@ -159,7 +159,9 @@ impl<'db> ClassBase<'db> {
                 Self::try_from_type(db, env, unfolded, subclass)
             }
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
-            Type::SpecializedClass(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
+                Some(Self::Class(ClassType::Generic(generic)))
+            }
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {

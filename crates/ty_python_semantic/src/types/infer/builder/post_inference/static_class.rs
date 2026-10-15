@@ -402,7 +402,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                 continue;
             }
             Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::SpecializedClass(base_alias) => {
+            Type::SpecializedClass(base_alias) | Type::GenericAlias(base_alias) => {
                 if check_explicit_base_variance
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =

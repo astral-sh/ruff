@@ -133,7 +133,7 @@ impl<'db> BoundSuperError<'db> {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     let env = context.program_environment();
                     match pivot_class {
-                        Type::SpecializedClass(alias) => {
+                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
                             builder.into_diagnostic(format_args!(
                                 "`types.GenericAlias` instance `{}` is not a valid class",
                                 alias.display_with(db, env, DisplaySettings::default(),),
@@ -851,7 +851,7 @@ impl<'db> BoundSuperType<'db> {
             Type::ModuleLiteral(_) => {
                 return delegate_to(KnownClass::ModuleType.to_instance(db, env));
             }
-            Type::SpecializedClass(_) => {
+            Type::SpecializedClass(_) | Type::GenericAlias(_) => {
                 return delegate_to(KnownClass::GenericAlias.to_instance(db, env));
             }
             Type::PropertyInstance(property) => {

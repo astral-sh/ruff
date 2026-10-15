@@ -86,9 +86,10 @@ impl<'db> Type<'db> {
                 Type::KnownInstance(instance) if instance.is_type_form_value() => {
                     instance.type_form_argument(db, env)
                 }
-                Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_) => {
-                    ty.to_instance_approximation(db, env)
-                }
+                Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_) => ty.to_instance_approximation(db, env),
                 _ => None,
             }
         }

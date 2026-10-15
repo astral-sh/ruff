@@ -1952,7 +1952,12 @@ impl<'db> Bindings<'db> {
                                 ));
                             }
                         }
-                        [Some(Type::SpecializedClass(generic_alias))] => {
+                        [
+                            Some(
+                                Type::SpecializedClass(generic_alias)
+                                | Type::GenericAlias(generic_alias),
+                            ),
+                        ] => {
                             let new_origin = generic_alias
                                 .origin(db)
                                 .with_dataclass_params(db, Some(params));
@@ -2890,6 +2895,7 @@ impl<'db> Bindings<'db> {
                                             overload.return_type(),
                                             Type::ClassLiteral(_)
                                                 | Type::SpecializedClass(_)
+                                                | Type::GenericAlias(_)
                                                 | Type::SubclassOf(_)
                                         )
                                     };
@@ -2906,9 +2912,10 @@ impl<'db> Bindings<'db> {
                                             ));
                                             continue;
                                         }
-                                        Some(Some(Type::SpecializedClass(generic_alias)))
-                                            if returns_class() =>
-                                        {
+                                        Some(Some(
+                                            Type::SpecializedClass(generic_alias)
+                                            | Type::GenericAlias(generic_alias),
+                                        )) if returns_class() => {
                                             let new_origin = generic_alias
                                                 .origin(db)
                                                 .with_dataclass_params(db, Some(dataclass_params));

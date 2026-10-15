@@ -274,7 +274,9 @@ impl<'db> Type<'db> {
                 Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
-            Type::SpecializedClass(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                Some(ClassType::Generic(alias).into_callable(db))
+            }
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
