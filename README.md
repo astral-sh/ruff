@@ -46,7 +46,7 @@ Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus doz
 [autoflake](https://pypi.org/project/autoflake/), and more, all while executing tens or hundreds of
 times faster than any individual tool.
 
-Ruff is extremely actively developed and used in major open-source projects like:
+Ruff is actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
 - [Apache Superset](https://github.com/apache/superset)
@@ -381,7 +381,7 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
+For the complete list of supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing<a id="contributing"></a>
 

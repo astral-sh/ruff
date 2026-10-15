@@ -23,6 +23,12 @@ numbers
           └── py.typed
 ```
 
+Change into the project directory:
+
+```console
+$ cd numbers
+```
+
 We'll then clear out the auto-generated content in `src/numbers/__init__.py`
 and create `src/numbers/calculate.py` with the following code:
 
@@ -163,7 +169,7 @@ src/numbers/calculate.py:5:80: E501 Line too long (90 > 79)
 Found 1 error.
 ```
 
-For a full enumeration of the supported settings, see [_Settings_](settings.md). For our project
+For the full list of supported settings, see [_Settings_](settings.md). For our project
 specifically, we'll want to make note of the minimum supported Python version:
 
 === "pyproject.toml"
