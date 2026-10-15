@@ -1247,6 +1247,30 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    pub(super) fn try_map_stored_arguments(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        map: impl Fn(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        let types = self
+            .types(db)
+            .iter()
+            .map(|&ty| map(ty))
+            .collect::<Option<Box<[_]>>>()?;
+        let tuple_inner = match self.tuple_inner(db) {
+            Some(tuple) => Some(tuple.try_map_stored_elements(db, program, map)?),
+            None => None,
+        };
+        Some(Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            tuple_inner,
+        ))
+    }
+
     pub(super) fn map_recursive_references(
         self,
         db: &'db dyn Db,
@@ -1348,7 +1372,9 @@ impl<'db> Specialization<'db> {
             self.generic_context(db).program(db),
         ));
         let types = self.map_types(db, |_, typevar, ty| {
-            if !any_over_type_expanding_aliases(db, &env, ty, |ty| ty.is_dynamic()) {
+            if !typevar.typevar(db).has_bound_or_constraints(db)
+                || !any_over_type_expanding_aliases(db, &env, ty, |ty| ty.is_dynamic())
+            {
                 return ty;
             }
             let Some(upper_bound) = typevar.top_materialized_upper_bound(db, &env) else {
@@ -1663,16 +1689,98 @@ impl<'db> Specialization<'db> {
         ))
     }
 
+    /// Cache materializations that only transform stored arguments and read declared variance.
+    /// No operation is available here: bounds and deferred bodies must use `materialize_impl`.
+    pub(super) fn try_materialize_without_expansion(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        kind: MaterializationKind,
+    ) -> Option<Self> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            specialization: Specialization<'db>,
+            kind: MaterializationKind,
+        ) -> Option<Specialization<'db>> {
+            let tuple_inner = match specialization.tuple_inner(db) {
+                Some(tuple) => Some(tuple.try_materialize_without_expansion(db, program, kind)?),
+                None => None,
+            };
+            let mut deferred = false;
+            let types = specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db))
+                .map(|(variable, &ty)| {
+                    let top = ty.try_materialize_without_expansion(
+                        db,
+                        program,
+                        MaterializationKind::Top,
+                    )?;
+                    match specialization_variance(db, variable) {
+                        TypeVarVariance::Bivariant => Some(top),
+                        variance
+                        @ (TypeVarVariance::Covariant | TypeVarVariance::Contravariant) => {
+                            if top != ty && variable.typevar(db).is_constrained(db) {
+                                deferred = true;
+                                return Some(ty);
+                            }
+                            let kind = if variance.is_covariant() {
+                                kind
+                            } else {
+                                kind.flip()
+                            };
+                            // Only an upper materialization of a changed argument needs its
+                            // parameter's bound. The other cases use the stored argument alone.
+                            if kind == MaterializationKind::Top
+                                && top != ty
+                                && variable.typevar(db).has_bound_or_constraints(db)
+                            {
+                                return None;
+                            }
+                            ty.try_materialize_without_expansion(db, program, kind)
+                        }
+                        TypeVarVariance::Invariant => {
+                            deferred |= top != ty;
+                            Some(ty)
+                        }
+                    }
+                })
+                .collect::<Option<Box<[_]>>>()?;
+            Some(Specialization::new(
+                db,
+                specialization.generic_context(db),
+                types,
+                deferred.then_some(kind),
+                tuple_inner,
+            ))
+        }
+
+        if self.materialization_kind(db).is_some() {
+            Some(self)
+        } else {
+            cached(db, program, self, kind)
+        }
+    }
+
     pub(super) fn materialize_impl(
         self,
         db: &'db dyn Db,
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        // The top and bottom materializations are fully static types already, so materializing them
-        // further does nothing.
-        if self.materialization_kind(db).is_some() {
-            return self;
+        if let Some(materialized) = self.try_materialize_without_expansion(
+            db,
+            visitor.env.program(db),
+            materialization_kind,
+        ) {
+            return materialized;
         }
         let mut has_unsimplified_dynamic_typevar = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {

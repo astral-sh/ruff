@@ -10,11 +10,11 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
-use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
+use crate::{Program, ProgramEnvironment};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -179,6 +179,20 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    pub(super) fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+    ) -> Option<Self> {
+        let overloads = self
+            .overloads
+            .iter()
+            .map(|signature| signature.try_specialize_stored(db, program, specialization))
+            .collect::<Option<SmallVec<[Signature<'db>; 1]>>>()?;
+        Some(Self::from_overloads(overloads))
+    }
+
     pub(super) fn map_recursive_references(
         &self,
         db: &'db dyn Db,
@@ -890,6 +904,68 @@ impl<'db> Signature<'db> {
             ..self.clone()
         };
         (SignatureIdentityShape(shape), types.into_boxed_slice())
+    }
+
+    /// Rewrite an explicit signature when every changed type is already stored.
+    fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+    ) -> Option<Self> {
+        if self.receiver_constraints().is_some()
+            || matches!(
+                self.parameters.kind(),
+                ParametersKind::ParamSpec(_)
+                    | ParametersKind::Concatenate(ConcatenateTail::ParamSpec(_))
+            )
+        {
+            return None;
+        }
+        let map = |ty: Type<'db>| ty.try_specialize_stored(db, program, specialization);
+        let mut parameters = self.parameters.clone();
+        for (index, parameter) in self.parameters.iter().enumerate() {
+            if parameter.has_starred_annotation() {
+                return None;
+            }
+            let mut mapped = parameter.clone();
+            mapped.annotated_type = map(parameter.annotated_type)?;
+            if let ParameterKind::PositionalOnly { default_type, .. }
+            | ParameterKind::PositionalOrKeyword { default_type, .. }
+            | ParameterKind::KeywordOnly { default_type, .. } = &mut mapped.kind
+                && let Some(ParameterDefault::Inferred(ty)) = default_type
+            {
+                *ty = map(*ty)?;
+            }
+            if mapped != *parameter {
+                Arc::make_mut(&mut parameters.data).value[index] = mapped;
+            }
+        }
+        Some(Self {
+            generic_context: self.generic_context.map(|context| {
+                GenericContext::from_typevar_instances(
+                    db,
+                    &ProgramEnvironment::from_program(program),
+                    context.variables(db).filter(|&variable| {
+                        match specialization.get(db, variable) {
+                            None => true,
+                            Some(Type::TypeVar(mapped)) => {
+                                mapped.identity(db) == variable.identity(db)
+                            }
+                            Some(_) => false,
+                        }
+                    }),
+                )
+            }),
+            definition: self.definition,
+            extras: self.extras.clone(),
+            parameters,
+            return_ty: if self.is_paramspec_value() {
+                self.return_ty
+            } else {
+                map(self.return_ty)?
+            },
+        })
     }
 
     fn map_recursive_references(

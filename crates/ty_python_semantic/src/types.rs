@@ -3047,14 +3047,40 @@ impl<'db> Type<'db> {
             ty.materialize(db, kind, &env.mapping())
         }
 
+        if let Some(materialized) =
+            self.try_materialize_without_expansion(db, env.program(db), materialization_kind)
+        {
+            return materialized;
+        }
+        *env.cached_or_compute(
+            || cached(db, env.program(db), self, materialization_kind),
+            || {
+                env.caches().materializations.get_or_compute(
+                    db,
+                    env,
+                    (env.program(db), self, materialization_kind),
+                    || self.materialize(db, materialization_kind, &env.mapping()),
+                )
+            },
+        )
+    }
+
+    /// Materialize stored arguments without opening definitions or inspecting bounds.
+    /// Types that require semantic inspection return `None` and use the caller's operation.
+    fn try_materialize_without_expansion(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        materialization_kind: MaterializationKind,
+    ) -> Option<Self> {
         match self {
             Type::Dynamic(_) => match materialization_kind {
-                MaterializationKind::Top => Type::object(),
-                MaterializationKind::Bottom => Type::Never,
+                MaterializationKind::Top => Some(Type::object()),
+                MaterializationKind::Bottom => Some(Type::Never),
             },
-            Type::Divergent(divergent) => {
-                Type::Divergent(divergent.materialized(materialization_kind))
-            }
+            Type::Divergent(divergent) => Some(Type::Divergent(
+                divergent.materialized(materialization_kind),
+            )),
             Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
@@ -3065,19 +3091,23 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_) => self,
-            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => self,
-            _ => *env.cached_or_compute(
-                || cached(db, env.program(db), self, materialization_kind),
-                || {
-                    env.caches().materializations.get_or_compute(
-                        db,
-                        env,
-                        (env.program(db), self, materialization_kind),
-                        || self.materialize(db, materialization_kind, &env.mapping()),
-                    )
-                },
-            ),
+            | Type::SpecialForm(_) => Some(self),
+            Type::NominalInstance(instance) => {
+                instance.try_materialize_without_expansion(db, program, materialization_kind)
+            }
+            Type::GenericAlias(alias) => {
+                let specialization = alias.specialization(db).try_materialize_without_expansion(
+                    db,
+                    program,
+                    materialization_kind,
+                )?;
+                Some(Type::GenericAlias(GenericAlias::new(
+                    db,
+                    alias.origin(db),
+                    specialization,
+                )))
+            }
+            _ => None,
         }
     }
 
@@ -8065,6 +8095,13 @@ impl<'db> Type<'db> {
             return self;
         }
 
+        if !specialize_self_domain
+            && let Some(specialized) =
+                self.try_specialize_stored(db, env.program(db), specialization)
+        {
+            return specialized;
+        }
+
         *env.cached_or_compute(
             || {
                 cached(
@@ -8098,6 +8135,90 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Substitute stored arguments without expanding aliases or simplifying changed unions.
+    /// Unsupported structures retain the caller's operation through the ordinary mapping path.
+    fn try_specialize_stored(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+    ) -> Option<Self> {
+        if specialization.materialization_kind(db).is_some() {
+            return None;
+        }
+        match self {
+            Type::TypeVar(typevar) if !typevar.is_paramspec(db) => {
+                return Some(specialization.get(db, typevar).unwrap_or(self));
+            }
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Never
+            | Type::ClassLiteral(_)
+            | Type::LiteralValue(_)
+            | Type::ModuleLiteral(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::BoundSuper(_)
+            | Type::SpecialForm(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => return Some(self),
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => {
+                return Some(self);
+            }
+            _ => {}
+        }
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+            specialization: Specialization<'db>,
+        ) -> Option<Type<'db>> {
+            let map = |ty: Type<'db>| ty.try_specialize_stored(db, program, specialization);
+            match ty {
+                Type::NominalInstance(instance) => {
+                    instance.try_map_stored_arguments(db, program, map)
+                }
+                Type::ProtocolInstance(protocol) => Some(Type::ProtocolInstance(
+                    protocol.try_map_stored_arguments(db, program, map)?,
+                )),
+                Type::GenericAlias(alias) => Some(Type::GenericAlias(GenericAlias::new(
+                    db,
+                    alias.origin(db),
+                    alias
+                        .specialization(db)
+                        .try_map_stored_arguments(db, program, map)?,
+                ))),
+                Type::FunctionLiteral(function) => Some(Type::FunctionLiteral(
+                    function.try_specialize_stored(db, program, specialization)?,
+                )),
+                Type::Callable(callable) => Some(Type::Callable(callable.try_specialize_stored(
+                    db,
+                    program,
+                    specialization,
+                )?)),
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|&element| map(element) == Some(element))
+                    .then_some(ty),
+                Type::Intersection(intersection) => intersection
+                    .positive(db)
+                    .iter()
+                    .chain(intersection.negative(db))
+                    .all(|&element| map(element) == Some(element))
+                    .then_some(ty),
+                _ => None,
+            }
+        }
+        cached(db, program, self, specialization)
+    }
+
     fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -8121,6 +8242,23 @@ impl<'db> Type<'db> {
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
+        }
+
+        if let TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
+            specialization,
+            specialize_self_domain: false,
+        }) = type_mapping
+            && let Some(specialized) =
+                self.try_specialize_stored(db, visitor.env.program(db), *specialization)
+        {
+            return specialized;
+        }
+
+        if let TypeMapping::Materialize(kind) = type_mapping
+            && let Some(materialized) =
+                self.try_materialize_without_expansion(db, visitor.env.program(db), *kind)
+        {
+            return materialized;
         }
 
         // Recursive singleton promotion only recurses into `NominalInstance` types (tuples

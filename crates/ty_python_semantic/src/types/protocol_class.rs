@@ -64,6 +64,24 @@ impl<'db> ClassType<'db> {
 pub(crate) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
+    pub(super) fn try_map_stored_arguments(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        map: impl Fn(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        Some(match self.0 {
+            ClassType::NonGeneric(_) => self,
+            ClassType::Generic(alias) => Self(ClassType::Generic(GenericAlias::new(
+                db,
+                alias.origin(db),
+                alias
+                    .specialization(db)
+                    .try_map_stored_arguments(db, program, map)?,
+            ))),
+        })
+    }
+
     pub(super) fn map_recursive_references(
         self,
         db: &'db dyn Db,
@@ -153,26 +171,28 @@ impl<'db> ProtocolClass<'db> {
         db: &'db dyn Db,
         visitor: &V,
     ) {
-        self.for_each_member_candidate(
+        self.for_each_member_declaration(
             db,
             visitor.program_environment(),
-            |_, candidate, specialization| {
-                let candidate = candidate.apply_specialization(
-                    db,
-                    visitor.program_environment(),
-                    specialization,
-                );
-                candidate.walk_recursive_member_types(db, visitor);
+            |members, specialization| {
+                for (_, candidate) in members {
+                    let candidate = candidate.apply_specialization(
+                        db,
+                        visitor.program_environment(),
+                        specialization,
+                    );
+                    candidate.walk_recursive_member_types(db, visitor);
+                }
             },
         );
     }
 
     /// Visits the effective declarations, specializing only classes that contribute members.
-    fn for_each_member_candidate(
+    fn for_each_member_declaration(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
+        mut visit: impl FnMut(&[(Name, ProtocolMemberCandidate<'db>)], Option<Specialization<'db>>),
     ) {
         for declarations in protocol_member_declarations(db, self.class_literal(db)) {
             let parent = match *self {
@@ -189,9 +209,7 @@ impl<'db> ProtocolClass<'db> {
                 .into_class()
                 .and_then(|class| class.static_class_literal(db))
                 .and_then(|(_, specialization)| specialization);
-            for (name, candidate) in &declarations.members {
-                visit(name, *candidate, specialization);
-            }
+            visit(&declarations.members, specialization);
         }
     }
 
@@ -3553,53 +3571,58 @@ fn compute_protocol_interface<'db>(
     ));
     let mut members = BTreeMap::default();
 
-    ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
+    ProtocolClass(class).for_each_member_declaration(db, &env, |declarations, specialization| {
         let specialization =
             specialization.map(|specialization| specialization.with_typevar_bounds(db, &env));
-        let candidate = candidate.apply_specialization(db, &env, specialization);
-        let ProtocolMemberCandidate {
-            ty,
-            qualifiers,
-            definition,
-            bound_on_class,
-        } = candidate;
-
-        let member = match ty {
-            Type::PropertyInstance(property) => ProtocolMemberData::property(
-                property
-                    .getter(db)
-                    .map(ProtocolPropertyType::property_getter),
-                property
-                    .setter(db)
-                    .map(ProtocolPropertyType::property_setter)
-                    .map(ProtocolMemberWrite::from_type),
+        for (name, candidate) in declarations {
+            let candidate = candidate.apply_specialization(db, &env, specialization);
+            let ProtocolMemberCandidate {
+                ty,
+                qualifiers,
                 definition,
-            ),
-            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
-            }
-            Type::FunctionLiteral(function)
-                if bound_on_class.is_yes()
-                    || function.is_staticmethod(db)
-                    || function.is_classmethod(db) =>
-            {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
-            }
-            _ if bound_on_class.is_yes()
-                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
-            {
-                if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(db, &env, ty, class, definition)
-                {
-                    descriptor
-                } else {
-                    ProtocolMemberData::attribute(ty, qualifiers, definition)
-                }
-            }
-            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
-        };
+                bound_on_class,
+            } = candidate;
 
-        members.insert(name.clone(), member);
+            let member = match ty {
+                Type::PropertyInstance(property) => ProtocolMemberData::property(
+                    property
+                        .getter(db)
+                        .map(ProtocolPropertyType::property_getter),
+                    property
+                        .setter(db)
+                        .map(ProtocolPropertyType::property_setter)
+                        .map(ProtocolMemberWrite::from_type),
+                    definition,
+                ),
+                Type::Callable(callable)
+                    if bound_on_class.is_yes() && callable.is_method_like(db) =>
+                {
+                    ProtocolMemberData::method(db, callable, definition)
+                }
+                Type::FunctionLiteral(function)
+                    if bound_on_class.is_yes()
+                        || function.is_staticmethod(db)
+                        || function.is_classmethod(db) =>
+                {
+                    ProtocolMemberData::method(db, function.into_callable_type(db), definition)
+                }
+                _ if bound_on_class.is_yes()
+                    && definition
+                        .is_some_and(|definition| definition.kind(db).is_function_def()) =>
+                {
+                    if let Some(descriptor) =
+                        descriptor_decorated_protocol_member(db, &env, ty, class, definition)
+                    {
+                        descriptor
+                    } else {
+                        ProtocolMemberData::attribute(ty, qualifiers, definition)
+                    }
+                }
+                _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+            };
+
+            members.insert(name.clone(), member);
+        }
     });
 
     ProtocolInterface::new(db, env.program(db), members)

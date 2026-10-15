@@ -34,7 +34,8 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, StaticClassLiteral, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    IntersectionType, MaterializationKind, StaticClassLiteral, Type, TypeContext, TypeMapping,
+    UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
@@ -383,6 +384,56 @@ impl<'db> TupleType<'db> {
             env.program(db),
             self.tuple(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
+        ))
+    }
+
+    /// Transform stored elements without resolving type variables or deferred bodies.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial = |_, _, _, _, _| None,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn try_materialize_without_expansion(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        kind: MaterializationKind,
+    ) -> Option<Self> {
+        self.try_map_stored_elements(db, program, |ty| {
+            ty.try_materialize_without_expansion(db, program, kind)
+        })
+    }
+
+    /// Map element types while preserving the stored tuple shape.
+    pub(super) fn try_map_stored_elements(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        map: impl Fn(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        let tuple = match self.tuple(db) {
+            Tuple::Fixed(tuple) => Tuple::heterogeneous(
+                tuple
+                    .iter_all_elements()
+                    .map(&map)
+                    .collect::<Option<Box<[_]>>>()?,
+            ),
+            Tuple::Variable(tuple) => {
+                let VariableSegment::Homogeneous(element) = tuple.variable() else {
+                    return None;
+                };
+                let element = map(element)?;
+                Tuple::Variable(VariableLengthTuple::try_new(
+                    tuple.prefix_elements().iter().copied().map(&map),
+                    VariableSegment::Homogeneous(element),
+                    tuple.suffix_elements().iter().copied().map(&map),
+                )?)
+            }
+        };
+        Some(Self::new(
+            db,
+            &ProgramEnvironment::from_program(program),
+            &tuple,
         ))
     }
 

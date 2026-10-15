@@ -1,6 +1,7 @@
 use super::DynamicType;
 use super::ErrorContext;
 use super::constraints::IteratorConstraintsExtension;
+use super::generics::Specialization;
 use super::infer::TransparentCallableReturn;
 use super::protocol_class::StructuralMemberPriority;
 use crate::ProgramEnvironment;
@@ -2475,6 +2476,27 @@ impl<'db> CallableType<'db> {
                 }),
             ),
         })
+    }
+
+    pub(super) fn try_specialize_stored(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+    ) -> Option<Self> {
+        let SignatureSource::Explicit(signatures) = self.signature_source(db) else {
+            return None;
+        };
+        Some(Self::new_internal(
+            db,
+            SignatureSource::Explicit(signatures.try_specialize_stored(
+                db,
+                program,
+                specialization,
+            )?),
+            self.kind(db),
+            self.deprecated(db),
+        ))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(

@@ -1,7 +1,7 @@
 use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::TypeVisitorKey;
-use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
+use crate::types::visitor::{TypeKind, TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -112,6 +112,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> bool {
+        match self {
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_) => return true,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => return false,
+            _ if matches!(TypeKind::from(self), TypeKind::Atomic) => return false,
+            _ => {}
+        }
         any_over_type(db, env, self, false, |ty| {
             matches!(
                 ty,
@@ -322,6 +328,11 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
+    /// Whether a bound or constraints are declared, without evaluating either.
+    pub(super) fn has_bound_or_constraints(self, db: &'db dyn Db) -> bool {
+        self._bound_or_constraints(db).is_some()
+    }
+
     pub(crate) fn constraints(
         self,
         db: &'db dyn Db,
@@ -383,6 +394,9 @@ impl<'db> TypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if self._bound_or_constraints(db).is_none() && self._default(db).is_none() {
+            return self;
+        }
         Self::new(
             db,
             self.identity(db),

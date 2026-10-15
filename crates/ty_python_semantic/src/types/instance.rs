@@ -1,9 +1,9 @@
 //! Instance types: both nominal and structural.
 
-use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
+use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::debug_assert_matches;
@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, GenericAlias, KnownClass,
     MaterializationKind, SubclassOfType, Type, TypeAliasType,
 };
 use crate::place::PlaceAndQualifiers;
@@ -374,6 +374,83 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Use the declared class hierarchy when it settles a relation without inspecting arguments.
+    pub(super) fn relation_from_class_declarations(
+        self,
+        db: &'db dyn Db,
+        target: Self,
+        relation: TypeRelation,
+    ) -> Option<bool> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial = |_, _, _, _, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn declared_relation<'db>(
+            db: &'db dyn Db,
+            source: ClassLiteral<'db>,
+            target: ClassLiteral<'db>,
+            relation: TypeRelation,
+            target_is_generic: bool,
+        ) -> Option<bool> {
+            let env = TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_file(source.program_file(db)),
+            );
+            let mut needs_arguments = false;
+            for base in source.iter_mro(db, &env).skip_first() {
+                let related = match base {
+                    ClassBase::Any => {
+                        relation.is_assignability() || target.is_known(db, KnownClass::Object)
+                    }
+                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) => {
+                        if relation.is_assignability() {
+                            !target.is_final(db)
+                        } else {
+                            target.is_known(db, KnownClass::Object)
+                        }
+                    }
+                    ClassBase::Class(base) if base.class_literal(db) == target => {
+                        match (base.is_generic(), target_is_generic) {
+                            (false, false) => true,
+                            (true, true) => {
+                                needs_arguments = true;
+                                false
+                            }
+                            _ => false,
+                        }
+                    }
+                    _ => false,
+                };
+                if related {
+                    return Some(true);
+                }
+            }
+            (!needs_arguments).then_some(false)
+        }
+
+        if target.is_object() || relation.is_assignability() && self.inherits_from_explicit_any() {
+            return Some(true);
+        }
+        if self.is_object() {
+            return Some(false);
+        }
+        let class = |instance: Self| match instance.0 {
+            NominalInstanceInner::NonTuple(class) => {
+                let class = class.class(db);
+                Some((class.class_literal(db), class.is_generic()))
+            }
+            NominalInstanceInner::ExactTuple(tuple) => Some((tuple.class_literal(db).into(), true)),
+            _ => None,
+        };
+        let (source, source_is_generic) = class(self)?;
+        let (target, target_is_generic) = class(target)?;
+        if source == target {
+            return (!source_is_generic && !target_is_generic).then_some(true);
+        }
+        declared_relation(db, source, target, relation, target_is_generic)
+    }
+
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
     /// tuple spec.
     ///
@@ -481,6 +558,65 @@ impl<'db> NominalInstanceType<'db> {
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         SubclassOfType::from(db, env, self.class(db, env))
+    }
+
+    /// Preserve the instance's nominal identity while transforming only stored type arguments.
+    pub(super) fn try_map_stored_arguments(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        map: impl Fn(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(Type::tuple(
+                tuple.try_map_stored_elements(db, program, map)?,
+            )),
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {
+                Some(Type::NominalInstance(self))
+            }
+            NominalInstanceInner::NonTuple(class) => {
+                let ClassType::Generic(alias) = class.class(db) else {
+                    return Some(Type::NominalInstance(self));
+                };
+                let specialization = alias
+                    .specialization(db)
+                    .try_map_stored_arguments(db, program, map)?;
+                let mapped =
+                    ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization));
+                Some(Type::NominalInstance(Self(NominalInstanceInner::NonTuple(
+                    class.with_class(db, mapped),
+                ))))
+            }
+        }
+    }
+
+    pub(super) fn try_materialize_without_expansion(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        kind: MaterializationKind,
+    ) -> Option<Type<'db>> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(Type::tuple(
+                tuple.try_materialize_without_expansion(db, program, kind)?,
+            )),
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {
+                Some(Type::NominalInstance(self))
+            }
+            NominalInstanceInner::NonTuple(class) => {
+                let ClassType::Generic(alias) = class.class(db) else {
+                    return Some(Type::NominalInstance(self));
+                };
+                let specialization = alias
+                    .specialization(db)
+                    .try_materialize_without_expansion(db, program, kind)?;
+                let mapped =
+                    ClassType::Generic(GenericAlias::new(db, alias.origin(db), specialization));
+                Some(Type::NominalInstance(Self(NominalInstanceInner::NonTuple(
+                    class.with_class(db, mapped),
+                ))))
+            }
+        }
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -1597,20 +1733,32 @@ fn non_recursive_protocol_interface<'db>(
         }
     }
 
-    let env = env.in_environment(ProgramEnvironment::from_file(
-        protocol.class_literal(db).program_file(db),
-    ));
-    interface.filter_members(db, |member| {
-        let visitor = ProtocolReferenceFinder {
-            env: &env,
-            origin: protocol.class_literal(db),
-            found: Cell::new(false),
-            recursion_guard: TypeCollector::default(),
-            active_aliases: ActiveRecursionDetector::default(),
-        };
-        walk_protocol_instance_member(db, member, receiver_ty, &TypeVisitorContext::new(&visitor));
-        !visitor.found.get()
-    })
+    env.caches().finite_protocol_interfaces.get_or_compute(
+        db,
+        env,
+        (env.program(db), interface, protocol, receiver_ty),
+        || {
+            let env = env.in_environment(ProgramEnvironment::from_file(
+                protocol.class_literal(db).program_file(db),
+            ));
+            interface.filter_members(db, |member| {
+                let visitor = ProtocolReferenceFinder {
+                    env: &env,
+                    origin: protocol.class_literal(db),
+                    found: Cell::new(false),
+                    recursion_guard: TypeCollector::default(),
+                    active_aliases: ActiveRecursionDetector::default(),
+                };
+                walk_protocol_instance_member(
+                    db,
+                    member,
+                    receiver_ty,
+                    &TypeVisitorContext::new(&visitor),
+                );
+                !visitor.found.get()
+            })
+        },
+    )
 }
 
 /// Infers protocol constraints without expanding recursive member requirements.
@@ -1663,7 +1811,14 @@ fn non_recursive_protocol_constraints<'db>(
 
     env.cached_or_compute(
         || non_recursive_protocol_constraints(db, env.program(db), source, target_protocol, target),
-        || compute(db, env, source, target_protocol, target),
+        || {
+            env.caches().finite_protocol_constraints.get_or_compute(
+                db,
+                env,
+                (env.program(db), source, target_protocol, target),
+                || compute(db, env, source, target_protocol, target),
+            )
+        },
     )
 }
 fn compute_non_recursive_protocol_constraints<'db>(
@@ -1896,6 +2051,27 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    pub(super) fn try_map_stored_arguments(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        map: impl Fn(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        Some(match self.inner {
+            Protocol::FromClass(class) => {
+                Self::from_class(class.try_map_stored_arguments(db, program, map)?)
+            }
+            Protocol::Materialized(materialized) => Self::materialized(
+                db,
+                materialized
+                    .origin(db)
+                    .try_map_stored_arguments(db, program, map)?,
+                materialized.materialization_kind(db),
+            ),
+            Protocol::Synthesized(_) => return None,
+        })
+    }
+
     pub(super) fn map_recursive_references(
         self,
         db: &'db dyn Db,

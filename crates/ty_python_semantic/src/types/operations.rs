@@ -12,13 +12,13 @@ use super::constraints::{CandidateSolutions, ConstraintProvenance, OwnedConstrai
 use super::cyclic::{GuardToken, RecursionGuardState};
 use super::generics::Specialization;
 use super::mro::{Mro, StaticMroError};
-use super::protocol_class::ProtocolInterface;
+use super::protocol_class::{ProtocolClass, ProtocolInterface, ProtocolInterfaceView};
 use super::recursive::OperationMemo;
 use super::relation::{TypeRelation, TypeVarEvaluation};
 use super::typevar::TypeVarSet;
 use super::{
     ApplyTypeMappingVisitor, CallableType, GenericAlias, MaterializationKind, MemberLookupKey,
-    MemberLookupResult, Type, TypePair, TypeRecursionState,
+    MemberLookupResult, ProtocolInstanceType, Type, TypePair, TypeRecursionState,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::{Db, ProgramEnvironment};
@@ -223,6 +223,26 @@ pub(super) struct OperationCaches<'db> {
     pub(super) class_members: OperationMemo<'db, MemberLookupKey<'db>, PlaceAndQualifiers<'db>>,
     pub(super) protocol_interfaces:
         OperationMemo<'db, (Program<'db>, GenericAlias<'db>), ProtocolInterface<'db>>,
+    pub(super) finite_protocol_interfaces: OperationMemo<
+        'db,
+        (
+            Program<'db>,
+            ProtocolInterface<'db>,
+            ProtocolClass<'db>,
+            Type<'db>,
+        ),
+        ProtocolInterface<'db>,
+    >,
+    pub(super) finite_protocol_constraints: OperationMemo<
+        'db,
+        (
+            Program<'db>,
+            ProtocolInstanceType<'db>,
+            ProtocolInstanceType<'db>,
+            ProtocolInterfaceView<'db>,
+        ),
+        OwnedConstraintSet<'db>,
+    >,
     pub(super) protocol_bindings:
         OperationMemo<'db, (Program<'db>, CallableType<'db>, Option<Type<'db>>), CallableType<'db>>,
     pub(super) protocol_receivers: OperationMemo<

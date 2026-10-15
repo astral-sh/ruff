@@ -714,6 +714,15 @@ impl<'db> Type<'db> {
         evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, target)
+            && let Some(related) = source.relation_from_class_declarations(db, target, relation)
+        {
+            return Cow::Owned(if related {
+                OwnedConstraintSet::always()
+            } else {
+                OwnedConstraintSet::default()
+            });
+        }
         #[salsa::tracked(
             returns(ref),
             cycle_initial = |_, _, _, _, _, _, _| OwnedConstraintSet::always(),
@@ -1198,6 +1207,10 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(disjoint) = self.trivial_disjointness(db, other) {
+            return ConstraintSet::from_bool(constraints, disjoint);
+        }
+
         #[salsa::tracked(
             returns(ref),
             cycle_initial = |_, _, _, _| OwnedConstraintSet::default(),
@@ -1242,6 +1255,40 @@ impl<'db> Type<'db> {
             },
         );
         constraints.load(db, env, &result)
+    }
+
+    /// Decide terminal comparisons before allocating guards or a constraint cache entry.
+    /// These cases inspect no nested types and cannot depend on an enclosing comparison.
+    fn trivial_disjointness(self, db: &'db dyn Db, other: Self) -> Option<bool> {
+        if self.materialized_divergent_fallback().is_some()
+            || other.materialized_divergent_fallback().is_some()
+        {
+            return None;
+        }
+        match (self, other) {
+            (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => None,
+            (Type::Never, _) | (_, Type::Never) => Some(true),
+            (Type::Dynamic(_) | Type::Divergent(_), _)
+            | (_, Type::Dynamic(_) | Type::Divergent(_)) => Some(false),
+            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+                if left.is_literal_string() && (right.is_literal_string() || right.is_string())
+                    || right.is_literal_string() && left.is_string()
+                {
+                    return Some(false);
+                }
+                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
+                    && left.enum_class_literal(db) == right.enum_class_literal(db)
+                    && !left.enum_class_literal(db).aliases_are_known(db)
+                {
+                    return Some(false);
+                }
+                Some(left.kind() != right.kind())
+            }
+            (Type::LiteralValue(_), Type::ClassLiteral(_) | Type::GenericAlias(_))
+            | (Type::ClassLiteral(_) | Type::GenericAlias(_), Type::LiteralValue(_)) => Some(true),
+            (Type::ClassLiteral(left), Type::ClassLiteral(right)) => Some(left != right),
+            _ => None,
+        }
     }
 
     fn compute_disjointness_constraints<'c>(
@@ -2242,6 +2289,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // and unnecessary. This early return is only an optimisation.
         if source == target && self.relation.can_safely_assume_reflexivity(source) {
             return self.always();
+        }
+
+        if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (source, target)
+            && let Some(related) =
+                source.relation_from_class_declarations(db, target, self.relation)
+        {
+            return ConstraintSet::from_bool(self.constraints, related);
         }
 
         self.with_recursion_guard(db, source, target, references, |comparison| {
@@ -3921,6 +3975,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         if let Some(context) = self.report_context() {
             context.take();
         }
+        if let Some(disjoint) = left.trivial_disjointness(db, right) {
+            return ConstraintSet::from_bool(self.constraints, disjoint);
+        }
         let result = self.with_recursion_guard(db, left, right, |comparison| {
             self.check_type_pair_impl(db, comparison, left, right)
         });
@@ -4188,25 +4245,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     self.check_type_pair(db, Type::TypeVar(type_var), other)
                 })
-            }
-
-            (Type::LiteralValue(left), Type::LiteralValue(right))
-                if left.is_literal_string() && right.is_literal_string()
-                    || (left.is_string() && right.is_literal_string())
-                    || (left.is_literal_string() && right.is_string()) =>
-            {
-                self.never()
-            }
-
-            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                if let (Some(left), Some(right)) = (left.as_enum(), right.as_enum())
-                    && left.enum_class_literal(db) == right.enum_class_literal(db)
-                    && !left.enum_class_literal(db).aliases_are_known(db)
-                {
-                    self.never()
-                } else {
-                    ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
-                }
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
