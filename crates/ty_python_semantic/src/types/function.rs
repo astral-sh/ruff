@@ -1643,24 +1643,39 @@ impl<'db> FunctionType<'db> {
             .unwrap_or_else(|| self.literal_signature(db))
     }
 
-    /// Use body inference when calling an unannotated function. Keeping this separate from
-    /// `signature` avoids making every reference to a function depend on its body.
+    /// The signature of this function, with the return type possibly inferred from the body.
+    ///
+    /// TODO: We should rename this function to `signature` and use it almost everywhere where
+    /// `signature` (above) is currently used. The function above should instead be renamed to
+    /// `signature_without_inferred_return_type` or `external_signature`, and only be used in
+    /// places where this is explicitly needed. This will make signatures more consistent with
+    /// the type inferred for calls to these functions (see also corresponding TODOs in
+    /// `return_type_inference.md`).
     pub(super) fn signature_with_inferred_return_type(
         self,
         db: &'db dyn Db,
     ) -> Cow<'db, CallableSignature<'db>> {
         let signature = self.signature(db);
+        // Never infer return types for functions with multiple overloads.
         let [overload] = signature.overloads.as_slice() else {
             return Cow::Borrowed(signature);
         };
+
         if !db
             .analysis_settings(self.file(db))
             .return_type_inference
             .is_active()
-            || !overload.return_ty.is_unknown()
-            || self.file(db).is_stub(db)
+            // Always preserve explicit annotations
             || self.has_explicit_return_annotation(db)
+            // Preserve return types already supplied by decorators or signature transformations,
+            // unless they are unknown.
+            || !overload.return_ty.is_unknown()
+            // We never infer return types in stubs
+            || self.file(db).is_stub(db)
+            // An (invalid) function with a single `@overload` could still fall through the filter above.
+            // We should not replace the `@overload`'s return type with the inferred type from the implementation.
             || !self.overloads_and_implementation(db).0.is_empty()
+            // Some functions are explicitly exempt from return type inference
             || is_exempt_from_return_type_inference(self.name(db))
         {
             return Cow::Borrowed(signature);
