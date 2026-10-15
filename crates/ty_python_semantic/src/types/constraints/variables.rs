@@ -1,6 +1,7 @@
 //! The different conditions that can be checked by an interior node in a constraint set BDD
 #![expect(dead_code)]
 
+use crate::types::recursive::RecursiveReferenceMapper;
 use std::fmt::Display;
 use std::marker::PhantomData;
 
@@ -81,6 +82,33 @@ pub(super) enum Constraint<'db> {
 }
 
 impl<'db> Constraint<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        match self {
+            Self::ConcreteLower(bound) => Self::ConcreteLower(ConcreteLowerBound::new(
+                bound.provenance,
+                bound.typevar,
+                mapper.map_type(db, bound.bound),
+            )),
+            Self::ConcreteUpper(bound) => Self::ConcreteUpper(ConcreteUpperBound::new(
+                bound.provenance,
+                bound.typevar,
+                mapper.map_type(db, bound.bound),
+            )),
+            Self::ConcreteEquivalence(bound) => {
+                Self::ConcreteEquivalence(ConcreteEquivalenceBound::new(
+                    bound.provenance,
+                    bound.typevar,
+                    mapper.map_type(db, bound.bound),
+                ))
+            }
+            Self::TypeVarRange(_) | Self::TypeVarEquivalence(_) => self,
+        }
+    }
+
     pub(super) fn new_node(
         self,
         db: &'db dyn Db,

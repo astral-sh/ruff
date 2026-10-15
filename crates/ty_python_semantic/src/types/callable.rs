@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::recursive::RecursiveReferenceMapper;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -743,6 +744,14 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        self.with_signatures(db, self.signatures(db).map_recursive_references(db, mapper))
+    }
+
     pub(crate) fn new<S>(db: &'db dyn Db, signatures: S, kind: CallableTypeKind) -> Self
     where
         S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,

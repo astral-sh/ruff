@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use crate::types::recursive::RecursiveReferenceMapper;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -290,6 +291,41 @@ impl Default for OwnedConstraintSet<'_> {
 }
 
 impl<'db> OwnedConstraintSet<'db> {
+    /// Rewrite bound syntax without testing or simplifying the represented constraints.
+    pub(super) fn map_recursive_references(
+        &self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        let Some(inner) = &self.inner else {
+            return self.clone();
+        };
+        let constraints: Box<[_]> = inner
+            .constraints
+            .iter()
+            .map(|constraint| constraint.map_recursive_references(db, mapper))
+            .collect();
+        if constraints == inner.constraints {
+            return self.clone();
+        }
+        Self {
+            node: self.node,
+            source_order: self.source_order,
+            inner: Some(Arc::new(OwnedConstraintSetInner {
+                constraints,
+                constraint_supports: inner.constraint_supports.clone(),
+                constraint_indices: inner.constraint_indices.clone(),
+                typevars: inner.typevars.clone(),
+                nodes: inner.nodes.clone(),
+                node_supports: inner.node_supports.clone(),
+                node_indices: inner.node_indices.clone(),
+                supports: inner.supports.clone(),
+                support_indices: inner.support_indices.clone(),
+                source_orders: inner.source_orders.clone(),
+            })),
+        }
+    }
+
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,

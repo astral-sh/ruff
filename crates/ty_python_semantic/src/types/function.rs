@@ -49,6 +49,7 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
+use crate::types::recursive::RecursiveReferenceMapper;
 use std::{borrow::Cow, str::FromStr};
 
 use bitflags::bitflags;
@@ -1216,6 +1217,34 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        let signature = self
+            .updated_signature(db)
+            .map(|signature| signature.map_recursive_references(db, mapper));
+        let implementations = self.updated_implementation_callables(db).map(|callables| {
+            callables
+                .iter()
+                .map(|callable| callable.map_recursive_references(db, mapper))
+                .collect()
+        });
+        let class_specialization = self
+            .class_specialization(db)
+            .map(|specialization| specialization.map_recursive_references(db, mapper));
+        if signature.is_none() && implementations.is_none() && class_specialization.is_none() {
+            return self;
+        }
+        Self::new_internal(
+            db,
+            self.literal(db),
+            UpdatedFunctionSignatures::new(signature, implementations, class_specialization),
+            self.descriptor_kind(db),
+        )
+    }
+
     pub(crate) fn new(
         db: &'db dyn Db,
         literal: FunctionLiteral<'db>,
@@ -1354,13 +1383,12 @@ impl<'db> FunctionType<'db> {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
-        let (updated_signature, updated_implementation_callables) = if type_mapping.is_structural()
-            || matches!(
-                type_mapping,
-                TypeMapping::ApplySpecialization(specialization)
-                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                    if specialization.preserves_lazy_signatures()
-            ) {
+        let (updated_signature, updated_implementation_callables) = if matches!(
+            type_mapping,
+            TypeMapping::ApplySpecialization(specialization)
+                | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                if specialization.preserves_lazy_signatures()
+        ) {
             (
                 self.updated_signature(db).map(|signature| {
                     signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
