@@ -1,29 +1,16 @@
-//! Tracks the support of each constraint and interior node in a BDD.
+//! Tracks type-variable occurrences, declaration dependencies, free dependencies, and
+//! existential locals for each constraint and interior node in a BDD.
 //!
-//! The support of a constraint is the set of typevars mentioned anywhere in the constraint
-//! (either the subject, or anywhere in the lower or upper bound).
-//!
-//! The support of a node is the union of the supports of every constraint reachable from that
-//! node.
+//! Atomic constraints collect these supports together. Existential constraints remove their
+//! locals only from free support; interior nodes union the supports of their constraint and edges.
 
-use std::cell::{Cell, RefCell};
 use std::ops::{BitOrAssign, Sub};
 
-use crate::types::constraints::variables::{AtomicConstraint, Constraint};
-use crate::types::constraints::{ConstraintId, ConstraintSetStorage, NodeId, TypeVarId};
-use crate::types::function::FunctionType;
-use crate::types::generics::walk_specialization_types;
-use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_instance_interface};
-use crate::types::signatures::{Signature, walk_signature};
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarInstance, TypeVarSet};
-use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
-use crate::types::{
-    BoundTypeVarInstance, GenericAlias, ProtocolInstanceType, RecursiveType, Type, TypeAliasType,
-};
-use crate::{Db, ProgramEnvironment};
+use crate::Db;
+use crate::types::constraints::{ConstraintId, ConstraintSetStorage, TypeVarId};
+use crate::types::typevar::TypeVarSet;
 
 use ruff_index::newtype_index;
-use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 #[newtype_index]
@@ -74,20 +61,11 @@ impl Support {
         self.chunks[chunk_index] |= bit_mask_within_chunk;
     }
 
-    /// Removes and returns an arbitrary typevar from this support.
-    pub(super) fn pop(&mut self) -> Option<TypeVarId> {
-        let (idx, first_nonempty_chunk) = self
-            .chunks
-            .iter_mut()
-            .enumerate()
-            .find(|(_, chunk)| **chunk != 0)?;
-        let first_set_bit_in_chunk = first_nonempty_chunk.lowest_one()? as usize;
-
-        // Clear out the bit we just found, and then return it
-        *first_nonempty_chunk ^= 1 << first_set_bit_in_chunk;
-        Some(TypeVarId::from_usize(
-            CHUNK_SIZE * idx + first_set_bit_in_chunk,
-        ))
+    pub(super) fn contains(&self, typevar: TypeVarId) -> bool {
+        let index = typevar.index();
+        self.chunks
+            .get(index / CHUNK_SIZE)
+            .is_some_and(|chunk| chunk & (1 << (index % CHUNK_SIZE)) != 0)
     }
 
     fn iter_chunks(&self) -> impl Iterator<Item = usize> + '_ {
@@ -203,280 +181,35 @@ impl Sub<&Support> for &Support {
     }
 }
 
-/// Whether a quantified body and its declared domains depend only on bound type variables.
+/// Supports collected together when a constraint is constructed.
 ///
-/// Ordinary support retains quantified locals and can omit lazy protocol members. Neither is
-/// suitable for deciding whether an existential can be evaluated independently of its context.
-pub(super) fn is_closed<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    storage: &mut ConstraintSetStorage<'db>,
-    body: NodeId,
-    locals: &Support,
-) -> bool {
-    let visitor = ClosedBodyVisitor {
-        env,
-        storage: RefCell::new(storage),
-        bound: RefCell::default(),
-        closed: Cell::new(true),
-        types: RefCell::default(),
-        nodes: RefCell::default(),
-    };
-    visitor.with_locals(db, locals, || visitor.visit_node(db, body));
-    visitor.closed.get()
+/// Occurrences retain quantified locals for solution extraction. Validation contains variables
+/// with declared bounds or constraints, and their transitive dependencies. An unbounded variable
+/// contributes to validation only when another variable's declaration depends on it.
+/// Free dependencies include declarations but respect the binders inside types and existential
+/// bodies, so they can establish independence from an enclosing BDD.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ConstraintSupports {
+    pub(super) occurrences: Support,
+    pub(super) validation: Support,
+    pub(super) free: Support,
+    /// Existential locals that must be freshened when this constraint set is reused.
+    pub(super) quantified: Support,
 }
 
-struct ClosedBodyVisitor<'a, 'db> {
-    env: &'a ProgramEnvironment<'db>,
-    storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-    bound: RefCell<Support>,
-    closed: Cell<bool>,
-    // A type or node can occur inside and outside the scope of the same binder.
-    types: RefCell<FxHashMap<Type<'db>, SmallVec<[Support; 1]>>>,
-    nodes: RefCell<FxHashSet<(NodeId, Support)>>,
-}
-
-impl<'db> ClosedBodyVisitor<'_, 'db> {
-    fn already_visited(&self, ty: Type<'db>) -> bool {
-        let bound = self.bound.borrow();
-        let mut types = self.types.borrow_mut();
-        let contexts = types.entry(ty).or_default();
-        // Binding additional variables cannot introduce a free occurrence. This also stops
-        // recursive definitions whose methods add their own binders on the way back to the type.
-        if contexts
-            .iter()
-            .any(|context| !context.contains_more_than(&bound))
-        {
-            return true;
-        }
-        contexts.push(bound.clone());
-        false
-    }
-
-    fn with_locals(&self, db: &'db dyn Db, locals: &Support, visit: impl FnOnce()) {
-        let previous = self.bound.borrow().clone();
-        *self.bound.borrow_mut() |= locals;
-        for local in (locals - &previous).iter() {
-            let local = self.storage.borrow().typevar_data(local);
-            match local.typevar(db).bound_or_constraints(db, self.env) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self.visit_type(db, bound),
-                Some(TypeVarBoundOrConstraints::Constraints(bounds)) => {
-                    for bound in bounds.elements(db) {
-                        self.visit_type(db, *bound);
-                    }
-                }
-                None => {}
-            }
-        }
-        visit();
-        self.bound.replace(previous);
-    }
-
-    fn locals(
-        &self,
-        db: &'db dyn Db,
-        locals: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
-    ) -> Support {
-        let mut storage = self.storage.borrow_mut();
-        Support::from_typevars(
-            locals
-                .into_iter()
-                .map(|local| storage.intern_typevar(db, local)),
-        )
-    }
-
-    fn visit_node(&self, db: &'db dyn Db, node: NodeId) {
-        if !self.closed.get()
-            || node.is_terminal()
-            || !self
-                .nodes
-                .borrow_mut()
-                .insert((node, self.bound.borrow().clone()))
-        {
-            return;
-        }
-        let interior = self.storage.borrow().interior_node_data(node);
-        let constraint = self
-            .storage
-            .borrow()
-            .constraint_data(interior.constraint)
-            .clone();
-        match constraint {
-            Constraint::Existential(existential) => {
-                self.with_locals(db, &existential.locals, || {
-                    self.visit_node(db, existential.body);
-                });
-            }
-            Constraint::Atomic(atomic) => {
-                let (left, right) = match atomic {
-                    AtomicConstraint::ConcreteLower(bound) => {
-                        (Type::TypeVar(bound.typevar), bound.bound)
-                    }
-                    AtomicConstraint::ConcreteUpper(bound) => {
-                        (Type::TypeVar(bound.typevar), bound.bound)
-                    }
-                    AtomicConstraint::ConcreteEquivalence(bound) => {
-                        (Type::TypeVar(bound.typevar), bound.bound)
-                    }
-                    AtomicConstraint::TypeVarRange(bound) => {
-                        (Type::TypeVar(bound.left), Type::TypeVar(bound.right))
-                    }
-                    AtomicConstraint::TypeVarEquivalence(bound) => {
-                        (Type::TypeVar(bound.left), Type::TypeVar(bound.right))
-                    }
-                };
-                self.visit_type(db, left);
-                self.visit_type(db, right);
-            }
-        }
-        self.visit_node(db, interior.if_true);
-        self.visit_node(db, interior.if_uncertain);
-        self.visit_node(db, interior.if_false);
+impl BitOrAssign<&Self> for ConstraintSupports {
+    fn bitor_assign(&mut self, rhs: &Self) {
+        self.occurrences |= &rhs.occurrences;
+        self.validation |= &rhs.validation;
+        self.free |= &rhs.free;
+        self.quantified |= &rhs.quantified;
     }
 }
 
-impl<'db> TypeVisitor<'db> for ClosedBodyVisitor<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
-        self.env
-    }
-
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
-    fn notify_skipped_lazy_type_attributes(&self) {
-        self.closed.set(false);
-    }
-
-    fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
-
-    fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-        walk_specialization_types(db, alias.specialization(db), self);
-    }
-
-    fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
-        let locals = self.locals(
-            db,
-            signature
-                .generic_context
-                .into_iter()
-                .flat_map(|context| context.variables(db)),
-        );
-        self.with_locals(db, &locals, || walk_signature(db, signature, self));
-    }
-
-    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
-        self.visit_callable_type(db, function.into_callable_type(db));
-        if let Some(specialization) = function.class_specialization(db) {
-            walk_specialization_types(db, specialization, self);
-        }
-    }
-
-    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
-        if let Some((class, specialization)) = protocol
-            .class_origin(db)
-            .and_then(|class| class.static_class_literal(db))
-        {
-            if let Some(specialization) = specialization {
-                walk_specialization_types(db, specialization, self);
-            }
-            let Some(origin) = class.into_protocol_class(db) else {
-                self.closed.set(false);
-                return;
-            };
-            let locals = self.locals(
-                db,
-                class
-                    .generic_context(db)
-                    .into_iter()
-                    .flat_map(|context| context.variables(db)),
-            );
-            self.with_locals(db, &locals, || {
-                // Inspect the definition separately from its arguments: recursively specializing
-                // a protocol such as P[list[T]] need not converge to a single Type identity.
-                if self.closed.get() && !self.already_visited(Type::ClassLiteral(class.into())) {
-                    walk_protocol_instance_interface(
-                        db,
-                        ProtocolInterfaceView::new(origin.interface(db), None),
-                        Type::ProtocolInstance(protocol),
-                        self,
-                    );
-                }
-            });
-        } else {
-            walk_protocol_instance_interface(
-                db,
-                protocol.interface(db),
-                Type::ProtocolInstance(protocol),
-                self,
-            );
-        }
-    }
-
-    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-        let specialization = alias.specialization(db).or_else(|| {
-            alias
-                .generic_context(db)
-                .map(|context| context.default_specialization(db, None))
-        });
-        if let Some(specialization) = specialization {
-            walk_specialization_types(db, specialization, self);
-        }
-        let locals = self.locals(
-            db,
-            alias
-                .generic_context(db)
-                .into_iter()
-                .flat_map(|context| context.variables(db)),
-        );
-        self.with_locals(db, &locals, || {
-            if self.closed.get() && !self.already_visited(Type::TypeAlias(alias.unspecialized(db)))
-            {
-                self.visit_type(db, alias.raw_value_type(db));
-            }
-        });
-    }
-
-    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        if let Some(arguments) = recursive.arguments(db) {
-            walk_specialization_types(db, arguments, self);
-        }
-        let constructor = recursive.constructor(db);
-        let locals = self.locals(
-            db,
-            recursive
-                .parameters(db)
-                .into_iter()
-                .flat_map(|context| context.variables(db)),
-        );
-        self.with_locals(db, &locals, || {
-            if self.closed.get() && !self.already_visited(Type::Recursive(constructor)) {
-                self.visit_type(db, constructor.unfold(db, self.env).into_type());
-            }
-        });
-    }
-
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if !self.closed.get() {
-            return;
-        }
-        if let Type::TypeVar(typevar) = ty {
-            let id = self.storage.borrow_mut().intern_typevar(db, typevar);
-            if !self.bound.borrow().iter().any(|bound| bound == id) {
-                self.closed.set(false);
-            }
-            return;
-        }
-        if matches!(ty, Type::Divergent(_)) {
-            self.closed.set(false);
-            return;
-        }
-        let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
-            return;
-        };
-        // Aliases have their own guard for their unspecialized definition.
-        if matches!(ty, Type::TypeAlias(_) | Type::Recursive(_)) || !self.already_visited(ty) {
-            walk_non_atomic_type(db, non_atomic, self);
+impl BitOrAssign<Option<&Self>> for ConstraintSupports {
+    fn bitor_assign(&mut self, rhs: Option<&Self>) {
+        if let Some(rhs) = rhs {
+            *self |= rhs;
         }
     }
 }

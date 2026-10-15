@@ -105,18 +105,21 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
-use crate::types::constraints::support::{Support, SupportId};
+use crate::types::constraints::support::{ConstraintSupports, Support, SupportId};
+use crate::types::function::FunctionType;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
+use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_instance_interface};
+use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarNonce, TypeVarSet,
 };
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type,
+    NonAtomicType, TypeKind, TypeVisitor, any_over_type_expanding_aliases, walk_non_atomic_type,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, RecursiveType,
-    Type, TypeAliasType, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType,
+    ProtocolInstanceType, RecursiveType, Type, TypeAliasType, TypePair, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -275,7 +278,7 @@ struct OwnedConstraintSetInner<'db> {
     nodes: Box<[InteriorNodeData]>,
     node_supports: Box<[SupportId]>,
     node_indices: RankBitBox,
-    supports: Box<[Support]>,
+    supports: Box<[ConstraintSupports]>,
     support_indices: RankBitBox,
     /// A dense, canonical source-order tree whose IDs are independent of sidecar construction
     /// history.
@@ -586,24 +589,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
-        fn collect(
-            storage: &ConstraintSetStorage<'_>,
-            node: NodeId,
-            seen: &mut FxHashSet<ConstraintId>,
-            locals: &mut Support,
-        ) {
-            node.for_each_unique_constraint(storage, &mut |id| {
-                if seen.insert(id)
-                    && let Constraint::Existential(existential) = storage.constraint_data(id)
-                {
-                    *locals |= &existential.locals;
-                    collect(storage, existential.body, seen, locals);
-                }
-            });
-        }
         let storage = self.builder.storage.borrow();
-        let mut locals = Support::default();
-        collect(&storage, self.node, &mut FxHashSet::default(), &mut locals);
+        let Some(supports) = storage.node_supports(self.node) else {
+            return self;
+        };
+        let locals = &supports.quantified;
         let variables = || locals.iter().map(|id| storage.typevar_data(id));
         let Some(min_freshness) = variables().map(|var| var.freshness(db)).min() else {
             return self;
@@ -612,10 +602,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .map(|var| var.freshness(db))
             .max()
             .unwrap_or(min_freshness);
-        let max_freshness = storage
-            .node_support(self.node)
-            .into_iter()
-            .flat_map(Support::iter)
+        let max_freshness = supports
+            .occurrences
+            .iter()
+            .chain(supports.validation.iter())
             .map(|id| storage.typevar_data(id).freshness(db))
             .chain(self.builder.signature_typevar_freshness.get())
             .fold(max_local_freshness, TypeVarNonce::max);
@@ -865,23 +855,25 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         support: &Support,
     ) -> Option<bool> {
         let mut storage = self.builder.storage.borrow_mut();
-        // A closed body cannot constrain the surrounding BDD. Validate its declared domains as
-        // well as its explicit constraints before replacing it with a Boolean terminal.
-        if !support::is_closed(db, env, &mut storage, self.node, support) {
+        // A closed body cannot constrain the surrounding BDD. Declared-domain dependencies
+        // are included in free support when the constraints are constructed.
+        if storage.node_supports(self.node).is_none_or(|supports| {
+            !supports.free.is_complete() || supports.free.contains_more_than(support)
+        }) {
             return None;
         }
-        drop(storage);
-        match self.solutions(db, env, locals) {
-            Ok(Solutions::Unconstrained) => Some(true),
-            Ok(Solutions::Constrained(SolutionPaths::Complete(paths)))
-                if paths.iter().any(Solution::is_valid) =>
-            {
-                Some(true)
-            }
-            Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(_))) => Some(false),
-            // Incomplete solving is not evidence for either terminal.
-            _ => None,
-        }
+        let budget = SolutionBudget::default();
+        let limits = BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        };
+        let source_orders = storage.calculate_source_orders(self.source_order);
+        let mut walker =
+            SolutionWalker::new(db, &mut storage, source_orders, locals, limits, self.node);
+        // Incomplete solving is not evidence for either terminal.
+        walker
+            .has_valid_solution(db, env, &mut storage, self.node, self.source_order)
+            .continue_value()
     }
 
     #[expect(dead_code, reason = "XXX: to be removed")]
@@ -1141,7 +1133,7 @@ struct ConstraintSetStorage<'db> {
     /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
-    supports: IndexVec<SupportId, Support>,
+    supports: IndexVec<SupportId, ConstraintSupports>,
     constraint_supports: IndexVec<ConstraintId, SupportId>,
     node_supports: IndexVec<NodeId, SupportId>,
 
@@ -1332,30 +1324,122 @@ impl<'db> ConstraintSetStorage<'db> {
         id
     }
 
-    /// Interns all of the typevars mentioned in a type in a stable order.
-    fn intern_mentioned_typevars_in_type(
+    /// Collects occurrence, validation, and free-variable supports in one traversal.
+    fn intern_constraint_typevars(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-        support: &mut Support,
-    ) {
+        constraint: &Constraint<'db>,
+    ) -> ConstraintSupports {
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+        enum Source {
+            /// A type appearing directly in an atomic constraint.
+            Occurrence,
+            /// A typevar's declared upper bound or constraints.
+            Declaration,
+            /// An inner binder's definition; only its free captures escape to validation.
+            Definition,
+        }
+
+        type SeenTypes<'db> = FxHashMap<(Type<'db>, Source), SmallVec<[Support; 1]>>;
+
         struct AliasVisit<'db> {
             ty: Type<'db>,
-            support: Support,
+            source: Source,
+            supports: ConstraintSupports,
             specialization: Option<Specialization<'db>>,
-            recursion_guard: TypeCollector<'db>,
+            bound: Support,
+            seen: SeenTypes<'db>,
         }
 
         struct InternMentionedTypevars<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-            support: RefCell<&'a mut Support>,
+            supports: RefCell<ConstraintSupports>,
+            bound: RefCell<Support>,
+            source: Cell<Source>,
             aliases: RefCell<Vec<AliasVisit<'db>>>,
-            recursion_guard: TypeCollector<'db>,
+            seen: RefCell<SeenTypes<'db>>,
         }
 
         impl<'db> InternMentionedTypevars<'_, 'db> {
+            fn with_source(&self, source: Source, visit: impl FnOnce()) {
+                let previous = self.source.replace(source);
+                visit();
+                self.source.set(previous);
+            }
+
+            fn already_visited(&self, ty: Type<'db>) -> bool {
+                let mut aliases = self.aliases.borrow_mut();
+                let mut seen = self.seen.borrow_mut();
+                let seen = aliases
+                    .last_mut()
+                    .map_or(&mut *seen, |alias| &mut alias.seen);
+                let contexts = seen.entry((ty, self.source.get())).or_default();
+                let bound = self.bound.borrow();
+                // A revisit under additional binders cannot add a free dependency.
+                if contexts
+                    .iter()
+                    .any(|previous| !previous.contains_more_than(&bound))
+                {
+                    return true;
+                }
+                contexts.push(bound.clone());
+                false
+            }
+
+            fn visit_declaration(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) {
+                let Some(declaration) = typevar.typevar(db).bound_or_constraints(db, self.env)
+                else {
+                    return;
+                };
+                let id = self.storage.borrow_mut().intern_typevar(db, typevar);
+                if self.source.get() != Source::Definition || !self.bound.borrow().contains(id) {
+                    self.supports.borrow_mut().validation.insert(id);
+                }
+                let source = match self.source.get() {
+                    Source::Occurrence => Source::Declaration,
+                    source => source,
+                };
+                self.with_source(source, || match declaration {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => self.visit_type(db, bound),
+                    TypeVarBoundOrConstraints::Constraints(bounds) => {
+                        for bound in bounds.elements(db) {
+                            self.visit_type(db, *bound);
+                        }
+                    }
+                });
+            }
+
+            fn with_bound(
+                &self,
+                db: &'db dyn Db,
+                context: Option<GenericContext<'db>>,
+                visit: impl FnOnce(),
+            ) {
+                let previous = self.bound.borrow().clone();
+                let locals = {
+                    let mut storage = self.storage.borrow_mut();
+                    Support::from_typevars(
+                        context
+                            .into_iter()
+                            .flat_map(|context| context.variables(db))
+                            .map(|var| storage.intern_typevar(db, var)),
+                    )
+                };
+                *self.bound.borrow_mut() |= &locals;
+                // These declarations belong to an inner type's binder, rather than to the
+                // surrounding constraint's solution problem. Only their free captures escape.
+                self.with_source(Source::Definition, || {
+                    for local in (&locals - &previous).iter() {
+                        let var = self.storage.borrow().typevar_data(local);
+                        self.visit_declaration(db, var);
+                    }
+                });
+                visit();
+                self.bound.replace(previous);
+            }
+
             fn visit_alias(
                 &self,
                 db: &'db dyn Db,
@@ -1364,20 +1448,26 @@ impl<'db> ConstraintSetStorage<'db> {
                 body: Type<'db>,
             ) {
                 let mut aliases = self.aliases.borrow_mut();
-                let mut previous = aliases.iter().rev().filter(|alias| alias.ty == ty);
+                let mut previous = aliases.iter().rev().filter(|alias| {
+                    alias.ty == ty
+                        && alias.source == self.source.get()
+                        && alias.bound == *self.bound.borrow()
+                });
                 let latest = previous.next();
                 let earlier = previous.next();
                 if let (Some(earlier), Some(latest)) = (earlier, latest)
-                    && latest.support == earlier.support
+                    && latest.supports == earlier.supports
                 {
                     return;
                 }
                 let index = aliases.len();
                 aliases.push(AliasVisit {
                     ty,
-                    support: self.support.borrow().clone(),
+                    source: self.source.get(),
+                    supports: self.supports.borrow().clone(),
                     specialization,
-                    recursion_guard: TypeCollector::default(),
+                    bound: self.bound.borrow().clone(),
+                    seen: SeenTypes::default(),
                 });
                 drop(aliases);
                 self.visit_type(db, body);
@@ -1395,16 +1485,76 @@ impl<'db> ConstraintSetStorage<'db> {
             }
 
             fn notify_skipped_lazy_type_attributes(&self) {
-                self.support.borrow_mut().mark_incomplete();
+                let mut supports = self.supports.borrow_mut();
+                if self.source.get() == Source::Occurrence {
+                    supports.occurrences.mark_incomplete();
+                }
+                supports.validation.mark_incomplete();
+                supports.free.mark_incomplete();
             }
 
             fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                // Declaration bounds, constraints, and defaults are not occurrences in the
-                // constraint itself and must not contribute to its support.
+                // Bound occurrences below visit declared domains, but never typevar defaults.
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
                 walk_specialization_types(db, alias.specialization(db), self);
+            }
+
+            fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+                self.with_bound(db, signature.generic_context, || {
+                    walk_signature(db, signature, self);
+                });
+            }
+
+            fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+                self.visit_callable_type(db, function.into_callable_type(db));
+                if let Some(specialization) = function.class_specialization(db) {
+                    walk_specialization_types(db, specialization, self);
+                }
+            }
+
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                if let Some((class, specialization)) = protocol
+                    .class_origin(db)
+                    .and_then(|class| class.static_class_literal(db))
+                {
+                    if let Some(specialization) = specialization {
+                        walk_specialization_types(db, specialization, self);
+                    }
+                    let Some(origin) = class.into_protocol_class(db) else {
+                        self.notify_skipped_lazy_type_attributes();
+                        return;
+                    };
+                    if self.source.get() == Source::Occurrence {
+                        self.supports.borrow_mut().occurrences.mark_incomplete();
+                    }
+                    self.with_source(Source::Definition, || {
+                        self.with_bound(db, class.generic_context(db), || {
+                            // Walk the definition separately from its arguments. Dependencies
+                            // need not unfold an expanding sequence such as P[list[T]].
+                            if !self.already_visited(Type::ClassLiteral(class.into())) {
+                                walk_protocol_instance_interface(
+                                    db,
+                                    ProtocolInterfaceView::new(origin.interface(db), None),
+                                    Type::ProtocolInstance(protocol),
+                                    self,
+                                );
+                            }
+                        });
+                    });
+                } else {
+                    walk_protocol_instance_interface(
+                        db,
+                        protocol.interface(db),
+                        Type::ProtocolInstance(protocol),
+                        self,
+                    );
+                }
             }
 
             fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
@@ -1435,24 +1585,44 @@ impl<'db> ConstraintSetStorage<'db> {
                 if let Type::TypeVar(bound_typevar) = ty {
                     let alias = self.aliases.borrow_mut().pop();
                     if let Some(alias) = alias {
-                        // The raw definition retains formal parameters. Visit their arguments
-                        // in the caller's context so finite nesting like Alias[Alias[T]] does
-                        // not count as a recursive reference in Alias's definition.
+                        // Substitute in the caller's scope. Finite use-site nesting is not a
+                        // recursive reference in the alias definition.
                         let argument = alias
                             .specialization
-                            .and_then(|specialization| specialization.get(db, bound_typevar))
-                            .unwrap_or(ty);
-                        self.visit_type(db, argument);
+                            .and_then(|specialization| specialization.get(db, bound_typevar));
+                        let bound = argument.map(|_| self.bound.replace(alias.bound.clone()));
+                        self.visit_type(db, argument.unwrap_or(ty));
+                        if let Some(bound) = bound {
+                            self.bound.replace(bound);
+                        }
                         self.aliases.borrow_mut().push(alias);
                         return;
                     }
-                    let mut storage = self.storage.borrow_mut();
-                    let typevar = storage.intern_typevar(db, bound_typevar);
-                    let mut support = self.support.borrow_mut();
-                    support.insert(typevar);
+                    let id = self.storage.borrow_mut().intern_typevar(db, bound_typevar);
+                    let is_bound = self.bound.borrow().contains(id);
+                    {
+                        let mut supports = self.supports.borrow_mut();
+                        if self.source.get() == Source::Occurrence {
+                            supports.occurrences.insert(id);
+                        }
+                        if self.source.get() == Source::Declaration
+                            || (self.source.get() == Source::Definition && !is_bound)
+                        {
+                            supports.validation.insert(id);
+                        }
+                        if !is_bound {
+                            supports.free.insert(id);
+                        }
+                    }
+                    if !self.already_visited(ty) {
+                        self.visit_declaration(db, bound_typevar);
+                    }
+                    return;
                 }
-                // The usual recursion guard would also cut off alias revisits that have
-                // discovered additional type variables.
+                if ty.is_divergent() {
+                    self.notify_skipped_lazy_type_attributes();
+                    return;
+                }
                 match ty {
                     Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
                     Type::Recursive(recursive) => self.visit_recursive_type(db, recursive),
@@ -1460,15 +1630,7 @@ impl<'db> ConstraintSetStorage<'db> {
                         let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
                             return;
                         };
-                        // Release the stack borrow before walking: nested visits can change
-                        // the active alias frame.
-                        let already_seen = self
-                            .aliases
-                            .borrow()
-                            .last()
-                            .map_or(&self.recursion_guard, |alias| &alias.recursion_guard)
-                            .type_was_already_seen(ty);
-                        if !already_seen {
+                        if !self.already_visited(ty) {
                             walk_non_atomic_type(db, non_atomic, self);
                         }
                     }
@@ -1476,54 +1638,47 @@ impl<'db> ConstraintSetStorage<'db> {
             }
         }
 
-        InternMentionedTypevars {
+        let types = match constraint {
+            Constraint::Atomic(atomic) => match atomic {
+                AtomicConstraint::ConcreteLower(bound) => {
+                    [Type::TypeVar(bound.typevar), bound.bound]
+                }
+                AtomicConstraint::ConcreteUpper(bound) => {
+                    [Type::TypeVar(bound.typevar), bound.bound]
+                }
+                AtomicConstraint::ConcreteEquivalence(bound) => {
+                    [Type::TypeVar(bound.typevar), bound.bound]
+                }
+                AtomicConstraint::TypeVarRange(bound) => {
+                    [Type::TypeVar(bound.left), Type::TypeVar(bound.right)]
+                }
+                AtomicConstraint::TypeVarEquivalence(bound) => {
+                    [Type::TypeVar(bound.left), Type::TypeVar(bound.right)]
+                }
+            },
+            Constraint::Existential(existential) => {
+                let mut supports = self
+                    .node_supports(existential.body)
+                    .cloned()
+                    .unwrap_or_default();
+                supports.quantified |= &existential.locals;
+                supports.free = &supports.free - &existential.locals;
+                return supports;
+            }
+        };
+        let visitor = InternMentionedTypevars {
             env,
             storage: RefCell::new(self),
-            support: RefCell::new(support),
+            supports: RefCell::default(),
+            bound: RefCell::default(),
+            source: Cell::new(Source::Occurrence),
             aliases: RefCell::default(),
-            recursion_guard: TypeCollector::default(),
+            seen: RefCell::default(),
+        };
+        for ty in types {
+            visitor.visit_type(db, ty);
         }
-        .visit_type(db, ty);
-    }
-
-    /// Interns all of the typevars mentioned in a constraint in a stable order.
-    fn intern_constraint_typevars(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraint: &Constraint<'db>,
-    ) -> Support {
-        let mut support = Support::default();
-        match constraint {
-            Constraint::Atomic(AtomicConstraint::ConcreteLower(constraint)) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
-            Constraint::Atomic(AtomicConstraint::ConcreteUpper(constraint)) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
-            Constraint::Atomic(AtomicConstraint::ConcreteEquivalence(constraint)) => {
-                support.insert(self.intern_typevar(db, constraint.typevar));
-                self.intern_mentioned_typevars_in_type(db, env, constraint.bound, &mut support);
-            }
-            Constraint::Atomic(AtomicConstraint::TypeVarRange(constraint)) => {
-                support.insert(self.intern_typevar(db, constraint.left));
-                support.insert(self.intern_typevar(db, constraint.right));
-            }
-            Constraint::Atomic(AtomicConstraint::TypeVarEquivalence(constraint)) => {
-                support.insert(self.intern_typevar(db, constraint.left));
-                support.insert(self.intern_typevar(db, constraint.right));
-            }
-            Constraint::Existential(existential) => {
-                // The body of an existential is stored in `storage`, and will have already been
-                // interned. And locals only have to be interned if they are mentioned in the body.
-                // All we have to do is update `support` to include the existential's (already
-                // calculated) support.
-                support |= self.node_support(existential.body);
-            }
-        }
-        support
+        visitor.supports.into_inner()
     }
 
     fn intern_constraint(
@@ -1561,11 +1716,12 @@ impl<'db> ConstraintSetStorage<'db> {
             return *id;
         }
 
-        let mut support = Support::default();
-        support |= self.constraint_support(data.constraint);
-        support |= self.node_support(data.if_true);
-        support |= self.node_support(data.if_uncertain);
-        support |= self.node_support(data.if_false);
+        let mut support = self
+            .support_data(self.constraint_support_id(data.constraint))
+            .clone();
+        support |= self.node_supports(data.if_true);
+        support |= self.node_supports(data.if_uncertain);
+        support |= self.node_supports(data.if_false);
         let support = self.intern_support(support);
 
         let id = self.nodes.push(data);
@@ -1714,7 +1870,7 @@ impl<'db> ConstraintSetStorage<'db> {
         result
     }
 
-    fn intern_support(&mut self, data: Support) -> SupportId {
+    fn intern_support(&mut self, data: ConstraintSupports) -> SupportId {
         let id = self.supports.push(data);
         self.adjusted_support_id(id)
     }
@@ -1731,7 +1887,7 @@ impl<'db> ConstraintSetStorage<'db> {
         self.typevars[typevar]
     }
 
-    fn support_data(&self, support: SupportId) -> &Support {
+    fn support_data(&self, support: SupportId) -> &ConstraintSupports {
         if let Some(compacted) = &self.compacted {
             let index = support.index();
             let split = compacted.support_indices.len();
@@ -1758,7 +1914,9 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn constraint_support(&self, constraint: ConstraintId) -> &Support {
-        self.support_data(self.constraint_support_id(constraint))
+        &self
+            .support_data(self.constraint_support_id(constraint))
+            .occurrences
     }
 
     fn constraint_mentions_typevars(
@@ -1789,6 +1947,11 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn node_support(&self, node: NodeId) -> Option<&Support> {
+        self.node_supports(node)
+            .map(|supports| &supports.occurrences)
+    }
+
+    fn node_supports(&self, node: NodeId) -> Option<&ConstraintSupports> {
         self.node_support_id(node)
             .map(|support| self.support_data(support))
     }
@@ -1916,7 +2079,12 @@ impl<'db> ConstraintSetStorage<'db> {
         // Keep existing destination IDs, and omit typevars used only by discarded constraints.
         let mut referenced_typevars = Support::default();
         for support in &inner.constraint_supports {
-            referenced_typevars |= &inner.supports[inner.retained_support_index(*support)];
+            referenced_typevars |=
+                &inner.supports[inner.retained_support_index(*support)].occurrences;
+            referenced_typevars |=
+                &inner.supports[inner.retained_support_index(*support)].validation;
+            referenced_typevars |=
+                &inner.supports[inner.retained_support_index(*support)].quantified;
         }
         for typevar in referenced_typevars.iter() {
             self.intern_typevar(db, inner.typevars[typevar]);
@@ -3868,7 +4036,9 @@ impl<'db> CandidateSolutions<'db> {
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let mut path = node.path_assignments(db, env, storage, source_order);
-        let node_support = storage.node_support(node).cloned();
+        let node_support = storage
+            .node_supports(node)
+            .map(|supports| supports.validation.clone());
         walker.visit_node(
             db,
             env,
@@ -5245,7 +5415,9 @@ mod tests {
             t,
             actual_bound,
         ));
-        let support = storage.intern_constraint_typevars(db, &env, &data.into());
+        let support = storage
+            .intern_constraint_typevars(db, &env, &data.into())
+            .occurrences;
         let mentioned = support
             .iter()
             .map(|typevar| storage.typevar_data(typevar))
@@ -5307,7 +5479,9 @@ mod tests {
                 t,
                 u,
             ));
-            let support = storage.intern_constraint_typevars(db, &env, &data.into());
+            let support = storage
+                .intern_constraint_typevars(db, &env, &data.into())
+                .occurrences;
             let mentioned = support
                 .iter()
                 .map(|typevar| storage.typevar_data(typevar))
@@ -5321,7 +5495,7 @@ mod tests {
     #[test]
     fn validity_closes_over_typevars_in_declared_upper_bounds() {
         // Both evidence paths violate `T ≤ U ≤ int`. `U` occurs only in `T`'s declared upper bound,
-        // so rejecting them requires validity traversal to add `U` to its worklist.
+        // so rejecting them requires including the transitive declaration dependency on `U`.
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();

@@ -130,7 +130,7 @@ impl OwnedConstraintSetBuilder {
                 // typevars that are used in the BDD, we don't have to include it in the compacted
                 // source_order list.
                 let constraint_support_id = storage.constraint_support_id(constraint.into_inner());
-                let constraint_support = storage.support_data(constraint_support_id);
+                let constraint_support = &storage.support_data(constraint_support_id).occurrences;
                 if !self.used_constraints[constraint.index()]
                     && let Some(live_support) = self.live_support.as_ref()
                     && live_support.is_complete()
