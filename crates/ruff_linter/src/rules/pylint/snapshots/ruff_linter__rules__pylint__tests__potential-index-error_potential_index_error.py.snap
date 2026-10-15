@@ -40,3 +40,11 @@ PLE0643 Expression is likely to raise `IndexError`
 5 |
 6 | print([1, 2, 3][2])  # OK
   |
+
+PLE0643 Expression is likely to raise `IndexError`
+  --> potential_index_error.py:16:14
+   |
+14 | print((*a, 9)[2])  # OK
+15 | print([*a, *a][2])  # OK
+16 | print((1, 2)[2])  # PLE0643
+   |              ^

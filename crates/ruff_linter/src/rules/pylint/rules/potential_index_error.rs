@@ -35,6 +35,11 @@ pub(crate) fn potential_index_error(checker: &Checker, value: &Expr, slice: &Exp
     // Determine the length of the sequence.
     let length = match value {
         Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            // A starred element expands to an unknown number of items, so the
+            // literal's length cannot be determined statically.
+            if elts.iter().any(Expr::is_starred_expr) {
+                return;
+            }
             match i64::try_from(elts.len()) {
                 Ok(length) => length,
                 Err(_) => return,

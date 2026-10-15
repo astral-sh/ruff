@@ -7,3 +7,10 @@ print([1, 2, 3][2])  # OK
 print([1, 2, 3][0])  # OK
 print([1, 2, 3][-3])  # OK
 print([1, 2, 3][3:])  # OK
+
+# A starred element has unknown length, so the subscript is not checked.
+a = (1, 2, 3)
+print((*a, 9)[1])  # OK
+print((*a, 9)[2])  # OK
+print([*a, *a][2])  # OK
+print((1, 2)[2])  # PLE0643
