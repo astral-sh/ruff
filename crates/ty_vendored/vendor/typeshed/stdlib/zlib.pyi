@@ -17,7 +17,7 @@ objects support decompress() and flush().
 
 import sys
 from _typeshed import ReadableBuffer
-from typing import Any, Final, final, type_check_only
+from typing import Any, Final, SupportsIndex, final, type_check_only
 from typing_extensions import Self
 
 DEFLATED: Final = 8
@@ -75,7 +75,7 @@ class _Decompress:
     def flush(self, length: int = 16384, /) -> bytes: ...
     def copy(self) -> _Decompress: ...
 
-def adler32(data: ReadableBuffer, value: int = 1, /) -> int:
+def adler32(data: ReadableBuffer, value: SupportsIndex = 1, /) -> int:
     """Compute an Adler-32 checksum of data.
 
       value
@@ -150,7 +150,7 @@ def compressobj(
       containing subsequences that are likely to occur in the input data.
     """
 
-def crc32(data: ReadableBuffer, value: int = 0, /) -> int:
+def crc32(data: ReadableBuffer, value: SupportsIndex = 0, /) -> int:
     """Compute a CRC-32 checksum of data.
 
       value
