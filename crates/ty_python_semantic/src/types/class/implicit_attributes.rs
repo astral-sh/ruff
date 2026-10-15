@@ -2,8 +2,7 @@
 
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
 use crate::{
-    Db, ProgramEnvironment, TypeOperations, TypeQualifiers, attribute_assignments,
-    attribute_declarations,
+    Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
     reachability::binding_reachability,
     types::{
@@ -106,7 +105,10 @@ impl<'db> StaticClassLiteral<'db> {
         let target_method_decorator = attribute.target_method_decorator(db);
         let program_file = class_body_scope.program_file(db);
         let python_file = program_file.python_file(db);
-        let env = &TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
+        let env = &crate::types::TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_file(program_file),
+        );
 
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
@@ -332,7 +334,7 @@ impl<'db> StaticClassLiteral<'db> {
 /// directly. Augmented assignments first require an existing instance or class attribute to supply
 /// the value they read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ImplicitAttribute<'db> {
+pub(crate) struct ImplicitAttribute<'db> {
     /// The attribute established by assignments that do not depend on an existing value.
     pub(super) member: Member<'db>,
     /// Augmented assignments that require an existing instance or class attribute.
@@ -350,7 +352,7 @@ pub(super) struct AugmentedBindings<'db> {
 impl get_size2::GetSize for AugmentedBindings<'_> {}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-struct ImplicitAttributeName<'db> {
+pub(crate) struct ImplicitAttributeName<'db> {
     #[returns(copy)]
     class_body_scope: ScopeId<'db>,
     #[returns(ref)]
@@ -370,7 +372,8 @@ fn implicit_attribute_binding_type<'db>(
     let program_file = definition.program_file(db);
     let module = parsed_module(db, program_file.python_file(db)).load(db);
     let index = semantic_index(db, program_file);
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
+    let env =
+        crate::types::TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
 
     match definition.kind(db) {
         DefinitionKind::AnnotatedAssignment(_) => {
@@ -488,7 +491,7 @@ fn implicit_attribute_cycle_recover<'db>(
     attribute_member: ImplicitAttribute<'db>,
     attribute: ImplicitAttributeName<'db>,
 ) -> ImplicitAttribute<'db> {
-    let env = TypeOperations::new_root(
+    let env = crate::types::TypeOperations::new_root(
         db,
         ProgramEnvironment::from_scope(attribute.class_body_scope(db)),
     );

@@ -1,8 +1,9 @@
 use crate::Db;
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
-use crate::{ProgramEnvironment, TypeOperations};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
@@ -55,11 +56,16 @@ impl<'db> NewType<'db> {
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
-            db,
-            &TypeOperations::new_root(db, ProgramEnvironment::from_definition(self_.definition(db))),
-        )),
-        heap_size=ruff_memory_usage::heap_size
+        cycle_initial = |db, _, self_: NewType<'db>| {
+            NewTypeBase::ClassType(ClassType::object(
+                db,
+                &TypeOperations::new_root(
+                    db,
+                    ProgramEnvironment::from_definition(self_.definition(db)),
+                ),
+            ))
+        },
+        heap_size = ruff_memory_usage::heap_size,
     )]
     fn lazy_base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         // `TypeInferenceBuilder` emits diagnostics for invalid `NewType` definitions that show up
@@ -108,17 +114,12 @@ impl<'db> NewType<'db> {
 
     // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
     // one if this `NewType` is cyclical, and we fall back to `object` in that case.
-    pub fn concrete_base_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub fn concrete_base_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_definition(self.definition(db)));
         for base in self.iter_bases(db) {
             match base {
                 NewTypeBase::NewType(_) => continue,
-                concrete => {
-                    let env = TypeOperations::new_root(
-                        db,
-                        ProgramEnvironment::from_definition(self.definition(db)),
-                    );
-                    return concrete.instance_type(db, &env);
-                }
+                concrete => return concrete.instance_type(db, &env),
             }
         }
         Type::object()

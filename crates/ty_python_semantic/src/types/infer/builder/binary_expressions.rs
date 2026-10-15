@@ -1,5 +1,6 @@
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeVisitorKey;
 use compact_str::CompactString;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -25,14 +26,40 @@ enum BinaryExpressionOperandTypes<'db> {
     TypedDictResult(Type<'db>),
 }
 
-type BinaryExpressionVisitor<'env, 'db> = TypeVisitorState<
-    'env,
-    'db,
-    ast::Operator,
-    (Type<'db>, ast::Operator, Type<'db>),
-    Option<Type<'db>>,
-    1,
->;
+type BinaryExpressionVisitor<'env, 'db> =
+    TypeVisitorState<'env, 'db, (Type<'db>, ast::Operator, Type<'db>), Option<Type<'db>>>;
+
+/// The inference state borrowed while an alias supplies one binary operand.
+pub(in crate::types) struct BinaryOperand<'a, 'db, 'ast> {
+    builder: &'a mut TypeInferenceBuilder<'db, 'ast>,
+    node: AnyNodeRef<'a>,
+    other: OtherOperand<'db>,
+    op: ast::Operator,
+    visitor: &'a BinaryExpressionVisitor<'a, 'db>,
+    state: &'a mut BinaryInferenceState<'db>,
+}
+
+enum OtherOperand<'db> {
+    Left(Type<'db>),
+    Right(Type<'db>),
+}
+
+impl<'db> BinaryOperand<'_, 'db, '_> {
+    pub(in crate::types) fn infer(self, expanded: Type<'db>) -> Option<Type<'db>> {
+        let (left, right) = match self.other {
+            OtherOperand::Left(left) => (left, expanded),
+            OtherOperand::Right(right) => (expanded, right),
+        };
+        self.builder.infer_binary_expression_type_impl(
+            self.node,
+            left,
+            right,
+            self.op,
+            self.visitor,
+            self.state,
+        )
+    }
+}
 
 fn is_union_type_operand(ty: Type<'_>) -> bool {
     matches!(
@@ -229,6 +256,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             UnionTypeInstance::from_value_expression_types(
                 db,
+                env,
                 [left_ty, right_ty],
                 self.scope(),
                 self.typevar_binding_context,
@@ -279,7 +307,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Type::TypedDict(typed_dict) = right_ty
                 && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                     left,
-                    typed_dict.to_partial(db),
+                    typed_dict.to_partial(db, self.context.program_environment()),
                     typed_dict,
                     "__ror__",
                 )
@@ -301,7 +329,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
-                typed_dict.to_partial(db),
+                typed_dict.to_partial(db, self.context.program_environment()),
                 typed_dict,
                 "__or__",
             )
@@ -377,7 +405,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // Subset updates use the mutation-safe patch as context.
-        let update_patch = typed_dict.to_update_patch(db);
+        let update_patch = typed_dict.to_update_patch(db, self.context.program_environment());
         if self
             .try_typed_dict_pep_584_dunder(value_expr, update_patch, typed_dict, "__ior__")
             .is_some()
@@ -461,7 +489,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             left_ty,
             right_ty,
             op,
-            &BinaryExpressionVisitor::new(self.program_environment(), Some(Type::Never)),
+            &BinaryExpressionVisitor::new(
+                self.program_environment(),
+                TypeVisitorKey::BinaryExpression,
+                Some(Type::Never),
+            ),
             state,
         )?;
         Some(state.limit_tuple_addition_result(self.db(), self.program_environment(), result))
@@ -528,38 +560,56 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::Recursive(recursive), rhs, _) => {
                 visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
                     let unfolded = expansion.expand_recursive(db, recursive).into_unfolded()?;
-                    self.infer_binary_expression_type_impl(node, unfolded, rhs, op, visitor, state)
+                    unfolded.infer_binary(BinaryOperand {
+                        builder: self,
+                        node,
+                        other: OtherOperand::Right(rhs),
+                        op,
+                        visitor,
+                        state,
+                    })
                 })
             }
 
             (lhs, Type::Recursive(recursive), _) => {
                 visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
                     let unfolded = expansion.expand_recursive(db, recursive).into_unfolded()?;
-                    self.infer_binary_expression_type_impl(node, lhs, unfolded, op, visitor, state)
+                    unfolded.infer_binary(BinaryOperand {
+                        builder: self,
+                        node,
+                        other: OtherOperand::Left(lhs),
+                        op,
+                        visitor,
+                        state,
+                    })
                 })
             }
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
-                    state,
-                )
-            }),
+            (Type::TypeAlias(alias), rhs, _) => {
+                visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
+                    expansion.alias_body(db, alias).infer_binary(BinaryOperand {
+                        builder: self,
+                        node,
+                        other: OtherOperand::Right(rhs),
+                        op,
+                        visitor,
+                        state,
+                    })
+                })
+            }
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit(db, (left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
-                    state,
-                )
-            }),
+            (lhs, Type::TypeAlias(alias), _) => {
+                visitor.visit_with_expansion(db, (left_ty, op, right_ty), |expansion| {
+                    expansion.alias_body(db, alias).infer_binary(BinaryOperand {
+                        builder: self,
+                        node,
+                        other: OtherOperand::Left(lhs),
+                        op,
+                        visitor,
+                        state,
+                    })
+                })
+            }
 
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, env, Type::TypedDict(left_typed_dict)) =>
@@ -703,7 +753,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
-                        newtype.concrete_base_type(db),
+                        newtype.concrete_base_type(db, env),
                         rhs,
                         op,
                         visitor,
@@ -716,7 +766,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_binary_expression_type_impl(
                         node,
                         lhs,
-                        newtype.concrete_base_type(db),
+                        newtype.concrete_base_type(db, env),
                         op,
                         visitor,
                         state,
@@ -1102,6 +1152,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     Some(UnionTypeInstance::from_value_expression_types(
                         db,
+                        env,
                         [left_ty, right_ty],
                         self.scope(),
                         self.typevar_binding_context,
@@ -1115,6 +1166,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
+                    env,
                     [left_ty, right_ty],
                     self.scope(),
                     self.typevar_binding_context,

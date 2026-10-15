@@ -40,7 +40,7 @@ pub fn prepare_type_hierarchy(
     let ty = goto_target.inferred_type(&model)?;
 
     let env = model.program_environment();
-    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, env, ty)?;
+    let hierarchy_class = ty_python_semantic::type_hierarchy_prepare(db, &env, ty)?;
     Some(type_hierarchy_class_to_item(db, hierarchy_class))
 }
 
@@ -53,9 +53,7 @@ pub fn type_hierarchy_supertypes(
     let Some(ty) = resolve_type_at(db, file, offset) else {
         return vec![];
     };
-    let env = ty_python_semantic::SemanticModel::new(db, file)
-        .program_environment()
-        .clone();
+    let env = ty_python_semantic::SemanticModel::new(db, file).program_environment();
     ty_python_semantic::type_hierarchy_supertypes(db, &env, ty)
         .into_iter()
         .map(|c| type_hierarchy_class_to_item(db, c))
@@ -77,9 +75,7 @@ pub fn type_hierarchy_subtypes(
     ty_module_resolver::all_modules(db, file.resolver_environment(db))
         .into_par_iter()
         .map_with_db(db, |db, module| {
-            let env = ty_python_semantic::SemanticModel::new(db, file)
-                .program_environment()
-                .clone();
+            let env = ty_python_semantic::SemanticModel::new(db, file).program_environment();
             ty_python_semantic::type_hierarchy_subtypes(db, &env, ty, &[module])
                 .into_iter()
                 .map(|class| type_hierarchy_class_to_item(db, class))

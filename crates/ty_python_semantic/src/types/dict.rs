@@ -1,7 +1,8 @@
+use crate::types::TypeOperations;
 use ruff_python_ast as ast;
 
+use crate::Db;
 use crate::types::{Type, UnionBuilder};
-use crate::{Db, TypeOperations};
 
 /// Recover the key and value types of an immediately consumed dictionary literal, without
 /// promoting its elements. The dictionary and its elements must already have been inferred:

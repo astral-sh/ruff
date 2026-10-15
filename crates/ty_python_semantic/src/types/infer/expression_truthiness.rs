@@ -1,9 +1,10 @@
 //! Truthiness of already-inferred expressions, including paths that cannot produce a value.
 
+use crate::types::TypeOperations;
 use ruff_python_ast as ast;
 use ty_python_core::{Truthiness, expression::ExpressionContext};
 
-use crate::{Db, TypeOperations, types::Type};
+use crate::{Db, types::Type};
 
 /// Determine whether an expression can finish evaluating and which boolean outcomes it can produce.
 ///

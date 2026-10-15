@@ -43,8 +43,10 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
-use crate::{ProgramEnvironment, TypeOperations};
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -65,8 +67,10 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use builder::TypeInferenceBuilder;
+pub(super) use builder::TypeInferenceBuilder;
+pub(super) use builder::binary_expressions::BinaryOperand;
 pub(super) use comparisons::UnsupportedComparisonError;
+pub(super) use comparisons::{IdentityUpcast, IdentityUpcastResult};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
@@ -108,21 +112,39 @@ pub(super) struct CyclicTypeAliasError<'db> {
 /// which recursive references remain in the recovered type.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        ImplicitAliasInference {
-            ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
-            diagnostics: TypeCheckDiagnostics::default(),
-            implicit_aliases: Box::default(),
-        }
-    },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
-        result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
-            fallback_type: recover(error.fallback_type),
-        });
+    cycle_initial =
+        |db,
+         id,
+         definition: Definition<'db>,
+         parameters: Option<crate::types::GenericContext<'db>>| {
+            ImplicitAliasInference {
+                ty: Ok(Type::Recursive(RecursiveType::initial(
+                    db, definition, id, parameters,
+                ))),
+                diagnostics: TypeCheckDiagnostics::default(),
+                implicit_aliases: Box::default(),
+            }
+        },
+    cycle_fn = |db,
+                cycle: &salsa::Cycle,
+                _: &ImplicitAliasInference<'db>,
+                result: ImplicitAliasInference<'db>,
+                definition: Definition<'db>,
+                parameters: Option<crate::types::GenericContext<'db>>| {
+        let mut result = result;
+
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
+        let recover =
+            |ty| RecursiveType::recover(db, &env, definition, cycle.id(), parameters, ty);
+        result.ty = result
+            .ty
+            .map(recover)
+            .map_err(|error| CyclicTypeAliasError {
+                fallback_type: recover(error.fallback_type),
+            });
         result
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 pub(super) fn infer_implicit_alias_type<'db>(
     db: &'db dyn Db,
@@ -159,7 +181,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
 /// checking collects each referenced alias once, so recursive aliases cannot accumulate each
 /// other's diagnostics during fixed-point iteration.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ImplicitAliasInference<'db> {
+pub(crate) struct ImplicitAliasInference<'db> {
     pub(super) ty: ImplicitAliasResult<'db>,
     pub(super) diagnostics: TypeCheckDiagnostics,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
@@ -528,7 +550,7 @@ pub(crate) fn infer_scope_types<'db>(
         let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         inference.cycle_normalized(db, &env, previous, cycle)
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 pub(crate) fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
@@ -580,7 +602,7 @@ pub(crate) fn infer_expression_types<'db>(
         let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(expression.scope(db)));
         inference.cycle_normalized(db, &env, previous, cycle)
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
@@ -696,14 +718,21 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
+    cycle_initial = |db, id, statement: StatementInner<'db>| {
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
-    cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(statement.program_file(db)));
+    cycle_fn = |db,
+                cycle,
+                previous: &StatementInferenceInner<'db>,
+                inference: StatementInferenceInner<'db>,
+                statement: StatementInner<'db>| {
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_file(statement.program_file(db)),
+        );
         inference.cycle_normalized(db, &env, previous, cycle)
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 fn infer_statement_types_impl<'db>(
     db: &'db dyn Db,
@@ -741,13 +770,13 @@ fn infer_statement_types_impl<'db>(
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
 /// interning an `ExpressionWithContext` unnecessarily when no type context is provided.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype)]
-pub(super) enum InferExpression<'db> {
+pub(crate) enum InferExpression<'db> {
     Bare(Expression<'db>),
     WithContext(ExpressionWithContext<'db>),
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ExpressionWithContext<'db> {
+pub(crate) struct ExpressionWithContext<'db> {
     #[returns(copy)]
     expression: Expression<'db>,
     #[returns(copy)]
@@ -780,13 +809,13 @@ impl<'db> InferExpression<'db> {
 
 /// A `ScopeId` with an optional `TypeContext`.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype)]
-pub(super) enum InferScope<'db> {
+pub(crate) enum InferScope<'db> {
     Bare(ScopeId<'db>),
     WithContext(ScopeWithContext<'db>),
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ScopeWithContext<'db> {
+pub(crate) struct ScopeWithContext<'db> {
     #[returns(copy)]
     scope: ScopeId<'db>,
     #[returns(copy)]
@@ -891,31 +920,14 @@ impl<'db> TypeContext<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Option<Cow<'db, [Type<'db>]>> {
-        fn targets<'db>(
-            db: &'db dyn Db,
-            inspector: &TypeInspector<'_, 'db>,
-            ty: Type<'db>,
-        ) -> Option<Cow<'db, [Type<'db>]>> {
+        TypeInspector::scope(env, TypeInspectionKey::NarrowTargets, |inspector| {
             inspector.inspect_normalized(
                 db,
-                ty,
+                self.annotation?,
                 |_, _| None,
-                |inspector, normalized| {
-                    match normalized.ty {
-                        Type::Union(union) => Some(Cow::Borrowed(union.elements(db))),
-                        // A union can collapse to one alternative. Use the resolved context
-                        // instead of retrying inference with the original aliases.
-                        ty if normalized.was_union => Some(Cow::Owned(vec![ty])),
-                        Type::NewTypeInstance(newtype) => {
-                            targets(db, inspector, newtype.concrete_base_type(db))
-                        }
-                        _ => None,
-                    }
-                },
+                |inspector, normalized| normalized.narrow_targets(db, inspector),
             )
-        }
-        // Trying the power set of these alternatives would require exponentially many attempts.
-        TypeInspector::scope(env, |inspector| targets(db, inspector, self.annotation?))
+        })
     }
 }
 
@@ -938,7 +950,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
         let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(unpack.program_file(db)));
         result.cycle_normalized(db, &env, previous, cycle)
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
     let program_file = unpack.program_file(db);
@@ -1681,7 +1693,7 @@ impl<'db> DefinitionInference<'db> {
             }
         }
 
-        Self {
+        DefinitionInference {
             expressions: FrozenMap::default(),
             types,
             #[cfg(debug_assertions)]
@@ -2506,3 +2518,15 @@ impl InferenceFlags {
         }
     }
 }
+
+pub(super) use builder::{ContextualLambda, TransparentCallableReturn};
+
+pub(super) use builder::OverloadInconsistency;
+
+pub(super) use comparisons::{BinaryComparisonOperand, upcast_partial_body};
+
+pub(super) use builder::SubscriptAssignment;
+
+pub(super) use builder::ConditionKind;
+
+pub(super) use builder::{ClassBindingUpdate, ClassMethodVarianceCheck};

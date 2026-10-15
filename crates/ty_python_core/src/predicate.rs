@@ -232,7 +232,7 @@ pub struct SubjectElementPatternPredicate<'db> {
 }
 
 /// Structural details for sequence patterns that affect narrowing and reachability.
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SequencePatternPredicateKind<'db> {
     pub patterns: Box<[PatternPredicateKind<'db>]>,
 }
@@ -258,7 +258,7 @@ impl<'db> SequencePatternPredicateKind<'db> {
 }
 
 /// Structural details for a class pattern.
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ClassPatternPredicateKind<'db> {
     pub class: Expression<'db>,
     pub positional: Box<[PatternPredicateKind<'db>]>,
@@ -271,14 +271,14 @@ impl ClassPatternPredicateKind<'_> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ClassPatternKeywordPredicateKind<'db> {
     pub attr: Name,
     pub pattern: PatternPredicateKind<'db>,
 }
 
 /// Structural details for a mapping pattern.
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingPatternPredicateKind<'db> {
     pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
     pub rest: Option<Name>,
@@ -290,7 +290,7 @@ impl MappingPatternPredicateKind<'_> {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingPatternEntryPredicateKind<'db> {
     pub key: Expression<'db>,
     pub pattern: PatternPredicateKind<'db>,
@@ -298,7 +298,7 @@ pub struct MappingPatternEntryPredicateKind<'db> {
 
 /// Pattern structure used for type narrowing, static reachability, and inferring the types of
 /// names bound by a successful match.
-#[derive(Debug, Clone, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),

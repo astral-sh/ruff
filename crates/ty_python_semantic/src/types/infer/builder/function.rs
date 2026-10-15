@@ -1,7 +1,10 @@
+use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
+use crate::types::recursive::TypeQueryVisit;
+use crate::types::recursive::{TypeInspectionKey, TypeQueryKey};
 use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::{
-    Db, DisplaySettings, FxIndexMap, ProgramEnvironment, TypeOperations,
+    Db, DisplaySettings, FxIndexMap, ProgramEnvironment,
     reachability::is_end_of_scope_reachable,
     types::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
@@ -157,18 +160,23 @@ struct ExpectedReturnType<'db> {
 
 impl<'db> ExpectedReturnType<'db> {
     /// Creates the expected return type policy for `function`.
-    fn from_function(db: &'db dyn Db, function: FunctionType<'db>) -> Self {
+    fn from_function(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        function: FunctionType<'db>,
+    ) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
         fn normalize<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Type<'db> {
-            if ty.has_outer_type(db, |ty| matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_))) {
+            if ty.has_outer_type(db, env, |ty| {
+                matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_))
+            }) {
                 KnownClass::Bool.to_instance(db, env)
             } else {
                 ty
             }
         }
 
-        let env =
-            TypeOperations::new_root(db, ProgramEnvironment::from_file(function.program_file(db)));
+        let env = env.in_environment(ProgramEnvironment::from_file(function.program_file(db)));
         let public = normalize(
             db,
             &env,
@@ -262,7 +270,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
-            let expected_return = ExpectedReturnType::from_function(db, enclosing_function);
+            let expected_return = ExpectedReturnType::from_function(db, env, enclosing_function);
             let expected_ty = expected_return.public();
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
@@ -591,7 +599,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let current_scope = self.scope().file_scope_id(db);
             for type_param in type_params.iter() {
                 let param_name = type_param.name();
-                for enclosing in enclosing_generic_contexts(self.db(), self.index, current_scope) {
+                for enclosing in enclosing_generic_contexts(
+                    self.db(),
+                    self.program_environment(),
+                    self.index,
+                    current_scope,
+                ) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
                         let kind = match type_param {
                             ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
@@ -632,36 +645,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         db,
                         ty,
                         |_, _| None,
-                        |inspector, ty| match ty {
-                            Type::Union(union) => {
-                                union.try_map(db, inspector.environment(), |ty| {
-                                    wrap(db, inspector, *ty, kind)
-                                })
-                            }
-                            Type::FunctionLiteral(function)
-                                if function.callable_type_kind(db)
-                                    == CallableTypeKind::FunctionLike
-                                    || function.callable_type_kind(db) == kind =>
-                            {
-                                Some(Type::FunctionLiteral(
-                                    function.with_descriptor_kind(db, kind),
-                                ))
-                            }
-                            Type::Callable(callable)
-                                if matches!(
-                                    callable.kind(db),
-                                    CallableTypeKind::Regular | CallableTypeKind::FunctionLike
-                                ) || callable.kind(db) == kind =>
-                            {
-                                Some(Type::Callable(callable.with_kind(db, kind)))
-                            }
-                            _ => None,
-                        },
+                        |inspector, ty| ty.wrap_descriptor(db, inspector, kind),
                     )
                 }
-                let wrapped = TypeInspector::scope(self.program_environment(), |inspector| {
-                    wrap(db, inspector, inferred_ty, kind)
-                });
+                let wrapped = TypeInspector::scope(
+                    self.program_environment(),
+                    TypeInspectionKey::InferFunctionDefinition(definition),
+                    |inspector| wrap(db, inspector, inferred_ty, kind),
+                );
                 if let Some(wrapped) = wrapped {
                     inferred_ty = wrapped;
                     continue;
@@ -1347,7 +1338,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class_definition = self.index.expect_single_definition(class);
         let class_literal = original_class_type(db, class_definition)?;
-        let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
+        let typing_self = typing_self(
+            db,
+            env,
+            self.scope(),
+            Some(method_definition),
+            class_literal,
+        );
         match receiver_kind {
             MethodReceiverKind::Class => typing_self.map(|typing_self| {
                 SubclassOfType::from(db, env, SubclassOfInner::TypeVar(typing_self))
@@ -1540,12 +1537,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
-        let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
-            // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
+        let mut parameters = callable.parameter_lists(db);
+        let first = parameters.next()?;
+        if parameters.next().is_some() {
             return None;
-        };
-
-        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
+        }
+        let parameter_type = first.as_slice().get(index as usize)?.annotated_type();
         (!parameter_type.has_provisional_marker(db, self.program_environment()))
             .then_some(parameter_type)
     }
@@ -1932,7 +1929,7 @@ impl KnownFunction {
                 };
                 let env = builder.program_environment();
                 let Some(protocol_class) = param_type
-                    .to_class_type(db)
+                    .to_class_type(db, env)
                     .and_then(|class| class.into_protocol_class(db))
                 else {
                     report_bad_argument_to_protocol_interface(
@@ -1953,7 +1950,7 @@ impl KnownFunction {
                     );
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
-                        protocol_class.interface(db).display(db, env)
+                        protocol_class.interface(db, env).display(db, env)
                     )));
                 }
             }
@@ -2020,12 +2017,12 @@ impl KnownFunction {
                         env,
                         classes
                             .iter()
-                            .flat_map(|class| class.iter_mro(db))
+                            .flat_map(|class| class.iter_mro(db, env))
                             .filter_map(ClassBase::into_class),
                     );
                     for (i, class) in classes.iter().enumerate() {
                         message.push('(');
-                        for class in class.iter_mro(db) {
+                        for class in class.iter_mro(db, env) {
                             message.push_str(
                                 &class
                                     .display_with(db, env, display_settings.clone())
@@ -2150,7 +2147,7 @@ impl KnownFunction {
                     _ => return,
                 };
 
-                if !class.has_ordering_method_in_mro(db) {
+                if !class.has_ordering_method_in_mro(db, builder.program_environment()) {
                     report_invalid_total_ordering_call(
                         &builder.context,
                         class.class_literal(db),
@@ -2208,7 +2205,9 @@ fn check_classinfo_in_isinstance<'db>(
                         function,
                     );
                 } else if function == KnownFunction::IsSubclass {
-                    let non_method_members = protocol_class.interface(db).non_method_members(db);
+                    let non_method_members = protocol_class
+                        .interface(db, context.program_environment())
+                        .non_method_members(db);
                     if !non_method_members.is_empty() {
                         report_issubclass_check_against_protocol_with_non_method_members(
                             context,
@@ -2292,11 +2291,15 @@ fn is_instance_tuple_exhaustive<'db>(
 struct InstanceTupleCovers<'a, 'db>(&'a TupleSpec<'db>);
 
 impl<'db> TypeQuery<'db> for InstanceTupleCovers<'_, 'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::InstanceTupleCovers(self.0.clone())
+    }
+
     type Output = bool;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _state: (),
@@ -2307,7 +2310,7 @@ impl<'db> TypeQuery<'db> for InstanceTupleCovers<'_, 'db> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> bool {
@@ -2354,11 +2357,15 @@ fn is_instance_truthiness<'db>(
 struct InstanceTruthiness<'db>(ClassLiteral<'db>);
 
 impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::InstanceTruthiness(self.0)
+    }
+
     type Output = Truthiness;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _state: (),
@@ -2369,7 +2376,7 @@ impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> Truthiness {
@@ -2379,7 +2386,7 @@ impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
             ty.as_nominal_instance().is_some_and(|instance| {
                 instance
                     .class(db, env)
-                    .is_subtype_of_class_literal(db, class)
+                    .is_subtype_of_class_literal(db, env, class)
             })
         };
 
@@ -2424,7 +2431,7 @@ impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
                         found_tvars_or_newtypes = true;
                     } else if let Type::NewTypeInstance(newtype) = positive {
                         found_tvars_or_newtypes = true;
-                        effective.add_positive_in_place(newtype.concrete_base_type(db));
+                        effective.add_positive_in_place(newtype.concrete_base_type(db, env));
                     } else {
                         effective.add_positive_in_place(positive);
                     }
@@ -2457,7 +2464,7 @@ impl<'db> TypeQuery<'db> for InstanceTruthiness<'db> {
             Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
             Type::NewTypeInstance(newtype) => {
-                always_true_if(is_instance(&newtype.concrete_base_type(db)))
+                always_true_if(is_instance(&newtype.concrete_base_type(db, env)))
             }
 
             Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {

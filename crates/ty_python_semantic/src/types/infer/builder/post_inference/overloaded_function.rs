@@ -1,3 +1,5 @@
+use crate::types::signatures::CallableSignature;
+use crate::types::{Signature, TypeOperations};
 use ruff_db::{
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
@@ -303,7 +305,7 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     if implementation_callables.is_empty()
         || implementation_callables
             .iter()
-            .any(|callable| callable.signatures(db).overloads.is_empty())
+            .any(|callable| callable.parameter_lists(db).len() == 0)
     {
         let function_node = implementation.node(db, context.file(), context.module());
         if let Some(builder) = context.report_lint(&INVALID_OVERLOAD, &function_node.name) {
@@ -318,15 +320,14 @@ fn check_non_generic_overload_implementation_consistency<'db>(
     // handles type-variable domains.
     if implementation_callables
         .iter()
-        .flat_map(|callable| &callable.signatures(db).overloads)
-        .any(|signature| !signature.is_non_generic())
+        .any(|callable| callable.has_generic_context(db))
     {
         return;
     }
 
     let overload_signatures = overloads.iter().flat_map(|overload| {
         overload
-            .decorated_signatures(db)
+            .decorated_signatures(db, env)
             .map(move |signature| (overload, signature))
     });
 
@@ -339,39 +340,17 @@ fn check_non_generic_overload_implementation_consistency<'db>(
 
     for (overload, overload_signature) in overload_signatures {
         let function_node = overload.node(db, context.file(), context.module());
-        let Some((implementation_signature, parameter_consistency, return_type_consistency)) =
-            implementation_callables.iter().find_map(|callable| {
-                let mut inconsistency = None;
-                for implementation_signature in &callable.signatures(db).overloads {
-                    let parameter_consistency = implementation_signature
-                        .non_generic_implementation_parameters_consistency_with(
-                            db,
-                            env,
-                            &overload_signature,
-                        );
-                    let return_type_consistency = implementation_signature
-                        .non_generic_implementation_return_type_consistency_with(
-                            db,
-                            env,
-                            &overload_signature,
-                        );
-                    if matches!(
-                        (&parameter_consistency, &return_type_consistency),
-                        (
-                            ParameterConsistency::Consistent,
-                            ReturnTypeConsistency::Consistent
-                        )
-                    ) {
-                        return None;
-                    }
-                    inconsistency = Some((
-                        implementation_signature,
-                        parameter_consistency,
-                        return_type_consistency,
-                    ));
-                }
-                inconsistency
-            })
+        let Some(OverloadInconsistency {
+            implementation_signature,
+            parameter_consistency,
+            return_type_consistency,
+        }) = implementation_callables.iter().find_map(|callable| {
+            callable
+                .inspect_signatures_root(db, env, |_, signatures| {
+                    signatures.overload_inconsistency(db, &overload_signature)
+                })
+                .flatten()
+        })
         else {
             continue;
         };
@@ -493,4 +472,50 @@ fn binding_decorator_inconsistencies<'db, 'a>(
         }
     }
     inconsistencies
+}
+
+pub(in crate::types) struct OverloadInconsistency<'db> {
+    implementation_signature: Signature<'db>,
+    parameter_consistency: ParameterConsistency<'db>,
+    return_type_consistency: ReturnTypeConsistency<'db>,
+}
+
+impl<'db> OverloadInconsistency<'db> {
+    pub(in crate::types) fn check(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        signatures: &CallableSignature<'db>,
+        overload_signature: &Signature<'db>,
+    ) -> Option<Self> {
+        let mut inconsistency = None;
+        for implementation_signature in &signatures.overloads {
+            let parameter_consistency = implementation_signature
+                .non_generic_implementation_parameters_consistency_with(
+                    db,
+                    env,
+                    overload_signature,
+                );
+            let return_type_consistency = implementation_signature
+                .non_generic_implementation_return_type_consistency_with(
+                    db,
+                    env,
+                    overload_signature,
+                );
+            if matches!(
+                (&parameter_consistency, &return_type_consistency),
+                (
+                    ParameterConsistency::Consistent,
+                    ReturnTypeConsistency::Consistent
+                )
+            ) {
+                return None;
+            }
+            inconsistency = Some(OverloadInconsistency {
+                implementation_signature: implementation_signature.clone(),
+                parameter_consistency,
+                return_type_consistency,
+            });
+        }
+        inconsistency
+    }
 }

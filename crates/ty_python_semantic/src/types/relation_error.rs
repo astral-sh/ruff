@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::TypeOperations;
 use crate::types::relation::TypeRelation;
 /// This module defines a tree structure for collecting contextual information about type relation errors
 /// (for example, why two types are not assignable or cannot overlap).
@@ -9,12 +10,12 @@ use ruff_python_ast::name::Name;
 use ty_python_core::definition::Definition;
 use ty_python_core::semantic_index;
 
+use crate::FxOrderSet;
 use crate::types::context::LintDiagnosticGuard;
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::iteration::add_async_generator_stub_help;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
-use crate::{FxOrderSet, TypeOperations};
 
 /// The relation explained by a diagnostic node, independently of the checker that owns the tree.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -872,8 +873,9 @@ impl<'db> ErrorContextNode<'db> {
             && let ErrorContext::ParameterNameMismatch { target_name, .. }
             | ErrorContext::ParameterMustAcceptKeywordArguments { target_name, .. } =
                 &single_grandchild.context
-            && let Some(protocol_member) =
-                proto_instance.interface(db).member_by_name(db, member_name)
+            && let Some(protocol_member) = proto_instance
+                .interface(db, env)
+                .member_by_name(db, member_name)
             && let Some(definition) = protocol_member.definition()
             && let Some(declaring_protocol) = nearest_enclosing_class(
                 db,

@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
-use ty_python_semantic::{Db as SemanticDb, TypeOperations};
+use ty_python_semantic::TypeOperations;
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -21,9 +21,7 @@ use ty_module_resolver::{
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
 use ty_python_semantic::importer::{ImportRequest, Importer};
-use ty_python_semantic::types::{
-    CycleKind, SpecialFormType, TypeQuery, TypeQueryContext, UnionType,
-};
+use ty_python_semantic::types::{SpecialFormType, TypeCategory, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{KnownClass, Type},
@@ -105,11 +103,11 @@ pub fn completion<'db>(
                         ModuleDependencyKind::Current
                     };
                     completions.add(
-                        CompletionBuilder::from_semantic_completion(db, env, semantic_completion)
+                        CompletionBuilder::from_semantic_completion(db, &env, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
                 }
-                add_keyword_completions(db, env, &mut completions);
+                add_keyword_completions(db, &env, &mut completions);
                 add_argument_completions(
                     db,
                     program_file,
@@ -300,9 +298,8 @@ impl<'db> Extend<SemanticCompletion<'db>> for Completions<'db> {
         T: IntoIterator<Item = SemanticCompletion<'db>>,
     {
         let db = self.db;
-        let env = ty_python_semantic::SemanticModel::new(db, self.program_file)
-            .program_environment()
-            .clone();
+        let env =
+            ty_python_semantic::SemanticModel::new(db, self.program_file).program_environment();
         for c in it {
             self.add_semantic(db, &env, c);
         }
@@ -510,9 +507,8 @@ impl<'db> CompletionBuilder<'db> {
             // but aren't marked here. That is, false negatives are
             // possible but false positives are not.
             if let Some(exception_ty) = collection_context.exception_ty {
-                let env = ty_python_semantic::SemanticModel::new(db, program_file)
-                    .program_environment()
-                    .clone();
+                let env =
+                    ty_python_semantic::SemanticModel::new(db, program_file).program_environment();
                 self.is_context_specific |= ty.is_assignable_to(db, &env, exception_ty);
             }
             if collection_context.is_in_class_def() {
@@ -534,9 +530,7 @@ impl<'db> CompletionBuilder<'db> {
             self.ty.and_then(|ty| {
                 completion_kind_from_type(
                     db,
-                    &ty_python_semantic::SemanticModel::new(db, program_file)
-                        .program_environment()
-                        .clone(),
+                    &ty_python_semantic::SemanticModel::new(db, program_file).program_environment(),
                     ty,
                 )
             })
@@ -858,7 +852,7 @@ impl<'m> Context<'m> {
             },
             ContextKind::NonImport(_) => {
                 let env = model.program_environment();
-                let exception_ty = self.cursor.exception_ty(db, env);
+                let exception_ty = self.cursor.exception_ty(db, &env);
                 let complete_callable_parentheses = settings.complete_function_parentheses
                     && !self.cursor.suppress_callable_parentheses();
                 let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
@@ -2149,7 +2143,7 @@ fn add_class_arg_completions<'db>(
     let env = model.program_environment();
 
     if !is_set("metaclass") {
-        let ty = KnownClass::Type.to_subclass_of(db, env);
+        let ty = KnownClass::Type.to_subclass_of(db, &env);
         completions.add(CompletionBuilder::argument("metaclass").ty(ty));
     }
 
@@ -2163,7 +2157,7 @@ fn add_class_arg_completions<'db>(
     //
     // See https://peps.python.org/pep-0728/
     if is_typed_dict && !is_set("total") {
-        let ty = KnownClass::Bool.to_instance(db, env);
+        let ty = KnownClass::Bool.to_instance(db, &env);
         completions.add(CompletionBuilder::argument("total").ty(ty));
     }
 }
@@ -3198,9 +3192,8 @@ fn add_import_completions_impl<'db>(
     semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
     module_dependency_kind: impl Fn(&SemanticCompletion<'db>) -> Option<ModuleDependencyKind>,
 ) {
-    let env = ty_python_semantic::SemanticModel::new(db, completions.program_file)
-        .program_environment()
-        .clone();
+    let env =
+        ty_python_semantic::SemanticModel::new(db, completions.program_file).program_environment();
     for semantic in semantic_completions {
         let module_dependency_kind = module_dependency_kind(&semantic);
         let is_from_type_check_only_module = matches!(
@@ -3319,78 +3312,19 @@ fn completion_kind_from_type<'db>(
     env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<CompletionKind> {
-    TypeQueryContext::with_root(env, FindCompletionKind, |root| root.visit(db, ty))
-}
-
-struct FindCompletionKind;
-
-impl<'db> TypeQuery<'db> for FindCompletionKind {
-    type Output = Option<CompletionKind>;
-
-    fn on_cycle(
-        &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
-        _ty: Type<'db>,
-        _kind: CycleKind,
-        _state: (),
-    ) -> Self::Output {
-        None
-    }
-
-    fn visit(
-        &self,
-        db: &'db dyn SemanticDb,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
-        ty: Type<'db>,
-        _state: (),
-    ) -> Self::Output {
-        Some(match ty {
-            Type::FunctionLiteral(_)
-            | Type::DataclassDecorator(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_) => CompletionKind::Function,
-            Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
-            Type::ModuleLiteral(_) => CompletionKind::Module,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                CompletionKind::Class
-            }
-            // This is a little weird for "struct." I'm mostly interpreting
-            // "struct" here as a more general "object." ---AG
-            Type::NominalInstance(_)
-            | Type::PropertyInstance(_)
-            | Type::SlotDescriptor(_)
-            | Type::BoundSuper(_)
-            | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::EnumComplement(_) => CompletionKind::Struct,
-            Type::LiteralValue(literal) if literal.is_enum() => CompletionKind::Enum,
-            Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_) | Type::TypeForm(_) => {
-                CompletionKind::Value
-            }
-            Type::ProtocolInstance(_) => CompletionKind::Interface,
-            Type::TypeVar(_) => CompletionKind::TypeParameter,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .find_map(|&ty| traversal.visit(db, ty))?,
-            Type::Intersection(intersection) => intersection
-                .iter_positive(db)
-                .find_map(|ty| traversal.visit(db, ty))?,
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::Never
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeAlias(_)
-            | Type::Recursive(_) => return None,
-            Type::RecursiveVar(_) => {
-                unreachable!("semantic operation on an unbound recursive variable")
-            }
-        })
-    }
+    Some(match ty.category(db, env)? {
+        TypeCategory::Function => CompletionKind::Function,
+        TypeCategory::Method => CompletionKind::Method,
+        TypeCategory::Module => CompletionKind::Module,
+        TypeCategory::Class => CompletionKind::Class,
+        // This is a little weird for "struct." I'm mostly interpreting
+        // "struct" here as a more general "object." ---AG
+        TypeCategory::Instance => CompletionKind::Struct,
+        TypeCategory::EnumLiteral => CompletionKind::Enum,
+        TypeCategory::Value => CompletionKind::Value,
+        TypeCategory::Protocol => CompletionKind::Interface,
+        TypeCategory::TypeVariable => CompletionKind::TypeParameter,
+    })
 }
 
 /// Defines an ordering relating the two completions for ranking purposes.

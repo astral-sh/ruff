@@ -1,4 +1,4 @@
-use crate::TypeOperations;
+use crate::types::TypeOperations;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;

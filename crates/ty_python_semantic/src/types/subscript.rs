@@ -1,8 +1,7 @@
 //! Inference for subscript expressions (e.g., `x[0]`, `list[int]`).
 
 use crate::Db;
-use crate::TypeOperations;
-use crate::types::ApplyTypeMappingVisitor;
+use crate::types::TypeOperations;
 use std::fmt::{self, Display};
 
 use compact_str::{CompactString, ToCompactString};
@@ -15,7 +14,7 @@ use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
-use super::cyclic::{CycleDetector, CycleKind};
+use super::cyclic::CycleKind;
 use super::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
@@ -23,6 +22,7 @@ use super::diagnostic::{
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
+use super::recursive::{TypeVisitorKey, TypeVisitorState};
 use super::special_form::SpecialFormType;
 use super::{
     ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
@@ -240,15 +240,16 @@ impl<'db> SubscriptErrorKind<'db> {
                         "Cannot subscript non-generic type alias `{}`",
                         alias.name(db)
                     ));
-                    let value_type = alias.raw_value_type(db);
-                    if value_type.is_specialized_generic(db) {
-                        diagnostic.annotate(context.secondary(&*subscript.value).message(
-                            format_args!(
-                                "Alias to `{}`, which is already specialized",
-                                value_type.display(db, env)
-                            ),
-                        ));
-                    }
+                    alias.inspect_definition(db, env, |body| {
+                        if body.is_specialized_generic(db) {
+                            diagnostic.annotate(context.secondary(&*subscript.value).message(
+                                format_args!(
+                                    "Alias to `{}`, which is already specialized",
+                                    body.display_string(db)
+                                ),
+                            ));
+                        }
+                    });
                 }
             }
             Self::NonGenericClass { class } => {
@@ -295,7 +296,7 @@ impl<'db> SubscriptErrorKind<'db> {
                             *value_ty,
                             None,
                             *slice_ty,
-                            typed_dict.items(db),
+                            &typed_dict.items(db, env),
                         );
                     } else if let Some(builder) =
                         context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
@@ -333,7 +334,7 @@ impl<'db> SubscriptErrorKind<'db> {
                     typed_dict_ty,
                     *full_object_ty,
                     *slice_ty,
-                    typed_dict.items(db),
+                    &typed_dict.items(db, env),
                 );
             }
             Self::NotSubscriptable { value_ty, method } => {
@@ -521,12 +522,12 @@ fn typed_dict_subscript<'db>(
         .as_string_literal()
         .map(|literal| literal.value(db))
     else {
-        if typed_dict.explicit_extra_items(db).is_some()
+        if typed_dict.explicit_extra_items(db, env).is_some()
             && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
             return Ok(typed_dict.value_type(db, env));
         }
-        let result_ty = if typed_dict.openness(db).is_closed()
+        let result_ty = if typed_dict.openness(db, env).is_closed()
             && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
             typed_dict.value_type(db, env)
@@ -543,7 +544,7 @@ fn typed_dict_subscript<'db>(
         ));
     };
 
-    typed_dict.item(db, key).map_or_else(
+    typed_dict.item(db, env, key).map_or_else(
         || {
             Err(SubscriptError::new(
                 Type::unknown(),
@@ -560,52 +561,65 @@ fn typed_dict_subscript<'db>(
 
 /// A subscript operation keeps both operands in its recursion key. Expanding either operand
 /// can revisit the pair, and alias normalization must reuse the same mapping state.
-struct SubscriptChecker<'env, 'db> {
-    mapping: ApplyTypeMappingVisitor<'env, 'db>,
+pub(super) struct SubscriptChecker<'env, 'db> {
     expr_context: ast::ExprContext,
-    active: CycleDetector<'db, ast::ExprContext, (Type<'db>, Type<'db>), (), 1>,
+    active: TypeVisitorState<'env, 'db, (Type<'db>, Type<'db>), ()>,
 }
 
 impl<'db> SubscriptChecker<'_, 'db> {
-    fn check(
+    pub(super) fn check(
         &self,
         db: &'db dyn Db,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
-        // Normalizing a concrete union can revisit it after recording its completed expansion.
-        // Only deferred definitions and bounds introduce recursive edges.
+        // Completed unions can retain recursive references. Only normalize their alternatives
+        // once; subsequent visits inspect the retained references individually.
         if ![value_ty, slice_ty].into_iter().any(|ty| {
-            ty.is_alias_like() || matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_))
+            ty.is_alias_like()
+                || matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_))
+                || matches!(ty, Type::Union(union) if union.needs_alias_expansion(db, self.active.mapping()))
         }) {
             return value_ty.subscript_impl(db, self, slice_ty);
         }
         self.active
-            .visit_active_with_expansion(db, (value_ty, slice_ty), &self.mapping, |visit| {
-                match visit {
-                    Err(CycleKind::Exact) => Ok(Type::Never),
-                    Err(CycleKind::MatchingIdentity) => Ok(Type::unknown()),
-                    Ok(expansion) => match (value_ty, slice_ty) {
-                        (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => {
-                            value_ty.subscript_impl(db, self, slice_ty)
-                        }
-                        (Type::Recursive(recursive), _) => expansion
-                            .expand_recursive(db, recursive)
-                            .map(|body| self.check(db, body, slice_ty))
-                            .unwrap_or(Ok(value_ty)),
-                        (_, Type::Recursive(recursive)) => expansion
-                            .expand_recursive(db, recursive)
-                            .map(|body| self.check(db, value_ty, body))
-                            .unwrap_or(Ok(value_ty)),
-                        (Type::TypeAlias(alias), _) => {
-                            self.check(db, alias.value_type(db), slice_ty)
-                        }
-                        (_, Type::TypeAlias(alias)) => {
-                            self.check(db, value_ty, alias.value_type(db))
-                        }
-                        _ => value_ty.subscript_impl(db, self, slice_ty),
-                    },
-                }
+            .visit_active_with_expansion(db, (value_ty, slice_ty), |visit| match visit {
+                Err(CycleKind::Exact) => Ok(Type::Never),
+                Err(CycleKind::MatchingIdentity | CycleKind::Reentrant) => Ok(Type::unknown()),
+                Ok(expansion) => match (value_ty, slice_ty) {
+                    (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => {
+                        value_ty.subscript_impl(db, self, slice_ty)
+                    }
+                    (Type::Recursive(recursive), _) => expansion
+                        .expand_recursive(db, recursive)
+                        .map(|body| body.subscript_as_value(db, self, slice_ty))
+                        .unwrap_or(Ok(value_ty)),
+                    (_, Type::Recursive(recursive)) => expansion
+                        .expand_recursive(db, recursive)
+                        .map(|body| body.subscript_as_index(db, self, value_ty))
+                        .unwrap_or(Ok(value_ty)),
+                    (Type::TypeAlias(alias), _) => expansion
+                        .alias_body(db, alias)
+                        .subscript_as_value(db, self, slice_ty),
+                    (_, Type::TypeAlias(alias)) => expansion
+                        .alias_body(db, alias)
+                        .subscript_as_index(db, self, value_ty),
+                    (Type::Union(union), _)
+                        if union.needs_alias_expansion(db, self.active.mapping()) =>
+                    {
+                        expansion
+                            .normalize(db, value_ty)
+                            .subscript_as_value(db, self, slice_ty)
+                    }
+                    (_, Type::Union(union))
+                        if union.needs_alias_expansion(db, self.active.mapping()) =>
+                    {
+                        expansion
+                            .normalize(db, slice_ty)
+                            .subscript_as_index(db, self, value_ty)
+                    }
+                    _ => value_ty.subscript_impl(db, self, slice_ty),
+                },
             })
     }
 }
@@ -619,9 +633,8 @@ impl<'db> Type<'db> {
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
         SubscriptChecker {
-            mapping: ApplyTypeMappingVisitor::new(env),
             expr_context,
-            active: CycleDetector::new(()),
+            active: TypeVisitorState::new(env, TypeVisitorKey::Subscript(expr_context), ()),
         }
         .check(db, self, slice_ty)
     }
@@ -632,7 +645,7 @@ impl<'db> Type<'db> {
         checker: &SubscriptChecker<'_, 'db>,
         slice_ty: Type<'db>,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
-        let env = checker.mapping.env;
+        let env = checker.active.mapping().env;
         let expr_context = checker.expr_context;
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return checker.check(db, fallback, slice_ty);
@@ -656,15 +669,6 @@ impl<'db> Type<'db> {
                 | Type::TypeAlias(_),
                 _,
             ) => Some(Ok(value_ty)),
-
-            // Expand overlapping alternatives before collecting their subscript errors.
-            (Type::Union(union), _) if union.needs_alias_expansion(db, &checker.mapping) => {
-                Some(checker.check(db, union.expand_aliases(db, &checker.mapping), slice_ty))
-            }
-
-            (_, Type::Union(union)) if union.needs_alias_expansion(db, &checker.mapping) => {
-                Some(checker.check(db, value_ty, union.expand_aliases(db, &checker.mapping)))
-            }
 
             (Type::Union(union), _) => Some(map_subscript_alternatives(
                 db,
@@ -771,7 +775,7 @@ impl<'db> Type<'db> {
                 if let Some(SliceLiteral { start, stop, step }) =
                     maybe_slice_nominal.slice_literal(db)
                     && let Some(tuple) = match value_ty {
-                        Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+                        Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db, env),
                         _ => value_ty,
                     }
                     .tuple_instance_spec(db, env) =>
@@ -1090,7 +1094,10 @@ impl<'db> Type<'db> {
                     return Ok(value_ty);
                 }
 
-                if class.iter_mro(db).any(|base| base == ClassBase::Generic) {
+                if class
+                    .iter_mro(db, env)
+                    .any(|base| base == ClassBase::Generic)
+                {
                     return Err(SubscriptError::new(
                         Type::unknown(),
                         SubscriptErrorKind::NonGenericClass { class },

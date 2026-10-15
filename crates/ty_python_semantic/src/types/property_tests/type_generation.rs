@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use std::debug_assert_matches;
 
 use crate::Db;
@@ -10,7 +11,7 @@ use crate::types::{
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Program, ProgramEnvironment, TypeOperations};
+use crate::{Program, ProgramEnvironment};
 use itertools::Either;
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
@@ -317,7 +318,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db),
+                    .default_specialization(db, env),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
@@ -326,7 +327,7 @@ impl Ty {
                     .place
                     .expect_type()
                     .expect_class_literal()
-                    .default_specialization(db),
+                    .default_specialization(db, env),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,

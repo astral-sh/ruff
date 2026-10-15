@@ -4,6 +4,7 @@
 //! lookup takes an already-inferred receiver type. Neither lookup obtains use-site types
 //! through `SemanticModel` or requests completed inference of the caller's scope.
 
+use crate::types::TypeOperations;
 use std::collections::VecDeque;
 
 use indexmap::IndexSet;
@@ -26,7 +27,7 @@ use ty_python_core::{
 
 use crate::place::implicit_builtins_symbol_scope;
 use crate::types::{ClassBase, ClassLiteral, ClassType, SubclassOfInner, Type, binding_type};
-use crate::{Db, FxIndexSet, ProgramEnvironment, TypeOperations, module_docstring};
+use crate::{Db, FxIndexSet, ProgramEnvironment, module_docstring};
 
 /// Controls whether local import aliases should be resolved to their targets or returned as-is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -454,7 +455,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut resolved = Vec::new();
     'scopes: for ancestor in class_literal
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .filter_map(|cls: ClassType<'db>| cls.static_class_literal(db).map(|(lit, _)| lit))
     {

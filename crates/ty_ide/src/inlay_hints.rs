@@ -32,9 +32,7 @@ impl InlayHint {
         let InlayHintImportContext { db, file, importer } = context;
 
         let position = expr.range().end();
-        let env = ty_python_semantic::SemanticModel::new(db, file)
-            .program_environment()
-            .clone();
+        let env = ty_python_semantic::SemanticModel::new(db, file).program_environment();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db, &env).to_string_parts();
 

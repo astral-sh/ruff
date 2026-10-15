@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::TypeOperations;
 use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
@@ -10,7 +11,6 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::FxIndexMap;
-use crate::TypeOperations;
 use crate::subscript::PyIndex;
 use crate::types::tuple::{TupleLength, TupleSpec};
 use crate::types::type_expansion::expand_elements;

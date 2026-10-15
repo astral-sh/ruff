@@ -1,7 +1,9 @@
+use crate::types::TypeOperations;
+use crate::types::recursive::{TypeInspectionKey, TypeQueryKey, TypeWalkKey};
+use crate::types::recursive::{TypeQueryVisit, TypeWalkVisit};
 use std::hash::{Hash, Hasher};
 
 use crate::Db;
-use crate::TypeOperations;
 use crate::types::recursive::TypeInspector;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -99,10 +101,10 @@ pub(crate) fn typed_dict_matches_class_pattern<'db>(
     else {
         return false;
     };
-    Type::instance(db, env, dict.top_materialization(db)).is_subtype_of(
+    Type::instance(db, env, dict.top_materialization(db, env)).is_subtype_of(
         db,
         env,
-        Type::instance(db, env, class.top_materialization(db)),
+        Type::instance(db, env, class.top_materialization(db, env)),
     )
 }
 
@@ -124,11 +126,15 @@ impl<'a, 'db, F> TypeWalk<'db, &'a mut F> for TypedDictPatternDomain
 where
     F: FnMut(TypedDictType<'db>) -> bool,
 {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::TypedDictPatternDomain
+    }
+
     type Output = bool;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeTraversal<'_, 'db, Self>,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _predicate: &'a mut F,
@@ -139,7 +145,7 @@ where
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         predicate: &'a mut F,
     ) -> bool {
@@ -337,7 +343,7 @@ fn class_pattern_is_exhaustive<'pattern, 'db>(
     kind: &'pattern ClassPatternPredicateKind<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
-    let class_instance_ty = Type::instance(db, env, class.top_materialization(db));
+    let class_instance_ty = Type::instance(db, env, class.top_materialization(db, env));
     let is_typed_dict_match = is_typed_dict_runtime_domain(db, env, subject_ty)
         && typed_dict_matches_class_pattern(db, env, class);
     if !is_typed_dict_match && !subject_ty.is_subtype_of(db, env, class_instance_ty) {
@@ -448,9 +454,13 @@ fn class_match_args_type<'db>(
 /// Callers must first establish that `__match_args__` is statically absent. A definite definition
 /// overrides match-self behavior, while a conditional definition makes it runtime-dependent;
 /// neither case should consult this flag.
-fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+fn class_has_match_self_flag<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: ClassLiteral<'db>,
+) -> bool {
     class
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|base| {
             matches!(
@@ -487,7 +497,7 @@ pub(crate) fn class_pattern_positional_result<'db>(
     class: ClassLiteral<'db>,
 ) -> Option<ClassPatternPositionalResult<'db>> {
     match class_match_args_type(db, env, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, env, class) => {
             Some(ClassPatternPositionalResult::Limit(1))
         }
         ClassMatchArgs::Undefined
@@ -501,25 +511,10 @@ pub(crate) fn class_pattern_positional_result<'db>(
         ClassMatchArgs::Defined { member_type, .. } => TypeInspector::inspect_root(
             db,
             env,
+            TypeInspectionKey::ClassPatternPositionalResult,
             member_type,
             |_, _| None,
-            |_, match_args| {
-                if let Some(limit) = match_args.exact_tuple_instance_spec(db).and_then(|tuple| {
-                    tuple
-                        .as_fixed_length()
-                        .map(super::tuple::FixedLengthTuple::len)
-                }) {
-                    Some(ClassPatternPositionalResult::Limit(limit))
-                } else {
-                    match_args
-                        .is_disjoint_from(
-                            db,
-                            env,
-                            Type::homogeneous_tuple(db, env, Type::unknown()),
-                        )
-                        .then_some(ClassPatternPositionalResult::InvalidType(match_args))
-                }
-            },
+            |_, match_args| match_args.class_pattern_positional_result(db),
         ),
         ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
     }
@@ -552,7 +547,7 @@ pub(crate) fn class_pattern_positional_sources<'db>(
     positional_count: usize,
 ) -> Vec<ClassPatternPositionalSource> {
     let fixed = match class_match_args_type(db, env, class) {
-        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, env, class) => {
             return (0..positional_count)
                 .map(|index| {
                     if index == 0 {
@@ -635,16 +630,18 @@ fn mapping_pattern_is_exhaustive<'pattern, 'db>(
             let Some(key) = key_ty.as_string_literal() else {
                 return false;
             };
-            typed_dict.item(db, key.value(db)).is_some_and(|field| {
-                field.is_required()
-                    && pattern_is_exhaustive_for_subject(
-                        db,
-                        env,
-                        &entry.pattern,
-                        field.declared_ty,
-                        cache,
-                    )
-            })
+            typed_dict
+                .item(db, env, key.value(db))
+                .is_some_and(|field| {
+                    field.is_required()
+                        && pattern_is_exhaustive_for_subject(
+                            db,
+                            env,
+                            &entry.pattern,
+                            field.declared_ty,
+                            cache,
+                        )
+                })
         })
     })
 }
@@ -799,11 +796,15 @@ struct DefinitePattern<'pattern, 'db>(&'pattern PatternPredicateKind<'db>);
 impl<'a, 'pattern, 'db> TypeWalk<'db, (&'a mut PatternTypeCache<'pattern, 'db>, Type<'db>)>
     for DefinitePattern<'pattern, 'db>
 {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::DefinitePattern(self.0.clone())
+    }
+
     type Output = Type<'db>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeTraversal<'_, 'db, Self>,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _state: (&'a mut PatternTypeCache<'pattern, 'db>, Type<'db>),
@@ -814,7 +815,7 @@ impl<'a, 'pattern, 'db> TypeWalk<'db, (&'a mut PatternTypeCache<'pattern, 'db>, 
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         resolved_subject_ty: Type<'db>,
         (cache, subject_ty): (&'a mut PatternTypeCache<'pattern, 'db>, Type<'db>),
     ) -> Type<'db> {
@@ -1119,11 +1120,15 @@ struct SequencePatternFallthrough<'pattern, 'db>(&'pattern SequencePatternPredic
 impl<'a, 'db> TypeWalk<'db, (&'a mut ExactTuplePatternExpansionBudget, Type<'db>)>
     for SequencePatternFallthrough<'_, 'db>
 {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::SequencePatternFallthrough(self.0.clone())
+    }
+
     type Output = Result<Type<'db>, ()>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeTraversal<'_, 'db, Self>,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _state: (&'a mut ExactTuplePatternExpansionBudget, Type<'db>),
@@ -1134,7 +1139,7 @@ impl<'a, 'db> TypeWalk<'db, (&'a mut ExactTuplePatternExpansionBudget, Type<'db>
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         resolved: Type<'db>,
         (budget, subject_ty): (&'a mut ExactTuplePatternExpansionBudget, Type<'db>),
     ) -> Self::Output {
@@ -1300,11 +1305,15 @@ fn is_same_enum_pattern_domain<'db>(
 struct EnumPatternDomain<'db>(EnumLiteralType<'db>);
 
 impl<'db> TypeQuery<'db> for EnumPatternDomain<'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::EnumPatternDomain(self.0)
+    }
+
     type Output = bool;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _state: (),
@@ -1315,7 +1324,7 @@ impl<'db> TypeQuery<'db> for EnumPatternDomain<'db> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> bool {

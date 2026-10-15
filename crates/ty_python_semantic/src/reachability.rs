@@ -193,7 +193,8 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use std::cell::RefCell;
 
 use crate::{
@@ -282,22 +283,34 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(predicate.subject(db).scope(db)));
+    cycle_fn = |db: &'db dyn Db,
+                cycle,
+                previous: &Type<'db>,
+                result: Type<'db>,
+                predicate: PatternPredicate<'db>,
+                _| {
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_scope(predicate.subject(db).scope(db)),
+        );
         result.cycle_normalized(db, &env, *previous, cycle)
     },
-    heap_size = ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 fn type_narrowed_after_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     expansion: PatternSubjectExpansion,
 ) -> Type<'db> {
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(predicate.program_file(db)),
+    );
     let narrowed_by_previous_patterns =
         type_narrowed_by_previous_patterns(db, predicate, expansion);
 
     let narrowed_by_pattern =
-        type_narrowed_by_pattern(db, predicate, narrowed_by_previous_patterns);
+        type_narrowed_by_pattern(db, &env, predicate, narrowed_by_previous_patterns);
     // If the pattern does not narrow the subject, the guard's truthiness cannot affect the result.
     // Skipping its inference also avoids cycles through the subject or a pattern capture.
     if narrowed_by_pattern == narrowed_by_previous_patterns
@@ -327,13 +340,11 @@ fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>
 /// subject type changes, introducing fresh recursive markers on every iteration.
 fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let env = TypeOperations::new_root(
-        db,
-        ProgramEnvironment::from_file(predicate.program_file(db)),
-    );
+    let env = env.in_environment(ProgramEnvironment::from_file(predicate.program_file(db)));
     pattern_binding_fallthrough_type(db, &env, predicate.kind(db), subject_ty)
 }
 
@@ -344,50 +355,10 @@ fn type_narrowed_by_pattern<'db>(
 /// name so previous `match` cases can be compared by member identity.
 fn enum_literal_subject_names<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     subject_ty: Type<'db>,
 ) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
-    fn add_enum_literal<'db>(
-        db: &'db dyn Db,
-        enum_class: &mut Option<EnumClassLiteral<'db>>,
-        names: &mut FxHashSet<Name>,
-        ty: Type<'db>,
-    ) -> Option<()> {
-        let enum_literal = ty.as_enum_literal()?;
-        let class = enum_literal.enum_class_literal(db);
-
-        if let Some(existing_class) = *enum_class {
-            if existing_class != class {
-                return None;
-            }
-        } else {
-            *enum_class = Some(class);
-        }
-
-        let name = enum_literal.name(db);
-        let canonical_name = class.resolve_member(db, name)?;
-        names.insert(canonical_name.clone());
-        Some(())
-    }
-
-    let mut enum_class = None;
-    let mut names = FxHashSet::default();
-
-    match subject_ty {
-        Type::LiteralValue(_) => {
-            add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
-        }
-        Type::Union(union) => {
-            for element in union.elements(db) {
-                add_enum_literal(db, &mut enum_class, &mut names, *element)?;
-            }
-        }
-        Type::TypeAlias(alias) => {
-            return enum_literal_subject_names(db, alias.value_type(db));
-        }
-        _ => return None,
-    }
-
-    Some((enum_class?, names))
+    subject_ty.enum_literal_members(db, env)
 }
 
 /// Return the canonical enum-member name matched by a single value pattern.
@@ -471,7 +442,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
-    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, subject_ty)?;
+    let (enum_class, mut remaining_names) = enum_literal_subject_names(db, env, subject_ty)?;
     let current_coverage = enum_member_pattern_coverage(db, env, enum_class, predicate.kind(db));
     let current_names = &current_coverage.definitely_matched;
     if current_names.is_empty() {
@@ -560,7 +531,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     let next_narrowed_subject_ty = if predicate.guard(db).is_none() {
         type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded)
     } else {
-        type_narrowed_by_pattern(db, predicate, narrowed_subject_ty)
+        type_narrowed_by_pattern(db, &env, predicate, narrowed_subject_ty)
     };
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
@@ -720,19 +691,26 @@ fn analyze_non_terminal_call_range<'db>(
     level: u32,
     index: usize,
 ) {
-    if level == 0 {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
-        let use_def = use_def_map(db, scope);
-        let call_predicates = non_terminal_call_predicates(db, scope);
-        let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
-        let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
-        analyze_non_terminal_calls(db, &env, use_def.predicates(), &call_predicates[start..end]);
-        return;
-    }
+    {
+        if level == 0 {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
+            let use_def = use_def_map(db, scope);
+            let call_predicates = non_terminal_call_predicates(db, scope);
+            let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
+            let end = start + NON_TERMINAL_CALL_CHUNK_SIZE;
+            analyze_non_terminal_calls(
+                db,
+                &env,
+                use_def.predicates(),
+                &call_predicates[start..end],
+            );
+            return;
+        }
 
-    let child_index = index * 2;
-    analyze_non_terminal_call_range(db, scope, level - 1, child_index);
-    analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
+        let child_index = index * 2;
+        analyze_non_terminal_call_range(db, scope, level - 1, child_index);
+        analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
+    };
 }
 
 /// Evaluates a reachability constraint, first caching complete blocks of statement calls up to its
@@ -842,9 +820,12 @@ fn evaluate_reachability_path<'db>(
     constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     call_predicates: Option<&[ScopedPredicateId]>,
-    mut id: ScopedReachabilityConstraintId,
-    mut use_checkpoint: bool,
+    id: ScopedReachabilityConstraintId,
+    use_checkpoint: bool,
 ) -> Truthiness {
+    let mut id = id;
+    let mut use_checkpoint = use_checkpoint;
+
     let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     let mut visited = 0;
     let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
@@ -1076,7 +1057,7 @@ impl<'db> ProjectedNarrowingGraph<'db> {
 /// Joins need to recognize an unconstrained suffix before applying `TypeGuard` replacement.
 /// Similarly, an unreachable graph must be eliminated before a later predicate can replace `Never`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum ProjectedNarrowingCheckpoint<'db> {
+pub(crate) enum ProjectedNarrowingCheckpoint<'db> {
     Unreachable,
     Unconstrained,
     Narrowed(Type<'db>),
@@ -1092,50 +1073,11 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
     }
 }
 
-/// Evaluates a stable suffix with the canonical projected-graph evaluator.
-///
-/// The root is projected directly to avoid querying its own checkpoint. Descendant checkpoints
-/// contribute their cached types and terminal shape. Nonterminal suffixes are expanded locally only
-/// when simplifying a join requires their predicates.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, id, _, _, _, _| ProjectedNarrowingCheckpoint::Narrowed(Type::divergent(id)),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
-        match result {
-            ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(
-                ty.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope)), previous.ty(base_ty), cycle)
-            ),
-            _ => result,
-        }
-    },
-    heap_size = get_size2::GetSize::get_heap_size
-)]
-fn evaluate_projected_narrowing_checkpoint<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    place: ScopedPlaceId,
-    constraint: ScopedNarrowingConstraint,
-    base_ty: Type<'db>,
-) -> ProjectedNarrowingCheckpoint<'db> {
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
-    let use_def = use_def_map(db, scope);
-    let evaluator = use_def.narrowing_evaluator(constraint);
-    let mut projector = NarrowingProjector::new(
-        db,
-        &env,
-        evaluator.narrowing_constraints(),
-        use_def.predicates(),
-        evaluator.predicate_narrowing_targets(),
-        place,
-        base_ty,
-    );
-    let root = projector.project(constraint, false);
-    match root {
-        ProjectedNarrowingNodeId::ALWAYS_FALSE => ProjectedNarrowingCheckpoint::Unreachable,
-        ProjectedNarrowingNodeId::ALWAYS_TRUE => ProjectedNarrowingCheckpoint::Unconstrained,
-        _ => ProjectedNarrowingCheckpoint::Narrowed(projector.narrow_projected(root, base_ty)),
-    }
-}
+// Evaluates a stable suffix with the canonical projected-graph evaluator.
+//
+// The root is projected directly to avoid querying its own checkpoint. Descendant checkpoints
+// contribute their cached types and terminal shape. Nonterminal suffixes are expanded locally only
+// when simplifying a join requires their predicates.
 
 /// Narrows bindings of one place while reusing their shared constraint suffixes.
 pub(crate) struct NarrowingProjector<'a, 'db> {
@@ -1425,6 +1367,83 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         root: ScopedNarrowingConstraint,
         use_root_checkpoint: bool,
     ) -> ProjectedNarrowingNodeId {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, id, _, _, _, _, _| {
+                crate::reachability::ProjectedNarrowingCheckpoint::Narrowed(
+                    crate::types::Type::divergent(id),
+                )
+            },
+            cycle_fn = |db,
+                        cycle,
+                        previous: &ProjectedNarrowingCheckpoint<'db>,
+                        value,
+                        _,
+                        scope: ScopeId<'db>,
+                        _: ScopedPlaceId,
+                        _: ScopedNarrowingConstraint,
+                        base_ty: Type<'db>| {
+                match value {
+                    ProjectedNarrowingCheckpoint::Narrowed(ty) => {
+                        ProjectedNarrowingCheckpoint::Narrowed(ty.cycle_normalized(
+                            db,
+                            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope)),
+                            previous.ty(base_ty),
+                            cycle,
+                        ))
+                    }
+                    _ => value,
+                }
+            },
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn evaluate_projected_narrowing_checkpoint<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            scope: ScopeId<'db>,
+            place: ScopedPlaceId,
+            constraint: ScopedNarrowingConstraint,
+            base_ty: Type<'db>,
+        ) -> ProjectedNarrowingCheckpoint<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, scope, place, constraint, base_ty)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            scope: ScopeId<'db>,
+            place: ScopedPlaceId,
+            constraint: ScopedNarrowingConstraint,
+            base_ty: Type<'db>,
+        ) -> ProjectedNarrowingCheckpoint<'db> {
+            let env = env.in_environment(ProgramEnvironment::from_scope(scope));
+            env.narrowing_checkpoint(scope, place, constraint, base_ty, || {
+                let use_def = use_def_map(db, scope);
+                let evaluator = use_def.narrowing_evaluator(constraint);
+                let mut projector = NarrowingProjector::new(
+                    db,
+                    &env,
+                    evaluator.narrowing_constraints(),
+                    use_def.predicates(),
+                    evaluator.predicate_narrowing_targets(),
+                    place,
+                    base_ty,
+                );
+                let root = projector.project(constraint, false);
+                match root {
+                    ProjectedNarrowingNodeId::ALWAYS_FALSE => {
+                        ProjectedNarrowingCheckpoint::Unreachable
+                    }
+                    ProjectedNarrowingNodeId::ALWAYS_TRUE => {
+                        ProjectedNarrowingCheckpoint::Unconstrained
+                    }
+                    _ => ProjectedNarrowingCheckpoint::Narrowed(
+                        projector.narrow_projected(root, base_ty),
+                    ),
+                }
+            })
+        }
+
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
@@ -1461,13 +1480,25 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                                     | PredicateNode::FinallyNormalPathImpossible { .. }
                             ))
                     {
-                        let checkpoint = evaluate_projected_narrowing_checkpoint(
-                            db,
-                            predicate_scope(db, &predicate),
-                            self.place,
-                            id,
-                            self.base_ty,
-                        );
+                        let checkpoint = *{
+                            let env = self.env;
+                            let scope = predicate_scope(db, &predicate);
+                            let place = self.place;
+                            let base_ty = self.base_ty;
+                            env.cached_or_compute(
+                                || {
+                                    evaluate_projected_narrowing_checkpoint(
+                                        db,
+                                        env.program(db),
+                                        scope,
+                                        place,
+                                        id,
+                                        base_ty,
+                                    )
+                                },
+                                || compute(db, env, scope, place, id, base_ty),
+                            )
+                        };
                         let projected = match checkpoint {
                             ProjectedNarrowingCheckpoint::Unreachable => {
                                 ProjectedNarrowingNodeId::ALWAYS_FALSE
@@ -1750,7 +1781,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                     Type::ClassLiteral(class) => {
-                        Type::instance(db, env, class.top_materialization(db))
+                        Type::instance(db, env, class.top_materialization(db, env))
                     }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         Type::Callable(CallableType::top(db))
@@ -1880,11 +1911,19 @@ pub(crate) fn is_non_terminal_call<'db>(
     let mut all_overloads_return_never = true;
     let mut any_overload_is_generic = false;
 
-    for overload in callables.signatures(db) {
-        let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
-        no_overloads_return_never &= !returns_never;
-        all_overloads_return_never &= returns_never;
-        any_overload_is_generic |= overload.return_ty.has_typevar(db, env);
+    for callable in &callables {
+        callable
+            .inspect_signatures_root(db, env, |_, signatures| {
+                let (none_return_never, all_return_never, any_generic) =
+                    signatures.return_behavior(db);
+                no_overloads_return_never &= none_return_never;
+                all_overloads_return_never &= all_return_never;
+                any_overload_is_generic |= any_generic;
+            })
+            .unwrap_or_else(|| {
+                all_overloads_return_never = false;
+                any_overload_is_generic = true;
+            });
     }
 
     if no_overloads_return_never && !any_overload_is_generic && !is_await {

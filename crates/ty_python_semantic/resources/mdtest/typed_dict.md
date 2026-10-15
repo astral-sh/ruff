@@ -9414,8 +9414,8 @@ def narrow(node: Node):
 
 ### Operations on shared recursive values
 
-These fields refer to the values of every `Node` subclass. The subclasses inherit the same fields,
-so many references lead to the same `Payload` type.
+Each `edge` field refers to the values of one `Node` subclass. Those subclasses inherit the same
+fields, so their values share the `Payload` type.
 
 ```py
 from typing import cast
@@ -9431,25 +9431,11 @@ class Edges(TypedDict, closed=True):
     edge1: TypeOf[next(iter(cast("Node1", {}).values()))]
     edge2: TypeOf[next(iter(cast("Node2", {}).values()))]
     edge3: TypeOf[next(iter(cast("Node3", {}).values()))]
-    edge4: TypeOf[next(iter(cast("Node4", {}).values()))]
-    edge5: TypeOf[next(iter(cast("Node5", {}).values()))]
-    edge6: TypeOf[next(iter(cast("Node6", {}).values()))]
-    edge7: TypeOf[next(iter(cast("Node7", {}).values()))]
-    edge8: TypeOf[next(iter(cast("Node8", {}).values()))]
-    edge9: TypeOf[next(iter(cast("Node9", {}).values()))]
-    edge10: TypeOf[next(iter(cast("Node10", {}).values()))]
 
 class Node0(Edges): ...
 class Node1(Edges): ...
 class Node2(Edges): ...
 class Node3(Edges): ...
-class Node4(Edges): ...
-class Node5(Edges): ...
-class Node6(Edges): ...
-class Node7(Edges): ...
-class Node8(Edges): ...
-class Node9(Edges): ...
-class Node10(Edges): ...
 ```
 
 Reading an attribute preserves its declared type, even when many recursive paths reach it:

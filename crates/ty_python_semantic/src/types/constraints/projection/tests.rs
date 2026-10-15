@@ -108,7 +108,7 @@ fn collect_paths<'db, 'c>(
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
-                budget.charge_type(db, binding.solution)?;
+                budget.charge_type(db, &env, binding.solution)?;
             }
             let mut path = path.to_vec();
             path.sort_by_key(|binding| {
@@ -178,7 +178,7 @@ fn invalid_paths_respect_projection_budgets() {
     let str = known_instance(db, KnownClass::Str);
     let bool = known_instance(db, KnownClass::Bool);
     let bytes = known_instance(db, KnownClass::Bytes);
-    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
         Some(TypeVarBoundOrConstraints::Constraints(
             TypeVarConstraints::new(db, [int, str].as_slice()),
         ))
@@ -254,7 +254,7 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
     let bool = known_instance(db, KnownClass::Bool);
     let bytes = known_instance(db, KnownClass::Bytes);
     let declared_constraints = TypeVarConstraints::new(db, [int, str].as_slice());
-    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
         Some(TypeVarBoundOrConstraints::Constraints(declared_constraints))
     });
     let builder = ConstraintSetBuilder::new();
@@ -320,8 +320,9 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
     let db = &db;
     let env = db.program_environment();
     let str = known_instance(db, KnownClass::Str);
-    let t = create_typevar(db, "T")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(str))
+    });
     let s = create_typevar(db, "S");
     let u = create_typevar(db, "U");
     let inferable = TypeVarSet::from_typevars(db, [t]);
@@ -385,8 +386,9 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
     let db = &db;
     let env = db.program_environment();
     let str = known_instance(db, KnownClass::Str);
-    let t = create_typevar(db, "T")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(str))
+    });
     let s = create_typevar(db, "S");
     let builder = ConstraintSetBuilder::new();
     let set = ConstraintSet::constrain_typevar_lower_bound(
@@ -438,7 +440,7 @@ fn upper_bound_checks_mixed_evidence_after_substitution() {
     let env = db.program_environment();
     let str = known_instance(db, KnownClass::Str);
     let list_str = KnownClass::List.to_specialized_instance(db, &env, &[str]);
-    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
         Some(TypeVarBoundOrConstraints::UpperBound(list_str))
     });
     let u = create_typevar(db, "U");
@@ -473,12 +475,13 @@ fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
     let env = db.program_environment();
     let str = known_instance(db, KnownClass::Str);
     let iterable_str = KnownClass::Iterable.to_specialized_instance(db, &env, &[str]);
-    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
         Some(TypeVarBoundOrConstraints::UpperBound(iterable_str))
     });
     let u = create_typevar(db, "U");
-    let s = create_typevar(db, "S")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S").map_bound_or_constraints(db, &env, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(str))
+    });
     let list_s = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
     let builder = ConstraintSetBuilder::new();
     let set = ConstraintSet::constrain_typevar_lower_bound(
@@ -521,8 +524,9 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         )
         .bind_self_with_receiver(db, &env, Some(int), None),
     );
-    let t = create_typevar(db, "T")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, &env, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(bound))
+    });
     let builder = ConstraintSetBuilder::new();
     let set = ConstraintSet::constrain_typevar_lower_bound(
         db,
@@ -797,7 +801,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         Vec::new(),
                         |mut paths, path, budget| {
                             for binding in path {
-                                budget.charge_type(db, binding.solution)?;
+                                budget.charge_type(db, &env, binding.solution)?;
                             }
                             paths.push(solution(path.iter().copied()));
                             Ok(paths)
@@ -904,7 +908,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
                 let ty = path[0].solution;
-                budget.charge_type(db, ty)?;
+                budget.charge_type(db, &env, ty)?;
                 constructed += 1;
                 Ok(UnionType::from_two_elements(db, &env, accumulated, ty))
             },
@@ -972,10 +976,13 @@ type Recursive = int | Recursive
         (alias("Recursive")?, 2),
     ] {
         assert_eq!(
-            ProjectionTypeBudget::new(terms - 1).charge_type(db, ty),
+            ProjectionTypeBudget::new(terms - 1).charge_type(db, &env, ty),
             Err(ProjectionError::TypeBudgetExceeded)
         );
-        assert_eq!(ProjectionTypeBudget::new(terms).charge_type(db, ty), Ok(()));
+        assert_eq!(
+            ProjectionTypeBudget::new(terms).charge_type(db, &env, ty),
+            Ok(())
+        );
     }
     Ok(())
 }
@@ -1032,7 +1039,7 @@ class E: ...
                 |accumulated, path, budget| {
                     assert_eq!(path.len(), 1);
                     let ty = path[0].solution;
-                    budget.charge_type(db, ty)?;
+                    budget.charge_type(db, &env, ty)?;
                     IntersectionType::bounded_from_elements(db, &env, [accumulated, ty])
                         .ok_or(ProjectionError::TypeBudgetExceeded)
                 },

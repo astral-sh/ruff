@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use compact_str::CompactString;
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath};
@@ -29,9 +30,9 @@ use crate::place_load::{
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleKind, ProgramEnvironment, SpecialFormType, Type, TypeOperations, TypeQualifiers,
-    TypeQuery, TypeQueryContext, binding_type, infer_complete_scope_types, infer_definition_types,
-    inferred_declaration, is_discarded_dict_key_assignment,
+    ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
+    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
@@ -54,8 +55,8 @@ use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
 /// methods will automatically handle using the string literal's AST node when necessary.
 pub struct SemanticModel<'db> {
     db: &'db dyn Db,
-    operations: TypeOperations<'db>,
     file: ProgramFile<'db>,
+    operations: TypeOperations<'db>,
     /// If `Some` then this `SemanticModel` is for analyzing the sub-AST of a string annotation.
     /// This expression will be used as a witness to the scope/location we're analyzing.
     in_string_annotation_expr: Option<Box<Expr>>,
@@ -63,10 +64,18 @@ pub struct SemanticModel<'db> {
 
 impl<'db> SemanticModel<'db> {
     pub fn new(db: &'db dyn Db, file: ProgramFile<'db>) -> Self {
+        TypeOperations::semantic_model(db, file)
+    }
+
+    pub(crate) fn with_operations(
+        db: &'db dyn Db,
+        file: ProgramFile<'db>,
+        operations: TypeOperations<'db>,
+    ) -> Self {
         Self {
             db,
-            operations: TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
             file,
+            operations,
             in_string_annotation_expr: None,
         }
     }
@@ -91,8 +100,8 @@ impl<'db> SemanticModel<'db> {
         self.file.program(self.db)
     }
 
-    pub fn program_environment(&self) -> &TypeOperations<'db> {
-        &self.operations
+    pub fn program_environment(&self) -> TypeOperations<'db> {
+        self.operations.clone()
     }
 
     pub fn file_path(&self) -> &FilePath {
@@ -132,8 +141,8 @@ impl<'db> SemanticModel<'db> {
         }
 
         let env = self.program_environment();
-        implicit_builtins_symbol_scope(self.db, env, name)
-            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, env))
+        implicit_builtins_symbol_scope(self.db, &env, name)
+            .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
     }
 
     /// Returns a map from symbol name to that symbol's
@@ -158,9 +167,11 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .rev()
         {
-            for memberdef in
-                all_reachable_members(db, file_scope.to_scope_id(self.db, program_file))
-            {
+            for memberdef in all_reachable_members(
+                db,
+                &self.operations,
+                file_scope.to_scope_id(self.db, program_file),
+            ) {
                 members.insert(
                     memberdef.member.name,
                     MemberDefinition {
@@ -274,7 +285,7 @@ impl<'db> SemanticModel<'db> {
             clippy::iter_over_hash_type,
             reason = "completion order is determined later by relevance ranking"
         )]
-        for member in all_members(db, self.program_environment(), ty) {
+        for member in all_members(db, &self.program_environment(), ty) {
             completions.push(Completion {
                 name: CompactString::new(member.name),
                 ty: Some(member.ty),
@@ -311,7 +322,7 @@ impl<'db> SemanticModel<'db> {
             return Vec::new();
         };
 
-        all_members(db, self.program_environment(), ty)
+        all_members(db, &self.program_environment(), ty)
             .into_iter()
             .map(|member| Completion {
                 name: CompactString::new(member.name),
@@ -337,14 +348,17 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_reachable_members(db, file_scope.to_scope_id(self.db, program_file)).map(
-                    |memberdef| Completion {
-                        name: CompactString::new(memberdef.member.name),
-                        ty: Some(memberdef.member.ty),
-                        builtin: false,
-                        is_type_check_only: memberdef.member.is_type_check_only,
-                    },
-                ),
+                all_reachable_members(
+                    db,
+                    &self.operations,
+                    file_scope.to_scope_id(self.db, program_file),
+                )
+                .map(|memberdef| Completion {
+                    name: CompactString::new(memberdef.member.name),
+                    ty: Some(memberdef.member.ty),
+                    builtin: false,
+                    is_type_check_only: memberdef.member.is_type_check_only,
+                }),
             );
         }
 
@@ -353,11 +367,13 @@ impl<'db> SemanticModel<'db> {
         // keeps the correct types (e.g., `__file__` is `str` for the current module,
         // not `str | None`).
         completions.extend(
-            all_implicit_module_globals(self.db, self.file).map(|(name, ty)| Completion {
-                name: CompactString::new(name),
-                ty: Some(ty),
-                builtin: true,
-                is_type_check_only: false,
+            all_implicit_module_globals(self.db, &self.operations, self.file).map(|(name, ty)| {
+                Completion {
+                    name: CompactString::new(name),
+                    ty: Some(ty),
+                    builtin: true,
+                    is_type_check_only: false,
+                }
             }),
         );
 
@@ -569,8 +585,8 @@ impl<'db> SemanticModel<'db> {
         let ast = parsed_string_annotation(source.as_str(), string_literal).ok()?;
         let model = Self {
             db: self.db,
-            operations: self.operations.clone(),
             file: self.file,
+            operations: self.operations.clone(),
             // Use expr_in_ast here because we might be entering a sub-sub-AST
             in_string_annotation_expr: Some(Box::new(
                 self.expr_in_ast(&Expr::StringLiteral(string_expr.clone()))
@@ -633,7 +649,7 @@ impl<'db> SemanticModel<'db> {
                 value_ty
                     .member_lookup_with_policy(
                         db,
-                        self.program_environment(),
+                        &self.program_environment(),
                         &attr.attr.id,
                         crate::types::MemberLookupPolicy::default(),
                     )
@@ -653,63 +669,19 @@ impl<'db> SemanticModel<'db> {
         string_expr: &ast::ExprStringLiteral,
         subscript: Option<&ast::ExprSubscript>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
-        struct StringLiteralCandidates;
-
-        impl<'db> TypeQuery<'db> for StringLiteralCandidates {
-            type Output = Vec<ExpectedStringLiteralCompletion<'db>>;
-
-            fn on_cycle(
-                &self,
-                _traversal: &TypeQueryContext<'_, 'db, Self>,
-                _ty: Type<'db>,
-                _kind: CycleKind,
-                _state: (),
-            ) -> Self::Output {
-                Vec::new()
-            }
-
-            fn visit(
-                &self,
-                db: &'db dyn Db,
-                traversal: &TypeQueryContext<'_, 'db, Self>,
-                ty: Type<'db>,
-                _state: (),
-            ) -> Self::Output {
-                match ty {
-                    Type::LiteralValue(literal) => literal
-                        .as_string()
-                        .map(|string_literal| {
-                            let value = string_literal.value(db).to_string();
-                            vec![ExpectedStringLiteralCompletion {
-                                ty: Type::string_literal(db, &*value),
-                                value,
-                            }]
-                        })
-                        .unwrap_or_default(),
-                    Type::Union(union) => union
-                        .elements(db)
-                        .iter()
-                        .flat_map(|element| traversal.visit(db, *element))
-                        .collect(),
-                    Type::Intersection(intersection) => intersection
-                        .positive(db)
-                        .iter()
-                        .flat_map(|element| traversal.visit(db, *element))
-                        .collect(),
-                    _ => Vec::new(),
-                }
-            }
-        }
         let db = self.db;
 
         let expected_ty = self.string_literal_completion_expected_type(string_expr);
         let mut candidates = expected_ty
             .map(|expected_ty| {
-                TypeQueryContext::with_root(
-                    self.program_environment(),
-                    StringLiteralCandidates,
-                    |root| root.visit(db, expected_ty),
-                )
+                expected_ty
+                    .string_literal_candidates(db, &self.program_environment())
+                    .into_iter()
+                    .map(|value| ExpectedStringLiteralCompletion {
+                        ty: Type::string_literal(db, value.as_str()),
+                        value,
+                    })
+                    .collect::<Vec<_>>()
             })
             .unwrap_or_default();
         // Finite choices from the expected type take precedence. A string used as the complete
@@ -727,7 +699,7 @@ impl<'db> SemanticModel<'db> {
                 candidates.retain(|candidate| {
                     candidate
                         .ty
-                        .is_assignable_to(db, self.program_environment(), expected_ty)
+                        .is_assignable_to(db, &self.program_environment(), expected_ty)
                 });
             }
         }
@@ -831,7 +803,7 @@ impl<'db> SemanticModel<'db> {
                     PlaceLoadSourceKind::Bindings(bindings) => {
                         let bound = place_from_bindings(
                             self.db,
-                            self.program_environment(),
+                            &self.program_environment(),
                             bindings.clone(),
                         )
                         .place
@@ -851,7 +823,7 @@ impl<'db> SemanticModel<'db> {
                         break;
                     }
                     PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name)) => {
-                        if class_body_implicit_symbol(self.db, self.program_environment(), &name)
+                        if class_body_implicit_symbol(self.db, &self.program_environment(), &name)
                             .place
                             .is_definitely_bound()
                         {
@@ -909,7 +881,7 @@ impl<'db> SemanticModel<'db> {
             }
             _ => return,
         };
-        let env = TypeOperations::new_root(self.db, ProgramEnvironment::from_file(file));
+        let env = ProgramEnvironment::from_file(file);
         let importing_file =
             ImportingFile::File(file.file(self.db), env.resolver_environment(self.db));
         let Some(target_file) = resolve_module_for_import_from(self.db, importing_file, import)

@@ -1,5 +1,7 @@
-use crate::types::recursive::RecursiveReferenceMapper;
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::{RecursiveReferenceMapper, TypeQueryVisit};
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -95,6 +97,41 @@ pub enum MethodWrapperKind {
     Classmethod,
 }
 
+struct MethodDescriptor<'db> {
+    db: &'db dyn Db,
+    kind: MethodWrapperKind,
+}
+
+impl<'db> super::TypeQuery<'db> for MethodDescriptor<'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::MethodDescriptor(self.kind)
+    }
+
+    type Output = Type<'db>;
+
+    fn on_cycle(
+        &self,
+        _context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        _kind: super::CycleKind,
+        (): (),
+    ) -> Self::Output {
+        Type::KnownInstance(KnownInstanceType::MethodWrapper(MethodWrapper::new(
+            self.db, ty, self.kind,
+        )))
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        (): (),
+    ) -> Self::Output {
+        MethodWrapper::wrap_body(db, context, ty, self.kind)
+    }
+}
+
 impl<'db> MethodWrapper<'db> {
     /// Construct a method descriptor, retaining function and callable representations that
     /// already encode the matching descriptor binding. Other callables need a separate wrapper
@@ -105,6 +142,18 @@ impl<'db> MethodWrapper<'db> {
         wrapped: Type<'db>,
         kind: MethodWrapperKind,
     ) -> Type<'db> {
+        super::TypeQueryContext::with_root(env, MethodDescriptor { db, kind }, |context| {
+            context.visit(db, wrapped)
+        })
+    }
+
+    fn wrap_body(
+        db: &'db dyn Db,
+        context: &super::TypeQueryContext<'_, 'db, MethodDescriptor<'db>>,
+        wrapped: Type<'db>,
+        kind: MethodWrapperKind,
+    ) -> Type<'db> {
+        let env = context.environment();
         match wrapped {
             // Descriptor access can expose the ordinary function while retaining its declaration
             // metadata. Reapplying the declared wrapper restores its descriptor state.
@@ -142,8 +191,7 @@ impl<'db> MethodWrapper<'db> {
             {
                 wrapped
             }
-            Type::Union(union) => union.map(db, env, |element| Self::wrap(db, env, *element, kind)),
-            Type::TypeAlias(alias) => Self::wrap(db, env, alias.value_type(db), kind),
+            Type::Union(union) => union.map(db, env, |element| context.visit(db, *element)),
             _ => Type::KnownInstance(KnownInstanceType::MethodWrapper(Self::new(
                 db, wrapped, kind,
             ))),
@@ -311,7 +359,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type_var_type(db, typevar);
         }
         KnownInstanceType::TypeAliasType(type_alias) => {
-            visitor.visit_type_alias_type(db, type_alias);
+            visitor.visit_type_contents(db, Type::TypeAlias(type_alias));
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }
@@ -346,10 +394,10 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type(db, ty.inner(db));
         }
         KnownInstanceType::Callable(callable) => {
-            visitor.visit_callable_type(db, callable);
+            visitor.visit_type_contents(db, Type::Callable(callable));
         }
         KnownInstanceType::NewType(newtype) => {
-            visitor.visit_newtype_instance_type(db, newtype);
+            visitor.visit_type_contents(db, Type::NewTypeInstance(newtype));
         }
         KnownInstanceType::Sentinel(_) => {
             // Nothing to visit
@@ -361,7 +409,8 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::FunctoolsPartial(partial)
         | KnownInstanceType::FunctoolsPartialCall(partial) => {
-            visitor.visit_callable_type(db, partial.partial(db));
+            visitor.visit_type(db, partial.wrapped(db).inner(db));
+            visitor.visit_type(db, Type::Callable(partial.partial(db)));
         }
         KnownInstanceType::MethodWrapper(wrapper) => {
             visitor.visit_type(db, wrapper.wrapped(db));
@@ -377,9 +426,9 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self {
-            KnownInstanceType::TypeAliasType(type_alias) => {
-                type_alias.raw_value_type(db).variance_of(db, env, typevar)
-            }
+            KnownInstanceType::TypeAliasType(type_alias) => type_alias
+                .inspect_definition(db, env, |body| body.variance_of(db, typevar))
+                .unwrap_or(VarianceTerm::BIVARIANT),
             KnownInstanceType::MethodWrapper(wrapper) => {
                 wrapper.wrapped(db).variance_of(db, env, typevar)
             }
@@ -663,7 +712,6 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
-                | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
@@ -929,15 +977,22 @@ impl<'db> UnionTypeInstance<'db> {
 
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
+        let env = env.in_environment(ProgramEnvironment::from_scope(scope_id));
         let mut builder = UnionBuilder::new(db, &env);
         for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context, inference_flags) {
+            match ty.in_type_expression(
+                db,
+                &env,
+                scope_id,
+                typevar_binding_context,
+                inference_flags,
+            ) {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(

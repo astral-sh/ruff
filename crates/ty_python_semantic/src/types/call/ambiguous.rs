@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::generics::Specialization;
-use crate::types::recursive::TypeInspector;
+use crate::types::recursive::{TypeInspectionKey, TypeInspector};
 use crate::types::tuple::{TupleSpec, TupleType, VariableSegment};
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -45,18 +45,29 @@ impl<'db> HasIdentity<'db> for ReturnTypes<'db> {
                 .all(|(left, right)| left.may_share_type_identity(db, *right))
     }
 
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+    fn to_identity(&self, db: &'db dyn Db, _env: &TypeOperations<'db>) -> Self::Id {
         self.0.iter().map(|ty| ty.to_type_identity(db)).collect()
     }
 }
 
-struct AmbiguousReturnMerger<'env, 'db> {
+pub(in crate::types) struct AmbiguousReturnMerger<'env, 'db> {
     db: &'db dyn Db,
     env: &'env TypeOperations<'db>,
     visitor: CycleDetector<'db, MergeAmbiguousReturns, ReturnTypes<'db>, Type<'db>, 1>,
 }
 
 impl<'db> AmbiguousReturnMerger<'_, 'db> {
+    pub(in crate::types) fn merge_expanded_column(
+        &self,
+        types: &[Type<'db>],
+        index: usize,
+        expanded: Type<'db>,
+    ) -> Type<'db> {
+        let mut types = types.to_vec();
+        types[index] = expanded;
+        self.merge(&types)
+    }
+
     fn merge(&self, types: &[Type<'db>]) -> Type<'db> {
         // Differing leaves retain this marker so cycle recovery can recognize when overload
         // ambiguity caused a loss of precision.
@@ -72,9 +83,10 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             return equivalent;
         }
 
-        self.visitor.visit(self.db, ReturnTypes(types.into()), || {
-            self.merge_structure(types).unwrap_or(unknown)
-        })
+        self.visitor
+            .visit(self.db, self.env, ReturnTypes(types.into()), || {
+                self.merge_structure(types).unwrap_or(unknown)
+            })
     }
 
     fn equivalent_representative(&self, types: &[Type<'db>]) -> Option<Type<'db>> {
@@ -114,13 +126,10 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             return Some(TypeInspector::inspect_root(
                 db,
                 env,
+                TypeInspectionKey::MergeAmbiguousReturn(index),
                 *ty,
                 |_, _| Type::Dynamic(DynamicType::AmbiguousOverload),
-                |_, expanded| {
-                    let mut types = types.to_vec();
-                    types[index] = expanded;
-                    self.merge(&types)
-                },
+                |_, expanded| expanded.merge_ambiguous_return(self, types, index),
             ));
         }
 
@@ -171,9 +180,11 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         let env = self.env;
         match ty {
             Type::SubclassOf(subclass) => Some(subclass.to_instance(db, env)),
-            Type::ClassLiteral(class) => {
-                Some(Type::instance(db, env, class.default_specialization(db)))
-            }
+            Type::ClassLiteral(class) => Some(Type::instance(
+                db,
+                env,
+                class.default_specialization(db, env),
+            )),
             Type::GenericAlias(alias) => Some(Type::instance(db, env, ClassType::Generic(alias))),
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 Some(Type::object())

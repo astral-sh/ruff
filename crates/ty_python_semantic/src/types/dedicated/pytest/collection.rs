@@ -61,6 +61,7 @@
 //! [test-discovery]: https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery
 //! [unittest-tests]: https://docs.pytest.org/en/stable/how-to/unittest.html
 
+use crate::types::TypeOperations;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
@@ -75,7 +76,7 @@ use crate::types::function::FunctionType;
 use crate::types::infer::{function_known_decorators, original_class_type};
 use crate::types::{
     ClassBase, ClassLiteral, KnownClass, MemberLookupPolicy, ProgramEnvironment, Type,
-    TypeOperations, binding_type, definition_expression_type,
+    binding_type, definition_expression_type,
 };
 
 /// Returns the tests that pytest collects from `file` under the default collection conventions.
@@ -391,14 +392,14 @@ fn pytest_test_class_kind<'db>(
     if Type::ClassLiteral(class).is_subtype_of(db, &env, KnownClass::ABCMeta.to_instance(db, &env))
         && class
             .identity_specialization(db)
-            .abstract_methods(db)
+            .abstract_methods(db, &env)
             .values()
             .any(|method| method.kind.is_explicit())
     {
         return None;
     }
 
-    if is_unittest_test_case(db, class) {
+    if is_unittest_test_case(db, &env, class) {
         return Some(PytestTestKind::StdlibUnittest);
     }
 
@@ -436,9 +437,13 @@ fn has_default_pytest_constructors<'db>(db: &'db dyn Db, class: ClassLiteral<'db
 }
 
 /// Returns whether the class inherits from the canonical `unittest.TestCase`.
-fn is_unittest_test_case(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+fn is_unittest_test_case<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: ClassLiteral<'db>,
+) -> bool {
     class
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|ancestor| ancestor.is_known(db, KnownClass::UnittestTestCase))
 }
@@ -447,7 +452,7 @@ fn is_unittest_test_case(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
 fn has_unittest_test_methods<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
     let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
     class
-        .iter_mro(db)
+        .iter_mro(db, &env)
         .filter_map(ClassBase::into_class)
         .filter_map(|ancestor| ancestor.static_class_literal(db))
         .any(|(ancestor, _)| {

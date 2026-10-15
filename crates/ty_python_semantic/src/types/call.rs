@@ -1,14 +1,21 @@
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
+use std::borrow::Cow;
+
 use super::context::InferContext;
-use super::{ClassType, Signature, Type, TypeContext, UnionType};
+use super::{
+    ClassType, CycleKind, Signature, Type, TypeContext, TypeQuery, TypeQueryContext, UnionType,
+};
 use crate::Db;
 use crate::place::Provenance;
+use crate::types::TypeOperations;
 use crate::types::call::bind::BindingError;
 use crate::types::function::OverloadLiteral;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
-use crate::{Program, ProgramEnvironment, TypeOperations};
+use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
 
-mod ambiguous;
+pub(super) mod ambiguous;
 mod arguments;
 pub(crate) mod bind;
 pub(super) use arguments::{Argument, CallArguments};
@@ -41,11 +48,42 @@ enum ReflectedMethodPriority {
 /// This is intentionally conservative: a false negative only widens a binary operation's result,
 /// while a false positive could discard a valid normal-method result.
 fn has_exact_runtime_class<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
-    match ty {
-        Type::ClassLiteral(_) | Type::LiteralValue(_) => true,
-        Type::NominalInstance(instance) => instance.class(db, env).is_final(db),
-        Type::TypeAlias(alias) => has_exact_runtime_class(db, env, alias.value_type(db)),
-        _ => false,
+    TypeQueryContext::with_root(env, HasExactRuntimeClass, |query| query.visit(db, ty))
+}
+
+struct HasExactRuntimeClass;
+
+impl<'db> TypeQuery<'db> for HasExactRuntimeClass {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::HasExactRuntimeClass
+    }
+
+    type Output = bool;
+
+    fn on_cycle(
+        &self,
+        _context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        (): (),
+    ) -> bool {
+        false
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        (): (),
+    ) -> bool {
+        match ty {
+            Type::ClassLiteral(_) | Type::LiteralValue(_) => true,
+            Type::NominalInstance(instance) => {
+                instance.class(db, context.environment()).is_final(db)
+            }
+            _ => false,
+        }
     }
 }
 
@@ -59,7 +97,7 @@ fn operator_dispatch_class<'db>(
     ty: Type<'db>,
 ) -> Option<ClassType<'db>> {
     match ty {
-        Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db),
+        Type::ClassLiteral(class) => class.metaclass(db).to_class_type(db, env),
         _ => ty.nominal_class(db, env),
     }
 }
@@ -113,7 +151,7 @@ fn reflected_method_priority<'db>(
         operator_dispatch_class(db, env, left_ty),
         operator_dispatch_class(db, env, right_ty),
     ) && left_class.class_literal(db) != right_class.class_literal(db)
-        && right_class.is_subtype_of_class_literal(db, left_class.class_literal(db))
+        && right_class.is_subtype_of_class_literal(db, env, left_class.class_literal(db))
     {
         if has_exact_runtime_class(db, env, left_ty) {
             ReflectedMethodPriority::Definitely
@@ -200,28 +238,63 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
-    ) -> Option<&'db BinaryOperationResult<'db>> {
-        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn try_call_bin_op_result_impl<'db>(
+    ) -> Option<Cow<'db, BinaryOperationResult<'db>>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _, _, _| None,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn type_try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             left_ty: Type<'db>,
             op: ast::Operator,
             right_ty: Type<'db>,
         ) -> Option<BinaryOperationResult<'db>> {
-            let env = &TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
-            Type::try_call_bin_op(db, env, left_ty, op, right_ty)
-                .ok()
-                .map(|bindings| BinaryOperationResult {
-                    return_type: bindings.return_type(db, env),
-                    deprecated_functions: bindings
-                        .deprecated_functions(db)
-                        .map(|(_, function)| function)
-                        .collect(),
-                })
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, program, left_ty, op, right_ty)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            program: Program<'db>,
+            left_ty: Type<'db>,
+            op: ast::Operator,
+            right_ty: Type<'db>,
+        ) -> Option<BinaryOperationResult<'db>> {
+            let env = &env.in_environment(ProgramEnvironment::from_program(program));
+            Type::compute_binary_operation_result(db, env, left_ty, op, right_ty)
         }
 
-        try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty).as_ref()
+        let res = {
+            let program = env.program(db);
+            env.cached_or_compute(
+                || type_try_call_bin_op_result_impl(db, program, left_ty, op, right_ty),
+                || compute(db, env, program, left_ty, op, right_ty),
+            )
+        };
+        match res {
+            Cow::Borrowed(result) => result.as_ref().map(Cow::Borrowed),
+            Cow::Owned(result) => result.map(Cow::Owned),
+        }
+    }
+
+    fn compute_binary_operation_result(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+    ) -> Option<BinaryOperationResult<'db>> {
+        Type::try_call_bin_op(db, env, left_ty, op, right_ty)
+            .ok()
+            .map(|bindings| BinaryOperationResult {
+                return_type: bindings.return_type(db, env),
+                deprecated_functions: bindings
+                    .deprecated_functions(db)
+                    .map(|(_, function)| function)
+                    .collect(),
+            })
     }
 
     pub(crate) fn try_call_bin_op(

@@ -1,4 +1,4 @@
-use crate::TypeOperations;
+use crate::types::TypeOperations;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -104,12 +104,12 @@ fn validate_typed_dict_field_overrides<'db>(
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db);
-    let own_fields = class.own_fields(db, None, CodeGeneratorKind::TypedDict);
+    let child_fields = TypedDictType::new(class.identity_specialization(db)).items(db, env);
+    let own_fields = class.own_fields(db, env, None, CodeGeneratorKind::TypedDict);
     let mut reported_fields = FxHashSet::default();
 
     for base in direct_bases {
-        for (field_name, base_field) in TypedDictType::new(*base).items(db) {
+        for (field_name, base_field) in TypedDictType::new(*base).items(db, env).iter() {
             let Some(child_field) = child_fields.get(field_name.as_str()) else {
                 continue;
             };
@@ -155,8 +155,8 @@ fn validate_typed_dict_openness<'db>(
     let db = context.db();
     let env = context.program_environment();
     let child = TypedDictType::new(class.identity_specialization(db));
-    let child_openness = child.openness(db);
-    let child_items = child.items(db);
+    let child_openness = child.openness(db, env);
+    let child_items = child.items(db, env);
 
     if let Some(arguments) = class_node.arguments.as_deref()
         && arguments.find_keyword("closed").is_some()
@@ -171,8 +171,8 @@ fn validate_typed_dict_openness<'db>(
 
     for base in direct_bases {
         let base_typed_dict = TypedDictType::new(*base);
-        let base_openness = base_typed_dict.openness(db);
-        let base_items = base_typed_dict.items(db);
+        let base_openness = base_typed_dict.openness(db, env);
+        let base_items = base_typed_dict.items(db, env);
 
         match base_openness {
             TypedDictOpenness::ImplicitlyOpen => {}

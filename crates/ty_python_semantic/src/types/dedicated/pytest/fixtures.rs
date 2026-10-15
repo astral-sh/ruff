@@ -42,6 +42,7 @@
 //!   available by that definition, including those reached through imports. Each exposure records the
 //!   fixture's public name, canonical declaration, and local and source bindings.
 
+use crate::types::TypeOperations;
 use std::cmp::Ordering;
 
 use itertools::Either;
@@ -68,10 +69,10 @@ use crate::lexical_name_path::lexical_name_path_for_definition;
 use crate::place::definitions::DefinitionResolution;
 use crate::types::function::{FunctionType, KnownFunction};
 use crate::types::infer::{function_known_decorators, infer_definition_types, original_class_type};
-use crate::types::signatures::Parameter as SignatureParameter;
+use crate::types::signatures::ParameterMetadata;
 use crate::types::{
-    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, TypeOperations,
-    definition_expression_type, extract_fixed_length_iterable_element_types, may_exist_at_runtime,
+    ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, Type, definition_expression_type,
+    extract_fixed_length_iterable_element_types, may_exist_at_runtime,
 };
 use crate::{Db, FxIndexMap, FxIndexSet};
 
@@ -132,7 +133,8 @@ pub fn fixture_bindings_for_parameter<'db>(
     db: &'db dyn Db,
     parameter: Definition<'db>,
 ) -> Box<[FixtureBinding<'db>]> {
-    let Some(request) = fixture_request_for_parameter(db, parameter) else {
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_definition(parameter));
+    let Some(request) = fixture_request_for_parameter(db, env, parameter) else {
         return Box::default();
     };
 
@@ -161,7 +163,8 @@ pub fn fixture_bindings_for_parameter<'db>(
             let Some(class) = original_class_type(db, class_definition) else {
                 return Box::default();
             };
-            let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(class));
+            let bindings =
+                bindings_in_search_scope(db, env, &request, FixtureSearchScope::Class(class));
             if !bindings.is_empty() {
                 return bindings;
             }
@@ -172,6 +175,7 @@ pub fn fixture_bindings_for_parameter<'db>(
     let request_file = parameter.program_file(db);
     let bindings = bindings_in_search_scope(
         db,
+        env,
         &request,
         FixtureSearchScope::Scope(global_scope(db, request_file)),
     );
@@ -183,6 +187,7 @@ pub fn fixture_bindings_for_parameter<'db>(
     for conftest in conftest_files(db, request_file) {
         let bindings = bindings_in_search_scope(
             db,
+            env,
             &request,
             FixtureSearchScope::Scope(global_scope(db, conftest)),
         );
@@ -194,7 +199,8 @@ pub fn fixture_bindings_for_parameter<'db>(
     // Finally, search installed core plugins in reverse registration order. The legacy
     // temporary-directory plugin is registered after the static core plugins, so it comes first.
     if let Some(plugin) = pytest_legacy_tmpdir_plugin(db, request_file.program(db)) {
-        let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(plugin));
+        let bindings =
+            bindings_in_search_scope(db, env, &request, FixtureSearchScope::Class(plugin));
         if !bindings.is_empty() {
             return bindings;
         }
@@ -205,6 +211,7 @@ pub fn fixture_bindings_for_parameter<'db>(
     {
         let bindings = bindings_in_search_scope(
             db,
+            env,
             &request,
             FixtureSearchScope::Scope(global_scope(db, *plugin)),
         );
@@ -428,6 +435,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     /// through one or more parameters.
     fn new(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         function_ref: &'db AstNodeRef<ast::StmtFunctionDef>,
         class_scope: Option<FileScopeId>,
         module: &'ast ParsedModuleRef,
@@ -468,7 +476,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
             index,
             class_scope,
             is_fixture_dependency,
-            mock_patch_count: mock_patch_count(db, function_definition, function),
+            mock_patch_count: mock_patch_count(db, env, function_definition, function),
         })
     }
 
@@ -489,38 +497,43 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     fn fixture_request_for_parameter(
         &self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         definition: Definition<'db>,
     ) -> Option<FixtureRequest<'db>> {
-        let signature_parameters = self
-            .function_type
-            .last_definition_signature(db)
-            .parameters();
+        let signature_parameters =
+            self.function_type
+                .inspect_last_definition_signature(db, env, |signatures| {
+                    signatures.single_parameter_metadata()
+                })?;
         let parameter = signature_parameters
             .iter()
-            .find(|parameter| parameter.definition() == Some(definition))?;
-        let parameter_name = parameter.keyword_name()?;
+            .find(|parameter| parameter.definition == Some(definition))?;
+        let parameter_name = parameter.keyword_name.as_ref()?;
 
         // Match pytest's logic for only injecting fixtures for required
         // parameters and by keyword:
         // https://docs.pytest.org/en/9.0.x/how-to/fixtures.html#requesting-fixtures
         // https://github.com/pytest-dev/pytest/blob/9.0.1/src/_pytest/compat.py#L145-L153
-        if parameter.has_default() {
+        if parameter.has_default {
             return None;
         }
 
         if self.function_type.has_implicit_receiver(db)
             && signature_parameters
-                .get_positional(0)
-                .is_some_and(|parameter| parameter.definition() == Some(definition))
+                .iter()
+                .find(|parameter| parameter.is_positional)
+                .is_some_and(|parameter| parameter.definition == Some(definition))
         {
             return None;
         }
 
-        if self.is_mock_patch_parameter(db, definition) {
+        if self.is_mock_patch_parameter(db, &signature_parameters, definition) {
             return None;
         }
 
-        if !self.is_fixture_dependency && self.directly_parametrized(db, parameter_name.as_str()) {
+        if !self.is_fixture_dependency
+            && self.directly_parametrized(db, env, parameter_name.as_str())
+        {
             return None;
         }
 
@@ -535,42 +548,48 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
     fn is_mock_patch_parameter(
         &self,
         db: &'db dyn Db,
+        parameters: &[ParameterMetadata<'db>],
         parameter_definition: Definition<'db>,
     ) -> bool {
         if self.mock_patch_count == 0 {
             return false;
         }
 
-        let signature = self.function_type.last_definition_signature(db);
-        let parameters = signature.parameters();
-        let is_source_keyword_parameter = |parameter: &SignatureParameter<'db>| {
-            parameter.keyword_name().is_some()
+        let is_source_keyword_parameter = |parameter: &ParameterMetadata<'db>| {
+            parameter.keyword_name.is_some()
                 // ty applies PEP 484's legacy positional-only convention to leading `__name`
                 // parameters, but Python and pytest still inspect them as positional-or-keyword.
                 || (self.function.parameters.posonlyargs.is_empty()
-                    && parameter.is_positional_only())
+                    && parameter.is_positional_only)
         };
         let skips_receiver = self.function_type.has_implicit_receiver(db)
             && parameters
-                .get_positional(0)
+                .iter()
+                .find(|parameter| parameter.is_positional)
                 .is_some_and(is_source_keyword_parameter);
 
         parameters
             .iter()
-            .filter(|parameter| is_source_keyword_parameter(parameter) && !parameter.has_default())
+            .filter(|parameter| is_source_keyword_parameter(parameter) && !parameter.has_default)
             .skip(usize::from(skips_receiver))
             .take(self.mock_patch_count)
-            .any(|candidate| candidate.definition() == Some(parameter_definition))
+            .any(|candidate| candidate.definition == Some(parameter_definition))
     }
 
     /// Returns whether static parametrization on the function or an enclosing class prevents this
     /// fixture request.
-    fn directly_parametrized(&self, db: &'db dyn Db, parameter_name: &str) -> bool {
+    fn directly_parametrized(
+        &self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        parameter_name: &str,
+    ) -> bool {
         if !self.function.decorator_list.is_empty() {
             let decorators = function_known_decorators(db, self.function_definition);
             if self.function.decorator_list.iter().any(|decorator| {
                 mark_excludes_fixture(
                     db,
+                    env,
                     self.function_definition,
                     &decorator.expression,
                     parameter_name,
@@ -595,6 +614,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
                 .any(|decorator| {
                     mark_excludes_fixture(
                         db,
+                        env,
                         definition,
                         &decorator.expression,
                         parameter_name,
@@ -622,6 +642,7 @@ impl FixtureRequestParentScope {
 /// Returns the fixture request represented by `definition`, if it is eligible for injection.
 fn fixture_request_for_parameter<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
 ) -> Option<FixtureRequest<'db>> {
     let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(_)) = definition.kind(db)
@@ -635,14 +656,15 @@ fn fixture_request_for_parameter<'db>(
     let function_ref = index.scope(function_scope).node().as_function()?;
     let class_scope = FixtureRequestContext::parent_scope(index, function_scope)?.class_scope();
     let module = parsed_module(db, file.python_file(db)).load(db);
-    let context = FixtureRequestContext::new(db, function_ref, class_scope, &module, index)?;
+    let context = FixtureRequestContext::new(db, env, function_ref, class_scope, &module, index)?;
 
-    context.fixture_request_for_parameter(db, definition)
+    context.fixture_request_for_parameter(db, env, definition)
 }
 
 /// Returns the number of parameters supplied by `unittest.mock.patch`.
 fn mock_patch_count<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     function_definition: Definition<'db>,
     function: &ast::StmtFunctionDef,
 ) -> usize {
@@ -660,6 +682,7 @@ fn mock_patch_count<'db>(
             };
             let new_position = if is_known_class_instance(
                 db,
+                env,
                 function_definition,
                 decorators.expression_type(&call.func),
                 "_patcher",
@@ -670,6 +693,7 @@ fn mock_patch_count<'db>(
                 && attribute.attr.as_str() == "object"
                 && is_known_class_instance(
                     db,
+                    env,
                     function_definition,
                     decorators.expression_type(&attribute.value),
                     "_patcher",
@@ -930,13 +954,14 @@ fn class_attribute_exists_at_runtime<'db>(
 /// Resolves a request against the fixture exposures in `search_scope`.
 fn bindings_in_search_scope<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     request: &FixtureRequest<'db>,
     search_scope: FixtureSearchScope<'db>,
 ) -> Box<[FixtureBinding<'db>]> {
     let search_scopes = match search_scope {
         FixtureSearchScope::Class(class) => Either::Left(
             class
-                .iter_mro(db)
+                .iter_mro(db, env)
                 .filter_map(ClassBase::into_class)
                 .filter(|ancestor| !ancestor.is_object(db))
                 .filter_map(|ancestor| ancestor.static_class_literal(db))
@@ -1378,6 +1403,7 @@ fn non_type_parameter_parent(
 /// Returns whether a static mark supplies this parameter directly or cannot be interpreted.
 fn mark_excludes_fixture<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
     parameter_name: &str,
@@ -1396,7 +1422,7 @@ fn mark_excludes_fixture<'db>(
         .arguments
         .find_argument_value("argnames", 0)
         .and_then(|argnames| {
-            statically_known_parametrize_names(db, definition, argnames, &expression_type)
+            statically_known_parametrize_names(db, env, definition, argnames, &expression_type)
         })
     else {
         return true;
@@ -1407,6 +1433,7 @@ fn mark_excludes_fixture<'db>(
 
     is_indirect(
         db,
+        env,
         definition,
         &call.arguments,
         parameter_name,
@@ -1415,20 +1442,19 @@ fn mark_excludes_fixture<'db>(
 }
 
 /// Returns whether a type is an instance of `class_name` from one of `modules`.
-fn is_known_class_instance(
-    db: &dyn Db,
-    definition: Definition<'_>,
-    ty: Option<Type<'_>>,
+fn is_known_class_instance<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    definition: Definition<'db>,
+    ty: Option<Type<'db>>,
     class_name: &str,
     modules: &[KnownModule],
 ) -> bool {
     let Some(Type::NominalInstance(instance)) = ty else {
         return false;
     };
-    let environment = TypeOperations::new_root(
-        db,
-        ProgramEnvironment::from_file(definition.program_file(db)),
-    );
+    let environment =
+        env.in_environment(ProgramEnvironment::from_file(definition.program_file(db)));
     let Some(class) = instance
         .class(db, &environment)
         .class_literal(db)
@@ -1449,6 +1475,7 @@ fn is_known_class_instance(
 /// direct, and `None` preserves uncertainty when the argument cannot be interpreted statically.
 fn is_indirect<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
     arguments: &ast::Arguments,
     parameter_name: &str,
@@ -1464,13 +1491,14 @@ fn is_indirect<'db>(
     if ty == Type::bool_literal(false) {
         return Some(false);
     }
-    statically_known_parametrize_names(db, definition, expression, expression_type)
+    statically_known_parametrize_names(db, env, definition, expression, expression_type)
         .map(|names| names.contains(&parameter_name))
 }
 
 /// Returns statically known pytest parametrization names from a string or fixed-length iterable.
 fn statically_known_parametrize_names<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     definition: Definition<'db>,
     expression: &ast::Expr,
     expression_type: &impl Fn(&ast::Expr) -> Option<Type<'db>>,
@@ -1486,10 +1514,8 @@ fn statically_known_parametrize_names<'db>(
         );
     }
 
-    let environment = TypeOperations::new_root(
-        db,
-        ProgramEnvironment::from_file(definition.program_file(db)),
-    );
+    let environment =
+        env.in_environment(ProgramEnvironment::from_file(definition.program_file(db)));
     extract_fixed_length_iterable_element_types(db, &environment, expression, |element| {
         expression_type(element).unwrap_or_else(Type::unknown)
     })?

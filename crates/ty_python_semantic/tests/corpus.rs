@@ -39,17 +39,23 @@ fn parser_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[test_case("a-e")]
-#[test_case("f")]
-#[test_case("g-o")]
-#[test_case("p")]
-#[test_case("q-z")]
-#[test_case("!a-z")]
-fn linter_no_panic(range: &str) -> anyhow::Result<()> {
+#[test_case("a-e", 0, 1)]
+// The large `f` group spans four tests to stay within CI's per-test timeout.
+#[test_case("f", 0, 4)]
+#[test_case("f", 1, 4)]
+#[test_case("f", 2, 4)]
+#[test_case("f", 3, 4)]
+#[test_case("g-o", 0, 1)]
+#[test_case("p", 0, 1)]
+#[test_case("q-z", 0, 1)]
+#[test_case("!a-z", 0, 1)]
+fn linter_no_panic(range: &str, shard: usize, shard_count: usize) -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
-    run_corpus_tests(&format!(
-        "{workspace_root}/crates/ruff_linter/resources/test/fixtures/[{range}]*/**/*.py"
-    ))
+    run_corpus_tests_sharded(
+        &format!("{workspace_root}/crates/ruff_linter/resources/test/fixtures/[{range}]*/**/*.py"),
+        shard,
+        shard_count,
+    )
 }
 
 #[test]
@@ -72,8 +78,12 @@ fn typeshed_no_panic(range: &str) -> anyhow::Result<()> {
     ))
 }
 
-#[expect(clippy::print_stdout)]
 fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
+    run_corpus_tests_sharded(pattern, 0, 1)
+}
+
+#[expect(clippy::print_stdout)]
+fn run_corpus_tests_sharded(pattern: &str, shard: usize, shard_count: usize) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let mut db = CorpusDb::new();
@@ -84,7 +94,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 
     let corpus = glob::glob(pattern).context("Failed to compile pattern")?;
 
-    for path in corpus {
+    for path in corpus.skip(shard).step_by(shard_count) {
         let path = path.context("Failed to glob path")?;
         let path = SystemPathBuf::from_path_buf(path).map_err(|path| {
             anyhow!(

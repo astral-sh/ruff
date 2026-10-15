@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
 use itertools::Either;
 use ruff_db::diagnostic::Annotation;
@@ -30,6 +31,7 @@ use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::visitor::any_over_type_including_alias_arguments;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::ScopeKind;
@@ -54,19 +56,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut definition = definition?;
         // A resolved non-recursive value already describes the alias. Gradual types, unions,
         // and quoted aliases can hide recursive references, so they still need inference.
+        // Runtime alias objects can also carry recursive references in their type arguments.
         // Even a valid union can have lost a cyclic member during value inference.
-        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
-            matches!(
-                ty,
-                Type::Dynamic(_)
-                    | Type::Divergent(_)
-                    | Type::Recursive(_)
-                    | Type::TypeAlias(_)
-                    | Type::KnownInstance(
-                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
-                    )
-            )
-        }) {
+        if !any_over_type_including_alias_arguments(
+            db,
+            self.program_environment(),
+            value_ty,
+            |ty| {
+                matches!(
+                    ty,
+                    Type::Dynamic(_)
+                        | Type::Divergent(_)
+                        | Type::Recursive(_)
+                        | Type::TypeAlias(_)
+                        | Type::KnownInstance(
+                            KnownInstanceType::UnionType(_)
+                                | KnownInstanceType::LiteralStringAlias(_)
+                        )
+                )
+            },
+        ) {
             return None;
         }
         if definition.kind(db).is_import() {
@@ -138,7 +147,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let ty = self.infer_type_expression(value);
         let db = self.db();
-        let ty = if ty.has_unguarded_alias_cycle(db) {
+        let ty = if ty.has_unguarded_alias_cycle(db, self.program_environment()) {
             let target = match definition.kind(db) {
                 DefinitionKind::Assignment(assignment) => Some(assignment.target(self.module())),
                 DefinitionKind::AnnotatedAssignment(assignment) => {
@@ -264,9 +273,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
         if let Some((alias, parameters)) = self.recursive_implicit_alias_reference(ty, definition) {
             return match parameters {
-                Some(parameters) => {
-                    alias.apply_specialization(db, parameters.default_specialization(db, None))
-                }
+                Some(parameters) => alias.apply_specialization(
+                    db,
+                    self.program_environment(),
+                    parameters.default_specialization(db, env, None),
+                ),
                 None => alias,
             };
         }
@@ -281,6 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .default_specialize(db, env)
             .in_type_expression(
                 db,
+                env,
                 self.scope(),
                 self.typevar_binding_context,
                 self.inference_flags(),
@@ -457,7 +469,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                             class
                                                 .inferred_metaclass(db)
                                                 .for_inheritance(db, env)
-                                                .to_class_type(db)
+                                                .to_class_type(db, env)
                                                 .and_then(|metaclass| metaclass.known(db)),
                                             Some(
                                                 KnownClass::Type
@@ -1284,32 +1296,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         TypeInspector::inspect_root(
             db,
             env,
+            TypeInspectionKey::InferStarredTypeExpression(
+                self.scope(),
+                ty_python_core::ExpressionNodeKey::from(ast::ExprRef::from(starred)),
+            ),
             starred_type,
             |_, _| Type::homogeneous_tuple(db, env, Type::unknown()),
             |_, starred_type| {
-                if starred_type.exact_tuple_instance_spec(self.db()).is_some()
-                    || matches!(
-                        starred_type,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                    )
-                {
-                    starred_type
-                } else {
-                    self.store_type_expression_flags(
-                        ast::ExprRef::from(starred),
-                        TypeExpressionFlags::INVALID_UNPACK,
-                    );
-                    if !starred_type.is_unknown()
-                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, starred)
-                    {
-                        diagnostic::add_type_expression_reference_link(
-                            builder.into_diagnostic(
-                                "`*` can only unpack a tuple type or `TypeVarTuple`",
-                            ),
-                        );
-                    }
-                    Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
-                }
+                starred_type.unpack_annotation(self, ast::ExprRef::from(starred), "*")
             },
         )
     }
@@ -1325,6 +1319,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.recursive_implicit_alias_reference(value_ty, definition)
         {
             let db = self.db();
+            let env = self.program_environment();
             return self.infer_explicit_callable_specialization(
                 subscript,
                 alias,
@@ -1332,7 +1327,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 &|arguments| {
                     alias.apply_specialization(
                         db,
-                        parameters.specialize_partial(db, arguments.iter().copied()),
+                        env,
+                        parameters.specialize_partial(db, env, arguments.iter().copied()),
                     )
                 },
             );
@@ -1608,16 +1604,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             TypeInspector::inspect_root(
                 db,
                 env,
+                TypeInspectionKey::InferSubclassOfTypeExpression(
+                    builder.scope(),
+                    ty_python_core::ExpressionNodeKey::from(slice),
+                ),
                 slice_ty,
                 |_, _| todo_type!("unsupported type[X] special form"),
-                |_, slice_ty| {
-                    SubclassOfType::try_from_instance(db, env, slice_ty).unwrap_or_else(
-                        |unsupported| match unsupported {
-                            Type::Callable(_) => invalid_type_argument(builder, slice),
-                            _ => todo_type!("unsupported type[X] special form"),
-                        },
-                    )
-                },
+                |_, slice_ty| slice_ty.subclass_argument(builder, slice),
             )
         };
 
@@ -1677,15 +1670,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if class_literal.is_tuple(self.db()) {
                             let class_type = self
                                 .infer_tuple_type_expression(subscript)
-                                .to_class_type(self.db());
+                                .to_class_type(self.db(), self.program_environment());
                             SubclassOfType::from(db, env, class_type)
                         } else {
                             match class_literal.generic_context(db) {
                                 Some(generic_context) => {
                                     let specialize = &|types: &[Option<Type<'db>>]| {
                                         let class = class_literal.apply_specialization(db, |_| {
-                                            generic_context
-                                                .specialize_partial(db, types.iter().copied())
+                                            generic_context.specialize_partial(
+                                                db,
+                                                env,
+                                                types.iter().copied(),
+                                            )
                                         });
                                         if class_literal.is_protocol(db) {
                                             match Type::instance(db, env, class) {
@@ -1790,13 +1786,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
-                generic_context.specialize_partial(db, types.iter().copied()),
+                env,
+                generic_context.specialize_partial(db, env, types.iter().copied()),
             );
 
             if in_type_expression {
                 specialized
                     .in_type_expression(
                         db,
+                        env,
                         scope_id,
                         current_typevar_binding_context,
                         current_inference_flags,
@@ -1956,6 +1954,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             specialized_type_alias
                                 .in_type_expression(
                                     db,
+                                    env,
                                     self.scope(),
                                     self.typevar_binding_context,
                                     self.inference_flags(),
@@ -1974,18 +1973,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     type_alias.name(self.db())
                                 ));
                                 let secondary = self.context.secondary(&*subscript.value);
-                                let value_type = type_alias.raw_value_type(self.db());
-                                if value_type.is_specialized_generic(self.db()) {
+                                type_alias.inspect_definition(db, env, |body| {
+                                    let reason = if body.is_specialized_generic(db) {
+                                        "already specialized"
+                                    } else {
+                                        "not generic"
+                                    };
                                     diagnostic.annotate(secondary.message(format_args!(
-                                        "Alias to `{}`, which is already specialized",
-                                        value_type.display(db, env)
+                                        "Alias to `{}`, which is {reason}",
+                                        body.display_string(db)
                                     )));
-                                } else {
-                                    diagnostic.annotate(secondary.message(format_args!(
-                                        "Alias to `{}`, which is not generic",
-                                        value_type.display(db, env)
-                                    )));
-                                }
+                                });
                             }
 
                             Type::unknown()
@@ -2129,6 +2127,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         specialized_class
                             .in_type_expression(
                                 db,
+                                env,
                                 self.scope(),
                                 self.typevar_binding_context,
                                 self.inference_flags(),
@@ -2373,7 +2372,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     AnnotatedExprContext::TypeExpression,
                 )
                 .inner_type()
-                .in_type_expression(db, self.scope(), None, self.inference_flags())
+                .in_type_expression(db, env, self.scope(), None, self.inference_flags())
                 .unwrap_or_else(|err| {
                     err.into_fallback_type(&self.context, subscript, self.inference_flags())
                 }),
@@ -2731,10 +2730,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => {
                     let narrowed = self.infer_type_expression(arguments_slice);
-                    let expanded = narrowed.expand_eagerly(db, env);
-
-                    if expanded.is_divergent() {
-                        expanded
+                    if let Some(divergence) = narrowed.divergence_after_aliases(db, env) {
+                        Type::Divergent(divergence)
                     } else {
                         TypeIsType::from_type_expression(self.db(), narrowed)
                     }
@@ -2887,35 +2884,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 TypeInspector::inspect_root(
                     db,
                     env,
+                    TypeInspectionKey::InferParameterizedSpecialFormTypeExpression(
+                        self.scope(),
+                        ty_python_core::ExpressionNodeKey::from(ast::ExprRef::from(subscript)),
+                    ),
                     inner_ty,
                     |_, _| Type::homogeneous_tuple(db, env, Type::unknown()),
                     |_, inner_ty| {
-                        // Preserve valid unpack targets so that `Unpack[...]` follows the same
-                        // argument-binding path as an equivalent starred annotation.
-                        if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
-                            || matches!(
-                                inner_ty,
-                                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                            )
-                        {
-                            inner_ty
-                        } else {
-                            self.store_type_expression_flags(
-                                ast::ExprRef::from(subscript),
-                                TypeExpressionFlags::INVALID_UNPACK,
-                            );
-                            if !inner_ty.is_unknown()
-                                && let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                diagnostic::add_type_expression_reference_link(
-                                    builder.into_diagnostic(
-                                        "`Unpack` can only unpack a tuple type or `TypeVarTuple`",
-                                    ),
-                                );
-                            }
-                            Type::homogeneous_tuple(db, env, Type::unknown())
-                        }
+                        inner_ty.unpack_annotation(self, ast::ExprRef::from(subscript), "Unpack")
                     },
                 )
             }
@@ -3086,8 +3062,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 match subscript_ty {
                     // type aliases to literal types
                     Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                        let value_ty = type_alias.value_type(db);
-                        if value_ty.is_literal_or_union_of_literals(db, env) {
+                        if let Some(value_ty) =
+                            Type::TypeAlias(type_alias).literal_argument_type(db, env)
+                        {
                             return Ok(value_ty);
                         }
                     }
@@ -3511,5 +3488,49 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             ty
         }
+    }
+}
+
+impl<'db> TypeInferenceBuilder<'db, '_> {
+    pub(in crate::types) fn validate_unpack_annotation(
+        &mut self,
+        expression: ast::ExprRef<'_>,
+        ty: Type<'db>,
+        syntax: &str,
+    ) -> Type<'db> {
+        let db = self.db();
+        if ty.exact_tuple_instance_spec(db).is_some()
+            || matches!(ty, Type::TypeVar(typevar) if typevar.is_typevartuple(db))
+        {
+            return ty;
+        }
+        self.store_type_expression_flags(expression, TypeExpressionFlags::INVALID_UNPACK);
+        if !ty.is_unknown()
+            && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression)
+        {
+            diagnostic::add_type_expression_reference_link(builder.into_diagnostic(format_args!(
+                "`{syntax}` can only unpack a tuple type or `TypeVarTuple`"
+            )));
+        }
+        Type::homogeneous_tuple(db, self.program_environment(), Type::unknown())
+    }
+
+    pub(in crate::types) fn subclass_argument_resolved(
+        &self,
+        slice: &ast::Expr,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        SubclassOfType::try_from_instance(self.db(), self.program_environment(), ty).unwrap_or_else(
+            |unsupported| match unsupported {
+                Type::Callable(_) => {
+                    self.report_invalid_type_expression(
+                        slice,
+                        "The argument to `type[]` must be a class object type",
+                    );
+                    SubclassOfType::subclass_of_unknown()
+                }
+                _ => todo_type!("unsupported type[X] special form"),
+            },
+        )
     }
 }

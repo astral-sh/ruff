@@ -1,5 +1,7 @@
-use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeWalkKey;
+use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal, StructuralTypeVisit};
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
@@ -118,12 +120,17 @@ impl<'db> FieldMetadata<'db> {
     /// ```py
     /// field: int = Field(default=0, alias="field_alias")
     /// ```
-    fn collect_from_rhs_type(&mut self, db: &'db dyn Db, rhs_type: Option<Type<'db>>) {
+    fn collect_from_rhs_type(
+        &mut self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        rhs_type: Option<Type<'db>>,
+    ) {
         match rhs_type {
             Some(Type::KnownInstance(KnownInstanceType::Field(field))) => {
                 // `own_fields_inner` has already specialized the right-hand side, including
                 // the default value inside a field specifier.
-                self.merge_field(db, field, None);
+                self.merge_field(db, env, field, None);
             }
             Some(rhs_type) => self.default_ty = Some(rhs_type),
             None => {}
@@ -145,6 +152,7 @@ impl<'db> FieldMetadata<'db> {
     fn collect_from_annotation(
         &mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         definition: Definition<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
@@ -154,7 +162,7 @@ impl<'db> FieldMetadata<'db> {
         };
         let annotation = assignment.annotation(&module);
 
-        if self.collect_from_annotated(db, definition, annotation, specialization) {
+        if self.collect_from_annotated(db, env, definition, annotation, specialization) {
             return;
         }
 
@@ -202,13 +210,14 @@ impl<'db> FieldMetadata<'db> {
             _ => return,
         };
 
-        self.collect_from_annotated(db, alias_definition, value, specialization);
+        self.collect_from_annotated(db, env, alias_definition, value, specialization);
     }
 
     /// Collect Pydantic field metadata from the `Annotated` part of a field's annotation.
     fn collect_from_annotated(
         &mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         definition: Definition<'db>,
         annotation: &Expr,
         specialization: Option<Specialization<'db>>,
@@ -253,9 +262,9 @@ impl<'db> FieldMetadata<'db> {
             ) {
                 let field_type = definition_expression_type(db, definition, metadata);
                 if let Type::KnownInstance(KnownInstanceType::Field(field)) = field_type {
-                    self.merge_field(db, field, specialization);
+                    self.merge_field(db, env, field, specialization);
                 } else {
-                    self.merge_field_call(db, definition, call, field_type, specialization);
+                    self.merge_field_call(db, env, definition, call, field_type, specialization);
                 }
             }
         }
@@ -270,11 +279,13 @@ impl<'db> FieldMetadata<'db> {
     fn merge_field(
         &mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         field: FieldInstance<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
         if let Some(default_type) = field.default_type(db) {
-            self.default_ty = Some(default_type.apply_optional_specialization(db, specialization));
+            self.default_ty =
+                Some(default_type.apply_optional_specialization(db, env, specialization));
         }
         self.init &= field.init(db);
         if let Some(alias) = field.alias(db) {
@@ -291,6 +302,7 @@ impl<'db> FieldMetadata<'db> {
     fn merge_field_call(
         &mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         definition: Definition<'db>,
         call: &ExprCall,
         call_type: Type<'db>,
@@ -300,15 +312,16 @@ impl<'db> FieldMetadata<'db> {
             let default_type = definition_expression_type(db, definition, default);
             if !default_type.is_instance_of(db, KnownClass::EllipsisType) {
                 self.default_ty =
-                    Some(default_type.apply_optional_specialization(db, specialization));
+                    Some(default_type.apply_optional_specialization(db, env, specialization));
             }
         } else if call.arguments.find_keyword("default_factory").is_some() {
-            self.default_ty = Some(call_type.apply_optional_specialization(db, specialization));
+            self.default_ty =
+                Some(call_type.apply_optional_specialization(db, env, specialization));
         }
 
         if let Some(init) = call.arguments.find_keyword("init") {
             let init = definition_expression_type(db, definition, &init.value);
-            let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
+            let env = env.in_environment(ProgramEnvironment::from_definition(definition));
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
@@ -343,15 +356,16 @@ impl<'db> FieldMetadata<'db> {
 /// Resolve a Pydantic field's metadata from its annotation and right-hand side.
 pub(in crate::types) fn field_metadata<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     definition: Option<Definition<'db>>,
     rhs_type: Option<Type<'db>>,
     specialization: Option<Specialization<'db>>,
 ) -> FieldMetadata<'db> {
     let mut metadata = FieldMetadata::default();
     if let Some(definition) = definition {
-        metadata.collect_from_annotation(db, definition, specialization);
+        metadata.collect_from_annotation(db, env, definition, specialization);
     }
-    metadata.collect_from_rhs_type(db, rhs_type);
+    metadata.collect_from_rhs_type(db, env, rhs_type);
     metadata
 }
 
@@ -507,9 +521,13 @@ fn config_boolean(
     })
 }
 
-pub(in crate::types) fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+pub(in crate::types) fn is_model<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
+) -> bool {
     class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseModel))
 }
@@ -537,7 +555,7 @@ pub(in crate::types) fn setattr_behavior<'db>(
 
     // Pydantic checks the receiver's effective config in `BaseModel.__setattr__` rather than
     // generating a setter on each frozen model. A custom setter can replace that behavior.
-    for base in class.iter_mro(db, None) {
+    for base in class.iter_mro(db, env) {
         if matches!(base, ClassBase::Generic | ClassBase::Protocol) {
             continue;
         }
@@ -550,7 +568,7 @@ pub(in crate::types) fn setattr_behavior<'db>(
             let is_frozen = metadata.is_frozen(db)
                 || !is_private_attribute(attribute)
                     && class
-                        .fields(db, None, field_policy)
+                        .fields(db, env, None, field_policy)
                         .get(attribute)
                         .is_some_and(|field| {
                             matches!(field.kind, FieldKind::Pydantic { frozen: true, .. })
@@ -597,8 +615,9 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
 
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
     class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticRootModel))
 }
@@ -607,12 +626,13 @@ fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 ///
 /// A settings model can populate any field from environment variables or another configured
 /// settings source, so no field value is necessarily required at the call site.
-pub(in crate::types) fn constructor_fields_are_optional(
-    db: &dyn Db,
-    class: StaticClassLiteral<'_>,
+pub(in crate::types) fn constructor_fields_are_optional<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
 ) -> bool {
     class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|base| base.is_known(db, KnownClass::PydanticBaseSettings))
 }
@@ -624,11 +644,12 @@ pub(in crate::types) fn constructor_fields_are_optional(
 /// `BaseSettings.__init__`, so we reuse them instead of duplicating their names and types.
 pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
     parameters: &mut Vec<Parameter<'db>>,
 ) {
     let Some(base_settings) = class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -666,6 +687,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelConfig {
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
     let mut config = ModelConfig::default();
 
     // Pydantic merges the effective config from each direct base from left to right. A later base
@@ -678,19 +700,19 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
             continue;
         }
 
-        let Some(base) = base.to_class_type(db) else {
+        let Some(base) = base.class_literal_or_origin(db) else {
             config = ModelConfig::unknown();
             continue;
         };
-        let base_literal = base.class_literal(db);
+        let base_literal = base;
         let Some(base) = base_literal.as_static() else {
             config.merge(ModelConfig::unknown());
             continue;
         };
 
-        if is_model(db, base) {
+        if is_model(db, env, base) {
             config.merge(model_config(db, base));
-        } else if let Some(base_config) = inherited_model_config(db, base) {
+        } else if let Some(base_config) = inherited_model_config(db, env, base) {
             config.merge(base_config);
         }
     }
@@ -702,8 +724,12 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     config
 }
 
-fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
-    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
+fn inherited_model_config<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
+) -> Option<ModelConfig> {
+    for base in class.iter_mro(db, env).filter_map(ClassBase::into_class) {
         let Some((base, _)) = base.static_class_literal(db) else {
             return Some(ModelConfig::unknown());
         };
@@ -897,6 +923,7 @@ fn class_keyword_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelConf
 /// Return the input type accepted by a Pydantic field's synthesized constructor parameter.
 pub(in crate::types) fn constructor_parameter_type<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
     field_name: &Name,
     field_type: Type<'db>,
@@ -911,7 +938,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
         return field_type;
     }
 
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
+    let env = env.in_environment(ProgramEnvironment::from_scope(class.body_scope(db)));
     lax_input_type(db, &env, field_type)
 }
 
@@ -926,12 +953,13 @@ pub(in crate::types) fn has_before_or_plain_field_validator<'db>(
     class: StaticClassLiteral<'db>,
     field_name: Name,
 ) -> bool {
+    let env = &TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
     let field_name = CharStr::from(field_name);
 
     // Pydantic inherits validators unless a subclass defines a symbol with the same method name.
     let mut shadowed_symbols = FxHashSet::default();
 
-    for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
+    for base in class.iter_mro(db, env).filter_map(ClassBase::into_class) {
         if base.is_known(db, KnownClass::PydanticBaseModel) {
             break;
         }
@@ -1030,11 +1058,15 @@ struct LaxInputType;
 type LaxInputTraversal<'env, 'db> = StructuralTypeTraversal<'env, 'db, LaxInputType>;
 
 impl<'db> TypeWalk<'db, &mut FxHashSet<Type<'db>>, StructuralTraversal> for LaxInputType {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::LaxInputType
+    }
+
     type Output = Type<'db>;
 
     fn on_cycle(
         &self,
-        _traversal: &LaxInputTraversal<'_, 'db>,
+        _traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _expanding_types: &mut FxHashSet<Type<'db>>,
@@ -1045,7 +1077,7 @@ impl<'db> TypeWalk<'db, &mut FxHashSet<Type<'db>>, StructuralTraversal> for LaxI
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &LaxInputTraversal<'_, 'db>,
+        traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
         field_type: Type<'db>,
         expanding_types: &mut FxHashSet<Type<'db>>,
     ) -> Type<'db> {
@@ -1223,7 +1255,8 @@ fn root_model_input_type<'db>(
     else {
         return Some(Type::any());
     };
-    let Some(root_field) = class.fields(db, specialization, field_policy).get("root") else {
+    let fields = class.fields(db, env, specialization, field_policy);
+    let Some(root_field) = fields.get("root") else {
         return Some(Type::any());
     };
 
@@ -1258,7 +1291,7 @@ fn model_input_type<'db>(
     let (class, _) = field_type
         .nominal_class(db, env)?
         .static_class_literal(db)?;
-    if !is_model(db, class) || is_root_model(db, class) {
+    if !is_model(db, env, class) || is_root_model(db, class) {
         return None;
     }
 
@@ -1320,9 +1353,13 @@ enum ModelInitBehavior {
     Other,
 }
 
-fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitBehavior {
+fn model_init_behavior<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
+) -> ModelInitBehavior {
     for base in class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
         .map(|(base, _)| base)
@@ -1363,33 +1400,37 @@ fn model_init_behavior(db: &dyn Db, class: StaticClassLiteral<'_>) -> ModelInitB
 /// A fixed custom initializer on an intermediate base class controls the constructor accepted by
 /// its subclasses. A variadic custom initializer still allows Pydantic to validate field values
 /// passed via keyword arguments.
-pub(in crate::types) fn synthesizes_constructor_signature_from_fields(
-    db: &dyn Db,
-    class: StaticClassLiteral<'_>,
+pub(in crate::types) fn synthesizes_constructor_signature_from_fields<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
 ) -> bool {
-    model_init_behavior(db, class) != ModelInitBehavior::CustomFixed
+    model_init_behavior(db, env, class) != ModelInitBehavior::CustomFixed
 }
 
 /// Return `true` if `class` should accept extra keywords in its synthesized constructor.
-pub(in crate::types) fn model_init_accepts_extra(
-    db: &dyn Db,
-    class: StaticClassLiteral<'_>,
-    metadata: ModelMetadata<'_>,
+pub(in crate::types) fn model_init_accepts_extra<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
+    metadata: ModelMetadata<'db>,
 ) -> bool {
     metadata.accepts_extra(db)
         && matches!(
-            model_init_behavior(db, class),
+            model_init_behavior(db, env, class),
             ModelInitBehavior::BaseModel | ModelInitBehavior::CustomVariadic
         )
 }
 
 /// Return `true` if extra keywords passed to `class` are silently discarded by Pydantic.
-fn model_init_discards_extra(
-    db: &dyn Db,
-    class: StaticClassLiteral<'_>,
-    metadata: ModelMetadata<'_>,
+fn model_init_discards_extra<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    class: StaticClassLiteral<'db>,
+    metadata: ModelMetadata<'db>,
 ) -> bool {
-    metadata.discards_extra(db) && model_init_behavior(db, class) == ModelInitBehavior::BaseModel
+    metadata.discards_extra(db)
+        && model_init_behavior(db, env, class) == ModelInitBehavior::BaseModel
 }
 
 /// Report keyword arguments that the Pydantic model constructor silently discards.
@@ -1412,7 +1453,7 @@ pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     else {
         return;
     };
-    if !model_init_discards_extra(db, class, metadata) {
+    if !model_init_discards_extra(db, context.program_environment(), class, metadata) {
         return;
     }
 

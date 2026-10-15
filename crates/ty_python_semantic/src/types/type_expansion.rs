@@ -1,7 +1,7 @@
 use crate::Db;
+use crate::types::TypeOperations;
 use itertools::Itertools;
 
-use crate::TypeOperations;
 use crate::types::enums::enum_member_literals;
 use crate::types::tuple::Tuple;
 use crate::types::{ApplyTypeMappingVisitor, CycleDetector, IntersectionType, KnownClass, Type};
@@ -30,6 +30,30 @@ pub(crate) fn expand_type<'db>(
     .expand(ty)
 }
 
+/// Enumerate a finite value domain without distributing unions inside containers.
+///
+/// Relations use this to check coverage by several target alternatives while retaining
+/// each target's alias identity until its comparison begins.
+pub(super) fn finite_alternatives<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+) -> Option<Vec<Type<'db>>> {
+    match ty {
+        Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db, env)),
+        Type::Intersection(intersection) => intersection.finite_alternatives(db, env),
+        Type::NominalInstance(instance) => {
+            let class = instance.class(db, env);
+            if class.is_known(db, KnownClass::Bool) {
+                Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
+            } else {
+                enum_member_literals(db, class.class_literal(db), None).map(Iterator::collect)
+            }
+        }
+        _ => None,
+    }
+}
+
 /// Expands a sequence of element types, bounding the size of their Cartesian product.
 pub(crate) fn expand_elements<'db>(
     db: &'db dyn Db,
@@ -47,7 +71,7 @@ pub(crate) fn expand_elements<'db>(
 
 /// Expand recursive aliases once per active specialization. A back-edge remains a tuple
 /// element so argument expansion does not enumerate an infinite recursive unfolding.
-struct TypeExpander<'a, 'db> {
+pub(super) struct TypeExpander<'a, 'db> {
     db: &'db dyn Db,
     env: &'a TypeOperations<'db>,
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
@@ -77,17 +101,14 @@ impl<'db> TypeExpander<'_, 'db> {
         Some(per_element.into_iter().multi_cartesian_product().collect())
     }
 
-    fn expand(&self, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+    pub(super) fn expand(&self, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
         let db = self.db;
         let env = self.env;
         match ty {
-            Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db, env)),
-            Type::Intersection(intersection) => intersection.finite_alternatives(db, env),
+            Type::EnumComplement(_) | Type::Intersection(_) => finite_alternatives(db, env, ty),
             Type::NominalInstance(instance) => {
-                let class = instance.class(db, env);
-
-                if class.is_known(db, KnownClass::Bool) {
-                    return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
+                if let Some(alternatives) = finite_alternatives(db, env, ty) {
+                    return Some(alternatives);
                 }
 
                 // If the class is a fixed-length tuple subtype, we expand it to its elements.
@@ -116,11 +137,6 @@ impl<'db> TypeExpander<'_, 'db> {
                     };
                 }
 
-                if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None)
-                {
-                    return Some(enum_members.collect());
-                }
-
                 None
             }
             Type::Union(union) => Some(
@@ -139,13 +155,19 @@ impl<'db> TypeExpander<'_, 'db> {
                     .collect(),
             ),
             // For type aliases, expand the underlying value type.
-            Type::TypeAlias(alias) => self
-                .visitor
-                .visit(db, ty, || self.expand(alias.value_type(db))),
+            Type::TypeAlias(alias) => {
+                self.visitor
+                    .visit_with_expansion(db, ty, &self.mapping, |expansion| {
+                        expansion.alias_body(db, alias).alternatives(self)
+                    })
+            }
             Type::Recursive(recursive) => {
                 self.visitor
                     .visit_with_expansion(db, ty, &self.mapping, |expansion| {
-                        self.expand(expansion.expand_recursive(db, recursive).into_unfolded()?)
+                        expansion
+                            .expand_recursive(db, recursive)
+                            .into_unfolded()?
+                            .alternatives(self)
                     })
             }
             // We don't handle `type[A | B]` here because it's already stored in the expanded form

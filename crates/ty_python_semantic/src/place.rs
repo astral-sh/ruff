@@ -1,6 +1,7 @@
 pub(crate) mod definitions;
 
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use itertools::Either;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
@@ -1263,12 +1264,19 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
-    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, scope: ScopeId<'db>, _, _, _| {
+    cycle_initial = |_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_fn = |db,
+                cycle,
+                previous: &PlaceAndQualifiers<'db>,
+                place: PlaceAndQualifiers<'db>,
+                scope: ScopeId<'db>,
+                _,
+                _,
+                _| {
         let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         place.cycle_normalized(db, &env, *previous, cycle)
     },
-    heap_size=ruff_memory_usage::heap_size
+    heap_size = ruff_memory_usage::heap_size,
 )]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
@@ -2649,6 +2657,7 @@ pub(crate) mod implicit_globals {
     /// for the current module, not `str | None`).
     pub(crate) fn all_implicit_module_globals<'db>(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         file: ProgramFile<'db>,
     ) -> impl Iterator<Item = (Name, Type<'db>)> + 'db {
         // Special-cased implicit globals that are not in `module_type_symbols`
@@ -2657,7 +2666,7 @@ pub(crate) mod implicit_globals {
             .map(Name::new_static);
 
         // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
+        let env = env.in_environment(ProgramEnvironment::from_file(file));
         let module_type_syms = module_type_symbols(db, &env).iter().cloned();
 
         // Combine and map to (name, type) pairs

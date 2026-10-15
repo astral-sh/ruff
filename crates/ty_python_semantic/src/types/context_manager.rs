@@ -1,14 +1,16 @@
 use crate::Db;
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::{
     FxOrderSet, Program,
     types::{
-        Bindings, CallArguments, CallDunderError, KnownClass, MemberLookupPolicy, Type,
-        TypeContext, call::CallErrorKind, context::InferContext,
-        diagnostic::INVALID_CONTEXT_MANAGER,
+        Bindings, CallArguments, CallDunderError, MemberLookupPolicy, Type, TypeContext,
+        call::CallErrorKind, context::InferContext, diagnostic::INVALID_CONTEXT_MANAGER,
     },
 };
-use crate::{ProgramEnvironment, TypeOperations};
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
 
@@ -17,11 +19,15 @@ struct CanSuppressExceptions {
 }
 
 impl<'db> TypeQuery<'db> for CanSuppressExceptions {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::CanSuppressExceptions(self.is_async)
+    }
+
     type Output = bool;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         (): (),
@@ -32,7 +38,7 @@ impl<'db> TypeQuery<'db> for CanSuppressExceptions {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         manager: Type<'db>,
         (): (),
     ) -> bool {
@@ -47,10 +53,10 @@ impl<'db> TypeQuery<'db> for CanSuppressExceptions {
         let is_async = self.is_async;
         if let Type::NewTypeInstance(newtype) = manager
             && newtype
-                .concrete_base_type(db)
-                .has_outer_type(db, super::Type::is_union)
+                .concrete_base_type(db, env)
+                .has_outer_type(db, env, super::Type::is_union)
         {
-            return traversal.visit(db, newtype.concrete_base_type(db));
+            return traversal.visit(db, newtype.concrete_base_type(db, env));
         }
         let method = if is_async { "__aexit__" } else { "__exit__" };
         let Some(callables) = manager
@@ -62,43 +68,12 @@ impl<'db> TypeQuery<'db> for CanSuppressExceptions {
             return false;
         };
 
-        let exception_type = KnownClass::BaseException.to_subclass_of(db, env);
-        let exception_instance = KnownClass::BaseException.to_instance(db, env);
-        for signature in callables
-            .iter()
-            .flat_map(|callable| callable.signatures(db))
-        {
-            if signature
-                .parameters()
-                .get_positional(0)
-                .is_some_and(|parameter| {
-                    parameter
-                        .annotated_type()
-                        .is_disjoint_from(db, env, exception_type)
+        for callable in &callables {
+            if traversal
+                .inspect_signatures(db, *callable, |signatures| {
+                    signatures.can_suppress_exceptions(db, is_async)
                 })
-                || signature
-                    .parameters()
-                    .get_positional(1)
-                    .is_some_and(|parameter| {
-                        parameter
-                            .annotated_type()
-                            .is_disjoint_from(db, env, exception_instance)
-                    })
-            {
-                continue;
-            }
-
-            let return_type = if is_async {
-                let Ok(awaited) = signature.return_ty.try_await(db, env) else {
-                    continue;
-                };
-                awaited
-            } else {
-                signature.return_ty
-            };
-
-            if return_type.is_equivalent_to(db, env, KnownClass::Bool.to_instance(db, env))
-                || return_type.is_equivalent_to(db, env, Type::bool_literal(true))
+                .unwrap_or(false)
             {
                 return true;
             }
@@ -163,23 +138,38 @@ impl<'db> Type<'db> {
         mode: EvaluationMode,
     ) -> bool {
         #[salsa::tracked(
-            returns(copy),
+            returns(ref),
             cycle_initial = |_, _, _, _, _| false,
-            heap_size = ruff_memory_usage::heap_size
+            heap_size = ruff_memory_usage::heap_size,
         )]
-        fn can_suppress_exceptions_impl<'db>(
+        fn type_can_suppress_exceptions_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             manager: Type<'db>,
             is_async: bool,
         ) -> bool {
             let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, program, manager, is_async)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            program: Program<'db>,
+            manager: Type<'db>,
+            is_async: bool,
+        ) -> bool {
+            let env = env.in_environment(ProgramEnvironment::from_program(program));
             TypeQueryContext::with_root(&env, CanSuppressExceptions { is_async }, |traversal| {
                 traversal.visit(db, manager)
             })
         }
 
-        can_suppress_exceptions_impl(db, env.program(db), self, mode.is_async())
+        let program = env.program(db);
+        let is_async = mode.is_async();
+        *env.cached_or_compute(
+            || type_can_suppress_exceptions_impl(db, program, self, is_async),
+            || compute(db, env, program, self, is_async),
+        )
     }
 
     /// Returns the type bound from a context manager with type `self`.

@@ -1,6 +1,8 @@
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
@@ -12,6 +14,7 @@ use crate::types::{
     },
     special_form::TypeQualifier,
 };
+use crate::types::{CycleKind, TypeOperations, TypeQuery, TypeQueryContext};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
@@ -312,7 +315,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             );
             let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
             let decorated_ty = decorator_result.return_type();
-            if !is_unknown_decorator_result(db, decorated_ty)
+            if !is_unknown_decorator_result(db, env, decorated_ty)
                 && !type_retains_original_class(db, env, original_class_ty, decorated_ty)
             {
                 metadata_applies_to_original_class = false;
@@ -389,40 +392,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             inferred_ty = TypeInspector::inspect_root(
                 db,
                 env,
+                TypeInspectionKey::InferClassDefinition(definition),
                 decorated_ty,
                 |ty, _| ty,
                 |_, resolved| {
-                    if is_unknown_decorator_result(db, decorated_ty) {
-                        inferred_ty
-                    } else if let divergent_ty @ Type::Divergent(_) = resolved {
-                        // Keep the current binding to bootstrap decorators whose return annotations
-                        // depend on the decorated class. Retain the cycle marker too: replacing it with
-                        // only the class lets inferred lambda return types grow on every iteration.
-                        UnionType::from_elements_cycle_recovery(
-                            db,
-                            env,
-                            [inferred_ty, divergent_ty],
-                        )
-                    } else if class_decorator_preserves_class_binding(
+                    resolved.class_decorator_result(
                         db,
-                        env,
-                        original_class_ty,
-                        decorated_ty,
-                    ) {
-                        merge_class_preserving_decorator_result(
-                            db,
-                            env,
-                            original_class_ty,
-                            inferred_ty,
-                            decorated_ty,
-                        )
-                    } else {
-                        // Only record an undecorated type once a decorator actually replaces the public
-                        // binding. If all decorators preserve the class, there is no alternate class type
-                        // to expose.
-                        undecorated_ty.get_or_insert(inferred_ty);
-                        decorated_ty
-                    }
+                        ClassBindingUpdate {
+                            original_class: original_class_ty,
+                            decorated: decorated_ty,
+                            inferred: inferred_ty,
+                            undecorated: &mut undecorated_ty,
+                        },
+                    )
                 },
             );
         }
@@ -548,34 +530,14 @@ fn class_decorator_preserves_class_binding<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    let Type::ClassLiteral(original_literal) = original_class else {
-        return false;
-    };
-
-    match decorated_class {
-        Type::ClassLiteral(decorated_literal) => {
-            let decorated_definition = decorated_literal.definition(db);
-            decorated_literal == original_literal
-                || decorated_definition.is_some()
-                    && decorated_definition == original_literal.definition(db)
-        }
-        Type::SubclassOf(subclass_of) => subclass_of
-            .subclass_of()
-            .into_class(db, env)
-            .is_some_and(|class| class == original_literal.default_specialization(db)),
-        // A provisional decorator result does not establish that the class is preserved.
-        // Keep its cycle marker so recursive return types can be normalized.
-        Type::Divergent(_) => false,
-        Type::Union(union) => union.elements(db).iter().all(|element| {
-            class_decorator_preserves_class_binding(db, env, original_class, *element)
-        }),
-        Type::TypeAlias(alias) => {
-            class_decorator_preserves_class_binding(db, env, original_class, alias.value_type(db))
-        }
-        _ => SubclassOfType::try_from_type(db, env, original_class).is_some_and(
-            |original_meta_type| decorated_class.is_equivalent_to(db, env, original_meta_type),
-        ),
-    }
+    TypeQueryContext::with_root(
+        env,
+        ClassBinding {
+            original_class,
+            allow_intersections: false,
+        },
+        |context| context.visit(db, decorated_class),
+    )
 }
 
 /// Return true if a type still contains the original class object, even if it also carries extra
@@ -586,19 +548,72 @@ fn type_retains_original_class<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    match decorated_class {
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| type_retains_original_class(db, env, original_class, *element)),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| type_retains_original_class(db, env, original_class, *element)),
-        Type::TypeAlias(alias) => {
-            type_retains_original_class(db, env, original_class, alias.value_type(db))
+    TypeQueryContext::with_root(
+        env,
+        ClassBinding {
+            original_class,
+            allow_intersections: true,
+        },
+        |context| context.visit(db, decorated_class),
+    )
+}
+
+struct ClassBinding<'db> {
+    original_class: Type<'db>,
+    allow_intersections: bool,
+}
+
+impl<'db> TypeQuery<'db> for ClassBinding<'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::ClassBinding(self.original_class, self.allow_intersections)
+    }
+
+    type Output = bool;
+
+    fn on_cycle(
+        &self,
+        _context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        (): (),
+    ) -> bool {
+        false
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        (): (),
+    ) -> bool {
+        let env = context.environment();
+        let Type::ClassLiteral(original) = self.original_class else {
+            return false;
+        };
+        match ty {
+            Type::ClassLiteral(decorated) => {
+                let definition = decorated.definition(db);
+                decorated == original
+                    || definition.is_some() && definition == original.definition(db)
+            }
+            Type::SubclassOf(subclass) => subclass
+                .subclass_of()
+                .into_class(db, env)
+                .is_some_and(|class| class == original.default_specialization(db, env)),
+            // A provisional decorator result cannot establish that the class is preserved.
+            Type::Divergent(_) => false,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| context.visit(db, *element)),
+            Type::Intersection(intersection) if self.allow_intersections => intersection
+                .positive(db)
+                .iter()
+                .any(|element| context.visit(db, *element)),
+            _ => SubclassOfType::try_from_type(db, env, self.original_class)
+                .is_some_and(|original_meta_type| ty.is_equivalent_to(db, env, original_meta_type)),
         }
-        _ => class_decorator_preserves_class_binding(db, env, original_class, decorated_class),
     }
 }
 
@@ -607,8 +622,12 @@ fn type_retains_original_class<'db>(
 /// This also handles `type[Unknown]` results from generic decorator factories whose type
 /// variables are specialized before the returned decorator receives the class. Explicit `Any`
 /// results do not trigger this fallback.
-fn is_unknown_decorator_result<'db>(db: &'db dyn Db, result_ty: Type<'db>) -> bool {
-    result_ty.has_outer_type(db, |result_ty| match result_ty {
+fn is_unknown_decorator_result<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    result_ty: Type<'db>,
+) -> bool {
+    result_ty.has_outer_type(db, env, |result_ty| match result_ty {
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_dynamic()
@@ -638,5 +657,45 @@ fn merge_class_preserving_decorator_result<'db>(
             .as_class_literal()
             .map(Type::ClassLiteral)
             .unwrap_or(original_class)
+    }
+}
+
+pub(in crate::types) struct ClassBindingUpdate<'a, 'db> {
+    original_class: Type<'db>,
+    decorated: Type<'db>,
+    inferred: Type<'db>,
+    undecorated: &'a mut Option<Type<'db>>,
+}
+
+impl<'db> ClassBindingUpdate<'_, 'db> {
+    pub(in crate::types) fn apply(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        resolved: Type<'db>,
+    ) -> Type<'db> {
+        let Self {
+            original_class,
+            decorated,
+            inferred,
+            undecorated,
+        } = self;
+
+        if is_unknown_decorator_result(db, env, decorated) {
+            inferred
+        } else if let divergent_ty @ Type::Divergent(_) = resolved {
+            // Keep the current binding to bootstrap decorators whose return annotations
+            // depend on the decorated class. Retain the cycle marker too: replacing it with
+            // only the class lets inferred lambda return types grow on every iteration.
+            UnionType::from_elements_cycle_recovery(db, env, [inferred, divergent_ty])
+        } else if class_decorator_preserves_class_binding(db, env, original_class, decorated) {
+            merge_class_preserving_decorator_result(db, env, original_class, inferred, decorated)
+        } else {
+            // Only record an undecorated type once a decorator actually replaces the public
+            // binding. If all decorators preserve the class, there is no alternate class type
+            // to expose.
+            undecorated.get_or_insert(inferred);
+            decorated
+        }
     }
 }

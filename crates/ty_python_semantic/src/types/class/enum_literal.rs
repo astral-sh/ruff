@@ -1,4 +1,5 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use ruff_db::diagnostic::Span;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
@@ -164,7 +165,7 @@ impl<'db> DynamicEnumLiteral<'db> {
         if let Some(mixin) = self.mixin_type(db) {
             bases.push(mixin);
         }
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        let env = ProgramEnvironment::from_scope(self.scope(db));
         bases.push(self.base_class(db).to_class_literal(db, &env));
         bases.into_boxed_slice()
     }
@@ -186,22 +187,26 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        let env = ProgramEnvironment::from_scope(self.scope(db));
         KnownClass::EnumType.to_class_literal(db, &env)
     }
 
     #[salsa::tracked(
         returns(ref),
-        heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {
+        heap_size = ruff_memory_usage::heap_size,
+        cycle_initial = |db, _, self_: DynamicEnumLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::DynamicEnum(self_))),
-                ClassBase::object(db, &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db)))),
+                ClassBase::object(
+                    db,
+                    &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db))),
+                ),
             ]))
-        }
+        },
     )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_enum(db, self)
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        Mro::of_dynamic_enum(db, &env, self)
     }
 
     fn has_known_members(self, db: &'db dyn Db) -> bool {

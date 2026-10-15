@@ -1,14 +1,18 @@
 //! Bounded projections of correlated constraint solutions.
 
+use crate::types::TypeOperations;
+use crate::types::recursive::StructuralTypeVisit;
+use crate::types::recursive::TypeWalkKey;
 use rustc_hash::FxHashSet;
 
 use super::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution, Solutions,
     TypeVarSolution,
 };
+use crate::Db;
+use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
 use crate::types::typevar::TypeVarSet;
-use crate::types::{Type, TypeVarVariance};
-use crate::{Db, TypeOperations};
+use crate::types::{CycleKind, Type, TypeVarVariance, TypeWalk};
 
 /// Limits for one projection, including preprocessing, path collection, and its result.
 #[derive(Clone, Copy, Debug)]
@@ -73,25 +77,87 @@ impl ProjectionTypeBudget {
     pub(crate) fn charge_type<'db>(
         &mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> Result<(), ProjectionError> {
-        self.charge_type_inner(db, ty, &mut FxHashSet::default())
+        let mut state = ProjectionTerms {
+            budget: self,
+            seen_aliases: FxHashSet::default(),
+        };
+        StructuralTypeTraversal::with_root(env, ChargeProjectionTerms, |traversal| {
+            traversal.visit_with(db, ty, &mut state)
+        })
     }
 
-    fn charge_type_inner<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        seen_aliases: &mut FxHashSet<Type<'db>>,
-    ) -> Result<(), ProjectionError> {
+    fn charge_one(&mut self) -> Result<(), ProjectionError> {
         self.remaining = self
             .remaining
             .checked_sub(1)
             .ok_or(ProjectionError::TypeBudgetExceeded)?;
+        Ok(())
+    }
+}
+
+struct ProjectionTerms<'a, 'db> {
+    budget: &'a mut ProjectionTypeBudget,
+    seen_aliases: FxHashSet<Type<'db>>,
+}
+
+struct ChargeProjectionTerms;
+
+impl<'db, 'budget, 'state>
+    TypeWalk<'db, &'state mut ProjectionTerms<'budget, 'db>, StructuralTraversal>
+    for ChargeProjectionTerms
+{
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::ChargeProjectionTerms
+    }
+
+    type Output = Result<(), ProjectionError>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        state: &'state mut ProjectionTerms<'budget, 'db>,
+    ) -> Self::Output {
+        match kind {
+            CycleKind::Exact => state.budget.charge_one(),
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => {
+                Err(ProjectionError::TypeBudgetExceeded)
+            }
+        }
+    }
+
+    fn visit_alias_like(
+        &self,
+        _db: &'db dyn Db,
+        _traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        state: &'state mut ProjectionTerms<'budget, 'db>,
+        visit_body: impl FnOnce(&'state mut ProjectionTerms<'budget, 'db>) -> Self::Output,
+    ) -> Self::Output {
+        state.budget.charge_one()?;
+        if matches!(ty, Type::TypeAlias(_)) && state.seen_aliases.insert(ty) {
+            visit_body(state)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        state: &'state mut ProjectionTerms<'budget, 'db>,
+    ) -> Self::Output {
+        state.budget.charge_one()?;
         match ty {
             Type::Union(union) => {
                 for element in union.elements(db) {
-                    self.charge_type_inner(db, *element, seen_aliases)?;
+                    traversal.visit_with(db, *element, &mut *state)?;
                 }
             }
             Type::Intersection(intersection) => {
@@ -99,11 +165,8 @@ impl ProjectionTypeBudget {
                     .iter_positive(db)
                     .chain(intersection.iter_negative(db))
                 {
-                    self.charge_type_inner(db, element, seen_aliases)?;
+                    traversal.visit_with(db, element, &mut *state)?;
                 }
-            }
-            Type::TypeAlias(alias) if seen_aliases.insert(ty) => {
-                self.charge_type_inner(db, alias.value_type(db), seen_aliases)?;
             }
             _ => {}
         }
@@ -174,11 +237,11 @@ impl<'db> ConstraintSet<'db, '_> {
         path_bounds.try_solve_with(choose, |solution| {
             for violation in solution.violations() {
                 for evidence in violation.evidence_types() {
-                    type_budget.charge_type(db, *evidence)?;
+                    type_budget.charge_type(db, env, *evidence)?;
                 }
             }
             for binding in &solution.solved_typevars {
-                type_budget.charge_type(db, binding.solution)?;
+                type_budget.charge_type(db, env, binding.solution)?;
             }
             Ok(())
         })

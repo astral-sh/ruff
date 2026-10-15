@@ -1,4 +1,6 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::types::TypeOperations;
+use crate::types::recursive::StructuralTypeVisit;
+use crate::types::recursive::TypeWalkKey;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
@@ -10,17 +12,19 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
-use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal, TypeInspector};
+use crate::types::recursive::{
+    SetExpansionContext, StructuralTraversal, StructuralTypeTraversal, TypeInspectionKey,
+    TypeInspector,
+};
+use crate::types::visitor;
 use crate::types::{
     ApplyTypeMappingVisitor, CycleKind, InstanceProjection, ProjectInstance, PromotionKind,
-    PromotionMode, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers, TypeQueryContext,
-    TypeWalk,
+    PromotionMode, Type, TypeContext, TypeMapping, TypeQualifiers, TypeQueryContext, TypeWalk,
 };
-use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
-mod generic_gradual_intersections;
+pub(super) mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
@@ -39,25 +43,29 @@ struct UnionExpansionState {
 }
 
 impl<'db> TypeWalk<'db, UnionExpansionState, StructuralTraversal> for ExpandUnion<'_, 'db> {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::ExpandUnion(self.unpack_aliases, self.cycle_recovery, self.expand_named)
+    }
+
     type Output = Result<Vec<Type<'db>>, ()>;
 
     fn on_cycle(
         &self,
-        _traversal: &StructuralTypeTraversal<'_, 'db, Self>,
+        _traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _state: UnionExpansionState,
     ) -> Self::Output {
         match kind {
             CycleKind::Exact => Ok(Vec::new()),
-            CycleKind::MatchingIdentity => Err(()),
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => Err(()),
         }
     }
 
     fn visit_alias_like(
         &self,
         db: &'db dyn Db,
-        _traversal: &StructuralTypeTraversal<'_, 'db, Self>,
+        _traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         state: UnionExpansionState,
         visit_body: impl FnOnce(UnionExpansionState) -> Self::Output,
@@ -95,7 +103,7 @@ impl<'db> TypeWalk<'db, UnionExpansionState, StructuralTraversal> for ExpandUnio
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &StructuralTypeTraversal<'_, 'db, Self>,
+        traversal: &StructuralTypeVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         state: UnionExpansionState,
     ) -> Self::Output {
@@ -248,24 +256,7 @@ impl<'db> UnionType<'db> {
         a: Type<'db>,
         b: Type<'db>,
     ) -> Type<'db> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db))), *previous, cycle)
-            },
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
-            UnionBuilder::new(db, &env)
-                .add(types.first(db))
-                .add(types.second(db))
-                .build()
-        }
-
-        union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
+        UnionBuilder::new(db, env).add(a).add(b).build()
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -306,13 +297,14 @@ impl<'db> UnionType<'db> {
     /// Recursively expands aliases that expose top-level union elements.
     ///
     /// Aliases nested inside non-union elements remain part of those elements.
-    pub(crate) fn expand_aliases(
+    pub(super) fn expand_aliases(
         self,
         db: &'db dyn Db,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        context: &SetExpansionContext<'_, '_, 'db>,
     ) -> Type<'db> {
-        // A relation can compare many source types with this union. Reuse its expansion within
-        // the same materialization root, whose active guards can affect recursive unfoldings.
+        let visitor = context.mapping();
+        // Reuse the expansion within this operation, whose active guards can affect recursive
+        // unfoldings.
         if let Some(expanded) = visitor.expanded_unions.borrow().get(&self) {
             return *expanded;
         }
@@ -328,8 +320,8 @@ impl<'db> UnionType<'db> {
         }
         let expanded = builder.build();
         let mut expansions = visitor.expanded_unions.borrow_mut();
-        // The result is already expanded for this operation, including when changing the source
-        // of a relation revisits the same target union. Preserve its remaining recursive boundary.
+        // The result is already expanded for this operation. Preserve its remaining recursive
+        // boundary when another path visits the same union.
         if let Type::Union(union) = expanded {
             expansions.insert(union, expanded);
         }
@@ -484,7 +476,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
-    pub(super) fn map_leave_aliases(
+    fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
@@ -1118,11 +1110,12 @@ impl<'db> IntersectionType<'db> {
     }
 
     /// Normalize direct aliases without expanding aliases nested inside containers.
-    pub(crate) fn expand_aliases(
+    pub(super) fn expand_aliases(
         self,
         db: &'db dyn Db,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        context: &SetExpansionContext<'_, '_, 'db>,
     ) -> Type<'db> {
+        let visitor = context.mapping();
         if let Some(expanded) = visitor.expanded_intersections.borrow().get(&self) {
             return *expanded;
         }
@@ -1239,23 +1232,9 @@ impl<'db> IntersectionType<'db> {
         a: Type<'db>,
         b: Type<'db>,
     ) -> Type<'db> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db))), *previous, cycle)
-            },
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
-            IntersectionBuilder::new(db, &env)
-                .positive_elements([types.first(db), types.second(db)])
-                .build()
-        }
-
-        intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
+        IntersectionBuilder::new(db, env)
+            .positive_elements([a, b])
+            .build()
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -1609,18 +1588,10 @@ fn expand_intersection_typevars_and_newtypes<'db>(
         let projected = TypeInspector::inspect_root(
             db,
             env,
+            TypeInspectionKey::ProjectIntersectionTypevar,
             element,
             |_, _| None,
-            |_, ty| match ty {
-                Type::TypeVar(tvar) => Some(match tvar.require_bound_or_constraints(db, env) {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => bound,
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        constraints.as_type(db, env)
-                    }
-                }),
-                Type::NewTypeInstance(newtype) => Some(newtype.concrete_base_type(db)),
-                _ => None,
-            },
+            |_, ty| ty.project_intersection_typevar(db),
         );
         builder.add_positive_in_place(projected.unwrap_or(element));
     }

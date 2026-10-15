@@ -1,5 +1,6 @@
+use crate::types::TypeOperations;
 use crate::{
-    Db, Program, ProgramEnvironment, TypeOperations,
+    Db, Program, ProgramEnvironment,
     place::{DefinedPlace, Definedness, Place, known_module_symbol},
     types::{
         Binding, ClassLiteral, ClassType, GenericContext, KnownInstanceType, StaticClassLiteral,
@@ -1199,7 +1200,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     #[track_caller]
-    pub fn to_instance<'db>(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
+    pub fn to_instance<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         debug_assert_ne!(
             self,
             KnownClass::Tuple,
@@ -1208,12 +1209,19 @@ impl KnownClass {
 
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
-                let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(argument.program(db)));
+            cycle_initial = |_, id, _| Type::divergent(id),
+            cycle_fn = |db,
+                        cycle,
+                        previous: &Type<'db>,
+                        result: Type<'db>,
+                        argument: KnownClassArgument<'db>| {
+                let env = TypeOperations::new_root(
+                    db,
+                    ProgramEnvironment::from_program(argument.program(db)),
+                );
                 result.cycle_normalized(db, &env, *previous, cycle)
             },
-            heap_size=ruff_memory_usage::heap_size,
+            heap_size = ruff_memory_usage::heap_size,
         )]
         fn known_class_to_instance<'db>(
             db: &'db dyn Db,
@@ -1226,7 +1234,7 @@ impl KnownClass {
             argument
                 .class(db)
                 .to_class_literal(db, env)
-                .to_class_type(db)
+                .to_class_type(db, env)
                 .map(|class| Type::instance(db, env, class))
                 .unwrap_or_else(Type::unknown)
         }
@@ -1287,7 +1295,7 @@ impl KnownClass {
                         class.display(env.python_version(db))
                     );
                 }
-                return class_literal.default_specialization(db);
+                return class_literal.default_specialization(db, env);
             }
 
             class_literal
@@ -1343,7 +1351,7 @@ impl KnownClass {
     fn lookup_class_literal<'db>(
         self,
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
+        env: &ProgramEnvironment<'db>,
     ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn known_class_to_class_literal<'db>(
@@ -1407,7 +1415,7 @@ impl KnownClass {
     pub(crate) fn try_to_class_literal<'db>(
         self,
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
+        env: &ProgramEnvironment<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
         match self.lookup_class_literal(db, env) {
             Ok(class_literal) => class_literal,
@@ -1428,7 +1436,7 @@ impl KnownClass {
     pub(crate) fn to_class_literal<'db>(
         self,
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
+        env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         self.try_to_class_literal(db, env)
             .map(|class| Type::ClassLiteral(ClassLiteral::Static(class)))
@@ -1441,7 +1449,7 @@ impl KnownClass {
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub fn to_subclass_of<'db>(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         self.to_class_literal(db, env)
-            .to_class_type(db)
+            .to_class_type(db, env)
             .map(|class| SubclassOfType::from(db, env, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
@@ -1465,8 +1473,9 @@ impl KnownClass {
         env: &TypeOperations<'db>,
         other: ClassType<'db>,
     ) -> bool {
-        self.lookup_class_literal(db, env)
-            .is_ok_and(|class| class.is_some_and(|class| class.is_subclass_of(db, None, other)))
+        self.lookup_class_literal(db, env).is_ok_and(|class| {
+            class.is_some_and(|class| class.is_subclass_of(db, env, None, other))
+        })
     }
 
     pub(crate) fn when_subclass_of<'db, 'c>(
@@ -2159,7 +2168,7 @@ impl KnownClass {
 }
 
 #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-struct KnownClassArgument {
+pub(crate) struct KnownClassArgument {
     #[returns(copy)]
     class: KnownClass,
 
@@ -2346,7 +2355,7 @@ mod tests {
             }
 
             // Check the class can be looked up successfully
-            let env = TypeOperations::new_root(&db, ProgramEnvironment::from_program(program));
+            let env = ProgramEnvironment::from_program(program);
             class.try_to_class_literal(&db, &env).unwrap();
 
             // We can't call `KnownClass::Tuple.to_instance()`;

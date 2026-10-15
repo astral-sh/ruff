@@ -1,4 +1,5 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::TextRange;
@@ -261,7 +262,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        let env = ProgramEnvironment::from_scope(self.scope(db));
         self.inferred_metaclass(db).to_type(db, &env)
     }
 
@@ -339,11 +340,11 @@ impl<'db> DynamicClassLiteral<'db> {
                 return Ok(ClassMetaclass::Selected(base_metaclass));
             }
             // Get the ClassType for comparison.
-            let Some(candidate_class) = candidate.to_class_type(db) else {
+            let Some(candidate_class) = candidate.to_class_type(db, &env) else {
                 // If candidate isn't a class type, keep it as is.
                 continue;
             };
-            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(db, &env) else {
                 continue;
             };
 
@@ -381,8 +382,8 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// If the MRO cannot be computed (e.g., due to inconsistent ordering), falls back
     /// to iterating over base MROs sequentially with deduplication.
-    pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::Dynamic(self), None)
+    pub(crate) fn iter_mro(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> MroIterator<'db> {
+        ClassLiteral::Dynamic(self).iter_mro(db, env)
     }
 
     /// Look up an instance member by iterating through the MRO.
@@ -392,7 +393,7 @@ impl<'db> DynamicClassLiteral<'db> {
         env: &TypeOperations<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, env, self.iter_mro(db)).instance_member(name) {
+        match MroLookup::new(db, env, self.iter_mro(db, env)).instance_member(name) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
@@ -436,7 +437,7 @@ impl<'db> DynamicClassLiteral<'db> {
             }
         }
 
-        let result = MroLookup::new(db, env, self.iter_mro(db)).class_member(
+        let result = MroLookup::new(db, env, self.iter_mro(db, env)).class_member(
             name, policy, None,  // No inherited generic context.
             false, // Dynamic classes are never `object`.
         );
@@ -478,16 +479,20 @@ impl<'db> DynamicClassLiteral<'db> {
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
+        cycle_initial = |db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([
                 ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(self_))),
-                ClassBase::object(db, &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db)))),
+                ClassBase::object(
+                    db,
+                    &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db))),
+                ),
             ]))
         },
-        heap_size=ruff_memory_usage::heap_size
+        heap_size = ruff_memory_usage::heap_size,
     )]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
-        Mro::of_dynamic_class(db, self)
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        Mro::of_dynamic_class(db, &env, self)
     }
 
     /// Return `Some()` if this dynamic class is known to be a [`DisjointBase`].
@@ -497,7 +502,11 @@ impl<'db> DynamicClassLiteral<'db> {
     /// ```python
     /// X = type("X", (), {"__slots__": ("a",)})
     /// ```
-    pub(super) fn as_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
+    pub(super) fn as_disjoint_base(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> Option<DisjointBase<'db>> {
         // Check if __slots__ is in the members
         for (name, ty) in self.members(db) {
             if name.as_str() == "__slots__" {
@@ -505,10 +514,8 @@ impl<'db> DynamicClassLiteral<'db> {
                 let is_non_empty = match ty {
                     // __slots__ = ("a", "b")
                     Type::NominalInstance(nominal) => {
-                        let env = TypeOperations::new_root(
-                            db,
-                            ProgramEnvironment::from_scope(self.scope(db)),
-                        );
+                        let env =
+                            env.in_environment(ProgramEnvironment::from_scope(self.scope(db)));
                         nominal.tuple_spec(db, &env).is_some_and(|spec| {
                             spec.len().into_fixed_length().is_some_and(|len| len > 0)
                         })

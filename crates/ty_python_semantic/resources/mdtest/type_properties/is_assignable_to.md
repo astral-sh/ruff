@@ -858,11 +858,9 @@ static_assert(not is_assignable_to(Literal[1] | None, int))
 static_assert(not is_assignable_to(Literal[1] | None, str | None))
 static_assert(not is_assignable_to(Any | int | str, int))
 
-# TODO: No errors
-# error: [static-assert-error]
 static_assert(is_assignable_to(bool, Literal[False] | AlwaysTruthy))
-# error: [static-assert-error]
 static_assert(is_assignable_to(bool, Literal[True] | AlwaysFalsy))
+# TODO: No error
 # error: [static-assert-error]
 static_assert(is_assignable_to(LiteralString, Literal[""] | AlwaysTruthy))
 static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))
