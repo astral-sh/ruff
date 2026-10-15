@@ -55,21 +55,25 @@ const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
 #[derive(Clone, Copy, Debug)]
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
-    TypeAlias(TypeAliasType<'db>),
-    Recursive(RecursiveType<'db>),
+    // Different representations and specializations of an alias share one declaration.
+    TypeAlias {
+        definition: Definition<'db>,
+        name: &'db str,
+    },
 }
 
 impl<'db> NamedItem<'db> {
-    fn is_same_item(self, db: &'db dyn Db, other: Self) -> bool {
+    fn is_same_item(self, other: Self) -> bool {
         match (self, other) {
             (NamedItem::Class(left), NamedItem::Class(right)) => left == right,
-            (NamedItem::TypeAlias(left), NamedItem::TypeAlias(right)) => {
-                // Specializations of the same alias share a display name.
-                left.definition(db) == right.definition(db)
-            }
-            (NamedItem::Recursive(left), NamedItem::Recursive(right)) => {
-                left.definition(db) == right.definition(db)
-            }
+            (
+                NamedItem::TypeAlias {
+                    definition: left, ..
+                },
+                NamedItem::TypeAlias {
+                    definition: right, ..
+                },
+            ) => left == right,
             _ => false,
         }
     }
@@ -77,20 +81,15 @@ impl<'db> NamedItem<'db> {
     fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             NamedItem::Class(class) => class.name(db),
-            NamedItem::TypeAlias(type_alias) => type_alias.name(db),
-            NamedItem::Recursive(recursive) => recursive.name(db),
+            NamedItem::TypeAlias { name, .. } => name,
         }
     }
 
     fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
         match self {
             NamedItem::Class(class) => class.qualified_name(db).components_excluding_self(),
-            NamedItem::TypeAlias(type_alias) => {
-                type_alias.qualified_name(db).components_excluding_self()
-            }
-            NamedItem::Recursive(recursive) => {
-                QualifiedTypeAliasName::new(db, recursive.definition(db), recursive.name(db))
-                    .components_excluding_self()
+            NamedItem::TypeAlias { definition, name } => {
+                QualifiedTypeAliasName::new(db, definition, name).components_excluding_self()
             }
         }
     }
@@ -600,7 +599,7 @@ impl<'db> AmbiguousNameCollector<'_, 'db> {
                 let value = entry.get_mut();
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
-                        if !existing.is_same_item(db, item) {
+                        if !existing.is_same_item(item) {
                             let qualified_name_components = item.qualified_name_components(db);
                             if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -616,7 +615,7 @@ impl<'db> AmbiguousNameCollector<'_, 'db> {
                         item: existing,
                         qualified_name_components,
                     } => {
-                        if !existing.is_same_item(db, item) {
+                        if !existing.is_same_item(item) {
                             let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
@@ -633,8 +632,8 @@ impl<'db> AmbiguousNameCollector<'_, 'db> {
         self.record(db, NamedItem::Class(class));
     }
 
-    fn record_type_alias(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-        self.record(db, NamedItem::TypeAlias(type_alias));
+    fn record_type_alias(&self, db: &'db dyn Db, definition: Definition<'db>, name: &'db str) {
+        self.record(db, NamedItem::TypeAlias { definition, name });
     }
 
     /// Returns the qualification level map for all names.
@@ -688,8 +687,12 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
-            Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
-            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::TypeAlias(type_alias) => {
+                self.record_type_alias(db, type_alias.definition(db), type_alias.name(db));
+            }
+            Type::Recursive(recursive) => {
+                self.record_type_alias(db, recursive.definition(db), recursive.name(db));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)

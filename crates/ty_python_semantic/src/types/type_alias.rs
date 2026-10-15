@@ -811,11 +811,6 @@ impl<'db> TypeAliasType<'db> {
             }
         }
     }
-
-    /// Returns a struct that can display the fully qualified name of this type alias.
-    pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
-        QualifiedTypeAliasName::new(db, self.definition(db), self.name(db))
-    }
 }
 
 impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
