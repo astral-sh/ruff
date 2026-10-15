@@ -1,4 +1,5 @@
 """Support for building partial DOM trees from SAX events."""
+
 import sys
 from _typeshed import Incomplete, Unused
 from collections.abc import MutableSequence, Sequence
@@ -35,8 +36,9 @@ _Event: TypeAlias = (
 class PullDOM(ContentHandler):
     """Content handler which turns SAX events into pull parser events.
 
-The nodes are created, but they are not added to the tree.
-"""
+    The nodes are created, but they are not added to the tree.
+    """
+
     document: Document | None
     documentFactory: _DocumentFactory
 
@@ -84,6 +86,7 @@ class ErrorHandler:
 
 class DOMEventStream:
     """Stream of the pull parser events."""
+
     stream: _SupportsReadClose[bytes] | _SupportsReadClose[str]
     parser: XMLReader  # Set to none after .clear() is called
     bufsize: int
@@ -96,15 +99,19 @@ class DOMEventStream:
     def __iter__(self) -> Self: ...
     def getEvent(self) -> _Event | None:
         """Return the next (event, node) tuple, or None at the end."""
+
     def expandNode(self, node: Document) -> None:
         """Expand all children of the node into the node."""
+
     def reset(self) -> None:
         """Discard unread events and prepare for parsing a new document."""
+
     def clear(self) -> None:
         """Release the parser and the document."""
 
 class SAX2DOM(PullDOM):
     """PullDOM which also adds every created node to the tree."""
+
     def startElementNS(self, name: _NSName, tagName: str | None, attrs: AttributesNSImpl) -> None: ...
     def startElement(self, name: str, attrs: AttributesImpl) -> None: ...
     def processingInstruction(self, target: str, data: str) -> None: ...
@@ -119,5 +126,6 @@ def parse(
     bufsize: int | None = None,
 ) -> DOMEventStream:
     """Return a DOMEventStream for the given file name or file object."""
+
 def parseString(string: str, parser: XMLReader | None = None) -> DOMEventStream:
     """Return a DOMEventStream for the given string."""

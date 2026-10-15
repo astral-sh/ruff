@@ -20,6 +20,7 @@ CAVEATS:
    any client code would have to be changed as well, we don't automate
    this.
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

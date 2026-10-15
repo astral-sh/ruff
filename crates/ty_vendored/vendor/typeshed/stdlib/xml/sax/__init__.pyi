@@ -18,6 +18,7 @@ xmlreader -- Base classes and constants which define the SAX 2 API for
 
 expatreader -- Driver that allows use of the Expat parser with SAX.
 """
+
 import sys
 from _typeshed import ReadableBuffer, StrPath, SupportsRead, _T_co
 from collections.abc import Iterable
@@ -43,24 +44,27 @@ default_parser_list: Final[list[str]]
 def make_parser(parser_list: Iterable[str] = ()) -> XMLReader:
     """Creates and returns a SAX parser.
 
-Creates the first parser it is able to instantiate of the ones
-given in the iterable created by chaining parser_list and
-default_parser_list.  The iterables must contain the names of Python
-modules containing both a SAX parser and a create_parser function.
-"""
+    Creates the first parser it is able to instantiate of the ones
+    given in the iterable created by chaining parser_list and
+    default_parser_list.  The iterables must contain the names of Python
+    modules containing both a SAX parser and a create_parser function.
+    """
+
 def parse(source: _Source, handler: ContentHandler, errorHandler: ErrorHandler = ...) -> None:
     """Parse an XML document with the default parser.
 
-source is a system identifier, a path-like object or a file object,
-handler is a ContentHandler instance, and errorHandler is an
-ErrorHandler instance.  All work is done by the handler.
-"""
+    source is a system identifier, a path-like object or a file object,
+    handler is a ContentHandler instance, and errorHandler is an
+    ErrorHandler instance.  All work is done by the handler.
+    """
+
 def parseString(string: ReadableBuffer | str, handler: ContentHandler, errorHandler: ErrorHandler | None = ...) -> None:
     """Parse an XML document from a string with the default parser.
 
-string is a str or a bytes-like object, the other arguments are the
-same as for parse().
-"""
+    string is a str or a bytes-like object, the other arguments are the
+    same as for parse().
+    """
+
 def _create_parser(parser_name: str) -> XMLReader: ...
 
 if sys.version_info >= (3, 14):

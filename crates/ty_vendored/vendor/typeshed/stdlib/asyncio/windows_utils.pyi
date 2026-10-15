@@ -1,4 +1,5 @@
 """Various Windows specific bits and pieces."""
+
 import subprocess
 import sys
 from collections.abc import Callable
@@ -18,8 +19,9 @@ if sys.platform == "win32":
     class PipeHandle:
         """Wrapper for an overlapped pipe handle which is vaguely file-object like.
 
-The IOCP event loop can use these instead of socket objects.
-"""
+        The IOCP event loop can use these instead of socket objects.
+        """
+
         def __init__(self, handle: int) -> None: ...
         def __del__(self) -> None: ...
         def __enter__(self) -> Self: ...
@@ -32,8 +34,9 @@ The IOCP event loop can use these instead of socket objects.
     class Popen(subprocess.Popen[AnyStr]):
         """Replacement for subprocess.Popen using overlapped pipe handles.
 
-The stdin, stdout, stderr are None or instances of PipeHandle.
-"""
+        The stdin, stdout, stderr are None or instances of PipeHandle.
+        """
+
         stdin: PipeHandle | None  # type: ignore[assignment]
         stdout: PipeHandle | None  # type: ignore[assignment]
         stderr: PipeHandle | None  # type: ignore[assignment]

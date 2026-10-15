@@ -5,6 +5,7 @@ the 'setup' function (which is to be called from the setup script).  Also
 indirectly provides the Distribution and Command classes, although they are
 really defined in distutils.dist and distutils.cmd.
 """
+
 from _typeshed import Incomplete, StrOrBytesPath
 from collections.abc import Mapping
 from distutils.cmd import Command as Command
@@ -93,6 +94,7 @@ def setup(
     command-specific options that became attributes of each command
     object.
     """
+
 def run_setup(script_name: str, script_args: list[str] | None = None, stop_after: str = "run") -> Distribution:
     """Run a setup script in a somewhat controlled environment, and
     return the Distribution instance that drives things.  This is useful

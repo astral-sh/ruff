@@ -38,26 +38,30 @@ class BaseContext:
     @staticmethod
     def current_process() -> BaseProcess:
         """
-Return process object representing the current process
-"""
+        Return process object representing the current process
+        """
+
     @staticmethod
     def parent_process() -> BaseProcess | None:
         """
-Return process object representing the parent process
-"""
+        Return process object representing the parent process
+        """
+
     @staticmethod
     def active_children() -> list[BaseProcess]:
         """
-Return list of process objects corresponding to live child processes
-"""
+        Return list of process objects corresponding to live child processes
+        """
+
     def cpu_count(self) -> int:
         """Returns the number of CPUs in the system"""
+
     def Manager(self) -> SyncManager:
         """Returns a manager associated with a running server process
 
-The managers methods such as `Lock()`, `Condition()` and `Queue()`
-can be used to create shared objects.
-"""
+        The managers methods such as `Lock()`, `Condition()` and `Queue()`
+        can be used to create shared objects.
+        """
 
     # N.B. Keep this in sync with multiprocessing.connection.Pipe.
     # _ConnectionBase is the common base class of Connection and PipeConnection
@@ -68,6 +72,7 @@ can be used to create shared objects.
     if sys.platform != "win32":
         def Pipe(self, duplex: bool = True) -> tuple[Connection[Any, Any], Connection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
+
     else:
         def Pipe(self, duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
@@ -76,24 +81,34 @@ can be used to create shared objects.
         self, parties: int, action: Callable[..., object] | None = None, timeout: float | None = None
     ) -> synchronize.Barrier:
         """Returns a barrier object"""
+
     def BoundedSemaphore(self, value: int = 1) -> synchronize.BoundedSemaphore:
         """Returns a bounded semaphore object"""
+
     def Condition(self, lock: _LockLike | None = None) -> synchronize.Condition:
         """Returns a condition object"""
+
     def Event(self) -> synchronize.Event:
         """Returns an event object"""
+
     def Lock(self) -> synchronize.Lock:
         """Returns a non-recursive lock object"""
+
     def RLock(self) -> synchronize.RLock:
         """Returns a recursive lock object"""
+
     def Semaphore(self, value: int = 1) -> synchronize.Semaphore:
         """Returns a semaphore object"""
+
     def Queue(self, maxsize: int = 0) -> queues.Queue[Any]:
         """Returns a queue object"""
+
     def JoinableQueue(self, maxsize: int = 0) -> queues.JoinableQueue[Any]:
         """Returns a queue object"""
+
     def SimpleQueue(self) -> queues.SimpleQueue[Any]:
         """Returns a queue object"""
+
     def Pool(
         self,
         processes: int | None = None,
@@ -157,38 +172,44 @@ can be used to create shared objects.
 
     def freeze_support(self) -> None:
         """Check whether this is a fake forked process in a frozen executable.
-If so then run code specified by commandline and exit.
-"""
+        If so then run code specified by commandline and exit.
+        """
+
     def get_logger(self) -> Logger:
         """Return package logger -- if it does not already exist then
-it is created.
-"""
+        it is created.
+        """
+
     def log_to_stderr(self, level: _LoggingLevel | None = None) -> Logger:
         """Turn on logging and add a handler which prints to stderr"""
+
     def allow_connection_pickling(self) -> None:
         """Install support for sending connections and sockets
-between processes
-"""
+        between processes
+        """
+
     def set_executable(self, executable: str) -> None:
         """Sets the path to a python.exe or pythonw.exe binary used to run
-child processes instead of sys.executable when using the 'spawn'
-start method.  Useful for people embedding Python.
-"""
+        child processes instead of sys.executable when using the 'spawn'
+        start method.  Useful for people embedding Python.
+        """
+
     if sys.version_info >= (3, 15):
         def set_forkserver_preload(
             self, module_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
         ) -> None:
             """Set list of module names to try to load in forkserver process.
 
-The on_error parameter controls how import failures are handled:
-"ignore" (default) silently ignores failures, "warn" emits warnings,
-and "fail" raises exceptions breaking the forkserver context.
-"""
+            The on_error parameter controls how import failures are handled:
+            "ignore" (default) silently ignores failures, "warn" emits warnings,
+            and "fail" raises exceptions breaking the forkserver context.
+            """
+
     else:
         def set_forkserver_preload(self, module_names: list[str]) -> None:
             """Set list of module names to try to load in forkserver process.
-This is really just a hint.
-"""
+            This is really just a hint.
+            """
 
     @overload
     def get_context(self, method: None = None) -> DefaultContext: ...
@@ -213,8 +234,8 @@ This is really just a hint.
     @property
     def reducer(self) -> str:
         """Controls how objects will be reduced to a form that can be
-shared with other processes.
-"""
+        shared with other processes.
+        """
     @reducer.setter
     def reducer(self, reduction: str) -> None: ...
 
