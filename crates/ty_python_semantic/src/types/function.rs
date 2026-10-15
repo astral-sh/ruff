@@ -64,12 +64,13 @@ use ty_module_resolver::{KnownModule, file_to_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
-use crate::types::generics::{GenericContext, typing_self};
+use crate::types::generics::{
+    GenericContext, Specialization, typing_self, walk_specialization_types,
+};
 use crate::types::infer::{
     infer_complete_scope_types, infer_definition_types, nearest_enclosing_class,
     original_class_type,
@@ -77,9 +78,7 @@ use crate::types::infer::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
-use crate::types::signatures::{
-    CallableSignature, Parameter, ReturnCallableTypeVarScope, Signature,
-};
+use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1142,17 +1141,26 @@ pub struct UpdatedFunctionSignatures<'db> {
     ///
     /// See also: [`FunctionLiteral::last_definition_signature`].
     implementation_callables: Option<Box<[CallableType<'db>]>>,
+
+    /// Retains the owner's type arguments for return types inferred after member lookup.
+    /// Static methods have no receiver from which these arguments could be recovered.
+    class_specialization: Option<Specialization<'db>>,
 }
 
 impl<'db> UpdatedFunctionSignatures<'db> {
     fn new(
         signature: Option<CallableSignature<'db>>,
         implementation_callables: Option<Box<[CallableType<'db>]>>,
+        class_specialization: Option<Specialization<'db>>,
     ) -> Option<Box<Self>> {
-        (signature.is_some() || implementation_callables.is_some()).then(|| {
+        (signature.is_some()
+            || implementation_callables.is_some()
+            || class_specialization.is_some())
+        .then(|| {
             Box::new(Self {
                 signature,
                 implementation_callables,
+                class_specialization,
             })
         })
     }
@@ -1194,6 +1202,9 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
         for callable in callables {
             visitor.visit_callable_type(db, *callable);
         }
+    }
+    if let Some(specialization) = function.class_specialization(db) {
+        walk_specialization_types(db, specialization, visitor);
     }
 }
 
@@ -1250,6 +1261,12 @@ impl<'db> FunctionType<'db> {
         Some(signature)
     }
 
+    fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.updated_signatures(db)
+            .as_deref()
+            .and_then(|updated| updated.class_specialization)
+    }
+
     fn updated_implementation_callables(self, db: &'db dyn Db) -> Option<&'db [CallableType<'db>]> {
         self.updated_signatures(db)
             .as_deref()
@@ -1281,6 +1298,7 @@ impl<'db> FunctionType<'db> {
             UpdatedFunctionSignatures::new(
                 self.updated_signature(db).cloned(),
                 Some(implementation_callables),
+                self.class_specialization(db),
             ),
             self.descriptor_kind(db),
         )
@@ -1314,6 +1332,7 @@ impl<'db> FunctionType<'db> {
             UpdatedFunctionSignatures::new(
                 Some(updated_signature),
                 updated_implementation_callables,
+                self.class_specialization(db),
             ),
             self.descriptor_kind(db),
         )
@@ -1366,13 +1385,53 @@ impl<'db> FunctionType<'db> {
             )
         };
 
-        if updated_signature.is_none() && updated_implementation_callables.is_none() {
+        let class_specialization = match self.class_specialization(db) {
+            Some(specialization) => {
+                Some(specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor))
+            }
+            None => match type_mapping {
+                TypeMapping::ApplySpecialization(specialization)
+                | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if specialization.specialize_self_domain()
+                        && db
+                            .analysis_settings(self.file(db))
+                            .return_type_inference
+                            .is_active()
+                        && !self.file(db).is_stub(db)
+                        && !self.has_explicit_return_annotation(db) =>
+                {
+                    // When we call an unannotated method on a type like `Box[int]`, where `Box[T]`
+                    // is a generic type, we might later need to specialize the inferred return type
+                    // of `method`, which might refer to the class-scoped type variable `T`. For
+                    // example:
+                    //
+                    //     class Box[T]:
+                    //         value: T
+                    //         def get(self): return self.value
+                    //
+                    // When calling `Box[int]().get()`, the inferred return type (naively inferred as `T`)
+                    // should be specialized to `int`. We therefore retain the specialization here, as it
+                    // cannot be recovered from the specialized signature in all cases (e.g. static methods).
+                    specialization.as_specialization(db)
+                }
+                _ => None,
+            },
+        };
+
+        if updated_signature.is_none()
+            && updated_implementation_callables.is_none()
+            && class_specialization.is_none()
+        {
             self
         } else {
             Self::new_internal(
                 db,
                 literal,
-                UpdatedFunctionSignatures::new(updated_signature, updated_implementation_callables),
+                UpdatedFunctionSignatures::new(
+                    updated_signature,
+                    updated_implementation_callables,
+                    class_specialization,
+                ),
                 self.descriptor_kind(db),
             )
         }
@@ -1392,7 +1451,12 @@ impl<'db> FunctionType<'db> {
                 .with_dataclass_transformer_params(db, params),
             ..literal
         };
-        Self::new_internal(db, literal, None, self.descriptor_kind(db))
+        Self::new_internal(
+            db,
+            literal,
+            UpdatedFunctionSignatures::new(None, None, self.class_specialization(db)),
+            self.descriptor_kind(db),
+        )
     }
 
     pub(crate) fn with_deprecated(
@@ -1755,44 +1819,7 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
-        // The following code makes sure that we specialize class-scoped type variables in the
-        // inferred return type. For example, the following `Box.get` function has an inferred
-        // return type of `T`, which should be specialized accordingly, when accessed through
-        // `Box[int]`, for example.
-        //
-        //     class Box[T]:
-        //         value: T
-        //         def get(self):
-        //             return self.value
-        //
-        if let Some(class) = class
-            && let Some(receiver) = self
-                .signature(db)
-                .overloads
-                .first()
-                .and_then(|signature| signature.parameters().get(0))
-                .map(Parameter::annotated_type)
-        {
-            let receiver = if self.literal(db).last_definition.is_classmethod(db) {
-                receiver
-                    .to_instance_approximation(db, &env)
-                    .unwrap_or_else(Type::unknown)
-            } else {
-                receiver
-            };
-            if let Some(owner) = receiver.nominal_class(db, &env).and_then(|receiver| {
-                receiver
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .find(|base| base.class_literal(db) == class)
-            }) {
-                return_type = return_type.apply_optional_specialization(
-                    db,
-                    owner.class_literal_and_specialization(db).1,
-                );
-            }
-        }
-        return_type
+        return_type.apply_optional_specialization(db, self.class_specialization(db))
     }
 
     #[salsa::tracked(
@@ -2034,6 +2061,13 @@ impl<'db> FunctionType<'db> {
                     UpdatedFunctionSignatures::new(
                         updated_signature,
                         updated_implementation_callables,
+                        match self.class_specialization(db) {
+                            Some(specialization) => Some(
+                                specialization
+                                    .recursive_type_normalized_impl(db, env, div, nested)?,
+                            ),
+                            None => None,
+                        },
                     ),
                     self.descriptor_kind(db),
                 ))

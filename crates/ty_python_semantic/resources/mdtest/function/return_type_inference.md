@@ -829,6 +829,18 @@ class Factory[T]:
 reveal_type(Factory[int].identity(1))  # revealed: int | Unknown
 ```
 
+Static methods also retain the class's type arguments:
+
+```py
+class Box[T]:
+    @staticmethod
+    def identity(value: T):
+        return value
+
+reveal_type(Box[int].identity(1))  # revealed: int | Unknown
+value: int = Box[int].identity(1)  # no diagnostic
+```
+
 ## Overloaded functions
 
 Return type inference (on the actual implementation function) should not influence the return type
