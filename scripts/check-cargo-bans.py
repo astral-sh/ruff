@@ -20,6 +20,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 """Supplement cargo-deny bans with workspace dependency policy checks."""
 

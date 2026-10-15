@@ -22,6 +22,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Check code snippets in docs are formatted by Ruff."""

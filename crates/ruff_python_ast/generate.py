@@ -20,6 +20,8 @@
 #
 # [tool.uv]
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 from __future__ import annotations
