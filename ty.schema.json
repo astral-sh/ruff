@@ -100,7 +100,7 @@
           ]
         },
         "return-type-inference": {
-          "description": "This setting controls when ty infers return types for functions without an explicit\nreturn type annotation.\n\n- `\"never\"`: Do not infer return types from function bodies. Unannotated functions\n  will have an inferred return type of `Unknown`.\n- `\"always\"`: Infer return types for unannotated functions and methods.\n\nEnabling return type inference will never override explicit return type annotations.\n\nFunctions in stubs and `if TYPE_CHECKING` blocks are never considered for return type\ninference.",
+          "description": "This setting controls when ty infers return types for functions without an explicit\nreturn type annotation.\n\n- `\"never\"`: Do not infer return types from function bodies. Unannotated functions\n  will have an inferred return type of `Unknown`.\n- `\"always\"`: Infer return types for unannotated functions and methods.\n\nEnabling return type inference will never override explicit return type annotations.\nLambda functions are not affected by this setting and their return type will always\nbe inferred.\n\nReturn types for generator functions and asynchronous functions are currently not\ninferred, but we plan to change this soon.\n\nFunctions in stubs and `if TYPE_CHECKING` blocks are never considered for return type\ninference.",
           "anyOf": [
             {
               "$ref": "#/definitions/ReturnTypeInference"

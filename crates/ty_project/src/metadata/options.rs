@@ -1563,6 +1563,11 @@ pub struct AnalysisOptions {
     /// - `"always"`: Infer return types for unannotated functions and methods.
     ///
     /// Enabling return type inference will never override explicit return type annotations.
+    /// Lambda functions are not affected by this setting and their return type will always
+    /// be inferred.
+    ///
+    /// Return types for generator functions and asynchronous functions are currently not
+    /// inferred, but we plan to change this soon.
     ///
     /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
     /// inference.
