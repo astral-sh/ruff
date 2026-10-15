@@ -535,7 +535,8 @@ def check(maximum: Top[Record[Any]], minimum: Bottom[Record[Any]]):
 
 ## Displaying nested TypedDict values
 
-Finite nesting is displayed in full. Each tuple element also gets its own complete display:
+These nested views are displayed in full. Reusing a view in another tuple element does not
+abbreviate it:
 
 ```py
 from typing_extensions import TypedDict
@@ -582,6 +583,27 @@ class Node[T](TypedDict, closed=True):
 
 def check(node: Node[int]):
     reveal_type(node["value"])  # revealed: dict_values[Literal["value"], dict_values[Literal["value"], ...]]
+```
+
+## Diagnostics for recursive tuple values
+
+Each element of `children` refers to the values of another specialization of `Node`. Reordering the
+arguments gives many paths through the same recursive types. We abbreviate these tuples when
+reporting an incompatible assignment.
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node[T, U, V, W, X](TypedDict, closed=True):
+    children: tuple[
+        TypeOf[next(iter(cast("Node[U, V, W, X, T]", {}).values()))],
+        TypeOf[next(iter(cast("Node[U, T, V, W, X]", {}).values()))],
+    ]
+
+def check(node: Node[int, str, bytes, float, bool]):
+    value: str = next(iter(node.values()))  # error: [invalid-assignment]
 ```
 
 ## Recursive TypedDict values containing class objects
