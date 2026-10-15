@@ -105,7 +105,7 @@ Check the areas relevant to the change, including:
 Treat the PR description and comments as claims to verify, not proof that the
 implementation is correct.
 
-## 4. Evaluate tests
+## 4. Evaluate tests and ecosystem results
 
 Inspect added and existing coverage against the behavior being changed. Look
 for missing negative cases, boundary cases, version-dependent behavior,
@@ -125,6 +125,16 @@ could not be run and why.
 
 Missing tests are review findings when they leave a plausible regression
 unprotected; describe the concrete scenario the test should cover.
+
+For behavior changes, report issues surfaced by ecosystem evidence as review
+findings unless the PR author has already explicitly accepted them. Read any
+posted ecosystem summary and verify that it covers the reviewed PR head. If a
+report for that head is available without a summary, inspect new or changed
+crashes, timeouts, and other severe failures, then spend a bounded amount of
+time sampling diagnostic additions, removals, and changes across projects and
+diagnostic categories. Report the sample's scope and avoid drawing broader
+conclusions than it supports. If no report matches the reviewed head, note that
+limitation and continue the review.
 
 ## 5. Validate findings
 
@@ -150,10 +160,20 @@ improvements.
 
 Lead with findings, ordered by severity. Use these categories:
 
-- **Blocker:** incorrect behavior, soundness problem, crash, data loss, major
-  regression, or architectural flaw that should prevent merging.
-- **Non-blocking:** worthwhile maintainability, test-coverage, complexity, or
-  meaningful consistency improvement that does not need to block merging.
+- **Blocker:** a correctness, soundness, reliability, security, or
+  architectural issue whose impact warrants delaying the merge and that the PR
+  introduces or materially worsens.
+- **Non-blocking:** a less severe correctness issue or a worthwhile
+  maintainability, test-coverage, complexity, or consistency improvement that
+  does not need to block merging.
+
+An underlying bug that can already be reproduced in another form on the merge
+base is usually non-blocking, even if the PR exposes it through new false
+positives or false negatives. Report the newly exposed behavior and distinguish
+the pre-existing cause from the PR's added impact. Escalate when evidence shows
+that the PR materially worsens the severity or breadth of the problem;
+ecosystem results can help establish impact, but are not required to recognize
+a severe regression.
 
 For each finding, provide:
 

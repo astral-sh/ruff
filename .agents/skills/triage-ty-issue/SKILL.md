@@ -221,40 +221,20 @@ Leave an issue open when its only fix is in an unmerged PR.
 
 ## 5. Select current repository labels
 
-Read the existing issue labels and current repository taxonomy. Fetch the live
-catalog when needed rather than assuming that labels seen in old mirrored
-issues still exist:
+Read the issue's existing labels and fetch the current label names and
+descriptions from `astral-sh/ty`:
 
 ```sh
 gh api repos/astral-sh/ty/labels --paginate \
   --jq '.[] | [.name, .description // ""] | @tsv'
 ```
 
-Choose the smallest useful set of exact, currently valid label names:
-
-- Use `bug` for confirmed defects and `feature` for requested capabilities
-  when a category label helps. Use `question` or `documentation` only when
-  those best describe the issue. A category label is not mandatory when
-  existing topical labels already express the issue well.
-- Add precise implementation-area labels where supported by the evidence,
-  such as `generics`, `narrowing`, `constraint-solver`, `type-inference`,
-  `typing semantics`, `type properties`, `set-theoretic types`, `overloads`,
-  `calls`, `constructor-call`, `attributes`, `Protocols`, `typeddict`,
-  `dataclasses`, `imports`, `configuration`, `diagnostics`, `server`,
-  `editor`, `completions`, `hover`, or `library`.
-- Add impact labels when applicable: `fatal` for a panic or crash, `hang`,
-  `performance`, `memory`, `non-determinism`, or `unsoundness`. Reserve
-  `unsoundness` for code ty accepts without a diagnostic even though a value
-  can violate its inferred or declared type at runtime; a false-positive
-  diagnostic alone is not unsoundness.
-- Use `needs-mre` when a minimal reproduction is missing, `needs-info` for
-  other essential missing details, `needs-design` for unresolved design, and
-  `needs-decision` when a maintainer must choose an approach.
-
-Respect exact capitalization, spaces, and hyphens. Do not invent labels such
-as `enhancement`, `invalid`, `duplicate`, or `ty`; they are not ty issue
-labels unless the live catalog now says otherwise. Distinguish labels to add,
-labels already present, and existing labels that appear incorrect.
+Use the names and descriptions to choose the smallest useful set supported by
+the evidence. Consider the issue's category, affected subsystem, user impact,
+and whether more information or a decision is needed. If a label's meaning
+remains unclear, omit it rather than guess. Use exact names from the current
+catalog, and distinguish labels to add, labels already present, and existing
+labels that appear incorrect.
 
 ## 6. Trace the root cause and propose a fix
 
@@ -268,9 +248,8 @@ reproduction. Common starting points are:
 - `crates/ty_module_resolver/`, `crates/ty_site_packages/`, and
   `crates/ty_project/` for imports, environments, stubs, project discovery,
   configuration, and orchestration.
-- `crates/ty_ide/`, `crates/ty_server/`, and
-  `crates/ty_completion_eval/truth/` for editor behavior, language-server
-  requests, completion ranking, and editor regression fixtures.
+- `crates/ty_ide/` and `crates/ty_server/` for editor behavior, completions,
+  and language-server requests.
 - Relevant Ruff Python parser/AST crates, vendored typeshed, or ty
   documentation when the evidence points outside the semantic engine.
 
@@ -284,11 +263,10 @@ Recommend a concrete first fix direction, nearby analogous implementation, and
 focused regression-test location. If existing work addresses the issue, point
 to that PR and describe any remaining gap instead of proposing redundant
 implementation. For semantic behavior, prefer a small mdtest in the existing
-file that covers the actual behavior. For LSP or editor
-issues, prefer the relevant IDE/server integration fixture; completion
-ranking changes belong in `crates/ty_completion_eval/truth/`. Mention edge
-cases, interaction with related issues, and any missing design decision that
-must be settled before implementation.
+file that covers the actual behavior. For LSP or editor issues, choose the
+relevant integration or evaluation fixture, following any more specific
+guidance in `AGENTS.md`. Mention edge cases, interaction with related issues,
+and any missing design decision that must be settled before implementation.
 
 For intended behavior, explain the rule or implementation that produces the
 symptom and offer a practical user workaround. Recommend a separate
