@@ -479,7 +479,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .explicit_bases(db)
                     .iter()
                     .copied()
-                    .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+                    .filter(|ty| matches!(ty, Type::SpecializedClass(_))),
             )
         }
 
@@ -1263,7 +1263,7 @@ impl<'db> StaticClassLiteral<'db> {
             // Generic metaclasses parameterized by type variables are not supported.
             // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
             // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
-            if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
+            if let Some(Type::SpecializedClass(alias)) = explicit_metaclass {
                 let specialization_has_typevars = alias
                     .specialization(db)
                     .types(db)
@@ -3247,7 +3247,7 @@ impl<'db> StaticClassLiteral<'db> {
                 for explicit_base in class.explicit_bases(db) {
                     let explicit_base_class_literal = match explicit_base {
                         Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
+                        Type::SpecializedClass(generic_alias) => Some(generic_alias.origin(db)),
                         _ => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {

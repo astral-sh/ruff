@@ -289,7 +289,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
 fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
     let env = ProgramEnvironment::from_program(program);
     let previous = oscillating_generic_alias(db, program);
-    let argument = if let Type::GenericAlias(alias) = previous
+    let argument = if let Type::SpecializedClass(alias) = previous
         && alias.specialization(db).types(db) == [Type::unknown()]
     {
         KnownClass::Int.to_instance(db, &env)
@@ -297,13 +297,13 @@ fn oscillating_generic_alias<'db>(db: &'db dyn Db, program: Program<'db>) -> Typ
         Type::unknown()
     };
 
-    Type::GenericAlias(list_alias(db, &env, argument))
+    Type::SpecializedClass(list_alias(db, &env, argument))
 }
 
 #[test]
 fn generic_alias_cycle_recovery_normalizes_same_origin_unknown_oscillation() {
     let db = setup_db();
-    let Type::GenericAlias(alias) = oscillating_generic_alias(&db, db.program()) else {
+    let Type::SpecializedClass(alias) = oscillating_generic_alias(&db, db.program()) else {
         panic!("cycle recovery should preserve the generic alias");
     };
 

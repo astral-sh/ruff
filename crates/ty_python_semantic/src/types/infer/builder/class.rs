@@ -76,7 +76,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 is_typed_dict |= match ty {
                     ty if TypingModule::from_typed_dict_type(self.db(), ty).is_some() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
-                    Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
+                    Type::SpecializedClass(alias) => alias.is_typed_dict(self.db()),
                     _ => false,
                 };
             }

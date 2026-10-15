@@ -232,7 +232,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
             Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
-            Type::GenericAlias(alias) => {
+            Type::SpecializedClass(alias) => {
                 TypeKind::NonAtomic(NonAtomicType::ClassSpecialization(alias))
             }
             Type::KnownInstance(known_instance) => {
