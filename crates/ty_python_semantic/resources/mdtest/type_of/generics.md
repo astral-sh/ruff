@@ -575,7 +575,7 @@ class C[T]:
 class D[T]:
     pass
 
-var: type[C[int]] = C[int]
+var: type[C[int]] = C[int]  # error: [invalid-assignment]
 var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
 ```
 
@@ -601,7 +601,7 @@ python-version = "3.13"
 ```
 
 An unspecialized generic final class object is assignable to its default-specialized `type[]` type
-(which is actually internally simplified to a GenericAlias type, since there cannot be subclasses.)
+(which represents one specialized class object, since there cannot be subclasses).
 
 ```py
 from typing import final
@@ -621,15 +621,15 @@ def _(bare: type[P]):  # error: [missing-type-argument]
     expects_type_p(bare)
 
     # Also OK, because `P[int]` and `P[str]` are both assignable to `P[Unknown]`
-    expects_type_p(P[int])
-    expects_type_p(P[str])
+    expects_type_p(type(P[int]()))
+    expects_type_p(type(P[str]()))
 
     # Also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
     expects_type_p_of_int(bare)
-    expects_type_p_of_int(P[int])
+    expects_type_p_of_int(type(P[int]()))
 
     # Not OK, because `P[str]` is not assignable to `P[int]`
-    expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
+    expects_type_p_of_int(type(P[str]()))  # error: [invalid-argument-type]
 ```
 
 The same principles apply when typevar defaults are used, but the results are a bit different
@@ -655,15 +655,15 @@ def _(bare: type[Q]):
     expects_type_q(bare)
 
     # Also OK if the explicit specialization lines up with the default, in either direction:
-    expects_type_q(Q[str])
+    expects_type_q(type(Q[str]()))
     expects_type_q_of_str(bare)
-    expects_type_q_of_str(Q[str])
+    expects_type_q_of_str(type(Q[str]()))
 
     # Not OK if the specializations don't line up:
-    expects_type_q(Q[int])  # error: [invalid-argument-type]
-    expects_type_q_of_int(Q[str])  # error: [invalid-argument-type]
+    expects_type_q(type(Q[int]()))  # error: [invalid-argument-type]
+    expects_type_q_of_int(type(Q[str]()))  # error: [invalid-argument-type]
     expects_type_q_of_int(bare)  # error: [invalid-argument-type]
-    expects_type_q_of_str(Q[int])  # error: [invalid-argument-type]
+    expects_type_q_of_str(type(Q[int]()))  # error: [invalid-argument-type]
 ```
 
 This also works with `ParamSpec`:
@@ -679,21 +679,21 @@ def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
 expects_type_c(C)
 
 # Also OK, any specialization is assignable to the unspecialized `C`
-expects_type_c(C[int])
-expects_type_c(C[str, int, bytes])
+expects_type_c(type(C[int]()))
+expects_type_c(type(C[str, int, bytes]()))
 
 # Ok, the unspecialized `C` is assignable to `type[C[int, str]]`
 expects_type_c_of_int_and_str(C)
 
 # Also OK, the specialized `C[int, str]` is assignable to `type[C[int, str]]`
-expects_type_c_of_int_and_str(C[int, str])
+expects_type_c_of_int_and_str(type(C[int, str]()))
 
 # error: [invalid-argument-type]
-expects_type_c_of_int_and_str(C[str])
+expects_type_c_of_int_and_str(type(C[str]()))
 # error: [invalid-argument-type]
-expects_type_c_of_int_and_str(C[int, str, bytes])
+expects_type_c_of_int_and_str(type(C[int, str, bytes]()))
 # error: [invalid-argument-type]
-expects_type_c_of_int_and_str(C[str, int])
+expects_type_c_of_int_and_str(type(C[str, int]()))
 ```
 
 And with a `ParamSpec` that has a default:
@@ -707,19 +707,19 @@ def expects_type_d_of_int(f: type[D[int]]): ...
 def expects_type_d_of_int_str(f: type[D[int, str]]): ...
 def _(bare: type[D]):
     expects_type_d(bare)
-    expects_type_d(D[int, str])
-    expects_type_d_of_int(D[int])
+    expects_type_d(type(D[int, str]()))
+    expects_type_d_of_int(type(D[int]()))
     expects_type_d_of_int_str(bare)
-    expects_type_d_of_int_str(D[int, str])
+    expects_type_d_of_int_str(type(D[int, str]()))
 
     # error: [invalid-argument-type]
-    expects_type_d(D[int])
+    expects_type_d(type(D[int]()))
     # error: [invalid-argument-type]
     expects_type_d_of_int(bare)
     # error: [invalid-argument-type]
-    expects_type_d_of_int(D[str])
+    expects_type_d_of_int(type(D[str]()))
     # error: [invalid-argument-type]
-    expects_type_d_of_int_str(D[str, int])
+    expects_type_d_of_int_str(type(D[str, int]()))
 ```
 
 ## Upcasting a `type[]` type to a `Callable` type

@@ -272,14 +272,14 @@ T_co = TypeVar("T_co", covariant=True)
 class Foo(Generic[T_co]): ...
 class Bar(Foo[T_co], Generic[T_co]): ...
 
-static_assert(is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
-static_assert(is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
+static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[int]]))
+static_assert(not is_assignable_to(TypeOf[Bar[bool]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo[int]]))
-static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
-static_assert(is_assignable_to(TypeOf[Bar[Unknown]], type[Foo[int]]))
+static_assert(not is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(not is_assignable_to(TypeOf[Bar[Unknown]], type[Foo[int]]))
 static_assert(is_assignable_to(TypeOf[Bar], type[Foo]))  # error: [missing-type-argument]
-static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
-static_assert(is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
+static_assert(not is_assignable_to(TypeOf[Bar[Any]], type[Foo[Any]]))
+static_assert(not is_assignable_to(TypeOf[Bar[Any]], type[Foo[int]]))
 
 static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
 static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
@@ -287,7 +287,7 @@ static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 
 ## Gradual class types in constraint-producing assignability
 
-`type[Any]` is assignable to class-object types, including specialized generic classes.
+`type[Any]` is assignable to class-object types, but not to runtime generic aliases.
 
 ```py
 from typing import Any
@@ -295,7 +295,7 @@ from ty_extensions import static_assert
 from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
 
 static_assert(is_constraint_set_assignable_to(type, type[Any]))
-static_assert(is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
+static_assert(not is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
 static_assert(not is_constraint_set_assignable_to(object, type[Any]))
 ```
 
@@ -1976,27 +1976,30 @@ class GenericClass[T]:
     x: T  # invariant
 
 static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))  # error: [missing-type-argument]
-static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
+static_assert(not is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
-static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
 
 class GenericClassIntBound[T: int]:
     x: T  # invariant
 
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
-static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))  # error: [missing-type-argument]
+static_assert(
+    # error: [missing-type-argument]
+    not is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound])
+)
 static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
-static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
 @final
 class GenericFinalClass[T]:
     x: T  # invariant
 
 static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [missing-type-argument]
-static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
+static_assert(not is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
 static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
-static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```
 

@@ -524,8 +524,8 @@ class Specialized(Generic[int]): ...
 
 def narrow_generic_alias[T: (Generic[int], Specialized)](klass: type[T]) -> None:
     if klass is Generic[int]:
-        reveal_type(klass)  # revealed: type[T@narrow_generic_alias] & <class 'Generic[int]'>
-        reveal_type(Generic[int])  # revealed: <class 'Generic[int]'>
+        reveal_type(klass)  # revealed: Never
+        reveal_type(Generic[int])  # revealed: Never
 ```
 
 ## Narrowing with a constrained `TypeVar`
