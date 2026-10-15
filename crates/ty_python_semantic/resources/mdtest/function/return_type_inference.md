@@ -728,6 +728,43 @@ reveal_type(FactorySub.reference())  # revealed: type[FactorySub] | Unknown
 reveal_type(FactorySub.create())  # revealed: FactorySub | Unknown
 ```
 
+### Methods returning class-scoped type variables
+
+If the inferred return type refers to a class-scoped type variable, it should be specialized
+accordingly.
+
+```py
+class Pair[X, Y]:
+    def __init__(self, first: X, second: Y):
+        self.first = first
+        self.second = second
+
+    def get_first(self):
+        return self.first
+
+    def get_second(self):
+        return self.second
+
+    def get_both(self):
+        return self.first, self.second
+
+def _(pair_int_str: Pair[int, str]):
+    reveal_type(pair_int_str.get_first())  # revealed: int | Unknown
+    reveal_type(pair_int_str.get_second())  # revealed: str | Unknown
+    reveal_type(pair_int_str.get_both())  # revealed: tuple[int, str] | Unknown
+```
+
+This also works for classmethods:
+
+```py
+class Factory[T]:
+    @classmethod
+    def identity(cls, value: T):
+        return value
+
+reveal_type(Factory[int].identity(1))  # revealed: int | Unknown
+```
+
 ## Overloaded functions
 
 Return type inference (on the actual implementation function) should not influence the return type

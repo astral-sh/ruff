@@ -1742,6 +1742,16 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
+        // The following code makes sure that we specialize class-scoped type variables in the
+        // inferred return type. For example, the following `Box.get` function has an inferred
+        // return type of `T`, which should be specialized accordingly, when accessed through
+        // `Box[int]`, for example.
+        //
+        //     class Box[T]:
+        //         value: T
+        //         def get(self):
+        //             return self.value
+        //
         if let Some(class) = class
             && let Some(receiver) = self
                 .signature(db)
@@ -1750,7 +1760,7 @@ impl<'db> FunctionType<'db> {
                 .and_then(|signature| signature.parameters().get(0))
                 .map(Parameter::annotated_type)
         {
-            let receiver = if self.is_classmethod(db) {
+            let receiver = if self.literal(db).last_definition.is_classmethod(db) {
                 receiver
                     .to_instance_approximation(db, &env)
                     .unwrap_or_else(Type::unknown)
@@ -1763,8 +1773,6 @@ impl<'db> FunctionType<'db> {
                     .filter_map(ClassBase::into_class)
                     .find(|base| base.class_literal(db) == class)
             }) {
-                // Member lookup can specialize the signature before its body is inferred.
-                // Apply the same owner specialization to newly discovered return types.
                 return_type = return_type.apply_optional_specialization(
                     db,
                     owner.class_literal_and_specialization(db).1,
