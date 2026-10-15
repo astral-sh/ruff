@@ -240,7 +240,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
             Some(generic_context) => {
                 // Note that at runtime, a specialized type alias is an instance of `typing.GenericAlias`.
-                // However, the `GenericAlias` type in ty is heavily special cased to refer to specialized
+                // However, `Type::GenericAlias` is heavily special cased to refer to specialized
                 // class literals, so we instead represent specialized type aliases as instances of
                 // `typing.TypeAliasType` internally, and pass the specialization through to the value type,
                 // except when resolving to an instance of the type alias, or its display representation.
