@@ -57,6 +57,12 @@ class G4(
     ...
 
 
+# Removing a duplicate base changes runtime behavior (`TypeError` before the fix),
+# so the fix must be unsafe.
+class H(int, int):
+    ...
+
+
 ###
 # Non-errors.
 ###

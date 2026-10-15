@@ -16,6 +16,7 @@ help: Remove duplicate base
 13 + class F1(A):
 14 |     ...
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F2`
   --> duplicate_bases.py:17:13
@@ -31,6 +32,7 @@ help: Remove duplicate base
 17 + class F2(A,):
 18 |     ...
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F3`
   --> duplicate_bases.py:23:5
@@ -48,6 +50,7 @@ help: Remove duplicate base
    -     A,
 22 |     A
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F4`
   --> duplicate_bases.py:30:5
@@ -65,6 +68,7 @@ help: Remove duplicate base
    -     A,
 30 | ):
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G1`
   --> duplicate_bases.py:36:13
@@ -81,6 +85,7 @@ help: Remove duplicate base
 36 + class G1(A, B):
 37 |     ...
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G2`
   --> duplicate_bases.py:40:13
@@ -96,6 +101,7 @@ help: Remove duplicate base
 40 + class G2(A, B,):
 41 |     ...
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G3`
   --> duplicate_bases.py:46:5
@@ -113,6 +119,7 @@ help: Remove duplicate base
    -     A,
 46 |     B
    |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G4`
   --> duplicate_bases.py:54:5
@@ -130,23 +137,42 @@ help: Remove duplicate base
    -     A,
 54 |     B,
    |
+note: This is an unsafe fix and may change runtime behavior
 
-PLE0241 [*] Duplicate base `Foo` for class `Bar`
-  --> duplicate_bases.py:76:5
+PLE0241 [*] Duplicate base `int` for class `H`
+  --> duplicate_bases.py:62:14
    |
-74 | # https://github.com/astral-sh/ruff/issues/18814
-75 | class Bar(Foo,  # 1
-76 |     Foo  # 2
-   |     ^^^
-77 | ):
-78 |     pass
+60 | # Removing a duplicate base changes runtime behavior (`TypeError` before the fix),
+61 | # so the fix must be unsafe.
+62 | class H(int, int):
+   |              ^^^
+63 |     ...
    |
 help: Remove duplicate base
    |
-74 | # https://github.com/astral-sh/ruff/issues/18814
+61 | # so the fix must be unsafe.
+   - class H(int, int):
+62 + class H(int):
+63 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+PLE0241 [*] Duplicate base `Foo` for class `Bar`
+  --> duplicate_bases.py:82:5
+   |
+80 | # https://github.com/astral-sh/ruff/issues/18814
+81 | class Bar(Foo,  # 1
+82 |     Foo  # 2
+   |     ^^^
+83 | ):
+84 |     pass
+   |
+help: Remove duplicate base
+   |
+80 | # https://github.com/astral-sh/ruff/issues/18814
    - class Bar(Foo,  # 1
    -     Foo  # 2
-75 + class Bar(Foo  # 2
-76 | ):
+81 + class Bar(Foo  # 2
+82 | ):
    |
 note: This is an unsafe fix and may change runtime behavior
