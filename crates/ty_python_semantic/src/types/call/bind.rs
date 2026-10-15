@@ -5678,6 +5678,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     parameter_tys: &'a mut [Option<Type<'db>>],
     parameter_ty_builders: Vec<Option<UnionBuilder<'db>>>,
     call_expression_tcx: TypeContext<'db>,
+    /// Final return type after applying this call's inferred type arguments.
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
@@ -5827,7 +5828,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             parameter_tys,
             parameter_ty_builders: Vec::new(),
             call_expression_tcx,
-            return_ty: refined_return_ty.unwrap_or(return_ty),
+            return_ty: refined_return_ty.unwrap_or_else(|| {
+                return_ty.apply_optional_specialization(
+                    db,
+                    inference.map(|inference| inference.merged_specialization(db)),
+                )
+            }),
             errors,
             inferable_typevars,
             inference,
@@ -6238,14 +6244,11 @@ impl<'db> CallInference<'_, 'db> {
         })
     }
 
-    /// Retains resolved inference alternatives that each validate every original argument.
+    /// Refines the return using resolved alternatives that each validate every original argument.
     ///
     /// Returns `None` when correlated inference is unavailable or incomplete. `Single` already
     /// has the same specialization under either projection.
-    fn validated_specializations(
-        &self,
-        inference: TypeVarInference<'db>,
-    ) -> Option<Vec<Specialization<'db>>> {
+    fn refined_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
         let db = self.db;
         let env = self.env;
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
@@ -6269,14 +6272,6 @@ impl<'db> CallInference<'_, 'db> {
                 |nested| matches!(nested, Type::TypeVar(variable) if variable.is_inferable(db, self.inferable_typevars)),
             )
         };
-        let return_variables = generic_context
-            .variables(db)
-            .enumerate()
-            .filter(|(_, variable)| {
-                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
-                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
-                })
-            });
         // An unresolved dependency does not make an alternative invalid. Keep the merged fallback
         // for the whole call rather than silently dropping that sibling.
         // Unresolved bindings can contain cycles, so none may reach recursive specialization.
@@ -6288,10 +6283,19 @@ impl<'db> CallInference<'_, 'db> {
         }) {
             return None;
         }
+        let return_variables: SmallVec<[_; 4]> = generic_context
+            .variables(db)
+            .enumerate()
+            .filter(|(_, variable)| {
+                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
+                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+                })
+            })
+            .collect();
         // A return variable missing from every alternative can use its default (or `Unknown`)
         // while other variables refine the return. The resulting specializations must still
         // validate every argument. Partial bindings still require the merged fallback.
-        for (index, variable) in return_variables {
+        for &(index, variable) in &return_variables {
             if alternatives.iter().all(|types| types[index].is_some()) {
                 continue;
             }
@@ -6353,7 +6357,10 @@ impl<'db> CallInference<'_, 'db> {
             validated.push(specialization);
         }
 
-        (!validated.is_empty()).then_some(validated)
+        if validated.is_empty() {
+            return None;
+        }
+        self.specialized_return_type(inference, &validated, &return_variables)
     }
 
     /// Projects the return type from specializations that each validate the whole call.
@@ -6361,6 +6368,7 @@ impl<'db> CallInference<'_, 'db> {
         &self,
         inference: TypeVarInference<'db>,
         specializations: &[Specialization<'db>],
+        return_variables: &[(usize, BoundTypeVarInstance<'db>)],
     ) -> Option<Type<'db>> {
         let db = self.db;
         let env = self.env;
@@ -6378,40 +6386,31 @@ impl<'db> CallInference<'_, 'db> {
         let mut variance = TypeVarVariance::Bivariant;
         let invariant_visitor = PairVisitor::new(true);
         let mut remaining_comparisons = SolutionBudget::default().visits;
-        let has_invariant_difference = inference
-            .generic_context(db)
-            .variables(db)
-            .enumerate()
-            .filter(|(_, variable)| {
-                any_over_type_expanding_aliases(db, env, self.return_ty, |ty| {
-                    matches!(ty, Type::TypeVar(return_variable) if return_variable.identity(db) == variable.identity(db))
+        let has_invariant_difference = return_variables.iter().any(|&(index, variable)| {
+            let types = specializations
+                .iter()
+                .map(|specialization| specialization.types(db)[index])
+                .unique();
+            if types.clone().all_equal() {
+                return false;
+            }
+            variance = variance.join(
+                self.return_ty
+                    .variance_of(db, env, variable.identity(db))
+                    .evaluate(db),
+            );
+            variance == TypeVarVariance::Invariant
+                // Whole-union comparisons are more conservative than tuple decomposition,
+                // so compatibility with one alternative is not transitive. Check every
+                // pair, falling back conservatively if the quadratic work exceeds budget.
+                || types.array_combinations().any(|[left, right]| {
+                    let Some(remaining) = remaining_comparisons.checked_sub(1) else {
+                        return true;
+                    };
+                    remaining_comparisons = remaining;
+                    self.has_invariant_return_difference(left, right, &invariant_visitor)
                 })
-            })
-            .any(|(index, variable)| {
-                let types = specializations
-                    .iter()
-                    .map(|specialization| specialization.types(db)[index])
-                    .unique();
-                if types.clone().all_equal() {
-                    return false;
-                }
-                variance = variance.join(
-                    self.return_ty
-                        .variance_of(db, env, variable.identity(db))
-                        .evaluate(db),
-                );
-                variance == TypeVarVariance::Invariant
-                    // Whole-union comparisons are more conservative than tuple decomposition,
-                    // so compatibility with one alternative is not transitive. Check every
-                    // pair, falling back conservatively if the quadratic work exceeds budget.
-                    || types.array_combinations().any(|[left, right]| {
-                        let Some(remaining) = remaining_comparisons.checked_sub(1) else {
-                            return true;
-                        };
-                        remaining_comparisons = remaining;
-                        self.has_invariant_return_difference(left, right, &invariant_visitor)
-                    })
-            });
+        });
 
         let mut returns = Vec::with_capacity(specializations.len());
         let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
@@ -6685,9 +6684,7 @@ impl<'db> CallInference<'_, 'db> {
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
-            refined_return_ty: self.validated_specializations(inference).and_then(
-                |specializations| self.specialized_return_type(inference, &specializations),
-            ),
+            refined_return_ty: self.refined_return_type(inference),
             errors: specialization_errors,
             constraint_set_errors,
         }
@@ -7780,16 +7777,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        let return_ty = if self.arguments_validated {
-            self.return_ty
-        } else {
-            self.return_ty.apply_optional_specialization(
-                self.db,
-                self.inference
-                    .map(|inference| inference.merged_specialization(self.db)),
-            )
-        };
-        (self.inferable_typevars, self.inference, return_ty)
+        (self.inferable_typevars, self.inference, self.return_ty)
     }
 }
 
