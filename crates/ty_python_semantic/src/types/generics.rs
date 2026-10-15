@@ -3938,6 +3938,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         Ok(())
     }
 
+    /// Infers an argument's type variables, preserving a rejected generic alias's specialization
+    /// for error recovery without treating the alias as a valid class object.
+    pub(super) fn infer_call_argument(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        let Type::GenericAlias(alias) = actual else {
+            return self.infer(formal, actual);
+        };
+        let when = self.constraint_for_relation(formal, actual, TypeVarVariance::Covariant);
+        if when.is_never_satisfied(self.db, self.env, self.inferable) {
+            // For `f[T](cls: type[T]) -> T`, `f(Box[int])` is invalid, but `Box[int]`
+            // still provides useful evidence for T. Keep it in the fallback mapping while
+            // retaining the unsatisfiable relation for the actual argument.
+            let result = self.infer(formal, Type::SpecializedClass(alias));
+            self.record_constraint_set(when);
+            return result;
+        }
+        self.infer(formal, actual)
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
