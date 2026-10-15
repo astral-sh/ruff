@@ -501,6 +501,25 @@ def _(value: Any):
     reveal_type(growing(value))  # revealed: tuple[Unknown, list[Unknown]]
 ```
 
+## Comparing growing recursive aliases
+
+The type arguments of these aliases keep growing, but their comparisons terminate. The two aliases
+are equivalent; proving this equivalence is not yet supported.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_equivalent_to
+
+type Delayed[A, B, C] = tuple[A, Delayed[B, C, tuple[A, Any]] | None]
+type Delayed2[A, B, C] = tuple[A, Delayed2[B, C, tuple[A, Any]] | None]
+
+# TODO: Prove equivalence between aliases with matching growing arguments.
+# error: [static-assert-error]
+static_assert(is_equivalent_to(Delayed[int, int, int], Delayed2[int, int, int]))
+static_assert(not is_disjoint_from(Delayed[int, int, int], Delayed2[int, int, int]))
+```
+
 ## Negation after specializing a recursive alias
 
 Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is

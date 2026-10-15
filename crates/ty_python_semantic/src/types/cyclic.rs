@@ -34,7 +34,10 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+    walk_type_with_recursion_guard,
+};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
     StaticClassLiteral, Type, TypeAliasType, TypedDictType,
@@ -809,6 +812,13 @@ pub trait HasIdentity<'db> {
         true
     }
 
+    /// Whether this item strictly descends into the earlier item's stored structure.
+    /// Such a visit is finite progress even when the recursive identities match, as when
+    /// visiting the argument `Alias[int]` inside `Alias[Alias[int]]`.
+    fn is_structurally_smaller_than(&self, _db: &'db dyn Db, _other: &Self) -> bool {
+        false
+    }
+
     /// Returns an identity that remains stable while this item is active in a [`CycleDetector`].
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id;
 }
@@ -823,6 +833,17 @@ impl<'db> HasIdentity<'db> for Type<'db> {
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         Type::to_type_identity(*self, db)
     }
+
+    fn is_structurally_smaller_than(&self, db: &'db dyn Db, other: &Self) -> bool {
+        if self == other {
+            return false;
+        }
+        let Some(reference) = RecursiveDefinition::from_type(db, *other) else {
+            return false;
+        };
+        let env = ProgramEnvironment::from_definition(reference.target.definition(db));
+        any_over_type_including_alias_arguments(db, &env, *other, |nested| nested == *self)
+    }
 }
 
 pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, Type<'db>), C, 1>;
@@ -836,6 +857,12 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
         (self.0.to_type_identity(db), self.1.to_type_identity(db))
+    }
+
+    fn is_structurally_smaller_than(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self != other
+            && (self.0 == other.0 || self.0.is_structurally_smaller_than(db, &other.0))
+            && (self.1 == other.1 || self.1.is_structurally_smaller_than(db, &other.1))
     }
 }
 
@@ -972,6 +999,7 @@ where
             let identity = item.to_identity(db);
             if candidates.any(|active| {
                 active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
+                    && !item.is_structurally_smaller_than(db, &active.item)
             }) {
                 return CycleDetectorVisit::Cycle(item);
             }

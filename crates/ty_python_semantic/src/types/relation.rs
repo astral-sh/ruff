@@ -11,7 +11,7 @@ use crate::types::constraints::{
     OptionConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
-use crate::types::enums::is_single_member_enum;
+use crate::types::enums::{enum_member_literals, is_single_member_enum};
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -1055,6 +1055,12 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             self.3,
         )
     }
+
+    fn is_structurally_smaller_than(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.2 == other.2
+            && self.3 == other.3
+            && (self.0, self.1).is_structurally_smaller_than(db, &(other.0, other.1))
+    }
 }
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
@@ -1330,88 +1336,118 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         union: UnionType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let target = Type::Union(union);
-        if let Type::Intersection(intersection) = source
-            && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
-        {
-            return self.check_type_pair(db, alternatives, target);
-        }
+        self.with_recursion_guard(db, source, target, || {
+            let mut elements_context = vec![];
+            let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
 
-        let check_expanded_source = || {
-            // Normally non-unions cannot directly contain unions in our model due to the fact that
-            // we enforce a DNF structure on our set-theoretic types. However, it *is* possible for
-            // there to be a newtype of a union, for an intersection to contain a newtype of a
-            // union, or for a non-inferable typevar (possibly inside an intersection) to widen to a
-            // bound or set of constraints that exposes a union; this requires special handling.
-            match source {
-                Type::TypeVar(typevar)
-                    if !typevar.is_inferable(db, self.inferable)
-                        && let Some(bound_or_constraints) =
-                            typevar.typevar(db).bound_or_constraints(db, self.env) =>
-                {
-                    self.check_source_typevar_bounds(db, bound_or_constraints, target)
-                }
-                Type::Intersection(intersection)
-                    if self.should_expand_intersection(db, intersection) =>
-                {
-                    self.check_type_pair(
-                        db,
-                        intersection.with_expanded_typevars_and_newtypes(db, self.env),
-                        target,
-                    )
-                }
-                Type::NewTypeInstance(newtype) => {
-                    let concrete_base = newtype.concrete_base_type(db);
-                    if concrete_base.is_union() {
-                        self.check_type_pair(db, concrete_base, target)
-                    } else {
-                        self.never()
+            let elements = union.elements(db);
+            let result = elements
+                .iter()
+                .when_any(db, self.constraints, |&element| {
+                    let result = self.check_type_pair(db, source, element);
+                    if let Some(context_tree) = context_tree {
+                        let context = context_tree.take();
+                        if !context.is_empty() {
+                            elements_context.push(context);
+                        }
                     }
-                }
-                _ => self.never(),
-            }
-        };
-
-        let mut elements_context = vec![];
-        let context_tree = self.context_tree.as_ref().filter(|tree| tree.is_enabled());
-
-        let elements = union.elements(db);
-        let result = elements
-            .iter()
-            .when_any(db, self.constraints, |&element| {
-                let result = self.check_type_pair(db, source, element);
-                if let Some(context_tree) = context_tree {
-                    let context = context_tree.take();
-                    if !context.is_empty() {
-                        elements_context.push(context);
+                    result
+                })
+                .or(db, self.constraints, || match source {
+                    Type::TypeAlias(alias) => {
+                        self.check_union_coverage(db, alias.value_type(db), union)
                     }
-                }
-                result
-            })
-            .or(db, self.constraints, check_expanded_source);
+                    Type::Recursive(recursive) => recursive
+                        .unfold(db, self.env)
+                        .map(|body| self.check_union_coverage(db, body, union))
+                        .unwrap_or(ConstraintSet::from_bool(
+                            self.constraints,
+                            self.relation.is_assignability(),
+                        )),
+                    Type::NewTypeInstance(newtype) => {
+                        self.check_union_coverage(db, newtype.concrete_base_type(db), union)
+                    }
+                    _ => self.check_union_coverage(db, source, union),
+                });
 
-        if context_tree.is_some()
-            && !elements_context.is_empty()
-            && result.is_never_satisfied(db, self.env, self.inferable)
-        {
-            let elements_without_context = elements.len() - elements_context.len();
-            if elements_without_context > 0 && elements_without_context < elements.len() {
-                elements_context.push(ErrorContextTree::from_context(
-                    ErrorContext::NotAssignableToNOtherUnionElements {
-                        n: elements_without_context,
+            if context_tree.is_some()
+                && !elements_context.is_empty()
+                && result.is_never_satisfied(db, self.env, self.inferable)
+            {
+                let elements_without_context = elements.len() - elements_context.len();
+                if elements_without_context > 0 && elements_without_context < elements.len() {
+                    elements_context.push(ErrorContextTree::from_context(
+                        ErrorContext::NotAssignableToNOtherUnionElements {
+                            n: elements_without_context,
+                        },
+                        self.relation,
+                    ));
+                }
+                self.set_context(
+                    ErrorContext::NotAssignableToAnyUnionElement {
+                        source,
+                        union: target,
                     },
-                    self.relation,
-                ));
+                    elements_context,
+                );
             }
-            self.set_context(
-                ErrorContext::NotAssignableToAnyUnionElement {
-                    source,
-                    union: target,
-                },
-                elements_context,
-            );
+
+            result
+        })
+    }
+
+    /// Check coverage by several target alternatives without unfolding either side's containers.
+    fn check_union_coverage(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target_union: UnionType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let target = Type::Union(target_union);
+        let alternatives = match source {
+            Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db, env)),
+            Type::Intersection(intersection) => intersection.finite_alternatives(db, env),
+            Type::NominalInstance(instance) => {
+                let class = instance.class(db, env);
+                if class.is_known(db, KnownClass::Bool) {
+                    Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
+                } else {
+                    enum_member_literals(db, class.class_literal(db), None).map(Iterator::collect)
+                }
+            }
+            _ => None,
+        };
+        if let Some(alternatives) = alternatives {
+            return alternatives
+                .into_iter()
+                .when_all(db, self.constraints, |alternative| {
+                    self.check_type_pair(db, alternative, target)
+                });
         }
 
-        result
+        match source {
+            Type::Union(union) => self.check_source_union(db, union, target),
+            Type::TypeAlias(_) | Type::Recursive(_) | Type::NewTypeInstance(_) => {
+                self.check_type_pair(db, source, target)
+            }
+            Type::TypeVar(typevar)
+                if !typevar.is_inferable(db, self.inferable)
+                    && let Some(bounds) = typevar.typevar(db).bound_or_constraints(db, env) =>
+            {
+                self.check_source_typevar_bounds(db, bounds, target)
+            }
+            Type::Intersection(intersection)
+                if self.should_expand_intersection(db, intersection) =>
+            {
+                self.check_type_pair(
+                    db,
+                    intersection.with_expanded_typevars_and_newtypes(db, env),
+                    target,
+                )
+            }
+            _ => self.never(),
+        }
     }
 
     fn check_target_intersection(
@@ -1829,6 +1865,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
             }
 
+            // Compare alias references before unfolding them so growing specializations revisit
+            // the same pair of definitions. Collective union coverage is checked separately.
+            (Type::Recursive(_) | Type::TypeAlias(_), Type::Union(union)) => {
+                self.check_target_union(db, source, union)
+            }
+
             (Type::Recursive(source_recursive), _) => {
                 // Both comparing arguments and unfolding can revisit this pair.
                 self.with_recursion_guard(db, source, target, || {
@@ -1899,15 +1941,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .with_recursion_guard(db, source, target, || {
                     self.check_type_pair(db, source, intersection.expand_aliases(db, env))
                 }),
-
-            // Annotation unions retain type aliases so recursive aliases can be represented.
-            // Normalize direct alias elements together before checking the union so reductions
-            // that depend on multiple elements, such as all members of an enum, are visible.
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db, env))
-                })
-            }
 
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
                 .with_recursion_guard(db, source, target, || {
@@ -2144,18 +2177,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
-                self.constraints,
-                match self.relation {
-                    TypeRelation::Subtyping => false,
-                    TypeRelation::Assignability => true,
-                    TypeRelation::Redundancy { .. } => match target {
-                        Type::Dynamic(_) => true,
-                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                        _ => false,
-                    },
+            (Type::Dynamic(_), _) => match self.relation {
+                TypeRelation::Subtyping => self.never(),
+                TypeRelation::Assignability => self.always(),
+                TypeRelation::Redundancy { .. } => match target {
+                    Type::Dynamic(_) => self.always(),
+                    Type::Union(union) => self.check_target_union(db, source, union),
+                    _ => self.never(),
                 },
-            ),
+            },
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
@@ -3467,6 +3497,41 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
+            // Split unions before unfolding aliases so their original pairs reach the guard.
+            (Type::Union(union), other) | (other, Type::Union(union)) => {
+                nontrivial_check(self, || {
+                    let mut children = Vec::new();
+                    let result = union
+                        .elements(db)
+                        .iter()
+                        .when_all(db, self.constraints, |e| {
+                            let result = self.check_type_pair(db, *e, other);
+                            if let Some(context) = self.report_context() {
+                                if context.is_empty() {
+                                    context.push(ErrorContext::DisjointTypes {
+                                        left: *e,
+                                        right: other,
+                                    });
+                                }
+                                children.push(context.take());
+                            }
+                            result
+                        });
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, env, self.inferable)
+                    {
+                        context.set(
+                            ErrorContext::DisjointUnion {
+                                union: Type::Union(union),
+                                other,
+                            },
+                            children,
+                        );
+                    }
+                    result
+                })
+            }
+
             (Type::Recursive(left_recursive), _) => left_recursive
                 .unfold(db, env)
                 .map(|left_unfolded| {
@@ -3574,40 +3639,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => self.never(),
-
-            (Type::Union(union), other) | (other, Type::Union(union)) => {
-                nontrivial_check(self, || {
-                    let mut children = Vec::new();
-                    let result = union
-                        .elements(db)
-                        .iter()
-                        .when_all(db, self.constraints, |e| {
-                            let result = self.check_type_pair(db, *e, other);
-                            if let Some(context) = self.report_context() {
-                                if context.is_empty() {
-                                    context.push(ErrorContext::DisjointTypes {
-                                        left: *e,
-                                        right: other,
-                                    });
-                                }
-                                children.push(context.take());
-                            }
-                            result
-                        });
-                    if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, env, self.inferable)
-                    {
-                        context.set(
-                            ErrorContext::DisjointUnion {
-                                union: Type::Union(union),
-                                other,
-                            },
-                            children,
-                        );
-                    }
-                    result
-                })
-            }
 
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
