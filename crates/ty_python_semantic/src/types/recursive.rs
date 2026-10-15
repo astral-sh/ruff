@@ -2843,11 +2843,7 @@ where
 
     /// Run a query with one cache and one set of guards for all recursive calls.
     #[cfg(test)]
-    pub(super) fn with_root<R>(
-        env: &'env TypeOperations<'db>,
-        query: Q,
-        visit: impl FnOnce(&Self) -> R,
-    ) -> R {
+    fn with_root<R>(env: &'env TypeOperations<'db>, query: Q, visit: impl FnOnce(&Self) -> R) -> R {
         visit(&Self::new(env, query))
     }
 

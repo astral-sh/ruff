@@ -1388,14 +1388,16 @@ impl<'db> Signature<'db> {
                 // TODO: Also intersect nested receiver type variables, such as the `T` in
                 // `self: list[T]`, with their valid specializations when constructing or solving the
                 // receiver constraint set.
-                if TypeInspector::inspect_root(
-                    db,
-                    env,
-                    TypeInspectionKey::BindSelfWithReceiver,
-                    annotation,
-                    |_, _| false,
-                    |_, annotation| annotation.receiver_violates_typevar_domain(db, receiver),
-                ) {
+                if !receiver.is_type_var()
+                    && TypeInspector::inspect_root(
+                        db,
+                        env,
+                        TypeInspectionKey::BindSelfWithReceiver,
+                        annotation,
+                        |_, _| false,
+                        |_, annotation| annotation.receiver_violates_typevar_domain(db, receiver),
+                    )
+                {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
                 receiver.when_constraint_set_assignable_to_owned(db, env, annotation)

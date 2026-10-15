@@ -768,6 +768,24 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, &env, self, None)
     }
 
+    /// Whether this class is itself `other` or inherits from it, regardless of type arguments.
+    /// Class identities come from the declaration's MRO, so this query does not specialize bases.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial = |_, _, _, _| false,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassLiteral<'db>) -> bool {
+        self == other || {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_file(self.program_file(db)));
+            self.iter_mro(db, &env)
+                .skip_first()
+                .filter_map(ClassBase::into_class)
+                .any(|base| base.class_literal(db) == other)
+        }
+    }
+
     /// Return the specializations from every inheritance path. These retain the declaring
     /// class's type variables; comparisons apply concrete arguments only to entries whose
     /// class matches the target.

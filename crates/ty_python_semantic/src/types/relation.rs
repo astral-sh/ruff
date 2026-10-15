@@ -838,6 +838,24 @@ impl<'db> Type<'db> {
             return false;
         }
 
+        if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, other) {
+            if target.is_object() {
+                return true;
+            }
+            if source.is_object() {
+                return false;
+            }
+            // Type arguments cannot make unrelated classes redundant with one another.
+            // Reject them before allocating guards and constraints for their arguments.
+            let source_class = source.class_literal(db, env);
+            let target_class = target.class_literal(db, env);
+            if source_class != target_class && !source_class.is_subclass_of(db, target_class) {
+                return false;
+            }
+            if !source.is_definition_generic(db) && !target.is_definition_generic(db) {
+                return true;
+            }
+        }
         *env.cached_or_compute(
             || cached_redundancy(db, TypePair::new(db, env.program(db), self, other)),
             || {
