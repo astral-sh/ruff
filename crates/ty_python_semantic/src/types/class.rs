@@ -768,6 +768,23 @@ impl<'db> ClassLiteral<'db> {
         MroIterator::new(db, &env, self, None)
     }
 
+    /// Return the specializations from every inheritance path. These retain the declaring
+    /// class's type variables; comparisons apply concrete arguments only to entries whose
+    /// class matches the target.
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = |_, _, _| Box::default(),
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn ancestor_specializations(self, db: &'db dyn Db) -> Box<[GenericAlias<'db>]> {
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_file(self.program_file(db)));
+        self.identity_specialization(db)
+            .iter_explicit_ancestors(db, &env)
+            .filter_map(ClassType::into_generic_alias)
+            .collect()
+    }
+
     /// Return the properties shared by all instances of this class.
     pub(super) fn instance_flags(self, db: &'db dyn Db) -> ClassInstanceFlags {
         let from_mro = |mro: &Mro<'db>| {
@@ -2931,9 +2948,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         };
 
+        // The declared bases already use the source's type variables. Substituting each
+        // variable with itself would rebuild those types without changing the relation.
+        let bases = source.class_literal(db).iter_mro(db, self.env).skip_first();
         let mut generic_target = None;
-        let result = source
-            .iter_mro(db, self.env)
+        let result = std::iter::once(ClassBase::Class(source))
+            .chain(bases)
             .when_any(db, self.constraints, |base| {
                 match base {
                     ClassBase::Any => ConstraintSet::from_bool(
@@ -2990,8 +3010,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // through `Concrete`, even if `Gradual` contributes `Base[Any]` to Child's MRO.
         result.or(db, self.constraints, || {
             source
-                .iter_explicit_ancestors(db, self.env)
-                .filter_map(ClassType::into_generic_alias)
+                .class_literal(db)
+                .ancestor_specializations(db)
+                .iter()
                 .filter(|ancestor| ClassLiteral::Static(ancestor.origin(db)) == target)
                 .when_any(db, self.constraints, |ancestor| {
                     self.check_specialization_pair(

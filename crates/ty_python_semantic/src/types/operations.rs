@@ -190,6 +190,8 @@ impl<'db> TypeOperations<'db> {
 /// Applied results remain within one source query and retain their recursion dependencies.
 #[derive(Default)]
 pub(super) struct OperationCaches<'db> {
+    pub(super) disjointness:
+        OperationMemo<'db, (TypePair<'db>, TypeVarSet<'db>), OwnedConstraintSet<'db>>,
     pub(super) solutions:
         OperationMemo<'db, (TypePair<'db>, TypeVarSet<'db>), CandidateSolutions<'db>>,
     pub(super) specializations:

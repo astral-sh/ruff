@@ -1180,6 +1180,60 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _| OwnedConstraintSet::default(),
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            compute(db, &env, types, inferable)
+        }
+
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            ConstraintSetBuilder::new().into_owned(|constraints| {
+                types.first(db).compute_disjointness_constraints(
+                    db,
+                    env,
+                    types.second(db),
+                    constraints,
+                    inferable,
+                )
+            })
+        }
+
+        let types = TypePair::new(db, env.program(db), self, other);
+        let result = env.cached_or_compute(
+            || cached(db, types, inferable),
+            || {
+                env.caches()
+                    .disjointness
+                    .get_or_compute(db, env, (types, inferable), || {
+                        compute(db, env, types, inferable)
+                    })
+            },
+        );
+        constraints.load(db, env, &result)
+    }
+
+    fn compute_disjointness_constraints<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
@@ -1207,24 +1261,7 @@ impl<'db> Type<'db> {
         other: Type<'db>,
     ) -> bool {
         let context = env.context();
-        context.compare_for_simplification(env, || {
-            let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
-            let materialization_visitor = ApplyTypeMappingVisitor::new(env);
-            DisjointnessChecker::new(
-                env,
-                &constraints,
-                TypeVarSet::None,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
-                &materialization_visitor,
-            )
-            .check_type_pair(db, self, other)
-            .is_always_satisfied(db, env, TypeVarSet::None)
-        })
+        context.compare_for_simplification(env, || self.is_disjoint_from(db, env, other))
     }
 
     /// Re-run a successful disjointness check with diagnostic context collection enabled.

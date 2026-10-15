@@ -3444,11 +3444,10 @@ impl<'db> Type<'db> {
             types: TypePair<'db>,
             inferable: TypeVarSet<'db>,
         ) -> CandidateSolutions<'db> {
-            let when = types.first(db).when_constraint_set_assignable_to_owned(
-                db,
-                env,
-                types.second(db),
-            );
+            let when =
+                types
+                    .first(db)
+                    .when_constraint_set_assignable_to_owned(db, env, types.second(db));
             when.query(|builder, when| {
                 let mut storage = builder.storage.borrow_mut();
                 CandidateSolutions::compute(
@@ -3466,9 +3465,11 @@ impl<'db> Type<'db> {
         env.cached_or_compute(
             || cached(db, types, inferable),
             || {
-                env.caches().solutions.get_or_compute(db, env, (types, inferable), || {
-                    compute(db, env, types, inferable)
-                })
+                env.caches()
+                    .solutions
+                    .get_or_compute(db, env, (types, inferable), || {
+                        compute(db, env, types, inferable)
+                    })
             },
         )
         .into_owned()

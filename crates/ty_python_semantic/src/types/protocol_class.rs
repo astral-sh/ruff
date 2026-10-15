@@ -40,7 +40,9 @@ use crate::{
         variance::infer_protocol_variance,
     },
 };
-use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
+use ty_python_core::{
+    definition::Definition, place::ScopedPlaceId, place_table, scope::ScopeId, use_def_map,
+};
 
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
@@ -151,15 +153,10 @@ impl<'db> ProtocolClass<'db> {
         db: &'db dyn Db,
         visitor: &V,
     ) {
-        let mut seen_members = FxHashSet::default();
-
         self.for_each_member_candidate(
             db,
             visitor.program_environment(),
-            |name, candidate, specialization| {
-                if !seen_members.insert(name.clone()) {
-                    return;
-                }
+            |_, candidate, specialization| {
                 let candidate = candidate.apply_specialization(
                     db,
                     visitor.program_environment(),
@@ -170,87 +167,30 @@ impl<'db> ProtocolClass<'db> {
         );
     }
 
-    /// Visits protocol member candidates in MRO order after applying declaration precedence.
-    ///
-    /// Consumers discard shadowed names before applying the accompanying specialization.
+    /// Visits the effective declarations, specializing only classes that contribute members.
     fn for_each_member_candidate(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
         mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
     ) {
-        for (parent_scope, specialization) in self
-            .iter_mro(db, env)
-            .filter_map(ClassBase::into_class)
-            .filter_map(|class| {
-                let (class_literal, specialization) = class.static_class_literal(db)?;
-                let protocol_class = class_literal.into_protocol_class(db)?;
-                Some((
-                    protocol_class.static_class_literal(db)?.0.body_scope(db),
-                    specialization,
-                ))
-            })
-        {
-            let use_def_map = use_def_map(db, parent_scope);
-            let place_table = place_table(db, parent_scope);
-            let mut direct_members = FxHashMap::default();
-
-            // Bindings that are not declared in the class body are invalid protocol members, but
-            // runtime-checkable protocols still consider them members for `isinstance()` and
-            // `issubclass()`.
-            for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
-                // Defaults retain inherited annotations, just as they do for ordinary classes.
-                let member = class_member(db, parent_scope, name).inner;
-                if let Place::Defined(place) = member.place {
-                    direct_members.insert(
-                        symbol_id,
-                        ProtocolMemberCandidate {
-                            ty: place.ty,
-                            qualifiers: member.qualifiers,
-                            definition: place.provenance.definition(),
-                            bound_on_class: BoundOnClass::Yes,
-                        },
-                    );
+        for declarations in protocol_member_declarations(db, self.class_literal(db)) {
+            let parent = match *self {
+                ClassType::Generic(alias)
+                    if declarations.class.class_literal(db) == self.class_literal(db) =>
+                {
+                    ClassBase::Class(ClassType::Generic(alias))
                 }
-            }
-
-            for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
-                let place_result = place_from_declarations(db, env, declarations)
-                    .with_imported_final(
-                        db,
-                        env,
-                        use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
-                    );
-                let first_declaration = place_result.first_declaration;
-                let place = place_result.ignore_conflicting_declarations();
-                if let Some(ty) = place.place.ignore_possibly_undefined() {
-                    direct_members
-                        .entry(symbol_id)
-                        .and_modify(|candidate| {
-                            candidate.ty = ty;
-                            candidate.qualifiers = place.qualifiers;
-                        })
-                        .or_insert(ProtocolMemberCandidate {
-                            ty,
-                            qualifiers: place.qualifiers,
-                            definition: first_declaration,
-                            bound_on_class: BoundOnClass::No,
-                        });
-                }
-            }
-
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "member names are unique within each class and both consumers are order-independent"
-            )]
-            for (symbol_id, candidate) in direct_members {
-                let name = place_table.symbol(symbol_id).name();
-                if excluded_from_proto_members(name) {
-                    continue;
-                }
-
-                visit(name, candidate, specialization);
+                ClassType::Generic(alias) => ClassBase::Class(declarations.class)
+                    .apply_optional_specialization(db, env, Some(alias.specialization(db))),
+                ClassType::NonGeneric(_) => ClassBase::Class(declarations.class),
+            };
+            let specialization = parent
+                .into_class()
+                .and_then(|class| class.static_class_literal(db))
+                .and_then(|(_, specialization)| specialization);
+            for (name, candidate) in &declarations.members {
+                visit(name, *candidate, specialization);
             }
         }
     }
@@ -3286,7 +3226,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
     ) || member.starts_with("_abc_")
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum BoundOnClass {
     Yes,
     No,
@@ -3298,7 +3238,7 @@ impl BoundOnClass {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 struct ProtocolMemberCandidate<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
@@ -3358,6 +3298,114 @@ impl<'db> ProtocolMemberCandidate<'db> {
             _ => visitor.visit_type(db, self.ty),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct ProtocolMemberDeclarations<'db> {
+    class: ClassType<'db>,
+    members: Box<[(Name, ProtocolMemberCandidate<'db>)]>,
+}
+
+/// Inheritance and declaration precedence depend on the class definition, not its arguments.
+/// Keep inherited arguments in terms of the declaring class's type variables so callers can
+/// substitute them while their own recursion guards are active.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial = |_, _, _| Box::default(),
+    heap_size = ruff_memory_usage::heap_size,
+)]
+fn protocol_member_declarations<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Box<[ProtocolMemberDeclarations<'db>]> {
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
+    let mut seen = FxHashSet::default();
+    class
+        .iter_mro(db, &env)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|class| {
+            let (literal, _) = class.static_class_literal(db)?;
+            literal.into_protocol_class(db)?;
+            let members: Box<[_]> = declared_protocol_members(db, literal.body_scope(db))
+                .iter()
+                .filter(|(name, _)| seen.insert(name.clone()))
+                .cloned()
+                .collect();
+            (!members.is_empty()).then_some(ProtocolMemberDeclarations { class, members })
+        })
+        .collect()
+}
+
+/// Read a protocol's declarations once, before applying any receiver or type arguments.
+/// Specializations share these source facts but transform their member types in the caller's
+/// operation, where recursive comparisons and signature expansions remain guarded.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial = |_, _, _| Box::default(),
+    heap_size = ruff_memory_usage::heap_size,
+)]
+fn declared_protocol_members<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> Box<[(Name, ProtocolMemberCandidate<'db>)]> {
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
+    let use_def_map = use_def_map(db, scope);
+    let place_table = place_table(db, scope);
+    let mut direct_members = FxHashMap::default();
+
+    // Bindings that are not declared in the class body are invalid protocol members, but
+    // runtime-checkable protocols still consider them members for `isinstance()` and
+    // `issubclass()`.
+    for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
+        let name = place_table.symbol(symbol_id).name();
+        // Defaults retain inherited annotations, just as they do for ordinary classes.
+        let member = class_member(db, scope, name).inner;
+        if let Place::Defined(place) = member.place {
+            direct_members.insert(
+                symbol_id,
+                ProtocolMemberCandidate {
+                    ty: place.ty,
+                    qualifiers: member.qualifiers,
+                    definition: place.provenance.definition(),
+                    bound_on_class: BoundOnClass::Yes,
+                },
+            );
+        }
+    }
+
+    for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+        let place_result = place_from_declarations(db, &env, declarations).with_imported_final(
+            db,
+            &env,
+            use_def_map.end_of_scope_imported_final_candidates(symbol_id.into()),
+        );
+        let first_declaration = place_result.first_declaration;
+        let place = place_result.ignore_conflicting_declarations();
+        if let Some(ty) = place.place.ignore_possibly_undefined() {
+            direct_members
+                .entry(symbol_id)
+                .and_modify(|candidate| {
+                    candidate.ty = ty;
+                    candidate.qualifiers = place.qualifiers;
+                })
+                .or_insert(ProtocolMemberCandidate {
+                    ty,
+                    qualifiers: place.qualifiers,
+                    definition: first_declaration,
+                    bound_on_class: BoundOnClass::No,
+                });
+        }
+    }
+
+    let mut members: Vec<_> = direct_members
+        .into_iter()
+        .filter_map(|(symbol_id, candidate)| {
+            let name = place_table.symbol(symbol_id).name();
+            (!excluded_from_proto_members(name)).then(|| (name.clone(), candidate))
+        })
+        .collect();
+    members.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    members.into_boxed_slice()
 }
 
 /// Cache `object` member names so missing protocol members can be rejected without member lookup.
@@ -3506,10 +3554,6 @@ fn compute_protocol_interface<'db>(
     let mut members = BTreeMap::default();
 
     ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
-        if members.contains_key(name) {
-            return;
-        }
-
         let specialization =
             specialization.map(|specialization| specialization.with_typevar_bounds(db, &env));
         let candidate = candidate.apply_specialization(db, &env, specialization);
@@ -3719,11 +3763,24 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let target_interface = protocol.interface(db, env);
+    // Type arguments and materialization affect member types, but cannot add or remove names.
+    // Use the shared declaration for this check, before constructing either specialization.
+    let interface_for_names = |protocol: ProtocolInstanceType<'db>| {
+        protocol.class_origin(db).map_or_else(
+            || protocol.interface(db, env),
+            |class| {
+                ProtocolInterfaceView::new(
+                    declared_protocol_interface(db, class.class_literal(db)),
+                    None,
+                )
+            },
+        )
+    };
+    let target_interface = interface_for_names(protocol);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(db, env);
+            let source_interface = interface_for_names(source_protocol);
 
             (source_interface.member_count(db) >= target_interface.member_count(db)
                 || source_interface.member_count(db)
