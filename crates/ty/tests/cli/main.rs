@@ -810,7 +810,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
         total = 1{plus_one_repeated}
         reveal_type(total)
         ",
-        plus_one_repeated = " + 1".repeat(2000 - 1)
+        plus_one_repeated = " + 1".repeat(5000 - 1)
     )?;
 
     let case = CliTest::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
@@ -823,7 +823,7 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
      --> test.py:4:13
       |
     4 | reveal_type(total)
-      |             ^^^^^ `Literal[2000]`
+      |             ^^^^^ `Literal[5000]`
 
     Found 1 diagnostic
 
