@@ -474,6 +474,23 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## Unpacking recursive tuple aliases
+
+Each recursive reference wraps `T` in another tuple. We can infer the alias without expanding that
+sequence indefinitely.
+
+```py
+type Nested[T] = tuple[T, *Nested[tuple[T]]]  # no diagnostic
+```
+
+The same applies to the `Unpack` spelling.
+
+```py
+from typing import Unpack
+
+type Explicit[T] = tuple[T, Unpack[Explicit[tuple[T]]]]  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases

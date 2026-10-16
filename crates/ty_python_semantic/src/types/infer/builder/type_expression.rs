@@ -3499,6 +3499,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         syntax: &str,
     ) -> Type<'db> {
         let db = self.db();
+        if ty.is_divergent() {
+            // Unpacking an unfinished alias must retain its inference cycle. Replacing the
+            // marker with `Unknown` lets each iteration add another specialized tuple prefix
+            // without leaving a recursive reference for cycle recovery to recognize.
+            return Type::homogeneous_tuple(db, self.program_environment(), ty);
+        }
         if ty.exact_tuple_instance_spec(db).is_some()
             || matches!(ty, Type::TypeVar(typevar) if typevar.is_typevartuple(db))
         {
