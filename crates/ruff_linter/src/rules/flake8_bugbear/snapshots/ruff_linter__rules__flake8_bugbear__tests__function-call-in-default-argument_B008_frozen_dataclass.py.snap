@@ -1,0 +1,28 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B008 Do not perform function call `NotFrozen` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:89:11
+   |
+88 | # Errors
+89 | def f(foo=NotFrozen()): ...
+   |           ^^^^^^^^^^^
+
+B008 Do not perform function call `ExplicitlyNotFrozen` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:92:11
+   |
+92 | def f(foo=ExplicitlyNotFrozen()): ...
+   |           ^^^^^^^^^^^^^^^^^^^^^
+
+B008 Do not perform function call `NotADataclass` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:95:11
+   |
+95 | def f(foo=NotADataclass()): ...
+   |           ^^^^^^^^^^^^^^^
+
+B008 Do not perform function call `len` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:99:27
+   |
+98 | # Calls nested inside a frozen dataclass instantiation are still checked.
+99 | def f(foo=Frozen(val=bool(len([])))): ...
+   |                           ^^^^^^^
