@@ -47,7 +47,7 @@ impl InlayHint {
             context,
             expr.into(),
             position,
-            details,
+            &details,
             ": ",
             allow_edits,
         ))
@@ -57,7 +57,7 @@ impl InlayHint {
         context: InlayHintImportContext<'_, 'db>,
         scope_node: AnyNodeRef<'_>,
         position: TextSize,
-        details: TypeDisplayDetails<'db>,
+        details: &TypeDisplayDetails<'db>,
         prefix: &str,
         mut allow_edits: bool,
     ) -> Self {
@@ -219,7 +219,7 @@ impl InlayHint {
             context,
             function.into(),
             function.parameters.end(),
-            details,
+            &details,
             " -> ",
             true,
         )
