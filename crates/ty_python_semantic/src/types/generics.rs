@@ -4195,18 +4195,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // The generic element can be composite, such as `Sequence[T]` in
                 // `Sequence[T] | None`. Multiple generic elements still need a choice of which
                 // one to match: `T | list[T]` against `int | list[int]` should infer `T = int`.
+                // Inspect the expanded shape without discarding the references needed by
+                // recursive inference's identity guard.
                 let types_have_typevars = formal_union
                     .elements(db)
                     .iter()
-                    .filter(|ty| ty.has_typevar(db, self.env));
+                    .filter(|ty| ty.resolve_type_alias(db).has_typevar(db, self.env));
                 let Ok(generic_element) = types_have_typevars.exactly_one() else {
                     return Ok(());
                 };
                 // Composite members can infer ordinary type variables, but re-inferring `Self`
                 // can widen the receiver's specialization, and variadic inference must preserve
                 // the caller's parameter pack instead of widening it through another union arm.
-                if !generic_element.is_type_var()
-                    && any_over_type(db, self.env, *generic_element, false, |ty| {
+                let generic_shape = generic_element.resolve_type_alias(db);
+                if !generic_shape.is_type_var()
+                    && any_over_type(db, self.env, generic_shape, false, |ty| {
                         ty.as_typevar().is_some_and(|typevar| {
                             typevar.typevar(db).is_self(db)
                                 || typevar.is_paramspec(db)
@@ -4216,7 +4219,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 {
                     return Ok(());
                 }
-                if actual_union.elements(db).iter().any(|ty| ty.is_type_var()) {
+                if actual_union
+                    .elements(db)
+                    .iter()
+                    .any(|ty| ty.resolve_type_alias(db).is_type_var())
+                {
                     return Ok(());
                 }
                 let remaining_actual =

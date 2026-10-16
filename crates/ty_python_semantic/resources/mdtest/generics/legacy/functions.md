@@ -3338,6 +3338,20 @@ def probe(value: Tree[int], other: OtherTree[str], plain: tuple[bytes, Tree[byte
     reveal_type(either_leaf((value, other)))  # revealed: int | str
 ```
 
+Leaf types can also be inferred when each recursive step nests the type argument in another tuple.
+Terminal values can be expressed through another union alias.
+
+```py
+End = int | None
+Growing = tuple[T, "Growing[tuple[T]] | End"]
+
+def growing_leaf(value: Growing[T]) -> T:
+    return value[0]
+
+def probe_growing(value: Growing[int]):
+    reveal_type(growing_leaf(value))  # revealed: int
+```
+
 ## Inferring type arguments from deeper recursive levels
 
 These trees have distinct types at their first three levels and integer values at every level

@@ -1,7 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -3465,9 +3465,9 @@ impl<'db> Type<'db> {
     /// If the type is a union (or a type alias that resolves to a union), filters union elements
     /// based on the provided predicate.
     ///
-    /// Aliases among the elements are expanded first. An element may itself be an alias for a
-    /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
-    /// set operation and has to see the members rather than the name.
+    /// The predicate sees expanded, simplified elements, including members of aliased unions.
+    /// Retained non-union aliases keep their identity so subsequent recursive operations can
+    /// guard them.
     ///
     /// Otherwise, returns the type unchanged.
     fn filter_union(
@@ -3479,17 +3479,40 @@ impl<'db> Type<'db> {
         let Type::Union(union) = self.resolve_type_alias(db) else {
             return self;
         };
-        let union = if union.has_aliases(db) {
-            match union.expand_aliases(db, env) {
-                Type::Union(expanded) => expanded,
-                // Expanding collapsed the union to a single type, leaving nothing to filter
-                // between, so apply the predicate to it directly.
-                expanded => return if f(&expanded) { expanded } else { Type::Never },
+        if !union.has_aliases(db) {
+            return union.filter(db, f);
+        }
+        let mut builder = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .or_recursively_defined(union.recursively_defined(db));
+        let mut pending = union.elements(db).iter().rev().copied().collect::<Vec<_>>();
+        let mut seen = FxHashSet::default();
+        let mut originals = FxHashMap::default();
+        while let Some(element) = pending.pop() {
+            if !seen.insert(element) {
+                continue;
             }
-        } else {
-            union
+            match element.resolve_type_alias(db) {
+                Type::Union(nested) => pending.extend(nested.elements(db).iter().rev().copied()),
+                resolved => {
+                    originals.entry(resolved).or_insert(element);
+                    builder.add_in_place(resolved);
+                }
+            }
+        }
+        // Simplify before filtering: a redundant member must not become a contextual type.
+        // Restore references only for elements that survive unchanged by simplification.
+        let mut retain = |resolved: &Type<'db>| {
+            if f(resolved) {
+                originals.get(resolved).copied().unwrap_or(*resolved)
+            } else {
+                Type::Never
+            }
         };
-        union.filter(db, f)
+        match builder.build() {
+            Type::Union(union) => union.map_leave_aliases(db, env, retain),
+            resolved => retain(&resolved),
+        }
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.

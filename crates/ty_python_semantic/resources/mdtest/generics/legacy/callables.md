@@ -1484,6 +1484,11 @@ def from_delayed(value: Delayed[int, U]) -> Callable[[U], U]:
     raise NotImplementedError
 
 reveal_type(generic_context(from_delayed))  # revealed: ty_extensions._internal.GenericContext[U@from_delayed]
+
+def use_delayed(value: Delayed[int, str]):
+    callback = from_delayed(value)
+    reveal_type(callback("value"))  # revealed: str
+    callback(1)  # error: [invalid-argument-type]
 ```
 
 ## Promotion through shared generic aliases

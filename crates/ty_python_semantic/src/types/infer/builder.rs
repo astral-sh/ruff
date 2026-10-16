@@ -6862,6 +6862,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(db)
                 .filter_union(db, env, |ty| ty.as_literal_value().is_some())
+                .resolve_type_alias(db)
             && ty.is_assignable_to(db, env, literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
@@ -8895,7 +8896,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable_tcx = if let Some(tcx) = tcx.annotation
             && let Some(callable) = tcx
                 .filter_union(db, env, Type::is_callable_type)
-                .resolve_type_alias(db)
+                .expand_top_level_aliases(db, env)
                 .as_callable()
         {
             match callable.signatures(self.db()).overloads.as_slice() {
