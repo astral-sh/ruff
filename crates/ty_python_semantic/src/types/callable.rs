@@ -1564,7 +1564,7 @@ impl<'scope, 'db> ExpandedSignatures<'scope, 'db> {
         checker.check_callable_signature_pair(db, self.signatures, target.signatures)
     }
 
-    pub(super) fn walk(self, db: &'db dyn Db, visitor: &(impl visitor::TypeVisitor<'db> + ?Sized)) {
+    fn walk(self, db: &'db dyn Db, visitor: &(impl visitor::TypeVisitor<'db> + ?Sized)) {
         for signature in self.signatures {
             walk_signature(db, signature, visitor);
         }
