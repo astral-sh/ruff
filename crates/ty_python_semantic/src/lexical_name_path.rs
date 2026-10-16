@@ -98,8 +98,13 @@ fn lexical_name_path_component_for_leaf(
             };
             name.id.clone()
         }
-        DefinitionKind::TypeAlias(_)
-        | DefinitionKind::Import(_)
+        DefinitionKind::TypeAlias(alias) => {
+            let ast::Expr::Name(name) = alias.node(parsed).name.as_ref() else {
+                return Err(());
+            };
+            name.id.clone()
+        }
+        DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)
         | DefinitionKind::ImportFromSubmodule(_)
         | DefinitionKind::StarImport(_)
