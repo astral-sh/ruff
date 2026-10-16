@@ -165,6 +165,9 @@ Settings: Settings {
     },
     analysis: AnalysisSettings {
         return_type_inference: Never,
+        strict_list_inference: true,
+        strict_dictionary_inference: true,
+        strict_set_inference: true,
         strict_generic_narrowing: false,
         strict_equality_semantics: false,
         respect_type_ignore_comments: true,

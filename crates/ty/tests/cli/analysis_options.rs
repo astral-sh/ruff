@@ -2,6 +2,116 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+#[test]
+fn strict_collection_inference() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "main.py",
+        r#"
+        from typing_extensions import reveal_type
+
+        reveal_type([1, "a"])
+        reveal_type({"a": 1, "b": "two"})
+        reveal_type({1, "a"})
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command().args(["--output-format", "concise"]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    main.py:4:13: info[revealed-type] Revealed type: `list[int | str]`
+    main.py:5:13: info[revealed-type] Revealed type: `dict[str, int | str]`
+    main.py:6:13: info[revealed-type] Revealed type: `set[int | str]`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    case.write_file(
+        "pyproject.toml",
+        r#"
+        [tool.ty.analysis]
+        strict-list-inference = false
+        strict-dictionary-inference = false
+        strict-set-inference = false
+        "#,
+    )?;
+    assert_cmd_snapshot!(
+        case.command().args(["--output-format", "concise"]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    main.py:4:13: info[revealed-type] Revealed type: `list[Unknown]`
+    main.py:5:13: info[revealed-type] Revealed type: `dict[str, Unknown]`
+    main.py:6:13: info[revealed-type] Revealed type: `set[Unknown]`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    assert_cmd_snapshot!(
+        case.command().args([
+            "--output-format",
+            "concise",
+            "--config",
+            "analysis.strict-list-inference=true",
+            "--config",
+            "analysis.strict-dictionary-inference=true",
+            "--config",
+            "analysis.strict-set-inference=true",
+        ]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    main.py:4:13: info[revealed-type] Revealed type: `list[int | str]`
+    main.py:5:13: info[revealed-type] Revealed type: `dict[str, int | str]`
+    main.py:6:13: info[revealed-type] Revealed type: `set[int | str]`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    case.write_file(
+        "ty.toml",
+        r#"
+        [analysis]
+        strict-list-inference = false
+        strict-dictionary-inference = false
+        strict-set-inference = false
+
+        [[overrides]]
+        include = ["main.py"]
+        [overrides.analysis]
+        strict-list-inference = true
+        strict-set-inference = true
+        "#,
+    )?;
+    assert_cmd_snapshot!(
+        case.command().args(["--output-format", "concise"]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    main.py:4:13: info[revealed-type] Revealed type: `list[int | str]`
+    main.py:5:13: info[revealed-type] Revealed type: `dict[str, Unknown]`
+    main.py:6:13: info[revealed-type] Revealed type: `set[int | str]`
+    Found 3 diagnostics
+
+    ----- stderr -----
+    WARN Ignoring the `tool.ty` section in `<temp_dir>/pyproject.toml` because `<temp_dir>/ty.toml` takes precedence.
+    "
+    );
+
+    Ok(())
+}
+
 /// ty ignores `type: ignore` comments when setting `respect-type-ignore-comments=false`
 #[test]
 fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
