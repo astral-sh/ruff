@@ -1159,20 +1159,6 @@ pub(super) fn warn_incompatible_formatter_settings(resolver: &Resolver) {
             );
         }
 
-        // Validate all rules that rely on custom indent widths.
-        if setting.linter.rules.any_enabled(&[
-            Rule::IndentationWithInvalidMultiple,
-            Rule::IndentationWithInvalidMultipleComment,
-        ]) && setting.formatter.indent_width.value() != 4
-        {
-            warn_user_once!(
-                "The `format.indent-width` option with a value other than 4 is incompatible with {invalid_indent:#} and {invalid_comment_indent:#}. We recommend disabling these rules when using the formatter, which enforces a consistent indentation width. Alternatively, set the `format.indent-width` option to `4`.",
-                invalid_indent = Rule::IndentationWithInvalidMultiple.name_and_code(),
-                invalid_comment_indent =
-                    Rule::IndentationWithInvalidMultipleComment.name_and_code()
-            );
-        }
-
         // Validate all rules that rely on quote styles.
         if setting
             .linter
