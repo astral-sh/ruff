@@ -333,8 +333,8 @@ impl<'db> CallableItem<'db> {
             CallableItem::Regular(binding) => {
                 binding.check_types(db, env, constraints, argument_types, call_expression_tcx);
 
-                // With one non-generic signature, one valid placement is sufficient. Keep the
-                // original diagnostics unless the ordinary type checker accepts that placement.
+                // With one non-generic signature, we can retry positional matching after inference.
+                // Keep the original diagnostics unless the ordinary checker accepts every match.
                 let [overload] = binding.overloads.as_mut_slice() else {
                     return;
                 };
@@ -5093,6 +5093,30 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             })
     }
 
+    /// Matches arguments in source order, deferring unpacked keywords until the end.
+    fn match_arguments(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+        let mut keywords_arguments = vec![];
+        for (argument_index, argument) in self.arguments.iter().enumerate() {
+            match argument {
+                CallArgument::Positional(_) | CallArgument::Synthetic(_) => {
+                    let _ = self.match_positional(argument_index, argument.kind(), None, false);
+                }
+                CallArgument::Keyword { name, .. } => {
+                    let _ = self.match_keyword(argument_index, argument.kind(), None, name);
+                }
+                CallArgument::Variadic(variadic) => {
+                    let _ = self.match_variadic(db, env, argument_index, variadic);
+                }
+                CallArgument::Keywords(keywords) => {
+                    keywords_arguments.push((argument_index, keywords));
+                }
+            }
+        }
+        for (keywords_index, keywords_type) in keywords_arguments {
+            self.match_keyword_variadic(db, env, keywords_index, keywords_type);
+        }
+    }
+
     /// Returns the minimum number of positional values supplied by the arguments after the
     /// argument at `argument_index`.
     ///
@@ -7482,7 +7506,7 @@ pub struct MatchedArgument<'db> {
 }
 
 /// One parameter matched to an argument.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatchedParameter<'db> {
     /// The index of the matched parameter.
     pub index: usize,
@@ -8316,26 +8340,7 @@ impl<'db> Binding<'db> {
     ) {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
-        let mut keywords_arguments = vec![];
-        for (argument_index, argument) in arguments.iter().enumerate() {
-            match argument {
-                CallArgument::Positional(_) | CallArgument::Synthetic(_) => {
-                    let _ = matcher.match_positional(argument_index, argument.kind(), None, false);
-                }
-                CallArgument::Keyword { name, .. } => {
-                    let _ = matcher.match_keyword(argument_index, argument.kind(), None, name);
-                }
-                CallArgument::Variadic(variadic) => {
-                    let _ = matcher.match_variadic(db, env, argument_index, variadic);
-                }
-                CallArgument::Keywords(keywords) => {
-                    keywords_arguments.push((argument_index, keywords));
-                }
-            }
-        }
-        for (keywords_index, keywords_type) in keywords_arguments {
-            matcher.match_keyword_variadic(db, env, keywords_index, keywords_type);
-        }
+        matcher.match_arguments(db, env);
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         let result = matcher.finish(db, env);
         self.variadic_argument_matched_to_variadic_parameter =
