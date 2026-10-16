@@ -6,7 +6,7 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, UnionType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -1356,6 +1356,90 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 
     db.write_file("/src/defaults.py", with_default)?;
     assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn alias_preserving_newtype_unions_update_after_base_changes() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+from typing import NewType, TypedDict
+class Base: ...
+N = NewType('N', Base)
+type Alias = Base
+";
+    let main = "\
+from base import N, Alias
+class First: ...
+class Second: ...
+first: First
+second: Second
+";
+    db.write_files([("/src/base.py", base), ("/src/main.py", main)])?;
+
+    let observe =
+        |db: &TestDb| -> anyhow::Result<_> {
+            let env = db.program_environment();
+            let file = system_path_to_file(db, "/src/main.py")?;
+            let Type::KnownInstance(KnownInstanceType::NewType(newtype)) =
+                global_symbol(db, file, "N").place.expect_type()
+            else {
+                anyhow::bail!("Expected a NewType constructor");
+            };
+            let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+                global_symbol(db, file, "Alias").place.expect_type()
+            else {
+                anyhow::bail!("Expected a type alias");
+            };
+            let newtype = newtype.map_base_class_type(db, |class| class);
+            let instance = Type::NewTypeInstance(newtype);
+            let first = global_symbol(db, file, "first").place.expect_type();
+            let second = global_symbol(db, file, "second").place.expect_type();
+            let aliased_tuple = Type::heterogeneous_tuple(db, &env, [Type::TypeAlias(alias)]);
+            let unions = [
+                instance,
+                Type::heterogeneous_tuple(db, &env, [instance]),
+                Type::KnownInstance(KnownInstanceType::NewType(newtype)),
+            ]
+            .map(|incoming| {
+                UnionType::from_elements_leave_aliases(
+                    db,
+                    &env,
+                    [first, second, aliased_tuple, incoming],
+                )
+                .display(db, &env)
+                .to_string()
+            });
+            let mut diagnostics = Vec::new();
+            for path in ["/src/base.py", "/src/main.py"] {
+                let file = system_path_to_file(db, path)?;
+                diagnostics.extend(check_types(db, program_file(db, file)).iter().map(
+                    |diagnostic| {
+                        (
+                            diagnostic.id().to_string(),
+                            diagnostic.headline_message().to_string(),
+                        )
+                    },
+                ));
+            }
+            Ok((unions, diagnostics))
+        };
+
+    let original = observe(&db)?;
+    assert!(original.1.is_empty());
+    let typed_dict = base.replace("class Base:", "class Base(TypedDict):");
+    for source in [typed_dict.as_str(), base] {
+        db.write_file("/src/base.py", source)?;
+        let mut fresh = setup_db();
+        fresh.write_files([("/src/base.py", source), ("/src/main.py", main)])?;
+        let observed = observe(&db)?;
+        assert_eq!(observed, observe(&fresh)?, "{source}");
+        if source == base {
+            assert_eq!(observed, original);
+        } else {
+            assert!(!observed.1.is_empty());
+        }
+    }
     Ok(())
 }
 
