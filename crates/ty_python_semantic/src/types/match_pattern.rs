@@ -1034,11 +1034,20 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
 ) -> Result<Type<'db>, ()> {
     let resolved = subject_ty.resolve_type_alias(db);
     let narrowed = match resolved {
-        Type::Union(union) => union
-            .try_map(db, env, |element| {
-                try_sequence_pattern_binding_fallthrough_type(db, env, kind, *element, budget).ok()
-            })
-            .ok_or(())?,
+        Type::Union(union) => {
+            // Wait until every element fits within the expansion budget before simplifying the
+            // union. Otherwise, we can spend substantial time simplifying a partial result that
+            // must be discarded when a later element exceeds the budget.
+            let mapped = union
+                .elements(db)
+                .iter()
+                .map(|element| {
+                    try_sequence_pattern_binding_fallthrough_type(db, env, kind, *element, budget)
+                })
+                .collect::<Result<Vec<_>, ()>>()?;
+            let mut mapped = mapped.into_iter();
+            union.try_map(db, env, |_| mapped.next()).ok_or(())?
+        }
         Type::Intersection(intersection) => {
             let mut failed = false;
             let narrowed = intersection.map_positive(db, env, |element| {
