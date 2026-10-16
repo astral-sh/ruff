@@ -8093,6 +8093,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Constructors share this inference machinery, but their type arguments are governed by
+        // their signatures rather than the literal inference options.
+        let strict_inference = !matches!(
+            collection_expr,
+            Some(ast::ExprRef::List(_) | ast::ExprRef::Set(_) | ast::ExprRef::Dict(_))
+        ) || match collection_class {
+            KnownClass::List => self.settings().strict_list_inference,
+            KnownClass::Dict => self.settings().strict_dictionary_inference,
+            KnownClass::Set => self.settings().strict_set_inference,
+            _ => true,
+        };
+        // Concrete contextual types take precedence. `Unknown` can come from an earlier generic
+        // inference pass and must not make the literal's inference strict again.
+        let infer_gradually: [bool; N] = std::array::from_fn(|index| {
+            !strict_inference
+                && elt_tys
+                    .clone()
+                    .nth(index)
+                    .and_then(|typevar| elt_tcx_constraints.get(&typevar.identity(db)))
+                    .is_none_or(|context| *context == Type::unknown())
+        });
+        let mut first_element_types: [Option<Type<'db>>; N] = [None; N];
+        let mut heterogeneous = [false; N];
+        let mut record_element_type = |index: usize, ty: Type<'db>| {
+            if !infer_gradually[index] || heterogeneous[index] {
+                return;
+            }
+            if let Some(first) = first_element_types[index] {
+                // A single union-typed element is still homogeneous. Compare elements before
+                // combining their types, which can also erase differences between subclasses.
+                heterogeneous[index] = !first.is_equivalent_to(db, env, ty);
+            } else {
+                first_element_types[index] = Some(ty);
+            }
+        };
+
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
@@ -8118,6 +8154,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
+                    record_element_type(0, unpacked_key_ty.promote(db, env));
+                    record_element_type(1, unpacked_value_ty.promote(db, env));
                     tuple_size_promotion_constraints.record_unpromotable_type(
                         db,
                         env,
@@ -8171,6 +8209,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_elt_expression(self, (i, elt, tcx.with_annotation(elt_tcx)))
                     });
 
+                if infer_gradually[i] {
+                    let promoted = inferred_elt_ty.promote(db, env);
+                    let element_type = if elt.is_starred_expr() {
+                        promoted.iterate(db, env).homogeneous_element_type(db, env)
+                    } else {
+                        promoted
+                    };
+                    record_element_type(i, element_type);
+                }
+
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
                     elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
@@ -8216,22 +8264,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let class_type = collection_alias
-            .origin(self.db())
-            .apply_specialization(db, |_| {
-                builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.inference_lower(db, env)?;
+        let class_type =
+            collection_alias
+                .origin(self.db())
+                .apply_specialization(db, |generic_context| {
+                    let specialization = builder.build_merged_with(|current_typevar, bounds| {
+                        let lower = bounds?.inference_lower(db, env)?;
 
-                    let lower = lower.promote_collection_element_type(
-                        db,
-                        env,
-                        tuple_size_promotion_constraints.allow(current_typevar.identity(self.db())),
-                        is_empty_collection_type_context(tcx),
-                    );
+                        let lower = lower.promote_collection_element_type(
+                            db,
+                            env,
+                            tuple_size_promotion_constraints
+                                .allow(current_typevar.identity(self.db())),
+                            is_empty_collection_type_context(tcx),
+                        );
 
-                    Some(lower)
-                })
-            });
+                        Some(lower)
+                    });
+
+                    if heterogeneous.contains(&true) {
+                        // Relax the completed specialization so solving constraints cannot reintroduce
+                        // concrete types alongside `Unknown` (for example, from an unpacked mapping).
+                        generic_context.specialize_recursive(
+                            db,
+                            specialization
+                                .types(db)
+                                .iter()
+                                .enumerate()
+                                .map(|(index, ty)| {
+                                    Some(if heterogeneous.get(index) == Some(&true) {
+                                        Type::unknown()
+                                    } else {
+                                        *ty
+                                    })
+                                }),
+                        )
+                    } else {
+                        specialization
+                    }
+                });
 
         Type::from(class_type).to_instance_approximation(db, env)
     }

@@ -10,6 +10,7 @@ reveal_type({})  # revealed: dict[Unknown, Unknown]
 
 ```py
 reveal_type({1: 1, 2: 1})  # revealed: dict[int, int]
+reveal_type({"a": 1, "b": "two"})  # revealed: dict[str, int | str]
 ```
 
 ## Dict of tuples
@@ -488,4 +489,92 @@ reveal_type(x["b"])  # revealed: Unknown
 # error: [invalid-type-form]
 x["c"]: int = ...
 reveal_type(x["c"])  # revealed: Unknown
+```
+
+## Gradual dictionary inference
+
+Disabling strict dictionary inference considers keys and values independently. Each homogeneous side
+retains its type; a heterogeneous side becomes `Unknown`.
+
+```toml
+[analysis]
+strict-dictionary-inference = false
+```
+
+```py
+reveal_type({"a": 1, "b": "two"})  # revealed: dict[str, Unknown]
+reveal_type({"a": "two", "b": 1})  # revealed: dict[str, Unknown]
+reveal_type({1: "a", "b": "two"})  # revealed: dict[Unknown, str]
+reveal_type({1: "a", "b": 2})  # revealed: dict[Unknown, Unknown]
+reveal_type({"a": 1, "b": 2})  # revealed: dict[str, int]
+reveal_type({})  # revealed: dict[Unknown, Unknown]
+reveal_type([1, "a"])  # revealed: list[int | str]
+reveal_type({1, "a"})  # revealed: set[int | str]
+```
+
+Unpacked mappings contribute their key and value types. A union within one entry is preserved,
+including in comprehensions.
+
+```py
+def unions(value: int | str, mapping: dict[str, int | str]):
+    reveal_type({"a": value})  # revealed: dict[str, int | str]
+    reveal_type({"a": value, "b": value})  # revealed: dict[str, int | str]
+    reveal_type({**mapping})  # revealed: dict[str, int | str]
+    reveal_type({**mapping, "a": 1})  # revealed: dict[str, Unknown]
+    reveal_type({key: item for key, item in mapping.items()})  # revealed: dict[str, int | str]
+
+reveal_type({**{"a": 1}, "b": "two"})  # revealed: dict[str, Unknown]
+reveal_type({**{"a": 1}, **{2: 3}})  # revealed: dict[Unknown, int]
+```
+
+Expected types still constrain keys and values. This option does not change constructor inference.
+
+```py
+items: dict[str, int | str] = {"a": 1, "b": "two"}
+reveal_type(items)  # revealed: dict[str, int | str]
+invalid: dict[str, int] = {"a": 1, "b": "two"}  # error: [invalid-assignment]
+
+def accepts_ints(items: dict[str, int]) -> None: ...
+
+accepts_ints({"a": 1, "b": "two"})  # error: [invalid-argument-type]
+reveal_type(dict(a=1, b="two"))  # revealed: dict[str, int | str]
+```
+
+`TypedDict` fields continue to be validated individually.
+
+```py
+from typing import TypedDict
+
+class Record(TypedDict):
+    name: str
+    count: int
+
+record: Record = {"name": "Alice", "count": 1}
+reveal_type(record)  # revealed: Record
+invalid_record: Record = {"name": "Alice", "count": "one"}  # error: [invalid-argument-type]
+```
+
+## Gradual inference for nested records
+
+With gradual list and dictionary inference, heterogeneous configuration records can be passed to
+typed functions without annotating each dictionary value
+([issue #4731](https://github.com/astral-sh/ty/issues/4731)).
+
+```toml
+[analysis]
+strict-list-inference = false
+strict-dictionary-inference = false
+```
+
+```py
+def print_names(names: list[str]) -> None: ...
+
+records = [
+    {"names": ["Alice"], "count": 1},
+    {"names": ["Bob"], "enabled": True},
+]
+for record in records:
+    reveal_type(record)  # revealed: dict[str, Unknown]
+    reveal_type(record["names"])  # revealed: Unknown
+    print_names(record["names"])  # no diagnostic
 ```

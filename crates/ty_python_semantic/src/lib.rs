@@ -97,9 +97,22 @@ fn register_lints(registry: &mut LintRegistryBuilder) {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Independent analysis options"
+)]
 pub struct AnalysisSettings {
     /// Whether to infer return types for functions without return annotations.
     pub return_type_inference: ReturnTypeInference,
+
+    /// Whether heterogeneous list elements retain their inferred types.
+    pub strict_list_inference: bool,
+
+    /// Whether heterogeneous dictionary keys and values retain their inferred types.
+    pub strict_dictionary_inference: bool,
+
+    /// Whether heterogeneous set elements retain their inferred types.
+    pub strict_set_inference: bool,
 
     /// Whether narrowing with generic classes uses the top materialization.
     pub strict_generic_narrowing: bool,
@@ -125,6 +138,9 @@ impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
             return_type_inference: ReturnTypeInference::default(),
+            strict_list_inference: true,
+            strict_dictionary_inference: true,
+            strict_set_inference: true,
             strict_generic_narrowing: false,
             strict_equality_semantics: false,
             respect_type_ignore_comments: true,
