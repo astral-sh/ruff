@@ -329,6 +329,8 @@ class MetaBase(type):
         return self
 
 class Meta(MetaBase):
+    # XXX: The receiver check requires `object <= _TMeta`, losing the metaclass restriction.
+    # error: [invalid-method-override]
     def __call__(cls: type[_TMeta], *args: Any, **kwargs: Any) -> _TMeta:
         reveal_type(super(Meta, cls).meta_base_value)  # revealed: int
         reveal_type(super(Meta, cls).plain())  # revealed: type[_TMeta@__call__]
@@ -356,6 +358,8 @@ super(Meta, OtherBase)  # error: [invalid-super-argument]
 T = TypeVar("T", bound=int)
 
 class BoundIntMeta(type):
+    # XXX: The receiver check requires `object <= T`, losing the metaclass restriction.
+    # error: [invalid-method-override]
     def __call__(cls: type[T]) -> T:
         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
 ```

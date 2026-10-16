@@ -1867,9 +1867,8 @@ def head(xs: list[T]) -> T:
     return xs[0]
 
 reveal_type(invoke(identity, 1))  # revealed: Literal[1]
-
-# TODO: this should be `Unknown | int`
-reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+# revealed: int
+reveal_type(invoke(head, [1, 2, 3]))
 ```
 
 ## Opaque decorators don't affect typevar binding

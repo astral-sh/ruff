@@ -4250,7 +4250,8 @@ class Container[T](Protocol):
     @classmethod
     def from_value[Self, S](cls: type[Self], value: S, flag: bool) -> object: ...
 
-reveal_type(Container.from_value)  # revealed: Overload[[S](value: S) -> object, [S](value: S, flag: bool) -> object]
+# TODO: Both bound overloads should be generic only in `S`.
+reveal_type(Container.from_value)  # revealed: Overload[[Self, S](value: S) -> object, [Self, S](value: S, flag: bool) -> object]
 ```
 
 ## Recursive protocol receiver binding with a bounded type variable

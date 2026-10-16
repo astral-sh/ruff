@@ -1,10 +1,8 @@
-//! Tracks the support of each constraint and interior node in a BDD.
+//! Tracks type-variable occurrences, declaration dependencies, free dependencies, and
+//! existential locals for each constraint and interior node in a BDD.
 //!
-//! The support of a constraint is the set of typevars mentioned anywhere in the constraint
-//! (either the subject, or anywhere in the lower or upper bound).
-//!
-//! The support of a node is the union of the supports of every constraint reachable from that
-//! node.
+//! Atomic constraints collect these supports together. Existential constraints remove their
+//! locals only from free support; interior nodes union the supports of their constraint and edges.
 
 use std::ops::{BitOrAssign, Sub};
 
@@ -28,6 +26,14 @@ pub(super) struct Support {
 const CHUNK_SIZE: usize = usize::BITS as usize;
 
 impl Support {
+    pub(super) fn from_typevars(typevars: impl IntoIterator<Item = TypeVarId>) -> Self {
+        let mut result = Self::default();
+        for typevar in typevars {
+            result.insert(typevar);
+        }
+        result
+    }
+
     pub(super) fn from_typevar_set<'db>(
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -55,20 +61,11 @@ impl Support {
         self.chunks[chunk_index] |= bit_mask_within_chunk;
     }
 
-    /// Removes and returns an arbitrary typevar from this support.
-    pub(super) fn pop(&mut self) -> Option<TypeVarId> {
-        let (idx, first_nonempty_chunk) = self
-            .chunks
-            .iter_mut()
-            .enumerate()
-            .find(|(_, chunk)| **chunk != 0)?;
-        let first_set_bit_in_chunk = first_nonempty_chunk.lowest_one()? as usize;
-
-        // Clear out the bit we just found, and then return it
-        *first_nonempty_chunk ^= 1 << first_set_bit_in_chunk;
-        Some(TypeVarId::from_usize(
-            CHUNK_SIZE * idx + first_set_bit_in_chunk,
-        ))
+    pub(super) fn contains(&self, typevar: TypeVarId) -> bool {
+        let index = typevar.index();
+        self.chunks
+            .get(index / CHUNK_SIZE)
+            .is_some_and(|chunk| chunk & (1 << (index % CHUNK_SIZE)) != 0)
     }
 
     fn iter_chunks(&self) -> impl Iterator<Item = usize> + '_ {
@@ -99,7 +96,7 @@ impl Support {
     }
 
     /// Returns whether this support contains any typevars that are not in `other`.
-    fn contains_more_than(&self, other: &Self) -> bool {
+    pub(super) fn contains_more_than(&self, other: &Self) -> bool {
         let lhs = self.iter_chunks();
         let rhs = std::iter::chain(other.iter_chunks(), std::iter::repeat(0));
         std::iter::zip(lhs, rhs).any(|(lhs, rhs)| (lhs & !rhs) != 0)
@@ -181,5 +178,38 @@ impl Sub<&Support> for &Support {
             *lhs &= !(*rhs);
         }
         result
+    }
+}
+
+/// Supports collected together when a constraint is constructed.
+///
+/// Occurrences retain quantified locals for solution extraction. Validation contains variables
+/// with declared bounds or constraints, and their transitive dependencies. An unbounded variable
+/// contributes to validation only when another variable's declaration depends on it.
+/// Free dependencies include declarations but respect the binders inside types and existential
+/// bodies, so they can establish independence from an enclosing BDD.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ConstraintSupports {
+    pub(super) occurrences: Support,
+    pub(super) validation: Support,
+    pub(super) free: Support,
+    /// Existential locals that must be freshened when this constraint set is reused.
+    pub(super) quantified: Support,
+}
+
+impl BitOrAssign<&Self> for ConstraintSupports {
+    fn bitor_assign(&mut self, rhs: &Self) {
+        self.occurrences |= &rhs.occurrences;
+        self.validation |= &rhs.validation;
+        self.free |= &rhs.free;
+        self.quantified |= &rhs.quantified;
+    }
+}
+
+impl BitOrAssign<Option<&Self>> for ConstraintSupports {
+    fn bitor_assign(&mut self, rhs: Option<&Self>) {
+        if let Some(rhs) = rhs {
+            *self |= rhs;
+        }
     }
 }

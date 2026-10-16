@@ -6,6 +6,8 @@ use std::cell::Cell;
 use std::debug_assert_matches;
 use std::marker::PhantomData;
 
+use itertools::Itertools;
+
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
@@ -1009,9 +1011,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             structurally_satisfied
         } else {
+            // A finite mismatch can reject the implementation before recursive receivers expand
+            // the protocol again, just as in protocol-to-protocol comparisons.
             protocol
                 .interface(db)
                 .members(db)
+                .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
                 .when_all(db, self.constraints, |member| {
                     self.type_satisfies_protocol_member(db, ty, &member)
                 })
