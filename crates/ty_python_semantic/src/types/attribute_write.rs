@@ -379,8 +379,8 @@ pub(super) fn attribute_write_requirement<'db>(
         Type::TypeVar(typevar) => {
             // Normal member lookup combines raw member types. Resolve each receiver separately
             // so writable instance storage is not mistaken for a descriptor alternative.
-            match typevar.typevar(db).bound_or_constraints(db, env) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) if bound != object_ty => {
+            match typevar.require_bound_or_constraints(db, env) {
+                TypeVarBoundOrConstraints::UpperBound(bound) if bound != object_ty => {
                     attribute_write_requirement(
                         db,
                         env,
@@ -389,14 +389,16 @@ pub(super) fn attribute_write_requirement<'db>(
                         Some(receiver.unwrap_or(object_ty)),
                     )
                 }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
                     AttributeWriteRequirement::All {
                         object_ty,
                         element_tys: constraints.elements(db),
                         receiver: Some(receiver.unwrap_or(object_ty)),
                     }
                 }
-                _ => instance_attribute_write_requirement(db, env, object_ty, attribute, receiver),
+                TypeVarBoundOrConstraints::UpperBound(_) => {
+                    instance_attribute_write_requirement(db, env, object_ty, attribute, receiver)
+                }
             }
         }
 
@@ -513,6 +515,20 @@ fn instance_attribute_write_requirement<'db>(
     attribute: &str,
     receiver: Option<Type<'db>>,
 ) -> AttributeWriteRequirement<'db> {
+    // Class-member lookup through `type[object]` (normalized to `type`) falls back to `object`.
+    // This does not guarantee writable storage, even though typeshed annotates metadata such as
+    // `__module__` as ordinary instance attributes.
+    if matches!(
+        object_ty.to_meta_type(db, env),
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type)
+    ) && !object_ty
+        .class_member(db, env, attribute)
+        .place
+        .is_undefined()
+    {
+        return AttributeWriteRequirement::CannotAssign;
+    }
+
     AttributeWriteRequirement::Instance {
         object_ty,
         receiver,
