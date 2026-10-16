@@ -594,6 +594,19 @@ mod tests {
         }
         assert_eq!(metadata.module_owners.len(), 3);
 
+        let owners = input
+            .as_object_mut()
+            .context("expected a metadata object")?
+            .remove("module_owners")
+            .context("expected legacy module owners")?;
+        input["modules"] = owners
+            .as_object()
+            .context("expected a module ownership map")?
+            .iter()
+            .map(|(name, owners)| (name.clone(), json!({"owners": owners})))
+            .collect();
+        assert_eq!(extract(&input)?, metadata);
+
         Ok(())
     }
 
