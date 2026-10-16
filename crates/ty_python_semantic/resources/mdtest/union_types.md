@@ -203,6 +203,26 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+## Unions with nominal bounds
+
+A union of proper nominal types cannot include instances of the bare `object` class. This remains
+true when the types contain `Any`, inherit from `Any`, or occur as positive intersection components.
+
+```py
+import sys
+from typing import Any, Literal
+from ty_extensions import Intersection, Not, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+class Gradual(Any): ...
+
+static_assert(not is_equivalent_to(tuple[Any] | list[Any], object))
+static_assert(not is_equivalent_to(Gradual | float, object))
+static_assert(not is_equivalent_to(TypeOf[sys.version_info] | str, object))
+static_assert(not is_equivalent_to(Intersection[int, Not[Literal[1]]] | str, object))
+static_assert(not is_equivalent_to(str | Intersection[Any, int], object))
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
