@@ -580,7 +580,12 @@ impl Workspace {
             &self.db,
             self.db.program_file(file_id.file),
             range.to_text_range(&index, &source, self.position_encoding)?,
-            &InlayHintSettings::default(),
+            // TODO: Provide a way to configure this
+            &InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                return_types: true,
+            },
         );
 
         Ok(result

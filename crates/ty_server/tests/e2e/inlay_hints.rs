@@ -15,61 +15,8 @@ use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
-#[test]
-fn return_type_hints_enabled_by_default_with_inference() -> Result<()> {
-    let workspace_root = SystemPath::new("src");
-    let file = SystemPath::new("src/foo.py");
-    let source = "def foo(): return 1\n";
-    for (options, inference, expected_count) in [
-        (serde_json::json!({}), "always", 1),
-        (serde_json::json!({"inlayHints": {}}), "always", 1),
-        (serde_json::json!({}), "never", 0),
-        (
-            serde_json::json!({"inlayHints": {"returnTypes": false}}),
-            "always",
-            0,
-        ),
-        (
-            serde_json::json!({"inlayHints": {"returnTypes": true}}),
-            "never",
-            0,
-        ),
-        (
-            serde_json::json!({"inlayHints": {
-                "returnTypes": true, "variableTypes": false, "callArgumentNames": false
-            }}),
-            "always",
-            1,
-        ),
-    ] {
-        let config = format!("[analysis]\nreturn-type-inference = '{inference}'\n");
-        let mut server = TestServerBuilder::new()?
-            .with_raw_initialization_options(options)
-            .with_workspace(workspace_root, None)?
-            .with_file("src/ty.toml", &config)?
-            .with_file(file, source)?
-            .enable_inlay_hints(true)
-            .build()
-            .wait_until_workspaces_are_initialized();
-        server.open_text_document(file, source, 1);
-        let hints = server
-            .inlay_hints_request(file, Range::new(Position::new(0, 0), Position::new(1, 0)))
-            .unwrap_or_default();
-        assert_eq!(hints.len(), expected_count);
-        if let Some(hint) = hints.first() {
-            assert_eq!(hint.position, Position::new(0, 9));
-            assert_eq!(hint.kind, Some(lsp_types::InlayHintKind::Type));
-            let lsp_types::Label::InlayHintLabelPartList(parts) = &hint.label else {
-                anyhow::bail!("Expected inlay hint label parts");
-            };
-            let label: String = parts.iter().map(|part| part.value.as_str()).collect();
-            assert_eq!(label, " -> Literal[1]");
-        }
-    }
-    Ok(())
-}
-
-/// Variable types and argument names are enabled by default.
+/// Tests that the default value of inlay hints settings is correct i.e., they're all enabled
+/// by default.
 #[test]
 fn default_inlay_hints() -> Result<()> {
     let workspace_root = SystemPath::new("src");
@@ -77,7 +24,7 @@ fn default_inlay_hints() -> Result<()> {
     let foo_content = "\
 class Thing: ...
 
-def foo(a: Thing) -> Thing:
+def foo(a: Thing):
     return a
 
 y = foo(Thing())
@@ -86,6 +33,10 @@ y = foo(Thing())
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(&ClientOptions::default())
         .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/ty.toml",
+            "[analysis]\nreturn-type-inference = 'always'\n",
+        )?
         .with_file(foo, foo_content)?
         .enable_inlay_hints(true)
         .build()
@@ -99,6 +50,35 @@ y = foo(Thing())
 
     insta::assert_json_snapshot!(hints, @r#"
     [
+      {
+        "position": {
+          "line": 2,
+          "character": 17
+        },
+        "label": [
+          {
+            "value": " -> "
+          },
+          {
+            "value": "Thing",
+            "location": {
+              "uri": "file://<temp_dir>/src/foo.py",
+              "range": {
+                "start": {
+                  "line": 0,
+                  "character": 6
+                },
+                "end": {
+                  "line": 0,
+                  "character": 11
+                }
+              }
+            }
+          }
+        ],
+        "kind": 1,
+        "textEdits": []
+      },
       {
         "position": {
           "line": 5,

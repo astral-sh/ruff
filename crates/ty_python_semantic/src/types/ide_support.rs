@@ -39,14 +39,12 @@ static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
     LazyLock::new(|| NameMatcher::keyword("class"));
 
 /// Returns the inferred callable return type for an unannotated function definition.
-///
-/// This opts into body dependencies, unlike ordinary function signature queries, and follows
-/// the same configuration and inference exclusions as calls. Decorated definitions are only
-/// supported when the resulting callable still refers to this definition.
 pub fn inlay_hint_return_type<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
 ) -> Option<Type<'db>> {
+    // TODO: Remove the async check once return-type inference supports async functions,
+    // using the awaited return type for the hint instead of the coroutine type.
     if function.returns.is_some() || function.is_async {
         return None;
     }
