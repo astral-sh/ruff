@@ -218,6 +218,27 @@ class IntBox(Box[int]): ...
 requires_type(IntBox)  # no diagnostic
 ```
 
+## Conditional generic class bases
+
+A generic alias and its unspecialized class are both valid bases. When a condition chooses between
+them, we report an unsupported MRO rather than an invalid base.
+
+```py
+class Base[T]: ...
+
+def _(flag: bool):
+    base = Base[int] if flag else Base
+    class Child(base): ...  # error: [unsupported-base]
+```
+
+An alternative that is not a valid base still produces an error:
+
+```py
+def _(flag: bool):
+    base = Base[int] if flag else 42
+    class Child(base): ...  # error: [invalid-base]
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
