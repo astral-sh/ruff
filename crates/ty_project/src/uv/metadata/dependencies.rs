@@ -29,7 +29,12 @@ impl UvMetadata {
             let editable_path = node
                 .source
                 .as_ref()
-                .and_then(|source| source.editable.clone());
+                .and_then(|source| source.editable.clone())
+                .filter(|_| {
+                    self.installed_packages.as_ref().is_none_or(|packages| {
+                        packages.get(id).is_some_and(|package| package.editable)
+                    })
+                });
             if let Some(path) = &editable_path
                 && !path.is_absolute()
             {
@@ -206,6 +211,20 @@ impl UvMetadata {
             return Err(DependencyMetadataError::MissingProjects);
         }
 
+        // Packages may remain installed after their declarations are removed, or may have been
+        // installed outside uv. Keep them for module ownership checks; installation alone does
+        // not make them declared dependencies.
+        if let Some(packages) = &self.installed_packages {
+            for (id, package) in packages {
+                distributions
+                    .entry(id.clone())
+                    .or_insert_with(|| DependencyDistribution {
+                        name: package.name.clone(),
+                        editable_path: None,
+                    });
+            }
+        }
+
         let mut module_owners: BTreeMap<ModuleName, Box<[CharStr]>> = BTreeMap::new();
         for (module, owners) in &self.module_owners {
             let Some(module) = ModuleName::new(module) else {
@@ -213,7 +232,12 @@ impl UvMetadata {
             };
             let owners = owners
                 .iter()
-                .filter(|owner| distributions.contains_key(&owner.package_id))
+                .filter(|owner| {
+                    self.installed_packages.as_ref().map_or_else(
+                        || distributions.contains_key(&owner.package_id),
+                        |packages| packages.contains_key(&owner.package_id),
+                    )
+                })
                 .map(|owner| owner.package_id.clone())
                 .collect::<BTreeSet<_>>();
             // Keep an empty entry when all owners are unknown. Omitting the entry would allow a
@@ -221,7 +245,8 @@ impl UvMetadata {
             module_owners.insert(module, owners.into_iter().collect());
         }
 
-        if module_owners.values().all(|owners| owners.is_empty())
+        if self.installed_packages.is_none()
+            && module_owners.values().all(|owners| owners.is_empty())
             && !distributions
                 .values()
                 .any(|distribution| distribution.editable_path.is_some())
@@ -421,6 +446,9 @@ mod tests {
         system
             .memory_file_system()
             .write_file_all(absolute("/app/pyproject.toml"), "[tool.uv.workspace]")?;
+        if let Some(root) = metadata["environment"]["root"].as_str() {
+            system.memory_file_system().create_directory_all(root)?;
+        }
         let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, &system)?;
         Ok(metadata.dependency_metadata()?)
     }
@@ -439,6 +467,20 @@ mod tests {
 
     fn ids<const N: usize>(ids: [&str; N]) -> BTreeSet<CharStr> {
         ids.into_iter().map(CharStr::from).collect()
+    }
+
+    #[test]
+    fn empty_installed_dependency_inventory_is_authoritative() -> anyhow::Result<()> {
+        let mut input = metadata();
+        input["environment"] = json!({"root": absolute("/app/.venv"), "packages": {}});
+        let metadata = extract(&input)?;
+        assert!(
+            metadata
+                .module_owners
+                .values()
+                .all(|owners| owners.is_empty())
+        );
+        Ok(())
     }
 
     #[test]
@@ -558,6 +600,17 @@ mod tests {
                 .and_then(|distribution| distribution.editable_path.as_deref()),
             Some(absolute("/editable-package").as_path())
         );
+
+        // A non-editable installation supersedes the editable source in the resolution.
+        input["environment"] = json!({
+            "root": absolute("/app/.venv"),
+            "packages": {"direct": {
+                "name": input["resolution"]["direct"]["name"], "version": "1.0",
+                "path": absolute("/app/.venv/site-packages/direct-1.dist-info"),
+                "editable": false
+            }}
+        });
+        assert_eq!(extract(&input)?.distributions["direct"].editable_path, None);
 
         Ok(())
     }

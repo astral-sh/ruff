@@ -102,3 +102,13 @@ pub(super) fn deserialize_map<'de, D: Deserializer<'de>, V: Deserialize<'de>>(
 
     deserializer.deserialize_map(MapVisitor(PhantomData))
 }
+
+pub(super) fn deserialize_optional_map<'de, D: Deserializer<'de>, V: Deserialize<'de>>(
+    deserializer: D,
+) -> Result<Option<BTreeMap<CharStr, V>>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(bound(deserialize = "V: Deserialize<'de>"))]
+    struct Map<V>(#[serde(deserialize_with = "deserialize_map")] BTreeMap<CharStr, V>);
+
+    Option::<Map<V>>::deserialize(deserializer).map(|value| value.map(|value| value.0))
+}

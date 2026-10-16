@@ -1,0 +1,13 @@
+---
+source: crates/ty_project/src/dependency/tests.rs
+expression: "DisplayDiagnostics::new(&db, &DisplayDiagnosticConfig::new(\"ty\"),\n&diagnostics)"
+---
+warning[unused-dependency]: Dependency `used-lib` is declared but never imported
+ --> project/script.py:1:1
+  |
+1 | / # /// script
+2 | | # dependencies = ['used-lib']
+3 | | # ///
+  | |_____^
+4 |   import helper
+  |
