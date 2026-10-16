@@ -388,6 +388,7 @@ struct SpecializationFlowVisitor<'db> {
     active_types: ActiveRecursionDetector<Type<'db>>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
+    captured_definitions: RefCell<FxHashSet<Definition<'db>>>,
     inconclusive: Cell<bool>,
 }
 
@@ -538,6 +539,7 @@ impl<'db> SpecializationFlowGraph<'db> {
         let mut graph = Self::default();
         let mut pending = vec![root];
         let mut visited = FxHashSet::default();
+        let mut captures = Vec::new();
 
         while let Some(source) = pending.pop() {
             let source_definition = source.definition(db);
@@ -551,11 +553,18 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visitor.visit_definition_body(db, source) {
                 graph.inconclusive = true;
             }
-            let (edges, referenced_definitions, inconclusive) = visitor.finish();
-            graph.edges.extend(edges);
-            if inconclusive {
+            graph.edges.extend(visitor.edges.into_inner());
+            captures.extend(
+                visitor
+                    .captured_definitions
+                    .into_inner()
+                    .into_iter()
+                    .map(|binding| (source_definition, binding)),
+            );
+            if visitor.inconclusive.get() {
                 graph.inconclusive_definitions.insert(source_definition);
             }
+            let referenced_definitions = visitor.referenced_definitions.into_inner();
             graph.definition_edges.extend(
                 referenced_definitions
                     .iter()
@@ -563,6 +572,13 @@ impl<'db> SpecializationFlowGraph<'db> {
             );
             pending.extend(referenced_definitions);
         }
+        // A capture from outside this graph is fixed while its definitions are specialized.
+        // Captures from a participating definition still need the parent specialization mapping.
+        graph.inconclusive_definitions.extend(
+            captures
+                .into_iter()
+                .filter_map(|(source, binding)| visited.contains(&binding).then_some(source)),
+        );
         graph
     }
 
@@ -736,16 +752,9 @@ impl<'db> SpecializationFlowVisitor<'db> {
             active_types: ActiveRecursionDetector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
+            captured_definitions: RefCell::default(),
             inconclusive: Cell::default(),
         })
-    }
-
-    fn finish(self) -> (Vec<FlowEdge<'db>>, Vec<RecursiveDefinition<'db>>, bool) {
-        (
-            self.edges.into_inner(),
-            self.referenced_definitions.into_inner(),
-            self.inconclusive.get(),
-        )
     }
 
     fn with_bound_context(&self, context: Option<GenericContext<'db>>, visit: impl FnOnce()) {
@@ -846,9 +855,11 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
                     .iter()
                     .any(|context| context.contains(db, identity))
             {
-                // Nested definitions can capture a type variable from an outer generic scope.
-                // Specialization does not yet retain the parent mapping needed to model it.
-                self.inconclusive.set(true);
+                if let Some(binding) = typevar.binding_context(db).definition() {
+                    self.captured_definitions.borrow_mut().insert(binding);
+                } else {
+                    self.inconclusive.set(true);
+                }
             }
             self.visit_bound_type_var_type(db, typevar);
             return;
@@ -1002,10 +1013,10 @@ impl<'db> TypeAliasType<'db> {
 impl<'db> ProtocolInstanceType<'db> {
     /// The recursion identity for a walk that inspects all protocol members, including methods.
     ///
-    /// Unlike type relations, dynamic-content checks do not have separate method guards. Include
-    /// method signatures in the flow graph so finite specialization cycles can use exact type
-    /// identities. If signature inference re-enters the flow query, its conservative cycle
-    /// recovery keeps the definition-level guard.
+    /// Type relations guard methods separately. Dynamic-content and free-type-variable checks
+    /// include method signatures in this flow graph so finite specialization cycles can use
+    /// exact type identities. If signature inference re-enters the flow query, its conservative
+    /// cycle recovery keeps the definition-level guard.
     ///
     /// For example, inspecting `Reset[str]` must also inspect `Reset[int]` before stopping at its
     /// exact repetition:
