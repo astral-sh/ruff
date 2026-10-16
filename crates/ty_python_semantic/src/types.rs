@@ -7520,34 +7520,47 @@ impl<'db> Type<'db> {
                 //     name: str,
                 //     value: Any,
                 //     *,
-                //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+                //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = (),
+                //     qualname: str | None = None,  # Python 3.15+
                 // ) -> Self: ...
                 // ```
+                let parameters = [
+                    Parameter::positional_or_keyword(Name::new_static("name"))
+                        .with_annotated_type(KnownClass::Str.to_instance(db, env)),
+                    Parameter::positional_or_keyword(Name::new_static("value"))
+                        .with_annotated_type(object_type_form(db)),
+                    Parameter::keyword_only(Name::new_static("type_params"))
+                        .with_annotated_type(Type::homogeneous_tuple(
+                            db,
+                            env,
+                            UnionType::from_elements(
+                                db,
+                                env,
+                                [
+                                    KnownClass::TypeVar.to_instance(db, env),
+                                    KnownClass::ParamSpec.to_instance(db, env),
+                                    KnownClass::TypeVarTuple.to_instance(db, env),
+                                ],
+                            ),
+                        ))
+                        .with_default_type(Type::empty_tuple(db, env)),
+                ];
+                let qualname = (env.python_version(db) >= ast::PythonVersion::PY315).then(|| {
+                    let none = Type::none(db, env);
+                    Parameter::keyword_only(Name::new_static("qualname"))
+                        .with_annotated_type(UnionType::from_two_elements(
+                            db,
+                            env,
+                            KnownClass::Str.to_instance(db, env),
+                            none,
+                        ))
+                        .with_default_type(none)
+                });
                 Some(
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::standard([
-                                Parameter::positional_or_keyword(Name::new_static("name"))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                                Parameter::positional_or_keyword(Name::new_static("value"))
-                                    .with_annotated_type(object_type_form(db)),
-                                Parameter::keyword_only(Name::new_static("type_params"))
-                                    .with_annotated_type(Type::homogeneous_tuple(
-                                        db,
-                                        env,
-                                        UnionType::from_elements(
-                                            db,
-                                            env,
-                                            [
-                                                KnownClass::TypeVar.to_instance(db, env),
-                                                KnownClass::ParamSpec.to_instance(db, env),
-                                                KnownClass::TypeVarTuple.to_instance(db, env),
-                                            ],
-                                        ),
-                                    ))
-                                    .with_default_type(Type::empty_tuple(db, env)),
-                            ]),
+                            Parameters::standard(parameters.into_iter().chain(qualname)),
                             Type::unknown(),
                         ),
                     )
