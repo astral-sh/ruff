@@ -3035,6 +3035,64 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
+## Writable `__class__` members
+
+A writable `__class__: type[object]` excludes proper subclasses of `object`: their inherited setter
+accepts only `type[Self]`.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class JustObject(Protocol):
+    __class__: type[object]
+
+class C: ...
+
+def takes_instance(value: JustObject) -> None: ...
+def takes_class(value: type[JustObject]) -> None: ...
+
+takes_instance(object())  # no diagnostic
+takes_class(object)  # no diagnostic
+
+takes_instance(C())  # error: [invalid-argument-type]
+takes_class(C)  # error: [invalid-argument-type]
+takes_instance(C)  # error: [invalid-argument-type]
+
+static_assert(not is_equivalent_to(JustObject, object))
+```
+
+Inherited declarations impose the same requirement:
+
+```py
+class InheritedJustObject(JustObject, Protocol): ...
+
+inherited: InheritedJustObject = C()  # error: [invalid-assignment]
+```
+
+Writable contracts that accept only `type[Self]` or `Never` do not require accepting another
+object's class. These protocols remain equivalent to `object`:
+
+```py
+from typing_extensions import Never, Self
+
+class SelfClass(Protocol):
+    @property
+    def __class__(self) -> type[Self]: ...
+    @__class__.setter
+    def __class__(self, value: type[Self]) -> None: ...
+
+class NeverClass(Protocol):
+    @property
+    def __class__(self) -> type[object]: ...
+    @__class__.setter
+    def __class__(self, value: Never) -> None: ...
+
+static_assert(is_equivalent_to(SelfClass, object))
+static_assert(is_equivalent_to(NeverClass, object))
+```
+
 ## Enum members and writable protocol members
 
 An enum class can satisfy a read-only property protocol through one of its members. It cannot
