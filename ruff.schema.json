@@ -5148,6 +5148,7 @@
         "pandas-use-of-dot-values",
         "pandas-use-of-inplace-argument",
         "pandas-use-of-pd-merge",
+        "pandas3-deprecation",
         "paramiko-call",
         "parenthesize-chained-operators",
         "pass-in-class-body",
