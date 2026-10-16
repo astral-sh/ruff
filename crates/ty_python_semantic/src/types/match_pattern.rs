@@ -1,7 +1,7 @@
 use std::hash::{Hash, Hasher};
 
-use crate::Db;
 use crate::ProgramEnvironment;
+use crate::{Db, FxOrderSet};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
@@ -965,9 +965,40 @@ pub(crate) fn pattern_binding_fallthrough_type<'db>(
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let mut budget = ExactTuplePatternExpansionBudget::default();
+    let mut tuple_expansion_exhausted = false;
+    pattern_binding_fallthrough_type_with_expansion(
+        db,
+        env,
+        kind,
+        subject_ty,
+        &mut tuple_expansion_exhausted,
+    )
+}
+
+/// Keep tuple expansion disabled after an earlier pattern exceeded its budget.
+///
+/// The caller carries this state between cases of one match statement. Without it, coalescing
+/// tuple alternatives on exhaustion would let each subsequent case restart the same expansion.
+pub(crate) fn pattern_binding_fallthrough_type_with_expansion<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    tuple_expansion_exhausted: &mut bool,
+) -> Type<'db> {
+    let mut budget = if *tuple_expansion_exhausted {
+        ExactTuplePatternExpansionBudget {
+            alternatives: MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES,
+            elements: MAX_EXACT_TUPLE_PATTERN_ELEMENTS,
+        }
+    } else {
+        ExactTuplePatternExpansionBudget::default()
+    };
     try_pattern_binding_fallthrough_type(db, env, kind, subject_ty, &mut budget).unwrap_or_else(
-        |()| conservative_pattern_binding_fallthrough_type(db, env, kind, subject_ty),
+        |()| {
+            *tuple_expansion_exhausted = true;
+            conservative_pattern_binding_fallthrough_type(db, env, kind, subject_ty)
+        },
     )
 }
 
@@ -1017,8 +1048,73 @@ fn conservative_pattern_binding_fallthrough_type<'db>(
         PatternPredicateKind::As(Some(pattern), _) => {
             conservative_pattern_binding_fallthrough_type(db, env, pattern, subject_ty)
         }
+        PatternPredicateKind::Sequence(_) => {
+            coalesce_tuple_pattern_fallthrough(db, env, subject_ty)
+        }
         _ => pattern_fallthrough_type(db, env, kind, subject_ty),
     }
+}
+
+/// Preserve tuple lengths and individual element types when correlations exceed the budget.
+fn coalesce_tuple_pattern_fallthrough<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    let resolved = subject_ty.resolve_type_alias(db);
+    let Type::Union(union) = resolved else {
+        return match resolved {
+            Type::Intersection(intersection) => intersection.map_positive(db, env, |positive| {
+                coalesce_tuple_pattern_fallthrough(db, env, *positive)
+            }),
+            _ => subject_ty,
+        };
+    };
+
+    let mut positions: Option<Vec<FxOrderSet<Type<'db>>>> = None;
+    for alternative in union.elements(db) {
+        let Some(tuple) = alternative.exact_tuple_instance_spec(db) else {
+            return subject_ty;
+        };
+        let Some(tuple) = tuple.as_fixed_length() else {
+            return subject_ty;
+        };
+        let positions = positions
+            .get_or_insert_with(|| (0..tuple.len()).map(|_| FxOrderSet::default()).collect());
+        if positions.len() != tuple.len() {
+            return subject_ty;
+        }
+        for (position, element) in positions.iter_mut().zip(tuple.iter_all_elements()) {
+            match element {
+                Type::Union(union) => position.extend(union.elements(db).iter().copied()),
+                _ => {
+                    position.insert(element);
+                }
+            }
+        }
+    }
+    let Some(positions) = positions else {
+        return subject_ty;
+    };
+    Type::heterogeneous_tuple(
+        db,
+        env,
+        positions.into_iter().map(|position| {
+            // A broader element can occur after many intersections that it subsumes. Drop
+            // those intersections before building the union, rather than first comparing
+            // every pair of exclusions and only later encountering their common bound.
+            UnionType::from_elements(
+                db,
+                env,
+                position.iter().copied().filter(|element| {
+                    !matches!(element, Type::Intersection(intersection)
+                    if intersection.positive(db).iter().any(|positive| {
+                        positive.is_nominal_instance() && position.contains(positive)
+                    }))
+                }),
+            )
+        }),
+    )
 }
 
 /// Apply sequence-pattern binding fallthrough, expanding immutable exact tuples within `budget`.
@@ -1105,7 +1201,7 @@ fn try_sequence_pattern_binding_fallthrough_type<'db>(
     }
 }
 
-const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 64;
+const MAX_EXACT_TUPLE_PATTERN_ALTERNATIVES: usize = 128;
 const MAX_EXACT_TUPLE_PATTERN_ELEMENTS: usize = 4_096;
 
 /// Limits the cumulative alternatives and element slots created by one pattern traversal.
@@ -1132,8 +1228,9 @@ impl ExactTuplePatternExpansionBudget {
 /// Return the part of an exact fixed-length tuple that can remain after a sequence pattern fails.
 ///
 /// A pattern fails if any aligned element pattern fails. Represent that as a union with one tuple
-/// alternative per element. Large expansions and gradual tuples keep the synthesized-protocol
-/// representation used by the general fallthrough path.
+/// alternative per element. Exceeding the shared budget makes the caller coalesce existing tuple
+/// alternatives without adding correlations. Gradual tuples and starred patterns keep the
+/// synthesized-protocol representation used by the general fallthrough path.
 fn exact_tuple_sequence_pattern_fallthrough_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
