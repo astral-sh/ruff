@@ -520,7 +520,9 @@ impl<'db> CallableType<'db> {
                 if !visited.insert(typevar) {
                     continue;
                 }
-                if let Some(original) = mapping.original_reference(db, Type::TypeVar(typevar)) {
+                if let Some(original) =
+                    mapping.original_reference(db, Type::TypeVar(typevar), visitor)
+                {
                     let variables = CallableTypeVarLocations::of_type(db, visitor.env, original)
                         .all(db)
                         .iter(db)
