@@ -222,12 +222,18 @@ pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Protocol` is represented by [`super::SpecialFormType::Protocol`], not this type.
-    SubscriptedProtocol(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Protocol[()]`, which has no type variables and is distinct from
+    /// an unsubscripted `Protocol`.
+    SubscriptedProtocol(Option<GenericContext<'db>>),
 
     /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Generic` is represented by [`super::SpecialFormType::Generic`], not this type.
-    SubscriptedGeneric(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Generic[()]`, which has no type variables and is distinct from an
+    /// unsubscripted `Generic`.
+    SubscriptedGeneric(Option<GenericContext<'db>>),
 
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
@@ -308,7 +314,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(db, context, visitor);
+            if let Some(context) = context {
+                walk_generic_context(db, context, visitor);
+            }
         }
         KnownInstanceType::TypeVar(typevar) => {
             visitor.visit_type_var_type(db, typevar);
