@@ -29,7 +29,52 @@ use crate::{
         visitor, walk_signature,
     },
 };
+use ty_python_core::Program;
 use ty_python_core::definition::Definition;
+
+/// The consumer determines cycle recovery, but never how callable sources are identified.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) enum CallableExpansionKind<'db> {
+    InstanceBinding {
+        constructor: Option<Type<'db>>,
+    },
+    ConstructorBinding,
+    ConstructorSignature,
+    Upcast {
+        policy: UpcastPolicy,
+        recursive_definition: Option<Definition<'db>>,
+    },
+}
+
+/// Shared recursion state for every path that expands a constructor or callable instance.
+/// Keep the detector private so callers cannot omit source identities from its keys.
+pub(super) struct CallableExpansionRecursion<'db> {
+    visits: super::CycleDetector<
+        'db,
+        (),
+        (
+            Type<'db>,
+            (Program<'db>, CallableExpansionKind<'db>),
+            Type<'db>,
+        ),
+        (),
+        3,
+    >,
+}
+
+impl Default for CallableExpansionRecursion<'_> {
+    fn default() -> Self {
+        Self {
+            visits: super::CycleDetector::new(()),
+        }
+    }
+}
+
+impl CallableExpansionRecursion<'_> {
+    pub(super) fn revision(&self) -> u64 {
+        self.visits.revision()
+    }
+}
 
 struct FunctionDescriptorGet<'db> {
     instance: Option<Type<'db>>,
@@ -160,7 +205,7 @@ impl<'db> Type<'db> {
 
     /// Identify the callable interface separately from the type's stored structure.
     /// Its source lets cycle detection recognize recursive calls with growing type arguments.
-    pub(super) fn callable_projection_key(self, db: &'db dyn Db) -> Type<'db> {
+    fn callable_projection_key(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -171,6 +216,35 @@ impl<'db> Type<'db> {
             }
             _ => self,
         }
+    }
+
+    /// Inspect a callable source while its exact and growing recursion guards remain active.
+    /// Direct calls and signature conversion use the same source identities and operation owner.
+    pub(super) fn with_callable_expansion<R>(
+        self,
+        db: &'db dyn Db,
+        mapping: &ApplyTypeMappingVisitor<'_, 'db>,
+        kind: CallableExpansionKind<'db>,
+        receiver: Option<Type<'db>>,
+        inspect: impl FnOnce(Result<&TypeExpansionContext<'_, '_, 'db>, CycleKind>) -> R,
+    ) -> R {
+        mapping
+            .env
+            .context()
+            .state()
+            .callable_expansions
+            .get_or_init(|| Box::new(CallableExpansionRecursion::default()))
+            .visits
+            .visit_active_with_expansion(
+                db,
+                (
+                    self.callable_projection_key(db),
+                    (mapping.env.program(db), kind),
+                    receiver.unwrap_or(Type::Never).callable_projection_key(db),
+                ),
+                mapping,
+                inspect,
+            )
     }
 
     pub(crate) fn try_upcast_to_callable(
@@ -219,7 +293,6 @@ impl<'db> Type<'db> {
         context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
-        let key = self.callable_projection_key(db);
         // Stored functions and bound methods do not follow a deferred type definition here.
         // Binding a receiver can ask a relation to inspect the same method; that relation owns
         // the recursive assumption, so conversion must not reject it as an unfinished projection.
@@ -240,34 +313,31 @@ impl<'db> Type<'db> {
                 },
             );
         }
-        env.context()
-            .state()
-            .callable_upcasts
-            .get_or_init(|| Box::new(crate::types::CycleDetector::new(())))
-            .visit_active_with_expansion(
-                db,
-                (
-                    key,
-                    (policy, context.recursive_definition),
-                    receiver.unwrap_or(Type::Never).callable_projection_key(db),
-                ),
-                &context.mapping,
-                |result| match result {
-                    Ok(expansion) => self
-                        .try_upcast_to_callable_impl(db, env, policy, context, receiver, expansion),
-                    Err(kind)
-                        if matches!(
-                            self,
-                            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-                        ) =>
-                    {
-                        Some(CallableTypes::one(CallableType::constructor_cycle(
-                            db, self, kind,
-                        )))
-                    }
-                    Err(_) => None,
-                },
-            )
+        self.with_callable_expansion(
+            db,
+            &context.mapping,
+            CallableExpansionKind::Upcast {
+                policy,
+                recursive_definition: context.recursive_definition,
+            },
+            receiver,
+            |result| match result {
+                Ok(expansion) => {
+                    self.try_upcast_to_callable_impl(db, env, policy, context, receiver, expansion)
+                }
+                Err(kind)
+                    if matches!(
+                        self,
+                        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+                    ) =>
+                {
+                    Some(CallableTypes::one(CallableType::constructor_cycle(
+                        db, self, kind,
+                    )))
+                }
+                Err(_) => None,
+            },
+        )
     }
 
     fn try_upcast_to_callable_impl(

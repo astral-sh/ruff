@@ -2210,6 +2210,7 @@ pub(super) type StructuralTypeVisit<'visit, 'env, 'db, O> =
 /// A walk's identity excludes mutable accumulators but retains fixed semantic inputs.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub(super) enum TypeWalkKey<'db> {
+    CallableMemberFlow,
     BuildIntersection,
     BuildUnion,
     ChargeProjectionTerms,

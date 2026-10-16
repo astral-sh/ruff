@@ -1459,3 +1459,78 @@ class End:
 
 reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
 ```
+
+## Recursive constructor calls with changing type arguments
+
+Here, `__new__` is another specialization of the class. Calling it keeps adding a `list` to the type
+argument without reaching a function signature, so we report a call error.
+
+```py
+class C[T]:
+    __new__: type["C[list[T]]"]
+
+C[int]()  # error: [call-non-callable]
+```
+
+## Recursive descriptor calls with changing type arguments
+
+Reading `value` calls the descriptor's `__get__`, which is itself another descriptor instance.
+Looking up its `__call__` repeats the descriptor access with a larger type argument. We recover with
+`Unknown` for the descriptor result, alongside the declared instance attribute type.
+
+```py
+class Descriptor[T]:
+    __get__: "Descriptor[list[T]]"
+    __call__: "Descriptor[list[T]]"
+
+class C:
+    value: Descriptor[int]
+
+reveal_type(C().value)  # revealed: Unknown | Descriptor[int]
+```
+
+## Finite descriptor call chains
+
+A descriptor can expose the next callable through a type argument. This chain reaches `End`, whose
+call returns `int`.
+
+```py
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Descriptor[T]:
+    def __get__(self, obj: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__: Descriptor[T]
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
+
+## Descriptor calls that reset type arguments
+
+The first descriptor access returns `Wrapper[None]`; the second returns `End`. This is a finite
+chain even though the new type argument is not contained in the old one.
+
+```py
+from typing import Any, overload
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Descriptor[T]:
+    @overload
+    def __get__(self: "Descriptor[int]", obj: object, owner: type | None = None) -> "Wrapper[None]": ...
+    @overload
+    def __get__(self: "Descriptor[None]", obj: object, owner: type | None = None) -> End: ...
+    def __get__(self, obj: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__: Descriptor[T]
+
+reveal_type(Wrapper[int]()())  # revealed: int
+```

@@ -560,7 +560,7 @@ impl<'db> TypeRecursionContext<'db> {
     }
 }
 
-type TypeRecursionRevision = [u64; 23];
+type TypeRecursionRevision = [u64; 21];
 
 impl TypeRecursionContext<'_> {
     /// Identify every shared guard that can affect a cached query.
@@ -578,9 +578,7 @@ impl TypeRecursionContext<'_> {
             sequent_derivation,
             specialized_mro,
             class_fields,
-            class_constructors,
-            callable_upcasts,
-            instance_call_bindings,
+            callable_expansions,
             abstract_methods,
             typed_dict_openness,
             narrowing_checkpoints,
@@ -606,9 +604,7 @@ impl TypeRecursionContext<'_> {
             sequent_derivation.revision(),
             specialized_mro.revision(),
             class_fields.revision(),
-            class_constructors.get().map_or(0, |guard| guard.revision()),
-            callable_upcasts.get().map_or(0, |guard| guard.revision()),
-            instance_call_bindings
+            callable_expansions
                 .get()
                 .map_or(0, |guard| guard.revision()),
             abstract_methods.revision(),
@@ -639,9 +635,7 @@ struct TypeRecursionState<'db> {
     sequent_derivation: ActiveRecursionDetector<(Program<'db>, salsa::Id, Option<salsa::Id>)>,
     specialized_mro: ActiveRecursionDetector<GenericAlias<'db>>,
     class_fields: ActiveRecursionDetector<class::ClassFieldQuery<'db>>,
-    class_constructors: OnceCell<Box<ClassConstructorRecursion<'db>>>,
-    callable_upcasts: OnceCell<Box<CallableUpcastRecursion<'db>>>,
-    instance_call_bindings: OnceCell<Box<InstanceCallBindingRecursion<'db>>>,
+    callable_expansions: OnceCell<Box<callable::CallableExpansionRecursion<'db>>>,
     abstract_methods: ActiveRecursionDetector<ClassType<'db>>,
     typed_dict_openness: ActiveRecursionDetector<TypedDictType<'db>>,
     narrowing_checkpoints: ActiveRecursionDetector<(
@@ -660,23 +654,6 @@ struct TypeRecursionState<'db> {
     alias_definitions: ActiveRecursionDetector<Definition<'db>>,
     comparisons: OnceCell<Box<relation::ComparisonRecursion<'db>>>,
 }
-
-type CallableUpcastRecursion<'db> = CycleDetector<
-    'db,
-    (),
-    (
-        Type<'db>,
-        (callable::UpcastPolicy, Option<Definition<'db>>),
-        Type<'db>,
-    ),
-    (),
-    3,
->;
-
-type ClassConstructorRecursion<'db> = CycleDetector<'db, (), (Type<'db>, Type<'db>), (), 2>;
-
-type InstanceCallBindingRecursion<'db> =
-    CycleDetector<'db, (), (Type<'db>, (Program<'db>, Option<Type<'db>>), Type<'db>), (), 2>;
 
 struct SignatureExpansionTag;
 type SignatureExpansionRecursion<'db> = CycleDetector<'db, SignatureExpansionTag, Type<'db>, (), 2>;
@@ -6135,32 +6112,25 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Bindings<'db> {
-        self.bindings_impl(
-            db,
-            env,
-            CollectBindings {
-                recursion_guard: &ActiveRecursionDetector::default(),
-                constructor: None,
-            },
-        )
+        self.bindings_impl(db, env, CollectBindings { constructor: None })
     }
 
     fn bindings_impl(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        operation: CollectBindings<'_, 'db>,
+        operation: CollectBindings<'db>,
     ) -> Bindings<'db> {
         TypeQueryContext::with_root(env, operation, |root| root.visit_with(db, self, None))
             .unwrap_or_else(|| CallableBinding::not_callable(self).into())
     }
 
-    fn bindings_with_receiver<'a>(
+    fn bindings_with_receiver(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        operation: CollectBindings<'a, 'db>,
-        traversal: &TypeQueryContext<'_, 'db, CollectBindings<'a, 'db>, Option<Type<'db>>>,
+        operation: CollectBindings<'db>,
+        traversal: &TypeQueryContext<'_, 'db, CollectBindings<'db>, Option<Type<'db>>>,
         receiver: Option<Type<'db>>,
     ) -> Option<Bindings<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
@@ -6421,24 +6391,22 @@ impl<'db> Type<'db> {
                 // TODO this should be called from `constructor_bindings` for better consistency
                 .known_class_literal_bindings(db, env, class)
                 .unwrap_or_else(|| {
-                    self.constructor_bindings(db, env, ClassType::NonGeneric(class), operation)
+                    self.constructor_bindings(db, env, ClassType::NonGeneric(class))
                 }),
 
             Type::GenericAlias(alias) => {
-                self.constructor_bindings(db, env, ClassType::Generic(alias), operation)
+                self.constructor_bindings(db, env, ClassType::Generic(alias))
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic_type) => {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
-                SubclassOfInner::Class(class) => {
-                    self.constructor_bindings(db, env, class, operation)
-                }
+                SubclassOfInner::Class(class) => self.constructor_bindings(db, env, class),
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map_or_else(
                     || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
                     |origin| {
-                        let bindings = self.constructor_bindings(db, env, *origin, operation);
+                        let bindings = self.constructor_bindings(db, env, *origin);
                         if protocol.materialization_kind(db).is_some() {
                             bindings.with_constructed_instance_type(
                                 db,
@@ -6503,19 +6471,18 @@ impl<'db> Type<'db> {
                 // as in `C[T].__call__: C[list[T]]`. Guard the callable projection so its source
                 // identifies this growth. Keep the guard active through member lookup and binding,
                 // including calls reached indirectly through descriptors.
-                env.context()
-                    .state()
-                    .instance_call_bindings
-                    .get_or_init(|| Box::new(CycleDetector::new(())))
-                    .try_visit_active(
-                        db,
-                        env,
-                        (
-                            self.callable_projection_key(db),
-                            (env.program(db), operation.constructor),
-                            receiver.unwrap_or(Type::Never).callable_projection_key(db),
-                        ),
-                        || match self
+                self.with_callable_expansion(
+                    db,
+                    &ApplyTypeMappingVisitor::new(env),
+                    callable::CallableExpansionKind::InstanceBinding {
+                        constructor: operation.constructor,
+                    },
+                    receiver,
+                    |expansion| {
+                        if expansion.is_err() {
+                            return CallableBinding::not_callable(self).into();
+                        }
+                        match self
                             .member_lookup_with_policy_and_receiver(
                                 db,
                                 env,
@@ -6542,9 +6509,9 @@ impl<'db> Type<'db> {
                                 bindings
                             }
                             Place::Undefined => CallableBinding::not_callable(self).into(),
-                        },
-                    )
-                    .unwrap_or_else(|| CallableBinding::not_callable(self).into())
+                        }
+                    },
+                )
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
@@ -7052,7 +7019,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
         class: ClassType<'db>,
-        operation: CollectBindings<'_, 'db>,
     ) -> Bindings<'db> {
         fn bind_constructor_new<'db>(
             db: &'db dyn Db,
@@ -7168,16 +7134,19 @@ impl<'db> Type<'db> {
             // instance type, rather than the class where the cycle happened to be detected.
             Binding::single(self_type, Signature::dynamic(Type::unknown())).into()
         };
-        // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
-        // `type[C]`, and different specializations need separate expansion even if one contains
-        // the other, because a constructor may ignore its nested type arguments.
-        let recursion_guard = operation.recursion_guard;
-        recursion_guard.visit(env, &self_type, on_cycle, || {
+        let bind = |expansion: Result<&recursive::TypeExpansionContext<'_, '_, 'db>, CycleKind>| {
+            if let Err(kind) = expansion {
+                return match kind {
+                    CycleKind::Exact => on_cycle(),
+                    CycleKind::MatchingIdentity | CycleKind::Reentrant => {
+                        CallableBinding::not_callable(self_type).into()
+                    }
+                };
+            }
             // Instance calls inside this constructor belong to its expansion. If they lead to
             // another constructor, that constructor retains its own cycle recovery policy.
             let operation = CollectBindings {
                 constructor: Some(self_type),
-                ..operation
             };
             // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
             // We preserve its full overload set here and defer constructor branching decisions
@@ -7353,7 +7322,14 @@ impl<'db> Type<'db> {
             };
 
             bindings.with_generic_context(db, inferable_class_context)
-        })
+        };
+        self_type.with_callable_expansion(
+            db,
+            &ApplyTypeMappingVisitor::new(env),
+            callable::CallableExpansionKind::ConstructorBinding,
+            None,
+            bind,
+        )
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
@@ -10629,12 +10605,11 @@ impl<'db> DunderBindings<'db> {
 }
 
 #[derive(Clone, Copy)]
-struct CollectBindings<'a, 'db> {
-    recursion_guard: &'a ActiveRecursionDetector<Type<'db>>,
+struct CollectBindings<'db> {
     constructor: Option<Type<'db>>,
 }
 
-impl<'db> TypeQuery<'db, Option<Type<'db>>> for CollectBindings<'_, 'db> {
+impl<'db> TypeQuery<'db, Option<Type<'db>>> for CollectBindings<'db> {
     fn recursion_key(&self) -> TypeQueryKey<'db> {
         TypeQueryKey::CollectBindings(self.constructor)
     }
@@ -10667,7 +10642,7 @@ impl<'db> TypeQuery<'db, Option<Type<'db>>> for CollectBindings<'_, 'db> {
     }
 }
 
-impl<'db> CollectBindings<'_, 'db> {
+impl<'db> CollectBindings<'db> {
     fn union_bindings(
         db: &'db dyn Db,
         traversal: &TypeQueryContext<'_, 'db, Self, Option<Type<'db>>>,

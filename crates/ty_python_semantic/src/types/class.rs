@@ -23,7 +23,6 @@ pub(crate) use self::static_literal::{
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
-use super::cyclic::CycleDetector;
 use super::dedicated::pydantic;
 use super::display;
 use super::{
@@ -2569,16 +2568,18 @@ impl<'db> ClassType<'db> {
         env: &TypeOperations<'db>,
         receiver: Type<'db>,
     ) -> CallableTypes<'db> {
-        env.context()
-            .state()
-            .class_constructors
-            .get_or_init(|| Box::new(CycleDetector::new(())))
-            .visit_active(db, env, (Type::from(self), receiver), |cycle| match cycle {
-                Some(kind) => {
+        Type::from(self).with_callable_expansion(
+            db,
+            &ApplyTypeMappingVisitor::new(env),
+            super::callable::CallableExpansionKind::ConstructorSignature,
+            Some(receiver),
+            |expansion| match expansion {
+                Err(kind) => {
                     CallableTypes::one(CallableType::constructor_cycle(db, receiver, kind))
                 }
-                None => self.compute_constructor_callables(db, env, receiver),
-            })
+                Ok(_) => self.compute_constructor_callables(db, env, receiver),
+            },
+        )
     }
 
     fn compute_constructor_callables(

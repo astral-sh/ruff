@@ -22,6 +22,7 @@
 
 use crate::types::TypeOperations;
 use crate::types::operations::{RecursiveOperationScope, TypeOperationIdentity};
+use crate::types::recursive::{TypeTraversal, TypeWalk, TypeWalkKey, TypeWalkVisit};
 use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use std::cell::{Cell, OnceCell, RefCell};
 use std::cmp::Eq;
@@ -36,8 +37,9 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::callable::SignatureSource;
-use crate::types::function::FunctionLiteral;
+use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::signatures::walk_signature;
 use crate::types::visitor::{TypeCollector, TypeVisitor, any_over_type_including_alias_arguments};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, KnownClass, MaterializationKind,
@@ -63,7 +65,12 @@ pub enum TypeIdentity<'db> {
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
-    GrowingConstructor(Definition<'db>, Option<KnownClass>),
+    GrowingConstructor {
+        definition: Definition<'db>,
+        runtime_class: Option<KnownClass>,
+        /// Descriptors can distinguish an exact class object from a value of `type[C]`.
+        subclass: bool,
+    },
     GrowingCallableInstance(Definition<'db>, Option<KnownClass>),
     GrowingRecursive {
         definition: Definition<'db>,
@@ -156,10 +163,20 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::TypedDict(class) => {
                         TypeIdentity::GrowingTypedDict(class.definition(db))
                     }
-                    RecursiveDefinition::Constructor(class) => TypeIdentity::GrowingConstructor(
-                        class.definition(db),
-                        self.as_callable()?.runtime_class(db),
-                    ),
+                    RecursiveDefinition::Constructor(class) => {
+                        let callable = self.as_callable()?;
+                        let SignatureSource::Projected(projection) = callable.signature_source(db)
+                        else {
+                            return None;
+                        };
+                        TypeIdentity::GrowingConstructor {
+                            definition: class.definition(db),
+                            runtime_class: callable.runtime_class(db),
+                            subclass: matches!(projection.source(), Type::SubclassOf(_)),
+                        }
+                    }
+                    // Descriptor reads are graph edges, not standalone type identities.
+                    RecursiveDefinition::DescriptorGet(_) => return None,
                     RecursiveDefinition::CallableInstance(class) => {
                         TypeIdentity::GrowingCallableInstance(
                             class.definition(db),
@@ -203,6 +220,8 @@ pub(crate) enum RecursiveDefinition<'db> {
     TypedDict(StaticClassLiteral<'db>),
     Constructor(StaticClassLiteral<'db>),
     CallableInstance(StaticClassLiteral<'db>),
+    /// A descriptor read, used only as an intermediate node in the specialization graph.
+    DescriptorGet(StaticClassLiteral<'db>),
     Structural(RecursiveType<'db>),
 }
 
@@ -212,6 +231,7 @@ enum RecursiveOrigin<'db> {
     Definition(Definition<'db>),
     Constructor(Definition<'db>),
     CallableInstance(Definition<'db>),
+    DescriptorGet(Definition<'db>),
 }
 
 /// A type parameter in one recursive source.
@@ -394,6 +414,7 @@ impl<'db> RecursiveDefinition<'db> {
             Self::CallableInstance(class) => {
                 RecursiveOrigin::CallableInstance(class.definition(db))
             }
+            Self::DescriptorGet(class) => RecursiveOrigin::DescriptorGet(class.definition(db)),
         }
     }
 
@@ -401,7 +422,8 @@ impl<'db> RecursiveDefinition<'db> {
         match self.origin(db) {
             RecursiveOrigin::Definition(definition)
             | RecursiveOrigin::Constructor(definition)
-            | RecursiveOrigin::CallableInstance(definition) => {
+            | RecursiveOrigin::CallableInstance(definition)
+            | RecursiveOrigin::DescriptorGet(definition) => {
                 ProgramEnvironment::from_definition(definition)
             }
         }
@@ -414,7 +436,8 @@ impl<'db> RecursiveDefinition<'db> {
             Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
-            | Self::CallableInstance(origin) => origin.generic_context(db),
+            | Self::CallableInstance(origin)
+            | Self::DescriptorGet(origin) => origin.generic_context(db),
         }
     }
 
@@ -429,7 +452,8 @@ impl<'db> RecursiveDefinition<'db> {
             Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
-            | Self::CallableInstance(origin) => origin.known(db),
+            | Self::CallableInstance(origin)
+            | Self::DescriptorGet(origin) => origin.known(db),
         };
         generic_context.default_specialization(db, env, known_class)
     }
@@ -816,30 +840,50 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 }
             }
 
-            RecursiveDefinition::Constructor(class) => {
-                let callables = class.identity_specialization(db).into_callable(db, env);
-                for callable in &callables {
-                    if callable
-                        .inspect_signatures(db, env, |signatures| {
-                            signatures.walk(db, &traversal);
-                        })
-                        .is_none()
+            RecursiveDefinition::Constructor(origin) => {
+                let class = origin.identity_specialization(db);
+                // Construction can return an instance of this class, whose __call__ may lead
+                // back to a constructor. Include that result alongside explicit return types.
+                self.record_reference(
+                    db,
+                    DefinitionUse::Specialized(
+                        RecursiveDefinition::CallableInstance(origin),
+                        class.class_literal_and_specialization(db).1,
+                    ),
+                );
+                // Read declarations without calling constructors or binding descriptors. Those
+                // operations can recurse before this graph has classified their type arguments.
+                for name in ["__new__", "__init__"] {
+                    if let Some(member) = class
+                        .class_member(
+                            db,
+                            env,
+                            name,
+                            super::MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        )
+                        .place
+                        .ignore_possibly_undefined()
                     {
-                        return false;
+                        self.visit_callable_member(db, member);
                     }
+                }
+                if let Some(member) = Type::from(class)
+                    .class_member_with_policy(
+                        db,
+                        env,
+                        "__call__",
+                        super::MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                {
+                    self.visit_callable_member(db, member);
                 }
             }
             RecursiveDefinition::CallableInstance(class) => {
-                let Some(instance) = Type::from(class.identity_specialization(db))
-                    .to_instance_approximation(db, env)
-                else {
-                    return false;
-                };
-                // Follow the declared callable member as an edge in the flow graph. Converting
-                // it first would recurse through a class-valued or instance-valued __call__
-                // before the graph can classify that edge's type arguments.
-                if let Some(call) = instance
-                    .member_lookup_with_policy(
+                if let Some(member) = class
+                    .identity_specialization(db)
+                    .class_member(
                         db,
                         env,
                         "__call__",
@@ -848,11 +892,34 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     .place
                     .ignore_possibly_undefined()
                 {
-                    traversal.visit_type(db, call);
+                    self.visit_callable_member(db, member);
+                }
+            }
+            RecursiveDefinition::DescriptorGet(class) => {
+                // Python looks up __get__ without applying the descriptor protocol again. A
+                // callable-valued __get__ is another graph edge; a function exposes its signature.
+                if let Some(member) = class
+                    .identity_specialization(db)
+                    .class_member(
+                        db,
+                        env,
+                        "__get__",
+                        super::MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                {
+                    traversal.visit_type(db, member);
                 }
             }
         }
         !self.has_unresolved_type.get()
+    }
+
+    fn visit_callable_member(&self, db: &'db dyn Db, member: Type<'db>) {
+        TypeTraversal::with_root(&self.env, CallableMemberFlow(self), |walk| {
+            walk.visit(db, member);
+        });
     }
 
     fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
@@ -880,6 +947,86 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     kind,
                 });
             }
+        }
+    }
+}
+
+/// Follow descriptor declarations before observing the callable exposed by member access.
+/// The graph queues each descriptor definition once instead of invoking its __get__ method.
+struct CallableMemberFlow<'a, 'db>(&'a SpecializationFlowVisitor<'db>);
+
+impl<'db> TypeWalk<'db> for CallableMemberFlow<'_, 'db> {
+    type Output = ();
+
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::CallableMemberFlow
+    }
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _state: (),
+    ) {
+        self.0.inconclusive.set(true);
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        walk: &TypeWalkVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) {
+        let flow = self.0;
+        let visitor = TypeVisitorContext::new(flow);
+        match ty {
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    walk.visit(db, *element);
+                }
+                return;
+            }
+            Type::Intersection(intersection) => {
+                for element in intersection.positive(db) {
+                    walk.visit(db, *element);
+                }
+                return;
+            }
+            Type::PropertyInstance(property) => {
+                if let Some(getter) = property.getter(db) {
+                    visitor.visit_type(db, getter);
+                }
+                return;
+            }
+            Type::TypeAlias(_) | Type::Recursive(_) => {
+                flow.inconclusive.set(true);
+                return;
+            }
+            _ => {}
+        }
+        if let Some(DefinitionUse::Specialized(
+            RecursiveDefinition::CallableInstance(class) | RecursiveDefinition::Protocol(class),
+            arguments,
+        )) = RecursiveDefinition::from_type(db, ty)
+            && !class
+                .identity_specialization(db)
+                .class_member(
+                    db,
+                    &flow.env,
+                    "__get__",
+                    super::MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .is_undefined()
+        {
+            let reference =
+                DefinitionUse::Specialized(RecursiveDefinition::DescriptorGet(class), arguments);
+            flow.record_reference(db, reference);
+            reference.walk_arguments(db, &visitor);
+        } else {
+            visitor.visit_type(db, ty.underlying_function(db));
         }
     }
 }
@@ -927,6 +1074,19 @@ impl<'db> TypeVisitorHooks<'db> for SpecializationFlowVisitor<'db> {
         }
 
         visit.walk_children_once(db, &self.visited_types);
+    }
+
+    fn visit_function_type(
+        &self,
+        db: &'db dyn Db,
+        visit: &TypeVisit<'_, 'db, Self>,
+        function: FunctionType<'db>,
+    ) {
+        // Only overload signatures describe calls. The implementation can carry additional
+        // receiver variables that are not part of the callable's public interface.
+        for signature in &function.signature(db).overloads {
+            walk_signature(db, signature, visit);
+        }
     }
 
     fn visit_bound_type_var_type(
