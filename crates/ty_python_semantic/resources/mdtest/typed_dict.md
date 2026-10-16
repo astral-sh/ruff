@@ -2657,6 +2657,25 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
+Read-only keys also can't be removed or given a default, even if they are not required:
+
+```py
+from typing_extensions import NotRequired
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot delete read-only key "value" from TypedDict `Cache`"
+    del cache["value"]
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value")
+    # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
+    cache.pop("value", 0)
+    # error: [invalid-argument-type] "Cannot set default for read-only key "value" on TypedDict `Cache`"
+    cache.setdefault("value", 0)
+```
+
 ## `update()` with `ReadOnly` items
 
 `update()` also cannot write to `ReadOnly` items, unless the source key is bottom-typed and
