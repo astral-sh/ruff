@@ -308,6 +308,7 @@ export const DEFAULT_SETTINGS = JSON.stringify(
       "python-version": "3.14",
     },
     analysis: {
+      "return-type-inference": "never",
       "strict-equality-semantics": false,
       "strict-generic-narrowing": false,
     },
