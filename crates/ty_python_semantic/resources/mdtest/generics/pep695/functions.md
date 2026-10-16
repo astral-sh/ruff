@@ -2836,6 +2836,30 @@ def selects_invalid_overload(value: int | str) -> None:
     assert_type(select(value), bool)
 ```
 
+## Unmatched union members do not constrain other arguments
+
+When assigning to a declared union type, only members to which the source type is assignable
+contribute to the inferred constraints. Unsatisfied members are ignored, and do not contribute any
+constraints.
+
+```py
+from typing import Any, Callable, Protocol
+
+class HasMethod(Protocol):
+    def method(self) -> int: ...
+
+def f[T](callback: Callable[[T], None], value: T, other: Any | HasMethod) -> T:
+    return value
+
+def g[T](callback: Callable[[T], None], value: T, other: HasMethod | Any) -> T:
+    return value
+
+def accepts_object(value: object) -> None: ...
+def _(other: object):
+    reveal_type(f(accepts_object, 1, other))  # revealed: Literal[1]
+    reveal_type(g(accepts_object, 1, other))  # revealed: Literal[1]
+```
+
 ## A single generic member of a union
 
 Inference through a container in an optional parameter preserves the type variable's bounds and
