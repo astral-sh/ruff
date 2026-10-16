@@ -6021,6 +6021,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .iter()
                 .filter(|ty| !ty.may_prefer_declared_type(db, env)),
         ) {
+            // Avoid narrowing to a singleton or dynamic member, which can lead to
+            // overly narrow results in the presence of dynamic types.
+            if narrowed_ty.is_dynamic() || narrowed_ty.is_singleton(db, env) {
+                continue;
+            }
+
             if let Some(result) = try_narrow(*narrowed_ty) {
                 if teardown_expression_cache {
                     self.teardown_expression_cache();
