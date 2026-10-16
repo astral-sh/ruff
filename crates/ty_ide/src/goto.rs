@@ -1423,7 +1423,7 @@ pub(crate) fn find_goto_target<'a>(
     find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
 }
 
-fn find_goto_target_impl<'a>(
+pub(crate) fn find_goto_target_impl<'a>(
     model: &'a SemanticModel,
     tokens: &'a Tokens,
     syntax: AnyNodeRef<'a>,

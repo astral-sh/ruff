@@ -1260,13 +1260,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         specialization: Specialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        self.apply_type_mapping_to_bound_or_constraints(db, &mapping, &visitor)
+    }
+
+    fn apply_type_mapping_to_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         self.map_bound_or_constraints(db, |original| {
-            let original = original?;
-            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-                specialization,
-            ));
-            let visitor = ApplyTypeMappingVisitor::new(env);
-            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+            original.map(|original| original.apply_type_mapping_impl(db, type_mapping, visitor))
         })
     }
 
@@ -1426,7 +1433,12 @@ impl<'db> BoundTypeVarInstance<'db> {
                 generic_context,
                 delta,
             } => {
-                if generic_context.contains(db, self.identity(db)) && !self.is_paramspec(db) {
+                let identity = if self.is_paramspec(db) {
+                    self.identity(db).without_paramspec_attr(db)
+                } else {
+                    self.identity(db)
+                };
+                if generic_context.contains(db, identity) {
                     Type::TypeVar(self.freshen_with_mapping(
                         db,
                         self.freshness(db).add(*delta),
@@ -1434,7 +1446,11 @@ impl<'db> BoundTypeVarInstance<'db> {
                         visitor,
                     ))
                 } else {
-                    Type::TypeVar(self)
+                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
+                        db,
+                        type_mapping,
+                        visitor,
+                    ))
                 }
             }
             TypeMapping::Promote(..)
@@ -1658,6 +1674,17 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
+    pub(super) const fn is_pep695(self) -> bool {
+        match self {
+            Self::Pep695TypeVar | Self::Pep695ParamSpec | Self::Pep695TypeVarTuple => true,
+            Self::LegacyTypeVar
+            | Self::TypingSelf
+            | Self::LegacyParamSpec
+            | Self::LegacyTypeVarTuple
+            | Self::Pep613Alias => false,
+        }
+    }
+
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }
@@ -2071,6 +2098,25 @@ impl<'db> TypeVarConstraints<'db> {
         UnionType::from_elements(db, env, self.elements(db))
     }
 
+    /// Whether every constraint in `self` has an equivalent constraint in `other`.
+    ///
+    /// For example, `(int, str)` is a subset of `(int, str, bytes)`, but `(bool, str)` is not
+    /// a subset of `(int, str)`: `bool` is a subtype of `int`, but is not equivalent to it.
+    pub(super) fn is_subset_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> bool {
+        self.elements(db).iter().all(|constraint| {
+            other.elements(db).iter().any(|other_constraint| {
+                // Union types preserve element order, so `int | str` and `str | int` can
+                // compare unequal with `==` even though they are equivalent constraints.
+                constraint.is_equivalent_to(db, env, *other_constraint)
+            })
+        })
+    }
+
     fn to_instance(
         self,
         db: &'db dyn Db,
@@ -2230,7 +2276,7 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TypeVarConstraints<'db>),
 }
 
-fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &V,

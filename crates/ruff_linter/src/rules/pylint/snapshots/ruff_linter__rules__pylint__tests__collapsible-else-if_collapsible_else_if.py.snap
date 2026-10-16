@@ -272,18 +272,18 @@ PLR5501 [*] Use `elif` instead of `else` then `if`, to reduce indentation
 help: Convert to `elif`
     |
 138 |         pass
-139 +         # inner comment which has mixed
-140 +     # indentation levels
-141 +             # which is pretty weird
-142 +     elif 2:
-143 +         pass
-144 |     else:
+    -     else:
     -             # inner comment which has mixed
-    -         # indentation levels
+139 +     # inner comment which has mixed
+140 |         # indentation levels
     -                 # which is pretty weird
     -         if 2:
     -             pass
     -         else:
     -             pass  # final pass comment
+141 +         # which is pretty weird
+142 +     elif 2:
+143 +         pass
+144 +     else:
 145 +         pass  # final pass comment
     |

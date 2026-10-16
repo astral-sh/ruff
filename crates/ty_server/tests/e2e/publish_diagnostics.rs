@@ -964,14 +964,64 @@ mod uv_metadata {
     use std::process::Command;
 
     use anyhow::Result;
+    #[cfg(feature = "test-uv")]
+    use lsp_types::Message;
     use lsp_types::{Code, PublishDiagnosticsNotification};
     use ruff_db::system::SystemPath;
+    #[cfg(feature = "test-uv")]
+    use ruff_python_trivia::textwrap::dedent;
     use serde_json::json;
     use ty_project::UseUv;
     #[cfg(feature = "test-uv")]
     use ty_project::uv_test_env_vars;
 
     use crate::TestServerBuilder;
+
+    #[cfg(feature = "test-uv")]
+    #[test]
+    fn uv_error_includes_summary_and_details() -> Result<()> {
+        let script = SystemPath::new("src/script.py");
+        let source = dedent(
+            "
+            # /// script
+            # dependencies = ['not a valid requirement ???']
+            # ///
+            value = 1
+        ",
+        );
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(SystemPath::new("src"), None)?
+            .with_file(script, &source)?
+            .with_real_uv(UseUv::Scripts)?
+            .enable_diagnostic_related_information(true)
+            .enable_pull_diagnostics(false)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        let diagnostics = server.await_notification::<PublishDiagnosticsNotification>();
+        let [diagnostic] = diagnostics.diagnostics.as_slice() else {
+            anyhow::bail!("expected the uv diagnostic: {diagnostics:?}");
+        };
+        let Message::String(message) = &diagnostic.message else {
+            anyhow::bail!("expected a plain-text diagnostic: {diagnostic:?}");
+        };
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(r"exit code: (\d+)", "exit status: $1");
+        let _settings = settings.bind_to_scope();
+        insta::assert_snapshot!(message, @"
+        `uv workspace metadata` failed with `exit status: 2`
+
+        info: TOML parse error at line 1, column 17
+          |
+        1 | dependencies = ['not a valid requirement ???']
+          |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        Expected one of `@`, `(`, `<`, `=`, `>`, `~`, `!`, `;`, found `a`
+        not a valid requirement ???
+            ^
+        ");
+        Ok(())
+    }
 
     #[cfg(feature = "test-uv")]
     #[test]

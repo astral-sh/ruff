@@ -103,6 +103,27 @@ def f():
     print("unreachable")
 ```
 
+### Calls to unions of functions returning `Never`
+
+In the example below, either function raises an exception, so calling the selected function makes
+the rest of the body unreachable. The enclosing function cannot implicitly return `None`, even
+though the two possible callees have different signatures.
+
+```py
+from typing_extensions import Never
+
+def fail_with_message(message: str = "") -> Never:
+    raise RuntimeError(message)
+
+def fail_with_code(code: int = 1) -> Never:
+    raise RuntimeError(code)
+
+def run(use_message: bool) -> int:
+    fail = fail_with_message if use_message else fail_with_code
+    fail()
+    reveal_type(use_message)  # revealed: Never
+```
+
 ### Python version and platform checks
 
 It is common to have code that is specific to a certain Python version or platform. This case is

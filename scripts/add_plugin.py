@@ -4,7 +4,11 @@
 # requires-python = ">=3.12"
 # dependencies = []
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -21,6 +25,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Generate boilerplate for a new Flake8 plugin.

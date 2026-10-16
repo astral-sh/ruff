@@ -23,6 +23,7 @@ mod tests {
 
     use crate::linter::check_path;
     use crate::registry::{Linter, Rule};
+    use crate::rules::flake8_type_checking::settings::RuntimeSemantics;
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
@@ -206,10 +207,13 @@ mod tests {
             Path::new("pyflakes").join(path).as_path(),
             &LinterSettings {
                 flake8_type_checking: crate::rules::flake8_type_checking::settings::Settings {
-                    runtime_required_base_classes: vec![
-                        "pydantic.BaseModel".to_string(),
-                        "sqlalchemy.orm.DeclarativeBase".to_string(),
-                    ],
+                    runtime_evaluated_base_classes: FxHashMap::from_iter([
+                        ("pydantic.BaseModel".to_string(), RuntimeSemantics::Required),
+                        (
+                            "sqlalchemy.orm.DeclarativeBase".to_string(),
+                            RuntimeSemantics::Required,
+                        ),
+                    ]),
                     ..Default::default()
                 },
                 ..LinterSettings::for_rule(rule_code)

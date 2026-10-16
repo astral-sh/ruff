@@ -31,7 +31,7 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{
     ChangeResult, CollectReporter, Db, Project, ScriptEnvironmentAvailability, UseUv,
-    UvSyncProgress, watch,
+    UvSyncProgress, UvWorkspace, watch,
 };
 use ty_project::{ProjectDatabase, ProjectMetadata, ProjectReloadResult};
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
@@ -47,8 +47,8 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     ruff_db::set_program_version(crate::version::version().to_string()).unwrap();
 
     let args = wild::args_os();
-    let args = argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
-        .context("Failed to read CLI arguments from file")?;
+    let args =
+        ruff_command_line::expand_args(args).context("Failed to read CLI arguments from file")?;
     let args = Cli::parse_from(args);
 
     match args.command {
@@ -148,8 +148,17 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd));
     let force_exclude = args.force_exclude();
 
-    let use_uv = UseUv::from_system(&system);
-    let use_uv = if use_uv == UseUv::On
+    let mut project_metadata = match &config_file {
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
+        None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    project_metadata.apply_configuration_files(&system)?;
+
+    project_metadata.set_override_options(args.into_options());
+    if project_metadata.use_uv() == UseUv::On
         && let [path] = check_paths.as_slice()
         && system.is_file(path)
         && system
@@ -158,21 +167,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     {
         // A single PEP 723 script uses its own uv environment, even with an explicit ty
         // configuration file. The other explicit paths still discover workspace metadata.
-        UseUv::Scripts
-    } else {
-        use_uv
-    };
+        project_metadata = project_metadata.with_use_uv(UseUv::Scripts);
+    }
 
-    let mut project_metadata = match &config_file {
-        Some(config_file) => {
-            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system, use_uv)?
-        }
-        None => ProjectMetadata::discover_with_uv(&project_path, &system, use_uv)?,
-    };
-
-    project_metadata.apply_configuration_files(&system)?;
-
-    project_metadata.set_override_options(args.into_options());
+    if project_metadata.use_uv().workspace_discovery_enabled() {
+        let workspace = UvWorkspace::discover(&project_path, &system);
+        project_metadata.apply_uv_workspace(&system, workspace)?;
+    }
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();

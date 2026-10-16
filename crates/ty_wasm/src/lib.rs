@@ -1635,6 +1635,11 @@ impl System for WasmSystem {
         Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
+    fn is_file_open(&self, path: &FilePath) -> bool {
+        path.as_system_path()
+            .is_some_and(|path| self.fs.is_file(path))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.fs.read_to_string(path)
     }

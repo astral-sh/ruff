@@ -12,7 +12,8 @@ help: Remove useless `return` statement
   |
 5 |     print(sys.version)
   -     return None  # [useless-return]
-6 |
+6 +     # [useless-return]
+7 |
   |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -26,7 +27,8 @@ help: Remove useless `return` statement
    |
 10 |     print(sys.version)
    -     return None  # [useless-return]
-11 |
+11 +     # [useless-return]
+12 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -40,7 +42,8 @@ help: Remove useless `return` statement
    |
 15 |     print(sys.version)
    -     return None  # [useless-return]
-16 |
+16 +     # [useless-return]
+17 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -54,7 +57,8 @@ help: Remove useless `return` statement
    |
 21 |         print(sys.version)
    -         return None  # [useless-return]
-22 |
+22 +         # [useless-return]
+23 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -68,7 +72,8 @@ help: Remove useless `return` statement
    |
 49 |     print(sys.version)
    -     return None  # [useless-return]
-50 |
+50 +     # [useless-return]
+51 |
    |
 
 PLR1711 [*] Useless `return` statement at end of function
@@ -82,4 +87,82 @@ help: Remove useless `return` statement
    |
 59 |         print(f"{key} not found")
    -         return None
+60 |
    |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:67:5
+   |
+65 |     print(sys.version)
+66 |
+67 |     return  # trailing comment is preserved
+   |     ^^^^^^
+help: Remove useless `return` statement
+   |
+66 |
+   -     return  # trailing comment is preserved
+67 +     # trailing comment is preserved
+68 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:73:9
+   |
+71 |     def print_python_version(self):
+72 |         print(sys.version)
+73 |         return None  # trailing comment is preserved
+   |         ^^^^^^^^^^^
+help: Remove useless `return` statement
+   |
+72 |         print(sys.version)
+   -         return None  # trailing comment is preserved
+73 +         # trailing comment is preserved
+74 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:78:5
+   |
+76 | def print_python_version():
+77 |     print(sys.version)
+78 |     return; # comment after a semicolon is preserved
+   |     ^^^^^^
+help: Remove useless `return` statement
+   |
+77 |     print(sys.version)
+   -     return; # comment after a semicolon is preserved
+78 +     # comment after a semicolon is preserved
+79 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:82:25
+   |
+81 | def print_python_version():
+82 |     print(sys.version); return  # comment after a same-line `return` is preserved
+   |                         ^^^^^^
+help: Remove useless `return` statement
+   |
+81 | def print_python_version():
+   -     print(sys.version); return  # comment after a same-line `return` is preserved
+82 +     print(sys.version); # comment after a same-line `return` is preserved
+83 |
+   |
+
+PLR1711 [*] Useless `return` statement at end of function
+  --> useless_return.py:87:5
+   |
+85 |   def print_python_version():
+86 |       print(sys.version)
+87 | /     return (  # comment inside the `return` makes the fix unsafe
+88 | |         None
+89 | |     )
+   | |_____^
+help: Remove useless `return` statement
+   |
+86 |     print(sys.version)
+   -     return (  # comment inside the `return` makes the fix unsafe
+   -         None
+   -     )
+   |
+note: This is an unsafe fix and may change runtime behavior

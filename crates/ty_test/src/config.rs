@@ -24,6 +24,7 @@ use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
 use ty_module_resolver::ModuleName;
 use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::ReturnTypeInference;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
@@ -164,6 +165,8 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    pub(crate) return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub(crate) strict_generic_narrowing: Option<bool>,
 

@@ -1,13 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Fix};
+use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -29,6 +30,11 @@ use crate::{AlwaysFixableViolation, Fix};
 /// def f():
 ///     print(5)
 /// ```
+///
+/// ## Fix safety
+/// A trailing comment on the same line as the `return` statement is preserved.
+/// The fix is marked as unsafe if it would delete any other comments, such as
+/// comments inside a parenthesized return value.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.257", category = Category::Complexity)]
 pub(crate) struct UselessReturn;
@@ -107,8 +113,29 @@ pub(crate) fn useless_return(
     }
 
     let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
-    let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
-    diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
-        checker.semantic().current_statement_id(),
-    )));
+
+    // Preserve a trailing comment on the same line as the `return` statement.
+    let edit = if let Some(index) = trailing_comment_start_offset(last_stmt, checker.source()) {
+        Edit::range_deletion(last_stmt.range().add_end(index))
+    } else {
+        fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer())
+    };
+
+    // Mark the fix as unsafe if it would still delete comments, e.g., inside a parenthesized
+    // return value.
+    let applicability = if checker
+        .comment_ranges()
+        .comments_in_range(edit.range())
+        .is_empty()
+    {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
+
+    diagnostic.set_fix(
+        Fix::applicable_edit(edit, applicability).isolate(Checker::isolation(
+            checker.semantic().current_statement_id(),
+        )),
+    );
 }

@@ -866,30 +866,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn sweep_nonlocal_lazy_snapshots(&mut self) {
+        if self.enclosing_snapshots.is_empty() {
+            return;
+        }
+
+        // Only the last scope containing a bound nonlocal matters: a lazy snapshot must be
+        // discarded if such a scope occurs at or after its enclosing scope. Build this index once
+        // instead of searching all later scopes separately for every snapshot.
+        let mut last_nonlocal_binding = FxHashMap::default();
+        for (scope_id, place_table) in self.place_tables.iter_enumerated() {
+            for symbol in place_table.symbols() {
+                if symbol.is_nonlocal() && symbol.is_bound() {
+                    last_nonlocal_binding.insert(symbol.name(), scope_id);
+                }
+            }
+        }
+
+        if last_nonlocal_binding.is_empty() {
+            return;
+        }
+
         self.enclosing_snapshots.retain(|key, _| {
-            let place_table = &self.place_tables[key.enclosing_scope];
-
-            let is_bound_and_non_local = || -> bool {
-                let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
-                    return false;
-                };
-
-                let symbol = place_table.symbol(symbol_id);
-                self.scopes
-                    .iter_enumerated()
-                    .skip_while(|(scope_id, _)| *scope_id != key.enclosing_scope)
-                    .any(|(scope_id, _)| {
-                        let other_scope_place_table = &self.place_tables[scope_id];
-                        let Some(symbol_id) = other_scope_place_table.symbol_id(symbol.name())
-                        else {
-                            return false;
-                        };
-                        let symbol = other_scope_place_table.symbol(symbol_id);
-                        symbol.is_nonlocal() && symbol.is_bound()
-                    })
+            if key.nested_laziness.is_eager() {
+                return true;
+            }
+            let ScopedPlaceId::Symbol(symbol_id) = key.enclosing_place else {
+                return true;
             };
-
-            key.nested_laziness.is_eager() || !is_bound_and_non_local()
+            let name = self.place_tables[key.enclosing_scope]
+                .symbol(symbol_id)
+                .name();
+            last_nonlocal_binding
+                .get(name)
+                .is_none_or(|scope| scope.index() < key.enclosing_scope.index())
         });
     }
 
@@ -1801,6 +1810,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
+                if let ast::Expr::Dict(unpacked) = &item.value {
+                    // The unpacked keys belong to the same target. Recording them in order
+                    // lets later items replace earlier bindings, including nested keys.
+                    self.add_dict_key_assignment_definitions_impl(
+                        target,
+                        unpacked.into(),
+                        assignment,
+                    );
+                }
                 continue;
             };
 
@@ -2245,9 +2263,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     (ExpressionContext::Condition, ast::Expr::Compare(compare))
                         if compare.ops.len() > 1 =>
                     {
-                        PredicateNode::ChainedComparisonCondition(expression)
+                        PredicateNode::Condition(expression)
                     }
-                    _ => PredicateNode::Expression(expression),
+                    _ => PredicateNode::Expression {
+                        expression,
+                        truthiness_from_type: predicate_node.is_name_expr()
+                            || predicate_node.is_literal_expr(),
+                    },
                 },
                 is_positive: true,
             }),
@@ -2383,9 +2405,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::Expression(expression)
-                    | PredicateNode::Condition(expression)
-                    | PredicateNode::ChainedComparisonCondition(expression) => {
+                    PredicateNode::Expression { expression, .. }
+                    | PredicateNode::Condition(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);

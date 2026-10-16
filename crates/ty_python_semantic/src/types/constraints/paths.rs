@@ -11,13 +11,18 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_index::{IndexVec, newtype_index};
 
-use crate::types::constraints::sequents::{Sequent, SequentGroup, SequentMap};
+use crate::types::constraints::sequents::{
+    GroupedSequents, InternedSequentConstraint, Sequent, SequentGroup, SequentMap,
+};
 use crate::types::constraints::variables::Constraint;
+use crate::types::constraints::variables::Constraint::{
+    ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
+};
 use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
-use crate::{Db, FxIndexMap, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// The position of an assignment in insertion order.
 #[newtype_index]
@@ -53,8 +58,15 @@ struct AssignmentIndex;
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<ConstraintId, u16>>,
+    /// The sequents that can fire when a particular assignment is added to the path.
+    sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
+    /// Constraints that have been _replaced_ with other constraints on this path, because a
+    /// sequent substituted an exact type for some typevar.
+    substituted_constraints: FxIndexSet<ConstraintId>,
+    /// Substitutions awaiting admission of their replacement assignment.
+    pending_substitutions: Vec<(ConstraintId, ConstraintId)>,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
     /// replenishment and rollback do not need to update these indices.
     positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
@@ -92,6 +104,31 @@ pub(crate) struct PathAssignments {
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
 /// chosen empirically, to balance performance with accurate ecosystem diagnostics.
 const OVERALL_FUEL_BUDGET: u16 = 256;
+
+/// Whether two constraints with disjoint, complete supports can still derive sequents.
+///
+/// A concrete lower/upper, lower/equality, or upper/equality pair can relate its type variables
+/// through a shared concrete pivot. Every other pair requires a shared type variable.
+fn can_interact_without_shared_typevars(left: Constraint<'_>, right: Constraint<'_>) -> bool {
+    match (left, right) {
+        (ConcreteLower(_), ConcreteUpper(_) | ConcreteEquivalence(_))
+        | (ConcreteUpper(_) | ConcreteEquivalence(_), ConcreteLower(_))
+        | (ConcreteUpper(_), ConcreteEquivalence(_))
+        | (ConcreteEquivalence(_), ConcreteUpper(_)) => true,
+        (
+            ConcreteLower(_)
+            | ConcreteUpper(_)
+            | ConcreteEquivalence(_)
+            | TypeVarRange(_)
+            | TypeVarEquivalence(_),
+            ConcreteLower(_)
+            | ConcreteUpper(_)
+            | ConcreteEquivalence(_)
+            | TypeVarRange(_)
+            | TypeVarEquivalence(_),
+        ) => false,
+    }
+}
 
 /// The maximum number of "trips through the sequent map" that we are willing to take for a
 /// derived constraint. This records how far removed we are from a constraint that comes
@@ -139,6 +176,29 @@ impl Ord for AssignmentFuel {
         let self_key = (self.remaining, std::cmp::Reverse(self.consumed));
         let other_key = (other.remaining, std::cmp::Reverse(other.consumed));
         self_key.cmp(&other_key)
+    }
+}
+
+impl Default for PathAssignments {
+    fn default() -> Self {
+        Self {
+            sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
+            assignments: FxIndexMap::default(),
+            substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
+            positive_assignment_indices: IndexVec::default(),
+            negative_assignment_indices: IndexVec::default(),
+            fuel_undo: Vec::default(),
+            remaining_overall_fuel: OVERALL_FUEL_BUDGET,
+            discovered: FxIndexMap::default(),
+            elaborated_pairs: FxHashSet::default(),
+            single_replay_consequents: FxHashMap::default(),
+            pair_replay_consequents: FxHashMap::default(),
+            independent_typevars: FxHashSet::default(),
+            assignment_queue: VecDeque::default(),
+            new_assignments: FxIndexMap::default(),
+        }
     }
 }
 
@@ -217,7 +277,10 @@ impl PathAssignments {
             .collect();
         Self {
             sequents: Vec::default(),
+            sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
+            substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -243,53 +306,15 @@ impl PathAssignments {
     where
         V: PathVisitor,
     {
-        self.visit_inner(db, env, storage, node, visitor, false)
-    }
-
-    /// Visits the paths of the negation of `node`, without constructing that negation eagerly.
-    pub(super) fn visit_negated<'db, V>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
-        visitor: &mut V,
-    ) -> ControlFlow<V::Break, V::Result>
-    where
-        V: PathVisitor,
-    {
-        self.visit_inner(db, env, storage, node, visitor, true)
-    }
-
-    fn visit_inner<'db, V>(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
-        visitor: &mut V,
-        negated: bool,
-    ) -> ControlFlow<V::Break, V::Result>
-    where
-        V: PathVisitor,
-    {
         visitor.visit_node()?;
         match node.node() {
-            Node::AlwaysTrue if negated => visitor.visit_unsatisfied(db, storage, self),
             Node::AlwaysTrue => visitor.visit_satisfied(db, storage, self),
-
-            Node::AlwaysFalse if negated => visitor.visit_satisfied(db, storage, self),
             Node::AlwaysFalse => visitor.visit_unsatisfied(db, storage, self),
 
             Node::Interior(interior) => {
                 let interior_value = visitor.enter_interior(db, storage, interior)?;
                 let interior = storage.interior_node_data(node);
 
-                let true_subtree = if negated {
-                    interior.if_true.or(storage, interior.if_uncertain)
-                } else {
-                    interior.if_true
-                };
                 let if_true = self.walk_edge(
                     db,
                     env,
@@ -299,7 +324,7 @@ impl PathAssignments {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit_inner(db, env, storage, true_subtree, visitor, negated)
+                            path.visit(db, env, storage, interior.if_true, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -315,48 +340,31 @@ impl PathAssignments {
                     },
                 )?;
 
-                let if_uncertain = if negated {
-                    let subtree = visitor.visit_impossible(db, storage, self)?;
-                    visitor.visit_edge(db, storage, &interior_value, subtree, self, 0..0)?
-                } else {
-                    self.walk_edge(
-                        db,
-                        env,
-                        storage,
-                        interior.constraint.when_unconstrained(),
-                        |storage, path, new_range, found_conflict| {
-                            let subtree = if found_conflict {
-                                visitor.visit_impossible(db, storage, path)
-                            } else {
-                                path.visit_inner(
-                                    db,
-                                    env,
-                                    storage,
-                                    interior.if_uncertain,
-                                    visitor,
-                                    false,
-                                )
-                            };
-                            match subtree {
-                                ControlFlow::Continue(subtree) => visitor.visit_edge(
-                                    db,
-                                    storage,
-                                    &interior_value,
-                                    subtree,
-                                    path,
-                                    new_range,
-                                ),
-                                ControlFlow::Break(b) => ControlFlow::Break(b),
-                            }
-                        },
-                    )?
-                };
+                let if_uncertain = self.walk_edge(
+                    db,
+                    env,
+                    storage,
+                    interior.constraint.when_unconstrained(),
+                    |storage, path, new_range, found_conflict| {
+                        let subtree = if found_conflict {
+                            visitor.visit_impossible(db, storage, path)
+                        } else {
+                            path.visit(db, env, storage, interior.if_uncertain, visitor)
+                        };
+                        match subtree {
+                            ControlFlow::Continue(subtree) => visitor.visit_edge(
+                                db,
+                                storage,
+                                &interior_value,
+                                subtree,
+                                path,
+                                new_range,
+                            ),
+                            ControlFlow::Break(b) => ControlFlow::Break(b),
+                        }
+                    },
+                )?;
 
-                let false_subtree = if negated {
-                    interior.if_false.or(storage, interior.if_uncertain)
-                } else {
-                    interior.if_false
-                };
                 let if_false = self.walk_edge(
                     db,
                     env,
@@ -366,7 +374,7 @@ impl PathAssignments {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
                         } else {
-                            path.visit_inner(db, env, storage, false_subtree, visitor, negated)
+                            path.visit(db, env, storage, interior.if_false, visitor)
                         };
                         match subtree {
                             ControlFlow::Continue(subtree) => visitor.visit_edge(
@@ -428,6 +436,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
+        let substituted_constraints_start = self.substituted_constraints.len();
         let fuel_undo_start = self.fuel_undo.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
@@ -473,6 +482,7 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        self.pending_substitutions.clear();
         // A branch can replenish an assignment more than once. Restore in reverse order while
         // every referenced assignment still exists.
         for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
@@ -490,6 +500,8 @@ impl PathAssignments {
             }
         }
         self.assignments.truncate(start);
+        self.substituted_constraints
+            .truncate(substituted_constraints_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
@@ -505,6 +517,10 @@ impl PathAssignments {
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             },
         )
+    }
+
+    pub(super) fn constraint_is_substituted(&self, constraint: ConstraintId) -> bool {
+        self.substituted_constraints.contains(&constraint)
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
@@ -562,84 +578,134 @@ impl PathAssignments {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
-            sequents: &[Sequent<Constraint<'db>>],
+            sequents: &[Sequent<InternedSequentConstraint<'db>>],
             dest: &mut Vec<Sequent<ConstraintId, u16>>,
+            antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
         ) {
-            let sequents = sequents.iter().map(|sequent| match sequent {
-                Sequent::SingleTautology { ante } => {
-                    let ante = storage.intern_constraint(db, env, *ante);
-                    Sequent::SingleTautology { ante }
-                }
-                Sequent::PairImpossibility { ante1, ante2 } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    Sequent::PairImpossibility { ante1, ante2 }
-                }
-                Sequent::TripleImpossibility {
-                    ante1,
-                    ante2,
-                    ante3,
-                } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    let ante3 = storage.intern_constraint(db, env, *ante3);
+            for sequent in sequents {
+                let sequent_index = dest.len();
+                let mut add_antecedent = |assignment| {
+                    antecedents
+                        .entry(assignment)
+                        .or_default()
+                        .push(sequent_index);
+                };
+
+                let sequent = match sequent {
+                    Sequent::SingleTautology { ante } => {
+                        let ante = storage.intern_constraint(db, env, ante.constraint(db));
+                        add_antecedent(ante.when_false());
+                        Sequent::SingleTautology { ante }
+                    }
+                    Sequent::PairImpossibility { ante1, ante2 } => {
+                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
+                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        Sequent::PairImpossibility { ante1, ante2 }
+                    }
                     Sequent::TripleImpossibility {
                         ante1,
                         ante2,
                         ante3,
+                    } => {
+                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
+                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
+                        let ante3 = storage.intern_constraint(db, env, ante3.constraint(db));
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        add_antecedent(ante3.when_true());
+                        Sequent::TripleImpossibility {
+                            ante1,
+                            ante2,
+                            ante3,
+                        }
                     }
-                }
-                Sequent::PairImplication {
-                    ante1, ante2, post, ..
-                } => {
-                    let ante1 = storage.intern_constraint(db, env, *ante1);
-                    let ante2 = storage.intern_constraint(db, env, *ante2);
-                    let post = storage.intern_constraint(db, env, *post);
-                    let (ante1_depth, _) = storage.cached_constraint_bound_depth(db, env, ante1);
-                    let (ante2_depth, _) = storage.cached_constraint_bound_depth(db, env, ante2);
-                    let fuel_cost =
-                        storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
                     Sequent::PairImplication {
                         ante1,
                         ante2,
                         post,
-                        fuel_cost,
+                        is_substitution,
+                        ..
+                    } => {
+                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
+                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
+                        let post = storage.intern_constraint(db, env, post.constraint(db));
+                        add_antecedent(ante1.when_true());
+                        add_antecedent(ante2.when_true());
+                        let (ante1_depth, _) =
+                            storage.cached_constraint_bound_depth(db, env, ante1);
+                        let (ante2_depth, _) =
+                            storage.cached_constraint_bound_depth(db, env, ante2);
+                        let fuel_cost =
+                            storage.sequent_fuel_cost(db, env, post, ante1_depth.max(ante2_depth));
+                        Sequent::PairImplication {
+                            ante1,
+                            ante2,
+                            post,
+                            fuel_cost,
+                            is_substitution: *is_substitution,
+                        }
                     }
-                }
-                Sequent::SingleImplication { ante, post, .. } => {
-                    let ante = storage.intern_constraint(db, env, *ante);
-                    let post = storage.intern_constraint(db, env, *post);
-                    let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
-                    let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
-                    Sequent::SingleImplication {
-                        ante,
-                        post,
-                        fuel_cost,
+                    Sequent::SingleImplication { ante, post, .. } => {
+                        let ante = storage.intern_constraint(db, env, ante.constraint(db));
+                        let post = storage.intern_constraint(db, env, post.constraint(db));
+                        add_antecedent(ante.when_true());
+                        let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
+                        let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
+                        Sequent::SingleImplication {
+                            ante,
+                            post,
+                            fuel_cost,
+                        }
                     }
-                }
-            });
-            dest.extend(sequents);
+                };
+
+                dest.push(sequent);
+            }
         }
 
         let start = self.sequents.len();
         for group in &map.sequents {
             match group {
                 SequentGroup::Ungrouped(sequents) => {
-                    intern_sequents(db, env, storage, sequents, &mut self.sequents);
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        sequents,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
                 }
-                SequentGroup::Grouped {
-                    equivalence,
-                    leftwards,
-                    rightwards,
-                } => {
+                SequentGroup::Grouped(grouped) => {
+                    let GroupedSequents {
+                        equivalence,
+                        leftwards,
+                        rightwards,
+                    } = grouped.as_ref();
                     let (first, _) = equivalence.in_builder(db, storage);
                     let (first, second) = if first.is_same_typevar_as(db, equivalence.left) {
                         (leftwards, rightwards)
                     } else {
                         (rightwards, leftwards)
                     };
-                    intern_sequents(db, env, storage, first, &mut self.sequents);
-                    intern_sequents(db, env, storage, second, &mut self.sequents);
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        first,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
+                    intern_sequents(
+                        db,
+                        env,
+                        storage,
+                        second,
+                        &mut self.sequents,
+                        &mut self.sequent_antecedents,
+                    );
                 }
             }
         }
@@ -667,24 +733,25 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.constraint_data(constraint);
-        let map = SequentMap::for_constraint(db, env, constraint_data);
-        let added = self.add_sequents(db, env, storage, map);
+        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
+            let added = self.add_sequents(db, env, storage, map);
 
-        // `projection_source_order` depends on knowing the order that sequents were discovered for
-        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-        // information here.
-        self.single_replay_consequents.insert(
-            constraint,
-            self.sequents[added]
-                .iter()
-                .filter_map(|sequent| match sequent {
-                    Sequent::SingleImplication { post, .. }
-                    | Sequent::PairImplication { post, .. } => Some(*post),
-                    _ => None,
-                })
-                .collect(),
-        );
+            // `projection_source_order` depends on knowing the order that sequents were discovered for
+            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+            // information here.
+            self.single_replay_consequents.insert(
+                constraint,
+                self.sequents[added]
+                    .iter()
+                    .filter_map(|sequent| match sequent {
+                        Sequent::SingleImplication { post, .. }
+                        | Sequent::PairImplication { post, .. } => Some(*post),
+                        _ => None,
+                    })
+                    .collect(),
+            );
+        }
 
         for existing_index in 0..self.discovered.len() {
             let (existing, _) = self
@@ -699,21 +766,22 @@ impl PathAssignments {
             let existing_support = storage.constraint_support(*existing);
             let constraint_support = storage.constraint_support(constraint);
 
-            // Independent typevars must be checked for disjoint or invalid constraints, but are
-            // otherwise already constrained and do not participate in sequent discovery.
-            if !existing_support.overlaps_with(constraint_support)
-                && existing_support
+            if existing_support.is_complete()
+                && constraint_support.is_complete()
+                && !existing_support.overlaps_with(constraint_support)
+            {
+                // Independent typevars must be checked for disjoint or invalid constraints, but
+                // are otherwise already constrained and do not participate in sequent discovery.
+                let independent = existing_support
                     .iter()
                     .chain(constraint_support.iter())
-                    .any(|typevar| self.independent_typevars.contains(&typevar))
-                && existing_support.is_complete()
-                && constraint_support.is_complete()
-            {
-                continue;
-            }
+                    .any(|typevar| self.independent_typevars.contains(&typevar));
 
-            if SequentMap::pair_cannot_produce_sequents(db, env, existing_data, constraint_data) {
-                continue;
+                if independent
+                    || !can_interact_without_shared_typevars(existing_data, constraint_data)
+                {
+                    continue;
+                }
             }
 
             let (a, a_data, b, b_data) = if existing_index < constraint_index {
@@ -721,12 +789,15 @@ impl PathAssignments {
             } else {
                 (constraint, constraint_data, *existing, existing_data)
             };
-            if !self.elaborated_pairs.insert((a, b)) {
+            if self.elaborated_pairs.contains(&(a, b)) {
                 // We've already elaborated this pair of constraints.
                 continue;
             }
 
-            let map = SequentMap::for_constraint_pair(db, env, a_data, b_data);
+            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+                continue;
+            };
+            self.elaborated_pairs.insert((a, b));
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -756,6 +827,19 @@ impl PathAssignments {
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
+        }
+        // Either fuel limit can prevent a replacement from being admitted. Keep the original
+        // evidence until the replacement actually holds, including when another derivation
+        // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
+        for (original, replacement) in self.pending_substitutions.drain(..) {
+            if self
+                .positive_assignment_indices
+                .get(replacement)
+                .is_some_and(Option::is_some)
+                && !self.substituted_constraints.contains(&replacement)
+            {
+                self.substituted_constraints.insert(original);
+            }
         }
         Ok(())
     }
@@ -858,10 +942,27 @@ impl PathAssignments {
         // brute-force search.
 
         self.new_assignments.clear();
+        let previous_sequents_len = self.sequents.len();
+        let previous_antecedents_len = self
+            .sequent_antecedents
+            .get(&assignment)
+            .map_or(0, Vec::len);
         self.discover_constraint(db, env, storage, assignment.constraint());
+        let sequents_len = self.sequents.len();
 
-        for i in 0..self.sequents.len() {
-            let sequent = self.sequents[i];
+        // Previously discovered sequents can only start firing if the assignment that we just
+        // added is one of their antecedents.
+        for index in 0..previous_antecedents_len {
+            let sequent_index = self.sequent_antecedents[&assignment][index];
+            let sequent = self.sequents[sequent_index];
+            self.check_sequent(db, env, storage, sequent)?;
+        }
+
+        // Sequent elaboration can produce rules whose antecedents do not include the constraint
+        // that caused us to discover them. Check every newly discovered sequent once against the
+        // complete set of assignments on the current path.
+        for sequent_index in previous_sequents_len..sequents_len {
+            let sequent = self.sequents[sequent_index];
             self.check_sequent(db, env, storage, sequent)?;
         }
 
@@ -904,9 +1005,18 @@ impl PathAssignments {
                 ante1,
                 ante2,
                 post,
+                is_substitution,
                 fuel_cost,
             } => {
-                self.check_pair_implication(db, storage, ante1, ante2, post, fuel_cost);
+                self.check_pair_implication(
+                    db,
+                    storage,
+                    ante1,
+                    ante2,
+                    post,
+                    is_substitution,
+                    fuel_cost,
+                );
                 Ok(())
             }
             Sequent::SingleImplication {
@@ -1010,6 +1120,7 @@ impl PathAssignments {
         Ok(())
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn check_pair_implication<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -1017,6 +1128,7 @@ impl PathAssignments {
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        is_substitution: bool,
         fuel_cost: u16,
     ) {
         if storage
@@ -1031,6 +1143,9 @@ impl PathAssignments {
         let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
             return;
         };
+        if is_substitution {
+            self.pending_substitutions.push((ante1, post));
+        }
         let available_fuel = ante1_fuel.min(ante2_fuel);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
@@ -1071,7 +1186,7 @@ struct PathAssignmentConflict;
 
 #[cfg(test)]
 mod tests {
-    use super::super::solutions::SolutionWalker;
+    use super::super::solutions::{Polarity, SolutionWalker};
     use super::super::*;
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1095,7 +1210,14 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
-        ConstraintSet::constrain_typevar_equivalence_bound(db, &env, builder, bound_typevar, ty)
+        ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            builder,
+            ConstraintProvenance::Evidence,
+            bound_typevar,
+            ty,
+        )
     }
 
     #[test]
@@ -1121,6 +1243,7 @@ mod tests {
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1128,6 +1251,7 @@ mod tests {
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -1137,115 +1261,10 @@ mod tests {
 
         for set in [lhs, rhs, intersection, tautology, implication] {
             assert_eq!(
-                set.is_always_satisfied(db, &env),
-                set.negate(db, &builder).is_never_satisfied(db, &env)
+                set.is_always_satisfied(db, &env, TypeVarSet::None),
+                set.negate(db, &builder)
+                    .is_never_satisfied(db, &env, TypeVarSet::None)
             );
-        }
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-    enum PathFoldBreak {
-        Satisfied,
-        Unsatisfied,
-        Impossible,
-        Combine,
-    }
-
-    /// A path fold that reconstructs a constraint set from its satisfied paths and can abort at
-    /// a specified callback.
-    struct ReconstructPathFold {
-        break_at: Option<PathFoldBreak>,
-    }
-
-    impl ReconstructPathFold {
-        fn result(
-            &self,
-            at: PathFoldBreak,
-            result: (NodeId, Option<SourceOrderId>),
-        ) -> ControlFlow<PathFoldBreak, (NodeId, Option<SourceOrderId>)> {
-            if self.break_at == Some(at) {
-                ControlFlow::Break(at)
-            } else {
-                ControlFlow::Continue(result)
-            }
-        }
-    }
-
-    impl PathFold for ReconstructPathFold {
-        type Result = (NodeId, Option<SourceOrderId>);
-        type Break = PathFoldBreak;
-
-        fn satisfied<'db>(
-            &mut self,
-            _db: &'db dyn Db,
-            storage: &mut ConstraintSetStorage<'db>,
-            path: &PathAssignments,
-        ) -> ControlFlow<Self::Break, Self::Result> {
-            let result =
-                path.assignments
-                    .iter()
-                    .fold((ALWAYS_TRUE, None), |result, (assignment, _)| {
-                        let (node, source_order) = result;
-                        let (assignment, assignment_source_order) =
-                            Node::new_satisfied_constraint(storage, *assignment);
-                        (
-                            node.and(storage, assignment),
-                            storage.ordered_source_order(source_order, assignment_source_order),
-                        )
-                    });
-            self.result(PathFoldBreak::Satisfied, result)
-        }
-
-        fn unsatisfied<'db>(
-            &mut self,
-            _db: &'db dyn Db,
-            _storage: &mut ConstraintSetStorage<'db>,
-            _path: &PathAssignments,
-        ) -> ControlFlow<Self::Break, Self::Result> {
-            self.result(PathFoldBreak::Unsatisfied, (ALWAYS_FALSE, None))
-        }
-
-        fn impossible<'db>(
-            &mut self,
-            _db: &'db dyn Db,
-            _storage: &mut ConstraintSetStorage<'db>,
-            _path: &PathAssignments,
-        ) -> ControlFlow<Self::Break, Self::Result> {
-            self.result(PathFoldBreak::Impossible, (ALWAYS_FALSE, None))
-        }
-
-        fn combine<'db>(
-            &mut self,
-            _db: &'db dyn Db,
-            storage: &mut ConstraintSetStorage<'db>,
-            if_true: Self::Result,
-            if_uncertain: Self::Result,
-            if_false: Self::Result,
-        ) -> ControlFlow<Self::Break, Self::Result> {
-            let (if_true, if_true_source_order) = if_true;
-            let (if_uncertain, if_uncertain_source_order) = if_uncertain;
-            let (if_false, if_false_source_order) = if_false;
-            let node = if_true.or(storage, if_uncertain).or(storage, if_false);
-            let source_order =
-                storage.ordered_source_order(if_true_source_order, if_uncertain_source_order);
-            let source_order = storage.ordered_source_order(source_order, if_false_source_order);
-            self.result(PathFoldBreak::Combine, (node, source_order))
-        }
-    }
-
-    fn path_assignments_for<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        builder: &ConstraintSetBuilder<'db>,
-        node: NodeId,
-        source_order: Option<SourceOrderId>,
-    ) -> PathAssignments {
-        let mut storage = builder.storage.borrow_mut();
-        match node.node() {
-            Node::AlwaysTrue | Node::AlwaysFalse => PathAssignments::new([], FxHashSet::default()),
-            Node::Interior(interior) => {
-                interior.path_assignments(db, env, &mut storage, source_order)
-            }
         }
     }
 
@@ -1263,125 +1282,15 @@ mod tests {
         // Construct the set in the opposite order from constraint creation. This ensures the
         // initializer follows the sidecar rather than either TDD traversal or constraint IDs.
         let set = u_str.and(db, &builder, || t_int);
-        let path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-        let storage = builder.storage.borrow();
+        let mut storage = builder.storage.borrow_mut();
+        let path = set
+            .node
+            .path_assignments(db, &env, &mut storage, set.source_order);
         let expected =
             [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
         let actual: Vec<_> = path.discovered.keys().copied().collect();
 
         assert_eq!(actual, expected);
-    }
-
-    #[test]
-    fn path_fold_reconstructs_constraint_sets() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-        let v = create_typevar(db, "V");
-        let builder = ConstraintSetBuilder::new();
-
-        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
-        let t_str = create_constraint(db, &builder, t, KnownClass::Str);
-        let u_int = create_constraint(db, &builder, u, KnownClass::Int);
-        let v_bytes = create_constraint(db, &builder, v, KnownClass::Bytes);
-        let union = t_int.or(db, &builder, || u_int);
-        let intersection = union.and(db, &builder, || t_str.or(db, &builder, || v_bytes));
-        let contradiction = t_int.and(db, &builder, || t_str);
-        let tautology = union.or(db, &builder, || union.negate(db, &builder));
-
-        let t_u =
-            ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, Type::TypeVar(u));
-        let u_int_upper = ConstraintSet::constrain_typevar_upper_bound(
-            db,
-            &env,
-            &builder,
-            u,
-            KnownClass::Int.to_instance(db, &env),
-        );
-        let int_t = ConstraintSet::constrain_typevar_lower_bound(
-            db,
-            &env,
-            &builder,
-            t,
-            KnownClass::Int.to_instance(db, &env),
-        );
-        let transitive = t_u
-            .and(db, &builder, || u_int_upper)
-            .and(db, &builder, || int_t)
-            .or(db, &builder, || v_bytes);
-
-        for set in [
-            ConstraintSet::always(&builder),
-            ConstraintSet::never(&builder),
-            union,
-            intersection,
-            contradiction,
-            tautology,
-            transitive,
-        ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-            let mut fold = ReconstructPathFold { break_at: None };
-            let mut storage = builder.storage.borrow_mut();
-            let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
-                path.visit(db, &env, &mut storage, set.node, &mut fold)
-            else {
-                panic!("reconstruction unexpectedly aborted");
-            };
-            drop(storage);
-            let reconstructed =
-                ConstraintSet::from_node(&builder, reconstructed, reconstructed_source_order);
-            assert!(
-                set.iff(db, &builder, reconstructed)
-                    .is_always_satisfied(db, &env)
-            );
-        }
-    }
-
-    #[test]
-    fn path_fold_break_restores_path_assignments() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-        let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(db, &builder, t, KnownClass::Int);
-        let t_str = create_constraint(db, &builder, t, KnownClass::Str);
-        let u_int = create_constraint(db, &builder, u, KnownClass::Int);
-        let set = t_int.and(db, &builder, || t_str).or(db, &builder, || u_int);
-
-        for break_at in [
-            PathFoldBreak::Satisfied,
-            PathFoldBreak::Unsatisfied,
-            PathFoldBreak::Impossible,
-            PathFoldBreak::Combine,
-        ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
-            let mut aborting_fold = ReconstructPathFold {
-                break_at: Some(break_at),
-            };
-            let mut storage = builder.storage.borrow_mut();
-            assert_eq!(
-                path.visit(db, &env, &mut storage, set.node, &mut aborting_fold),
-                ControlFlow::Break(break_at)
-            );
-
-            let mut completing_fold = ReconstructPathFold { break_at: None };
-            let ControlFlow::Continue((reconstructed, reconstructed_source_order)) =
-                path.visit(db, &env, &mut storage, set.node, &mut completing_fold)
-            else {
-                panic!("reconstruction unexpectedly aborted after {break_at:?}");
-            };
-            drop(storage);
-            let reconstructed =
-                ConstraintSet::from_node(&builder, reconstructed, reconstructed_source_order);
-            assert!(
-                set.iff(db, &builder, reconstructed)
-                    .is_always_satisfied(db, &env)
-            );
-        }
     }
 
     #[test]
@@ -1398,12 +1307,13 @@ mod tests {
             .storage
             .borrow()
             .calculate_source_orders(set.source_order);
+        let inferable = TypeVarSet::from_typevars(db, [t]);
         let expected = CandidateSolutions::compute(
             db,
             &env,
             &mut builder.storage.borrow_mut(),
             set.node,
-            TypeVarSet::from_typevars(db, [t]),
+            inferable,
             set.source_order,
         );
 
@@ -1413,24 +1323,45 @@ mod tests {
             (usize::MAX, 1, ProjectionError::TraversalBudgetExceeded),
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
-            let mut path = path_assignments_for(db, &env, &builder, set.node, set.source_order);
             let mut storage = builder.storage.borrow_mut();
+            let mut path = set
+                .node
+                .path_assignments(db, &env, &mut storage, set.source_order);
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(source_orders.clone());
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
             assert_eq!(
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits),
+                walker.visit_node(
+                    db,
+                    &env,
+                    &mut storage,
+                    &mut limits,
+                    &mut path,
+                    None,
+                    Polarity::Positive,
+                    set.node
+                ),
                 ControlFlow::Break(error)
             );
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(source_orders.clone());
-            let ControlFlow::Continue(()) =
-                walker.visit_node(db, &env, &mut storage, &mut path, set.node, &mut limits);
-            assert_eq!(walker.finish(db, &env, &mut storage), expected);
+            let mut walker =
+                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
+            let ControlFlow::Continue(()) = walker.visit_node(
+                db,
+                &env,
+                &mut storage,
+                &mut limits,
+                &mut path,
+                None,
+                Polarity::Positive,
+                set.node,
+            );
+            assert_eq!(walker.finish(), expected);
         }
     }
 }

@@ -233,6 +233,38 @@ class Foo4[**P]:
         self.kwargs: P.kwargs = kwargs
 ```
 
+## Class `ParamSpec` bindings remain visible in nested classes
+
+A PEP 695 `ParamSpec` remains bound to the class that declares it when referenced in a nested
+class's method. Both callable annotations and forwarded arguments use the outer class's binding.
+
+```py
+from typing import Callable
+
+class Outer[**P]:
+    class Inner:
+        def method(self, callback: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> int:
+            return callback(*args, **kwargs)
+
+# revealed: def method(self, callback: (**P@Outer) -> int, *args: P@Outer.args, **kwargs: P@Outer.kwargs) -> int
+reveal_type(Outer.Inner.method)
+```
+
+## Class `ParamSpec` bindings across intervening methods
+
+A PEP 695 `ParamSpec` binding remains visible through an intervening method that captures it through
+its components.
+
+```py
+class Outer[**P]:
+    def method(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        class Inner:
+            def nested(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+        # revealed: def nested(self, *args: P@Outer.args, **kwargs: P@Outer.kwargs) -> None
+        reveal_type(Inner.nested)
+```
+
 ## Semantics of `P.args` and `P.kwargs`
 
 The type of `args` and `kwargs` inside the function is `P.args` and `P.kwargs` respectively instead
@@ -711,6 +743,39 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Immediate literal forwarding
+
+A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
+checks their individual types and argument count.
+
+```py
+from typing import Callable
+
+def forward[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def target(x: int, y: int) -> int:
+    return x + y
+
+reveal_type(forward(target, *[1, 2]))  # revealed: int
+reveal_type(forward(target, **{"x": 1, "y": 2}))  # revealed: int
+forward(target, *[1])  # error: [missing-argument]
+forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
+own parameter and forwards only the remaining keys.
+
+```py
+def forward_prefix[**P, R](callback: Callable[P, R], prefix: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed: int
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
+forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
+forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
 ### Preserve an unpacked required suffix
 
 A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic
@@ -808,6 +873,105 @@ def f(x: int, y: str) -> int:
 
 c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
+```
+
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+class Factory[T]:
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable
+
+def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`.
+
+```py
+# `R` is bounded by `Factory[object]`, and since `Factory` is invariant, no other fully static
+# specialization of `Factory` can satisfy that bound.
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
+### Class method with a generic callable receiver
+
+A class method's receiver can be a generic callable whose parameters are captured by a `ParamSpec`.
+
+```py
+from typing import Callable
+
+class Protocol: ...
+
+class Factory[P: Protocol]:
+    @classmethod
+    def for_protocol[**Params, R: "Factory[Protocol]"](cls: Callable[Params, R], protocol: Callable[[], P]) -> "Factory[P]":
+        raise NotImplementedError
+
+Factory.for_protocol(Protocol)  # no diagnostic
+```
+
+### Captured and fixed variables in a return type
+
+Capturing a callable's type variable does not permit a second, enclosing variable in its return type
+to violate a bound. An enclosing variable whose bound already satisfies the return bound is
+accepted.
+
+```py
+from typing import Callable
+
+def forward[**P, R: tuple[object, str]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def unrestricted[S](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    # TODO: Reject this call because `S` is not bounded by `str`.
+    forward(make, 1)  # no diagnostic
+
+def non_generic[S](fixed: S) -> None:
+    def make(value: int) -> tuple[int, S]:
+        return value, fixed
+
+    # TODO: Reject this call because `S` is not bounded by `str`.
+    forward(make, 1)  # no diagnostic
+
+def bounded[S: str](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, 1)  # no diagnostic
+```
+
+### Specializing a captured variable to satisfy a return bound
+
+The callable can be specialized with `T = str` to accept `"text"` and satisfy the return bound. The
+call with `1` is invalid even after specializing `T` to match the argument.
+
+```py
+from typing import Callable
+
+def forward[**P, R: tuple[str, str]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def outer[S: str](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, "text")  # no diagnostic
+    # TODO: Reject this call because `T` cannot satisfy both the argument and the return bound.
+    forward(make, 1)  # no diagnostic
 ```
 
 ### `ParamSpec` in prepended positional parameters
@@ -1454,6 +1618,63 @@ info: Overload implementation defined here
    |
 10 |     def make[**P](cls: Callable[P, "Factory"], *args: P.args, **kwargs: P.kwargs) -> "Factory":
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+### Constructor overrides with receiver-inferred parameters
+
+In the below example, `Base.__new__` takes the same arguments as the class's `build` method. Binding
+its `cls` receiver infers an `int` parameter from `Base.build`, so an override accepting only `str`
+is incompatible.
+
+```py
+from __future__ import annotations
+from typing import Protocol, Self, override
+
+class Builder[**P](Protocol):
+    def build(self, *args: P.args, **kwargs: P.kwargs) -> object: ...
+
+class Base:
+    @staticmethod
+    def build(value: int) -> object:
+        return object()
+
+    def __new__[**P](cls: Builder[P], *args: P.args, **kwargs: P.kwargs) -> Base:
+        raise NotImplementedError
+
+class Invalid(Base):
+    @override
+    def __new__(cls, value: str) -> Self:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
+### Wrapped classmethod factories passed to callbacks
+
+A classmethod can use a callable instance to forward arguments to the class constructor. Passing
+this factory to `asyncio.to_thread` infers the constructor's parameters and its instance type from
+the captured class. The `to_thread` definition below is based on typeshed's stub.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+async def to_thread(func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    raise NotImplementedError
+
+class Factory:
+    def __call__[**P, R](self, cls: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return cls(*args, **kwargs)
+
+class C:
+    def __init__(self, value: int, *, label: str = "") -> None: ...
+    make = classmethod(Factory())
+
+async def check():
+    reveal_type(await to_thread(C.make, 1, label="label"))  # revealed: C
+    await to_thread(C.make)  # error: [missing-argument] "No argument provided for required parameter `value`"
+    await to_thread(C.make, "wrong")  # error: [invalid-argument-type] "Expected `int`"
+    await to_thread(C.make, 1, label=2)  # error: [invalid-argument-type] "Expected `str`"
 ```
 
 ### Gradual types propagate through `ParamSpec` inference
@@ -2274,4 +2495,78 @@ def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int
     return ctr("", *args, **kwargs)
 
 call_factory(my_factory)
+```
+
+## Calling methods on a union of `ParamSpec` specializations
+
+A caller's parameter list can be shared by the receivers while the return type preserves the
+relationship between each receiver and its other type argument.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Box[**P, T]:
+    value: T
+
+    def invoke(self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward[T, **P](
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    box = a if cond else b
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1)
+    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    # revealed: tuple[Box[P@forward, str], str] | tuple[Box[P@forward, T@forward], T@forward]
+    reveal_type(result)
+    return result  # no diagnostic
+
+def reverse[T, **P](
+    a: Box[P, str], b: Box[P, T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[P, str], str] | tuple[Box[P, T], T]:
+    invoke = b.invoke if cond else a.invoke
+    return invoke(callback, *args, **kwargs)  # no diagnostic
+```
+
+## Calling a union of methods with a `ParamSpec`
+
+The caller's `ParamSpec` remains fixed while each method is specialized for its own receiver.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def invoke[**P](self, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        callback(*args, **kwargs)
+        return self, self.value
+
+def forward[T, **P](
+    a: Box[str], b: Box[T], cond: bool, callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs
+) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    result = box.invoke(callback, *args, **kwargs)  # no diagnostic
+    # revealed: tuple[Box[str], str] | tuple[Box[T@forward], T@forward]
+    reveal_type(result)
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1)
+    return result  # no diagnostic
+
+def callback(x: int, *, label: str) -> None: ...
+def concrete(a: Box[str], b: Box[int], cond: bool):
+    box = a if cond else b
+    reveal_type(box.invoke(callback, 1, label="ok"))  # revealed: tuple[Box[str], str] | tuple[Box[int], int]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    box.invoke(callback, 1, label=1)
+    # error: [missing-argument]
+    # error: [missing-argument]
+    box.invoke(callback, 1)
 ```

@@ -154,10 +154,12 @@ Foo(1, 2)
 def _(flag: bool) -> None:
     class Foo:
         if flag:
-            def __new__(cls, x: int): ...
+            def __new__(cls, x: int):
+                return super().__new__(cls)
 
         else:
-            def __new__(cls, x: int, y: int = 1): ...
+            def __new__(cls, x: int, y: int = 1):
+                return super().__new__(cls)
 
     reveal_type(Foo(1))  # revealed: Foo
     # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["1"]`"
@@ -1789,11 +1791,7 @@ class C[T: (str | None, int | None)]:
         raise NotImplementedError
 
 reveal_type(C("a"))  # revealed: C[str | None]
-
-# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
-# `C[int | None]` without an error.
-# error: [invalid-argument-type]
-reveal_type(C(1))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
 ```
 
 ## Union `self` annotations with variadic constructor parameters
@@ -2320,4 +2318,32 @@ reveal_type(C())  # revealed: C
 
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
+```
+
+## Covariant constructors retain outer type variables from arguments
+
+A holder argument supplies its outer type variable to a covariant constructor, even without an
+expected return type. The constructor's bound and default must not replace that outer variable. Both
+the standalone expression and the return expression infer `RelatedBox[T]`.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import TypeVar
+
+class Client: ...
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class Holder(Generic[T]):
+    def related(self) -> RelatedBox[T]:
+        # revealed: RelatedBox[T@Holder]
+        reveal_type(RelatedBox(self))
+        # revealed: RelatedBox[T@Holder]
+        return reveal_type(RelatedBox(self))
+
+class RelatedBox(Generic[T]):
+    def __init__(self, holder: Holder[T]) -> None:
+        self.holder = holder
 ```

@@ -65,6 +65,33 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
+## Negated dynamic type aliases
+
+A negated alias of `Any` behaves like `Any` in both single and tuple exception handlers.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Not
+
+type Dynamic = Any
+
+def catch_negated_alias(exc: Not[Dynamic]) -> None:
+    try:
+        raise ValueError
+    except exc as single:
+        reveal_type(single)  # revealed: Any
+
+    try:
+        raise ValueError
+    except (exc,) as tuple_element:
+        reveal_type(tuple_element)  # revealed: Any
+```
+
 ## Exception-class expressions
 
 Exception-class expressions can produce intersections, gradual refinements, or unions. Positive

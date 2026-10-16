@@ -820,6 +820,112 @@ def intersection_augmented(arg: Intersection[HasFinal, NotFinal]):
     arg.x += 1
 ```
 
+### Instance attributes on unions and protocol intersections
+
+An instance attribute remains `Final` when another union member allows assignment. Narrowing the
+receiver through a protocol also preserves the nominal class's `Final` restriction.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Protocol
+from typing_extensions import TypeIs
+
+class Fixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class AlsoFixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class Mutable:
+    value: int = 1
+
+class Marker(Protocol):
+    @property
+    def marker(self) -> bool: ...
+
+def has_marker(value: object) -> TypeIs[Marker]:
+    return True
+
+def assign(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    either.value = 2  # error: [invalid-assignment]
+    either.value += 1  # error: [invalid-assignment]
+    both.value = 2  # error: [invalid-assignment]
+    if has_marker(fixed):
+        fixed.value = 2  # error: [invalid-assignment]
+    if has_marker(either):
+        either.value = 2  # error: [invalid-assignment]
+    if has_marker(mutable):
+        mutable.value = 2  # no diagnostic
+```
+
+The same restriction applies to deletion, even when a protocol component permits it:
+
+```py
+def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    del either.value  # error: [invalid-assignment]
+    if has_marker(fixed):
+        del fixed.value  # error: [invalid-assignment]
+    if has_marker(either):
+        del either.value  # error: [invalid-assignment]
+    if has_marker(both):
+        del both.value  # error: [invalid-assignment]
+    if has_marker(mutable):
+        del mutable.value  # no diagnostic
+```
+
+Narrowing `self` still allows initialization. That exemption does not apply to another parameter:
+
+```py
+class Initialized:
+    def __init__(self, other: "Initialized | Mutable") -> None:
+        self.value: Final[int] = 1
+        if has_marker(self):
+            self.value = 2  # no diagnostic
+        if has_marker(other):
+            other.value = 2  # error: [invalid-assignment]
+```
+
+Diagnostics point to the nominal class that declares the attribute:
+
+```py
+class Declared:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        self.value = 1
+
+def assign_declared(value: Declared | Mutable) -> None:
+    value.value = 2  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to final attribute `value` on type `Declared`
+  --> src/mdtest_snippet.py:56:5
+   |
+56 |     value.value = 2  # snapshot: invalid-assignment
+   |     ^^^^^^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
+   |
+  ::: src/mdtest_snippet.py:50:12
+   |
+50 |     value: Final[int]
+   |            ---------- Attribute declared as `Final` here
+```
+
+A type alias in a union preserves the `Final` restriction on the aliased class's instance attribute.
+
+```py
+type FixedAlias = Fixed
+
+def assign_aliased(value: FixedAlias | Mutable) -> None:
+    value.value = 2  # error: [invalid-assignment]
+```
+
 ## Mutability
 
 Objects qualified with `Final` *can be modified*. `Final` represents a constant reference to an

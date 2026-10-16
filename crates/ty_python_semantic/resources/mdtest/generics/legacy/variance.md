@@ -2101,6 +2101,39 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for classmethod wrappers
+
+A classmethod exposes its wrapped callable through `__func__`, including any mutable attributes. In
+the below example, `Wrapper[T].value` therefore makes `C[T]` invariant even though `T` does not
+appear in the bound call signature. Accepting `C[int]` as `C[object]` would let `set_value` replace
+an `int` with a `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", infer_variance=True)
+
+class Wrapper(Generic[T]):
+    value: T
+
+    def __call__(self, cls: object) -> None: ...
+
+class C(Generic[T]):
+    method = classmethod(Wrapper[T]())
+
+def set_value(c: C[object]) -> None:
+    c.method.__func__.value = "not an int"
+
+def corrupt(c: C[int]) -> int:
+    set_value(c)  # error: [invalid-argument-type]
+    return c.method.__func__.value
+```
+
 ## Inferred variance for writable subclass-type attributes
 
 A writable public `type[T]` attribute makes a legacy type variable with inferred variance invariant.

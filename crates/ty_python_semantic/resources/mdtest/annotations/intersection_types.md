@@ -132,6 +132,81 @@ def _(a_and_b: AAndB, not_a: NotA, quoted: Quoted, nested: Nested, generic: BoxG
     reveal_type(generic)  # revealed: Box[A & B]
 ```
 
+## Recursive aliases
+
+Intersections and negations do not guard recursive references. An alias that refers to itself
+through these operations has a circular definition.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4601>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "~A & A"  # error: [cyclic-type-alias-definition]
+B: TypeAlias = "B & ~B"  # error: [cyclic-type-alias-definition]
+C: TypeAlias = "~C"  # error: [cyclic-type-alias-definition]
+D: TypeAlias = "D & int"  # error: [cyclic-type-alias-definition]
+```
+
+The same restriction applies to PEP 695 aliases:
+
+```py
+type E = ~E & E  # error: [cyclic-type-alias-definition]
+type F = F & ~F  # error: [cyclic-type-alias-definition]
+type G = ~G  # error: [cyclic-type-alias-definition]
+type H = H & int  # error: [cyclic-type-alias-definition]
+```
+
+## Mutually recursive aliases
+
+An unguarded cycle can also pass through another alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "~B"  # error: [cyclic-type-alias-definition]
+B: TypeAlias = "A"  # error: [cyclic-type-alias-definition]
+
+type C = ~D  # error: [cyclic-type-alias-definition]
+type D = C  # error: [cyclic-type-alias-definition]
+```
+
+## Guarded recursive aliases
+
+Recursion through a container remains valid when the container appears in an intersection or
+negation.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAlias
+
+A: TypeAlias = "list[A] & ~str"
+C: TypeAlias = "~list[C]"
+
+type B = list[B] & ~str
+type D = ~list[D]
+
+def _(a: A, b: B, c: C, d: D):
+    reveal_type(a)  # revealed: A
+    reveal_type(b)  # revealed: list[B]
+    reveal_type(c)  # revealed: C
+    reveal_type(d)  # revealed: ~list[D]
+```
+
 ## Intersections inside `type[...]`
 
 ```toml

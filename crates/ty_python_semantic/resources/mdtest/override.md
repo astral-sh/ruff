@@ -138,14 +138,14 @@ class Invalid:
     @lossy_decorator
     def lossy2(self): ...  # error: [invalid-explicit-override]
 
-# TODO: all overrides in this class should cause us to emit *Liskov* violations,
-# but not `@override` violations
+# These members override an inherited name,
+# but violate its Liskov contract.
 class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
-    def foo(self) -> int: ...
+    def foo(self) -> int: ...  # error: [invalid-property-type-override]
     @override
-    def my_property1(self) -> int: ...
+    def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
 
     # Class and static methods can override each other when "bound" signatures match,
     # but here, we deliberately add a new parameter to introduce a Liskov violation
@@ -634,6 +634,31 @@ class Parent(Grandparent):
 class Child(Parent):
     @override
     def __new__(cls) -> Parent: ...  # error: [invalid-method-override]
+```
+
+## Wrapped classmethods with inherited `Self` incompatibilities
+
+In the below example, `Parent.make` already violates `Grandparent.make`'s return contract: `Self`
+means `Parent` when accessed on `Parent`, but the wrapped factory returns `Grandparent`.
+`Child.make` preserves the parent's return type, so we do not report the inherited incompatibility
+on `Child`.
+
+```pyi
+from typing_extensions import Self
+
+class Grandparent:
+    @classmethod
+    def make(cls) -> Self: ...
+
+class Factory:
+    def __call__(self, cls: type[Grandparent]) -> Grandparent: ...
+
+class Parent(Grandparent):
+    make = classmethod(Factory())  # error: [invalid-attribute-override]
+
+class Child(Parent):
+    @classmethod
+    def make(cls) -> Grandparent: ...
 ```
 
 ## Missing `@override` decorator

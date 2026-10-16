@@ -219,6 +219,50 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
+### Tuple subclasses
+
+Expanding the possible element types of a tuple subclass preserves its class identity. A class
+pattern matching that subclass is exhaustive, including when it appears inside a sequence pattern.
+
+```py
+from typing import NamedTuple, final
+
+class Point(NamedTuple):
+    x: bool
+
+def named_tuple(value: Point) -> int:  # no diagnostic
+    match value:
+        case Point():
+            return 42
+
+def nested_named_tuple(value: tuple[Point]) -> int:  # no diagnostic
+    match value:
+        case [Point()]:
+            return 42
+
+@final
+class TupleSubclass(tuple[bool]): ...
+
+def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
+    match value:
+        case TupleSubclass():
+            return 42
+```
+
+A guard or a refutable attribute pattern can still leave values unmatched:
+
+```py
+def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+    match value:
+        case Point() if flag:
+            return 42
+
+def refutable(value: Point) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
+    match value:
+        case Point(x=True):
+            return 42
+```
+
 ### Dynamic class
 
 A dynamically typed class expression may match any value, but we cannot prove which values it does
@@ -655,6 +699,118 @@ def _(target: int, flag: NotBoolable):
             y = 3
 
     reveal_type(y)  # revealed: Literal[1, 2, 3]
+```
+
+## Reachability after guarded patterns
+
+In these examples, an always-true guard makes the later case with the same pattern unreachable. A
+false or ambiguous guard can let the later case match.
+
+```py
+def always_true_guard(value: int | str) -> None:
+    match value:
+        # The guard is statically known to be true, so the second case is unreachable.
+        case str() if True:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 3]
+
+def always_false_guard(value: int | str) -> None:
+    match value:
+        # The guard is always false, so strings can reach the second case.
+        case str() if False:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[2, 3]
+
+def ambiguous_guard(value: int | str, flag: bool) -> None:
+    match value:
+        # The guard may be false, so strings can reach the second case.
+        case str() if flag:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 2, 3]
+```
+
+## Reachability after guarded enum patterns
+
+An enum member matched by an always-true guarded case cannot reach the same pattern in a later case.
+A false or ambiguous guard can leave that pattern reachable.
+
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def enum_with_always_true_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # The guard is statically known to be true, so the second case is unreachable.
+        case Color.RED if True:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+
+    reveal_type(result)  # revealed: Literal[1, 3]
+
+def enum_with_always_false_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # The guard is always false, so `Color.RED` can reach the second case.
+        case Color.RED if False:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+
+    reveal_type(result)  # revealed: Literal[2, 3]
+
+def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool) -> None:
+    match value:
+        # The guard may be false, so `Color.RED` can reach the second case.
+        case Color.RED if flag:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+
+    reveal_type(result)  # revealed: Literal[1, 2, 3]
+```
+
+The type of a name captured by the pattern can make the guard always true:
+
+```py
+def enum_with_capture_dependent_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # `red` is always `Color.RED`, so the guard is true and the second case is unreachable.
+        case Color.RED as red if red is Color.RED:  # error: [redundant-condition-strict] "always true"
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+
+    reveal_type(result)  # revealed: Literal[1, 3]
 ```
 
 ## Matching on enum | None without covering None

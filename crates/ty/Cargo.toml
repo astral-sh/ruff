@@ -18,6 +18,7 @@ license.workspace = true
 doctest = false
 
 [dependencies]
+ruff_command_line = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
 ruff_python_ast = { workspace = true }
@@ -30,7 +31,6 @@ ty_site_packages = { workspace = true }
 ty_static = { workspace = true }
 
 anyhow = { workspace = true }
-argfile = { workspace = true }
 clap = { workspace = true, features = ["wrap_help", "string", "env"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
