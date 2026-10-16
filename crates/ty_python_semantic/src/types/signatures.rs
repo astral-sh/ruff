@@ -1440,8 +1440,10 @@ impl<'db> Signature<'db> {
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
-        let concrete_class_receiver =
-            matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
+        let concrete_class_receiver = matches!(
+            receiver_type,
+            Type::ClassLiteral(_) | Type::SpecializedClass(_)
+        );
         let specialization = builder.build_merged_with(|typevar, bounds| {
             if let Some(bounds) = bounds
                 && bounds.as_exact(db, env).is_some()

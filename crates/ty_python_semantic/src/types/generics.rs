@@ -3685,7 +3685,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 )
             ) && instance
                 .class(db, env)
-                .into_generic_alias()
+                .into_class_specialization()
                 .is_some_and(|alias| {
                     matches!(
                         alias.specialization(db).types(db),
@@ -4068,7 +4068,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (
                 Type::TypeForm(formal_typeform),
-                actual @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)),
+                actual @ (Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
+                | Type::GenericAlias(_)
+                | Type::SubclassOf(_)),
             ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 if let Some(actual_instance) = actual.to_instance_approximation(db, self.env) {
@@ -4506,6 +4509,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (
                 Type::SubclassOf(formal_subclass),
                 actual @ (Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_)),
@@ -4531,12 +4535,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                formal @ (Type::SubclassOf(_) | Type::GenericAlias(_)),
+                formal @ (Type::SubclassOf(_) | Type::SpecializedClass(_) | Type::GenericAlias(_)),
                 Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Union(_),
-            ) if formal.is_generic_alias()
+            ) if formal.is_specialized_class_or_alias()
                 || matches!(formal, Type::SubclassOf(subclass)
                     if matches!(subclass.subclass_of(), SubclassOfInner::Class(_))) =>
             {
@@ -4770,7 +4775,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (Type::NominalInstance(formal_nominal), Type::NominalInstance(actual_nominal)) => {
-                if let Some(formal_alias) = formal_nominal.class(db, self.env).into_generic_alias()
+                if let Some(formal_alias) = formal_nominal
+                    .class(db, self.env)
+                    .into_class_specialization()
                 {
                     let formal_origin = formal_alias.origin(db);
                     for base in actual_nominal.class(db, self.env).iter_mro(db) {

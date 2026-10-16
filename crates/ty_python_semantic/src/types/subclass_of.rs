@@ -82,7 +82,7 @@ impl<'db> SubclassOfType<'db> {
             Type::ClassLiteral(literal) => {
                 SubclassOfInner::Class(literal.default_specialization(db))
             }
-            Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
+            Type::SpecializedClass(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
             Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::SpecialForm(SpecialFormType::Unknown) => {
                 SubclassOfInner::Dynamic(DynamicType::Unknown)
@@ -200,7 +200,7 @@ impl<'db> SubclassOfType<'db> {
             .and_then(|typevar| typevar.typevar(db).upper_bound(db, env))
             .and_then(|bound| {
                 let bound = Self::try_from_instance(db, env, bound.resolve_type_alias(db)).ok()?;
-                matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_)).then_some(bound)
+                matches!(bound, Type::ClassLiteral(_) | Type::SpecializedClass(_)).then_some(bound)
             })
     }
 

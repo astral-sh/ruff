@@ -63,7 +63,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::InferContext;
-use crate::types::dedicated::pydantic;
+use crate::types::dedicated::{numpy, pydantic};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
@@ -3179,6 +3179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::LiteralValue(..)
             | Type::SpecialForm(..)
             | Type::ClassLiteral(..)
+            | Type::SpecializedClass(..)
             | Type::GenericAlias(..)
             | Type::SubclassOf(..)
             | Type::KnownInstance(..)
@@ -3697,6 +3698,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             SpecialFormType::try_from_file_and_name(db, importing_file, &name.id)
         }) {
             target_ty = Type::SpecialForm(special_form);
+        } else if let Type::GenericAlias(alias) = target_ty
+            && let Some(name) = target.as_name_expr()
+            && let Some(class) = numpy::scalar_class(self.db(), definition, &name.id, alias)
+        {
+            target_ty = class;
         }
 
         target_ty
@@ -4863,7 +4869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::declared(Some(declared.inner_type())),
             );
-            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
+            let inferred_ty = if is_pep_613_type_alias && let Some(name) = target.as_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.
                 match inferred_ty {
@@ -4877,6 +4883,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
                             InternedType::new(self.db(), Type::unknown()),
                         ))
+                    }
+                    Type::GenericAlias(alias) => {
+                        numpy::scalar_class(db, definition, &name.id, alias).unwrap_or(inferred_ty)
                     }
                     _ => inferred_ty,
                 }
@@ -5649,6 +5658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
@@ -7048,7 +7058,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     alias
                 }
-                Type::GenericAlias(alias) => alias,
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => alias,
                 _ => return None,
             };
 
@@ -7070,7 +7080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         class_type
-            .map(Type::GenericAlias)
+            .map(Type::SpecializedClass)
             .filter(|class_type| !class_type.has_provisional_marker(db, env))
             .unwrap_or(ty)
     }
@@ -7767,7 +7777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let collection_alias = collection_class
                 .try_to_class_literal(db, env)?
                 .identity_specialization(db)
-                .into_generic_alias()?;
+                .into_class_specialization()?;
 
             let generic_context = collection_alias
                 .specialization(self.db())
@@ -9488,7 +9498,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
-            Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
+            Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
+                Some(ClassType::Generic(generic))
+            }
             Type::SubclassOf(subclass) => subclass.subclass_of().into_class(db, env),
             _ => None,
         };
@@ -11269,10 +11281,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Class `{}` has no attribute `{attr_name}`",
                             class.name(db),
                         )),
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                            "Class `{}` has no attribute `{attr_name}`",
-                            alias.display(db, env),
-                        )),
+                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) => builder
+                            .into_diagnostic(format_args!(
+                                "Class `{}` has no attribute `{attr_name}`",
+                                alias.display(db, env),
+                            )),
                         Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
                             "Function `{}` has no attribute `{attr_name}`",
                             function.name(db),
@@ -11764,6 +11777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::SpecializedClass(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)

@@ -5,7 +5,7 @@ use crate::types::generics::Specialization;
 use crate::types::tuple::{TupleSpec, TupleType, VariableSegment};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ClassType, DynamicType, GenericAlias, KnownClass, SubclassOfInner, SubclassOfType, Type,
+    ClassSpecialization, ClassType, DynamicType, KnownClass, SubclassOfInner, SubclassOfType, Type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -147,12 +147,12 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             .iter()
             .map(|ty| match (first, ty) {
                 (Type::NominalInstance(_), Type::NominalInstance(instance)) => {
-                    instance.class(db, env).into_generic_alias()
+                    instance.class(db, env).into_class_specialization()
                 }
                 (Type::ProtocolInstance(_), Type::ProtocolInstance(protocol))
                     if protocol.materialization_kind(db).is_none() =>
                 {
-                    protocol.class_origin(db)?.into_generic_alias()
+                    protocol.class_origin(db)?.into_class_specialization()
                 }
                 _ => None,
             })
@@ -170,7 +170,9 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             Type::ClassLiteral(class) => {
                 Some(Type::instance(db, env, class.default_specialization(db)))
             }
-            Type::GenericAlias(alias) => Some(Type::instance(db, env, ClassType::Generic(alias))),
+            Type::SpecializedClass(alias) => {
+                Some(Type::instance(db, env, ClassType::Generic(alias)))
+            }
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
                 Some(Type::object())
             }
@@ -178,7 +180,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         }
     }
 
-    fn merge_classes(&self, aliases: &[GenericAlias<'db>]) -> Option<ClassType<'db>> {
+    fn merge_classes(&self, aliases: &[ClassSpecialization<'db>]) -> Option<ClassType<'db>> {
         let db = self.db;
         let first = *aliases.first()?;
         let context = first.specialization(db).generic_context(db);
@@ -211,7 +213,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
                 }
             })
             .collect::<Option<_>>()?;
-        Some(ClassType::Generic(GenericAlias::new(
+        Some(ClassType::Generic(ClassSpecialization::new(
             db,
             first.origin(db),
             Specialization::new(db, context, types, None, None),

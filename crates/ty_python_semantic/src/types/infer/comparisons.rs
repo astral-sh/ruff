@@ -528,7 +528,7 @@ impl<'db> Type<'db> {
                 | Type::Callable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
@@ -539,7 +539,8 @@ impl<'db> Type<'db> {
                 | Type::AlwaysFalsy
                 | Type::BoundSuper(_)
                 | Type::TypeForm(_)
-                | Type::TypedDict(_) => UpcastResult::stable(ty),
+                | Type::TypedDict(_)
+                | Type::GenericAlias(_) => UpcastResult::stable(ty),
             }
         }
 

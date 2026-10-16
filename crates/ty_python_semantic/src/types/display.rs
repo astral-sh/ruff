@@ -22,7 +22,7 @@ use ty_module_resolver::file_to_module;
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassSpecialization, ClassType};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
@@ -685,7 +685,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                     self.record_class(db, literal.enum_class(db));
                 }
             }
-            Type::GenericAlias(alias) => {
+            Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
@@ -1294,7 +1294,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
-            Type::GenericAlias(generic) => {
+            Type::SpecializedClass(generic) | Type::GenericAlias(generic) => {
                 f.set_invalid_type_annotation();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
@@ -2099,7 +2099,7 @@ impl Display for DisplayFunctionType<'_, '_> {
     }
 }
 
-impl<'db> GenericAlias<'db> {
+impl<'db> ClassSpecialization<'db> {
     pub(crate) fn display<'env>(
         self,
         db: &'db dyn Db,

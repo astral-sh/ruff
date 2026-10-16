@@ -248,7 +248,11 @@ impl<'db> AllMembers<'db> {
                 );
             }
 
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+            Type::GenericAlias(alias) => {
+                self.extend_with_type(db, env, Type::SpecializedClass(alias));
+            }
+
+            Type::SpecializedClass(generic_alias) if generic_alias.is_typed_dict(db) => {
                 self.extend_with_type(
                     db,
                     env,
@@ -270,7 +274,7 @@ impl<'db> AllMembers<'db> {
                 self.extend_with_metaclass_members(db, env, ty, class_literal.metaclass(db));
             }
 
-            Type::GenericAlias(generic_alias) => {
+            Type::SpecializedClass(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
                 self.extend_with_class_members(db, env, ty, ClassLiteral::Static(class_literal));
                 self.extend_with_synthetic_members(
@@ -394,7 +398,7 @@ impl<'db> AllMembers<'db> {
                         );
                     }
                 }
-                Type::GenericAlias(generic_alias) => {
+                Type::SpecializedClass(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(
                         db,

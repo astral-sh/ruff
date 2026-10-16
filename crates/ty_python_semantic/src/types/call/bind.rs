@@ -73,12 +73,13 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
+    ClassSpecialization, CycleDetector, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    DynamicType, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1947,15 +1948,22 @@ impl<'db> Bindings<'db> {
                                 ));
                             }
                         }
-                        [Some(Type::GenericAlias(generic_alias))] => {
+                        [
+                            Some(
+                                Type::SpecializedClass(generic_alias)
+                                | Type::GenericAlias(generic_alias),
+                            ),
+                        ] => {
                             let new_origin = generic_alias
                                 .origin(db)
                                 .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
+                            overload.set_return_type(Type::SpecializedClass(
+                                ClassSpecialization::new(
+                                    db,
+                                    new_origin,
+                                    generic_alias.specialization(db),
+                                ),
+                            ));
                         }
                         _ => {}
                     },
@@ -2882,6 +2890,7 @@ impl<'db> Bindings<'db> {
                                         matches!(
                                             overload.return_type(),
                                             Type::ClassLiteral(_)
+                                                | Type::SpecializedClass(_)
                                                 | Type::GenericAlias(_)
                                                 | Type::SubclassOf(_)
                                         )
@@ -2899,14 +2908,15 @@ impl<'db> Bindings<'db> {
                                             ));
                                             continue;
                                         }
-                                        Some(Some(Type::GenericAlias(generic_alias)))
-                                            if returns_class() =>
-                                        {
+                                        Some(Some(
+                                            Type::SpecializedClass(generic_alias)
+                                            | Type::GenericAlias(generic_alias),
+                                        )) if returns_class() => {
                                             let new_origin = generic_alias
                                                 .origin(db)
                                                 .with_dataclass_params(db, Some(dataclass_params));
-                                            overload.set_return_type(Type::GenericAlias(
-                                                GenericAlias::new(
+                                            overload.set_return_type(Type::SpecializedClass(
+                                                ClassSpecialization::new(
                                                     db,
                                                     new_origin,
                                                     generic_alias.specialization(db),
