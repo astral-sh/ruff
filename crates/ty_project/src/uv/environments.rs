@@ -929,8 +929,8 @@ mod tests {
                 },
                 "leaf": {"kind": "package", "name": "leaf", "dependencies": []}
             },
-            "module_owners": {
-                "leaf": [{"package_id": "leaf"}]
+            "modules": {
+                "leaf": {"owners": [{"package_id": "leaf"}]}
             }
         })
     }
