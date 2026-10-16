@@ -3474,5 +3474,127 @@ def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]
         reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
 ```
 
+## Recursive instance attributes with growing type arguments
+
+Reading `child` adds another `list` around the type argument. Comparing the class with a recursive
+protocol terminates even though no exact specialization repeats. We reject the return because the
+protocol also permits writing any `HasChild` to `child`.
+
+```py
+from typing import Protocol
+
+class Node[T]:
+    child: "Node[list[T]]"
+
+class HasChild(Protocol):
+    child: "HasChild"
+
+def as_protocol(node: Node[int]) -> HasChild:
+    return node  # error: [invalid-return-type]
+```
+
+## Recursive class attributes with growing type arguments
+
+The same comparison can follow class objects instead of instances. Each `child` names another
+specialization of the class; it does not satisfy the protocol's writable attribute.
+
+```py
+from typing import Protocol
+
+class Node[T]:
+    child: "type[Node[list[T]]]"
+
+class HasChild(Protocol):
+    child: "HasChild"
+
+def as_protocol() -> HasChild:
+    return Node[int]  # error: [invalid-return-type]
+```
+
+## Recursive descriptor results with growing type arguments
+
+A descriptor can return the next specialization. Comparing its result with a recursive protocol also
+terminates.
+
+```py
+from typing import Protocol
+
+class Child[T]:
+    def __get__(self, instance: object, owner: type | None = None) -> "Node[list[T]]":
+        raise NotImplementedError
+
+class Node[T]:
+    child = Child[T]()
+
+class HasChild(Protocol):
+    child: "HasChild"
+
+def as_protocol(node: Node[int]) -> HasChild:
+    return node  # error: [invalid-return-type]
+```
+
+## Recursive properties with growing type arguments
+
+A property can expose the same growing sequence. We stop the recursive comparison conservatively.
+
+TODO: This read-only protocol is satisfied at every level, so the return should be accepted.
+
+```py
+from typing import Protocol
+
+class Node[T]:
+    @property
+    def child(self) -> "Node[list[T]]":
+        raise NotImplementedError
+
+class HasChild(Protocol):
+    @property
+    def child(self) -> "HasChild": ...
+
+def as_protocol(node: Node[int]) -> HasChild:
+    return node  # error: [invalid-return-type]
+```
+
+## Recursive properties whose type arguments stabilize
+
+Here `child` wraps the second argument in a list, but also replaces that argument with `None`. After
+two reads, the specialization is `Node[list[None], None]` and repeats. We can therefore establish
+that the class satisfies the protocol.
+
+```py
+from typing import Protocol
+
+class Node[T, U]:
+    @property
+    def child(self) -> "Node[list[U], None]":
+        raise NotImplementedError
+
+class HasChild(Protocol):
+    @property
+    def child(self) -> "HasChild": ...
+
+def as_protocol(node: Node[int, str]) -> HasChild:
+    return node  # no diagnostic
+```
+
+## Finite nesting of classes with recursive properties
+
+Comparing nested type arguments makes finite progress even when the class has a recursively growing
+property. We still compare the inner specializations to establish covariance.
+
+```py
+class Node[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+    @property
+    def child(self) -> "Node[tuple[T]]":
+        raise NotImplementedError
+
+def widen(node: Node[Node[int]]) -> Node[Node[object]]:
+    return node  # no diagnostic
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

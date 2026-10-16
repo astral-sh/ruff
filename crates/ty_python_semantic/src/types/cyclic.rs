@@ -39,6 +39,7 @@ use ty_python_core::definition::Definition;
 use crate::types::callable::SignatureSource;
 use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::list_members::all_end_of_scope_members;
 use crate::types::signatures::walk_signature;
 use crate::types::visitor::{TypeCollector, TypeVisitor, any_over_type_including_alias_arguments};
 use crate::types::{
@@ -62,6 +63,11 @@ impl<'guard> GuardToken<'guard> {
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
+    GrowingNominalInstance(Definition<'db>),
+    GrowingClassMembers {
+        definition: Definition<'db>,
+        subclass: bool,
+    },
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
@@ -99,6 +105,16 @@ impl<'db> Type<'db> {
             (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
             (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
                 a.definition(db) == b.definition(db)
+            }
+            (Type::NominalInstance(a), Type::NominalInstance(b)) => {
+                matches!((a.stored_class(db), b.stored_class(db)), (Some(a), Some(b))
+                    if a.class_literal(db) == b.class_literal(db))
+            }
+            (Type::GenericAlias(a), Type::GenericAlias(b)) => a.origin(db) == b.origin(db),
+            (Type::SubclassOf(a), Type::SubclassOf(b)) => {
+                matches!((a.subclass_of(), b.subclass_of()),
+                    (SubclassOfInner::Class(a), SubclassOfInner::Class(b))
+                    if a.class_literal(db) == b.class_literal(db))
             }
             (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
                 a.definition(db) == b.definition(db)
@@ -144,16 +160,33 @@ impl<'db> Type<'db> {
             // that visits stop even though no exact type repeats. Recursion that revisits one
             // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
             // no coarser identity: the detectors stop on the repeated type itself.
-            Type::TypeAlias(_)
+            Type::NominalInstance(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::TypeAlias(_)
             | Type::ProtocolInstance(_)
             | Type::TypedDict(_)
             | Type::Recursive(_)
             | Type::Callable(_) => {
-                let target = RecursiveDefinition::from_type(db, self)?.target(db);
+                let reference = RecursiveDefinition::from_type(db, self)?;
+                let target = if matches!(self, Type::GenericAlias(_) | Type::SubclassOf(_)) {
+                    reference.for_member_access().target(db)
+                } else {
+                    reference.target(db)
+                };
                 if !target.may_have_unbounded_specialization(db) {
                     return None;
                 }
                 Some(match target {
+                    RecursiveDefinition::Nominal(class)
+                        if matches!(self, Type::NominalInstance(_)) =>
+                    {
+                        TypeIdentity::GrowingNominalInstance(class.definition(db))
+                    }
+                    RecursiveDefinition::Nominal(class) => TypeIdentity::GrowingClassMembers {
+                        definition: class.definition(db),
+                        subclass: matches!(self, Type::SubclassOf(_)),
+                    },
                     RecursiveDefinition::TypeAlias(alias) => {
                         TypeIdentity::GrowingTypeAlias(alias.definition(db))
                     }
@@ -215,6 +248,7 @@ impl<'db> RecursiveType<'db> {
 /// A source whose type parameters can flow through recursive references.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum RecursiveDefinition<'db> {
+    Nominal(StaticClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
@@ -365,7 +399,7 @@ impl<'db> RecursiveDefinition<'db> {
             Type::NominalInstance(instance) => {
                 let (class, arguments) = instance.stored_class(db)?.static_class_literal(db)?;
                 class.generic_context(db)?;
-                (Self::CallableInstance(class), arguments)
+                (Self::Nominal(class), arguments)
             }
             Type::Recursive(recursive) => {
                 let specialization = recursive.arguments(db)?;
@@ -391,7 +425,7 @@ impl<'db> RecursiveDefinition<'db> {
             Type::Callable(callable) => {
                 return match callable.signature_source(db) {
                     SignatureSource::Projected(projection) => {
-                        Self::from_type(db, projection.source())
+                        Self::from_type(db, projection.source()).map(DefinitionUse::for_call)
                     }
                     SignatureSource::Explicit(_) => None,
                 };
@@ -406,7 +440,7 @@ impl<'db> RecursiveDefinition<'db> {
         match self {
             Self::TypeAlias(alias) => RecursiveOrigin::Definition(alias.definition(db)),
             Self::Structural(recursive) => RecursiveOrigin::Definition(recursive.definition(db)),
-            Self::Protocol(origin) | Self::TypedDict(origin) => {
+            Self::Nominal(origin) | Self::Protocol(origin) | Self::TypedDict(origin) => {
                 RecursiveOrigin::Definition(origin.definition(db))
             }
 
@@ -433,7 +467,8 @@ impl<'db> RecursiveDefinition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.generic_context(db),
             Self::Structural(recursive) => recursive.parameters(db),
-            Self::Protocol(origin)
+            Self::Nominal(origin)
+            | Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
             | Self::CallableInstance(origin)
@@ -449,7 +484,8 @@ impl<'db> RecursiveDefinition<'db> {
     ) -> Specialization<'db> {
         let known_class = match self {
             Self::TypeAlias(_) | Self::Structural(_) => None,
-            Self::Protocol(origin)
+            Self::Nominal(origin)
+            | Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
             | Self::CallableInstance(origin)
@@ -523,6 +559,26 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
+    /// Reading members of a class object or instance follows the same declarations.
+    fn for_member_access(self) -> Self {
+        match self {
+            Self::Specialized(RecursiveDefinition::Constructor(class), arguments) => {
+                Self::Specialized(RecursiveDefinition::Nominal(class), arguments)
+            }
+            Self::Specialized(..) => self,
+        }
+    }
+
+    /// Calling an instance inspects its `__call__` member rather than its ordinary attributes.
+    fn for_call(self) -> Self {
+        match self {
+            Self::Specialized(RecursiveDefinition::Nominal(class), arguments) => {
+                Self::Specialized(RecursiveDefinition::CallableInstance(class), arguments)
+            }
+            Self::Specialized(..) => self,
+        }
+    }
+
     fn target(self, _db: &'db dyn Db) -> RecursiveDefinition<'db> {
         match self {
             Self::Specialized(target, _) => target,
@@ -800,6 +856,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
         let env = &self.env;
         let traversal = TypeVisitorContext::new(self);
         match source {
+            RecursiveDefinition::Nominal(origin) => self.visit_nominal_members(db, origin),
             RecursiveDefinition::Structural(recursive) => {
                 let visitor: super::recursive::TypeVisitorState<'_, 'db, Type<'db>, bool> =
                     super::recursive::TypeVisitorState::new(
@@ -922,6 +979,92 @@ impl<'db> SpecializationFlowVisitor<'db> {
         });
     }
 
+    /// Follow declared instance members without reading descriptors or calling accessors.
+    /// Bases contribute their own members through their specialized definition references.
+    fn visit_nominal_members(&self, db: &'db dyn Db, origin: StaticClassLiteral<'db>) {
+        let traversal = TypeVisitorContext::new(self);
+        for base in origin.explicit_bases(db) {
+            if let Some(instance) = base.to_instance(db, &self.env) {
+                traversal.visit_type(db, instance.into_inner());
+            }
+        }
+
+        let mut seen = FxHashSet::default();
+        for member in all_end_of_scope_members(db, &self.env, origin.body_scope(db)) {
+            if seen.insert(member.member.name.clone()) {
+                self.visit_nominal_member(db, member.member.name.as_str(), member.member.ty);
+            }
+        }
+
+        let class = origin.identity_specialization(db);
+        for name in class.own_instance_attribute_names(db) {
+            if seen.insert(name.clone())
+                && let Some(ty) = class
+                    .own_instance_member(db, &self.env, name)
+                    .ignore_possibly_undefined()
+            {
+                self.visit_nominal_member(db, name, ty);
+            }
+        }
+    }
+
+    fn visit_nominal_member(&self, db: &'db dyn Db, name: &str, ty: Type<'db>) {
+        if matches!(name, "__getattr__" | "__getattribute__") {
+            self.visit_accessor_annotation(db, ty, None);
+            return;
+        }
+        match ty {
+            // Method comparisons already guard their source declarations. Including receivers
+            // here would make an otherwise non-recursive generic class appear recursive.
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {}
+            Type::PropertyInstance(property) => {
+                if let Some(getter) = property.getter(db) {
+                    self.visit_accessor_annotation(db, getter, None);
+                }
+                if let Some(setter) = property.setter(db) {
+                    self.visit_accessor_annotation(db, setter, Some(1));
+                }
+            }
+            _ => self.visit_callable_member(db, ty),
+        }
+    }
+
+    /// Inspect source signatures, excluding receivers and implementation-only overload types.
+    fn visit_accessor_annotation(
+        &self,
+        db: &'db dyn Db,
+        accessor: Type<'db>,
+        parameter: Option<usize>,
+    ) {
+        let traversal = TypeVisitorContext::new(self);
+        let signatures = match accessor.underlying_function(db) {
+            Type::FunctionLiteral(function) => function.signature(db),
+            Type::Callable(callable) => {
+                let SignatureSource::Explicit(signatures) = callable.signature_source(db) else {
+                    self.inconclusive.set(true);
+                    return;
+                };
+                signatures
+            }
+            _ => {
+                self.inconclusive.set(true);
+                return;
+            }
+        };
+        for signature in &signatures.overloads {
+            let ty = match parameter {
+                None => signature.return_ty,
+                Some(index) => {
+                    let Some(parameter) = signature.parameters().get_positional(index) else {
+                        continue;
+                    };
+                    parameter.annotated_type()
+                }
+            };
+            traversal.visit_type(db, ty);
+        }
+    }
+
     fn record_reference(&self, db: &'db dyn Db, reference: DefinitionUse<'db>) {
         let target = reference.target(db);
         self.referenced_definitions.borrow_mut().push(target);
@@ -1007,7 +1150,7 @@ impl<'db> TypeWalk<'db> for CallableMemberFlow<'_, 'db> {
             _ => {}
         }
         if let Some(DefinitionUse::Specialized(
-            RecursiveDefinition::CallableInstance(class) | RecursiveDefinition::Protocol(class),
+            RecursiveDefinition::Nominal(class) | RecursiveDefinition::Protocol(class),
             arguments,
         )) = RecursiveDefinition::from_type(db, ty)
             && !class
@@ -1069,6 +1212,13 @@ impl<'db> TypeVisitorHooks<'db> for SpecializationFlowVisitor<'db> {
 
         if let Some(reference) = RecursiveDefinition::from_type(db, ty) {
             self.record_reference(db, reference);
+            if matches!(reference.target(db), RecursiveDefinition::Nominal(_)) {
+                // A returned or stored instance can be inspected through ordinary attributes or
+                // converted to a callable. Both projections can lead back to the current source.
+                self.record_reference(db, reference.for_call());
+            } else if matches!(reference.target(db), RecursiveDefinition::Constructor(_)) {
+                self.record_reference(db, reference.for_member_access());
+            }
             reference.walk_arguments(db, visit);
             return;
         }
