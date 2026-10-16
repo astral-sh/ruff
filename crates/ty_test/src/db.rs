@@ -51,6 +51,10 @@ impl Db {
         };
 
         db.settings = Some(Settings::new(&db, program_settings));
+        ty_python_semantic::initialize_reaching_definitions_recording(
+            &db,
+            ty_python_semantic::ReachingDefinitionsRecordingMode::default(),
+        );
         db
     }
 
