@@ -97,3 +97,13 @@ def f():
 
     cast(typ=int, val=3.0)  # TC006
     cast(val=3.0, typ=int)  # TC006
+
+
+def f():
+    # Display-only fix: quoting leaves an escape sequence in the forward reference
+    from typing import cast, Literal
+
+    cast(Literal["'"], "'")  # TC006
+    cast(Literal["\n"], "\n")  # TC006
+    cast(Literal[r'''a
+b'''], "")  # TC006
