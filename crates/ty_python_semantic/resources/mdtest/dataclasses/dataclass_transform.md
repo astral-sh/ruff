@@ -194,8 +194,77 @@ GenericModel[str](value=1)
 
 ### `eq_default`
 
-`eq=True/False` does not have a observable effect (apart from a minor change regarding whether
-`other` is positional-only or not, which is not modelled at the moment).
+The `eq_default` argument controls whether `__eq__` is generated. Equality generation is enabled by
+default, and an explicit `eq` argument to the decorator overrides its default:
+
+```py
+from typing import Literal
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def normal(*, eq: bool = True):
+    raise NotImplementedError
+
+@dataclass_transform(eq_default=False)
+def without_eq(*, eq: bool = False):
+    raise NotImplementedError
+
+@normal()
+class DefaultEq: ...
+
+@normal(eq=False)
+class DisabledEq: ...
+
+@without_eq()
+class NoDefaultEq: ...
+
+@without_eq(eq=True)
+class EnabledEq: ...
+
+reveal_type(DefaultEq.__eq__)  # revealed: (self: DefaultEq, other: object) -> bool
+reveal_type(DisabledEq.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+reveal_type(NoDefaultEq.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+reveal_type(EnabledEq.__eq__)  # revealed: (self: EnabledEq, other: object) -> bool
+```
+
+As with `@dataclass`, a method defined in the class body takes precedence over generation:
+
+```py
+@normal()
+class CustomEq:
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+reveal_type(CustomEq() == object())  # revealed: Literal[True]
+```
+
+Metaclass-based transformers use the same defaults and accept overrides in class arguments:
+
+```py
+@dataclass_transform(eq_default=False)
+class ModelMeta(type): ...
+
+class WithoutMetaEq(metaclass=ModelMeta): ...
+class WithMetaEq(metaclass=ModelMeta, eq=True): ...
+
+reveal_type(WithoutMetaEq.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+reveal_type(WithMetaEq.__eq__)  # revealed: (self: WithMetaEq, other: object) -> bool
+```
+
+Base-class-based transformers also accept overrides. The transformer base itself does not receive a
+generated method, while its dataclass-like subclasses do:
+
+```py
+@dataclass_transform(eq_default=True)
+class ModelBase: ...
+
+class WithBaseEq(ModelBase): ...
+class WithoutBaseEq(ModelBase, eq=False): ...
+
+reveal_type(ModelBase.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+reveal_type(WithBaseEq.__eq__)  # revealed: (self: WithBaseEq, other: object) -> bool
+reveal_type(WithoutBaseEq.__eq__)  # revealed: def __eq__(self, value: object, /) -> bool
+```
 
 ### `order_default`
 
