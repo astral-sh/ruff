@@ -1461,6 +1461,62 @@ class Node(Generic[T]):
 Node[int]()()  # error: [call-non-callable]
 ```
 
+## Recursive calls through generic properties
+
+The `__call__` property infers its result from the instance's `child` attribute. Each lookup returns
+another `Node` with a larger type argument, so it never reaches a function signature.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+class HasChild(Protocol[T_co]):
+    @property
+    def child(self) -> T_co: ...
+
+class Node(Generic[T]):
+    child: "Node[list[T]]"
+
+    @property
+    def __call__(self: HasChild[U]) -> U:
+        raise NotImplementedError
+
+Node[int]()()  # error: [call-non-callable]
+```
+
+## Finite calls through generic properties
+
+A generic property can also expose a callable stored in a type argument. Each lookup removes one
+layer of `Wrapper` until it reaches `End`, whose call returns `int`.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+class HasChild(Protocol[T_co]):
+    @property
+    def child(self) -> T_co: ...
+
+class Wrapper(Generic[T]):
+    child: T
+
+    @property
+    def __call__(self: HasChild[U]) -> U:
+        raise NotImplementedError
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[Wrapper[End]]]()())  # revealed: int
+```
+
 ## Recursive descriptor calls with changing type arguments
 
 Reading `value` calls the descriptor's `__get__`, which is itself another descriptor instance.

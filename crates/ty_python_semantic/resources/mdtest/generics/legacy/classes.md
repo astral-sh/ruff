@@ -4480,6 +4480,61 @@ def as_protocol() -> HasChild:
     return Node[int]  # error: [invalid-return-type]
 ```
 
+## Recursive metaclass properties with growing type arguments
+
+A property inherited by a metaclass can return the next specialization of a class object. We stop
+the recursive comparison even though each property read adds another `list` to the type argument.
+
+TODO: The read-only protocol is satisfied at every level, so this assignment should be accepted.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class BaseMeta(type):
+    @property
+    def child(self: "type[Node[T]]") -> "type[Node[list[T]]]":
+        raise NotImplementedError
+
+class Meta(BaseMeta):
+    pass
+
+class Node(Generic[T], metaclass=Meta):
+    pass
+
+class HasChild(Protocol):
+    @property
+    def child(self) -> "HasChild": ...
+
+node: HasChild = Node[int]  # error: [invalid-assignment]
+```
+
+## Metaclass properties whose type arguments stabilize
+
+A fixed property result lets the comparison reach an exact repetition. Here, reading `child` on
+`Node[str]` returns `Node[int]`, whose `child` has the same type.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    @property
+    def child(self: "type[Node[T]]") -> "type[Node[int]]":
+        raise NotImplementedError
+
+class Node(Generic[T], metaclass=Meta):
+    pass
+
+class HasChild(Protocol):
+    @property
+    def child(self) -> "HasChild": ...
+
+node: HasChild = Node[str]  # no diagnostic
+```
+
 ## Recursive descriptor results with growing type arguments
 
 A descriptor can return the next specialization. Comparing its result with a recursive protocol also

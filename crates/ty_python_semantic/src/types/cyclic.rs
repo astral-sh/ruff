@@ -178,12 +178,10 @@ impl<'db> Type<'db> {
                     return None;
                 }
                 Some(match target {
-                    RecursiveDefinition::Nominal(class)
-                        if matches!(self, Type::NominalInstance(_)) =>
-                    {
+                    RecursiveDefinition::Nominal(class) => {
                         TypeIdentity::GrowingNominalInstance(class.definition(db))
                     }
-                    RecursiveDefinition::Nominal(class) => TypeIdentity::GrowingClassMembers {
+                    RecursiveDefinition::ClassMembers(class) => TypeIdentity::GrowingClassMembers {
                         definition: class.definition(db),
                         subclass: matches!(self, Type::SubclassOf(_)),
                     },
@@ -249,6 +247,7 @@ impl<'db> RecursiveType<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum RecursiveDefinition<'db> {
     Nominal(StaticClassLiteral<'db>),
+    ClassMembers(StaticClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
@@ -263,6 +262,7 @@ pub(crate) enum RecursiveDefinition<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum RecursiveOrigin<'db> {
     Definition(Definition<'db>),
+    ClassMembers(Definition<'db>),
     Constructor(Definition<'db>),
     CallableInstance(Definition<'db>),
     DescriptorGet(Definition<'db>),
@@ -444,6 +444,7 @@ impl<'db> RecursiveDefinition<'db> {
                 RecursiveOrigin::Definition(origin.definition(db))
             }
 
+            Self::ClassMembers(class) => RecursiveOrigin::ClassMembers(class.definition(db)),
             Self::Constructor(class) => RecursiveOrigin::Constructor(class.definition(db)),
             Self::CallableInstance(class) => {
                 RecursiveOrigin::CallableInstance(class.definition(db))
@@ -455,6 +456,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         match self.origin(db) {
             RecursiveOrigin::Definition(definition)
+            | RecursiveOrigin::ClassMembers(definition)
             | RecursiveOrigin::Constructor(definition)
             | RecursiveOrigin::CallableInstance(definition)
             | RecursiveOrigin::DescriptorGet(definition) => {
@@ -468,6 +470,7 @@ impl<'db> RecursiveDefinition<'db> {
             Self::TypeAlias(alias) => alias.generic_context(db),
             Self::Structural(recursive) => recursive.parameters(db),
             Self::Nominal(origin)
+            | Self::ClassMembers(origin)
             | Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
@@ -485,6 +488,7 @@ impl<'db> RecursiveDefinition<'db> {
         let known_class = match self {
             Self::TypeAlias(_) | Self::Structural(_) => None,
             Self::Nominal(origin)
+            | Self::ClassMembers(origin)
             | Self::Protocol(origin)
             | Self::TypedDict(origin)
             | Self::Constructor(origin)
@@ -559,11 +563,11 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
-    /// Reading members of a class object or instance follows the same declarations.
+    /// Class-object lookup includes metaclass members as well as the class's declarations.
     fn for_member_access(self) -> Self {
         match self {
             Self::Specialized(RecursiveDefinition::Constructor(class), arguments) => {
-                Self::Specialized(RecursiveDefinition::Nominal(class), arguments)
+                Self::Specialized(RecursiveDefinition::ClassMembers(class), arguments)
             }
             Self::Specialized(..) => self,
         }
@@ -857,6 +861,26 @@ impl<'db> SpecializationFlowVisitor<'db> {
         let traversal = TypeVisitorContext::new(self);
         match source {
             RecursiveDefinition::Nominal(origin) => self.visit_nominal_members(db, origin),
+            RecursiveDefinition::ClassMembers(origin) => {
+                self.visit_nominal_members(db, origin);
+                let metaclass = origin.identity_specialization(db).metaclass(db, env);
+                if let Some((metaclass, arguments)) = metaclass
+                    .to_class_type(db, env)
+                    .and_then(|class| class.static_class_literal(db))
+                {
+                    // Metaclasses need not be generic to expose generic properties or descriptors.
+                    // Keep this edge separate from instance lookup: Node's instances do not read
+                    // attributes from Node's metaclass.
+                    let reference = DefinitionUse::Specialized(
+                        RecursiveDefinition::Nominal(metaclass),
+                        arguments,
+                    );
+                    self.record_reference(db, reference);
+                    reference.walk_arguments(db, &traversal);
+                } else {
+                    self.has_unresolved_type.set(true);
+                }
+            }
             RecursiveDefinition::Structural(recursive) => {
                 let visitor: super::recursive::TypeVisitorState<'_, 'db, Type<'db>, bool> =
                     super::recursive::TypeVisitorState::new(
@@ -966,17 +990,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     .place
                     .ignore_possibly_undefined()
                 {
-                    if let Some(signatures) = Self::source_signatures(db, member) {
-                        // Parameter annotations constrain the descriptor call; they are not
-                        // values inspected by the next expansion. Including them would turn
-                        // a finite projection like __get__(..., instance: Wrapper[T]) -> T
-                        // into an apparent cycle through Wrapper.
-                        for signature in &signatures.overloads {
-                            traversal.visit_type(db, signature.return_ty);
-                        }
-                    } else {
-                        traversal.visit_type(db, member);
-                    }
+                    self.visit_accessor_annotation(db, member, None);
                 }
             }
         }
@@ -995,7 +1009,20 @@ impl<'db> SpecializationFlowVisitor<'db> {
         let traversal = TypeVisitorContext::new(self);
         for base in origin.explicit_bases(db) {
             if let Some(instance) = base.to_instance(db, &self.env) {
-                traversal.visit_type(db, instance.into_inner());
+                let instance = instance.into_inner();
+                if let Type::NominalInstance(instance) = instance
+                    && let Some((base, arguments)) = instance
+                        .stored_class(db)
+                        .and_then(|class| class.static_class_literal(db))
+                {
+                    // A nongeneric base can still contribute an accessor with method parameters.
+                    let reference =
+                        DefinitionUse::Specialized(RecursiveDefinition::Nominal(base), arguments);
+                    self.record_reference(db, reference);
+                    reference.walk_arguments(db, &traversal);
+                } else {
+                    traversal.visit_type(db, instance);
+                }
             }
         }
 
@@ -1061,7 +1088,8 @@ impl<'db> SpecializationFlowVisitor<'db> {
     ) {
         let traversal = TypeVisitorContext::new(self);
         let Some(signatures) = Self::source_signatures(db, accessor) else {
-            self.inconclusive.set(true);
+            self.has_unresolved_type.set(true);
+            traversal.visit_type(db, accessor);
             return;
         };
         for signature in &signatures.overloads {
@@ -1074,6 +1102,16 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     parameter.annotated_type()
                 }
             };
+            // Binding an accessor can infer a method parameter from its receiver. The result
+            // can then refer back to any class, even when its annotation is only a type variable.
+            // Inspect the exposed annotation, not receiver parameters: a receiver such as
+            // Wrapper[T] does not itself make the finite projection Wrapper[T] -> T recursive.
+            if any_over_type_including_alias_arguments(db, &self.env, ty, |ty| {
+                matches!(ty, Type::TypeVar(typevar)
+                    if !self.source_parameters.contains(&RecursiveDefinition::parameter_identity(db, typevar)))
+            }) {
+                self.has_unresolved_type.set(true);
+            }
             traversal.visit_type(db, ty);
         }
     }
@@ -1152,7 +1190,7 @@ impl<'db> TypeWalk<'db> for CallableMemberFlow<'_, 'db> {
             }
             Type::PropertyInstance(property) => {
                 if let Some(getter) = property.getter(db) {
-                    visitor.visit_type(db, getter);
+                    flow.visit_accessor_annotation(db, getter, None);
                 }
                 return;
             }
@@ -1229,12 +1267,6 @@ impl<'db> TypeVisitorHooks<'db> for SpecializationFlowVisitor<'db> {
                 // or call arguments. Without those bindings, this graph cannot prove that
                 // specialization is finite.
                 self.inconclusive.set(true);
-                if matches!(self.source_origin, RecursiveOrigin::DescriptorGet(_)) {
-                    // Calling __get__ can infer this variable from the receiver's interface.
-                    // Its result may refer back to any definition, even if the return annotation
-                    // contains no explicit reference to that definition.
-                    self.has_unresolved_type.set(true);
-                }
             }
             return;
         }
