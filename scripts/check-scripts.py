@@ -6,6 +6,9 @@
 #     "pathspec>=1.1.1",
 # ]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"

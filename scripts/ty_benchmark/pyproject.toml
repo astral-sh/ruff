@@ -28,6 +28,9 @@ ignore = [
     "E501", # We use ruff format
 ]
 
+[tool.ty.analysis]
+return-type-inference = "always"
+
 [tool.ty.rules]
 blanket-ignore-comment = "error"
 missing-type-argument = "error"

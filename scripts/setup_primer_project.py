@@ -4,6 +4,9 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
