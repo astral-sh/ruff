@@ -302,8 +302,8 @@ Inner2 = returns_class()
 # TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
 reveal_type(Inner1 is Inner2)  # revealed: Literal[True]
 
-# TODO: This should ideally be an error
-i: Inner1 = Inner2()
+# A class returned from an ordinary function cannot be used as a static type.
+i: Inner1 = Inner2()  # error: [invalid-type-form]
 ```
 
 Therefore, the return type of `returns_class` cannot be `<class 'Inner'>`. Instead, we currently
