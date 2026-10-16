@@ -1786,14 +1786,14 @@ impl<'db> FunctionType<'db> {
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
-            let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db)));
             result.cycle_normalized(db, &env, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition.body_scope(db);
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         let index = semantic_index(db, scope.program_file(db));
         let module = parsed_module(db, self.python_file(db)).load(db);
         let function = scope.node(db).expect_function();
@@ -1869,7 +1869,7 @@ impl<'db> FunctionType<'db> {
     )]
     fn inherited_return_annotation(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let scope = self.literal(db).last_definition.body_scope(db);
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         let index = semantic_index(db, scope.program_file(db));
         let class = original_class_type(
             db,

@@ -12,7 +12,7 @@ use crate::types::{Type, UnionBuilder};
 
 /// Return whether the outer type may be a tuple, without searching nested arguments or members.
 /// A recursion cutoff conservatively counts as a possible tuple.
-fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+fn may_be_tuple<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
     struct TupleShape;
 
     impl<'db> TypeWalk<'db> for TupleShape {

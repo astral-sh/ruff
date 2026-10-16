@@ -214,7 +214,7 @@ pub(crate) enum TypeVarEvaluation {
 /// nominal origins whose classes have no explicit bases.
 fn has_missing_generic_nominal_bound<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     source: IntersectionType<'db>,
     target: IntersectionType<'db>,
 ) -> bool {
