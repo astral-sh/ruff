@@ -1270,6 +1270,27 @@ reveal_type(generic_context(into_regular_callable(A)))
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Self fields in generic dataclasses
+
+A dataclass constructor infers the class type parameter alongside the `Self` used in its fields.
+
+```py
+from dataclasses import dataclass
+from typing import Self
+
+@dataclass
+class Node[T]:
+    value: T
+    parent: Self | None = None
+
+class IntNode(Node[int]): ...
+
+reveal_type(Node(1, Node(2)))  # revealed: Node[int]
+reveal_type(IntNode(1, IntNode(2)))  # revealed: IntNode
+IntNode("wrong")  # error: [invalid-argument-type]
+reveal_type(IntNode(1, Node(2)))  # revealed: IntNode
+```
+
 ### Inherited dataclass converters
 
 A subclass specializes an inherited converter's input type for its synthesized methods and attribute
