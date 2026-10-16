@@ -245,6 +245,11 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    #[expect(
+        clippy::inline_always,
+        reason = "Class extraction is on the hot path for union simplification."
+    )]
+    #[inline(always)]
     pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
@@ -1588,6 +1593,11 @@ impl<'db> NominalInstanceClass<'db> {
         matches!(self, Self::InheritsFromExplicitAny(_))
     }
 
+    #[expect(
+        clippy::inline_always,
+        reason = "Class extraction is on the hot path for union simplification."
+    )]
+    #[inline(always)]
     fn class(self, db: &'db dyn Db) -> ClassType<'db> {
         match self {
             Self::Plain(class) => class,
