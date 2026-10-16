@@ -525,6 +525,22 @@ def g(x: Not[B[int]]):
     assert_type(x, list[B[int]] | int)
 ```
 
+## Comparing recursive aliases inside negations
+
+Each recursive reference below wraps `T` in another `list`. We can compare these types without
+expanding every reference. The tuple's second element prevents `Nested[int]` from being assigned to
+`Nested[str]`.
+
+```py
+from ty_extensions import Not
+
+type Nested[T] = tuple[list[Not[Nested[list[T]]]], T]
+
+def convert(value: Nested[int]) -> Nested[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
 ## Excluding a recursive alias from a list
 
 `Without[A]` describes a list that is not an `A`. Since `list[Any]` is gradual, its `Any` can stand

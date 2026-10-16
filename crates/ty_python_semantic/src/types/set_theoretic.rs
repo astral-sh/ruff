@@ -1321,9 +1321,7 @@ impl<'db> IntersectionType<'db> {
             return Type::Intersection(self);
         }
 
-        let mut builder = IntersectionBuilder::new(db, visitor.env)
-            .preserve_aliases(true)
-            .positive_elements(positive);
+        let mut builder = IntersectionBuilder::new(db, visitor.env).positive_elements(positive);
         for element in &negative {
             builder.add_negative_in_place(*element);
         }

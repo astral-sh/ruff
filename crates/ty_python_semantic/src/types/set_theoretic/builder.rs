@@ -1469,9 +1469,10 @@ impl<'a, 'db, L: IntersectionLimits>
             expand_union_elements(db, ty, traversal.mapping_visitor(), true, false, true);
         let expanded = UnionType::from_elements_structural(db, elements, recursively_defined);
         let (builder, negative) = state;
-        if (negative || builder.preserve_aliases)
-            && matches!(ty, Type::TypeAlias(_))
-            && !expanded.is_never()
+        // Preserve negated aliases after simplifying their bodies. Positive atomic bodies also
+        // retain their outer reference when they contain nested references, so comparisons and
+        // inference can recognize repeated expansions.
+        if !expanded.is_never()
             && !expanded.is_divergent()
             && !matches!(
                 expanded,
@@ -1481,6 +1482,8 @@ impl<'a, 'db, L: IntersectionLimits>
                     | Type::TypeAlias(_)
                     | Type::Recursive(_)
             )
+            && ((negative && matches!(ty, Type::TypeAlias(_)))
+                || any_over_type(db, &builder.env, expanded, false, Type::is_alias_like))
         {
             for inner in &mut builder.intersections {
                 if negative {
@@ -1545,7 +1548,6 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
-    preserve_aliases: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1555,15 +1557,7 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
-            preserve_aliases: false,
         }
-    }
-
-    /// Preserve positive aliases when their bodies are atomic intersection elements.
-    /// Negative aliases retain their recursive references regardless of this setting.
-    pub(crate) fn preserve_aliases(mut self, preserve: bool) -> Self {
-        self.preserve_aliases = preserve;
-        self
     }
 
     pub(super) fn expand_aliases(
@@ -1572,24 +1566,17 @@ impl<'db> IntersectionBuilder<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let mut builder = Self::new(db, visitor.env);
-        // Comparisons request the outer bodies explicitly. Ordinary intersection construction
-        // preserves negative alias references, including aliases with atomic bodies.
-        let expand = |ty| {
-            let (elements, recursively_defined) =
-                expand_union_elements(db, ty, visitor, true, false, true);
-            UnionType::from_elements_structural(db, elements, recursively_defined)
-        };
         StructuralTypeTraversal::with_mapping_visitor(
             visitor,
             BuildIntersection::<UnboundedIntersection>(PhantomData),
             |root| {
                 for positive in intersection.positive(db) {
                     let ControlFlow::Continue(()) =
-                        root.visit_with(db, expand(*positive), (&mut builder, false));
+                        root.visit_with(db, *positive, (&mut builder, false));
                 }
                 for negative in intersection.negative(db) {
                     let ControlFlow::Continue(()) =
-                        root.visit_with(db, expand(*negative), (&mut builder, true));
+                        root.visit_with(db, *negative, (&mut builder, true));
                 }
                 builder.build()
             },

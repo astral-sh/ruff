@@ -1554,14 +1554,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .negative(db)
                     .iter()
                     .when_all(db, self.constraints, |&negative| {
-                        let negative = match self.relation {
-                            TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => negative,
-                            TypeRelation::Assignability => {
-                                negative.bottom_materialization(db, self.env)
-                            }
+                        // Negation reverses the relation. Comparing the excluded types directly
+                        // also preserves gradual equivalence: `~A` and `~B` are equivalent when
+                        // `A` and `B` are, even if neither is a subtype of itself.
+                        let excluded = if let Type::Intersection(source) = source {
+                            source.negative(db).iter().when_any(
+                                db,
+                                self.constraints,
+                                |&source_negative| {
+                                    self.check_type_pair(db, negative, source_negative)
+                                },
+                            )
+                        } else {
+                            self.never()
                         };
-                        self.as_disjointness_checker()
-                            .check_type_pair(db, source_ty, negative)
+                        excluded.or(db, self.constraints, || {
+                            let negative = match self.relation {
+                                TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => {
+                                    negative
+                                }
+                                TypeRelation::Assignability => {
+                                    negative.bottom_materialization(db, self.env)
+                                }
+                            };
+                            self.as_disjointness_checker()
+                                .check_type_pair(db, source_ty, negative)
+                        })
                     })
             })
     }
@@ -3615,63 +3633,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::Recursive(left_recursive), _) => {
-                comparison.compare_source_recursive(db, left_recursive, right)
-            }
-
-            (_, Type::Recursive(right_recursive)) => {
-                comparison.compare_target_recursive(db, left, right_recursive)
-            }
-
-            (Type::TypeAlias(alias), _) => {
-                nontrivial_check(self, || comparison.compare_source_alias(db, alias, right))
-            }
-
-            (_, Type::TypeAlias(alias)) => {
-                nontrivial_check(self, || comparison.compare_target_alias(db, left, alias))
-            }
-
-            (Type::EnumComplement(complement), other) => nontrivial_check(self, || {
-                self.check_type_pair(db, complement.remaining_literal_union(db, env), other)
-            }),
-
-            (other, Type::EnumComplement(complement)) => nontrivial_check(self, || {
-                self.check_type_pair(db, other, complement.remaining_literal_union(db, env))
-            }),
-
-            // `type[T]` and `TypeForm[S]` overlap whenever their represented instance types do.
-            (Type::SubclassOf(subclass_of), Type::TypeForm(typeform))
-            | (Type::TypeForm(typeform), Type::SubclassOf(subclass_of)) => {
-                nontrivial_check(self, || {
-                    self.check_type_pair(
-                        db,
-                        subclass_of.to_instance(db, env),
-                        typeform.type_argument(db),
-                    )
-                })
-            }
-
-            // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
-            (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
-                if let Some(type_var) = subclass_of.into_type_var()
-                    && let Some(instance) = other.to_instance_approximation(db, env) =>
-            {
-                nontrivial_check(self, || {
-                    self.check_type_pair(db, Type::TypeVar(type_var), instance)
-                })
-            }
-
-            // A typevar is never disjoint from itself, since all occurrences of the typevar must
-            // be specialized to the same type. (This is an important difference between typevars
-            // and `Any`!) Different typevars might be disjoint, depending on their bounds and
-            // constraints, which are handled below.
-            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
-                if !left_tvar.is_inferable(db, self.inferable)
-                    && left_tvar.is_same_typevar_as(db, right_tvar) =>
-            {
-                self.never()
-            }
-
             (Type::TypeVar(tvar), Type::Intersection(intersection))
             | (Type::Intersection(intersection), Type::TypeVar(tvar))
                 if !tvar.is_inferable(db, self.inferable)
@@ -3680,33 +3641,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // An unbounded typevar is never disjoint from any other type, since it might be
-            // specialized to any type. A bounded typevar is not disjoint from its bound, and is
-            // only disjoint from other types if its bound is. A constrained typevar is disjoint
-            // from a type if all of its constraints are.
-            (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
-                if !tvar.is_inferable(db, self.inferable) =>
-            {
-                nontrivial_check(self, || {
-                    match tvar.typevar(db).bound_or_constraints(db, env) {
-                        None => self.never(),
-                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            self.check_type_pair(db, bound, other)
-                        }
-                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
-                            typevar_constraints.elements(db).iter().when_all(
-                                db,
-                                self.constraints,
-                                |constraint| self.check_type_pair(db, *constraint, other),
-                            )
-                        }
-                    }
-                })
-            }
-
-            // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => self.never(),
-
+            // Decompose set operations before unfolding aliases. For example, checking whether
+            // `Not[A]` and `B` are disjoint compares `B` with `A`; expanding `B` first would lose
+            // its identity when recursive specializations keep changing its arguments.
             (Type::Union(union), other) | (other, Type::Union(union)) => {
                 nontrivial_check(self, || {
                     let mut children = Vec::new();
@@ -3788,6 +3725,90 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     self.check_intersection_pair_via_elements(db, intersection, other)
                 }
             }),
+
+            (Type::Recursive(left_recursive), _) => {
+                comparison.compare_source_recursive(db, left_recursive, right)
+            }
+
+            (_, Type::Recursive(right_recursive)) => {
+                comparison.compare_target_recursive(db, left, right_recursive)
+            }
+
+            (Type::TypeAlias(alias), _) => {
+                nontrivial_check(self, || comparison.compare_source_alias(db, alias, right))
+            }
+
+            (_, Type::TypeAlias(alias)) => {
+                nontrivial_check(self, || comparison.compare_target_alias(db, left, alias))
+            }
+
+            (Type::EnumComplement(complement), other) => nontrivial_check(self, || {
+                self.check_type_pair(db, complement.remaining_literal_union(db, env), other)
+            }),
+
+            (other, Type::EnumComplement(complement)) => nontrivial_check(self, || {
+                self.check_type_pair(db, other, complement.remaining_literal_union(db, env))
+            }),
+
+            // `type[T]` and `TypeForm[S]` overlap whenever their represented instance types do.
+            (Type::SubclassOf(subclass_of), Type::TypeForm(typeform))
+            | (Type::TypeForm(typeform), Type::SubclassOf(subclass_of)) => {
+                nontrivial_check(self, || {
+                    self.check_type_pair(
+                        db,
+                        subclass_of.to_instance(db, env),
+                        typeform.type_argument(db),
+                    )
+                })
+            }
+
+            // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
+            (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
+                if let Some(type_var) = subclass_of.into_type_var()
+                    && let Some(instance) = other.to_instance_approximation(db, env) =>
+            {
+                nontrivial_check(self, || {
+                    self.check_type_pair(db, Type::TypeVar(type_var), instance)
+                })
+            }
+
+            // A typevar is never disjoint from itself, since all occurrences of the typevar must
+            // be specialized to the same type. (This is an important difference between typevars
+            // and `Any`!) Different typevars might be disjoint, depending on their bounds and
+            // constraints, which are handled below.
+            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
+                if !left_tvar.is_inferable(db, self.inferable)
+                    && left_tvar.is_same_typevar_as(db, right_tvar) =>
+            {
+                self.never()
+            }
+
+            // An unbounded typevar is never disjoint from any other type, since it might be
+            // specialized to any type. A bounded typevar is not disjoint from its bound, and is
+            // only disjoint from other types if its bound is. A constrained typevar is disjoint
+            // from a type if all of its constraints are.
+            (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
+                if !tvar.is_inferable(db, self.inferable) =>
+            {
+                nontrivial_check(self, || {
+                    match tvar.typevar(db).bound_or_constraints(db, env) {
+                        None => self.never(),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            self.check_type_pair(db, bound, other)
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
+                            typevar_constraints.elements(db).iter().when_all(
+                                db,
+                                self.constraints,
+                                |constraint| self.check_type_pair(db, *constraint, other),
+                            )
+                        }
+                    }
+                })
+            }
+
+            // TODO: Infer specializations here
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => self.never(),
 
             // A NewType's concrete base can be a metaclass: `N = NewType("N", Meta)`, where `Meta`
             // subclasses `type`. Unwrapping it here lets the earlier `to_instance_approximation`
