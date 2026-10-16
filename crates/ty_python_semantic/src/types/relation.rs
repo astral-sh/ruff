@@ -404,9 +404,16 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_subtype_of(db, env, target, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db, env, TypeVarSet::None)
+        self.relation_constraints(
+            db,
+            env,
+            target,
+            TypeVarSet::None,
+            TypeRelation::Subtyping,
+            TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
+        )
+        .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(super) fn when_subtype_of<'c>(
@@ -466,7 +473,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
     ) -> bool {
         self.when_assignable_to_owned(db, env, target, TypeVarSet::None)
-            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Whether an attribute accepts every value of `value_ty` through ordinary assignment.
@@ -562,8 +569,7 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, env, target, &constraints)
+        self.when_constraint_set_assignable_to_owned(db, env, target)
             .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
@@ -577,24 +583,34 @@ impl<'db> Type<'db> {
     ) -> bool {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial = |_, _, _| false,
+            cycle_initial = |_, _, _, _, _| false,
             heap_size = ruff_memory_usage::heap_size,
         )]
-        fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
-            compute(db, &env, types)
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            first: Type<'db>,
+            second: Type<'db>,
+        ) -> bool {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(
+                db,
+                &env,
+                TypePair {
+                    program,
+                    first,
+                    second,
+                },
+            )
         }
 
         fn compute<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, types: TypePair<'db>) -> bool {
-            let constraints = ConstraintSetBuilder::new();
             types
-                .first(db)
-                .has_relation_to_with_typevar_evaluation(
+                .first
+                .relation_constraints(
                     db,
                     env,
-                    types.second(db),
-                    &constraints,
+                    types.second,
                     TypeVarSet::None,
                     TypeRelation::Subtyping,
                     TypeVarEvaluation::Lazy,
@@ -603,9 +619,13 @@ impl<'db> Type<'db> {
                 .is_always_satisfied(db, env, TypeVarSet::None)
         }
 
-        let types = TypePair::new(db, env.program(db), self, target);
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: target,
+        };
         *env.cached_or_compute(
-            || cached(db, types),
+            || cached(db, types.program, types.first, types.second),
             || {
                 env.caches()
                     .constraint_set_subtyping
@@ -714,6 +734,13 @@ impl<'db> Type<'db> {
         evaluation: TypeVarEvaluation,
         provenance: ConstraintProvenance,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        if let Some(related) = self.trivial_relation(target, relation, evaluation) {
+            return Cow::Owned(if related {
+                OwnedConstraintSet::always()
+            } else {
+                OwnedConstraintSet::default()
+            });
+        }
         if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (self, target)
             && let Some(related) = source.relation_from_class_declarations(db, target, relation)
         {
@@ -736,8 +763,7 @@ impl<'db> Type<'db> {
             evaluation: TypeVarEvaluation,
             provenance: ConstraintProvenance,
         ) -> OwnedConstraintSet<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program));
             compute(db, &env, types, inferable, relation, evaluation, provenance)
         }
 
@@ -751,10 +777,10 @@ impl<'db> Type<'db> {
             provenance: ConstraintProvenance,
         ) -> OwnedConstraintSet<'db> {
             ConstraintSetBuilder::new().into_owned(|constraints| {
-                types.first(db).compute_relation_constraints(
+                types.first.compute_relation_constraints(
                     db,
                     env,
-                    types.second(db),
+                    types.second,
                     constraints,
                     inferable,
                     relation,
@@ -764,7 +790,11 @@ impl<'db> Type<'db> {
             })
         }
 
-        let types = TypePair::new(db, env.program(db), self, target);
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: target,
+        };
         env.cached_or_compute(
             || cached(db, types, inferable, relation, evaluation, provenance),
             || {
@@ -776,6 +806,66 @@ impl<'db> Type<'db> {
                 )
             },
         )
+    }
+
+    /// Settle comparisons determined by stored values before allocating recursion state.
+    /// Lazy type-variable comparisons still produce constraints, even against `Any` or `Never`.
+    pub(super) fn trivial_relation(
+        self,
+        target: Self,
+        relation: TypeRelation,
+        evaluation: TypeVarEvaluation,
+    ) -> Option<bool> {
+        if matches!(self, Type::RecursiveVar(_))
+            || matches!(target, Type::RecursiveVar(_))
+            || self.materialized_divergent_fallback().is_some()
+            || target.materialized_divergent_fallback().is_some()
+        {
+            return None;
+        }
+        // Reflexivity precedes lazy constraint creation in the relation checker as well.
+        if self == target && relation.can_safely_assume_reflexivity(self) {
+            return Some(true);
+        }
+        if evaluation == TypeVarEvaluation::Lazy
+            && (matches!(self, Type::TypeVar(_)) || matches!(target, Type::TypeVar(_)))
+        {
+            return None;
+        }
+        match (self, target) {
+            // Everything is a subtype of `object`; `Never` is a subtype of everything.
+            (_, Type::NominalInstance(target)) if target.is_object() => Some(true),
+            (Type::Never, _) => Some(true),
+            (Type::LiteralValue(source), Type::LiteralValue(target)) => {
+                // String literals are subtypes of `LiteralString`. Union simplification
+                // otherwise preserves the unpromotable form of a literal.
+                Some(
+                    source.is_string() && target.is_literal_string()
+                        || source.kind() == target.kind()
+                            && (!matches!(relation, TypeRelation::Redundancy { pure: false })
+                                || source.is_promotable()),
+                )
+            }
+            (Type::Dynamic(_), Type::Dynamic(_)) => Some(!relation.is_subtyping()),
+            (
+                Type::Dynamic(_),
+                Type::NominalInstance(_)
+                | Type::LiteralValue(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::Never,
+            )
+            | (
+                Type::NominalInstance(_)
+                | Type::LiteralValue(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_),
+                Type::Dynamic(_),
+            ) => Some(relation.is_assignability()),
+            _ => None,
+        }
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
@@ -825,15 +915,17 @@ impl<'db> Type<'db> {
     ) -> bool {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial = |_, _, _| true,
+            cycle_initial = |_, _, _, _, _| true,
             heap_size = ruff_memory_usage::heap_size,
         )]
-        fn cached_redundancy<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
-            types
-                .first(db)
-                .is_redundant_with_local(db, &env, types.second(db))
+        fn cached_redundancy<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            first: Type<'db>,
+            second: Type<'db>,
+        ) -> bool {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            first.is_redundant_with_local(db, &env, second)
         }
 
         if self == other {
@@ -866,7 +958,7 @@ impl<'db> Type<'db> {
             }
         }
         *env.cached_or_compute(
-            || cached_redundancy(db, TypePair::new(db, env.program(db), self, other)),
+            || cached_redundancy(db, env.program(db), self, other),
             || {
                 env.caches().redundancy.get_or_compute(
                     db,
@@ -939,13 +1031,14 @@ impl<'db> Type<'db> {
             return true;
         }
 
-        self.has_relation_to(
+        self.relation_constraints(
             db,
             env,
             other,
-            &ConstraintSetBuilder::new(),
             TypeVarSet::None,
             TypeRelation::Redundancy { pure: true },
+            TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
         )
         .is_always_satisfied(db, env, TypeVarSet::None)
     }
@@ -1091,13 +1184,25 @@ impl<'db> Type<'db> {
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial = |_, _, _| OwnedConstraintSet::always(),
+            cycle_initial = |_, _, _, _, _| OwnedConstraintSet::always(),
             heap_size = ruff_memory_usage::heap_size,
         )]
-        fn cached<'db>(db: &'db dyn Db, types: TypePair<'db>) -> OwnedConstraintSet<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
-            compute(db, &env, types)
+        fn cached<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            first: Type<'db>,
+            second: Type<'db>,
+        ) -> OwnedConstraintSet<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(
+                db,
+                &env,
+                TypePair {
+                    program,
+                    first,
+                    second,
+                },
+            )
         }
 
         fn compute<'db>(
@@ -1108,24 +1213,26 @@ impl<'db> Type<'db> {
             let constraints = ConstraintSetBuilder::new();
             let mapping = env.mapping();
             constraints.into_owned(|constraints| {
-                types
-                    .first(db)
-                    .when_equivalent_to_with_materialization_visitor(
-                        db,
-                        types.second(db),
-                        constraints,
-                        &mapping,
-                        TypeVarEvaluation::Lazy,
-                    )
+                types.first.when_equivalent_to_with_materialization_visitor(
+                    db,
+                    types.second,
+                    constraints,
+                    &mapping,
+                    TypeVarEvaluation::Lazy,
+                )
             })
         }
 
         if self == other {
             return Cow::Owned(OwnedConstraintSet::always());
         }
-        let types = TypePair::new(db, env.program(db), self, other);
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: other,
+        };
         env.cached_or_compute(
-            || cached(db, types),
+            || cached(db, types.program, types.first, types.second),
             || {
                 env.caches()
                     .constraint_set_equivalence
@@ -1145,7 +1252,7 @@ impl<'db> Type<'db> {
         }
 
         self.when_constraint_set_equivalent_to_owned(db, env, other)
-            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(
@@ -1194,8 +1301,7 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_disjoint_from(db, env, other, &constraints, TypeVarSet::None)
+        self.disjointness_constraints(db, env, other, TypeVarSet::None)
             .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
@@ -1207,8 +1313,24 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let result = self.disjointness_constraints(db, env, other, inferable);
+        constraints.load(db, env, &result)
+    }
+
+    /// Reuse a completed disjointness result without copying it for boolean queries.
+    fn disjointness_constraints(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        other: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
         if let Some(disjoint) = self.trivial_disjointness(db, other) {
-            return ConstraintSet::from_bool(constraints, disjoint);
+            return Cow::Owned(if disjoint {
+                OwnedConstraintSet::always()
+            } else {
+                OwnedConstraintSet::default()
+            });
         }
 
         #[salsa::tracked(
@@ -1221,8 +1343,7 @@ impl<'db> Type<'db> {
             types: TypePair<'db>,
             inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program));
             compute(db, &env, types, inferable)
         }
 
@@ -1233,18 +1354,22 @@ impl<'db> Type<'db> {
             inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
             ConstraintSetBuilder::new().into_owned(|constraints| {
-                types.first(db).compute_disjointness_constraints(
+                types.first.compute_disjointness_constraints(
                     db,
                     env,
-                    types.second(db),
+                    types.second,
                     constraints,
                     inferable,
                 )
             })
         }
 
-        let types = TypePair::new(db, env.program(db), self, other);
-        let result = env.cached_or_compute(
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: other,
+        };
+        env.cached_or_compute(
             || cached(db, types, inferable),
             || {
                 env.caches()
@@ -1253,8 +1378,7 @@ impl<'db> Type<'db> {
                         compute(db, env, types, inferable)
                     })
             },
-        );
-        constraints.load(db, env, &result)
+        )
     }
 
     /// Decide terminal comparisons before allocating guards or a constraint cache entry.
@@ -1270,6 +1394,11 @@ impl<'db> Type<'db> {
             (Type::Never, _) | (_, Type::Never) => Some(true),
             (Type::Dynamic(_) | Type::Divergent(_), _)
             | (_, Type::Dynamic(_) | Type::Divergent(_)) => Some(false),
+            (Type::NominalInstance(left), Type::NominalInstance(right))
+                if left.is_object() || right.is_object() =>
+            {
+                Some(false)
+            }
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
                 if left.is_literal_string() && (right.is_literal_string() || right.is_string())
                     || right.is_literal_string() && left.is_string()
@@ -2282,13 +2411,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, source, target);
         }
 
-        // Subtyping implies assignability, so if subtyping is reflexive and the two types are
-        // equal, it is both a subtype and assignable. Assignability is always reflexive.
-        //
-        // Note that we could do a full equivalence check here, but that would be both expensive
-        // and unnecessary. This early return is only an optimisation.
-        if source == target && self.relation.can_safely_assume_reflexivity(source) {
-            return self.always();
+        if let Some(related) =
+            source.trivial_relation(target, self.relation, self.typevar_evaluation)
+        {
+            return ConstraintSet::from_bool(self.constraints, related);
         }
 
         if let (Type::NominalInstance(source), Type::NominalInstance(target)) = (source, target)
@@ -2985,28 +3111,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
             (Type::KnownBoundMethod(source_method), Type::KnownBoundMethod(target_method)) => {
                 self.check_known_bound_method_pair(db, source_method, target_method)
-            }
-
-            // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::LiteralValue(source), Type::LiteralValue(target))
-                if source.is_string() && target.is_literal_string() =>
-            {
-                self.always()
-            }
-
-            // For union simplification, we want to preserve the unpromotable form of a literal value,
-            // and so redundancy is not symmetric.
-            (Type::LiteralValue(source), Type::LiteralValue(target))
-                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
-            {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    source.kind() == target.kind() && source.is_promotable(),
-                )
-            }
-
-            (Type::LiteralValue(source), Type::LiteralValue(target)) => {
-                ConstraintSet::from_bool(self.constraints, source.kind() == target.kind())
             }
 
             // No literal type is a subtype of any other literal type, unless they are the same

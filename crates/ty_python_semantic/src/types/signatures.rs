@@ -184,11 +184,14 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Option<Self> {
         let overloads = self
             .overloads
             .iter()
-            .map(|signature| signature.try_specialize_stored(db, program, specialization))
+            .map(|signature| {
+                signature.try_specialize_stored(db, program, specialization, specialize_self_domain)
+            })
             .collect::<Option<SmallVec<[Signature<'db>; 1]>>>()?;
         Some(Self::from_overloads(overloads))
     }
@@ -912,6 +915,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Option<Self> {
         if self.receiver_constraints().is_some()
             || matches!(
@@ -922,7 +926,14 @@ impl<'db> Signature<'db> {
         {
             return None;
         }
-        let map = |ty: Type<'db>| ty.try_specialize_stored(db, program, specialization);
+        let map = |ty: Type<'db>| {
+            ty.try_specialize_stored(db, program, specialization, specialize_self_domain)
+        };
+        let return_ty = if self.is_paramspec_value() {
+            self.return_ty
+        } else {
+            map(self.return_ty)?
+        };
         let mut parameters = self.parameters.clone();
         for (index, parameter) in self.parameters.iter().enumerate() {
             if parameter.has_starred_annotation() {
@@ -942,29 +953,30 @@ impl<'db> Signature<'db> {
             }
         }
         Some(Self {
-            generic_context: self.generic_context.map(|context| {
-                GenericContext::from_typevar_instances(
-                    db,
-                    &ProgramEnvironment::from_program(program),
-                    context.variables(db).filter(|&variable| {
-                        match specialization.get(db, variable) {
-                            None => true,
-                            Some(Type::TypeVar(mapped)) => {
-                                mapped.identity(db) == variable.identity(db)
-                            }
-                            Some(_) => false,
-                        }
-                    }),
-                )
-            }),
+            generic_context: if let Some(context) = self.generic_context {
+                let variables = context.variables(db).filter(|&variable| {
+                    match specialization.get(db, variable) {
+                        None => true,
+                        Some(Type::TypeVar(mapped)) => mapped.identity(db) == variable.identity(db),
+                        Some(_) => false,
+                    }
+                });
+                let env = ProgramEnvironment::from_program(program);
+                Some(if specialize_self_domain {
+                    let variables = variables
+                        .map(|variable| map(Type::TypeVar(variable))?.as_typevar())
+                        .collect::<Option<SmallVec<[_; 2]>>>()?;
+                    GenericContext::from_typevar_instances(db, &env, variables)
+                } else {
+                    GenericContext::from_typevar_instances(db, &env, variables)
+                })
+            } else {
+                None
+            },
             definition: self.definition,
             extras: self.extras.clone(),
             parameters,
-            return_ty: if self.is_paramspec_value() {
-                self.return_ty
-            } else {
-                map(self.return_ty)?
-            },
+            return_ty,
         })
     }
 

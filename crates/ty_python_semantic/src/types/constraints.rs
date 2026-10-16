@@ -344,6 +344,20 @@ impl<'db> OwnedConstraintSet<'db> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Check a completed set without copying its nodes into another constraint builder.
+    pub(super) fn is_always_satisfied(
+        &self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        match self.node.node() {
+            Node::AlwaysTrue => true,
+            Node::AlwaysFalse => false,
+            Node::Interior(_) => self.query(|_, set| set.is_always_satisfied(db, env, inferable)),
+        }
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -3433,8 +3447,7 @@ impl<'db> Type<'db> {
             types: TypePair<'db>,
             inferable: TypeVarSet<'db>,
         ) -> CandidateSolutions<'db> {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program));
             compute(db, &env, types, inferable)
         }
 
@@ -3444,10 +3457,9 @@ impl<'db> Type<'db> {
             types: TypePair<'db>,
             inferable: TypeVarSet<'db>,
         ) -> CandidateSolutions<'db> {
-            let when =
-                types
-                    .first(db)
-                    .when_constraint_set_assignable_to_owned(db, env, types.second(db));
+            let when = types
+                .first
+                .when_constraint_set_assignable_to_owned(db, env, types.second);
             when.query(|builder, when| {
                 let mut storage = builder.storage.borrow_mut();
                 CandidateSolutions::compute(
@@ -3461,7 +3473,11 @@ impl<'db> Type<'db> {
             })
         }
 
-        let types = TypePair::new(db, env.program(db), self, target);
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: target,
+        };
         env.cached_or_compute(
             || cached(db, types, inferable),
             || {

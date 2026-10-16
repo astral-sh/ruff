@@ -53,8 +53,14 @@ impl<'db> VarianceTerm<'db> {
                 _ => symbolic.push(term),
             }
         }
+        if symbolic.len() > 1 {
+            let mut seen = FxHashSet::default();
+            symbolic.retain(|term| seen.insert(*term));
+        }
         if constant != TypeVarVariance::Bivariant {
-            symbolic.push(Self::Constant(constant));
+            // Evaluate the constant first so a known invariant result does not evaluate the
+            // symbolic terms. Retain those terms for dependency discovery.
+            symbolic.insert(0, Self::Constant(constant));
         }
         match symbolic.as_slice() {
             [] => Self::BIVARIANT,
@@ -94,7 +100,20 @@ impl<'db> VarianceTerm<'db> {
 
     /// Evaluate an expression using declared variance at protocol-parameter references.
     pub(crate) fn evaluate(self, db: &'db dyn Db) -> TypeVarVariance {
-        self.evaluate_with(db, &|variable| variable.effective_variance(db))
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+        fn cached<'db>(db: &'db dyn Db, sum: VarianceSum<'db>) -> TypeVarVariance {
+            sum.terms(db).iter().map(|term| term.evaluate(db)).collect()
+        }
+        match self {
+            Self::Constant(variance) => variance,
+            Self::Variable(variable) => variable.effective_variance(db),
+            Self::Join(sum) => cached(db, sum),
+            _ => {
+                self.evaluate_children(db, &|variable| variable.effective_variance(db), &|child| {
+                    child.evaluate(db)
+                })
+            }
+        }
     }
 
     /// Substitute the supplied variable values; the component solver supplies its current
@@ -104,22 +123,27 @@ impl<'db> VarianceTerm<'db> {
         db: &'db dyn Db,
         lookup: &impl Fn(VarianceVariable<'db>) -> TypeVarVariance,
     ) -> TypeVarVariance {
+        self.evaluate_children(db, lookup, &|child| child.evaluate_with(db, lookup))
+    }
+
+    /// Evaluate the outer constructor using the supplied values of its children.
+    fn evaluate_children(
+        self,
+        db: &'db dyn Db,
+        lookup: &impl Fn(VarianceVariable<'db>) -> TypeVarVariance,
+        evaluate: &impl Fn(Self) -> TypeVarVariance,
+    ) -> TypeVarVariance {
         match self {
             Self::Constant(variance) => variance,
             Self::Variable(variable) => lookup(variable),
-            Self::Join(sum) => sum
-                .terms(db)
-                .iter()
-                .map(|term| term.evaluate_with(db, lookup))
-                .collect(),
-            Self::Compose(product) => product
-                .left(db)
-                .evaluate_with(db, lookup)
-                .compose_thunk(|| product.right(db).evaluate_with(db, lookup)),
+            Self::Join(sum) => sum.terms(db).iter().map(|term| evaluate(*term)).collect(),
+            Self::Compose(product) => {
+                evaluate(product.left(db)).compose_thunk(|| evaluate(product.right(db)))
+            }
             Self::Substitute(substitution) => {
-                let positive = || substitution.positive(db).evaluate_with(db, lookup);
-                let negative = || substitution.negative(db).evaluate_with(db, lookup).flip();
-                match substitution.parameter(db).evaluate_with(db, lookup) {
+                let positive = || evaluate(substitution.positive(db));
+                let negative = || evaluate(substitution.negative(db)).flip();
+                match evaluate(substitution.parameter(db)) {
                     TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
                     TypeVarVariance::Covariant => positive(),
                     TypeVarVariance::Contravariant => negative(),

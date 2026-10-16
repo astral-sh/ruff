@@ -8,6 +8,7 @@ use std::ops::{Deref, Range};
 use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
+use ty_python_core::Program;
 
 use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral, GenericAlias};
 use crate::types::class_base::ClassBase;
@@ -53,6 +54,33 @@ impl<'db> Mro<'db> {
         std::iter::once(ClassBase::Class(ClassType::Generic(alias)))
             .chain(self.iter().skip(1).map(|base| {
                 base.apply_optional_specialization(db, env, Some(alias.specialization(db)))
+            }))
+            .collect()
+    }
+
+    /// Substitute stored arguments without opening definitions or applying materialization.
+    pub(super) fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        alias: GenericAlias<'db>,
+    ) -> Option<Self> {
+        let specialization = alias.specialization(db);
+        if specialization.materialization_kind(db).is_some() {
+            return None;
+        }
+        std::iter::once(Some(ClassBase::Class(ClassType::Generic(alias))))
+            .chain(self.iter().skip(1).map(|base| {
+                if let ClassBase::Class(ClassType::Generic(base)) = *base {
+                    let Type::GenericAlias(specialized) = Type::GenericAlias(base)
+                        .try_specialize_stored(db, program, specialization, false)?
+                    else {
+                        return None;
+                    };
+                    Some(ClassBase::Class(ClassType::Generic(specialized)))
+                } else {
+                    Some(*base)
+                }
             }))
             .collect()
     }

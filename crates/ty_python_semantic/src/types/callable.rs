@@ -2483,6 +2483,7 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Option<Self> {
         let SignatureSource::Explicit(signatures) = self.signature_source(db) else {
             return None;
@@ -2493,6 +2494,7 @@ impl<'db> CallableType<'db> {
                 db,
                 program,
                 specialization,
+                specialize_self_domain,
             )?),
             self.kind(db),
             self.deprecated(db),

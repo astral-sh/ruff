@@ -1374,16 +1374,27 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Option<Self> {
         let literal = self.literal(db);
-        let signature = self
-            .signature(db)
-            .try_specialize_stored(db, program, specialization)?;
+        let signature = self.signature(db).try_specialize_stored(
+            db,
+            program,
+            specialization,
+            specialize_self_domain,
+        )?;
         let implementation = if literal.has_separate_implementation(db) {
             Some(
                 self.implementation_callables(db)
                     .iter()
-                    .map(|callable| callable.try_specialize_stored(db, program, specialization))
+                    .map(|callable| {
+                        callable.try_specialize_stored(
+                            db,
+                            program,
+                            specialization,
+                            specialize_self_domain,
+                        )
+                    })
                     .collect::<Option<_>>()?,
             )
         } else {

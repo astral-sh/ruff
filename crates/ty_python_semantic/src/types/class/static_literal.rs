@@ -55,17 +55,22 @@ use crate::{
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
-        typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
+        typed_dict::{
+            TypedDictFieldBuilder, TypedDictParams, TypedDictSchema, TypedDictType,
+            typed_dict_params_from_class_def,
+        },
         variance::{MemberVariance, VarianceInferable, VarianceOrigin, VarianceTerm},
         visitor::{TypeCollector, TypeVisitor},
     },
 };
 use ty_python_core::{
-    ProgramFile, attribute_scopes,
+    Program, ProgramFile, ScopedDefinitionId, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState},
     place_table,
     scope::ScopeId,
-    semantic_index, use_def_map,
+    semantic_index,
+    symbol::ScopedSymbolId,
+    use_def_map,
 };
 
 /// Representation of a class definition statement in the AST: either a non-generic class, or a
@@ -211,6 +216,13 @@ struct InheritedFrozenDataclassFields<'db> {
 pub(crate) struct OwnClassFields<'db> {
     fields: FxIndexMap<Name, Field<'db>>,
     class_variables: Box<[Name]>,
+}
+
+/// A field annotation before specialization or constructor-field interpretation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ClassFieldDeclaration<'db> {
+    place: PlaceAndQualifiers<'db>,
+    first_declaration: Option<Definition<'db>>,
 }
 
 #[salsa::tracked]
@@ -2786,48 +2798,18 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Collects ordered constructor fields and `ClassVar` masks in one pass over a class body.
-    ///
-    /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
-    fn compute_own_fields(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        specialization: Option<Specialization<'db>>,
-        field_policy: CodeGeneratorKind<'db>,
-    ) -> OwnClassFields<'db> {
-        let class_body_scope = self.body_scope(db);
-        let env = env.in_environment(ProgramEnvironment::from_scope(class_body_scope));
-        let table = place_table(db, class_body_scope);
-
-        let use_def = use_def_map(db, class_body_scope);
-
-        // `own_fields(..., NamedTuple)` is called while constructing the class's MRO because the
-        // field types determine the synthesized tuple base. `typed_dict_params` also queries the
-        // class's MRO, so only read the `total` default when collecting `TypedDict` fields.
-        let typed_dict_fields_are_required_by_default =
-            if field_policy == CodeGeneratorKind::TypedDict {
-                self.typed_dict_params(db)
-                    .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
-                    .contains(TypedDictParams::TOTAL)
-            } else {
-                false
-            };
-        let dataclass_kw_only_default = field_policy.is_dataclass_like().then(|| {
-            let own_field_policy =
-                CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
-            self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
-        });
-        let mut kw_only_sentinel_field_seen = false;
-        let mut field_declarations = Vec::new();
-
+    /// Identify field declarations and their source order independently of specialization.
+    #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    fn field_declarations(self, db: &'db dyn Db) -> Box<[(ScopedDefinitionId, ScopedSymbolId)]> {
+        let use_def = use_def_map(db, self.body_scope(db));
+        let mut fields = Vec::new();
         for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
             // fields. The check is too broad in the sense that it also excludes (weird) constructs where
             // a symbol would have multiple declarations, one of which is an annotated assignment. If we
             // want to improve this, we could instead pass a definition-kind filter to the use-def map
-            // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
+            // query, or when resolving the annotation. Doing so would potentially require
             // us to generate a union of `__init__` methods.
             if !declarations.clone().contains_only_annotated_assignments(db) {
                 continue;
@@ -2849,19 +2831,154 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             };
 
-            let result = place_from_declarations(db, &env, declarations.clone());
-            field_declarations.push((first_declaration_order, symbol_id, result));
+            fields.push((first_declaration_order, symbol_id));
         }
+        fields.sort_unstable_by_key(|(order, _)| *order);
+        fields.into_boxed_slice()
+    }
 
-        field_declarations
-            .sort_unstable_by_key(|(first_declaration_order, _, _)| *first_declaration_order);
+    /// Resolve one declaration-site annotation, before applying a class's type arguments.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial = |_, id, _, _| ClassFieldDeclaration {
+            place: Place::bound(Type::divergent(id)).into(),
+            first_declaration: None,
+        },
+        cycle_fn = |db, cycle, previous: &ClassFieldDeclaration<'db>, mut field: ClassFieldDeclaration<'db>, class: StaticClassLiteral<'db>, _| {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
+            field.place = field.place.cycle_normalized(db, &env, previous.place, cycle);
+            field
+        },
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn field_annotation(
+        self,
+        db: &'db dyn Db,
+        symbol: ScopedSymbolId,
+    ) -> ClassFieldDeclaration<'db> {
+        let scope = self.body_scope(db);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
+        let result = place_from_declarations(
+            db,
+            &env,
+            use_def_map(db, scope).end_of_scope_symbol_declarations(symbol),
+        );
+        let first_declaration = result.first_declaration;
+        ClassFieldDeclaration {
+            place: result.ignore_conflicting_declarations(),
+            first_declaration,
+        }
+    }
 
+    /// Assemble an unspecialized schema from declaration-site annotations.
+    /// Generic classes retain the consuming operation while their fields are specialized.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial = |_, _, _, _| None,
+        cycle_fn = |_, _, _, _, _, _| None,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn try_stored_typed_dict_items(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+    ) -> Option<TypedDictSchema<'db>> {
+        if self.generic_context(db).is_some() {
+            return None;
+        }
+        let mro = self.try_mro_unspecialized(db).ok()?;
+        let mut items = TypedDictSchema::default();
+        for base in mro.iter().rev().filter_map(|base| base.into_class()) {
+            if let Some((class, specialization)) = base.static_class_literal(db) {
+                if !CodeGeneratorKind::TypedDict.matches(db, class.into()) {
+                    continue;
+                }
+                if specialization.is_none() && class.generic_context(db).is_some() {
+                    return None;
+                }
+                let total = class
+                    .typed_dict_params(db)?
+                    .contains(TypedDictParams::TOTAL);
+                let table = place_table(db, class.body_scope(db));
+                for &(_, symbol) in class.field_declarations(db) {
+                    let annotation = class.field_annotation(db, symbol);
+                    let attr = annotation.place;
+                    if attr.is_class_var() {
+                        continue;
+                    }
+                    let Some(declared_ty) = attr.place.ignore_possibly_undefined() else {
+                        continue;
+                    };
+                    let declared_ty = match specialization {
+                        Some(specialization) => {
+                            declared_ty.try_specialize_stored(db, program, specialization, false)?
+                        }
+                        None => declared_ty,
+                    };
+                    if declared_ty.is_instance_of(db, KnownClass::KwOnly) {
+                        continue;
+                    }
+                    items.insert(
+                        table.symbol(symbol).name().clone(),
+                        TypedDictFieldBuilder::new(declared_ty)
+                            .required(attr.is_required() || !attr.is_not_required() && total)
+                            .read_only(attr.is_read_only())
+                            .first_declaration(annotation.first_declaration)
+                            .build(),
+                    );
+                }
+            } else if let ClassLiteral::DynamicTypedDict(class) = base.class_literal(db) {
+                items.extend(
+                    class
+                        .items(db)
+                        .iter()
+                        .map(|(name, field)| (name.clone(), field.clone())),
+                );
+            }
+        }
+        Some(items)
+    }
+
+    /// Collects ordered constructor fields and `ClassVar` masks in one pass over a class body.
+    ///
+    /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
+    fn compute_own_fields(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind<'db>,
+    ) -> OwnClassFields<'db> {
+        let class_body_scope = self.body_scope(db);
+        let env = env.in_environment(ProgramEnvironment::from_scope(class_body_scope));
+        let table = place_table(db, class_body_scope);
+        let use_def = use_def_map(db, class_body_scope);
+
+        // `own_fields(..., NamedTuple)` is called while constructing the class's MRO because the
+        // field types determine the synthesized tuple base. `typed_dict_params` also queries the
+        // class's MRO, so only read the `total` default when collecting `TypedDict` fields.
+        let typed_dict_fields_are_required_by_default =
+            if field_policy == CodeGeneratorKind::TypedDict {
+                self.typed_dict_params(db)
+                    .expect("TypedDictParams should be available for CodeGeneratorKind::TypedDict")
+                    .contains(TypedDictParams::TOTAL)
+            } else {
+                false
+            };
+        let dataclass_kw_only_default = field_policy.is_dataclass_like().then(|| {
+            let own_field_policy =
+                CodeGeneratorKind::from_class(db, self.into()).unwrap_or(field_policy);
+            self.has_dataclass_param(db, own_field_policy, DataclassFlags::KW_ONLY)
+        });
+        let mut kw_only_sentinel_field_seen = false;
         let mut attributes = FxIndexMap::default();
         let mut class_variables = Vec::new();
-        for (_, symbol_id, result) in field_declarations {
+        for &(_, symbol_id) in self.field_declarations(db) {
+            let ClassFieldDeclaration {
+                place: attr,
+                first_declaration,
+            } = self.field_annotation(db, symbol_id);
             let symbol = table.symbol(symbol_id);
-            let first_declaration = result.first_declaration;
-            let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                     class_variables.push(symbol.name().clone());
@@ -3102,14 +3219,23 @@ impl<'db> StaticClassLiteral<'db> {
         }
     }
 
-    /// A helper function for `instance_member` that looks up the `name` attribute only on
-    /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        name: &str,
-    ) -> Member<'db> {
+    /// Infer an instance member from this class's declarations and receiver assignments.
+    /// Consumers apply class arguments afterward, under their own operation's recursion guards.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial = |_, id, _, _| Member {
+            inner: Place::bound(Type::divergent(id)).into(),
+        },
+        cycle_fn = |db, cycle, previous: &Member<'db>, member: Member<'db>, class: StaticClassLiteral<'db>, _| {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
+            Member { inner: member.inner.cycle_normalized(db, &env, previous.inner, cycle) }
+        },
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: Name) -> Member<'db> {
+        let env =
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        let name = name.as_str();
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -3696,7 +3822,7 @@ impl<'db> StaticClassLiteral<'db> {
         let receiver = self.variance_receiver(db, &env);
         let attribute_variances = attribute_names
             .map(|name| {
-                let place_and_quals = self.own_instance_member(db, &env, &name).inner;
+                let place_and_quals = self.own_instance_member(db, Name::new(&name)).inner;
                 (name, place_and_quals, false)
             })
             .chain(attribute_places_and_qualifiers)

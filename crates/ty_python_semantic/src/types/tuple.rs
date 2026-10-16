@@ -345,7 +345,11 @@ impl<'db> TupleType<'db> {
 
         *env.cached_or_compute(
             || tuple_type_cached_class_type(db, env.program(db), self),
-            || compute(db, env, self),
+            || {
+                env.caches()
+                    .tuple_classes
+                    .get_or_compute(db, env, (env.program(db), self), || compute(db, env, self))
+            },
         )
     }
 

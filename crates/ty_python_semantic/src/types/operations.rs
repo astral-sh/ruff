@@ -8,6 +8,7 @@ use std::rc::Rc;
 use salsa::plumbing::AsId;
 use ty_python_core::{Program, ProgramFile};
 
+use super::class::ClassType;
 use super::constraints::{CandidateSolutions, ConstraintProvenance, OwnedConstraintSet};
 use super::cyclic::{GuardToken, RecursionGuardState};
 use super::generics::Specialization;
@@ -15,10 +16,14 @@ use super::mro::{Mro, StaticMroError};
 use super::protocol_class::{ProtocolClass, ProtocolInterface, ProtocolInterfaceView};
 use super::recursive::OperationMemo;
 use super::relation::{TypeRelation, TypeVarEvaluation};
-use super::typevar::TypeVarSet;
+use super::set_theoretic::builder::{IntersectionPolarity, IntersectionSimplification};
+use super::tuple::TupleType;
+use super::typed_dict::TypedDictSchema;
+use super::typevar::{TypeVarConstraints, TypeVarSet};
+use super::visitor::{DynamicContent, DynamicContentMode};
 use super::{
-    ApplyTypeMappingVisitor, CallableType, GenericAlias, MaterializationKind, MemberLookupKey,
-    MemberLookupResult, ProtocolInstanceType, Type, TypePair, TypeRecursionState,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, GenericAlias, MaterializationKind,
+    MemberLookupKey, MemberLookupResult, ProtocolInstanceType, Type, TypePair, TypeRecursionState,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::{Db, ProgramEnvironment};
@@ -190,10 +195,16 @@ impl<'db> TypeOperations<'db> {
 /// Applied results remain within one source query and retain their recursion dependencies.
 #[derive(Default)]
 pub(super) struct OperationCaches<'db> {
+    pub(super) constrained_upper_arguments:
+        OperationMemo<'db, (TypePair<'db>, TypeVarConstraints<'db>), Type<'db>>,
+    pub(super) dynamic_content:
+        OperationMemo<'db, (Program<'db>, Type<'db>, DynamicContentMode), DynamicContent>,
     pub(super) disjointness:
         OperationMemo<'db, (TypePair<'db>, TypeVarSet<'db>), OwnedConstraintSet<'db>>,
     pub(super) solutions:
         OperationMemo<'db, (TypePair<'db>, TypeVarSet<'db>), CandidateSolutions<'db>>,
+    pub(super) materialized_bounds:
+        OperationMemo<'db, (Program<'db>, BoundTypeVarInstance<'db>), Option<Type<'db>>>,
     pub(super) specializations:
         OperationMemo<'db, (Program<'db>, Type<'db>, Specialization<'db>, bool), Type<'db>>,
     pub(super) materializations:
@@ -221,6 +232,11 @@ pub(super) struct OperationCaches<'db> {
     pub(super) members:
         OperationMemo<'db, (MemberLookupKey<'db>, Option<Type<'db>>), MemberLookupResult<'db>>,
     pub(super) class_members: OperationMemo<'db, MemberLookupKey<'db>, PlaceAndQualifiers<'db>>,
+    pub(super) typed_dict_items:
+        OperationMemo<'db, (Program<'db>, ClassType<'db>), TypedDictSchema<'db>>,
+    pub(super) tuple_classes: OperationMemo<'db, (Program<'db>, TupleType<'db>), ClassType<'db>>,
+    pub(super) intersection_simplifications:
+        OperationMemo<'db, (TypePair<'db>, IntersectionPolarity), IntersectionSimplification>,
     pub(super) protocol_interfaces:
         OperationMemo<'db, (Program<'db>, GenericAlias<'db>), ProtocolInterface<'db>>,
     pub(super) finite_protocol_interfaces: OperationMemo<

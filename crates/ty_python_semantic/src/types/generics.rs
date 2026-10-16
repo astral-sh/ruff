@@ -1813,9 +1813,9 @@ impl<'db> Specialization<'db> {
                         vartype.materialize(db, effective_materialization_kind, visitor);
 
                     if effective_materialization_kind == MaterializationKind::Top
+                        && *has_dynamic_type
                         && let Some(upper_bound) =
                             bound_typevar.top_materialized_upper_bound(db, visitor.env)
-                        && *has_dynamic_type
                     {
                         IntersectionType::from_two_elements(
                             db,
@@ -1920,6 +1920,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (source.tuple_inner(db), target.tuple_inner(db))
         {
             return self.check_tuple_type_pair(db, source_tuple, target_tuple);
+        }
+
+        // Materializations are fully static even when their stored arguments still contain
+        // `Any`. Equal materialized specializations therefore satisfy subtyping by reflexivity.
+        if source == target
+            && (!self.relation.is_subtyping() || source.materialization_kind(db).is_some())
+        {
+            return self.always();
         }
 
         let env = self.env;
@@ -2086,6 +2094,53 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.materialization_visitor,
         );
 
+        if materialization == MaterializationKind::Top {
+            // Materialization belongs to the caller's mapping. Cache the comparison only after
+            // resolving its inputs, so a different active transformation produces a different key.
+            let constraint_tops = TypeVarConstraints::new(
+                db,
+                constraints
+                    .iter()
+                    .map(|constraint| {
+                        constraint.materialize(
+                            db,
+                            MaterializationKind::Top,
+                            self.materialization_visitor,
+                        )
+                    })
+                    .collect::<Box<[_]>>(),
+            );
+            return env.caches().constrained_upper_arguments.get_or_compute(
+                db,
+                env,
+                (
+                    super::TypePair {
+                        program: env.program(db),
+                        first: argument_top,
+                        second: argument_bottom,
+                    },
+                    constraint_tops,
+                ),
+                || {
+                    IntersectionType::from_two_elements(
+                        db,
+                        env,
+                        argument_top,
+                        UnionType::from_elements(
+                            db,
+                            env,
+                            constraint_tops.elements(db).iter().copied().filter(
+                                |&constraint_top| {
+                                    argument_bottom.is_subtype_of(db, env, constraint_top)
+                                        && !argument_top.is_disjoint_from(db, env, constraint_top)
+                                },
+                            ),
+                        ),
+                    )
+                },
+            );
+        }
+
         let viable_constraints = constraints.iter().filter_map(|constraint| {
             let constraint_top =
                 constraint.materialize(db, MaterializationKind::Top, self.materialization_visitor);
@@ -2093,36 +2148,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A viable constraint must overlap the argument's upper materialization and contain
             // its lower materialization. The upper check matters for `Intersection[int, Any]`,
             // and the lower check matters for `Any | int`.
-            if argument_top.is_disjoint_from(db, env, constraint_top)
-                || !argument_bottom.is_subtype_of(db, env, constraint_top)
+            if !argument_bottom.is_subtype_of(db, env, constraint_top)
+                || argument_top.is_disjoint_from(db, env, constraint_top)
             {
                 return None;
             }
 
-            Some(match materialization {
-                MaterializationKind::Top => constraint_top,
-                MaterializationKind::Bottom => constraint.materialize(
-                    db,
-                    MaterializationKind::Bottom,
-                    self.materialization_visitor,
-                ),
-            })
+            Some(constraint.materialize(
+                db,
+                MaterializationKind::Bottom,
+                self.materialization_visitor,
+            ))
         });
 
-        match materialization {
-            MaterializationKind::Top => IntersectionType::from_two_elements(
-                db,
-                env,
-                argument_top,
-                UnionType::from_elements(db, env, viable_constraints),
-            ),
-            MaterializationKind::Bottom => UnionType::from_two_elements(
-                db,
-                env,
-                argument_bottom,
-                IntersectionType::from_elements(db, env, viable_constraints),
-            ),
-        }
+        UnionType::from_two_elements(
+            db,
+            env,
+            argument_bottom,
+            IntersectionType::from_elements(db, env, viable_constraints),
+        )
     }
 
     /// Whether two types encountered in an invariant position

@@ -1,13 +1,14 @@
-use crate::Db;
 use crate::types::TypeOperations;
 use crate::types::recursive::StructuralTypeVisit;
 use crate::types::recursive::TypeWalkKey;
 use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
+use crate::{Db, ProgramEnvironment};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::Program;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -762,7 +763,7 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
 }
 
 /// Whether a type contains a dynamic type matching the requested filter.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum DynamicContent {
     /// The type was fully inspected and contains no matching dynamic type.
     Absent,
@@ -778,7 +779,7 @@ impl DynamicContent {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum DynamicContentMode {
     All,
     NonAny,
@@ -820,6 +821,40 @@ pub(super) fn non_any_dynamic_content<'db>(
 }
 
 pub(super) fn dynamic_content_impl<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+    mode: DynamicContentMode,
+) -> DynamicContent {
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = |_, _, _, _, _| DynamicContent::Indeterminate,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn cached<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        ty: Type<'db>,
+        mode: DynamicContentMode,
+    ) -> DynamicContent {
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+        compute_dynamic_content(db, &env, ty, mode)
+    }
+
+    let program = env.program(db);
+    *env.cached_or_compute(
+        || cached(db, program, ty, mode),
+        || {
+            env.caches()
+                .dynamic_content
+                .get_or_compute(db, env, (program, ty, mode), || {
+                    compute_dynamic_content(db, env, ty, mode)
+                })
+        },
+    )
+}
+
+fn compute_dynamic_content<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     ty: Type<'db>,

@@ -69,9 +69,9 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::{Program, ProgramFile};
 use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
@@ -562,6 +562,15 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 #[salsa::tracked]
 impl<'db> GenericAlias<'db> {
+    /// Share ancestry whose specialization only rewrites stored type arguments.
+    #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    fn try_stored_mro(self, db: &'db dyn Db, program: Program<'db>) -> Option<Mro<'db>> {
+        self.origin(db)
+            .try_mro_unspecialized(db)
+            .ok()?
+            .try_specialize_stored(db, program, self)
+    }
+
     /// Resolve the specialized ancestry within the consuming operation.
     fn try_mro(
         self,
@@ -620,6 +629,9 @@ impl<'db> GenericAlias<'db> {
         let env = env.in_environment(ProgramEnvironment::from_scope(
             self.origin(db).body_scope(db),
         ));
+        if let Some(mro) = self.try_stored_mro(db, env.program(db)) {
+            return Ok(Cow::Borrowed(mro));
+        }
         match env.cached_or_compute(
             || generic_alias_try_mro(db, env.program(db), self),
             || {
@@ -1837,6 +1849,13 @@ impl<'db> ClassType<'db> {
         other: Self,
         specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
     ) -> bool {
+        if !other
+            .class_literal(db)
+            .is_subclass_of(db, self.class_literal(db))
+        {
+            return false;
+        }
+
         other
             .iter_mro(db, env)
             .filter_map(ClassBase::into_class)
@@ -1979,8 +1998,11 @@ impl<'db> ClassType<'db> {
             return compatible;
         }
 
-        // A class cannot implement two incompatible specializations of an invariant base.
-        if self.has_incompatible_generic_base(db, env, other, specializations_are_disjoint) {
+        // Diagnostic comparisons check generic arguments first so an incompatible layout
+        // does not change which cause we report.
+        if context.is_some()
+            && self.has_incompatible_generic_base(db, env, other, &specializations_are_disjoint)
+        {
             return false;
         }
 
@@ -1991,7 +2013,7 @@ impl<'db> ClassType<'db> {
                 other
                     .nearest_disjoint_base(db)
                     .is_some_and(|disjoint_base_2| {
-                        !disjoint_base_1.could_coexist_in_mro_with(db, env, &disjoint_base_2)
+                        !disjoint_base_1.could_coexist_in_mro_with(db, &disjoint_base_2)
                     })
             })
         {
@@ -2001,6 +2023,13 @@ impl<'db> ClassType<'db> {
                     right: Type::instance(db, env, other),
                 });
             }
+            return false;
+        }
+
+        // A class cannot implement two incompatible specializations of an invariant base.
+        if context.is_none()
+            && self.has_incompatible_generic_base(db, env, other, specializations_are_disjoint)
+        {
             return false;
         }
 
@@ -2494,13 +2523,13 @@ impl<'db> ClassType<'db> {
                 enum_lit.own_instance_member(db, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
-                class_literal.own_instance_member(db, env, name)
+                class_literal.own_instance_member(db, Name::new(name))
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
                 generic
                     .origin(db)
-                    .own_instance_member(db, env, name)
+                    .own_instance_member(db, Name::new(name))
                     .map_type(|ty| {
                         ty.apply_optional_owner_specialization_to_member(
                             db,
@@ -3773,23 +3802,12 @@ impl<'db> DisjointBase<'db> {
     }
 
     /// Two disjoint bases can only coexist in a class's MRO if one is a subclass of the other
-    fn could_coexist_in_mro_with(
-        &self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        other: &Self,
-    ) -> bool {
+    fn could_coexist_in_mro_with(&self, db: &'db dyn Db, other: &Self) -> bool {
         // CPython's layout check operates on runtime classes. Type arguments are irrelevant here:
         // a generic disjoint base and any specialization of that base share the same layout.
         self == other
-            || self
-                .class
-                .identity_specialization(db)
-                .is_subtype_of_class_literal(db, env, other.class)
-            || other
-                .class
-                .identity_specialization(db)
-                .is_subtype_of_class_literal(db, env, self.class)
+            || self.class.is_subclass_of(db, other.class)
+            || other.class.is_subclass_of(db, self.class)
     }
 }
 

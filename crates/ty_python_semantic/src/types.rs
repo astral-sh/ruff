@@ -2436,18 +2436,12 @@ impl<T> InstanceProjection<T> {
 
 /// An ordered pair of types and their Python version shared by type-relation and set-theoretic
 /// queries.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct TypePair<'db> {
-    #[returns(copy)]
     program: Program<'db>,
-    #[returns(copy)]
     first: Type<'db>,
-    #[returns(copy)]
     second: Type<'db>,
 }
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for TypePair<'_> {}
 
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
@@ -3106,6 +3100,28 @@ impl<'db> Type<'db> {
                     alias.origin(db),
                     specialization,
                 )))
+            }
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|&element| {
+                    element.try_materialize_without_expansion(db, program, materialization_kind)
+                        == Some(element)
+                })
+                .then_some(self),
+            Type::Intersection(intersection) => {
+                let unchanged = |element: Type<'db>, kind| {
+                    element.try_materialize_without_expansion(db, program, kind) == Some(element)
+                };
+                (intersection
+                    .positive(db)
+                    .iter()
+                    .all(|&element| unchanged(element, materialization_kind))
+                    && intersection
+                        .negative(db)
+                        .iter()
+                        .all(|&element| unchanged(element, materialization_kind.flip())))
+                .then_some(self)
             }
             _ => None,
         }
@@ -8095,9 +8111,8 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        if !specialize_self_domain
-            && let Some(specialized) =
-                self.try_specialize_stored(db, env.program(db), specialization)
+        if let Some(specialized) =
+            self.try_specialize_stored(db, env.program(db), specialization, specialize_self_domain)
         {
             return specialized;
         }
@@ -8142,13 +8157,20 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         specialization: Specialization<'db>,
+        specialize_self_domain: bool,
     ) -> Option<Self> {
         if specialization.materialization_kind(db).is_some() {
             return None;
         }
         match self {
             Type::TypeVar(typevar) if !typevar.is_paramspec(db) => {
-                return Some(specialization.get(db, typevar).unwrap_or(self));
+                return match specialization.get(db, typevar) {
+                    Some(mapped) => Some(mapped),
+                    None if specialize_self_domain && typevar.typevar(db).is_self(db) => typevar
+                        .try_specialize_stored_self_domain(db, specialization)
+                        .map(Type::TypeVar),
+                    None => Some(self),
+                };
             }
             Type::Dynamic(_)
             | Type::Divergent(_)
@@ -8166,11 +8188,18 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) if !instance.is_definition_generic(db) => {
                 return Some(self);
             }
-            _ => {}
+            Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::GenericAlias(_)
+            | Type::FunctionLiteral(_)
+            | Type::Callable(_)
+            | Type::Union(_)
+            | Type::Intersection(_) => {}
+            _ => return None,
         }
         #[salsa::tracked(
             returns(copy),
-            cycle_initial = |_, _, _, _, _| None,
+            cycle_initial = |_, _, _, _, _, _| None,
             heap_size = ruff_memory_usage::heap_size,
         )]
         fn cached<'db>(
@@ -8178,8 +8207,11 @@ impl<'db> Type<'db> {
             program: Program<'db>,
             ty: Type<'db>,
             specialization: Specialization<'db>,
+            specialize_self_domain: bool,
         ) -> Option<Type<'db>> {
-            let map = |ty: Type<'db>| ty.try_specialize_stored(db, program, specialization);
+            let map = |ty: Type<'db>| {
+                ty.try_specialize_stored(db, program, specialization, specialize_self_domain)
+            };
             match ty {
                 Type::NominalInstance(instance) => {
                     instance.try_map_stored_arguments(db, program, map)
@@ -8194,13 +8226,19 @@ impl<'db> Type<'db> {
                         .specialization(db)
                         .try_map_stored_arguments(db, program, map)?,
                 ))),
-                Type::FunctionLiteral(function) => Some(Type::FunctionLiteral(
-                    function.try_specialize_stored(db, program, specialization)?,
-                )),
+                Type::FunctionLiteral(function) => {
+                    Some(Type::FunctionLiteral(function.try_specialize_stored(
+                        db,
+                        program,
+                        specialization,
+                        specialize_self_domain,
+                    )?))
+                }
                 Type::Callable(callable) => Some(Type::Callable(callable.try_specialize_stored(
                     db,
                     program,
                     specialization,
+                    specialize_self_domain,
                 )?)),
                 Type::Union(union) => union
                     .elements(db)
@@ -8216,7 +8254,7 @@ impl<'db> Type<'db> {
                 _ => None,
             }
         }
-        cached(db, program, self, specialization)
+        cached(db, program, self, specialization, specialize_self_domain)
     }
 
     fn apply_type_mapping<'a>(
@@ -8246,10 +8284,14 @@ impl<'db> Type<'db> {
 
         if let TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
             specialization,
-            specialize_self_domain: false,
+            specialize_self_domain,
         }) = type_mapping
-            && let Some(specialized) =
-                self.try_specialize_stored(db, visitor.env.program(db), *specialization)
+            && let Some(specialized) = self.try_specialize_stored(
+                db,
+                visitor.env.program(db),
+                *specialization,
+                *specialize_self_domain,
+            )
         {
             return specialized;
         }
