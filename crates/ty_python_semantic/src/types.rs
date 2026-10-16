@@ -7095,7 +7095,8 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let Some(signature) = bound_method.unbound_signatures_with_inferred_return_type(db) else {
+                let Some(signature) = bound_method.unbound_signatures_with_inferred_return_type(db)
+                else {
                     return Some(
                         bound_method
                             .func(db)

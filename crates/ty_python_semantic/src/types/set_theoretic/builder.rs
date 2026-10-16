@@ -1541,17 +1541,24 @@ impl<'db> IntersectionBuilder<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let mut builder = Self::new(db, visitor.env);
+        // Comparisons request the outer bodies explicitly. Ordinary intersection construction
+        // preserves negative alias references, including aliases with atomic bodies.
+        let expand = |ty| {
+            let (elements, recursively_defined) =
+                expand_union_elements(db, ty, visitor, true, false, true);
+            UnionType::from_elements_structural(db, elements, recursively_defined)
+        };
         StructuralTypeTraversal::with_mapping_visitor(
             visitor,
             BuildIntersection::<UnboundedIntersection>(PhantomData),
             |root| {
                 for positive in intersection.positive(db) {
                     let ControlFlow::Continue(()) =
-                        root.visit_with(db, *positive, (&mut builder, false));
+                        root.visit_with(db, expand(*positive), (&mut builder, false));
                 }
                 for negative in intersection.negative(db) {
                     let ControlFlow::Continue(()) =
-                        root.visit_with(db, *negative, (&mut builder, true));
+                        root.visit_with(db, expand(*negative), (&mut builder, true));
                 }
                 builder.build()
             },

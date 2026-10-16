@@ -1,116 +1,69 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use rustc_hash::FxHashSet;
-use std::cell::Cell;
 
 use ruff_python_ast::{self as ast};
 
-use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
-use crate::types::newtype::{NewType, walk_newtype_base};
+use crate::types::cyclic::CycleKind;
+use crate::types::recursive::{TypeTraversal, TypeWalk};
 use crate::types::tuple::TupleSpec;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, walk_type_var_bounds};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
-use crate::types::{
-    IntersectionType, KnownInstanceType, RecursiveType, Type, TypeAliasType, UnionBuilder,
-};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarBoundOrConstraints};
+use crate::types::{Type, UnionBuilder};
 
 /// Return whether the outer type may be a tuple, without searching nested arguments or members.
 /// A recursion cutoff conservatively counts as a possible tuple.
 fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
-    struct TupleShapeVisitor<'a, 'db> {
-        env: &'a ProgramEnvironment<'db>,
-        recursion_guard: TypeCollector<'db>,
-        active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
-        may_be_tuple: Cell<bool>,
-    }
+    struct TupleShape;
 
-    impl<'db> TupleShapeVisitor<'_, 'db> {
-        fn visit_guarded(&self, db: &'db dyn Db, ty: Type<'db>, visit: impl FnOnce()) {
-            self.active_types.visit(
-                &ty.to_type_identity(db),
-                || self.may_be_tuple.set(true),
-                visit,
-            );
-        }
-    }
+    impl<'db> TypeWalk<'db> for TupleShape {
+        type Output = bool;
 
-    impl<'db> TypeVisitor<'db> for TupleShapeVisitor<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
-            self.env
+        fn on_cycle(
+            &self,
+            _traversal: &TypeTraversal<'_, 'db, Self>,
+            _ty: Type<'db>,
+            _kind: CycleKind,
+            (): (),
+        ) -> bool {
+            true
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            if self.may_be_tuple.get() {
-                return;
+        fn visit(
+            &self,
+            db: &'db dyn Db,
+            traversal: &TypeTraversal<'_, 'db, Self>,
+            ty: Type<'db>,
+            (): (),
+        ) -> bool {
+            let env = traversal.environment();
+            if ty.tuple_instance_spec(db, env).is_some() {
+                return true;
             }
-
-            if ty.tuple_instance_spec(db, self.env).is_some() {
-                self.may_be_tuple.set(true);
-                return;
-            }
-
-            if matches!(
-                ty,
-                Type::Union(_)
-                    | Type::Intersection(_)
-                    | Type::TypeAlias(_)
-                    | Type::Recursive(_)
-                    | Type::NewTypeInstance(_)
-                    | Type::TypeVar(_)
-            ) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        fn visit_intersection_type(&self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
-            for element in intersection.iter_positive(db) {
-                self.visit_type(db, element);
-            }
-        }
-
-        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            self.visit_guarded(db, Type::TypeAlias(alias), || {
-                self.visit_type(db, alias.value_type(db));
-            });
-        }
-
-        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            self.visit_guarded(db, Type::Recursive(recursive), || {
-                self.visit_type(db, recursive.unfold(db, self.env).into_type());
-            });
-        }
-
-        fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
-            self.visit_guarded(db, Type::NewTypeInstance(newtype), || {
-                walk_newtype_base(db, newtype, self);
-            });
-        }
-
-        fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
-            self.visit_guarded(
-                db,
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)),
-                || {
-                    if let Some(bounds) = typevar.bound_or_constraints(db, self.env) {
-                        walk_type_var_bounds(db, bounds, self);
+            match ty {
+                Type::Union(union) => union.elements(db).iter().any(|ty| traversal.visit(db, *ty)),
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|ty| traversal.visit(db, ty)),
+                Type::NewTypeInstance(newtype) => {
+                    traversal.visit(db, newtype.base(db).instance_type(db, env))
+                }
+                Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        traversal.visit(db, bound)
                     }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .any(|ty| traversal.visit(db, *ty)),
+                    None => false,
                 },
-            );
+                Type::Recursive(_) => true,
+                _ => false,
+            }
         }
     }
 
-    let visitor = TupleShapeVisitor {
-        env,
-        recursion_guard: TypeCollector::default(),
-        active_types: ActiveRecursionDetector::default(),
-        may_be_tuple: Cell::new(false),
-    };
-    visitor.visit_type(db, ty);
-    visitor.may_be_tuple.get()
+    TypeTraversal::with_root(env, TupleShape, |traversal| traversal.visit(db, ty))
 }
 
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
