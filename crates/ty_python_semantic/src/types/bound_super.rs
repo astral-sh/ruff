@@ -651,7 +651,7 @@ impl<'db> BoundSuperType<'db> {
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
             Type::Recursive(recursive) => {
-                return recursive.unfold(db, env).map(delegate_to).unwrap_or(Err(
+                return recursive.unfold(db).map(delegate_to).unwrap_or(Err(
                     BoundSuperError::AbstractOwnerType {
                         owner_type,
                         pivot_class: pivot_class_type,

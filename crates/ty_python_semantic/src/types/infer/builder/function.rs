@@ -2340,7 +2340,7 @@ fn is_instance_truthiness<'db>(
 
     match ty {
         Type::Recursive(recursive) => recursive
-            .unfold(db, env)
+            .unfold(db)
             .map(|unfolded| is_instance_truthiness(db, env, unfolded, class))
             .unwrap_or(Truthiness::Ambiguous),
         Type::RecursiveVar(_) => {

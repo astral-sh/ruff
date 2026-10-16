@@ -372,7 +372,7 @@ pub(super) fn attribute_write_requirement<'db>(
             attribute_write_requirement(db, env, alias.value_type(db), attribute, receiver)
         }
         Type::Recursive(recursive) => recursive
-            .unfold(db, env)
+            .unfold(db)
             .map(|unfolded| attribute_write_requirement(db, env, unfolded, attribute, receiver))
             .unwrap_or(AttributeWriteRequirement::Unconstrained),
 

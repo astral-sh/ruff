@@ -315,7 +315,7 @@ impl<'db> Type<'db> {
             match ty {
                 Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
                     recursive
-                        .unfold(db, env)
+                        .unfold(db)
                         .map(|unfolded| upcast(db, env, unfolded, visitor))
                         .unwrap_or(UpcastResult::unstable(ty))
                 }),

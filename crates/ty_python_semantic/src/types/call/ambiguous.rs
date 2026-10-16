@@ -115,7 +115,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         {
             return Some(self.merge_column(types.iter().map(|ty| match ty {
                 Type::TypeAlias(alias) => alias.value_type(db),
-                Type::Recursive(recursive) => recursive.unfold(db, env).into_type(),
+                Type::Recursive(recursive) => recursive.unfold(db).into_type(),
                 _ => *ty,
             })));
         }

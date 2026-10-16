@@ -240,7 +240,7 @@ impl<'db> Type<'db> {
             Type::Never => Truthiness::Uninhabited,
 
             Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+                .unfold(db)
                 .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
                 .unwrap_or(Ok(Truthiness::Ambiguous))?,
 

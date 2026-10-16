@@ -209,7 +209,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        self.visit_type(db, recursive.unfold(db, self.env).into_type());
+        self.visit_type(db, recursive.unfold(db).into_type());
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {

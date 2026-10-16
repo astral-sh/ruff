@@ -1048,7 +1048,7 @@ fn lax_input_type_impl<'db>(
             return Type::any();
         }
         let result = recursive
-            .unfold(db, env)
+            .unfold(db)
             .map(|unfolded| lax_input_type_impl(db, env, unfolded, expanding_types))
             .unwrap_or(Type::any());
         expanding_types.remove(&constructor);

@@ -582,14 +582,14 @@ impl<'db> Type<'db> {
 
             (Type::Recursive(recursive), _) => Some(
                 recursive
-                    .unfold(db, env)
+                    .unfold(db)
                     .map(|unfolded| unfolded.subscript(db, env, slice_ty, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),
 
             (_, Type::Recursive(recursive)) => Some(
                 recursive
-                    .unfold(db, env)
+                    .unfold(db)
                     .map(|unfolded| value_ty.subscript(db, env, unfolded, expr_context))
                     .unwrap_or(Ok(value_ty)),
             ),

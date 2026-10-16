@@ -442,7 +442,7 @@ impl<'db> CallableTypeVarLocations<'db> {
                             None => locations,
                         };
                     }
-                    visitor.visit_type(db, recursive.unfold(db, &env).into_type());
+                    visitor.visit_type(db, recursive.unfold(db).into_type());
                 }
                 Type::Callable(callable) => {
                     walk_callable_type(db, callable, &visitor);
@@ -4113,7 +4113,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (Type::Recursive(recursive), _) => {
                 return self.infer_map_impl(
-                    recursive.unfold(db, self.env).into_type(),
+                    recursive.unfold(db).into_type(),
                     actual,
                     polarity,
                     visitor,
@@ -4889,7 +4889,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (formal, Type::Recursive(recursive)) => {
                 return self.infer_map_impl(
                     formal,
-                    recursive.unfold(db, self.env).into_type(),
+                    recursive.unfold(db).into_type(),
                     polarity,
                     visitor,
                 );

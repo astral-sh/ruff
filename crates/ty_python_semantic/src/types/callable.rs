@@ -208,7 +208,7 @@ impl<'db> Type<'db> {
             ))),
 
             Type::Recursive(recursive) => recursive
-                .unfold(db, env)
+                .unfold(db)
                 .into_unfolded()?
                 .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 

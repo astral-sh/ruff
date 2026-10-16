@@ -3096,7 +3096,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         match object_ty {
-            Type::Recursive(recursive) => recursive.unfold(db, env).is_unchanged_or(|unfolded| {
+            Type::Recursive(recursive) => recursive.unfold(db).is_unchanged_or(|unfolded| {
                 self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
             }),
             Type::RecursiveVar(_) => {
@@ -5618,7 +5618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ) -> Option<Type<'d>> {
             match ty {
                 Type::Recursive(recursive) => {
-                    let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                    let unfolded = recursive.unfold(db).into_unfolded()?;
                     propagate_callable_kind(db, env, unfolded, kind)
                 }
                 Type::RecursiveVar(_) => {

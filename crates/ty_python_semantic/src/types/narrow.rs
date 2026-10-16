@@ -591,9 +591,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
             Type::TypeAlias(alias) => self.generate(db, alias.value_type(db)),
-            Type::Recursive(recursive) => {
-                self.generate(db, recursive.unfold(db, env).into_unfolded()?)
-            }
+            Type::Recursive(recursive) => self.generate(db, recursive.unfold(db).into_unfolded()?),
             Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
@@ -5138,7 +5136,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let mut excluded_tags = UnionBuilder::new(db, &self.env);
         visit_matching_typeddict_field_types(
             db,
-            &self.env,
             subscript_value_type,
             key_literal.value(db),
             &mut |tag_type| {
@@ -5493,7 +5490,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
         Type::Recursive(recursive) => recursive
-            .unfold(db, &recursive.environment(db))
+            .unfold(db)
             .is_unfolded_and(|unfolded| is_or_contains_typeddict(db, unfolded)),
 
         Type::Dynamic(_)
@@ -5614,7 +5611,6 @@ fn key_membership_contains_protocol<'db>(
 /// Visit matching `TypedDict` field types, ignoring other alternatives and missing fields.
 fn visit_matching_typeddict_field_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     field_name: &str,
     visit: &mut impl FnMut(Type<'db>),
@@ -5632,15 +5628,14 @@ fn visit_matching_typeddict_field_types<'db>(
         Type::TypeAlias(alias) => {
             return visit_matching_typeddict_field_types(
                 db,
-                env,
                 alias.value_type(db),
                 field_name,
                 visit,
             );
         }
         Type::Recursive(recursive) => {
-            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
-                visit_matching_typeddict_field_types(db, env, unfolded, field_name, visit);
+            if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db) {
+                visit_matching_typeddict_field_types(db, unfolded, field_name, visit);
             }
             return;
         }
@@ -5650,7 +5645,7 @@ fn visit_matching_typeddict_field_types<'db>(
     };
 
     for element in elements {
-        visit_matching_typeddict_field_types(db, env, *element, field_name, visit);
+        visit_matching_typeddict_field_types(db, *element, field_name, visit);
     }
 }
 

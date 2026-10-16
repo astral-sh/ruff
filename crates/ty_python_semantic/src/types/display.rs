@@ -992,7 +992,7 @@ impl<'db> RecursiveType<'db> {
             name: self.name(db),
             settings,
         }
-        .fmt_specialized(env, self.arguments(db), self.materialization_kind(db), f)
+        .fmt_specialized(env, self.arguments(db), f)
     }
 }
 
@@ -1021,7 +1021,7 @@ impl<'db> Type<'db> {
                     definition,
                     name,
                     constructor.parameters(db),
-                    constructor.unfold(db, env).into_type(),
+                    constructor.unfold(db).into_type(),
                 )
             }
             _ => return None,
@@ -1055,27 +1055,13 @@ impl<'db> TypeAliasDisplay<'db> {
         &self,
         env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
-        materialization: Option<MaterializationKind>,
         f: &mut TypeWriter<'_, '_, 'db>,
     ) -> fmt::Result {
-        if let Some(kind) = materialization {
-            let (name, form) = match kind {
-                MaterializationKind::Top => ("Top", SpecialFormType::Top),
-                MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
-            };
-            f.with_type(Type::SpecialForm(form)).write_str(name)?;
-            f.write_char('[')?;
-        }
-
         self.fmt_detailed(f)?;
         if let Some(specialization) = specialization {
             specialization
                 .display_short(self.db, env, TupleSpecialization::No, self.settings.clone())
                 .fmt_detailed(f)?;
-        }
-
-        if materialization.is_some() {
-            f.write_char(']')?;
         }
         Ok(())
     }
@@ -1827,7 +1813,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::TypeAlias(alias) => alias
                 .display_with(db, self.settings.clone())
-                .fmt_specialized(self.env, alias.specialization(db), None, f),
+                .fmt_specialized(self.env, alias.specialization(db), f),
             Type::Recursive(recursive) => {
                 recursive.fmt_display(db, self.env, self.settings.clone(), f)
             }

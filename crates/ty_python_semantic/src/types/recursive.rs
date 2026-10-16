@@ -333,9 +333,6 @@ pub struct RecursiveType<'db> {
     /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
     pub(super) arguments: Option<Specialization<'db>>,
-    /// The lazy materialization applied to this recursive alias, if any.
-    #[returns(copy)]
-    pub(super) materialization_kind: Option<MaterializationKind>,
     /// The body reached after crossing an odd number of contravariant positions.
     #[returns(copy)]
     opposite_body: Option<Type<'db>>,
@@ -667,10 +664,6 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
             positive.apply_type_mapping_impl(db, &rebind, TypeContext::default(), &rebind_visitor);
         let negative =
             negative.apply_type_mapping_impl(db, &rebind, TypeContext::default(), &rebind_visitor);
-        let materialization = match operation {
-            RecursiveOperation::Materialize(kind) => Some(kind),
-            RecursiveOperation::Promote(..) | RecursiveOperation::RescopeReturnCallables(_) => None,
-        };
         let origin = RecursiveMappingOrigin::new(
             db,
             Type::Recursive(source.select(db, false)),
@@ -682,7 +675,6 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
             cycle,
             positive,
             arguments,
-            materialization,
             Some(negative),
             source.negative(db),
             Some(origin),
@@ -692,6 +684,14 @@ impl<'db> RecursiveTypeMapping<'_, 'db> {
 
 #[salsa::tracked]
 impl<'db> RecursiveType<'db> {
+    /// The materialization producing the selected polarity, if it is the outermost operation.
+    fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+        let RecursiveOperation::Materialize(kind) = self.origin(db)?.operation(db) else {
+            return None;
+        };
+        Some(if self.negative(db) { kind.flip() } else { kind })
+    }
+
     /// Prove that both polarities preserve this instantiation and its recursive unfoldings.
     /// Promotion treats free variables as opaque; later specializing them requires a new proof.
     fn mapping_is_noop(
@@ -934,7 +934,6 @@ impl<'db> RecursiveType<'db> {
             )),
             arguments,
             None,
-            None,
             false,
             None,
         )
@@ -988,7 +987,6 @@ impl<'db> RecursiveType<'db> {
                 body,
                 self.arguments(db),
                 None,
-                None,
                 false,
                 None,
             ))
@@ -1030,7 +1028,6 @@ impl<'db> RecursiveType<'db> {
             self.cycle(db),
             self.body(db),
             arguments,
-            self.materialization_kind(db),
             self.opposite_body(db),
             self.negative(db),
             self.origin(db),
@@ -1056,43 +1053,17 @@ impl<'db> RecursiveType<'db> {
         {
             origin.constructor(db).select(db, self.negative(db))
         } else {
-            self.with_materialization(db, None)
+            self
         }
     }
 
-    fn with_materialization(
-        self,
-        db: &'db dyn Db,
-        materialization: Option<MaterializationKind>,
-    ) -> Self {
-        Self::new_internal(
-            db,
-            self.definition(db),
-            self.cycle(db),
-            self.body(db),
-            self.arguments(db),
-            materialization,
-            self.opposite_body(db),
-            self.negative(db),
-            self.origin(db),
-        )
-    }
-
     fn select(self, db: &'db dyn Db, negative: bool) -> Self {
-        let materialization = self.materialization_kind(db).map(|kind| {
-            if self.negative(db) == negative {
-                kind
-            } else {
-                kind.flip()
-            }
-        });
         Self::new_internal(
             db,
             self.definition(db),
             self.cycle(db),
             self.body(db),
             self.arguments(db),
-            materialization,
             self.opposite_body(db),
             negative,
             self.origin(db),
@@ -1158,9 +1129,7 @@ impl<'db> RecursiveType<'db> {
         if let Some(origin) = self.origin(db) {
             return origin.constructor(db).constructor(db);
         }
-        // Like an unspecialized PEP 695 alias, parameter-flow analysis must not
-        // re-enter materialization while deriving the constructor's identity.
-        self.with_materialization(db, None).with_arguments(
+        self.with_arguments(
             db,
             self.parameters(db)
                 .map(|parameters| parameters.identity_specialization(db)),
@@ -1168,7 +1137,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The program in which the recursive type's body was constructed.
-    pub fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         ProgramEnvironment::from_definition(self.definition(db))
     }
 
@@ -1176,27 +1145,8 @@ impl<'db> RecursiveType<'db> {
     ///
     /// Report whether unfolding returns exactly `Type::Recursive(self)`. An unfolded
     /// type can still contain recursive references, so callers must retain their recursion guards.
-    pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
-        // A growing specialization cannot converge by repeating the same query key. Materialize
-        // its closed unfolding directly, under the caller's recursion guard, instead.
-        let unfolded = if self.opposite_body(db).is_some() {
-            self.unfolded_body(db)
-        } else if self.materialization_kind(db).is_some()
-            && !self.may_have_unbounded_specialization(db)
-        {
-            materialized_unfold(db, self)
-        } else {
-            let unfolded = self.unfolded_body(db);
-            match self.materialization_kind(db) {
-                Some(kind) => unfolded.apply_type_mapping(
-                    db,
-                    env,
-                    &TypeMapping::Materialize(kind),
-                    TypeContext::default(),
-                ),
-                None => unfolded,
-            }
-        };
+    pub fn unfold(self, db: &'db dyn Db) -> UnfoldResult<'db> {
+        let unfolded = self.unfolded_body(db);
         if unfolded == Type::Recursive(self) {
             UnfoldResult::Unchanged(self)
         } else {
@@ -1324,7 +1274,6 @@ impl<'db> RecursiveType<'db> {
                     self.cycle(db),
                     body,
                     arguments,
-                    self.materialization_kind(db),
                     opposite_body,
                     self.negative(db),
                     origin,
@@ -1367,7 +1316,7 @@ impl<'db> RecursiveType<'db> {
                 visitor.visit(db, Type::Recursive(self), mapping, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
                     // first can feed a recursive alias's previous approximation into its own arguments.
-                    self.unfold(db, visitor.env)
+                    self.unfold(db)
                         .map(|unfolded| {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -1389,7 +1338,7 @@ impl<'db> RecursiveType<'db> {
                     });
                     let recursive = self.with_arguments(db, arguments);
                     recursive
-                        .unfold(db, visitor.env)
+                        .unfold(db)
                         .map(|unfolded| {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -1411,7 +1360,7 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
-        self.unfold(db, &env)
+        self.unfold(db)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
     }
@@ -1527,13 +1476,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if !source.mapping_is_noop(db, origin.operation(db), self.materialization_visitor) {
                 break;
             }
-            ty = Type::Recursive(
-                if source.opposite_body(db).is_some() || source.materialization_kind(db).is_some() {
-                    source.select(db, recursive.negative(db))
-                } else {
-                    source
-                },
-            );
+            ty = Type::Recursive(if source.opposite_body(db).is_some() {
+                source.select(db, recursive.negative(db))
+            } else {
+                source
+            });
         }
         ty
     }
@@ -1638,37 +1585,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             })
     }
-}
-
-/// Materialize an unfolding lazily, keeping the marked binder as the recursive fallback.
-///
-/// Comparing a recursive specialization with its materialization can request this same unfolding
-/// before it has finished materializing. Returning the marked binder closes that cycle while
-/// preserving the requested materialization polarity.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn materialized_unfold<'db>(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Type<'db> {
-    let Some(kind) = recursive.materialization_kind(db) else {
-        debug_assert!(
-            false,
-            "materialized unfolding requires a materialization kind"
-        );
-        return Type::Recursive(recursive);
-    };
-    let env = recursive.environment(db);
-    let unfolded = recursive
-        .with_materialization(db, None)
-        .unfold(db, &env)
-        .into_type();
-    unfolded.apply_type_mapping(
-        db,
-        &env,
-        &TypeMapping::Materialize(kind),
-        TypeContext::default(),
-    )
 }
 
 impl<'db> VarianceInferable<'db> for RecursiveType<'db> {

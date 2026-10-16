@@ -3355,11 +3355,7 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                 visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
             }
             Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                imp(
-                    db,
-                    recursive.unfold(db, &recursive.environment(db)).into_type(),
-                    visitor,
-                )
+                imp(db, recursive.unfold(db).into_type(), visitor)
             })?,
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")

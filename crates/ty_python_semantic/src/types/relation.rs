@@ -1460,7 +1460,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         checker.check_union_coverage(db, alias.value_type(db), union)
                     }
                     Type::Recursive(recursive) => recursive
-                        .unfold(db, checker.env)
+                        .unfold(db)
                         .map(|body| checker.check_union_coverage(db, body, union))
                         .unwrap_or(ConstraintSet::from_bool(
                             checker.constraints,
@@ -2029,7 +2029,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     };
                     by_arguments.or(db, checker.constraints, || {
                         source_recursive
-                            .unfold(db, checker.env)
+                            .unfold(db)
                             .map(|source_unfolded| {
                                 checker.check_type_pair(db, source_unfolded, target)
                             })
@@ -2044,7 +2044,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::Recursive(target_recursive)) => {
                 self.with_recursion_guard(db, source, target, |checker| {
                     target_recursive
-                        .unfold(db, checker.env)
+                        .unfold(db)
                         .map(|target_unfolded| checker.check_type_pair(db, source, target_unfolded))
                         .unwrap_or(ConstraintSet::from_bool(
                             checker.constraints,
@@ -3708,7 +3708,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (Type::Recursive(left_recursive), _) => left_recursive
-                .unfold(db, env)
+                .unfold(db)
                 .map(|left_unfolded| {
                     self.with_recursion_guard(db, left, right, |checker| {
                         checker.check_type_pair(db, left_unfolded, right)
@@ -3717,7 +3717,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 .unwrap_or(self.never()),
 
             (_, Type::Recursive(right_recursive)) => right_recursive
-                .unfold(db, env)
+                .unfold(db)
                 .map(|right_unfolded| {
                     self.with_recursion_guard(db, left, right, |checker| {
                         checker.check_type_pair(db, left, right_unfolded)
