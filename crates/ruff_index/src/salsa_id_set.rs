@@ -60,11 +60,21 @@ impl<T: AsId + Copy> ImmutableSalsaIdSet<T> {
     }
 
     /// Returns whether the ID of `value` is in this set.
+    ///
+    /// Searches run headers and checks at most one bitmap word.
     pub fn contains(&self, value: T) -> bool {
         let needle = Chunk::singleton(value.as_id());
-        self.chunks()
-            .take_while(|chunk| chunk.offset <= needle.offset)
-            .any(|chunk| chunk.offset == needle.offset && chunk.bits & needle.bits != 0)
+        for (offset, bits) in self.runs() {
+            let Some(relative_offset) = needle.offset.checked_sub(offset) else {
+                return false;
+            };
+            if let Ok(index) = usize::try_from(relative_offset / WORD_BITS)
+                && let Some(bits) = bits.get(index)
+            {
+                return bits & needle.bits != 0;
+            }
+        }
+        false
     }
 
     /// Iterates over the complete IDs in increasing `Id::as_bits()` order.
@@ -126,7 +136,7 @@ impl<T: AsId + Copy> ImmutableSalsaIdSet<T> {
         result.freeze()
     }
 
-    fn chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
+    fn runs(&self) -> impl Iterator<Item = (u64, &[u64])> + '_ {
         let mut words = self.words.as_ref();
         std::iter::from_fn(move || {
             let (&header, rest) = words.split_first()?;
@@ -136,7 +146,10 @@ impl<T: AsId + Copy> ImmutableSalsaIdSet<T> {
             words = rest;
             Some((offset, bits))
         })
-        .flat_map(|(offset, bits)| {
+    }
+
+    fn chunks(&self) -> impl Iterator<Item = Chunk> + '_ {
+        self.runs().flat_map(|(offset, bits)| {
             bits.iter().enumerate().map(move |(index, &bits)| Chunk {
                 offset: offset + index as u64 * WORD_BITS,
                 bits,
@@ -433,6 +446,7 @@ mod tests {
         assert_eq!(set, ImmutableSalsaIdSet::new());
         assert!(set.is_empty());
         assert_eq!(set.len(), 0);
+        assert!(!set.contains(id(0, 0)));
         assert_eq!(set.ids().next(), None);
         assert_eq!(set.get_heap_size(), 0);
     }
@@ -465,6 +479,38 @@ mod tests {
         }
         for absent in [id(62, 0), id(65, 1), id(64, 2), id(0, u32::MAX)] {
             assert!(!frozen.contains(absent));
+        }
+    }
+
+    #[test]
+    fn contains_across_runs() {
+        let isolated = [id(200 * 64 + 7, 0), id(64, 1)];
+        let set = ImmutableSalsaIdSet::from_iter(
+            (1..=130)
+                .flat_map(|word| [id(word * 64, 0), id(word * 64 + 63, 0)])
+                .chain(isolated),
+        );
+
+        for word in 1..=130 {
+            assert!(set.contains(id(word * 64, 0)));
+            assert!(set.contains(id(word * 64 + 63, 0)));
+            assert!(!set.contains(id(word * 64 + 1, 0)));
+        }
+        for value in isolated {
+            assert!(set.contains(value));
+        }
+        for absent in [
+            id(0, 0),
+            id(63, 0),
+            id(131 * 64, 0),
+            id(200 * 64 + 6, 0),
+            id(201 * 64, 0),
+            id(128, 1),
+            // Truncating the word index to 32 bits would falsely match the first run.
+            id(64, 64),
+            id(Id::MAX_U32 - 2, u32::MAX),
+        ] {
+            assert!(!set.contains(absent));
         }
     }
 
