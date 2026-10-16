@@ -19,3 +19,54 @@ help: Replace with `None`; initialize within function
 4 |     """
   |
 note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_1.py:32:41
+   |
+31 | # Error: the alias resolves to a mutable generic.
+32 | def err_mutable_alias(d: MutableAlias = {}):
+   |                                         ^^
+33 |     ...
+   |
+help: Replace with `None`; initialize within function
+   |
+31 | # Error: the alias resolves to a mutable generic.
+   - def err_mutable_alias(d: MutableAlias = {}):
+32 + def err_mutable_alias(d: MutableAlias = None):
+33 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_1.py:40:31
+   |
+39 | # Error: the alias is self-referential and cannot be resolved.
+40 | def err_self_ref(d: SelfRef = {}):
+   |                               ^^
+41 |     ...
+   |
+help: Replace with `None`; initialize within function
+   |
+39 | # Error: the alias is self-referential and cannot be resolved.
+   - def err_self_ref(d: SelfRef = {}):
+40 + def err_self_ref(d: SelfRef = None):
+41 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_1.py:45:41
+   |
+44 | # Error: the alias is defined after the function, so it can't be resolved yet.
+45 | def err_forward_alias(d: ForwardAlias = {}):
+   |                                         ^^
+46 |     ...
+   |
+help: Replace with `None`; initialize within function
+   |
+44 | # Error: the alias is defined after the function, so it can't be resolved yet.
+   - def err_forward_alias(d: ForwardAlias = {}):
+45 + def err_forward_alias(d: ForwardAlias = None):
+46 |     ...
+   |
+note: This is an unsafe fix and may change runtime behavior
