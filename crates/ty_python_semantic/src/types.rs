@@ -25,6 +25,7 @@ use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, file_to_module, resolve_module,
 };
 
+use self::callable::CallableTypeKind;
 pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
@@ -110,7 +111,7 @@ pub(crate) use crate::types::typevar::{
     TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
-use crate::types::typevar::{TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
@@ -2096,6 +2097,56 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// A captured parameter list, another `ParamSpec`, or a combination of those values.
+///
+/// Use [`Type::as_paramspec_value`] to validate callable kinds, whole ParamSpec references,
+/// and the members of unions and positive-only intersections.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ParamSpecValue<'db> {
+    Callable(CallableType<'db>),
+    ParamSpec(BoundTypeVarInstance<'db>),
+    Union(UnionType<'db>),
+    Intersection(IntersectionType<'db>),
+}
+
+impl<'db> ParamSpecValue<'db> {
+    /// Maps captured lists and ParamSpec references, retaining their union or intersection.
+    fn try_map(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        map: &mut impl FnMut(Self) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        Type::from(self)
+            .try_map_union_intersection(db, env, &mut |value| map(value.as_paramspec_value(db)?))
+    }
+
+    /// Reifies captured parameter lists as callables for argument matching and checking.
+    fn to_callable_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+        match self {
+            Self::Callable(callable) => Some(Type::Callable(callable.into_regular(db))),
+            Self::ParamSpec(paramspec) => Some(Type::Callable(CallableType::single(
+                db,
+                Signature::new(Parameters::paramspec(db, paramspec), Type::unknown()),
+            ))),
+            Self::Union(_) | Self::Intersection(_) => {
+                self.try_map(db, env, &mut |value| value.to_callable_type(db, env))
+            }
+        }
+    }
+}
+
+impl<'db> From<ParamSpecValue<'db>> for Type<'db> {
+    fn from(value: ParamSpecValue<'db>) -> Self {
+        match value {
+            ParamSpecValue::Callable(callable) => Self::Callable(callable),
+            ParamSpecValue::ParamSpec(paramspec) => Self::TypeVar(paramspec),
+            ParamSpecValue::Union(union) => Self::Union(union),
+            ParamSpecValue::Intersection(intersection) => Self::Intersection(intersection),
+        }
+    }
+}
+
 /// The result of discarding disjoint elements from a union.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum DiscardDisjointUnionElementsResult<'db> {
@@ -2980,6 +3031,35 @@ impl<'db> Type<'db> {
     const fn as_callable(self) -> Option<CallableType<'db>> {
         match self {
             Type::Callable(callable_type) => Some(callable_type),
+            _ => None,
+        }
+    }
+
+    fn as_paramspec_value(self, db: &'db dyn Db) -> Option<ParamSpecValue<'db>> {
+        match self {
+            Self::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
+                Some(ParamSpecValue::Callable(callable))
+            }
+            Self::TypeVar(typevar) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
+                Some(ParamSpecValue::ParamSpec(typevar))
+            }
+            Self::Union(union)
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|element| element.as_paramspec_value(db).is_some()) =>
+            {
+                Some(ParamSpecValue::Union(union))
+            }
+            Self::Intersection(intersection)
+                if intersection.negative(db).is_empty()
+                    && intersection
+                        .positive(db)
+                        .iter()
+                        .all(|element| element.as_paramspec_value(db).is_some()) =>
+            {
+                Some(ParamSpecValue::Intersection(intersection))
+            }
             _ => None,
         }
     }
@@ -9544,9 +9624,12 @@ impl<'db> Type<'db> {
                 .flat_map(|signatures| signatures.iter())
                 .filter_map(|signature| {
                     let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
-                    let value = specialization.get(db, typevar)?;
-                    matches!(value, Type::Union(_) | Type::Intersection(_))
-                        .then_some((typevar, value))
+                    let value = specialization.get(db, typevar)?.as_paramspec_value(db)?;
+                    matches!(
+                        value,
+                        ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_)
+                    )
+                    .then_some((typevar, value))
                 })
                 .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
                 .collect::<Vec<_>>();
@@ -9558,9 +9641,9 @@ impl<'db> Type<'db> {
                 let mut expansion_size = 1usize;
                 for (_, value) in &combined_paramspecs {
                     let mut count = 0usize;
-                    let counted = value.try_map_union_intersection(db, visitor.env, &mut |value| {
+                    let counted = value.try_map(db, visitor.env, &mut |value| {
                         count += 1;
-                        (count <= MAX_PARAMSPEC_EXPANSION).then_some(value)
+                        (count <= MAX_PARAMSPEC_EXPANSION).then_some(Type::from(value))
                     });
                     expansion_size = expansion_size.saturating_mul(count);
                     if counted.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
@@ -9570,8 +9653,8 @@ impl<'db> Type<'db> {
 
                 return visitor.visit(db, self, type_mapping, || {
                     value
-                        .try_map_union_intersection(db, visitor.env, &mut |value| {
-                            let bindings = [(*typevar, value)];
+                        .try_map(db, visitor.env, &mut |value| {
+                            let bindings = [(*typevar, Type::from(value))];
                             let specialization = ApplySpecialization::WithBindings {
                                 specialization,
                                 bindings: &bindings,

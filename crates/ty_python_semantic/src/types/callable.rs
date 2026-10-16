@@ -58,26 +58,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Reifies a captured parameter list as a callable for argument matching and checking.
-    pub(super) fn paramspec_value_callable_type(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<Type<'db>> {
-        self.try_map_union_intersection(db, env, &mut |value| match value {
-            Type::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
-                Some(Type::Callable(callable.into_regular(db)))
-            }
-            Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
-                Some(Type::Callable(CallableType::single(
-                    db,
-                    Signature::new(Parameters::paramspec(db, typevar), Type::unknown()),
-                )))
-            }
-            _ => None,
-        })
-    }
-
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
         match self {
             Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
