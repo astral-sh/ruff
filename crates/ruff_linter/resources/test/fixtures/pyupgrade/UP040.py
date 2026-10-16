@@ -133,12 +133,6 @@ T: TypeAlias = ( # comment0
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
 
-# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
-constraints = (int, str)
-T_starred = TypeVar("T_starred", *constraints)
-StarredList: TypeAlias = list[T_starred]
-StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
-
 # Preserve parentheses around a multiline union in a TypeAliasType call.
 LongAlias = TypeAliasType(
     "LongAlias",
@@ -155,3 +149,10 @@ ParenAlias = TypeAliasType(
         | str
     ),
 )
+
+
+# A sole starred constraint needs a trailing comma in the PEP 695 constraint tuple.
+constraints = (int, str)
+T_starred = TypeVar("T_starred", *constraints)
+StarredList: TypeAlias = list[T_starred]
+StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))

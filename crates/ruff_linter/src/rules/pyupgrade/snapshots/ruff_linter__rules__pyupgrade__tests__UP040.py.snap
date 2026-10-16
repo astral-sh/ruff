@@ -444,95 +444,92 @@ help: Use the `type` keyword
     |
 note: This is an unsafe fix and may change runtime behavior
 
-UP040 [*] Type alias `StarredList` uses `TypeAlias` annotation instead of the `type` keyword
-   --> UP040.py:139:1
-    |
-137 | constraints = (int, str)
-138 | T_starred = TypeVar("T_starred", *constraints)
-139 | StarredList: TypeAlias = list[T_starred]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-140 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
-    |
-help: Use the `type` keyword
-    |
-138 | T_starred = TypeVar("T_starred", *constraints)
-    - StarredList: TypeAlias = list[T_starred]
-139 + type StarredList[T_starred: (*constraints,)] = list[T_starred]
-140 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-UP040 [*] Type alias `StarredAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:140:1
-    |
-138 | T_starred = TypeVar("T_starred", *constraints)
-139 | StarredList: TypeAlias = list[T_starred]
-140 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-141 |
-142 | # Preserve parentheses around a multiline union in a TypeAliasType call.
-    |
-help: Use the `type` keyword
-    |
-139 | StarredList: TypeAlias = list[T_starred]
-    - StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
-140 + type StarredAlias[T_starred: (*constraints,)] = list[T_starred]
-141 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
 UP040 [*] Type alias `LongAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:143:1
+   --> UP040.py:137:1
     |
-142 |   # Preserve parentheses around a multiline union in a TypeAliasType call.
-143 | / LongAlias = TypeAliasType(
-144 | |     "LongAlias",
-145 | |     int
-146 | |     | str
-147 | |     | float
-148 | | )
+136 |   # Preserve parentheses around a multiline union in a TypeAliasType call.
+137 | / LongAlias = TypeAliasType(
+138 | |     "LongAlias",
+139 | |     int
+140 | |     | str
+141 | |     | float
+142 | | )
     | |_^
-149 |
-150 |   # An already parenthesized value keeps its own parentheses.
+143 |
+144 |   # An already parenthesized value keeps its own parentheses.
     |
 help: Use the `type` keyword
     |
-142 | # Preserve parentheses around a multiline union in a TypeAliasType call.
+136 | # Preserve parentheses around a multiline union in a TypeAliasType call.
     - LongAlias = TypeAliasType(
     -     "LongAlias",
     -     int
-143 + type LongAlias = (int
-144 |     | str
+137 + type LongAlias = (int
+138 |     | str
     -     | float
     - )
-145 +     | float)
-146 |
+139 +     | float)
+140 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `ParenAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:151:1
+   --> UP040.py:145:1
     |
-150 |   # An already parenthesized value keeps its own parentheses.
-151 | / ParenAlias = TypeAliasType(
-152 | |     "ParenAlias",
-153 | |     (
-154 | |         int
-155 | |         | str
-156 | |     ),
-157 | | )
+144 |   # An already parenthesized value keeps its own parentheses.
+145 | / ParenAlias = TypeAliasType(
+146 | |     "ParenAlias",
+147 | |     (
+148 | |         int
+149 | |         | str
+150 | |     ),
+151 | | )
     | |_^
 help: Use the `type` keyword
     |
-150 | # An already parenthesized value keeps its own parentheses.
+144 | # An already parenthesized value keeps its own parentheses.
     - ParenAlias = TypeAliasType(
     -     "ParenAlias",
     -     (
-151 + type ParenAlias = (
-152 |         int
-153 |         | str
+145 + type ParenAlias = (
+146 |         int
+147 |         | str
     -     ),
     - )
-154 +     )
+148 +     )
+149 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `StarredList` uses `TypeAlias` annotation instead of the `type` keyword
+   --> UP040.py:157:1
+    |
+155 | constraints = (int, str)
+156 | T_starred = TypeVar("T_starred", *constraints)
+157 | StarredList: TypeAlias = list[T_starred]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    |
+help: Use the `type` keyword
+    |
+156 | T_starred = TypeVar("T_starred", *constraints)
+    - StarredList: TypeAlias = list[T_starred]
+157 + type StarredList[T_starred: (*constraints,)] = list[T_starred]
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+UP040 [*] Type alias `StarredAlias` uses `TypeAliasType` assignment instead of the `type` keyword
+   --> UP040.py:158:1
+    |
+156 | T_starred = TypeVar("T_starred", *constraints)
+157 | StarredList: TypeAlias = list[T_starred]
+158 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Use the `type` keyword
+    |
+157 | StarredList: TypeAlias = list[T_starred]
+    - StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
+158 + type StarredAlias[T_starred: (*constraints,)] = list[T_starred]
     |
 note: This is an unsafe fix and may change runtime behavior
