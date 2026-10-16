@@ -77,7 +77,21 @@ y = foo(Thing())
           }
         ],
         "kind": 1,
-        "textEdits": []
+        "textEdits": [
+          {
+            "range": {
+              "start": {
+                "line": 2,
+                "character": 17
+              },
+              "end": {
+                "line": 2,
+                "character": 17
+              }
+            },
+            "newText": " -> Thing"
+          }
+        ]
       },
       {
         "position": {

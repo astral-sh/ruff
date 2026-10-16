@@ -12,7 +12,7 @@ use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, Member
 use ty_python_semantic::types::ide_support::{
     inlay_hint_call_argument_details, inlay_hint_return_type,
 };
-use ty_python_semantic::types::{Type, TypeDetail};
+use ty_python_semantic::types::{Type, TypeDetail, TypeDisplayDetails};
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -29,9 +29,9 @@ impl InlayHint {
         expr: &Expr,
         rhs: &Expr,
         ty: Type<'db>,
-        mut allow_edits: bool,
+        allow_edits: bool,
     ) -> Option<Self> {
-        let InlayHintImportContext { db, file, importer } = context;
+        let InlayHintImportContext { db, file, .. } = context;
 
         let position = expr.range().end();
         let env = ProgramEnvironment::from_file(file);
@@ -43,7 +43,27 @@ impl InlayHint {
             return None;
         }
 
-        let mut dynamic_importer = DynamicImporter::new(importer, expr);
+        Some(Self::type_annotation(
+            context,
+            expr.into(),
+            position,
+            details,
+            ": ",
+            allow_edits,
+        ))
+    }
+
+    fn type_annotation<'db>(
+        context: InlayHintImportContext<'_, 'db>,
+        scope_node: AnyNodeRef<'_>,
+        position: TextSize,
+        details: TypeDisplayDetails<'db>,
+        prefix: &str,
+        mut allow_edits: bool,
+    ) -> Self {
+        let InlayHintImportContext { db, file, importer } = context;
+        let env = ProgramEnvironment::from_file(file);
+        let mut dynamic_importer = DynamicImporter::new(importer, scope_node);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -60,7 +80,7 @@ impl InlayHint {
         let mut edit_label = details.label.clone();
         let mut edit_offset: isize = 0;
 
-        let mut label_parts = vec![": ".into()];
+        let mut label_parts = vec![prefix.into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
                 TypeDetail::Type(ty) => {
@@ -152,7 +172,7 @@ impl InlayHint {
         let text_edits = if details.is_valid_syntax && allow_edits {
             let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!(": {edit_label}"),
+                new_text: format!("{prefix}{edit_label}"),
             }];
 
             text_edits.extend(dynamic_importer.text_edits());
@@ -162,12 +182,12 @@ impl InlayHint {
             vec![]
         };
 
-        Some(Self {
+        Self {
             position,
             kind: InlayHintKind::Type,
             label: InlayHintLabel { parts: label_parts },
             text_edits,
-        })
+        }
     }
 
     fn call_argument_name(
@@ -188,36 +208,21 @@ impl InlayHint {
         }
     }
 
-    fn return_type(db: &dyn Db, file: ProgramFile<'_>, position: TextSize, ty: Type<'_>) -> Self {
-        let env = ProgramEnvironment::from_file(file);
-        let details = ty.display(db, &env).to_string_parts();
-        let mut parts = vec![" -> ".into()];
-        let mut offset = 0;
-        for (range, detail) in details.targets.iter().zip(&details.details) {
-            if let TypeDetail::Type(ty) = detail
-                && range.start().to_usize() >= offset
-            {
-                let start = range.start().to_usize();
-                let end = range.end().to_usize();
-                if start > offset {
-                    parts.push(details.label[offset..start].into());
-                }
-                parts.push(
-                    InlayHintLabelPart::new(&details.label[start..end])
-                        .with_target(ty.navigation_targets(db, &env).into_iter().next()),
-                );
-                offset = end;
-            }
-        }
-        if offset < details.label.len() {
-            parts.push(details.label[offset..].into());
-        }
-        Self {
-            position,
-            kind: InlayHintKind::Type,
-            label: InlayHintLabel { parts },
-            text_edits: vec![],
-        }
+    fn return_type<'db>(
+        context: InlayHintImportContext<'_, 'db>,
+        function: &ruff_python_ast::StmtFunctionDef,
+        ty: Type<'db>,
+    ) -> Self {
+        let env = ProgramEnvironment::from_file(context.file);
+        let details = ty.display(context.db, &env).to_string_parts();
+        Self::type_annotation(
+            context,
+            function.into(),
+            function.parameters.end(),
+            details,
+            " -> ",
+            true,
+        )
     }
 
     pub fn display(&self) -> InlayHintDisplay<'_> {
@@ -506,9 +511,12 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                     && let Some(ty) = inlay_hint_return_type(&self.model, function)
                 {
                     self.hints.push(InlayHint::return_type(
-                        self.db,
-                        self.model.program_file(),
-                        position,
+                        InlayHintImportContext {
+                            db: self.db,
+                            file: self.model.program_file(),
+                            importer: &self.importer,
+                        },
+                        function,
                         ty,
                     ));
                 }
@@ -733,7 +741,7 @@ struct DynamicallyImportedMember {
 
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
-    /// The expression node used to compute members in scope (lazily).
+    /// The node used to compute members in scope (lazily).
     scope_node: AnyNodeRef<'a>,
     scope_offset: TextSize,
     members: Option<MembersInScope<'db>>,
@@ -743,11 +751,11 @@ struct DynamicImporter<'a, 'db> {
 }
 
 impl<'a, 'db> DynamicImporter<'a, 'db> {
-    fn new(importer: &'a Importer<'db>, expr: &'a Expr) -> Self {
+    fn new(importer: &'a Importer<'db>, scope_node: AnyNodeRef<'a>) -> Self {
         Self {
             importer,
-            scope_node: expr.into(),
-            scope_offset: expr.range().start(),
+            scope_node,
+            scope_offset: scope_node.range().start(),
             members: None,
             dynamic_imports: FxIndexMap::default(),
         }
@@ -961,8 +969,10 @@ mod tests {
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        2 | def unannotated(x: int):
+        1 |
+          - def unannotated(x: int):
           -     return str(x)
+        2 + def unannotated(x: int) -> str:
         3 +     return str(object=x)
         4 |
           |
@@ -1007,6 +1017,20 @@ mod tests {
            |
         LL |     def method(self)[ -> str | Unknown]:
            |                                ^^^^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 + from ty_extensions._internal import Unknown
+        2 |
+        3 | class C:
+        4 |     value: str
+        5 |
+          -     def method(self):
+        6 +     def method(self) -> str | Unknown:
+        7 |         return self.value
+          |
         ");
 
         // We do not infer return types for overloaded functions.
@@ -1048,6 +1072,60 @@ mod tests {
         async def asynchronous(x: int):
             return f"{x}"
         "#);
+    }
+
+    #[test]
+    fn return_type_hint_imports() {
+        let mut test = return_type_hint_test(
+            r#"
+        from module import make
+
+        def create():
+            return make()
+        "#,
+        );
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Item: ...
+
+        def make() -> Item: ...
+        "#,
+            ),
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import make
+
+        def create()[ -> Item]:
+            return make()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:2:7
+          |
+        2 | class Item: ...
+          |       ^^^^
+        info: Source
+         --> main2.py:4:18
+          |
+        4 | def create()[ -> Item]:
+          |                  ^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 |
+          - from module import make
+        2 + from module import make, Item
+        3 |
+          - def create():
+        4 + def create() -> Item:
+        5 |     return make()
+          |
+        ");
     }
 
     struct InlayHintTest {
