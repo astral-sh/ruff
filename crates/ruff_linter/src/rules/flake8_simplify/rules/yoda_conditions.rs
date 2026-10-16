@@ -7,7 +7,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_python_stdlib::str::{self};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
@@ -137,8 +137,7 @@ impl ConstantLikelihood {
 }
 
 /// Generate a fix to reverse a comparison.
-fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
-    let range = expr.range();
+fn reverse_comparison(range: TextRange, locator: &Locator, stylist: &Stylist) -> Result<String> {
     let source_code = locator.slice(range);
 
     transform_expression(source_code, stylist, |mut expression| {
@@ -205,14 +204,8 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
 }
 
 /// SIM300
-pub(crate) fn yoda_conditions(
-    checker: &Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [right]) = (ops, comparators) else {
+pub(crate) fn yoda_conditions(checker: &Checker, compare: &ast::ExprCompare) {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -227,18 +220,20 @@ pub(crate) fn yoda_conditions(
         return;
     }
 
-    if let Ok(suggestion) = reverse_comparison(expr, checker.locator(), checker.stylist()) {
+    if let Ok(suggestion) =
+        reverse_comparison(compare.range(), checker.locator(), checker.stylist())
+    {
         let mut diagnostic = checker.report_diagnostic(
             YodaConditions {
                 suggestion: Some(SourceCodeSnippet::new(suggestion.clone())),
             },
-            expr.range(),
+            compare.range(),
         );
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            pad(suggestion, expr.range(), checker.locator()),
-            expr.range(),
+            pad(suggestion, compare.range(), checker.locator()),
+            compare.range(),
         )));
     } else {
-        checker.report_diagnostic(YodaConditions { suggestion: None }, expr.range());
+        checker.report_diagnostic(YodaConditions { suggestion: None }, compare.range());
     }
 }

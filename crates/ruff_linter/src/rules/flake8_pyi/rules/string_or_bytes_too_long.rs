@@ -102,8 +102,8 @@ fn count_f_string_chars(f_string: &ast::ExprFString) -> usize {
         .value
         .iter()
         .map(|part| match part {
-            ast::FStringPart::Literal(string) => string.chars().count(),
-            ast::FStringPart::FString(f_string) => f_string
+            ast::FStringPartRef::Literal(string) => string.chars().count(),
+            ast::FStringPartRef::FString(f_string) => f_string
                 .elements
                 .iter()
                 .map(|element| match element {

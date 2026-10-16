@@ -480,6 +480,19 @@ def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
     static_assert(not is_subtype_of(U, T))
 ```
 
+A typevar bounded by a union is a subtype of that union, but not of either member individually:
+
+```py
+def _[T: int | str](t: T) -> None:
+    static_assert(is_assignable_to(T, int | str))
+    static_assert(not is_assignable_to(T, int))
+    static_assert(not is_assignable_to(T, str))
+
+    static_assert(is_subtype_of(T, int | str))
+    static_assert(not is_subtype_of(T, int))
+    static_assert(not is_subtype_of(T, str))
+```
+
 A constrained fully static typevar is assignable to the union of its constraints, but not to any of
 the constraints individually. None of the constraints are subtypes of the typevar, though the
 intersection of all of its constraints is a subtype of the typevar.
@@ -550,6 +563,19 @@ def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
     static_assert(not is_subtype_of(Super | Unrelated, T))
     static_assert(not is_subtype_of(Intersection[Base, Unrelated], T))
     static_assert(not is_subtype_of(Intersection[Base, Any], T))
+```
+
+A bounded typevar is a subtype of a constrained typevar if its bound is a subtype of every target
+constraint:
+
+```py
+def _[S: Intersection[Base, Unrelated], T: (Base, Unrelated)](s: S, t: T) -> None:
+    static_assert(is_assignable_to(S, T))
+    static_assert(is_subtype_of(S, T))
+
+def _[S: Base, T: (Base, Unrelated)](s: S, t: T) -> None:
+    static_assert(not is_assignable_to(S, T))
+    static_assert(not is_subtype_of(S, T))
 ```
 
 Two distinct fully static typevars are not subtypes of each other, even if they have the same
@@ -912,6 +938,65 @@ def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
+A fully static typevar `T` is assignable to `T & Any`:
+
+```py
+def _[T, U](t: T) -> None:
+    static_assert(is_assignable_to(T, Intersection[T, Any]))
+    static_assert(not is_subtype_of(T, Intersection[T, Any]))
+    static_assert(not is_assignable_to(T, Intersection[U, Any]))
+
+def _[T: object, U: object](t: T) -> None:
+    static_assert(is_assignable_to(T, Intersection[T, Any]))
+    static_assert(not is_subtype_of(T, Intersection[T, Any]))
+    static_assert(not is_assignable_to(T, Intersection[U, Any]))
+
+def _[T: (int, str), U: (int, str)](t: T) -> None:
+    static_assert(is_assignable_to(T, Intersection[T, Any]))
+    static_assert(not is_subtype_of(T, Intersection[T, Any]))
+    static_assert(not is_assignable_to(T, Intersection[U, Any]))
+```
+
+The same relation holds when the intersection is nested within a union:
+
+```py
+def _[T: object, U: object](t: T, u: U) -> None:
+    static_assert(is_assignable_to(T, T | int))
+    static_assert(is_subtype_of(T, T | int))
+
+    static_assert(is_assignable_to(T, Intersection[T, Any] | int))
+    static_assert(not is_subtype_of(T, Intersection[T, Any] | int))
+    static_assert(not is_assignable_to(T, Intersection[U, Any] | int))
+
+def _[T: (int, str), U: (int, str)](t: T, u: U) -> None:
+    static_assert(is_assignable_to(T, T | int))
+    static_assert(is_subtype_of(T, T | int))
+
+    static_assert(is_assignable_to(T, Intersection[T, Any] | int))
+    static_assert(not is_subtype_of(T, Intersection[T, Any] | int))
+    static_assert(not is_assignable_to(T, Intersection[U, Any] | int))
+```
+
+But does not hold when the intersection contains a negated member within the range of the bounded
+typevar:
+
+```py
+def _[T: object](t: T) -> None:
+    static_assert(not is_assignable_to(T, Intersection[T, Any, Not[int]]))
+    static_assert(not is_subtype_of(T, Intersection[T, Not[int]]))
+
+def _[T: (int, str)](t: T) -> None:
+    static_assert(not is_assignable_to(T, Intersection[T, Any, Not[int]]))
+    static_assert(not is_subtype_of(T, Intersection[T, Not[int]]))
+```
+
+A gradually bounded typevar is not assignable to its own negation:
+
+```py
+def _[T: Any](t: T) -> None:
+    static_assert(not is_assignable_to(T, Not[T]))
+```
+
 ## Bounded typevars remain assignable to their upper bound after narrowing
 
 Narrowing can leave a bounded typevar represented as an intersection, but it should still be
@@ -946,7 +1031,8 @@ def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
         return check(class_or_tuple)
     return class_or_tuple
 
-def check(check_type: type): ...
+def check[T: type](check_type: T) -> T:
+    return check_type
 
 # In this scenario, we do not expand the intersection,
 # because it only has inferrable type variables in it.
@@ -1092,6 +1178,350 @@ def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
+## Attribute writes through type variables
+
+An assignment must be valid for every constraint or alternative in a union bound. Reading the
+attribute produces a union of its possible types, but that union is not a valid write type.
+
+```py
+class A:
+    value: int
+
+class B:
+    value: str
+
+def constrained[T: (A, B)](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+
+def bounded[T: A | B](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Self in attribute writes through type variables
+
+An attribute annotation and a property setter can both use `Self` to refer to the receiver's type.
+
+```py
+from typing import Self
+
+class Stored:
+    cls: type[Self]
+
+def condition() -> bool:
+    return True
+
+class WithProperty:
+    if condition():
+        @property
+        def cls(self) -> type[Self]:
+            return type(self)
+
+        @cls.setter
+        def cls(self: Self, value: type[Self]) -> None:
+            pass
+
+        @cls.deleter
+        def cls(self) -> None:
+            pass
+
+    else:
+        @property
+        def cls(self) -> type[Self]:
+            return type(self)
+
+        @cls.setter
+        def cls(self: Self, value: type[Self]) -> None:
+            pass
+
+        @cls.deleter
+        def cls(self) -> None:
+            pass
+```
+
+`Self` stays bound to the original type variable. The actual class `type(obj)` is accepted, but
+`Stored` may be too broad for a receiver whose type is a subclass of `Stored`.
+
+```py
+def stored[T: Stored](obj: T):
+    obj.cls = type(obj)  # no diagnostic
+    obj.cls = Stored  # error: [invalid-assignment]
+```
+
+The same binding applies to every possible setter of a conditionally defined property.
+
+```py
+def property_bound[T: WithProperty](obj: T):
+    obj.cls = type(obj)  # no diagnostic
+    obj.cls = WithProperty  # error: [invalid-assignment]
+```
+
+Every constraint must permit a write or deletion, with `Self` still bound to the type variable.
+
+```py
+def constrained[T: (Stored, WithProperty)](obj: T):
+    obj.cls = type(obj)  # no diagnostic
+    del obj.cls  # no diagnostic
+```
+
+A union bound preserves the same `Self` binding and deletion support.
+
+```py
+def bounded[T: Stored | WithProperty](obj: T):
+    obj.cls = type(obj)  # no diagnostic
+    del obj.cls  # no diagnostic
+```
+
+A protocol annotation also binds `Self` to the original type variable. Its additional `marker`
+member keeps the protocol distinct from `Stored`.
+
+```py
+from typing import Protocol
+
+class HasClass(Protocol):
+    marker: int
+    cls: type[Self]
+
+def protocol_bound[T: Stored | HasClass](obj: T):
+    obj.cls = type(obj)  # no diagnostic
+```
+
+## Read-only attribute alternatives
+
+A getter-only property prevents writes and deletion, even when another receiver permits both.
+
+```py
+class Stored:
+    value: int
+
+class ReadOnly:
+    @property
+    def value(self) -> int:
+        return 0
+
+def constrained[T: (Stored, ReadOnly)](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+    del obj.value  # error: [invalid-assignment]
+```
+
+## Custom `__setattr__` through type variables
+
+A custom setter validates the names and values of otherwise undefined attributes. Explicit attribute
+annotations take precedence over the setter's parameter types.
+
+```py
+from typing import Literal
+
+class Custom:
+    declared: str
+
+    # error: [invalid-method-override]
+    def __setattr__(self, name: Literal["dynamic"], value: int) -> None:
+        pass
+
+def assign[T: Custom](obj: T):
+    obj.dynamic = 1  # no diagnostic
+    obj.dynamic = "wrong"  # error: [invalid-assignment]
+    obj.other = 1  # error: [invalid-assignment]
+    obj.declared = "ok"  # no diagnostic
+    obj.declared = 1  # error: [invalid-assignment]
+```
+
+## Self in custom `__setattr__` through type variables
+
+Each setter's `Self` parameter refers to the original type variable.
+
+```py
+from typing import Self
+
+class Custom:
+    def __setattr__(self, name: str, value: Self) -> None:
+        pass
+
+def condition() -> bool:
+    return True
+
+class Other:
+    if condition():
+        def __setattr__(self, name: str, value: Self) -> None:
+            pass
+
+    else:
+        def __setattr__(self, name: str, value: Self) -> None:
+            pass
+
+def assign[T: Custom | Other](obj: T):
+    obj.other = obj  # no diagnostic
+    obj.other = Custom()  # error: [invalid-assignment]
+```
+
+Conditionally defined setters also retain the original receiver's type.
+
+```py
+def conditional[T: Other](obj: T):
+    obj.other = obj  # no diagnostic
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    obj.other = Other()
+```
+
+Classmethod setters also preserve `Self` as the instance type of the original receiver.
+
+```py
+class ClassMethod:
+    @classmethod
+    def __setattr__(cls, name: str, value: Self) -> None:
+        pass
+
+def class_method[T: ClassMethod](obj: T):
+    obj.other = obj  # no diagnostic
+    obj.other = ClassMethod()  # error: [invalid-assignment]
+```
+
+## Terminal `__setattr__` through type variables
+
+A setter returning `Never` also rejects assignments to declared attributes.
+
+```py
+from typing import Never
+
+class Immutable:
+    value: int
+
+    def __setattr__(self, name: str, value: object) -> Never:
+        raise AttributeError
+
+def assign[T: Immutable](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Frozen dataclass attributes through type variables
+
+Frozen fields remain read-only through a type variable.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+def bounded[T: Frozen](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+An ordinary subclass can introduce mutable attributes while inheriting frozen fields.
+
+```py
+class Child(Frozen):
+    extra: int
+
+def child[T: Child](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+    obj.extra = 1  # no diagnostic
+```
+
+A writable alternative does not make the frozen field writable.
+
+```py
+class Mutable:
+    value: int
+
+def constrained[T: (Frozen, Mutable)](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+
+def union_bound[T: Frozen | Mutable](obj: T):
+    obj.value = 1  # error: [invalid-assignment]
+```
+
+## Static method assignments through type variables
+
+An instance assignment shadows a static method with its underlying function. This also works when
+the instance has a bounded or constrained type variable as its type:
+
+```py
+class C:
+    @staticmethod
+    def f(x: int) -> int:
+        return x
+
+class D(C): ...
+
+def bounded[T: C](obj: T):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+
+def constrained[T: (C, D)](obj: T):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+```
+
+A class assignment replaces the static method descriptor itself. We reject assigning the unwrapped
+function through a generic class object:
+
+```py
+def bounded_class[T: C](cls: type[T]):
+    cls.f = cls.f  # error: [invalid-assignment]
+
+def constrained_class[T: (C, D)](cls: type[T]):
+    cls.f = cls.f  # error: [invalid-assignment]
+```
+
+## Enum members on generic class objects
+
+An enum member cannot be reassigned through a generic class receiver. The restriction applies to
+every constraint or alternative in an upper bound. Non-member attributes remain writable.
+
+```py
+from enum import Enum
+from typing import Any, Protocol
+
+class A(Enum):
+    X = 0
+    label: str
+
+class B(Enum):
+    X = 0
+    label: str
+
+class Writable(Protocol):
+    X: Any
+```
+
+For a constrained type variable, the assignment must be valid for every constraint. These class
+objects also cannot satisfy a protocol that requires a writable enum member:
+
+```py
+def constrained[T: (A, B)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+The same applies to a union bound, including one defined through a type alias:
+
+```py
+type Both = A | B
+
+def union_bound[T: Both](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+    writable: Writable = cls  # error: [invalid-assignment]
+    cls.label = "label"
+```
+
+One enum alternative is enough to reject the write, even if another class allows assignment to the
+attribute:
+
+```py
+class Plain:
+    X: int = 0
+
+def mixed_constraints[T: (Plain, A)](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+
+def mixed_bound[T: A | Plain](cls: type[T]):
+    cls.X = 0  # error: [invalid-assignment]
+```
+
 ## Cycles
 
 ### Bounds and constraints
@@ -1187,6 +1617,30 @@ class D[T = T]:
     x: T
 
 reveal_type(D().x)  # revealed: Unknown
+```
+
+### Defaults through recursive aliases
+
+A default that refers to its own type variable through a recursive alias falls back to `Unknown`.
+This also applies when another specialization of the same alias wraps the reference.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+type Tree[U] = tuple[U, Tree[U] | None]
+T = TypeVar("T", default="Tree[T]")
+N = TypeVar("N", default="Tree[Tree[N]]")
+
+class Box(Generic[T]): ...
+class NestedBox(Generic[N]): ...
+
+reveal_type(Box())  # revealed: Box[Unknown]
+reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

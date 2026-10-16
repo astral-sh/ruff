@@ -6,10 +6,12 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
+use ty_python_core::definition::Definition;
 use ty_python_core::semantic_index;
 
 use crate::types::context::LintDiagnosticGuard;
 use crate::types::infer::nearest_enclosing_class;
+use crate::types::iteration::add_async_generator_stub_help;
 use crate::types::tuple::TupleLength;
 use crate::types::{DisplaySettings, Type, TypedDictType};
 use crate::{FxOrderSet, ProgramEnvironment};
@@ -172,6 +174,8 @@ pub(crate) enum ErrorContext<'db> {
     IncompatibleReturnTypes {
         source: Type<'db>,
         target: Type<'db>,
+        source_definition: Option<Definition<'db>>,
+        target_definition: Option<Definition<'db>>,
     },
     IncompatibleParameterTypes {
         source: Type<'db>,
@@ -528,12 +532,33 @@ impl<'db> ErrorContext<'db> {
                     target = target.display(db, env)
                 )
             }
-            Self::IncompatibleReturnTypes { source, target } => format!(
-                "incompatible return types: `{source}` is not {relation} `{target}`",
-                source = source.display(db, env),
-                relation = relation.description(),
-                target = target.display(db, env),
-            ),
+            Self::IncompatibleReturnTypes {
+                source,
+                target,
+                source_definition,
+                target_definition,
+            } => {
+                if let Some(definition) = source_definition
+                    && source
+                        .coroutine_returning_async_iterable(db, env)
+                        .is_some_and(|result| result.is_assignable_to(db, env, *target))
+                {
+                    help_messages.insert(HelpMessages::AsyncGeneratorStub(*definition));
+                }
+                if let Some(definition) = target_definition
+                    && target
+                        .coroutine_returning_async_iterable(db, env)
+                        .is_some_and(|result| source.is_assignable_to(db, env, result))
+                {
+                    help_messages.insert(HelpMessages::AsyncGeneratorStub(*definition));
+                }
+                format!(
+                    "incompatible return types: `{source}` is not {relation} `{target}`",
+                    source = source.display(db, env),
+                    relation = relation.description(),
+                    target = target.display(db, env),
+                )
+            }
             Self::IncompatibleParameterTypes {
                 source,
                 target,
@@ -685,6 +710,7 @@ impl<'db> ErrorContext<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum HelpMessages<'db> {
+    AsyncGeneratorStub(Definition<'db>),
     RequiredFieldCouldBeRemoved,
     TypedDictNotAssignableToDict(ErrorRelation),
     ConsiderUsingMappingInsteadOfDict,
@@ -710,27 +736,30 @@ enum HelpMessages<'db> {
 }
 
 impl<'db> HelpMessages<'db> {
-    fn display(
+    fn attach_to(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment,
         relation: ErrorRelation,
-    ) -> impl std::fmt::Display {
-        std::fmt::from_fn(move |f| match self {
-            HelpMessages::RequiredFieldCouldBeRemoved => f.write_str(
+        diag: &mut LintDiagnosticGuard<'_, '_>,
+    ) {
+        match self {
+            HelpMessages::AsyncGeneratorStub(definition) => {
+                add_async_generator_stub_help(db, diag, *definition);
+            }
+            HelpMessages::RequiredFieldCouldBeRemoved => diag.help(
                 "The required field could be removed through a destructive operation \
                 like `del` on the target",
             ),
             HelpMessages::TypedDictNotAssignableToDict(relation) => {
-                write!(
-                    f,
+                diag.help(format_args!(
                     "A TypedDict is not usually {} any `dict[..]` type; \
                     `dict` types allow destructive operations like `clear()`",
                     relation.description()
-                )
+                ));
             }
             HelpMessages::ConsiderUsingMappingInsteadOfDict => {
-                f.write_str("Consider using `Mapping[..]` instead of `dict[..]`")
+                diag.help("Consider using `Mapping[..]` instead of `dict[..]`");
             }
             HelpMessages::OpenTypedDictNotAssignableToMapping {
                 typed_dict_name,
@@ -740,14 +769,13 @@ impl<'db> HelpMessages<'db> {
                     .as_ref()
                     .map(|name| format!("`{name}`"))
                     .unwrap_or_else(|| "this TypedDict".to_string());
-                write!(
-                    f,
+                diag.help(format_args!(
                     "{name} would be {relation} `{mapping}` \
                     if it were declared with `closed=True`, \
                     but TypedDicts are open by default",
                     relation = relation.description(),
                     mapping = mapping_target.display(db, env)
-                )
+                ));
             }
             HelpMessages::ExplainOpenTypedDictUnsoundness {
                 typed_dict_name,
@@ -757,21 +785,22 @@ impl<'db> HelpMessages<'db> {
                     .as_ref()
                     .map(|name| format!("`{name}`"))
                     .unwrap_or_else(|| "this TypedDict".to_string());
-                write!(
-                    f,
+                diag.help(format_args!(
                     "A subclass of {name} could validly add a new field \
                     of an arbitrary type, violating subtyping with `{mapping_type}`",
                     mapping_type = mapping_target.display(db, env)
-                )
+                ));
             }
-            HelpMessages::TopCallableExplanation => f.write_str(
+            HelpMessages::TopCallableExplanation => diag.help(
                 "This type includes all possible parameter sets, \
                 so it cannot safely be called \
                 because there is no valid set of arguments for it",
             ),
             HelpMessages::ConsiderAddingADefaultValue { parameter_name } => match parameter_name {
-                Some(name) => write!(f, "Parameter `{name}` must have a default value"),
-                None => f.write_str("The parameter must have a default value"),
+                Some(name) => {
+                    diag.help(format_args!("Parameter `{name}` must have a default value"));
+                }
+                None => diag.help("The parameter must have a default value"),
             },
             HelpMessages::SuggestMakingParameterPositionalOnly {
                 ty,
@@ -782,17 +811,16 @@ impl<'db> HelpMessages<'db> {
             } => {
                 let settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, [*ty, *protocol]);
-                write!(
-                    f,
+                diag.help(format_args!(
                     "`{source}` might be {relation} `{target}` \
                     if the parameter `{parameter_name}` were made positional-only \
                     in `{declaring_protocol_name}.{method_name}`",
                     source = ty.display_with(db, env, settings.clone()),
                     relation = relation.description(),
                     target = protocol.display_with(db, env, settings),
-                )
+                ));
             }
-        })
+        }
     }
 }
 
@@ -1008,7 +1036,7 @@ impl<'db> ErrorContextTree<'db> {
             diag.info(line);
         }
         for (relation, help_message) in help_messages {
-            diag.help(help_message.display(db, env, relation));
+            help_message.attach_to(db, env, relation, diag);
         }
     }
 }

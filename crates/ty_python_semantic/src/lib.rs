@@ -41,15 +41,14 @@ pub use ty_site_packages::{
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
-    contains_identifier, definitions_for_attribute, definitions_for_bin_op,
-    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
-    map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
-    type_hierarchy_supertypes,
+    definitions_for_attribute, definitions_for_bin_op, definitions_for_imported_symbol,
+    definitions_for_name, definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare,
+    type_hierarchy_subtypes, type_hierarchy_supertypes,
 };
 pub use types::{
     DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
-    TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
-    pytest_global_plugin_files,
+    PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
+    pytest_global_plugin_files, pytest_tests_in_file,
 };
 
 mod db;
@@ -99,6 +98,9 @@ fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
+    /// Whether to infer return types for functions without return annotations.
+    pub return_type_inference: ReturnTypeInference,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub strict_generic_narrowing: bool,
 
@@ -122,6 +124,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
+            return_type_inference: ReturnTypeInference::default(),
             strict_generic_narrowing: false,
             strict_equality_semantics: false,
             respect_type_ignore_comments: true,
@@ -129,6 +132,30 @@ impl Default for AnalysisSettings {
             replace_imports_with_any: ModuleGlobSet::empty(),
         }
     }
+}
+
+/// Controls return type inference for functions without explicit return annotations.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ReturnTypeInference {
+    /// Do not infer return types from function bodies. Unannotated functions
+    /// will have an inferred return type of `Unknown`.
+    #[default]
+    Never,
+    /// Infer return types for unannotated functions and methods.
+    Always,
+}
+
+impl ReturnTypeInference {
+    const fn is_active(self) -> bool {
+        matches!(self, Self::Always)
+    }
+}
+
+impl ty_combine::Combine for ReturnTypeInference {
+    fn combine_with(&mut self, _other: Self) {}
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching

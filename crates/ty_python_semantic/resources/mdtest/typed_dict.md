@@ -60,7 +60,7 @@ If a dict literal is inferred against a union containing both a `TypedDict` and 
 extra keys accepted by the non-`TypedDict` arm should not trigger eager `TypedDict` diagnostics:
 
 ```py
-from typing import Any, TypedDict
+from typing_extensions import Any, TypedDict
 
 class FormatterConfig(TypedDict, total=False):
     format: str
@@ -77,7 +77,7 @@ Methods that are available on `dict`s are also available on `TypedDict`s:
 bob.update(age=26)
 bob.update({"age": 27})
 
-class NamePatch(TypedDict, total=False):
+class NamePatch(TypedDict, total=False, closed=True):
     name: str
 
 name_update: NamePatch = {"name": "Bobby"}
@@ -147,7 +147,7 @@ class Movie(TypedDict, total=False):
     year: int
     director: NotRequired[str]
 
-class MissingRequiredTitle(TypedDict, total=False):
+class MissingRequiredTitle(TypedDict, total=False, closed=True):
     year: int
 
 movie: Movie = {"title": "Alien"}
@@ -2529,6 +2529,8 @@ def _(
     # No error here:
     reveal_type(person[unknown_key])  # revealed: Unknown
 
+    # error: [invalid-key] "got key of type `list[RecursiveKey | None]`"
+    # error: [invalid-key] "got key of type `None`"
     reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
     # error: [invalid-key] "Unknown key "anything" for TypedDict `Animal`"
@@ -2667,13 +2669,13 @@ class ReadOnlyPerson(TypedDict):
     id: ReadOnly[int]
     age: int
 
-class AgePatch(TypedDict, total=False):
+class AgePatch(TypedDict, total=False, closed=True):
     age: int
 
 class IdPatch(TypedDict, total=False):
     id: int
 
-class ImpossibleIdPatch(TypedDict, total=False):
+class ImpossibleIdPatch(TypedDict, total=False, closed=True):
     id: NotRequired[Never]
 
 person: ReadOnlyPerson = {"id": 1, "age": 30}
@@ -2694,6 +2696,134 @@ person.update({"id": 2})
 person.update(id=2)
 
 person.update(impossible_id_patch)
+```
+
+## Updates with undeclared source items
+
+An open `TypedDict` can contain items that are not declared in its type. A `NamePatch` may contain a
+`count` item with an incompatible type, so neither `update()` nor `|=` can safely apply it to a
+`Counter`. A source declaring every destination field is accepted when those declared types are
+compatible.
+
+```py
+from typing_extensions import TypedDict
+
+class NamePatch(TypedDict):
+    name: str
+
+class Counter(TypedDict):
+    name: str
+    count: int
+
+def _(counter: Counter, patch: NamePatch, other: Counter):
+    counter.update(patch)  # error: [invalid-argument-type]
+    counter |= patch  # error: [unsupported-operator]
+    counter.update(other)
+    counter |= other
+    counter |= {"name": "updated", "count": 1}
+```
+
+## Updates with undeclared read-only items
+
+An open source may contain a destination's read-only item even when it does not declare that item.
+Although `id` accepts any object, the update is rejected because it could overwrite a read-only
+item.
+
+```py
+from typing_extensions import Never, NotRequired, ReadOnly, TypedDict
+
+class Person(TypedDict):
+    id: ReadOnly[object]
+    name: str
+
+class NamePatch(TypedDict):
+    name: str
+
+def _(person: Person, patch: NamePatch):
+    person.update(patch)  # error: [invalid-argument-type]
+    person |= patch  # error: [unsupported-operator]
+```
+
+A source with an `id: NotRequired[Never]` item cannot contain `id`, so it can update the mutable
+`name` item even when the source is open.
+
+```py
+class ImpossibleIdPatch(TypedDict):
+    id: NotRequired[Never]
+    name: str
+
+def _(person: Person, patch: ImpossibleIdPatch):
+    person.update(patch)
+    person |= patch
+```
+
+## Updates with undeclared destination items
+
+By default, an open `TypedDict`'s undeclared items behave as read-only items of type `object`. This
+allows subtypes to give those items narrower types: `destination` may contain a `count` item of type
+`str`. Even a closed source cannot update an undeclared destination key, because it could overwrite
+such an item with an incompatible value. A non-mutating merge can include these keys because it
+leaves the destination unchanged.
+
+```py
+from typing_extensions import TypedDict
+
+class Named(TypedDict):
+    name: str
+
+class CountPatch(TypedDict, closed=True):
+    count: int
+
+def _(destination: Named, patch: CountPatch):
+    destination.update(patch)  # error: [invalid-argument-type]
+    destination |= patch  # error: [unsupported-operator]
+    reveal_type(destination | patch)  # revealed: Named
+```
+
+Explicit mutable extra items permit these updates when the source's value types are compatible. An
+`object` extra-item type accepts both integer and string values, while `int` only accepts the
+integer patch. Explicit read-only extra items reject writes even when their value type is
+compatible.
+
+```py
+from typing_extensions import ReadOnly
+
+class ObjectExtras(Named, extra_items=object): ...
+class IntExtras(Named, extra_items=int): ...
+class ReadOnlyExtras(Named, extra_items=ReadOnly[object]): ...
+
+class StringPatch(TypedDict, closed=True):
+    count: str
+
+def _(
+    objects: ObjectExtras,
+    ints: IntExtras,
+    read_only: ReadOnlyExtras,
+    count: CountPatch,
+    text: StringPatch,
+):
+    objects.update(count)
+    objects |= count
+    objects.update(text)
+    objects |= text
+    ints.update(count)
+    ints |= count
+    ints.update(text)  # error: [invalid-argument-type]
+    ints |= text  # error: [unsupported-operator]
+    read_only.update(count)  # error: [invalid-argument-type]
+    read_only |= count  # error: [unsupported-operator]
+```
+
+An optional bottom-typed item cannot be present, so it does not write an undeclared destination key:
+
+```py
+from typing_extensions import Never, NotRequired
+
+class AbsentCountPatch(TypedDict, closed=True):
+    count: NotRequired[Never]
+
+def _(destination: Named, patch: AbsentCountPatch):
+    destination.update(patch)
 ```
 
 ## Methods on `TypedDict`
@@ -2840,7 +2970,7 @@ def _(v: OptionalX | RequiredX) -> None:
     # but this is a terrible error message:
     #
     # error: [call-non-callable] "Object of type `Overload[]` is not callable"
-    reveal_type(v.pop("x"))  # revealed: Unknown
+    reveal_type(v.pop("x"))  # revealed: int | Unknown
 
 def union_pop_with_default(u: OptionalX | OptStrX) -> None:
     # `Literal[0]` is assignable to `int`, so `OptionalX` arm returns `int`; `OptStrX` arm
@@ -3361,7 +3491,22 @@ def set_and_get(value: SetAndGet[Key, Value], key: Key, item: Value) -> Value:
 
 def takes_int(value: int) -> None: ...
 def _(value: CorrelatedA | CorrelatedB) -> None:
+    # TODO: This should not error.
+    # snapshot: invalid-argument-type
     takes_int(set_and_get(value, "a", 1))
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `takes_int` is incorrect
+   --> src/mdtest_snippet.py:347:15
+    |
+347 |     takes_int(set_and_get(value, "a", 1))
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+info: Function defined here
+   --> src/mdtest_snippet.py:343:5
+    |
+343 | def takes_int(value: int) -> None: ...
+    |     ^^^^^^^^^ ---------- Parameter declared here
 ```
 
 Generic protocols that use `keys()` and `__getitem__()` can infer their type variables from a
@@ -4296,6 +4441,58 @@ type AliasNodeChild[T] = AliasNode[T] | None
 
 # TODO: Infer `AliasNode[int]`.
 reveal_type(AliasNode(child=AliasNode(value=1)))  # revealed: AliasNode[Unknown]
+```
+
+### Constructor inference through recursive aliases
+
+A generic `TypedDict` inside a recursive alias does not acquire an incompatible type argument from
+another constructor field. Both alias syntaxes preserve the unresolved outer type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict, TypeVar
+
+T = TypeVar("T")
+
+class Item[T](TypedDict):
+    value: T
+
+Tree = Item[T] | list["Tree[T]"]
+type ExplicitTree[T] = Item[T] | list[ExplicitTree[T]]
+
+class Box[T](TypedDict):
+    data: Tree[T]
+    marker: T
+
+class ExplicitBox[T](TypedDict):
+    data: ExplicitTree[T]
+    marker: T
+
+reveal_type(Box(data={"value": 1}, marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data={"value": 1}, marker="x"))  # revealed: ExplicitBox[Unknown]
+reveal_type(Box(data=Item(value=1), marker="x"))  # revealed: Box[Unknown]
+reveal_type(ExplicitBox(data=Item(value=1), marker="x"))  # revealed: ExplicitBox[Unknown]
+```
+
+Aliases whose type arguments change at every recursive step also keep constructor inference
+conservative.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+type ExplicitGrowing[T] = tuple[T, ExplicitGrowing[list[T]] | None]
+
+class GrowingBox[T](TypedDict):
+    data: Growing[T]
+
+class ExplicitGrowingBox[T](TypedDict):
+    data: ExplicitGrowing[T]
+
+reveal_type(GrowingBox(data=(1, None)))  # revealed: GrowingBox[Unknown]
+reveal_type(ExplicitGrowingBox(data=(1, None)))  # revealed: ExplicitGrowingBox[Unknown]
 ```
 
 ### Constructor inference from nested values
@@ -5459,6 +5656,51 @@ tree: TreeNode = {
 bad_tree: TreeNode = {"value": 1, "left": "not a node", "right": None}
 ```
 
+## Recursive functional `TypedDict` in a shared expression
+
+The recursive field is approximated during cycle recovery, while the other fields keep their types.
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+Node = Alias = TypedDict("Node", {"child": "Node | None", "name": str, "id": NotRequired[int]})
+reveal_type(Node)  # revealed: <class 'Node'>
+reveal_type(Alias)  # revealed: <class 'Node'>
+
+node = Node(child=None, name="root")
+reveal_type(node["child"])  # revealed: Divergent
+reveal_type(node["name"])  # revealed: str
+Node(child=None, name=1)  # error: [invalid-argument-type]
+
+Other = OtherAlias = TypedDict("Other", {"child": "OtherAlias"})
+reveal_type(OtherAlias(child=None)["child"])  # revealed: Divergent
+```
+
+## Recursive functional `TypedDict` nested in an expression
+
+```py
+from typing import TypedDict
+
+Node = (TypedDict("Node", {"child": "Node | None", "name": str}),)[0]
+reveal_type(Node(child=None, name="root")["name"])  # revealed: str
+
+def conditional(flag: bool):
+    Conditional = TypedDict("Conditional", {"child": "Conditional | None"}) if flag else None
+    reveal_type(Conditional)  # revealed: <class 'Conditional'> | None
+```
+
+## Recursive `extra_items` in a shared expression
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+Extra = Alias = TypedDict("Extra", {"name": str}, extra_items="ReadOnly[Extra]")
+value = Extra(name="root")
+reveal_type(value["name"])  # revealed: str
+reveal_type(value["other"])  # revealed: Divergent
+value["other"] = value  # error: [invalid-assignment] "key is marked read-only"
+```
+
 ## Deprecated keyword-argument syntax
 
 The deprecated keyword-argument syntax (fields as keyword arguments instead of a dict) is rejected.
@@ -6407,6 +6649,22 @@ def match_one_tag(u: Foo | MultiTag):
         reveal_type(u)  # revealed: Foo | MultiTag
 ```
 
+A comparison value can itself be a union of literals. Only `Foo` has a tag that can match here, but
+either dictionary can fail to match when the comparison value is `"other"`:
+
+```py
+def union_comparator(u: Foo | Bing, other: Literal["foo", "other"]):
+    if u["tag"] == other:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
+
+    if other != u["tag"]:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo
+```
+
 Boolean tags can be narrowed by truthiness, including through a generic `TypedDict` and a type
 alias:
 
@@ -6451,6 +6709,17 @@ class FalsyIntTag(TypedDict):
 
 def _(response: Response | TruthyIntTag | FalsyIntTag):
     if response["success"]:
+        reveal_type(response)  # revealed: Success[int] | TruthyIntTag
+    else:
+        reveal_type(response)  # revealed: Failure | FalsyIntTag
+```
+
+Boolean literals can also be compared explicitly. Since `True == 1`, both matching boolean and
+integer tags remain in the positive branch:
+
+```py
+def boolean_comparator(response: Response | TruthyIntTag | FalsyIntTag):
+    if response["success"] == True:
         reveal_type(response)  # revealed: Success[int] | TruthyIntTag
     else:
         reveal_type(response)  # revealed: Failure | FalsyIntTag
@@ -6510,6 +6779,64 @@ def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
         reveal_type(u)  # revealed: WithAliasTagB
 ```
 
+An `IntEnum` member compares equal to its integer value without having the same literal type. The
+enum and integer tags both match, so fields unique to one dictionary are not safe to access. The
+dictionary with the enum tag remains possible when equality is false because it also permits
+`"other"`:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE, "other"]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+    integer_only: int
+
+def enum_tag(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == 1:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+        u["integer_only"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+Integer tags can also match an enum member used as the comparison value:
+
+```py
+def enum_comparator(u: EnumTag | IntegerTag | Foo):
+    if u["tag"] == Number.ONE:
+        reveal_type(u)  # revealed: EnumTag | IntegerTag
+    else:
+        reveal_type(u)  # revealed: EnumTag | Foo
+```
+
+An enum can customize `__ne__` independently of `__eq__`. An ambiguous inequality keeps the
+dictionary with that enum tag in both branches, including the branch where the inequality is false:
+
+```py
+class NeverUnequal(Enum):
+    A = 1
+    B = 2
+
+    def __ne__(self, other: object) -> bool:
+        return False
+
+class UnequalTag(TypedDict):
+    tag: Literal[NeverUnequal.A]
+
+def custom_inequality(u: UnequalTag | Foo | Bar):
+    if u["tag"] != "foo":
+        reveal_type(u)  # revealed: UnequalTag | Bar
+    else:
+        reveal_type(u)  # revealed: UnequalTag | Foo
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -6533,8 +6860,8 @@ def _(u: Foo):
         reveal_type(u)  # revealed: Never
 ```
 
-Narrowing is restricted to `Literal` tags, though, because `x == "foo"` doesn't generally tell us
-anything about the type of `x`. Here's an example where narrowing would be tempting but unsound:
+An `int` tag can contain subclasses that compare equal to unrelated values, so that dictionary
+remains possible in the equality branch:
 
 ```py
 from ty_extensions import static_assert
@@ -6560,7 +6887,7 @@ class WackyInt(int):
 _: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
 ```
 
-The same restriction applies to a tag union containing a non-literal type. The `int` alternative can
+The same reasoning applies to a tag union containing a non-literal type. The `int` alternative can
 still hold a `WackyInt` that compares equal to `"foo"`:
 
 ```py
@@ -6590,7 +6917,7 @@ def _(x: Intersection[Foo, Any]):
         reveal_type(x)  # revealed: Never
 ```
 
-But intersections with non-literal fields cannot be narrowed:
+Intersections with an `int` field remain possible in both branches:
 
 ```py
 from ty_extensions import Intersection
@@ -6619,6 +6946,66 @@ def _(x: Intersection[StrTagTD, Any]):
         reveal_type(x)  # revealed: Never
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
+```
+
+A broad tag does not prevent other dictionaries from being excluded. Although `str` contains both
+literal tag types, comparing each dictionary's field separately rules out `Bing` when equality is
+true and `Foo` when it is false:
+
+```py
+def mixed_string_tags(u: Foo | Bing | StrTagTD):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | StrTagTD
+    else:
+        reveal_type(u)  # revealed: Bing | StrTagTD
+```
+
+A broad string tag might also contain a subclass that compares equal to an integer. The comparison
+does not establish that a field unique to the integer-tagged dictionary exists:
+
+```py
+class MatchesInteger(str):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+_: StrTagTD = {"tag": MatchesInteger("other")}
+
+def broad_string_tag(u: StrTagTD | IntegerTag):
+    if u["tag"] == 1:
+        reveal_type(u)  # revealed: StrTagTD | IntegerTag
+        u["integer_only"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: StrTagTD
+```
+
+An `Any` tag remains possible in both branches, while a known literal tag can still be excluded:
+
+```py
+class DynamicTag(TypedDict):
+    tag: Any
+
+def dynamic_tag(u: Foo | Bing | DynamicTag):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo | (DynamicTag & ~<TypedDict with items 'tag'>)
+    else:
+        reveal_type(u)  # revealed: Bing | (DynamicTag & ~<TypedDict with items 'tag'>)
+```
+
+An unknown or custom comparison value can match either literal tag, so it cannot exclude either
+dictionary:
+
+```py
+def dynamic_comparator(u: Foo | Bing, other: Any):
+    if u["tag"] == other:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
+
+def custom_comparator(u: Foo | Bing, other: MatchesInteger):
+    if other == u["tag"]:
+        reveal_type(u)  # revealed: Foo | Bing
+    else:
+        reveal_type(u)  # revealed: Foo | Bing
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
@@ -6889,6 +7276,40 @@ def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
             reveal_type(u)  # revealed: WithEnumTagC
 ```
 
+An integer pattern can match an `IntEnum` tag because matching uses runtime equality:
+
+```py
+from enum import IntEnum
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+class EnumTag(TypedDict):
+    tag: Literal[Number.ONE]
+
+class IntegerTag(TypedDict):
+    tag: Literal[1]
+
+def match_enum_and_integer_tags(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case 1:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
+```
+
+Conversely, an enum member used as a value pattern can match an integer tag:
+
+```py
+def match_integer_tags_with_enum(u: EnumTag | IntegerTag | Foo):
+    match u["tag"]:
+        case Number.ONE:
+            reveal_type(u)  # revealed: EnumTag | IntegerTag
+        case _:
+            reveal_type(u)  # revealed: Foo
+```
+
 We can also narrow a single `TypedDict` type to `Never`:
 
 ```py
@@ -6900,7 +7321,8 @@ def match_single(u: Foo):
             reveal_type(u)  # revealed: Never
 ```
 
-Narrowing is restricted to `Literal` tags:
+A non-literal tag can match the pattern or fail to match it, so its dictionary remains possible in
+both branches. Other dictionaries can still be excluded based on their literal tags:
 
 ```py
 from ty_extensions import static_assert
@@ -6909,17 +7331,16 @@ from ty_extensions._internal import is_assignable_to
 class NonLiteralTD(TypedDict):
     tag: int
 
-def match_non_literal(u: Foo | NonLiteralTD):
+def match_non_literal(u: Foo | Bing | NonLiteralTD):
     match u["tag"]:
         case "foo":
-            # We can't narrow the union here...
             reveal_type(u)  # revealed: Foo | NonLiteralTD
         case _:
-            # ...(but we *can* narrow here)...
-            reveal_type(u)  # revealed: NonLiteralTD
+            reveal_type(u)  # revealed: Bing | NonLiteralTD
 ```
 
-and it is also restricted to `match` patterns that solely consist of value patterns:
+A broad value pattern can match either tag, so another alternative in the same OR pattern does not
+rule out either dictionary:
 
 ```py
 class Config:
@@ -7468,6 +7889,15 @@ static_assert(is_equivalent_to(Extra, Closed))
 static_assert(is_subtype_of(Extra, Closed))
 static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
+```
+
+This also applies to `get`: an undeclared key returns only `None` or the supplied default, whether
+`extra_items` is `Never` or an alias of `Never`:
+
+```py
+def _(extra: Extra, aliased: AliasedExtra) -> None:
+    reveal_type(extra.get("missing"))  # revealed: None
+    reveal_type(aliased.get("missing", False))  # revealed: Literal[False]
 ```
 
 ### Empty closed TypedDict truthiness
@@ -8089,29 +8519,125 @@ def _(
     read_only.clear()  # error: [unresolved-attribute]
 ```
 
-### `get` accounts for closed TypedDicts
+### `get` on closed TypedDicts
 
-An arbitrary string key can only refer to a declared item on a closed TypedDict:
+A closed `TypedDict` cannot contain keys beyond those in its definition. Here, `Person` cannot
+contain an `"email"` key, so `get` returns only `None` or the supplied default:
+
+```py
+from typing_extensions import TypedDict
+
+class Person(TypedDict, closed=True):
+    name: str
+    age: int
+
+def _(person: Person) -> None:
+    reveal_type(person.get("email"))  # revealed: None
+    reveal_type(person.get("email", False))  # revealed: Literal[False]
+```
+
+A key of type `str` could be `"name"`, `"age"`, or an absent key, so the result includes both field
+types and the default:
+
+```py
+def _(person: Person, key: str) -> None:
+    reveal_type(person.get(key))  # revealed: int | str | None
+    reveal_type(person.get(key, b"missing"))  # revealed: int | str | Literal[b"missing"]
+```
+
+If every key in a union of string literals is absent, only the default can be returned:
+
+```py
+from typing import Literal
+
+def _(person: Person, key: Literal["email", "phone"]) -> None:
+    reveal_type(person.get(key, False))  # revealed: Literal[False]
+```
+
+### `get` on closed TypedDicts defined with functional syntax
+
+The functional syntax has the same behavior: an arbitrary string may name a declared field, but an
+undeclared literal key always returns the default.
+
+```py
+from typing_extensions import TypedDict
+
+Person = TypedDict("Person", {"name": str}, closed=True)
+
+def _(person: Person, key: str) -> None:
+    reveal_type(person.get(key))  # revealed: str | None
+    reveal_type(person.get("email", False))  # revealed: Literal[False]
+```
+
+### `get` on an empty closed TypedDict
+
+An empty closed `TypedDict` cannot contain any key, so even a lookup with an arbitrary string
+returns `None`:
+
+```py
+from typing_extensions import TypedDict
+
+class Empty(TypedDict, closed=True): ...
+
+def _(empty: Empty, key: str) -> None:
+    reveal_type(empty.get(key))  # revealed: None
+```
+
+### `get` through a saved method reference
+
+Saving `get` in a variable preserves its return types for absent keys:
+
+```py
+from typing_extensions import TypedDict
+
+class Person(TypedDict, closed=True):
+    name: str
+
+def _(person: Person) -> None:
+    get = person.get
+    reveal_type(get("email"))  # revealed: None
+    reveal_type(get("email", False))  # revealed: Literal[False]
+```
+
+### `get` default types for absent keys
+
+When a key is absent, the annotation on the result gives the element type for an empty list passed
+as the default. This also works through a saved method reference:
 
 ```py
 from typing_extensions import TypedDict
 
 class Closed(TypedDict, closed=True):
     name: str
-    year: int
 
-FunctionalClosed = TypedDict(
-    "FunctionalClosed",
-    {"name": str, "year": int},
-    closed=True,
-)
+def _(closed: Closed) -> None:
+    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[int]
+    get = closed.get
+    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[int]
+```
 
-class EmptyClosed(TypedDict, closed=True): ...
+An annotation does not make an incompatible default valid:
 
-def _(closed: Closed, functional: FunctionalClosed, empty: EmptyClosed, key: str) -> None:
-    reveal_type(closed.get(key))  # revealed: str | int | None
-    reveal_type(functional.get(key))  # revealed: str | int | None
-    reveal_type(empty.get(key))  # revealed: None
+```py
+def _(closed: Closed) -> None:
+    wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
+```
+
+### `get` default types for non-required items
+
+For a declared non-required item, we infer the type of an empty list from the item's type, even when
+the result has no annotation:
+
+```py
+from typing_extensions import TypedDict
+
+class ClosedPartial(TypedDict, total=False, closed=True):
+    values: list[int]
+
+def _(partial: ClosedPartial) -> None:
+    reveal_type(partial.get("values", []))  # revealed: list[int]
+    get = partial.get
+    reveal_type(get("values", []))  # revealed: list[int]
 ```
 
 ### `pop` and `setdefault` support literal extra-item keys

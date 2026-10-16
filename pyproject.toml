@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.16.6"
+version = "0.17.1"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -33,6 +33,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Rust",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -58,12 +59,13 @@ exclude = [
 [dependency-groups]
 dev = [
     "astral-dev-toolchain-cargo-codspeed>=5.0.1",
+    "astral-dev-toolchain-cargo-deny>=0.20.2",
     "astral-dev-toolchain-cargo-fuzz>=0.13.2",
     "astral-dev-toolchain-cargo-insta>=1.48.0",
     "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
-    "astral-dev-toolchain-hyperfine>=1.20.0",
-    "prek==0.4.12",
+    "astral-dev-toolchain-hyperfine>=2.0.0",
+    "prek==0.5.3",
 ]
 release = [
     "rooster==0.1.1",
@@ -76,17 +78,6 @@ docs = [
     "mkdocs-redirects>=1.2.3",
     "pyyaml>=6.0.3",
 ]
-# The compatibility tests use the Ruff binary built from this checkout.
-ruff-lsp-test = [
-    "lsprotocol>=2023.0.0",
-    "packaging>=23.1",
-    # ruff-lsp uses the pygls 1.x server API.
-    "pygls>=1.1.0,<2",
-    "pytest>=9.0.3,<10",
-    "pytest-asyncio>=0.21.2",
-    "python-lsp-jsonrpc>=1.0.0",
-    "typing-extensions>=4.7.1",
-]
 ty-ecosystem = [
     "ecosystem-analyzer",
 ]
@@ -94,43 +85,145 @@ typeshed-docstrings = [
     "docstring-adder",
 ]
 typeshed-formatting = [
-    "black",
+    "black>=26.10.0",
 ]
 
 [tool.uv]
 no-build = true
+require-build-hashes = true
+# By default, uv records all `exclude-newer-package` exemptions in the lockfile for
+# every script in the repo, even when the corresponding package is not in the
+# lockfile for that script. This preview feature omits those entries, so changes
+# to unrelated exemptions don't cause script lockfiles to be updated when refreshed.
+# https://docs.astral.sh/uv/concepts/preview/#missing-exclude-newer-package-lock
+preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
+# The `missing-exclude-newer-package-lock` preview feature requires uv 0.12.10 or later.
+# Before uv 0.12.10, adding an unrelated `exclude-newer-package` exemption could
+# also cause uv to update a script's lockfile the next time the script was run,
+# leading to unexpected lockfile changes in PRs.
+required-version = ">=0.13.0"
 # CI installs the local ecosystem runner and tools pinned to Git revisions.
 no-binary-package = [
-    "black",
     "docstring-adder",
     "ecosystem-analyzer",
     "mypy-primer",
     "ruff-ecosystem",
     "typeshed-client",
 ]
-# Pin the isolated build environment for source-build exceptions.
+# Pin and verify build dependencies for the project and source-build exceptions.
 build-constraint-dependencies = [
-    "flit-core==4.0.2",
-    "hatch-fancy-pypi-readme==25.1.0",
-    "hatch-vcs==0.5.0",
-    "hatchling==1.32.0",
-    "packaging==26.3",
-    "pathspec==1.1.1",
-    "pluggy==1.6.0",
-    "setuptools==84.0.0",
-    "setuptools-scm==10.2.1",
-    "tomli==2.4.1; python_version < '3.11'",
-    "tomlkit==0.15.1",
-    "trove-classifiers==2026.6.1.19",
-    "typing-extensions==4.16.0; python_version < '3.11'",
-    "uv-build==0.12.3",
-    "vcs-versioning==2.2.4",
-    "wheel==0.47.0",
+    { requirement = "flit-core==4.0.2", hashes = [
+        "sha256:8d80717e28d982b41594ed5b14d4e89fbc5bad55473fde27994a3101db18a94e",
+        "sha256:b6929defd93884b584d7c87829e0e7b5c26ed6be17b0b873979019314aa841c8",
+    ] },
+    { requirement = "maturin==1.15.0", hashes = [
+        "sha256:0ebf9767892725083138e671c34482c660317a2f3d6a29fc0e0f34e9d8c99136",
+        "sha256:126e12e618b4db42f68c779a56d41f82a390145ba36ac3f621d057eb34f5ad9d",
+        "sha256:4f9d33e6c3f9615c8caceecbbbd440f8eb25a3ddeb687077682cd5eca2e9ae15",
+        "sha256:552c2be4afd43fe8d5c9f3ec8d4c4756d973b8dcbe94c14084390301f50243e1",
+        "sha256:653020a63525bb224e5ab0adf02e17a2e08bc86dbea7fc1399c9a56d7529b99e",
+        "sha256:6bf6dc62e22d4dcfd5a51244ff0d58975fa4979c48209fe84159617648956d82",
+        "sha256:7ab7eebffd7b8debca2265985de4eaeb332141276d24b9560b5ad484d4b3add1",
+        "sha256:7eb066372f541f8eb4909c79c5d9bd0b9e8125980bdf1ec9e8aba23c6c8d6c55",
+        "sha256:94b26cc8e8aba61a5f2099715fe640e18c5f678e9a500408b38761263954228a",
+        "sha256:bf29beddd0c6708f112db51d5275fc28b28b9e9c9c5faae387eaef662918b176",
+        "sha256:c40b4eae7bf5ef1f4b1af8d623fe4105016f93578fb15b764e741d08ec3b92dd",
+        "sha256:c7dc0c66c78d3debdd9c5aa807e861fbcbf07f3505d34b125df74c03986b0f48",
+        "sha256:cd35772633f489841132bc8e71d6fc7f842df30b9c05cd5cdf1ee1ddcb744cc7",
+        "sha256:da649988be98e87e009e51b1bf0d301b6a301bc0cecbdd60d40d8ba60748d1ca",
+    ] },
+    { requirement = "packaging==26.3", hashes = [
+        "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79",
+        "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+    ] },
+    { requirement = "setuptools==84.0.0", hashes = [
+        "sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+        "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73",
+    ] },
+    { requirement = "tomli==2.0.1 ; python_full_version < '3.8'", hashes = [
+        "sha256:939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc",
+        "sha256:de526c12914f0c550d15924c62d72abc48d6fe7364aa87328337a31007fe8a4f",
+    ] },
+    { requirement = "tomli==2.4.1 ; python_full_version >= '3.8' and python_full_version < '3.11'", hashes = [
+        "sha256:01f520d4f53ef97964a240a035ec2a869fe1a37dde002b57ebc4417a27ccd853",
+        "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe",
+        "sha256:136443dbd7e1dee43c68ac2694fde36b2849865fa258d39bf822c10e8068eac5",
+        "sha256:1d8591993e228b0c930c4bb0db464bdad97b3289fb981255d6c9a41aedc84b2d",
+        "sha256:2190f2e9dd7508d2a90ded5ed369255980a1bcdd58e52f7fe24b8162bf9fedbd",
+        "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26",
+        "sha256:36d2bd2ad5fb9eaddba5226aa02c8ec3fa4f192631e347b3ed28186d43be6b54",
+        "sha256:3d48a93ee1c9b79c04bb38772ee1b64dcf18ff43085896ea460ca8dec96f35f6",
+        "sha256:47149d5bd38761ac8be13a84864bf0b7b70bc051806bc3669ab1cbc56216b23c",
+        "sha256:4ab97e64ccda8756376892c53a72bd1f964e519c77236368527f758fbc36a53a",
+        "sha256:4b605484e43cdc43f0954ddae319fb75f04cc10dd80d830540060ee7cd0243cd",
+        "sha256:504aa796fe0569bb43171066009ead363de03675276d2d121ac1a4572397870f",
+        "sha256:51529d40e3ca50046d7606fa99ce3956a617f9b36380da3b7f0dd3dd28e68cb5",
+        "sha256:52c8ef851d9a240f11a88c003eacb03c31fc1c9c4ec64a99a0f922b93874fda9",
+        "sha256:559db847dc486944896521f68d8190be1c9e719fced785720d2216fe7022b662",
+        "sha256:5a881ab208c0baf688221f8cecc5401bd291d67e38a1ac884d6736cbcd8247e9",
+        "sha256:5cb41aa38891e073ee49d55fbc7839cfdb2bc0e600add13874d048c94aadddd1",
+        "sha256:5e262d41726bc187e69af7825504c933b6794dc3fbd5945e41a79bb14c31f585",
+        "sha256:5ee18d9ebdb417e384b58fe414e8d6af9f4e7a0ae761519fb50f721de398dd4e",
+        "sha256:7008df2e7655c495dd12d2a4ad038ff878d4ca4b81fccaf82b714e07eae4402c",
+        "sha256:734e20b57ba95624ecf1841e72b53f6e186355e216e5412de414e3c51e5e3c41",
+        "sha256:7c7e1a961a0b2f2472c1ac5b69affa0ae1132c39adcb67aba98568702b9cc23f",
+        "sha256:7f86fd587c4ed9dd76f318225e7d9b29cfc5a9d43de44e5754db8d1128487085",
+        "sha256:7f94b27a62cfad8496c8d2513e1a222dd446f095fca8987fceef261225538a15",
+        "sha256:88dceee75c2c63af144e456745e10101eb67361050196b0b6af5d717254dddf7",
+        "sha256:8a650c2dbafa08d42e51ba0b62740dae4ecb9338eefa093aa5c78ceb546fcd5c",
+        "sha256:8d65a2fbf9d2f8352685bc1364177ee3923d6baf5e7f43ea4959d7d8bc326a36",
+        "sha256:96481a5786729fd470164b47cdb3e0e58062a496f455ee41b4403be77cb5a076",
+        "sha256:a120733b01c45e9a0c34aeef92bf0cf1d56cfe81ed9d47d562f9ed591a9828ac",
+        "sha256:b1d22e6e9387bf4739fbe23bfa80e93f6b0373a7f1b96c6227c32bef95a4d7a8",
+        "sha256:b8c198f8c1805dc42708689ed6864951fd2494f924149d3e4bce7710f8eb5232",
+        "sha256:c2541745709bad0264b7d4705ad453b76ccd191e64aa6f0fc66b69a293a45ece",
+        "sha256:c742f741d58a28940ce01d58f0ab2ea3ced8b12402f162f4d534dfe18ba1cd6a",
+        "sha256:c7f2c7f2b9ca6bdeef8f0fa897f8e05085923eb091721675170254cbc5b02897",
+        "sha256:d312ef37c91508b0ab2cee7da26ec0b3ed2f03ce12bd87a588d771ae15dcf82d",
+        "sha256:d4d8fe59808a54658fcc0160ecfb1b30f9089906c50b23bcb4c69eddc19ec2b4",
+        "sha256:da25dc3563bff5965356133435b757a795a17b17d01dbc0f42fb32447ddfd917",
+        "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396",
+        "sha256:eb0dc4e38e6a1fd579e5d50369aa2e10acfc9cace504579b2faabb478e76941a",
+        "sha256:ec9bfaf3ad2df51ace80688143a6a4ebc09a248f6ff781a9945e51937008fcbc",
+        "sha256:ede3e6487c5ef5d28634ba3f31f989030ad6af71edfb0055cbbd14189ff240ba",
+        "sha256:f3c6818a1a86dd6dca7ddcaaf76947d5ba31aecc28cb1b67009a5877c9a64f3f",
+        "sha256:f758f1b9299d059cc3f6546ae2af89670cb1c4d48ea29c3cacc4fe7de3058257",
+        "sha256:f8f0fc26ec2cc2b965b7a3b87cd19c5c6b8c5e5f436b984e85f486d652285c30",
+        "sha256:fd0409a3653af6c147209d267a0e4243f0ae46b011aa978b1080359fddc9b6cf",
+        "sha256:ff18e6a727ee0ab0388507b89d1bc6a22b138d1e2fa56d1ad494586d61d2eae9",
+        "sha256:ff2983983d34813c1aeb0fa89091e76c3a22889ee83ab27c5eeb45100560c049",
+    ] },
+    { requirement = "uv-build==0.12.3", hashes = [
+        "sha256:322d634f2fbf8c7965dde52106db8040b0cc23dbc07b6508d900f217843bd129",
+        "sha256:39adb84a210edaffc4eab8f59a2fc66579d08ea4e75acd3f36548f33f4a3eefc",
+        "sha256:3bdf349e221a93544c940157361d22e5b6d73bc9bd1b302364461d8afd46479a",
+        "sha256:3f6cda73d200e755d8aec6492af22c279ce69e460241a5f7507eba4aeb08abb7",
+        "sha256:48117d0f8d7be3e88f2e8e63e608873bc2aa950f5d9c3a845650e41632dfd0e9",
+        "sha256:52d1bb3e76217f4ece4fb2b89a7536d481af087567d83428cc72d570b540f3df",
+        "sha256:6d0d59550fc9498087c071e9c842c87cd5288e0f8bda4888a633d6be79c3178c",
+        "sha256:7b9bd7b737e8e79370684c959e9500eb32fee44efc396d51ab11ca598d1596a2",
+        "sha256:7f13598c88b44a9b46c5d74370a0c12954f2e328d9193e80358a38edf95c7608",
+        "sha256:855dbaf6912805e70ae1c788a282dc023d69f6acaec0955d14e57759017e11de",
+        "sha256:9bc47530837f8a544c7a9e11e6636a950bc68aac1837462052dc180f45318f96",
+        "sha256:aa2c683d59b2c593b3b3f20e9bdc949131f3e6dd11250f214093a4b800e2472d",
+        "sha256:ad894d87c4e048973ba975aa85f9c8b30fe1065b8c10ec2adfd8395333a6df4f",
+        "sha256:b294990201d431fb0e7cfada5a00e7e5d4c520c32c86a437a11825f73960c441",
+        "sha256:b6f51ed4411a35f008c9ef6e28016ac8f167f5c14fb2d0e453a9a97246b14206",
+        "sha256:b92f3c999dceaa1ba544587be5e85708bbc7a584f4e22dbb770409699eeffe80",
+        "sha256:c821185380be7573bed6e653f995c6211258bd5351cbccf4072cef3ebfcf1a5c",
+        "sha256:cf304c80cf6200aad0956bbc2cdb1e23dd49bfeb74e036a263050de2b0e54f91",
+        "sha256:d1d47f328fb52f62cbc4915c82c96850d246d9029e6f461bfd01f31f43a13451",
+    ] },
+    { requirement = "wheel==0.47.0", hashes = [
+        "sha256:212281cab4dff978f6cedd499cd893e1f620791ca6ff7107cf270781e587eced",
+        "sha256:cc72bd1009ba0cf63922e28f94d9d83b920aa2bb28f798a31d0691b02fa3c9b3",
+    ] },
 ]
 exclude-newer = "P7D"
 
 [tool.uv.exclude-newer-package]
-astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-deny = "2026-09-15T19:10:00Z"
+astral-dev-toolchain-hyperfine = "2026-10-08T08:11:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
@@ -141,16 +234,12 @@ astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 dev = { requires-python = ">=3.12" }
 release = { requires-python = ">=3.12" }
 docs = { requires-python = ">=3.12" }
-ruff-lsp-test = { requires-python = ">=3.12" }
 ty-ecosystem = { requires-python = ">=3.13" }
 typeshed-docstrings = { requires-python = ">=3.10" }
 typeshed-formatting = { requires-python = ">=3.10" }
 
 [tool.uv.sources]
 docstring-adder = { git = "https://github.com/astral-sh/docstring-adder.git" }
-# Switch to a released version once it includes
-# https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
-black = { git = "https://github.com/psf/black.git" }
 # Keep scripts/setup_primer_project.py and its lockfile synchronized with
 # ecosystem-analyzer's mypy-primer pin when updating its locked revision.
 ecosystem-analyzer = { git = "https://github.com/astral-sh/ecosystem-analyzer" }
@@ -295,7 +384,14 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-ignore_labels = ["internal", "ci", "testing", "ty"]
+ignore_labels = [
+    "internal",
+    "ci",
+    "testing",
+    "ty",
+    "release",
+    "playground",
+]
 
 version_files = [
     "README.md",
@@ -312,6 +408,8 @@ version_files = [
     { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
+    { target = ".github/ISSUE_TEMPLATE/1_bug_report.yaml" },
+    { target = ".github/ISSUE_TEMPLATE/3_question.yaml" },
 ]
 
 [tool.rooster.section-labels]
@@ -320,7 +418,7 @@ version_files = [
 "Bug fixes" = ["bug"]
 "Rule changes" = [
     "diagnostics",
-    "docstrings",
+    "docstring",
     "rule",
     "fixes",
     "isort",

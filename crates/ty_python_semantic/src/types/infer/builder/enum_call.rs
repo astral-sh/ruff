@@ -209,7 +209,7 @@ fn next_auto_value<'db>(
                     if last <= 0 {
                         Type::int_literal(1)
                     } else {
-                        let shift = i64::BITS - last.leading_zeros();
+                        let shift = last.cast_unsigned().bit_width();
                         1_u64
                             .checked_shl(shift)
                             .and_then(|value| i64::try_from(value).ok())

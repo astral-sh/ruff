@@ -23,8 +23,8 @@ use crate::types::typed_dict::{
     deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
+    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
+    KnownClass, MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
     TypingModule, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
@@ -389,6 +389,17 @@ fn synthesize_typed_dict_get<'db>(
     } else {
         typed_dict.value_type(db, env)
     };
+    let str_ty = KnownClass::Str.to_instance(db, env);
+    let missing_keys = typed_dict.openness(db).is_closed().then(|| {
+        let key_ty = IntersectionBuilder::new(db, env)
+            .add_positive(str_ty)
+            .add_negative(typed_dict.key_type(db, env))
+            .build();
+        (key_ty, Type::Never)
+    });
+    let fallback_types = missing_keys
+        .into_iter()
+        .chain(std::iter::once((str_ty, fallback_value_ty)));
     let overloads = fields
         .iter()
         .flat_map(|(field_name, field)| {
@@ -462,38 +473,38 @@ fn synthesize_typed_dict_get<'db>(
                 )
             }
         })
-        // Fallback overloads for unknown keys
-        .chain(std::iter::once(Signature::new(
-            Parameters::standard([
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-            ]),
-            UnionType::from_two_elements(db, env, fallback_value_ty, Type::none(db, env)),
-        )))
-        .chain(std::iter::once({
+        // For keys absent from a closed TypedDict, `get` returns only `None` or
+        // the supplied default. Put these overloads before the general string
+        // fallback so it doesn't add declared field types to the result.
+        .chain(fallback_types.flat_map(|(key_type, value_type)| {
+            let get_sig = Signature::new(
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                ]),
+                UnionType::from_two_elements(db, env, value_type, Type::none(db, env)),
+            );
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
                 env,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
-
-            let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                Parameter::positional_only(Some(Name::new_static("default")))
-                    .with_annotated_type(Type::TypeVar(t_default)),
-            ];
-
-            Signature::new_generic(
+            let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, env, [t_default])),
-                Parameters::standard(parameters),
-                UnionType::from_two_elements(db, env, fallback_value_ty, Type::TypeVar(t_default)),
-            )
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                    Parameter::positional_only(Some(Name::new_static("default")))
+                        .with_annotated_type(Type::TypeVar(t_default)),
+                ]),
+                UnionType::from_two_elements(db, env, value_type, Type::TypeVar(t_default)),
+            );
+            [get_sig, get_with_default_sig]
         }));
 
     Type::Callable(CallableType::new(

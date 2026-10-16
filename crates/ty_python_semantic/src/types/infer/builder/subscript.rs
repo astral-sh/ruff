@@ -16,6 +16,7 @@ use crate::types::diagnostic::{
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
+use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
@@ -32,7 +33,7 @@ use crate::types::{
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    UnionType, UnionTypeInstance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -103,8 +104,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, env, keys))
                 }
-                Type::TypeAlias(alias) => {
-                    visitor.visit(db, ty, || imp(db, env, alias.value_type(db), visitor))
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    visitor.visit(db, ty, || imp(db, env, ty.resolve_type_alias(db), visitor))
                 }
                 _ => None,
             }
@@ -183,7 +184,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
-        self.infer_subscript_load_impl(value_ty, subscript)
+        let result = self.infer_subscript_load_impl(value_ty, subscript)?;
+        if let ast::Expr::Dict(dict) = subscript.value.as_ref()
+            && let Some((_, values)) =
+                dict_literal_key_value_types(self.db(), self.program_environment(), dict, |expr| {
+                    self.expression_type(expr)
+                })
+        {
+            return Ok(values);
+        }
+        Ok(result)
     }
 
     fn infer_subscript_load_impl(
@@ -1040,7 +1050,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if type_to_check
                                 .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context
@@ -1077,7 +1087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     &constraints,
                                     TypeVarSet::None,
                                 )
-                                .is_never_satisfied(db, env)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context
@@ -1377,21 +1387,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         //
                         // OnlyParamSpec[int]  # P: (int, /)
                         // ```
-                        let parameters =
-                            if param_type.is_todo() {
-                                Parameters::todo()
-                            } else if param_type.is_dynamic() && param_type != Type::any() {
-                                // If we ended up with an `Unknown` type here, it almost certainly means
-                                // that we already emitted an error elsewhere. Fallback to the more lenient
-                                // type.
-                                Parameters::unknown()
-                            } else {
-                                Parameters::from_annotation(
-                                    db,
-                                    [Parameter::positional_only(None)
-                                        .with_annotated_type(param_type)],
-                                )
-                            };
+                        let parameters = if param_type.is_todo() {
+                            Parameters::todo()
+                        } else if param_type.is_non_divergent_dynamic() && param_type != Type::any()
+                        {
+                            // If we ended up with an `Unknown` type here, it almost certainly means
+                            // that we already emitted an error elsewhere. Fallback to the more lenient
+                            // type.
+                            Parameters::unknown()
+                        } else {
+                            // Preserve cycle placeholders so recursive specializations can
+                            // be normalized instead of growing another parameter type.
+                            Parameters::from_annotation(
+                                db,
+                                [
+                                    Parameter::positional_only(None)
+                                        .with_annotated_type(param_type),
+                                ],
+                            )
+                        };
                         return Ok(Type::paramspec_value_callable(db, parameters));
                     }
 
@@ -1728,7 +1742,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        match object_ty {
+        // Aliases must use the same union and TypedDict checks as their underlying types.
+        match object_ty.resolve_type_alias(db) {
             Type::Union(union) => {
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
@@ -1827,7 +1842,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && let Some(expected_ty) = typed_dict.arbitrary_key_mutation_type(db, env)
                     {
                         let rhs_value_ty =
-                            infer_rhs_value(self, TypeContext::new(Some(expected_ty)));
+                            infer_rhs_value(self, TypeContext::declared(Some(expected_ty)));
                         if rhs_value_ty.is_assignable_to(db, env, expected_ty) {
                             return true;
                         }
@@ -1897,7 +1912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let item = typed_dict.item(db, key);
                     let value_ty = infer_rhs_value.infer_silent(
                         self,
-                        TypeContext::new(item.as_ref().map(|item| item.declared_ty)),
+                        TypeContext::declared(item.as_ref().map(|item| item.declared_ty)),
                     );
 
                     if item.is_some() {
@@ -2419,9 +2434,6 @@ enum LegacyGenericContextError<'db> {
     /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
     /// We should emit a diagnostic for this, but we don't yet.
     VariadicTupleArguments,
-    /// It's valid to subscribe `Generic` or `Protocol` with this type,
-    /// but the type is not yet supported.
-    NotYetSupported,
     /// A duplicate typevar was provided.
     DuplicateTypevar(&'db str),
     /// A `TypeVarTuple` was provided but not unpacked.
@@ -2429,20 +2441,6 @@ enum LegacyGenericContextError<'db> {
     /// The generic context is available when the argument is a bound `TypeVarTuple` and is used
     /// to avoid cascading errors during recovery.
     TypeVarTupleMustBeUnpacked(Option<GenericContext<'db>>),
-}
-
-impl<'db> LegacyGenericContextError<'db> {
-    const fn into_type(self) -> Type<'db> {
-        match self {
-            LegacyGenericContextError::InvalidArgument(_)
-            | LegacyGenericContextError::VariadicTupleArguments
-            | LegacyGenericContextError::DuplicateTypevar(_)
-            | LegacyGenericContextError::TypeVarTupleMustBeUnpacked(_) => Type::unknown(),
-            LegacyGenericContextError::NotYetSupported => {
-                todo_type!("ParamSpecs and TypeVarTuples")
-            }
-        }
-    }
 }
 
 /// Validate the type arguments to `Generic[...]` or `Protocol[...]`, returning
@@ -2489,10 +2487,7 @@ fn infer_legacy_generic_subscript<'db>(
                 SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
             ))
         }
-        Err(
-            error @ (LegacyGenericContextError::NotYetSupported
-            | LegacyGenericContextError::VariadicTupleArguments),
-        ) => Ok(error.into_type()),
+        Err(LegacyGenericContextError::VariadicTupleArguments) => Ok(Type::unknown()),
     }
 }
 
@@ -2559,14 +2554,6 @@ fn legacy_generic_class_context<'db>(
             )
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(None));
-        } else if any_over_type(db, env, argument_ty, true, |inner_ty| match inner_ty {
-            Type::NominalInstance(nominal) => matches!(
-                nominal.known_class(db),
-                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
-            ),
-            _ => false,
-        }) {
-            return Err(LegacyGenericContextError::NotYetSupported);
         } else {
             return Err(LegacyGenericContextError::InvalidArgument(argument_ty));
         }

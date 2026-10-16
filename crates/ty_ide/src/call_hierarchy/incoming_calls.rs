@@ -10,6 +10,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 use ty_module_resolver::ResolverFile;
@@ -18,9 +19,7 @@ use ty_python_core::ProgramFile;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
-use ty_python_semantic::{
-    HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel, contains_identifier,
-};
+use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel};
 
 /// Salsa snapshots coordinate clone and drop through shared state. For ordinary targets, most
 /// files are rejected by the text prefilter, so process enough files per job to amortize that
@@ -80,6 +79,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         let files = db.project().files(db);
         let files: Vec<_> = files.iter().filter(|other| *other != source_file).collect();
         let minimum_job_len = minimum_parallel_job_len(files.len(), MAX_MIN_FILES_PER_PARALLEL_JOB);
+        let matcher = needle.map(NameMatcher::new);
         // The byte-level text prefilter still pays off as a coarse gate:
         // files that don't contain the target name (or an import of it)
         // textually are skipped before any AST work. Files that route the
@@ -92,8 +92,8 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
             .with_min_len(minimum_job_len)
             .map_with_db(db, |db, other_file| {
                 let source = ruff_db::source::source_text(db, other_file);
-                if let Some(name) = needle
-                    && !contains_identifier(&source, name)
+                if let Some(matcher) = &matcher
+                    && !matcher.may_match(&source)
                 {
                     return Vec::new();
                 }

@@ -82,6 +82,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
   |     ------ ^^^^^^ Did you mean "name"?
   |     |
   |     TypedDict `Person`
+help: Replace with "name"
   |
 7 | def access_invalid_literal_string_key(person: Person):
   -     person["nane"]  # error: [invalid-key]
@@ -137,6 +138,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean "name"?
    |     |
    |     TypedDict `Person`
+help: Replace with "name"
    |
 21 | def write_to_non_existing_key(person: Person):
    -     person["nane"] = "Alice"  # error: [invalid-key]
@@ -201,6 +203,7 @@ error[invalid-key]: Unknown key "nane" for TypedDict `Person`
    |     ------ ^^^^^^ Did you mean 'name'?
    |     |
    |     TypedDict `Person`
+help: Replace with 'name'
    |
 42 |     # error: [invalid-key]
    -     person['nane'] = "Alice"  # fmt: skip

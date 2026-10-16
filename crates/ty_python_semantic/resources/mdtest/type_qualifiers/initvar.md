@@ -95,7 +95,8 @@ C()  # error: [missing-argument] "No argument provided for required parameter `a
 
 ## Deferred annotations
 
-The same case must not fail when annotations are deferred, as they are by default on Python 3.14:
+With deferred annotations, the default value of `int` shadows the built-in type in both annotations.
+Field synthesis still reports the missing argument even though the annotations are invalid.
 
 ```toml
 [environment]
@@ -108,8 +109,8 @@ from ty_extensions import Top
 
 @dataclass
 class C:
-    a: Top[int]
-    int: InitVar[int] = 0
+    a: Top[int]  # error: [invalid-type-form]
+    int: InitVar[int] = 0  # error: [invalid-type-form]
 
 def fn():
     C()  # error: [missing-argument] "No argument provided for required parameter `a`"

@@ -38,15 +38,7 @@ impl Violation for InEmptyCollection {
 
 /// RUF060
 pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare) {
-    let [op] = &*compare.ops else {
-        return;
-    };
-
-    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
-        return;
-    }
-
-    let [right] = &*compare.comparators else {
+    let Some((_, CmpOp::In | CmpOp::NotIn, right)) = compare.as_single() else {
         return;
     };
 

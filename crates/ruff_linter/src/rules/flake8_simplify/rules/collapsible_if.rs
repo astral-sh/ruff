@@ -274,22 +274,16 @@ fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
 
 /// Returns `true` if an expression is an `if __name__ == "__main__":` check.
 fn is_main_check(expr: &Expr) -> bool {
-    if let Expr::Compare(ast::ExprCompare {
-        left, comparators, ..
-    }) = expr
+    if let Expr::Compare(ast::ExprCompare { operands, .. }) = expr
+        && let [
+            Expr::Name(ast::ExprName { id, .. }),
+            Expr::StringLiteral(ast::ExprStringLiteral { value, .. }),
+        ] = &**operands
     {
-        if let Expr::Name(ast::ExprName { id, .. }) = left.as_ref() {
-            if id == "__name__" {
-                if let [Expr::StringLiteral(ast::ExprStringLiteral { value, .. })] = &**comparators
-                {
-                    if value == "__main__" {
-                        return true;
-                    }
-                }
-            }
-        }
+        id == "__name__" && value == "__main__"
+    } else {
+        false
     }
-    false
 }
 
 fn parenthesize_and_operand(expr: libcst_native::Expression) -> libcst_native::Expression {

@@ -2,9 +2,8 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
-    call::CallError,
-    function::KnownFunction,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    function::{KnownFunction, OverloadLiteral},
     infer::{
         TypeInferenceBuilder,
         builder::{DeclaredAndInferredType, DeferredExpressionState},
@@ -16,9 +15,32 @@ use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
+enum ClassDecoratorApplication<'db> {
+    Ordinary(Option<(Type<'db>, ClassDecoratorResult<'db>)>),
+    DataclassTransform,
+}
+
+enum ClassDecoratorResult<'db> {
+    Success {
+        return_type: Type<'db>,
+        deprecated_functions: Box<[OverloadLiteral<'db>]>,
+    },
+    Failure {
+        return_type: Type<'db>,
+    },
+}
+
+impl<'db> ClassDecoratorResult<'db> {
+    fn return_type(&self) -> Type<'db> {
+        match self {
+            Self::Success { return_type, .. } | Self::Failure { return_type } => *return_type,
+        }
+    }
+}
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
-        self.infer_body(&class.body);
+        self.infer_scope_body(&class.body);
     }
 
     pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
@@ -171,7 +193,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
             if !metadata_applies_to_original_class {
-                decorators_to_apply.push((decorator_ty, decorator, None));
+                decorators_to_apply.push((
+                    decorator_ty,
+                    decorator,
+                    ClassDecoratorApplication::Ordinary(None),
+                ));
                 continue;
             }
 
@@ -255,6 +281,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         db,
                         transformer_params,
                     ));
+                    // We only model the metadata of this application, but its selected overload
+                    // can still be deprecated. Avoid resolving the call when no overload is
+                    // deprecated: the decorator's annotations may depend on this class.
+                    if f.iter_overloads_and_implementation(db).any(|overload| {
+                        overload.is_overload(db) && overload.deprecated(db).is_some()
+                    }) {
+                        decorators_to_apply.push((
+                            decorator_ty,
+                            decorator,
+                            ClassDecoratorApplication::DataclassTransform,
+                        ));
+                    }
                     continue;
                 }
             }
@@ -272,10 +310,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 total_ordering,
             );
             let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
-            let decorated_ty = match &decorator_result {
-                Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(db, env),
-            };
+            let decorated_ty = decorator_result.return_type();
             if !is_unknown_decorator_result(db, decorated_ty)
                 && !type_retains_original_class(db, env, original_class_ty, decorated_ty)
             {
@@ -285,7 +320,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             decorators_to_apply.push((
                 decorator_ty,
                 decorator,
-                Some((original_class_ty, decorator_result)),
+                ClassDecoratorApplication::Ordinary(Some((original_class_ty, decorator_result))),
             ));
         }
 
@@ -303,7 +338,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // In the second pass, apply class decorators from inner to outer and use their return types
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
-        for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
+        for (decorator_ty, decorator_node, application) in decorators_to_apply {
+            let precomputed_result = match application {
+                ClassDecoratorApplication::Ordinary(precomputed_result) => precomputed_result,
+                ClassDecoratorApplication::DataclassTransform => {
+                    if let ClassDecoratorResult::Success {
+                        deprecated_functions,
+                        ..
+                    } = apply_class_decorator(db, env, decorator_ty, inferred_ty)
+                    {
+                        self.report_deprecated_functions(
+                            &decorator_node.expression,
+                            deprecated_functions,
+                        );
+                    }
+                    continue;
+                }
+            };
             let decorator_result = match precomputed_result {
                 // The metadata pass already called this decorator with the same input. If an inner
                 // decorator changed the binding, apply this decorator to the new public binding.
@@ -315,10 +366,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _ => apply_class_decorator(db, env, decorator_ty, inferred_ty),
             };
             let decorated_ty = match decorator_result {
-                Ok(return_ty) => return_ty,
-                Err(CallError(_, bindings)) => {
+                ClassDecoratorResult::Success {
+                    return_type,
+                    deprecated_functions,
+                } => {
+                    self.report_deprecated_functions(
+                        &decorator_node.expression,
+                        deprecated_functions,
+                    );
+                    return_type
+                }
+                ClassDecoratorResult::Failure { return_type } => {
                     self.defer_decorator_call(decorator_node, inferred_ty);
-                    bindings.return_type(db, env)
+                    return_type
                 }
             };
             let decorated_ty = match decorated_ty {
@@ -327,6 +387,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
                 inferred_ty
+            } else if let divergent_ty @ Type::Divergent(_) = decorated_ty.resolve_type_alias(db) {
+                // Keep the current binding to bootstrap decorators whose return annotations
+                // depend on the decorated class. Retain the cycle marker too: replacing it with
+                // only the class lets inferred lambda return types grow on every iteration.
+                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, divergent_ty])
             } else if class_decorator_preserves_class_binding(
                 db,
                 env,
@@ -438,11 +503,17 @@ fn apply_class_decorator<'db>(
     env: &ProgramEnvironment<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
-) -> Result<Type<'db>, CallError<'db>> {
+) -> ClassDecoratorResult<'db> {
     let call_arguments = CallArguments::positional([decorated_ty]);
-    decorator_ty
-        .try_call(db, env, &call_arguments)
-        .map(|bindings| bindings.return_type(db, env))
+    match decorator_ty.try_call(db, env, &call_arguments) {
+        Ok(bindings) => ClassDecoratorResult::Success {
+            return_type: bindings.return_type(db, env),
+            deprecated_functions: bindings.deprecated_decorator_functions(db).collect(),
+        },
+        Err(error) => ClassDecoratorResult::Failure {
+            return_type: error.return_type(db, env),
+        },
+    }
 }
 
 /// Return true if a decorator result still binds the name to the original class.
@@ -479,7 +550,9 @@ fn class_decorator_preserves_class_binding<'db>(
             .subclass_of()
             .into_class(db, env)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
-        Type::Divergent(_) => true,
+        // A provisional decorator result does not establish that the class is preserved.
+        // Keep its cycle marker so recursive return types can be normalized.
+        Type::Divergent(_) => false,
         Type::Union(union) => union.elements(db).iter().all(|element| {
             class_decorator_preserves_class_binding(db, env, original_class, *element)
         }),

@@ -94,7 +94,7 @@ PositiveList = TypeAliasType(
 T = typing.TypeVar("T", default=Any)
 AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
 
-# unsafe fix if comments within the fix
+# Comments outside the alias value are removed by the fix.
 T = TypeVar("T")
 PositiveList = TypeAliasType(  # eaten comment
     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
@@ -148,3 +148,20 @@ MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
 constraint_iterator = iter((int, str))
 T_iterator = TypeVar("T_iterator", *constraint_iterator)
 IteratorAlias = TypeAliasType("IteratorAlias", list[T_iterator], type_params=(T_iterator,))
+
+# Preserve parentheses around a multiline union in a TypeAliasType call.
+LongAlias = TypeAliasType(
+    "LongAlias",
+    int
+    | str
+    | float
+)
+
+# An already parenthesized value keeps its own parentheses.
+ParenAlias = TypeAliasType(
+    "ParenAlias",
+    (
+        int
+        | str
+    ),
+)

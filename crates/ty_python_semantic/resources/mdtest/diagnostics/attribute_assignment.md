@@ -315,9 +315,9 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
    |
 11 | instance.attr = "wrong"  # snapshot: invalid-assignment
    |                 ^^^^^^^ Expected `int`, found `Literal["wrong"]`
-info: Argument to function `Descriptor.__set__` is incorrect
+info: Argument to bound method `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
-info: Function defined here
+info: Method defined here
  --> src/mdtest_snippet.py:2:9
   |
 2 |     def __set__(self, instance: object, value: int) -> None:
@@ -344,7 +344,7 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `attr
   --> src/mdtest_snippet.py:10:1
    |
 10 | instance.attr = 1  # snapshot: invalid-assignment
-   | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of function `WrongDescriptor.__set__`
+   | ^^^^^^^^^^^^^ No argument provided for required parameter `extra` of bound method `WrongDescriptor.__set__`
 info: This assignment implicitly calls `__set__` on a descriptor of type `WrongDescriptor`
 info: Parameter declared here
  --> src/mdtest_snippet.py:2:53
@@ -407,10 +407,10 @@ error[invalid-assignment]: Invalid assignment to data descriptor attribute `x` o
   |
 8 | c.x = (1, b"")  # snapshot: invalid-assignment
   |       ^^^^^^^^ Expected `tuple[int, str]`, found `tuple[Literal[1], Literal[b""]]`
-info: Argument to function `Descriptor.__set__` is incorrect
+info: Argument to bound method `Descriptor.__set__` is incorrect
 info: This assignment implicitly calls `__set__` on a descriptor of type `Descriptor`
 info: the second tuple element is not compatible: `Literal[b""]` is not assignable to `str`
-info: Function defined here
+info: Method defined here
  --> src/mdtest_snippet.py:2:9
   |
 2 |     def __set__(self, instance, value: tuple[int, str]) -> None: ...

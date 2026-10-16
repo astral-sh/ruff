@@ -6,7 +6,11 @@
 #     "pyyaml>=6.0.3",
 # ]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -23,6 +27,8 @@
 # [tool.uv]
 # no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
@@ -105,7 +111,6 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/rules/": "rules.md",
     "https://docs.astral.sh/ruff/default-rules/": "default-rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
-    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
     "https://docs.astral.sh/ruff/preview/": "preview.md",
 }
 
@@ -175,10 +180,10 @@ def generate_rule_metadata(rule_doc: Path) -> None:
             what_it_does_found = True
             continue  # Skip the '## What it does' line
 
-        if what_it_does_found and not description:
+        if what_it_does_found and description is None:
             description = line.removesuffix("\n")
 
-        if title_found and description:
+        if title_found and description is not None:
             break
     else:
         if not title_found:

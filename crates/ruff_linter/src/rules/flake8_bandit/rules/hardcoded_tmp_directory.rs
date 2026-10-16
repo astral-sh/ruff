@@ -66,10 +66,10 @@ pub(crate) fn hardcoded_tmp_directory(checker: &Checker, string: StringLike) {
         StringLike::FString(ast::ExprFString { value, .. }) => {
             for part in value {
                 match part {
-                    ast::FStringPart::Literal(literal) => {
+                    ast::FStringPartRef::Literal(literal) => {
                         check(checker, literal, literal.range());
                     }
-                    ast::FStringPart::FString(f_string) => {
+                    ast::FStringPartRef::FString(f_string) => {
                         for literal in f_string.elements.literals() {
                             check(checker, literal, literal.range());
                         }

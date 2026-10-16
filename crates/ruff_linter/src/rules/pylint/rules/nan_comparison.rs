@@ -50,8 +50,8 @@ impl Violation for NanComparison {
 }
 
 /// PLW0177
-pub(crate) fn nan_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    nan_comparison_impl(checker, std::iter::once(left).chain(comparators));
+pub(crate) fn nan_comparison(checker: &Checker, operands: &[Expr]) {
+    nan_comparison_impl(checker, operands.iter());
 }
 
 /// PLW0177

@@ -213,16 +213,14 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     let mut diagnostics = vec![];
 
     // Check `left`.
-    let mut comparator = compare.left.as_ref();
-    let [op, ..] = &*compare.ops else {
-        return;
-    };
-    let [next, ..] = &*compare.comparators else {
-        return;
-    };
+    let left = compare.first_operand();
+    let comparators = compare.comparators();
+    let mut comparator = left;
+    let op = compare.first_operator();
+    let next = compare.second_operand();
 
     if !helpers::is_constant_non_singleton(next) {
-        if let Some(op) = EqCmpOp::try_from(*op) {
+        if let Some(op) = EqCmpOp::try_from(op) {
             if checker.is_rule_enabled(Rule::NoneComparison) && comparator.is_none_literal_expr() {
                 match op {
                     EqCmpOp::Eq => {
@@ -284,7 +282,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     }
 
     // Check each comparator in order.
-    for (index, (op, next)) in compare.ops.iter().zip(&compare.comparators).enumerate() {
+    for (index, (op, next)) in compare.ops.iter().zip(comparators).enumerate() {
         if helpers::is_constant_non_singleton(comparator) {
             comparator = next;
             continue;
@@ -381,42 +379,21 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
         let tokens = checker.tokens();
         let source = checker.source();
 
-        let content = match (&*compare.ops, &*compare.comparators) {
+        let content = match (&*compare.ops, comparators) {
             ([op], [comparator]) => {
-                if let Some(kind) = is_redundant_boolean_comparison(*op, &compare.left) {
-                    let needs_wrap = compare.left.range().start() != compare.range().start();
+                if let Some(kind) = is_redundant_boolean_comparison(*op, left) {
+                    let needs_wrap = left.range().start() != compare.range().start();
                     generate_redundant_comparison(
                         compare, tokens, source, comparator, kind, needs_wrap,
                     )
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
                     let needs_wrap = comparator.range().end() != compare.range().end();
-                    generate_redundant_comparison(
-                        compare,
-                        tokens,
-                        source,
-                        &compare.left,
-                        kind,
-                        needs_wrap,
-                    )
+                    generate_redundant_comparison(compare, tokens, source, left, kind, needs_wrap)
                 } else {
-                    generate_comparison(
-                        &compare.left,
-                        &ops,
-                        &compare.comparators,
-                        compare.into(),
-                        tokens,
-                        source,
-                    )
+                    generate_comparison(left, &ops, comparators, compare.into(), tokens, source)
                 }
             }
-            _ => generate_comparison(
-                &compare.left,
-                &ops,
-                &compare.comparators,
-                compare.into(),
-                tokens,
-                source,
-            ),
+            _ => generate_comparison(left, &ops, comparators, compare.into(), tokens, source),
         };
 
         for diagnostic in &mut diagnostics {

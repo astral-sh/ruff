@@ -37,10 +37,9 @@ pub fn inferred_python_version_source_annotation(
             .as_ref()
             .and_then(|source| source.span(db))
             .map(Annotation::primary),
-        PythonVersionSource::Cli
-        | PythonVersionSource::Editor
-        | PythonVersionSource::UvMetadata
-        | PythonVersionSource::Default => None,
+        PythonVersionSource::Cli | PythonVersionSource::Editor | PythonVersionSource::Default => {
+            None
+        }
     }
 }
 
@@ -115,11 +114,6 @@ pub(crate) fn add_inferred_python_version_hint_to_diagnostic(
             diagnostic.info(format_args!(
                 "Python {version} was assumed when {action} \
                 because it's the version of the selected Python interpreter in your editor",
-            ));
-        }
-        crate::PythonVersionSource::UvMetadata => {
-            diagnostic.info(format_args!(
-                "Python {version} was assumed when {action} because it was provided by uv metadata",
             ));
         }
         crate::PythonVersionSource::InstallationDirectoryLayout {

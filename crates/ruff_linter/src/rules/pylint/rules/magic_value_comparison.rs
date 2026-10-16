@@ -120,8 +120,8 @@ fn is_sys_version_comparand(expr: &Expr, semantic: &SemanticModel) -> bool {
 }
 
 /// PLR2004
-pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators: &[Expr]) {
-    for (left, right) in std::iter::once(left).chain(comparators).tuple_windows() {
+pub(crate) fn magic_value_comparison(checker: &Checker, operands: &[Expr]) {
+    for (left, right) in operands.iter().tuple_windows() {
         // If both of the comparators are literals, skip rule for the whole expression.
         // R0133: comparison-of-constants
         if as_literal(left).is_some() && as_literal(right).is_some() {
@@ -130,7 +130,7 @@ pub(crate) fn magic_value_comparison(checker: &Checker, left: &Expr, comparators
     }
 
     let mut previous = None;
-    let mut operands = std::iter::once(left).chain(comparators).peekable();
+    let mut operands = operands.iter().peekable();
     while let Some(comparison_expr) = operands.next() {
         if let Some(value) = as_literal(comparison_expr)
             && is_magic_value(value, &checker.settings().pylint.allow_magic_value_types)

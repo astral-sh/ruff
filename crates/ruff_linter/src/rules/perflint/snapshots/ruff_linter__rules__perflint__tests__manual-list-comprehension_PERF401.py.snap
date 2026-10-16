@@ -297,4 +297,51 @@ PERF401 Use a list comprehension to create a transformed list
 327 |         if i > 0:
 328 |             filtered.append(i)
     |             ^^^^^^^^^^^^^^^^^^
+329 |
+330 | def f(values, allowed):
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:335:13
+    |
+333 |     for value in [values] if isinstance(values, str) else values:
+334 |         if value not in allowed:
+335 |             found.append(value)
+    |             ^^^^^^^^^^^^^^^^^^^
+336 |     return found
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use `list.extend` to create a transformed list
+   --> PERF401.py:343:13
+    |
+341 |     for value in ([values] if isinstance(values, str) else values):
+342 |         if value not in allowed:
+343 |             found.append(value)
+    |             ^^^^^^^^^^^^^^^^^^^
+344 |     return found
+    |
+help: Replace for loop with list.extend
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:350:9
+    |
+348 |     found = []
+349 |     for value in lambda: values:
+350 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+351 |     return found
+    |
+help: Replace for loop with list comprehension
+
+PERF401 Use a list comprehension to create a transformed list
+   --> PERF401.py:375:9
+    |
+373 |         values if values else ()
+374 |     ):
+375 |         found.append(value * 2)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+376 |     return found
+    |
 help: Replace for loop with list comprehension

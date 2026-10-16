@@ -66,14 +66,8 @@ impl Violation for SingleItemMembershipTest {
 }
 
 /// FURB171
-pub(crate) fn single_item_membership_test(
-    checker: &Checker,
-    expr: &Expr,
-    left: &Expr,
-    ops: &[CmpOp],
-    comparators: &[Expr],
-) {
-    let ([op], [right]) = (ops, comparators) else {
+pub(crate) fn single_item_membership_test(checker: &Checker, compare: &ast::ExprCompare) {
+    let Some((left, op, right)) = compare.as_single() else {
         return;
     };
 
@@ -95,21 +89,24 @@ pub(crate) fn single_item_membership_test(
                 left,
                 &[membership_test.replacement_op()],
                 std::slice::from_ref(item),
-                expr.into(),
+                compare.into(),
                 checker.tokens(),
                 checker.source(),
             ),
-            expr.range(),
+            compare.range(),
             checker.locator(),
         ),
-        expr.range(),
+        compare.range(),
     );
 
     // All supported cases can change runtime behavior; mark as unsafe.
     let fix = Fix::unsafe_edit(edit);
 
     checker
-        .report_diagnostic(SingleItemMembershipTest { membership_test }, expr.range())
+        .report_diagnostic(
+            SingleItemMembershipTest { membership_test },
+            compare.range(),
+        )
         .set_fix(fix);
 }
 
