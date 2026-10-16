@@ -608,7 +608,9 @@ impl TypeRecursionContext<'_> {
             class_fields.revision(),
             class_constructors.get().map_or(0, |guard| guard.revision()),
             callable_upcasts.get().map_or(0, |guard| guard.revision()),
-            instance_call_bindings.revision(),
+            instance_call_bindings
+                .get()
+                .map_or(0, |guard| guard.revision()),
             abstract_methods.revision(),
             typed_dict_openness.revision(),
             narrowing_checkpoints.revision(),
@@ -639,12 +641,7 @@ struct TypeRecursionState<'db> {
     class_fields: ActiveRecursionDetector<class::ClassFieldQuery<'db>>,
     class_constructors: OnceCell<Box<ClassConstructorRecursion<'db>>>,
     callable_upcasts: OnceCell<Box<CallableUpcastRecursion<'db>>>,
-    instance_call_bindings: ActiveRecursionDetector<(
-        Program<'db>,
-        Option<Type<'db>>,
-        Type<'db>,
-        Option<Type<'db>>,
-    )>,
+    instance_call_bindings: OnceCell<Box<InstanceCallBindingRecursion<'db>>>,
     abstract_methods: ActiveRecursionDetector<ClassType<'db>>,
     typed_dict_openness: ActiveRecursionDetector<TypedDictType<'db>>,
     narrowing_checkpoints: ActiveRecursionDetector<(
@@ -677,6 +674,9 @@ type CallableUpcastRecursion<'db> = CycleDetector<
 >;
 
 type ClassConstructorRecursion<'db> = CycleDetector<'db, (), (Type<'db>, Type<'db>), (), 2>;
+
+type InstanceCallBindingRecursion<'db> =
+    CycleDetector<'db, (), (Type<'db>, (Program<'db>, Option<Type<'db>>), Type<'db>), (), 2>;
 
 struct SignatureExpansionTag;
 type SignatureExpansionRecursion<'db> = CycleDetector<'db, SignatureExpansionTag, Type<'db>, (), 2>;
@@ -6499,41 +6499,52 @@ impl<'db> Type<'db> {
                 // of the original object as the "callable type". That ensures that we get errors
                 // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
                 // callable".
-                // A chain of `__call__` attributes can revisit an instance without unfolding an
-                // alias. Keep the guard active through both member lookup and call binding, and
-                // share it with calls reached indirectly through descriptors.
-                env.context().state().instance_call_bindings.visit(
-                    env,
-                    &(env.program(db), operation.constructor, self, receiver),
-                    || CallableBinding::not_callable(self).into(),
-                    || match self
-                        .member_lookup_with_policy_and_receiver(
-                            db,
-                            env,
-                            "__call__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                            receiver,
-                        )
-                        .unwrap_or_else(|error| error.fallback_member(db))
-                        .member(db)
-                        .place
-                    {
-                        Place::Defined(DefinedPlace {
-                            ty: dunder_callable,
-                            definedness: boundness,
-                            ..
-                        }) => {
-                            let mut bindings = dunder_callable.bindings_impl(db, env, operation);
-                            bindings.replace_callable_type(dunder_callable, self);
-                            bindings.set_implicitly_invoked();
-                            if boundness == Definedness::PossiblyUndefined {
-                                bindings.set_dunder_call_is_possibly_unbound();
+                // A chain of `__call__` attributes can revisit a class with new type arguments,
+                // as in `C[T].__call__: C[list[T]]`. Guard the callable projection so its source
+                // identifies this growth. Keep the guard active through member lookup and binding,
+                // including calls reached indirectly through descriptors.
+                env.context()
+                    .state()
+                    .instance_call_bindings
+                    .get_or_init(|| Box::new(CycleDetector::new(())))
+                    .try_visit_active(
+                        db,
+                        env,
+                        (
+                            self.callable_projection_key(db),
+                            (env.program(db), operation.constructor),
+                            receiver.unwrap_or(Type::Never).callable_projection_key(db),
+                        ),
+                        || match self
+                            .member_lookup_with_policy_and_receiver(
+                                db,
+                                env,
+                                "__call__",
+                                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                                receiver,
+                            )
+                            .unwrap_or_else(|error| error.fallback_member(db))
+                            .member(db)
+                            .place
+                        {
+                            Place::Defined(DefinedPlace {
+                                ty: dunder_callable,
+                                definedness: boundness,
+                                ..
+                            }) => {
+                                let mut bindings =
+                                    dunder_callable.bindings_impl(db, env, operation);
+                                bindings.replace_callable_type(dunder_callable, self);
+                                bindings.set_implicitly_invoked();
+                                if boundness == Definedness::PossiblyUndefined {
+                                    bindings.set_dunder_call_is_possibly_unbound();
+                                }
+                                bindings
                             }
-                            bindings
-                        }
-                        Place::Undefined => CallableBinding::not_callable(self).into(),
-                    },
-                )
+                            Place::Undefined => CallableBinding::not_callable(self).into(),
+                        },
+                    )
+                    .unwrap_or_else(|| CallableBinding::not_callable(self).into())
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,

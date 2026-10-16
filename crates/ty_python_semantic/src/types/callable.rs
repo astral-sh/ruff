@@ -158,6 +158,21 @@ impl<'db> Type<'db> {
         Type::Callable(CallableType::paramspec_value(db, parameters))
     }
 
+    /// Identify the callable interface separately from the type's stored structure.
+    /// Its source lets cycle detection recognize recursive calls with growing type arguments.
+    pub(super) fn callable_projection_key(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_) => {
+                Type::Callable(CallableType::incomplete_projection(db, self))
+            }
+            _ => self,
+        }
+    }
+
     pub(crate) fn try_upcast_to_callable(
         self,
         db: &'db dyn Db,
@@ -204,7 +219,7 @@ impl<'db> Type<'db> {
         context: &CallableUpcastContext<'_, 'db>,
         receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
-        let key = self;
+        let key = self.callable_projection_key(db);
         // Stored functions and bound methods do not follow a deferred type definition here.
         // Binding a receiver can ask a relation to inspect the same method; that relation owns
         // the recursive assumption, so conversion must not reject it as an unfinished projection.
@@ -234,7 +249,7 @@ impl<'db> Type<'db> {
                 (
                     key,
                     (policy, context.recursive_definition),
-                    receiver.unwrap_or(Type::Never),
+                    receiver.unwrap_or(Type::Never).callable_projection_key(db),
                 ),
                 &context.mapping,
                 |result| match result {

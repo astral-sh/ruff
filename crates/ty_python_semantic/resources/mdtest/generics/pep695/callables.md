@@ -1419,3 +1419,43 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Recursive `__call__` attributes with changing type arguments
+
+Following `__call__` never reaches a callable signature here: each step adds another `list` to the
+type argument. We report a call error even though no exact specialization repeats.
+
+```py
+class C[T]:
+    __call__: "C[list[T]]"
+
+C[int]()()  # error: [call-non-callable]
+```
+
+The growing cycle can also pass through another class.
+
+```py
+class First[T]:
+    __call__: "Second[list[T]]"
+
+class Second[T]:
+    __call__: First[T]
+
+First[int]()()  # error: [call-non-callable]
+```
+
+## Finite chains of callable instances
+
+Revisiting the same generic class can make progress. When `__call__` is a type argument, following
+it through a finite nesting of instances reaches the innermost callable.
+
+```py
+class Wrapper[T]:
+    __call__: T
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
