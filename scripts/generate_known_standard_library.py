@@ -2,6 +2,9 @@
 # requires-python = ">=3.12"
 # dependencies = ["stdlibs"]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
