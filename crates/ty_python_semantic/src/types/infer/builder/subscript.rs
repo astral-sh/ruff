@@ -2286,14 +2286,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let items = typed_dict.items(db);
 
                                         if let Some(field) = items.get(key) {
-                                            // Key exists but is required (i.e., can't be deleted).
+                                            // Key exists but is read-only or required (i.e.,
+                                            // can't be deleted). Only point at the field's
+                                            // declaration for required keys, since that
+                                            // annotation suggests making the field `NotRequired`.
+                                            let (field, error_kind) = if field.is_read_only() {
+                                                (None, TypedDictDeleteErrorKind::ReadOnlyKey)
+                                            } else {
+                                                (Some(field), TypedDictDeleteErrorKind::RequiredKey)
+                                            };
                                             report_cannot_delete_typed_dict_key(
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
                                                 key,
-                                                Some(field),
-                                                TypedDictDeleteErrorKind::RequiredKey,
+                                                field,
+                                                error_kind,
                                             );
                                         } else if typed_dict
                                             .explicit_extra_items(db)
