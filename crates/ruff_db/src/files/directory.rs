@@ -13,7 +13,7 @@ pub struct DirectoryListing(Box<[(CompactString, FileType)]>);
 
 impl DirectoryListing {
     /// Returns the type of the entry named `name`, if present.
-    fn file_type(&self, name: &str) -> Option<FileType> {
+    pub fn file_type(&self, name: &str) -> Option<FileType> {
         self.0
             .binary_search_by(|(candidate, _)| candidate.as_str().cmp(name))
             .ok()
@@ -44,7 +44,7 @@ impl DirectoryListing {
         match self.file_type(name) {
             Some(FileType::Directory) => true,
             Some(FileType::File) | None => false,
-            Some(FileType::Symlink) => db.system().is_directory(&directory.join(name)),
+            Some(FileType::Symlink) => system_path_to_directory(db, directory.join(name)).is_ok(),
         }
     }
 
@@ -139,6 +139,49 @@ mod tests {
     use crate::files::directory_listing;
     use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
+
+    #[test]
+    #[cfg(all(unix, feature = "os"))]
+    fn symlink_target_changes_without_parent_listing_change() -> std::io::Result<()> {
+        use super::system_path_to_directory;
+        use crate::Db;
+        use crate::files::{File, FilePath};
+        use crate::system::{DbWithTestSystem as _, OsSystem};
+
+        #[salsa::tracked]
+        fn linked_directory_exists(db: &dyn Db, directory: File) -> bool {
+            let FilePath::System(path) = directory.path(db) else {
+                return false;
+            };
+            directory_listing(db, path)
+                .is_ok_and(|listing| listing.entry_is_directory(db, path, "link"))
+        }
+
+        let temp_dir = tempfile::tempdir()?;
+        let root = SystemPath::from_std_path(temp_dir.path())
+            .ok_or_else(|| std::io::Error::other("temporary directory is not UTF-8"))?;
+        let directory = root.join("src");
+        let target = root.join("target");
+        let link = directory.join("link");
+
+        let mut db = TestDb::new();
+        db.use_system(OsSystem::new(root));
+        std::fs::create_dir(directory.as_std_path())?;
+        std::os::unix::fs::symlink(target.as_std_path(), link.as_std_path())?;
+
+        let directory_file =
+            system_path_to_directory(&db, &directory).map_err(std::io::Error::other)?;
+
+        assert!(!linked_directory_exists(&db, directory_file));
+
+        std::fs::create_dir(target.as_std_path())?;
+        // The link's target changed, but the directory containing the link did not.
+        File::sync_path(&mut db, &link);
+
+        assert!(linked_directory_exists(&db, directory_file));
+
+        Ok(())
+    }
 
     #[test]
     fn listing_is_sorted() -> std::io::Result<()> {

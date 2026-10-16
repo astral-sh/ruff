@@ -991,7 +991,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1006,14 +1006,14 @@ mod tests {
                 "#
         ),
          @r#"
-        Added 4 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
@@ -1024,7 +1024,7 @@ mod tests {
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            )
+            )  # ty: ignore[no-matching-overload]
         ```
         "#);
     }
@@ -1035,7 +1035,7 @@ mod tests {
             suppress_all_in(r#"
                 from typing import TypeAlias
 
-                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+                JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
                 def get_data() -> dict[str, JsonValue]:
@@ -1049,14 +1049,14 @@ mod tests {
                     ); missing  # ty: ignore[unresolved-reference]
                 "#),
             @r#"
-        Added 4 suppressions
+        Added 7 suppressions
 
         ## Fixed source
 
         ```py
         from typing import TypeAlias
 
-        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int
+        JsonValue: TypeAlias = dict[str, "JsonValue"] | list["JsonValue"] | int | str
 
 
         def get_data() -> dict[str, JsonValue]:
@@ -1067,7 +1067,7 @@ mod tests {
             diag = get_data()
             diag["home_assistant"]["entities"] = sorted(  # ty: ignore[invalid-assignment]
                 diag["home_assistant"]["entities"], key=lambda ent: ent["entity_id"]  # ty: ignore[invalid-argument-type, not-subscriptable]
-            ); missing  # ty: ignore[unresolved-reference]
+            ); missing  # ty: ignore[unresolved-reference, no-matching-overload]
         ```
         "#
         );

@@ -103,7 +103,7 @@ mod tests {
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
             &settings::LinterSettings {

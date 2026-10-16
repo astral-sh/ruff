@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -49,7 +50,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", category = Category::Correctness)]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -122,7 +123,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.30")]
+#[violation_metadata(stable_since = "v0.0.30", category = Category::Correctness)]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }

@@ -263,11 +263,27 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     let base = if visitor.should_visit_lazy_type_attributes() {
         Some(newtype.base(db))
     } else {
-        newtype.eager_base(db)
+        let base = newtype.eager_base(db);
+        if base.is_none() {
+            visitor.notify_skipped_lazy_type_attributes();
+        }
+        base
     };
     if let Some(base) = base {
         visitor.visit_type(db, base.instance_type(db, visitor.program_environment()));
     }
+}
+
+/// Evaluate and visit the instance type of a newtype's base.
+///
+/// The caller must guard against recursive newtypes.
+pub(super) fn walk_newtype_base<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    newtype: NewType<'db>,
+    visitor: &V,
+) {
+    let base = newtype.base(db);
+    visitor.visit_type(db, base.instance_type(db, visitor.program_environment()));
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.

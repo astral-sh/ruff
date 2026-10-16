@@ -7,7 +7,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{DefinitionCategory, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{DefinitionCategory, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
@@ -112,8 +112,8 @@ pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding
     let used_definitions = index.scope_ids().flat_map(|scope_id| {
         index
             .use_def_map(scope_id.file_scope_id(db))
-            .all_definitions_with_usage()
-            .filter_map(|(_, state, is_used)| is_used.then_some(state.definition()).flatten())
+            .definitions_with_usage()
+            .filter_map(|(_, definition, is_used)| is_used.then_some(definition))
     });
     let used_user_visible_definitions = super::user_visible_definitions(db, used_definitions);
 
@@ -142,10 +142,7 @@ pub fn unused_bindings(db: &dyn Db, file: ProgramFile<'_>) -> Box<[UnusedBinding
         // track used IDs as we go.
         let mut loop_header_used_definition_ids = FxHashSet::default();
 
-        for (definition_id, state, is_used) in use_def_map.all_definitions_with_usage() {
-            let DefinitionState::Defined(definition) = state else {
-                continue;
-            };
+        for (definition_id, definition, is_used) in use_def_map.definitions_with_usage() {
             let is_used = is_used || used_user_visible_definitions.contains(&definition);
 
             if is_used {
@@ -823,6 +820,23 @@ mod tests {
     }
 
     #[test]
+    fn closure_uses_later_annotated_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                def inner():
+                    return value
+
+                value: int = 1
+                return inner
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
     fn nested_comprehension_capture_uses_intermediate_rebindings() -> anyhow::Result<()> {
         let source = dedent(
             "
@@ -948,6 +962,45 @@ mod tests {
 
         let names = collect_unused_names(&source)?;
         assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_annotated_loop_carried_rebinding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f(items: list[int]) -> None:
+                value = 0
+                for item in items:
+                    print(value)
+                    value: int = item
+            ",
+        );
+
+        assert!(collect_unused_names(&source)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reports_shadowed_annotated_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def f() -> int:
+                value: int = 1
+                value: int = 2
+                return value
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let start = TextSize::try_from(source.find("value: int = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(start, start + TextSize::new(5)),
+                name: Name::new("value"),
+            }]
+        );
         Ok(())
     }
 

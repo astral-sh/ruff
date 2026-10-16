@@ -12,7 +12,8 @@ use crate::system::AnySystemPath;
 pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{
-    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, resolve_file_uri_range,
+    FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt, cell_range,
+    resolve_file_uri_range,
 };
 pub use text_document::TextDocument;
 pub(crate) use text_document::{DocumentVersion, LanguageId};
@@ -50,9 +51,9 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 /// ty also doesn't support resolving settings per cell, instead, settings are resolved per file or notebook.
 ///
 /// Thus, the motivation of `DocumentKey` is to prevent accidental use of Cell keys for operations
-/// that expect to work on a file path level. That's what [`DocumentHandle::to_file_path`]
-/// is for, it returns a file path for any document, taking into account that these methods should
-/// return the notebook for cell documents and notebooks.
+/// that expect to work on a file path level.
+/// [`OpenDocumentHandle::notebook_or_file_path`](crate::session::OpenDocumentHandle::notebook_or_file_path)
+/// returns the containing notebook's path for a cell, and the document's own path otherwise.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub(super) enum DocumentKey {
     /// A URI using the `file` schema and maps to a valid path.

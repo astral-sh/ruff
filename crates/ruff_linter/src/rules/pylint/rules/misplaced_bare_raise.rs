@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::in_dunder_method;
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 ///         raise ValueError("`obj` cannot be `None`")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct MisplacedBareRaise;
 
 impl Violation for MisplacedBareRaise {

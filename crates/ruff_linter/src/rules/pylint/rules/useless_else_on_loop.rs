@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -47,7 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `break` and `continue` Statements, and `else` Clauses on Loops](https://docs.python.org/3/tutorial/controlflow.html#break-and-continue-statements-and-else-clauses-on-loops)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.156")]
+#[violation_metadata(stable_since = "v0.0.156", category = Category::Suspicious)]
 pub(crate) struct UselessElseOnLoop;
 
 impl Violation for UselessElseOnLoop {
@@ -55,7 +56,9 @@ impl Violation for UselessElseOnLoop {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`else` clause on loop without a `break` statement; remove the `else` and dedent its contents".to_string()
+        "`else` clause on loop without a `break` statement; \
+            remove the `else` and dedent its contents"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

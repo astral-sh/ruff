@@ -354,6 +354,8 @@ fn glob_to_regex(pattern: &str) -> Result<Box<str>, ModuleGlobError> {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[track_caller]
@@ -527,52 +529,43 @@ mod tests {
     #[test]
     fn test_invalid_empty_pattern() {
         let result = ModuleGlobSet::from_patterns([""]);
-        assert!(matches!(result, Err(ModuleGlobError::EmptyPattern)));
+        assert_matches!(result, Err(ModuleGlobError::EmptyPattern));
     }
 
     #[test]
     fn test_invalid_just_negation() {
         let result = ModuleGlobSet::from_patterns(["!"]);
-        assert!(matches!(result, Err(ModuleGlobError::EmptyPattern)));
+        assert_matches!(result, Err(ModuleGlobError::EmptyPattern));
     }
 
     #[test]
     fn test_invalid_double_star_combined() {
         let result = ModuleGlobSet::from_patterns(["foo**"]);
-        assert!(matches!(
-            result,
-            Err(ModuleGlobError::InvalidDoubleStarUsage(_))
-        ));
+        assert_matches!(result, Err(ModuleGlobError::InvalidDoubleStarUsage(_)));
 
         let result = ModuleGlobSet::from_patterns(["**foo"]);
-        assert!(matches!(
-            result,
-            Err(ModuleGlobError::InvalidDoubleStarUsage(_))
-        ));
+        assert_matches!(result, Err(ModuleGlobError::InvalidDoubleStarUsage(_)));
 
         let result = ModuleGlobSet::from_patterns(["foo.bar**"]);
-        assert!(matches!(
-            result,
-            Err(ModuleGlobError::InvalidDoubleStarUsage(_))
-        ));
+        assert_matches!(result, Err(ModuleGlobError::InvalidDoubleStarUsage(_)));
     }
 
     #[test]
     fn test_invalid_consecutive_dots() {
         let result = ModuleGlobSet::from_patterns(["foo..bar"]);
-        assert!(matches!(result, Err(ModuleGlobError::ConsecutiveDots)));
+        assert_matches!(result, Err(ModuleGlobError::ConsecutiveDots));
     }
 
     #[test]
     fn test_invalid_leading_dot() {
         let result = ModuleGlobSet::from_patterns([".foo"]);
-        assert!(matches!(result, Err(ModuleGlobError::LeadingDot)));
+        assert_matches!(result, Err(ModuleGlobError::LeadingDot));
     }
 
     #[test]
     fn test_invalid_trailing_dot() {
         let result = ModuleGlobSet::from_patterns(["foo."]);
-        assert!(matches!(result, Err(ModuleGlobError::TrailingDot)));
+        assert_matches!(result, Err(ModuleGlobError::TrailingDot));
     }
 
     #[test]

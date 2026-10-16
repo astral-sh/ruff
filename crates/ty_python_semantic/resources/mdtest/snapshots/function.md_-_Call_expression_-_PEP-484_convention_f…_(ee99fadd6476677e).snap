@@ -72,13 +72,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
 57 |     # parameter in a classmethod, and is always passed positionally at runtime,
 58 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
 59 |     # emit `[invalid-legacy-positional-parameter]` on the method.
-60 |     def __new__(cls, __x: int): ...
-61 | 
-62 | # error: [positional-only-parameter-as-kwarg]
-63 | C(42).method(__x=1)
-64 | # error: [positional-only-parameter-as-kwarg]
-65 | C.class_method(__x="1")
-66 | C.static_method("x", __x=42)  # fine
+60 |     def __new__(cls, __x: int):
+61 |         return super().__new__(cls)
+62 | 
+63 | # error: [positional-only-parameter-as-kwarg]
+64 | C(42).method(__x=1)
+65 | # error: [positional-only-parameter-as-kwarg]
+66 | C.class_method(__x="1")
+67 | C.static_method("x", __x=42)  # fine
 ```
 
 # Diagnostics
@@ -98,7 +99,7 @@ info: Function signature here
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
  --> src/mdtest_snippet.py:9:15
   |
 9 | def g(x: int, __y: str): ...
@@ -110,7 +111,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
   --> src/mdtest_snippet.py:20:16
    |
 20 | def g2(x: int, __y: str): ...  # error: [invalid-legacy-positional-parameter]
@@ -122,7 +123,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
   --> src/mdtest_snippet.py:22:16
    |
 22 | def g2(x: str, __y: int): ...  # error: [invalid-legacy-positional-parameter]
@@ -134,7 +135,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
   --> src/mdtest_snippet.py:23:22
    |
 23 | def g2(x: str | int, __y: int | str): ...  # error: [invalid-legacy-positional-parameter]
@@ -146,7 +147,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
   --> src/mdtest_snippet.py:41:11
    |
 41 | def g4(a, __b): ...  # error: [invalid-legacy-positional-parameter]
@@ -158,7 +159,7 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 ```
 
 ```
-warning[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
+info[invalid-legacy-positional-parameter]: Invalid use of the legacy convention for positional-only parameters
   --> src/mdtest_snippet.py:55:29
    |
 55 |     def static_method(self, __x: int): ...  # error: [invalid-legacy-positional-parameter]
@@ -171,9 +172,9 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.method`
-  --> src/mdtest_snippet.py:63:14
+  --> src/mdtest_snippet.py:64:14
    |
-63 | C(42).method(__x=1)
+64 | C(42).method(__x=1)
    |              ^^^^^
 info: Method signature here
   --> src/mdtest_snippet.py:49:9
@@ -185,9 +186,9 @@ info: Method signature here
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.class_method`
-  --> src/mdtest_snippet.py:65:16
+  --> src/mdtest_snippet.py:66:16
    |
-65 | C.class_method(__x="1")
+66 | C.class_method(__x="1")
    |                ^^^^^^^
 info: Method signature here
   --> src/mdtest_snippet.py:51:9

@@ -19,8 +19,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, MemberDefinition,
-    NameKind, SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::suppress_single;
@@ -34,27 +33,33 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, DeclarationsIterator, FileScopeId, attribute_scopes,
-    semantic_index,
+    BindingWithConstraints, DeclarationsIterator, FileScopeId, attribute_scopes, semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
-    SitePackagesPaths, SysPrefixPathOrigin,
+    SitePackagesDiscoveryError, SitePackagesPaths, SysPrefixPathOrigin,
 };
 pub use types::ide_support::{
     ImplementationsFinder, ImportAliasResolution, ResolvedDefinition, TypeHierarchyClass,
-    contains_identifier, definitions_for_attribute, definitions_for_bin_op,
-    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
-    map_stub_definition, type_hierarchy_prepare, type_hierarchy_subtypes,
-    type_hierarchy_supertypes,
+    definitions_for_attribute, definitions_for_bin_op, definitions_for_imported_symbol,
+    definitions_for_name, definitions_for_unary_op, map_stub_definition, type_hierarchy_prepare,
+    type_hierarchy_subtypes, type_hierarchy_supertypes,
 };
-pub use types::{DisplaySettings, ProgramEnvironment, TypeQualifiers};
+pub use types::{
+    DisplaySettings, FixtureBinding, FixtureExposure, FixtureNameSource, ProgramEnvironment,
+    PytestTest, TypeQualifiers, fixture_bindings_for_parameter, fixture_exposures_for_definition,
+    pytest_global_plugin_files, pytest_tests_in_file,
+};
 
 mod db;
+pub mod dependency;
 mod dunder_all;
 mod fixes;
+pub mod importer;
+mod lexical_name_path;
 pub mod lint;
 pub(crate) mod place;
+pub(crate) mod place_load;
 mod reachability;
 mod semantic_model;
 mod subscript;
@@ -93,6 +98,9 @@ fn register_lints(registry: &mut LintRegistryBuilder) {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct AnalysisSettings {
+    /// Whether to infer return types for functions without return annotations.
+    pub return_type_inference: ReturnTypeInference,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub strict_generic_narrowing: bool,
 
@@ -116,6 +124,7 @@ pub struct AnalysisSettings {
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
+            return_type_inference: ReturnTypeInference::default(),
             strict_generic_narrowing: false,
             strict_equality_semantics: false,
             respect_type_ignore_comments: true,
@@ -125,8 +134,35 @@ impl Default for AnalysisSettings {
     }
 }
 
+/// Controls return type inference for functions without explicit return annotations.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum ReturnTypeInference {
+    /// Do not infer return types from function bodies. Unannotated functions
+    /// will have an inferred return type of `Unknown`.
+    #[default]
+    Never,
+    /// Infer return types for unannotated functions and methods.
+    Always,
+}
+
+impl ReturnTypeInference {
+    const fn is_active(self) -> bool {
+        matches!(self, Self::Always)
+    }
+}
+
+impl ty_combine::Combine for ReturnTypeInference {
+    fn combine_with(&mut self, _other: Self) {}
+}
+
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
 /// the one given for a specific class body scope.
+///
+/// Loop headers are excluded: rebinding an attribute's receiver can create a loop header for the
+/// attribute without assigning to the attribute itself.
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
@@ -134,14 +170,26 @@ pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
     name: &'s str,
-) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+) -> impl Iterator<
+    Item = (
+        impl Iterator<Item = BindingWithConstraints<'db, 'db>>,
+        FileScopeId,
+    ),
+> + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+    attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = index.use_def_map(function_scope_id);
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
+        let assignments = use_def
+            .reachable_member_bindings(member)
+            .filter(move |binding| {
+                !binding
+                    .binding
+                    .is_defined_and(|definition| definition.kind(db).is_loop_header())
+            });
+        Some((assignments, function_scope_id))
     })
 }
 

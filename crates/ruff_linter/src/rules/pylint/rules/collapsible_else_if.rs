@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -46,7 +47,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `if` Statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.253")]
+#[violation_metadata(stable_since = "v0.0.253", category = Category::Pedantic)]
 pub(crate) struct CollapsibleElseIf;
 
 impl Violation for CollapsibleElseIf {

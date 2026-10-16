@@ -1,8 +1,8 @@
 use itertools::Itertools;
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast, HasNodeIndex, NodeIndex, name::Name};
 use ruff_text_size::Ranged;
 
-use crate::types::class::DynamicClassLiteral;
+use crate::types::class::{DynamicClassLiteral, DynamicClassScopeOffset};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE,
@@ -10,7 +10,7 @@ use crate::types::diagnostic::{
     report_inconsistent_generic_bases,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
-use crate::types::infer::builder::TypeInferenceBuilder;
+use crate::types::infer::builder::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
 use crate::types::{ClassBase, KnownClass, Type, extract_fixed_length_iterable_element_types};
 
@@ -36,6 +36,44 @@ impl DynamicClassKind {
 }
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    /// Identify a dangling dynamic-class call without retaining an absolute source position.
+    pub(super) fn dynamic_class_scope_offset(
+        &self,
+        call: &ast::ExprCall,
+    ) -> DynamicClassScopeOffset {
+        let scope_anchor = self
+            .scope()
+            .node(self.db())
+            .node_index()
+            .unwrap_or(NodeIndex::from(0));
+        let anchor_u32 = scope_anchor
+            .as_u32()
+            .expect("scope anchor should not be NodeIndex::NONE");
+        let relative_index = |index: NodeIndex| {
+            index
+                .as_u32()
+                .expect("dynamic class anchor should not be NodeIndex::NONE")
+                - anchor_u32
+        };
+
+        if let DeferredExpressionState::InStringAnnotation(enclosing_node_key) = self.deferred_state
+        {
+            let enclosing_index = enclosing_node_key.index();
+            let string: &ast::ExprStringLiteral = self
+                .module()
+                .get_by_index(enclosing_index)
+                .try_into()
+                .expect("string annotation key should point to ExprStringLiteral");
+
+            DynamicClassScopeOffset::StringAnnotation {
+                offset: relative_index(enclosing_index),
+                range: call.range() - string.start(),
+            }
+        } else {
+            DynamicClassScopeOffset::Node(relative_index(call.node_index().load()))
+        }
+    }
+
     /// Extract base classes from the bases argument of a `type()` or `types.new_class()` call.
     ///
     /// Emits a diagnostic if `bases_type` is not a valid bases iterable for the given kind.

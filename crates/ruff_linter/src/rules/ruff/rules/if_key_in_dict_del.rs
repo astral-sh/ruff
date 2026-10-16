@@ -3,6 +3,7 @@ use ruff_python_ast::{CmpOp, Expr, ExprName, ExprSubscript, Stmt, StmtIf};
 use ruff_python_semantic::analyze::typing;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 type Key = Expr;
@@ -32,7 +33,7 @@ type Dict = ExprName;
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the if statement contains comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Complexity)]
 pub(crate) struct IfKeyInDictDel;
 
 impl AlwaysFixableViolation for IfKeyInDictDel {
@@ -83,7 +84,7 @@ fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
         return None;
     };
 
-    let [Expr::Name(dict)] = comp.comparators.as_ref() else {
+    let [key, Expr::Name(dict)] = comp.operands.as_ref() else {
         return None;
     };
 
@@ -91,7 +92,7 @@ fn extract_dict_and_key_from_test(test: &Expr) -> Option<(&Dict, &Key)> {
         return None;
     }
 
-    Some((dict, &comp.left))
+    Some((dict, key))
 }
 
 fn extract_dict_and_key_from_del(targets: &[Expr]) -> Option<(&Dict, &Key)> {

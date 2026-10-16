@@ -1,14 +1,13 @@
 ## What it does
 
-Checks for subscript accesses with invalid keys and `TypedDict` construction with an
-unknown key.
+Checks for subscript accesses with invalid keys and `TypedDict` construction with an unknown key.
 
 ## Why is this bad?
 
 Subscripting with an invalid key will raise a `KeyError` at runtime.
 
-Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is
-`closed=true` it also violates the expectations of the type.
+Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is `closed=true`
+it also violates the expectations of the type.
 
 ## Examples
 

@@ -40,9 +40,20 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: Infer the `TypeVarTuple` from arguments matched to the variadic parameter.
-reveal_type(collect())  # revealed: tuple[Unknown, ...]
-reveal_type(collect(1, "a"))  # revealed: tuple[Unknown, ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+```
+
+The legacy spelling must also preserve argument-derived types when a surrounding assignment expects
+an incompatible return type.
+
+```py
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
 ```
 
 ## Callable parameters
@@ -69,6 +80,24 @@ reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 # TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
 # from the callback.
 reveal_type(invoke(format_value, 1))  # revealed: str
+```
+
+## Forwarding a `ParamSpec` through an unpacked type variable tuple
+
+A callable that forwards a parameter specification can itself be passed, with its arguments, to a
+callable whose positional parameters are described by an unpacked type variable tuple.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+def invoke(callback: Callable[[Unpack[Ts]], None], *args: Unpack[Ts]) -> None: ...
+def forward(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def one_arg(value: int) -> None: ...
+
+invoke(forward, one_arg, 1)
 ```
 
 ## Type aliases
@@ -162,8 +191,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
-accept(True, 1, b"bad")
+accept(True, 1, b"bad")  # error: [invalid-argument-type]
 ```
 
 ## Defaults

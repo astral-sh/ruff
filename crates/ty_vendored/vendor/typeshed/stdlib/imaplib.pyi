@@ -292,7 +292,8 @@ class IMAP4:
             Note: 'duration' requires a socket connection (not IMAP4_stream).
             """
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 13):
+        # Default was fixed in Python 3.13.15, 3.14.7
         def list(self, directory: str = "", pattern: str = "*") -> tuple[str, _AnyResponseData]:
             """List mailbox names in directory matching pattern.
 
@@ -332,7 +333,8 @@ class IMAP4:
         Returns server 'BYE' response.
         """
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 13):
+        # Default was fixed in Python 3.13.15, 3.14.7
         def lsub(self, directory: str = "", pattern: str = "*") -> _CommandResults:
             """List 'subscribed' mailbox names in directory matching pattern.
 
@@ -419,7 +421,8 @@ class IMAP4:
         (typ, [data]) = <instance>.setacl(mailbox, who, what)
         """
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 13):
+        # Parameter "mailbox" was added in Python 3.13.15, 3.14.7
         def setannotation(self, mailbox: str | bytes, *args: str) -> _CommandResults:
             """(typ, [data]) = <instance>.setannotation(mailbox[, entry, attribute]+)
             Set ANNOTATIONs.

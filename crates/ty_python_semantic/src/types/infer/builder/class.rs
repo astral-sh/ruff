@@ -1,12 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
-use crate::place::Place;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
-    call::CallError,
-    callable::CallableFunctionProvenance,
-    function::KnownFunction,
+    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
+    function::{KnownFunction, OverloadLiteral},
     infer::{
         TypeInferenceBuilder,
         builder::{DeclaredAndInferredType, DeferredExpressionState},
@@ -18,9 +15,32 @@ use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
+enum ClassDecoratorApplication<'db> {
+    Ordinary(Option<(Type<'db>, ClassDecoratorResult<'db>)>),
+    DataclassTransform,
+}
+
+enum ClassDecoratorResult<'db> {
+    Success {
+        return_type: Type<'db>,
+        deprecated_functions: Box<[OverloadLiteral<'db>]>,
+    },
+    Failure {
+        return_type: Type<'db>,
+    },
+}
+
+impl<'db> ClassDecoratorResult<'db> {
+    fn return_type(&self) -> Type<'db> {
+        match self {
+            Self::Success { return_type, .. } | Self::Failure { return_type } => *return_type,
+        }
+    }
+}
+
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
-        self.infer_body(&class.body);
+        self.infer_scope_body(&class.body);
     }
 
     pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {
@@ -36,9 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.infer_type_parameters(type_params);
 
         if class.arguments.is_some() {
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
 
             // PEP 695 class headers are inferred in the type-parameter scope, before the completed
             // class type is available. Infer the bases first because `extra_items=T` is an
@@ -55,7 +73,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(base, TypeContext::default())
                 };
                 is_typed_dict |= match ty {
-                    ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
+                    ty if TypingModule::from_typed_dict_type(self.db(), ty).is_some() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
                     Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
                     _ => false,
@@ -168,11 +186,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )),
             }
         };
-        let decorator_call_ty = |decorator: &ast::Decorator| match &decorator.expression {
-            ast::Expr::Call(call) => Some(self.expression_type(&call.func)),
-            _ => None,
-        };
-
         // In the first pass, collect metadata decorators that shape the original class object.
         // Once an inner decorator replaces the public binding, outer decorators are ordinary
         // runtime applications only: they cannot retroactively add metadata to the original class.
@@ -180,7 +193,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
             if !metadata_applies_to_original_class {
-                decorators_to_apply.push((decorator_ty, decorator, None));
+                decorators_to_apply.push((
+                    decorator_ty,
+                    decorator,
+                    ClassDecoratorApplication::Ordinary(None),
+                ));
                 continue;
             }
 
@@ -264,6 +281,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         db,
                         transformer_params,
                     ));
+                    // We only model the metadata of this application, but its selected overload
+                    // can still be deprecated. Avoid resolving the call when no overload is
+                    // deprecated: the decorator's annotations may depend on this class.
+                    if f.iter_overloads_and_implementation(db).any(|overload| {
+                        overload.is_overload(db) && overload.deprecated(db).is_some()
+                    }) {
+                        decorators_to_apply.push((
+                            decorator_ty,
+                            decorator,
+                            ClassDecoratorApplication::DataclassTransform,
+                        ));
+                    }
                     continue;
                 }
             }
@@ -281,28 +310,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 total_ordering,
             );
             let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
-            let decorated_ty = match &decorator_result {
-                Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(db, env),
-            };
-            if is_unknown_decorator_result(db, decorated_ty) {
-                if !preserve_binding_for_unknown_result(
-                    db,
-                    env,
-                    decorator_ty,
-                    decorator_call_ty(decorator),
-                    decorated_ty,
-                ) {
-                    metadata_applies_to_original_class = false;
-                }
-            } else if !type_retains_original_class(db, env, original_class_ty, decorated_ty) {
+            let decorated_ty = decorator_result.return_type();
+            if !is_unknown_decorator_result(db, decorated_ty)
+                && !type_retains_original_class(db, env, original_class_ty, decorated_ty)
+            {
                 metadata_applies_to_original_class = false;
             }
 
             decorators_to_apply.push((
                 decorator_ty,
                 decorator,
-                Some((original_class_ty, decorator_result)),
+                ClassDecoratorApplication::Ordinary(Some((original_class_ty, decorator_result))),
             ));
         }
 
@@ -320,7 +338,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // In the second pass, apply class decorators from inner to outer and use their return types
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
-        for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
+        for (decorator_ty, decorator_node, application) in decorators_to_apply {
+            let precomputed_result = match application {
+                ClassDecoratorApplication::Ordinary(precomputed_result) => precomputed_result,
+                ClassDecoratorApplication::DataclassTransform => {
+                    if let ClassDecoratorResult::Success {
+                        deprecated_functions,
+                        ..
+                    } = apply_class_decorator(db, env, decorator_ty, inferred_ty)
+                    {
+                        self.report_deprecated_functions(
+                            &decorator_node.expression,
+                            deprecated_functions,
+                        );
+                    }
+                    continue;
+                }
+            };
             let decorator_result = match precomputed_result {
                 // The metadata pass already called this decorator with the same input. If an inner
                 // decorator changed the binding, apply this decorator to the new public binding.
@@ -332,28 +366,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _ => apply_class_decorator(db, env, decorator_ty, inferred_ty),
             };
             let decorated_ty = match decorator_result {
-                Ok(return_ty) => return_ty,
-                Err(CallError(_, bindings)) => {
-                    bindings.report_diagnostics(&self.context, decorator_node.into());
-                    bindings.return_type(db, env)
+                ClassDecoratorResult::Success {
+                    return_type,
+                    deprecated_functions,
+                } => {
+                    self.report_deprecated_functions(
+                        &decorator_node.expression,
+                        deprecated_functions,
+                    );
+                    return_type
+                }
+                ClassDecoratorResult::Failure { return_type } => {
+                    self.defer_decorator_call(decorator_node, inferred_ty);
+                    return_type
                 }
             };
             let decorated_ty = match decorated_ty {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
-            // If a class decorator application loses all precision, preserve the original class
-            // binding for decorators known to preserve unknown results.
-            let should_preserve_binding = is_unknown_decorator_result(db, decorated_ty)
-                && preserve_binding_for_unknown_result(
-                    db,
-                    env,
-                    decorator_ty,
-                    decorator_call_ty(decorator_node),
-                    decorated_ty,
-                );
-            inferred_ty = if should_preserve_binding {
+            inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
                 inferred_ty
+            } else if let divergent_ty @ Type::Divergent(_) = decorated_ty.resolve_type_alias(db) {
+                // Keep the current binding to bootstrap decorators whose return annotations
+                // depend on the decorated class. Retain the cycle marker too: replacing it with
+                // only the class lets inferred lambda return types grow on every iteration.
+                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, divergent_ty])
             } else if class_decorator_preserves_class_binding(
                 db,
                 env,
@@ -388,9 +426,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // and we don't need to run inference here
         if type_params.is_none() {
             // In stub files, keyword values may reference names that are defined later in the file.
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
+            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
             for keyword in class_node.keywords() {
                 if keyword.arg.as_deref() != Some("extra_items") {
                     self.infer_expression(&keyword.value, TypeContext::default());
@@ -467,11 +503,17 @@ fn apply_class_decorator<'db>(
     env: &ProgramEnvironment<'db>,
     decorator_ty: Type<'db>,
     decorated_ty: Type<'db>,
-) -> Result<Type<'db>, CallError<'db>> {
+) -> ClassDecoratorResult<'db> {
     let call_arguments = CallArguments::positional([decorated_ty]);
-    decorator_ty
-        .try_call(db, env, &call_arguments)
-        .map(|bindings| bindings.return_type(db, env))
+    match decorator_ty.try_call(db, env, &call_arguments) {
+        Ok(bindings) => ClassDecoratorResult::Success {
+            return_type: bindings.return_type(db, env),
+            deprecated_functions: bindings.deprecated_decorator_functions(db).collect(),
+        },
+        Err(error) => ClassDecoratorResult::Failure {
+            return_type: error.return_type(db, env),
+        },
+    }
 }
 
 /// Return true if a decorator result still binds the name to the original class.
@@ -508,7 +550,9 @@ fn class_decorator_preserves_class_binding<'db>(
             .subclass_of()
             .into_class(db, env)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
-        Type::Divergent(_) => true,
+        // A provisional decorator result does not establish that the class is preserved.
+        // Keep its cycle marker so recursive return types can be normalized.
+        Type::Divergent(_) => false,
         Type::Union(union) => union.elements(db).iter().all(|element| {
             class_decorator_preserves_class_binding(db, env, original_class, *element)
         }),
@@ -545,218 +589,18 @@ fn type_retains_original_class<'db>(
     }
 }
 
-/// Return true if an unknown class-decorator result should leave the current class type in place.
+/// Return true if a class-decorator result should leave the current binding unchanged.
 ///
-/// This handles both direct decorators and decorator factories:
-/// ```python
-/// def decorator(cls):
-///     return cls
-///
-/// def decorator_factory():
-///     return decorator
-///
-/// @decorator_factory()
-/// class C: ...
-/// ```
-///
-/// The factory case needs the type of the call target, because the type of
-/// `@decorator_factory()` is the returned decorator, while the expression type of
-/// `decorator_factory` carries the static information that tells us whether an unknown result can
-/// be preserved.
-fn preserve_binding_for_unknown_result<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    decorator_ty: Type<'db>,
-    decorator_call_ty: Option<Type<'db>>,
-    decorator_result_ty: Type<'db>,
-) -> bool {
-    ClassDecoratorUnknownResultPolicy::from_decorator(db, env, decorator_ty, decorator_result_ty)
-        == ClassDecoratorUnknownResultPolicy::PreserveBinding
-        || decorator_call_ty.is_some_and(|ty| {
-            ClassDecoratorUnknownResultPolicy::from_decorator(db, env, ty, decorator_result_ty)
-                == ClassDecoratorUnknownResultPolicy::PreserveBinding
-        })
-}
-
-/// Return true if applying a class decorator produced no useful replacement type.
-fn is_unknown_decorator_result<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    ty.is_unknown() || is_unknown_class_object_decorator_result(db, ty)
-}
-
-/// Return true if applying a class decorator produced an unknown class-object type.
-///
-/// Besides plain `Unknown`, class decorators can produce unknown class-object types such as
-/// `type[Any]`. Those are represented as a `SubclassOf` dynamic type, but they should trigger the
-/// same preservation fallback as an unknown result:
-/// ```python
-/// from typing import Any
-///
-/// def decorator(cls) -> type[Any]: ...
-///
-/// @decorator
-/// class C: ...
-/// ```
-fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    let Type::SubclassOf(subclass_of) = ty.resolve_type_alias(db) else {
-        return false;
-    };
-
-    subclass_of
-        .subclass_of()
-        .into_dynamic()
-        .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown())
-}
-
-/// Policy for class decorators whose application result is unknown.
-///
-/// This is only consulted after applying the decorator produced no useful replacement type. If the
-/// decorator itself statically suggests an unannotated identity-preserving shape, we keep the
-/// current class binding; if it explicitly promises a replacement type, or if the decorator is
-/// unknown, we let the unknown result replace the binding.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-enum ClassDecoratorUnknownResultPolicy {
-    /// Preserve the current class binding when the decorator result is unknown.
-    PreserveBinding,
-    /// Use the unknown decorator result as the public binding.
-    ReplaceBinding,
-}
-
-impl ClassDecoratorUnknownResultPolicy {
-    /// Infer the unknown-result policy from the decorator's own type.
-    ///
-    /// Unannotated function and method decorators are treated as class-preserving when their
-    /// application result is unknown. Explicit return annotations are trusted as replacement
-    /// intent.
-    fn from_decorator<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        decorator_ty: Type<'db>,
-        decorator_result_ty: Type<'db>,
-    ) -> Self {
-        if decorator_ty.is_unknown() {
-            return Self::ReplaceBinding;
-        }
-
-        Self::known_from_decorator(db, env, decorator_ty, decorator_result_ty)
-            .unwrap_or(Self::ReplaceBinding)
-    }
-
-    /// Return the known preservation policy for a class decorator, if one can be read statically.
-    ///
-    /// For unknown decorator results, unannotated functions are treated as likely
-    /// identity-preserving:
-    /// ```python
-    /// def decorator(cls):
-    ///     return cls
-    /// ```
-    ///
-    /// Explicit return annotations are trusted instead:
-    /// ```python
-    /// def decorator(cls) -> object:
-    ///     return object()
-    /// ```
-    ///
-    /// Callable instances and protocols delegate the decision to their `__call__` member, because
-    /// the decorator value itself is not the function that receives the class.
-    fn known_from_decorator<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        decorator_ty: Type<'db>,
-        decorator_result_ty: Type<'db>,
-    ) -> Option<Self> {
-        match decorator_ty {
-            Type::FunctionLiteral(function) => {
-                Some(if function.has_explicit_return_annotation(db) {
-                    Self::ReplaceBinding
-                } else {
-                    Self::PreserveBinding
-                })
-            }
-            Type::BoundMethod(method) => {
-                Some(if method.function(db).has_explicit_return_annotation(db) {
-                    Self::ReplaceBinding
-                } else {
-                    Self::PreserveBinding
-                })
-            }
-            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
-                let call_symbol = decorator_ty
-                    .member_lookup_with_policy(
-                        db,
-                        env,
-                        "__call__",
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                    )
-                    .place;
-
-                if let Place::Defined(place) = call_symbol
-                    && place.is_definitely_defined()
-                {
-                    Some(
-                        Self::known_from_decorator(db, env, place.ty, decorator_result_ty)
-                            .unwrap_or(Self::ReplaceBinding),
-                    )
-                } else {
-                    Some(Self::ReplaceBinding)
-                }
-            }
-            Type::Union(union) => Some(
-                if union.elements(db).iter().all(|element| {
-                    Self::known_from_decorator(db, env, *element, decorator_result_ty)
-                        == Some(Self::PreserveBinding)
-                }) {
-                    Self::PreserveBinding
-                } else {
-                    Self::ReplaceBinding
-                },
-            ),
-            Type::TypeAlias(alias) => Some(
-                Self::known_from_decorator(db, env, alias.value_type(db), decorator_result_ty)
-                    .unwrap_or(Self::ReplaceBinding),
-            ),
-            Type::Callable(callable) => Some(match callable.provenance(db) {
-                // An unannotated function preserves the class binding when applying it loses the
-                // concrete return type:
-                // ```python
-                // decorator = lambda cls: cls
-                //
-                // @decorator
-                // class C: ...
-                // ```
-                CallableFunctionProvenance::ImplicitReturn => Self::PreserveBinding,
-                // An explicit return annotation can intentionally replace the class binding:
-                // ```python
-                // def decorator[T](cls) -> T: ...
-                //
-                // @decorator
-                // class C: ...
-                // ```
-                CallableFunctionProvenance::ExplicitReturn => Self::ReplaceBinding,
-                // Generic class-preserving decorator factories can lose the concrete class in
-                // their returned `Callable`, while still producing an unknown class-object result:
-                // ```python
-                // def identity_factory[T]() -> Callable[[type[T]], type[T]]: ...
-                //
-                // @identity_factory()
-                // class C: ...
-                // ```
-                CallableFunctionProvenance::None
-                    if is_unknown_class_object_decorator_result(db, decorator_result_ty) =>
-                {
-                    Self::PreserveBinding
-                }
-                // An ordinary `Callable` replacement result has no function provenance to justify
-                // the unannotated-function preservation fallback:
-                // ```python
-                // def replacement_factory[T]() -> Callable[[type[object]], T]: ...
-                //
-                // @replacement_factory()
-                // class C: ...
-                // ```
-                CallableFunctionProvenance::None => Self::ReplaceBinding,
-            }),
-            _ => None,
-        }
+/// This also handles `type[Unknown]` results from generic decorator factories whose type
+/// variables are specialized before the returned decorator receives the class. Explicit `Any`
+/// results do not trigger this fallback.
+fn is_unknown_decorator_result<'db>(db: &'db dyn Db, result_ty: Type<'db>) -> bool {
+    match result_ty.resolve_type_alias(db) {
+        Type::SubclassOf(subclass_of) => subclass_of
+            .subclass_of()
+            .into_dynamic()
+            .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown()),
+        result_ty => result_ty.is_unknown(),
     }
 }
 

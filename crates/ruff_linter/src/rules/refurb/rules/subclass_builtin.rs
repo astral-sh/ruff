@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
@@ -60,7 +61,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.3")]
+#[violation_metadata(preview_since = "0.7.3", category = Category::Suspicious)]
 pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,

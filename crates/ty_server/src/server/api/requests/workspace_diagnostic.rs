@@ -17,7 +17,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use ty_ide::{Hint, hints};
-use ty_project::{ProgressReporter, ProjectDatabase, SemanticDb as _};
+use ty_project::{Db as _, ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
@@ -98,6 +98,10 @@ use crate::system::file_to_uri;
 /// suspended workspace diagnostic request (if any) after every notification if the notification
 /// changed the [`Session`]'s state.
 ///
+/// Workspace diagnostics also wait while a script's initial environment is unavailable.
+/// Refreshing an available project or script environment does not block diagnostics.
+/// The same long-polling mechanism resumes the request after the host applies the uv results.
+///
 /// [workspace-diagnostics](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic)
 pub(crate) struct WorkspaceDiagnosticRequestHandler;
 
@@ -113,6 +117,20 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
     ) -> Result<WorkspaceDiagnosticReport> {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
             tracing::debug!("Workspace diagnostics is disabled; returning empty report");
+            return Ok(WorkspaceDiagnosticReport { items: vec![] });
+        }
+
+        if snapshot
+            .projects()
+            .iter()
+            .any(|db| db.uv_environments().has_pending_initializations())
+        {
+            tracing::debug!(
+                "Deferring workspace diagnostics until script initialization completes"
+            );
+            // Returning an empty workspace report makes `handle_request` suspend the request.
+            // Skip the response writer: it would clear diagnostics for previous result IDs
+            // that we have not checked yet. Suspension retains the request, not this snapshot.
             return Ok(WorkspaceDiagnosticReport { items: vec![] });
         }
 
@@ -239,7 +257,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
-        let unnecessary_hints = hints(db, db.program_file(file));
+        let unnecessary_hints = hints(db, file);
 
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
@@ -287,7 +305,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            let unnecessary_hints = hints(db, db.program_file(file));
+            let unnecessary_hints = hints(db, file);
             response.write_diagnostics_for_file(db, file, &diagnostics, &unnecessary_hints);
         }
         response.maybe_flush();
@@ -394,45 +412,48 @@ impl<'a> ResponseWriter<'a> {
         let key = DocumentKey::from_uri(&uri);
         let version = self
             .index
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .map(|doc| doc.version())
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(
+        let diagnostics = diagnostics
+            .iter()
+            .filter(|diagnostic| self.global_settings.should_show_diagnostic(diagnostic));
+        let Some(result_id) = Diagnostics::result_id_from_hash(
             db,
-            diagnostics,
+            diagnostics.clone(),
             unnecessary_hints,
             self.client_capabilities,
-        );
+        ) else {
+            // Leave any previous result ID for `into_final_report` to clear. Without a previous
+            // result, there is nothing to report and the request can continue long polling.
+            return;
+        };
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_uri, id)| id);
 
-        let report = match result_id {
-            Some(new_id) if Some(&new_id) == previous_result_id.as_ref() => {
+        let report = match previous_result_id {
+            Some(previous_id) if result_id == previous_id => {
                 WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
                     WorkspaceUnchangedDocumentDiagnosticReport {
                         uri,
                         version,
                         unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id,
                         },
                     },
                 )
             }
-            new_id => {
+            _ => {
                 let mut lsp_diagnostics = diagnostics
-                    .iter()
-                    .filter_map(|diagnostic| {
-                        Some(
-                            to_lsp_diagnostic(
-                                db,
-                                diagnostic,
-                                self.position_encoding,
-                                self.client_capabilities,
-                                self.global_settings,
-                            )?
-                            .1,
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.position_encoding,
+                            self.client_capabilities,
                         )
+                        .1
                     })
                     .collect::<Vec<_>>();
                 lsp_diagnostics.extend(unnecessary_hints_to_lsp_diagnostics(
@@ -447,7 +468,7 @@ impl<'a> ResponseWriter<'a> {
                         uri,
                         version,
                         full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                            result_id: new_id,
+                            result_id: Some(result_id),
                             items: lsp_diagnostics,
                         },
                     },

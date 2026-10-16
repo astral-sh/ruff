@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `contextlib.suppress` without arguments.
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `contextlib.suppress`](https://docs.python.org/3/library/contextlib.html#contextlib.suppress)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.118")]
+#[violation_metadata(stable_since = "v0.0.118", category = Category::Correctness)]
 pub(crate) struct UselessContextlibSuppress;
 
 impl Violation for UselessContextlibSuppress {

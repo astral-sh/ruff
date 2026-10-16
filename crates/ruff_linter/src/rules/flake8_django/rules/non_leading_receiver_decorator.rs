@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks that Django's `@receiver` decorator is listed first, prior to
@@ -41,7 +42,7 @@ use crate::checkers::ast::Checker;
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.246")]
+#[violation_metadata(stable_since = "v0.0.246", category = Category::Suspicious)]
 pub(crate) struct DjangoNonLeadingReceiverDecorator;
 
 impl Violation for DjangoNonLeadingReceiverDecorator {

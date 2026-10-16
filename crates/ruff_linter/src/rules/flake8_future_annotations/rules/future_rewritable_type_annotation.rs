@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
@@ -68,7 +69,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Style)]
 pub(crate) struct FutureRewritableTypeAnnotation {
     name: String,
 }

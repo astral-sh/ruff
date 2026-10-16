@@ -160,6 +160,47 @@ Defaults to `true`.
 
 ---
 
+### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+Lambda functions are not affected by this setting and their return type will always
+be inferred.
+
+Return types for generator functions and asynchronous functions are currently not
+inferred, but we plan to change this soon.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    return-type-inference = "always"
+    ```
+
+---
+
 ### `strict-equality-semantics`
 
 Configure ty's behavior regarding type inference and narrowing of equality
@@ -269,7 +310,7 @@ def narrow_match(x: str) -> None:
 ### `strict-generic-narrowing`
 
 Whether ty should use strict narrowing for unspecialized generic classes in
-`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+`isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
 
 When enabled, ty narrows to the top materialization of the class. For example,
 `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -364,6 +405,10 @@ your environment from an activated Conda environment, and will look for a `.venv
 in the project root if none of the above apply. Failing that, ty will look for a `python3`
 or `python` binary available in `PATH`.
 
+Scripts with inline metadata use their own Python environment. They can use an explicitly
+configured environment, an activated environment, or an environment selected by the editor.
+Unlike projects, they do not automatically use a `.venv` directory.
+
 [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
@@ -446,11 +491,14 @@ to determine a value:
    and attempt to infer the Python version of that environment
 3. Fall back to the default value (see below)
 
+Scripts with inline metadata use their `requires-python` field instead of
+`project.requires-python`. They do not inherit the Python version of the enclosing project.
+
 For some language features, ty can also understand conditionals based on comparisons
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
 
-**Default value**: `"3.14"`
+**Default value**: `"3.15"`
 
 **Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15"`
 
@@ -485,6 +533,9 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./src`
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
+
+Scripts with inline metadata have no first-party roots by default because they are
+single-file programs. Set `root = ["."]` to allow importing local modules.
 
 **Default value**: `null`
 
@@ -711,6 +762,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -719,6 +773,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -752,6 +809,9 @@ When multiple patterns match, later entries take precedence.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -760,6 +820,9 @@ When multiple patterns match, later entries take precedence.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -788,6 +851,9 @@ Defaults to `true`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
@@ -796,9 +862,59 @@ Defaults to `true`.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
+    ```
+
+---
+
+#### `return-type-inference`
+
+This setting controls when ty infers return types for functions without an explicit
+return type annotation.
+
+- `"never"`: Do not infer return types from function bodies. Unannotated functions
+  will have an inferred return type of `Unknown`.
+- `"always"`: Infer return types for unannotated functions and methods.
+
+Enabling return type inference will never override explicit return type annotations.
+Lambda functions are not affected by this setting and their return type will always
+be inferred.
+
+Return types for generator functions and asynchronous functions are currently not
+inferred, but we plan to change this soon.
+
+Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+inference.
+
+**Default value**: `"never"`
+
+**Type**: `"never" | "always"`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    return-type-inference = "always"
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    return-type-inference = "always"
     ```
 
 ---
@@ -894,6 +1010,9 @@ def narrow_match(x: str) -> None:
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
@@ -902,6 +1021,9 @@ def narrow_match(x: str) -> None:
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Preserve broad builtin types instead of narrowing them to literals
     strict-equality-semantics = true
@@ -912,7 +1034,7 @@ def narrow_match(x: str) -> None:
 #### `strict-generic-narrowing`
 
 Whether ty should use strict narrowing for unspecialized generic classes in
-`isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+`isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
 
 When enabled, ty narrows to the top materialization of the class. For example,
 `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -937,6 +1059,9 @@ Defaults to `false`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true
@@ -945,6 +1070,9 @@ Defaults to `false`.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true

@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `logging.exception()` with `exc_info` set to `False`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Pedantic)]
 pub(crate) struct ExceptionWithoutExcInfo;
 
 impl Violation for ExceptionWithoutExcInfo {

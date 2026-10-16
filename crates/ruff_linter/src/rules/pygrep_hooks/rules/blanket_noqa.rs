@@ -4,6 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::noqa::{self, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -39,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Ruff documentation](https://docs.astral.sh/ruff/configuration/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.200")]
+#[violation_metadata(stable_since = "v0.0.200", category = Category::Pedantic)]
 pub(crate) struct BlanketNOQA {
     missing_colon: bool,
     file_exemption: bool,

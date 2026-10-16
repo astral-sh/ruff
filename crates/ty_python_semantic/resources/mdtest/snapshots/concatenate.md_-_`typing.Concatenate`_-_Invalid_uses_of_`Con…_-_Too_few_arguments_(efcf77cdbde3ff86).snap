@@ -33,24 +33,24 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
 18 |     reveal_type(c)  # revealed: (...) -> int
 19 | 
 20 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)"
-21 | reveal_type(Foo[Concatenate[()]].attr)  # revealed: (...) -> None
+21 | reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
 22 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-23 | reveal_type(Foo[Concatenate[int]].attr)  # revealed: (...) -> None
+23 | reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
 24 | # error: [invalid-type-form] "`typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)"
-25 | reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
+25 | reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None
 26 | # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
-27 | reveal_type(Foo[Concatenate].attr)  # revealed: (...) -> None
+27 | reveal_type(Foo[Concatenate]().attr)  # revealed: (...) -> None
 28 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-29 | reveal_type(Foo[[Concatenate]].attr)  # revealed: (Unknown, /) -> None
+29 | reveal_type(Foo[[Concatenate]]().attr)  # revealed: (Unknown, /) -> None
 30 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-31 | reveal_type(Foo[[Concatenate, int]].attr)  # revealed: (Unknown, int, /) -> None
+31 | reveal_type(Foo[[Concatenate, int]]().attr)  # revealed: (Unknown, int, /) -> None
 32 | 
 33 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-34 | reveal_type(Foo[[Concatenate[int], str]].attr)  # revealed: (Unknown, str, /) -> None
+34 | reveal_type(Foo[[Concatenate[int], str]]().attr)  # revealed: (Unknown, str, /) -> None
 35 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-36 | reveal_type(Foo[[Concatenate[int, str], str]].attr)  # revealed: (Unknown, str, /) -> None
+36 | reveal_type(Foo[[Concatenate[int, str], str]]().attr)  # revealed: (Unknown, str, /) -> None
 37 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-38 | reveal_type(Foo[[Concatenate[()], str]].attr)  # revealed: (Unknown, str, /) -> None
+38 | reveal_type(Foo[[Concatenate[()], str]]().attr)  # revealed: (Unknown, str, /) -> None
 39 | 
 40 | # Subscripting a class that does not have "exactly one paramspec" takes a different code path;
 41 | # these tests exercise that code path
@@ -60,10 +60,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/concaten
 45 | 
 46 | # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
 47 | # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
-48 | reveal_type(Bar[Concatenate, Concatenate].a)  # revealed: (...) -> int
+48 | reveal_type(Bar[Concatenate, Concatenate]().a)  # revealed: (...) -> int
 49 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
 50 | # error: [invalid-type-form] "`typing.Concatenate` is not allowed in this context in a type expression"
-51 | reveal_type(Bar[[Concatenate], [Concatenate]].a)  # revealed: (Unknown, /) -> int
+51 | reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
 ```
 
 # Diagnostics
@@ -108,7 +108,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least two arguments w
 error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 0)
   --> src/mdtest_snippet.py:21:17
    |
-21 | reveal_type(Foo[Concatenate[()]].attr)  # revealed: (...) -> None
+21 | reveal_type(Foo[Concatenate[()]]().attr)  # revealed: (...) -> None
    |                 ^^^^^^^^^^^^^^^
 
 ```
@@ -117,7 +117,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:23:17
    |
-23 | reveal_type(Foo[Concatenate[int]].attr)  # revealed: (...) -> None
+23 | reveal_type(Foo[Concatenate[int]]().attr)  # revealed: (...) -> None
    |                 ^^^^^^^^^^^^^^^^
 
 ```
@@ -126,7 +126,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments when used in a type expression (got 1)
   --> src/mdtest_snippet.py:25:17
    |
-25 | reveal_type(Foo[Concatenate[(int,)]].attr)  # revealed: (...) -> None
+25 | reveal_type(Foo[Concatenate[(int,)]]().attr)  # revealed: (...) -> None
    |                 ^^^^^^^^^^^^^^^^^^^
 
 ```
@@ -135,7 +135,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least 2 arguments whe
 error[invalid-type-form]: `typing.Concatenate` requires at least two arguments when used in a type expression
   --> src/mdtest_snippet.py:27:17
    |
-27 | reveal_type(Foo[Concatenate].attr)  # revealed: (...) -> None
+27 | reveal_type(Foo[Concatenate]().attr)  # revealed: (...) -> None
    |                 ^^^^^^^^^^^
 
 ```
@@ -144,7 +144,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least two arguments w
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:29:18
    |
-29 | reveal_type(Foo[[Concatenate]].attr)  # revealed: (Unknown, /) -> None
+29 | reveal_type(Foo[[Concatenate]]().attr)  # revealed: (Unknown, /) -> None
    |                  ^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -156,7 +156,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:31:18
    |
-31 | reveal_type(Foo[[Concatenate, int]].attr)  # revealed: (Unknown, int, /) -> None
+31 | reveal_type(Foo[[Concatenate, int]]().attr)  # revealed: (Unknown, int, /) -> None
    |                  ^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -168,7 +168,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:34:18
    |
-34 | reveal_type(Foo[[Concatenate[int], str]].attr)  # revealed: (Unknown, str, /) -> None
+34 | reveal_type(Foo[[Concatenate[int], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -180,7 +180,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:36:18
    |
-36 | reveal_type(Foo[[Concatenate[int, str], str]].attr)  # revealed: (Unknown, str, /) -> None
+36 | reveal_type(Foo[[Concatenate[int, str], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -192,7 +192,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:38:18
    |
-38 | reveal_type(Foo[[Concatenate[()], str]].attr)  # revealed: (Unknown, str, /) -> None
+38 | reveal_type(Foo[[Concatenate[()], str]]().attr)  # revealed: (Unknown, str, /) -> None
    |                  ^^^^^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -204,7 +204,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` requires at least two arguments when used in a type expression
   --> src/mdtest_snippet.py:48:17
    |
-48 | reveal_type(Bar[Concatenate, Concatenate].a)  # revealed: (...) -> int
+48 | reveal_type(Bar[Concatenate, Concatenate]().a)  # revealed: (...) -> int
    |                 ^^^^^^^^^^^
 
 ```
@@ -213,7 +213,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least two arguments w
 error[invalid-type-form]: `typing.Concatenate` requires at least two arguments when used in a type expression
   --> src/mdtest_snippet.py:48:30
    |
-48 | reveal_type(Bar[Concatenate, Concatenate].a)  # revealed: (...) -> int
+48 | reveal_type(Bar[Concatenate, Concatenate]().a)  # revealed: (...) -> int
    |                              ^^^^^^^^^^^
 
 ```
@@ -222,7 +222,7 @@ error[invalid-type-form]: `typing.Concatenate` requires at least two arguments w
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:51:18
    |
-51 | reveal_type(Bar[[Concatenate], [Concatenate]].a)  # revealed: (Unknown, /) -> int
+51 | reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
    |                  ^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`
@@ -234,7 +234,7 @@ info:  - as a type argument for a `ParamSpec` parameter
 error[invalid-type-form]: `typing.Concatenate` is not allowed in this context in a type expression
   --> src/mdtest_snippet.py:51:33
    |
-51 | reveal_type(Bar[[Concatenate], [Concatenate]].a)  # revealed: (Unknown, /) -> int
+51 | reveal_type(Bar[[Concatenate], [Concatenate]]().a)  # revealed: (Unknown, /) -> int
    |                                 ^^^^^^^^^^^
 info: `typing.Concatenate` is only valid:
 info:  - as the first argument to `Callable`

@@ -321,6 +321,7 @@ impl<'db> SameEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(db, operator)? {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
@@ -384,8 +385,8 @@ enum EnumValueSetMembers<'db> {
 impl<'db> EnumValueSet<'db> {
     /// Extract only structural enum membership facts from `ty`.
     ///
-    /// This deliberately does not use subtyping: a `NewType` over an enum is a subtype of the
-    /// enum but remains disjoint from the enum's literal members.
+    /// This deliberately does not use subtyping: extra nominal restrictions must not be
+    /// transferred to the other comparison operand.
     fn from_type(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -417,6 +418,9 @@ impl<'db> EnumValueSet<'db> {
                     enum_class: instance.class_literal(db, env).into_enum_class(db)?,
                     members: EnumValueSetMembers::All,
                 },
+                Type::NewTypeInstance(newtype) => {
+                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), active_types)?
+                }
                 Type::EnumComplement(complement) => EnumValueSet {
                     enum_class: complement.enum_class_literal(db),
                     members: EnumValueSetMembers::AllExcept(complement),
@@ -520,6 +524,16 @@ impl<'db> EnumValueSet<'db> {
     ) -> Option<Self> {
         if let Some(complement) = intersection.enum_complement(db, env) {
             return Self::from_type(db, env, Type::EnumComplement(complement), active_types);
+        }
+
+        if intersection
+            .positive(db)
+            .iter()
+            .any(|positive| matches!(positive.resolve_type_alias(db), Type::NewTypeInstance(_)))
+            && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
+            && let Some(value_set) = Self::from_type(db, env, expanded, active_types)
+        {
+            return Some(value_set);
         }
 
         // Other intersection components can only reduce the represented enum values. Ignoring
@@ -925,6 +939,7 @@ impl<'db> ProjectedEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(operator) {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {

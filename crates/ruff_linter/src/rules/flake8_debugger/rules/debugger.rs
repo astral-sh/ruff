@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 /// - [Python documentation: `pdb` — The Python Debugger](https://docs.python.org/3/library/pdb.html)
 /// - [Python documentation: `logging` — Logging facility for Python](https://docs.python.org/3/library/logging.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.141")]
+#[violation_metadata(stable_since = "v0.0.141", category = Category::Correctness)]
 pub(crate) struct Debugger {
     using_type: DebuggerUsingType,
 }

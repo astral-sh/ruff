@@ -45,7 +45,7 @@
       ]
     },
     "dummy-variable-rgx": {
-      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+      "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
       "type": [
         "string",
         "null"
@@ -446,7 +446,7 @@
       ]
     },
     "ignore": {
-      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+      "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -582,7 +582,7 @@
       "deprecated": true
     },
     "per-file-ignores": {
-      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+      "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "object",
         "null"
@@ -691,7 +691,7 @@
       ]
     },
     "select": {
-      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+      "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
       "type": [
         "array",
         "null"
@@ -719,7 +719,7 @@
       }
     },
     "target-version": {
-      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.11 or ==3.11\nspecify `target-version = \"py311\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
+      "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.12 or ==3.12\nspecify `target-version = \"py312\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -869,6 +869,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "AnnotationSemanticsSelection": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/RuntimeSemantics"
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
     },
     "ApiBan": {
       "type": "object",
@@ -1486,7 +1502,7 @@
           ]
         },
         "banned-api": {
-          "description": "Specific modules or module members that may not be imported or accessed.\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
+          "description": "Specific modules or module members that may not be imported or accessed.\nThese can be extended by the\n[`extend-banned-api`](#lint_flake8-tidy-imports_extend-banned-api) option.\n\nNote that this rule is only meant to flag accidental uses,\nand can be circumvented via `eval` or `importlib`.",
           "type": [
             "object",
             "null"
@@ -1503,6 +1519,16 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "extend-banned-api": {
+          "description": "Additional modules or module members that may not be imported or accessed.\nThese entries will be added to the\n[`banned-api`](#lint_flake8-tidy-imports_banned-api) mapping and will override\nany existing entries if the two settings overlap.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "$ref": "#/definitions/ApiBan"
           }
         },
         "require-lazy": {
@@ -1541,24 +1567,26 @@
           ]
         },
         "runtime-evaluated-base-classes": {
-          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nCommon examples include Pydantic's `pydantic.BaseModel` and SQLAlchemy's\n`sqlalchemy.orm.DeclarativeBase`, but can also support user-defined\nclasses that inherit from those base classes. For example, if you define\na common `DeclarativeBase` subclass that's used throughout your project\n(e.g., `class Base(DeclarativeBase) ...` in `base.py`), you can add it to\nthis list (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes that list any of the enumerated classes as a base class\nfrom needing to be moved into type-checking blocks.\n\nThis can either be configured as a list, if all entries share the same\nruntime semantics of being runtime required. Or a table where each entry\nis assigned to its desired runtime semantics.\n\nA common example for `\"runtime\"` required semantics is Pydantic's `pydantic.BaseModel`\nbut can also support user-defined classes that inherit from those base classes.\nFor example, if you define a common `BaseModel` subclass that's used throughout\nyour project (e.g., `class Base(BaseModel) ...` in `base.py`), you can add it to\nthis list/table (`runtime-evaluated-base-classes = [\"base.Base\"]`) to exempt\nmodels from being moved into type-checking blocks.\n\n```toml\n[tool.ruff.lint.flake8-type-checking]\nruntime-evaluated-base-classes = [\"pydantic.BaseModel\"]\n```\n\nOr\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"pydantic.BaseModel\" = \"required\"\n```\n\nFor some use-cases like SQLAlchemy's `sqlalchemy.orm.DeclarativeBase` it makes more\nsense to mark the class as runtime `\"ambiguous\"`, since references to other models do\nnot need to resolve at runtime. With these semantics ruff will assume the annotations\nalready contain all of the correct forward references, and will not attempt to move\nrelated imports and/or quote annotations.\n\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]\n\"sqlalchemy.orm.DeclarativeBase\" = \"ambiguous\"\n```",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
-          "type": [
-            "array",
-            "null"
-          ],
-          "items": {
-            "type": "string"
-          }
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.\n\nJust like with `runtime-evaluated-base-classes` it's possible to mark\ndecorators as runtime `\"ambiguous\"`.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "strict": {
           "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports\nare present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
@@ -2156,7 +2184,7 @@
           }
         },
         "dummy-variable-rgx": {
-          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, and `_var`, but not `_var_`.",
+          "description": "A regular expression used to identify \"dummy\" variables, or those which\nshould be ignored when enforcing (e.g.) unused-variable rules. The\ndefault expression matches `_`, `__`, `_var`, and `_次`, but not `_var_`\nor `_次_`.",
           "type": [
             "string",
             "null"
@@ -2469,7 +2497,7 @@
           ]
         },
         "ignore": {
-          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.",
+          "description": "A list of rule codes or prefixes to ignore. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the same\nprefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -2530,7 +2558,7 @@
           ]
         },
         "per-file-ignores": {
-          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.",
+          "description": "A list of mappings from file pattern to rule codes or prefixes to\nexclude, when considering any matching files. An initial '!' negates\nthe file pattern.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
             "object",
             "null"
@@ -2627,7 +2655,7 @@
           ]
         },
         "select": {
-          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire categories (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.",
+          "description": "A list of rule codes or prefixes to enable. Prefixes can specify exact\nrules (like `F841`), entire groups (like `F`), or anything in\nbetween.\n\nWhen breaking ties between enabled and disabled rules (via `select` and\n`ignore`, respectively), more specific prefixes override less\nspecific prefixes. `ignore` takes precedence over `select` if the\nsame prefix appears in both.\n\nIn preview, categories like `correctness` and `suspicious` can be used\nin addition to rule codes and linter group prefixes.",
           "type": [
             "array",
             "null"
@@ -3153,7 +3181,7 @@
           ]
         },
         "strictly-empty-init-modules": {
-          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\n`__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.",
           "type": [
             "boolean",
             "null"
@@ -4307,6 +4335,7 @@
         "RUF073",
         "RUF074",
         "RUF075",
+        "RUF077",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -4573,10 +4602,12 @@
         "UP045",
         "UP046",
         "UP047",
+        "UP048",
         "UP049",
         "UP05",
         "UP050",
         "UP051",
+        "UP052",
         "W",
         "W1",
         "W19",
@@ -4734,11 +4765,14 @@
         "complex-assignment-in-stub",
         "complex-if-statement-in-stub",
         "complex-structure",
+        "complexity",
         "constant-imported-as-non-constant",
+        "context-manager-iterator",
         "continue-in-finally",
         "continue-outside-loop",
         "convert-named-tuple-functional-to-class",
         "convert-typed-dict-functional-to-class",
+        "correctness",
         "create-subprocess-in-async-function",
         "custom-type-var-for-self",
         "dataclass-enum",
@@ -4834,6 +4868,7 @@
         "for-loop-writes",
         "format-in-get-text-func-call",
         "format-literals",
+        "formatting",
         "forward-annotation-syntax-error",
         "fromisoformat-replace-z",
         "function-call-in-dataclass-default-argument",
@@ -4979,6 +5014,7 @@
         "map-without-explicit-strict",
         "math-constant",
         "meta-class-abc-meta",
+        "method-receiver-default",
         "mismatched-section-underline-length",
         "misplaced-bare-raise",
         "missing-blank-line-after-last-section",
@@ -5156,6 +5192,7 @@
         "pass-statement-stub-body",
         "patch-version-comparison",
         "path-constructor-current-directory",
+        "pedantic",
         "pep484-style-positional-only-parameter",
         "percent-format-expected-mapping",
         "percent-format-expected-sequence",
@@ -5166,6 +5203,7 @@
         "percent-format-positional-count-mismatch",
         "percent-format-star-requires-sequence",
         "percent-format-unsupported-format-character",
+        "performance",
         "post-init-default",
         "potential-index-error",
         "print",
@@ -5187,6 +5225,7 @@
         "pytest-erroneous-use-fixtures-on-fixture",
         "pytest-extraneous-scope-function",
         "pytest-fail-without-message",
+        "pytest-fixture-autouse",
         "pytest-fixture-finalizer-callback",
         "pytest-fixture-incorrect-parentheses-style",
         "pytest-fixture-param-without-value",
@@ -5253,6 +5292,7 @@
         "replace-universal-newlines",
         "request-with-no-cert-validation",
         "request-without-timeout",
+        "restriction",
         "return-in-generator",
         "return-in-init",
         "return-in-try-except-finally",
@@ -5265,6 +5305,7 @@
         "runtime-cast-value",
         "runtime-import-in-type-checking-block",
         "runtime-string-union",
+        "security",
         "self-assigning-variable",
         "self-or-cls-assignment",
         "set-attr-with-constant",
@@ -5310,6 +5351,7 @@
         "string-or-bytes-too-long",
         "strip-with-multi-characters",
         "stub-body-multiple-statements",
+        "style",
         "subclass-builtin",
         "subprocess-popen-preexec-fn",
         "subprocess-popen-with-shell-equals-true",
@@ -5323,6 +5365,7 @@
         "superfluous-else-return",
         "suppressible-exception",
         "surrounding-whitespace",
+        "suspicious",
         "suspicious-eval-usage",
         "suspicious-ftp-lib-usage",
         "suspicious-ftplib-import",
@@ -5546,6 +5589,7 @@
         "verbose-raise",
         "wait-for-process-in-async-function",
         "weak-cryptographic-key",
+        "while-one",
         "whitespace-after-decorator",
         "whitespace-after-open-bracket",
         "whitespace-before-close-bracket",
@@ -5562,6 +5606,21 @@
         "zip-dict-keys-and-values",
         "zip-instead-of-pairwise",
         "zip-without-explicit-strict"
+      ]
+    },
+    "RuntimeSemantics": {
+      "description": "Represents the desired runtime semantics for a set of type definitions\n\nNote that the order of variants is important here. `Required` has the\nhighest precedence when calling `RuntimeSemantics::combine` on two\nseparate targeting sources. (E.g. classes can be targeted both via\ntheir decorators, but also via their base classes, so this determines\nwhat happens when two sources disagree)",
+      "oneOf": [
+        {
+          "description": "Assume that all targeted annotations are going to be evaluated at runtime\nat some point. So all referenced bindings need to be available at runtime.",
+          "type": "string",
+          "const": "required"
+        },
+        {
+          "description": "Do not make any assumptions about how the targeted annotations are going\nto be interacted with, assume the current execution context of any referenced\nbindings is already correct.",
+          "type": "string",
+          "const": "ambiguous"
+        }
       ]
     },
     "Strictness": {

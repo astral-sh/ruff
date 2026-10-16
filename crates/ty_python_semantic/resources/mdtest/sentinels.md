@@ -70,6 +70,36 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
         reveal_type(x)  # revealed: MISSING
 ```
 
+Sentinel values can also be combined with types at runtime:
+
+```py
+reveal_type(MISSING | None)  # revealed: <types.UnionType special-form 'MISSING | None'>
+reveal_type(None | MISSING)  # revealed: <types.UnionType special-form 'None | MISSING'>
+reveal_type(MISSING | int)  # revealed: <types.UnionType special-form 'MISSING | int'>
+reveal_type(int | MISSING)  # revealed: <types.UnionType special-form 'int | MISSING'>
+reveal_type(MISSING | MISSING)  # revealed: MISSING
+```
+
+When enabled, `mismatched-sentinel-name` reports names that do not match their assigned variables,
+including when the constructor has an alias or an explicit representation:
+
+```py
+from typing_extensions import Sentinel as SentinelAlias
+
+MISMATCHED = Sentinel("OTHER")  # snapshot
+MISMATCHED_WITH_POSITIONAL_REPR = Sentinel("OTHER", "other")  # error: [mismatched-sentinel-name]
+MISMATCHED_WITH_KEYWORD_REPR = Sentinel("OTHER", repr="other")  # error: [mismatched-sentinel-name]
+ALIASED_MISMATCHED = SentinelAlias("OTHER")  # error: [mismatched-sentinel-name]
+```
+
+```snapshot
+info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the variable it is assigned to
+  --> src/mdtest_snippet.py:66:23
+   |
+66 | MISMATCHED = Sentinel("OTHER")  # snapshot
+   |                       ^^^^^^^ Expected "MISMATCHED", got "OTHER"
+```
+
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
 rejected as class bases:
 
@@ -88,6 +118,16 @@ Sentinels declared in class scope can also be used in type expressions:
 ```py
 class C:
     MARKER = Sentinel("C.MARKER")
+    UNQUALIFIED = Sentinel("UNQUALIFIED")  # no diagnostic
+    WRONG_CLASS = Sentinel("Other.WRONG_CLASS")  # error: [mismatched-sentinel-name]
+    WRONG_NAME = Sentinel("C.OTHER")  # error: [mismatched-sentinel-name]
+
+    class Nested:
+        MARKER = Sentinel("C.Nested.MARKER")  # no diagnostic
+        UNQUALIFIED = Sentinel("UNQUALIFIED")  # no diagnostic
+        PARTIALLY_QUALIFIED = Sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
+        WRONG_CLASS = Sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
+        WRONG_NAME = Sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]
 
 def accepts_marker(x: C.MARKER) -> None: ...
 
@@ -210,6 +250,26 @@ def reverse_negative_check(x: int | MISSING | OTHER) -> None:
         reveal_type(x)  # revealed: MISSING
 ```
 
+When enabled, `mismatched-sentinel-name` also checks builtin sentinels, including when the builtin
+is imported under an alias or given an explicit representation:
+
+```py
+from builtins import sentinel as sentinel_alias
+
+MISMATCHED = sentinel("OTHER")  # snapshot
+MISMATCHED_WITH_POSITIONAL_REPR = sentinel("OTHER", "other")  # error: [mismatched-sentinel-name]
+MISMATCHED_WITH_KEYWORD_REPR = sentinel("OTHER", repr="other")  # error: [mismatched-sentinel-name]
+ALIASED_MISMATCHED = sentinel_alias("OTHER")  # error: [mismatched-sentinel-name]
+```
+
+```snapshot
+info[mismatched-sentinel-name]: The name passed to `sentinel` does not match the variable it is assigned to
+  --> src/mdtest_snippet.py:61:23
+   |
+61 | MISMATCHED = sentinel("OTHER")  # snapshot
+   |                       ^^^^^^^ Expected "MISMATCHED", got "OTHER"
+```
+
 Sentinel objects are always truthy, expose the standard sentinel metadata attributes, and are
 rejected as class bases:
 
@@ -228,6 +288,16 @@ Sentinels declared in class scope can also be used in type expressions:
 ```py
 class C:
     MARKER = sentinel("C.MARKER")
+    UNQUALIFIED = sentinel("UNQUALIFIED")  # no diagnostic
+    WRONG_CLASS = sentinel("Other.WRONG_CLASS")  # error: [mismatched-sentinel-name]
+    WRONG_NAME = sentinel("C.OTHER")  # error: [mismatched-sentinel-name]
+
+    class Nested:
+        MARKER = sentinel("C.Nested.MARKER")  # no diagnostic
+        UNQUALIFIED = sentinel("UNQUALIFIED")  # no diagnostic
+        PARTIALLY_QUALIFIED = sentinel("Nested.PARTIALLY_QUALIFIED")  # error: [mismatched-sentinel-name]
+        WRONG_CLASS = sentinel("Other.Nested.WRONG_CLASS")  # error: [mismatched-sentinel-name]
+        WRONG_NAME = sentinel("C.Nested.OTHER")  # error: [mismatched-sentinel-name]
 
 def accepts_marker(x: C.MARKER) -> None: ...
 
@@ -285,6 +355,7 @@ UNKNOWN_KEYWORD = sentinel("UNKNOWN_KEYWORD", unknown=NAME)  # error: [unknown-a
 import typing_extensions
 
 EXTENSIONS_MISSING = typing_extensions.Sentinel("EXTENSIONS_MISSING")
+EXTENSIONS_MISMATCHED = typing_extensions.Sentinel("OTHER")  # error: [mismatched-sentinel-name]
 
 def f(x: int | EXTENSIONS_MISSING): ...
 

@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, LintName};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
@@ -24,6 +24,7 @@ use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
+use crate::warn_user_once;
 
 /// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -169,7 +170,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(&code.noqa_code()),
+        })) => code.noqa_code().is_some_and(|code| codes.includes(&code)),
         _ => false,
     }
 }
@@ -184,19 +185,19 @@ pub(crate) enum FileExemption {
 }
 
 impl FileExemption {
-    /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
-    pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
-        match self {
-            FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
-        }
-    }
-
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         match self {
             FileExemption::All(_) => true,
             FileExemption::Codes(codes) => codes.contains(&needle),
+        }
+    }
+
+    /// Returns `true` if the file is exempt from the rule with the given name.
+    pub(crate) fn includes_name(&self, needle: LintName) -> bool {
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(rules) => rules.iter().any(|rule| rule.name() == needle),
         }
     }
 
@@ -280,13 +281,16 @@ impl<'a> FileNoqaDirectives<'a> {
 
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) at {path_display}:{line}: \
+                                {warning}"
                             );
                         }
 
                         if no_indentation_at_offset {
                             warn!(
-                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix."
+                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. \
+                                File-level suppression comments must appear on their own line. \
+                                For line-level suppression, omit the `ruff:` prefix."
                             );
                             continue;
                         }
@@ -748,14 +752,18 @@ pub(crate) enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexicalError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
-            LexicalError::InvalidSuffix => {
-                fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
-            }
-            LexicalError::InvalidCodeSuffix => {
-                fmt.write_str("expected code to consist of uppercase letters followed by digits only (e.g. `F401`)")
-            }
-
+            LexicalError::MissingCodes => fmt.write_str(
+                "expected a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidSuffix => fmt.write_str(
+                "expected `:` followed by a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidCodeSuffix => fmt.write_str(
+                "expected code to consist of uppercase letters followed by digits only \
+                (e.g. `F401`)",
+            ),
         }
     }
 }
@@ -962,12 +970,12 @@ fn find_suppression_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
-        let Some(code) = message.secondary_code() else {
+        let Some(name) = message.id().as_lint() else {
             comments_by_line.push(None);
             continue;
         };
 
-        if exemption.contains_secondary_code(code) {
+        if exemption.includes_name(name) {
             comments_by_line.push(None);
             continue;
         }
@@ -989,7 +997,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1012,7 +1023,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1032,9 +1046,18 @@ fn find_suppression_comments<'a>(
         };
 
         let identifier = match suppression_kind {
-            SuppressionKind::Noqa => code.as_str(),
             SuppressionKind::Ignore if is_human_readable_names_enabled(preview) => message.name(),
-            SuppressionKind::Ignore => code.as_str(),
+            SuppressionKind::Ignore => message.secondary_code_or_id(),
+            SuppressionKind::Noqa => {
+                let Some(code) = message.secondary_code() else {
+                    warn_user_once!(
+                        "Cannot add `noqa` comments for rules without codes; use `--add-ignore` instead."
+                    );
+                    comments_by_line.push(None);
+                    continue;
+                };
+                code.as_str()
+            }
         };
 
         comments_by_line.push(Some(SuppressionComment {
@@ -1216,7 +1239,8 @@ impl<'a> NoqaDirectives<'a> {
                         let path_display = relativize_path(path);
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) \
+                                at {path_display}:{line}: {warning}"
                             );
                         }
                     }
@@ -1464,7 +1488,8 @@ mod tests {
         if second_count > 0 {
             writeln!(
                 output,
-                "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
+                "## Additional suppressions added on a second pass: \
+                {second_count}\n\n```py\n{fixed}\n```\n"
             )?;
         }
 
@@ -3341,7 +3366,7 @@ mod tests {
             PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
-        assert_eq!(output, format!("{contents}"));
+        assert_eq!(output, contents);
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [UnusedVariable {

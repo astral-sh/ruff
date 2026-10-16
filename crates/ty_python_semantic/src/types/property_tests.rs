@@ -39,10 +39,10 @@ use type_generation::{intersection, union};
 /// where `t1`, `t2`, ..., `tn` are identifiers that represent arbitrary types, and `<property>`
 /// is an expression using these identifiers.
 macro_rules! type_property_test {
-    ($test_name:ident, $db:ident, $env:ident, forall types $($types:ident),+ . $property:expr) => {
+    (@impl $test_name:ident, $db:ident, $env:ident, $input_type:ty, $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
-        fn $test_name($($types: Ty),+) -> bool {
+        fn $test_name($($types: $input_type),+) -> bool {
             let $db = &get_cached_db();
             let $env = &$db.program_environment();
             $(let $types = $types.into_type($db, $env);)+
@@ -57,22 +57,12 @@ macro_rules! type_property_test {
         }
     };
 
+    ($test_name:ident, $db:ident, $env:ident, forall types $($types:ident),+ . $property:expr) => {
+        type_property_test!(@impl $test_name, $db, $env, Ty, $($types),+ . $property);
+    };
+
     ($test_name:ident, $db:ident, $env:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
-        #[quickcheck_macros::quickcheck]
-        #[ignore]
-        fn $test_name($($types: FullyStaticTy),+) -> bool {
-            let $db = &get_cached_db();
-            let $env = &$db.program_environment();
-            $(let $types = $types.into_type($db, $env);)+
-            let result = $property;
-
-            if !result {
-                println!("\nFailing types were:");
-                $(println!("{}", $types.display($db, $env));)+
-            }
-
-            result
-        }
+        type_property_test!(@impl $test_name, $db, $env, FullyStaticTy, $($types),+ . $property);
     };
 
     // A property test with a logical implication.
@@ -119,11 +109,16 @@ mod stable {
         forall types s, t. s.is_subtype_of(db, env, t) && t.is_subtype_of(db, env, s) => s.is_equivalent_to(db, env, t)
     );
 
+    // Reusing a negation cache across targets gives the same results as explicitly negating `S`.
     type_property_test!(
-        structural_negation_subtyping_matches_materialized_negation, db, env,
-        forall types s, t. {
+        negation_subtyping_matches_materialized_negation, db, env,
+        forall types s, t, u. {
+            let negated = s.negate(db, env);
             let mut cache = None;
-            s.negation_is_subtype_of_cached(db, env, t, &mut cache) == s.negate(db, env).is_subtype_of(db, env, t)
+            [t, u].into_iter().all(|target| {
+                s.negation_is_subtype_of_cached(db, env, target, &mut cache)
+                    == negated.is_subtype_of(db, env, target)
+            })
         }
     );
 

@@ -1,13 +1,14 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::typevar::TypeVarSet;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints, UnionType,
-    call::CallErrorKind, constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -17,6 +18,10 @@ impl<'db> Type<'db> {
     /// This method should only be used outside type checking or when evaluating if a type
     /// is truthy or falsy in a context where Python doesn't make an implicit `bool` call.
     /// Use [`try_bool`](Self::try_bool) for type checking or implicit `bool` calls.
+    ///
+    /// Uninhabited types return [`Truthiness::Uninhabited`]: neither boolean outcome is possible.
+    /// This describes the value type; a compound expression can also fail to complete because
+    /// of its operands, even when its inferred result type is inhabited.
     pub(crate) fn bool(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Truthiness {
         self.try_bool_impl(
             db,
@@ -185,7 +190,7 @@ impl<'db> Type<'db> {
         };
 
         let try_union = |union: UnionType<'db>| {
-            let mut truthiness = None;
+            let mut truthiness = Truthiness::Uninhabited;
             let mut all_not_callable = true;
             let mut has_errors = false;
 
@@ -200,14 +205,9 @@ impl<'db> Type<'db> {
                         }
                     };
 
-                truthiness.get_or_insert(element_truthiness);
-
-                if Some(element_truthiness) != truthiness {
-                    truthiness = Some(Truthiness::Ambiguous);
-
-                    if allow_short_circuit {
-                        return Ok(Truthiness::Ambiguous);
-                    }
+                truthiness = truthiness.union(element_truthiness);
+                if allow_short_circuit && truthiness.is_ambiguous() {
+                    return Ok(Truthiness::Ambiguous);
                 }
             }
 
@@ -217,22 +217,32 @@ impl<'db> Type<'db> {
                         not_boolable_type: *self,
                     });
                 }
-                return Err(BoolError::Union {
-                    union,
-                    truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
-                });
+                return Err(BoolError::Union { union, truthiness });
             }
-            Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
+            Ok(truthiness)
         };
 
         let truthiness = match self {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
+            Type::Callable(callable) if callable.runtime_class(db).is_some() => {
+                Truthiness::AlwaysTrue
+            }
+
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Never
             | Type::Callable(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeForm(_) => Truthiness::Ambiguous,
+
+            Type::Never => Truthiness::Uninhabited,
+
+            Type::Recursive(recursive) => recursive
+                .unfold(db, env)
+                .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
+                .unwrap_or(Ok(Truthiness::Ambiguous))?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
@@ -249,11 +259,22 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
                 let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
-                Truthiness::from(tracked_set.is_always_satisfied(db, env))
+                Truthiness::from(tracked_set.is_always_satisfied(db, env, TypeVarSet::None))
             }
 
             Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {
                 Truthiness::from(*is_non_empty)
+            }
+
+            Type::PropertyInstance(property)
+                if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) =>
+            {
+                Type::instance(db, env, class).try_bool_impl(
+                    db,
+                    env,
+                    allow_short_circuit,
+                    visitor,
+                )?
             }
 
             Type::FunctionLiteral(_)
@@ -264,6 +285,7 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
             | Type::BoundSuper(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)

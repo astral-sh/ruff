@@ -1,14 +1,216 @@
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
-use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
+use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
+use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
+use ruff_db::testing::assert_function_query_was_not_run_by_name;
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::AsId;
 use test_case::test_case;
 use ty_python_core::program::Program;
 use ty_python_core::{ProgramFile, TestProgramDb as _};
+
+#[test]
+fn member_lookup_result_size() {
+    // Property diagnostics must not enlarge every cached member lookup.
+    assert_eq!(
+        size_of::<MemberLookupResult<'_>>(),
+        size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
+    );
+}
+
+#[test]
+fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/accessors.py",
+        r#"
+        from typing_extensions import deprecated
+
+        @deprecated("old getter")
+        def getter(self: object) -> int: ...
+
+        def setter(self: object, value: int) -> None: ...
+        "#,
+    )?;
+    let accessor_ids = {
+        let file = system_path_to_file(&db, "/src/accessors.py")?;
+        let env = db.program_environment();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let getter = global_symbol(&db, file, "getter").place.expect_type();
+        let setter = global_symbol(&db, file, "setter").place.expect_type();
+        let property = PropertyInstanceType::new(&db, Some(getter), Some(setter), None);
+        let deprecations = Type::PropertyInstance(property)
+            .property_deprecations(&db)
+            .ok_or_else(|| anyhow::anyhow!("expected a deprecated getter"))?;
+        assert_eq!(deprecations.functions(&db, ast::ExprContext::Load).len(), 1);
+        assert_eq!(
+            CallableDescription::from_overload(
+                &db,
+                deprecations.functions(&db, ast::ExprContext::Load)[0],
+            )
+            .name(),
+            "getter"
+        );
+        assert!(
+            deprecations
+                .functions(&db, ast::ExprContext::Store)
+                .is_empty()
+        );
+
+        let [Type::FunctionLiteral(getter), Type::FunctionLiteral(setter)] = [getter, setter]
+        else {
+            anyhow::bail!("expected accessor functions");
+        };
+        [getter.as_id(), setter.as_id()]
+    };
+    let events = db.take_salsa_events();
+    for accessor in accessor_ids {
+        assert_function_query_was_not_run_by_name(
+            &db,
+            "FunctionType < 'db >::literal_signature_",
+            Some(accessor),
+            &events,
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn bounded_intersection_preserves_late_union_elements() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+    let narrow = UnionType::from_elements(db, &env, (5..=7).map(Type::int_literal));
+    let expected = UnionType::from_elements(db, &env, (5..=6).map(Type::int_literal));
+
+    // The first union exceeds the budget, but its last two elements survive the intersection.
+    for elements in [[wide, narrow], [narrow, wide]] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(expected)
+        );
+    }
+
+    // A narrowing factor applies before union distribution even when it appears last.
+    let literal = Type::int_literal(5);
+    for elements in [
+        [wide, narrow, literal],
+        [narrow, wide, literal],
+        [literal, wide, narrow],
+    ] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
+}
+
+#[test]
+fn bounded_intersection_returns_none_when_budget_exhausted() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+
+    // A single union requires no distribution and is returned exactly, regardless of its size.
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, [wide]),
+        Some(wide)
+    );
+    // Exceeding the budget must return `None`, not a partial intersection.
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, [wide, wide]),
+        None
+    );
+}
+
+#[test]
+fn bounded_intersection_limits_negated_alias_expansion() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/aliases.py",
+        r#"
+        from typing import Literal
+        from ty_extensions import Intersection, Not
+
+        class A: ...
+        class B: ...
+        class C: ...
+        class D: ...
+        class E: ...
+        class F: ...
+
+        type First = Intersection[A, B]
+        type Second = Intersection[C, D]
+        type Third = Intersection[E, F]
+        type Excluded = Not[int]
+        type ExcludedLiteral = Not[Literal[5]]
+        "#,
+    )?;
+    let db = &db;
+    let env = db.program_environment();
+    let file = system_path_to_file(db, "/src/aliases.py")?;
+    let file = ProgramFile::new(db, file, env.program(db));
+    let mut exclusions = Vec::new();
+    for name in ["First", "Second", "Third"] {
+        let ty = global_symbol(db, file, name).place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+            anyhow::bail!("expected `{name}` to be a type alias");
+        };
+        exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    }
+
+    // De Morgan's law expands these negated intersections into a product of unions.
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions[..2]).is_some());
+    assert!(IntersectionType::bounded_from_elements(db, &env, &exclusions).is_none());
+
+    // A narrowing factor prunes these alternatives before they can exhaust the budget,
+    // regardless of where it appears among the negated aliases.
+    let literal = Type::int_literal(5);
+    for position in 0..=exclusions.len() {
+        let mut elements = exclusions.clone();
+        elements.insert(position, literal);
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(literal)
+        );
+    }
+
+    // Double negation of a literal is also a narrowing factor, not a disjunction.
+    let excluded_literal = global_symbol(db, file, "ExcludedLiteral")
+        .place
+        .expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded_literal else {
+        anyhow::bail!("expected `ExcludedLiteral` to be a type alias");
+    };
+    exclusions.push(Type::TypeAlias(alias).negate(db, &env));
+    assert_eq!(
+        IntersectionType::bounded_from_elements(db, &env, exclusions),
+        Some(Type::LiteralValue(LiteralValueType::unpromotable(5)))
+    );
+
+    // A double negation introduces no alternatives and must not consume the first-union exemption.
+    let excluded = global_symbol(db, file, "Excluded").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = excluded else {
+        anyhow::bail!("expected `Excluded` to be a type alias");
+    };
+    let integer = Type::TypeAlias(alias).negate(db, &env);
+    let wide = UnionType::from_elements(db, &env, (1..=6).map(Type::int_literal));
+    for elements in [[integer, wide], [wide, integer]] {
+        assert_eq!(
+            IntersectionType::bounded_from_elements(db, &env, elements),
+            Some(wide)
+        );
+    }
+    Ok(())
+}
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
@@ -414,7 +616,7 @@ fn divergent_type() {
     );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
         let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union
         .recursive_type_normalized_impl(db, &env, div, false)
@@ -442,6 +644,204 @@ fn divergent_type() {
             .to_string(),
         "Never"
     );
+}
+
+#[test]
+fn pending_narrowing_intersections_are_order_independent() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    for elements in [[pending, recursive], [recursive, pending]] {
+        assert_eq!(
+            IntersectionType::from_elements(&db, &env, elements),
+            pending
+        );
+    }
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_positive(recursive)
+            .add_negative(pending)
+            .build(),
+        pending
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(pending)
+            .add_positive(recursive)
+            .build(),
+        pending
+    );
+}
+
+#[test]
+fn recursive_annotated_normalization() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+
+    let recursive = annotated(div);
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(list_of(div))).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(recursive).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, true),
+        None
+    );
+}
+
+#[test]
+fn recursive_annotated_relations() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+    let recursive = annotated(div);
+    let integer = annotated(KnownClass::Int.to_instance(&db, &env));
+    let object = annotated(Type::object());
+
+    for concrete in [integer, object, annotated(recursive)] {
+        assert!(concrete.is_assignable_to(&db, &env, recursive));
+        assert!(recursive.is_assignable_to(&db, &env, concrete));
+        assert!(!concrete.is_subtype_of(&db, &env, recursive));
+        assert!(!recursive.is_subtype_of(&db, &env, concrete));
+        assert!(!concrete.is_disjoint_from(&db, &env, recursive));
+        assert!(!recursive.is_disjoint_from(&db, &env, concrete));
+    }
+    assert!(!integer.is_assignable_to(&db, &env, object));
+    assert!(!object.is_assignable_to(&db, &env, integer));
+    assert!(integer.is_disjoint_from(&db, &env, object));
+    assert!(object.is_disjoint_from(&db, &env, integer));
+    assert!(!Type::int_literal(1).is_assignable_to(&db, &env, recursive));
+    assert!(!recursive.is_assignable_to(&db, &env, KnownClass::Int.to_instance(&db, &env)));
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db, &env);
+    let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+    let callable_returning =
+        |return_ty| Type::single_callable(&db, Signature::new(Parameters::empty(), return_ty));
+
+    // A constructor must retain a recursive reference even when a union also contains a
+    // resolved initializer. Otherwise, subsequent iterations can grow without a depth bound.
+    let approximation = UnionType::from_elements(
+        &db,
+        &env,
+        [
+            pending,
+            int,
+            recursive,
+            callable_returning(pending),
+            foreign,
+        ],
+    );
+    let normalized = normalize(approximation);
+    assert_eq!(
+        normalized,
+        UnionType::from_elements(&db, &env, [int, callable_returning(recursive), foreign])
+    );
+    assert!(
+        normalized
+            .as_union()
+            .is_some_and(|union| union.recursively_defined(&db) == RecursivelyDefined::No)
+    );
+
+    let unresolved = UnionType::from_elements(&db, &env, [pending, recursive]);
+    assert_eq!(normalize(unresolved), pending);
+
+    // Pending narrowing in an opaque bound invalidates the enclosing type argument.
+    let pending_typevar = BoundTypeVarInstance::synthetic_self(
+        &db,
+        pending,
+        BindingContext::Synthetic(env.program(&db)),
+    );
+    assert_eq!(
+        normalize(list_of(Type::TypeVar(pending_typevar))),
+        list_of(recursive)
+    );
+
+    // Metadata not rewritten by recursive normalization must not retain pending narrowing.
+    let typevar_object =
+        Type::KnownInstance(KnownInstanceType::TypeVar(pending_typevar.typevar(&db)));
+    assert_eq!(normalize(list_of(typevar_object)), recursive);
+}
+
+#[test]
+fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("/src/aliases.py", "type Constant[T] = int")?;
+    let env = db.program_environment();
+    let file = system_path_to_file(&db, "/src/aliases.py")?;
+    let file = ProgramFile::new(&db, file, env.program(&db));
+    let pending = Type::pending_narrowing();
+    let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let normalize =
+        |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
+    let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
+
+    // Stored arguments remain provisional even when the alias body does not use them.
+    // An alias does not itself establish recursive structure, but an enclosing constructor does.
+    let ty = global_symbol(&db, file, "Constant").place.expect_type();
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) = ty else {
+        anyhow::bail!("expected `Constant` to be a type alias");
+    };
+    let alias = Type::TypeAlias(
+        alias.apply_specialization(&db, |context| context.repeat_specialization(&db, pending)),
+    );
+    assert_eq!(normalize(alias), pending);
+    assert_eq!(normalize(list_of(alias)), list_of(recursive));
+    Ok(())
+}
+
+#[test]
+fn unrestricted_tuple_materialization_absorbs_divergent_approximations() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |tuple| KnownClass::List.to_specialized_instance(db, &env, &[tuple]);
+    let approximation = |element| list_of(Type::heterogeneous_tuple(db, &env, [element]));
+    let top = list_of(Type::homogeneous_tuple(db, &env, Type::any())).top_materialization(db, &env);
+
+    // This fixed top absorbs every exact-tuple approximation, including a marker nested
+    // more deeply in a later iteration. Removing the marker here therefore converges.
+    let first = approximation(div);
+    for candidate in [first, approximation(first)] {
+        assert_eq!(UnionType::from_elements(db, &env, [candidate, top]), top);
+        assert_eq!(UnionType::from_elements(db, &env, [top, candidate]), top);
+    }
+
+    // An unresolved marker is not itself an unrestricted gradual element type. Its
+    // homogeneous tuple must not acquire the same family as `tuple[Any, ...]`.
+    let divergent_top =
+        list_of(Type::homogeneous_tuple(db, &env, div)).top_materialization(db, &env);
+    let empty = list_of(Type::empty_tuple(db, &env));
+    assert!(!empty.is_subtype_of(db, &env, divergent_top));
+    assert!(!empty.is_redundant_with(db, &env, divergent_top));
 }
 
 #[test]
@@ -530,88 +930,73 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     let env = db.program_environment();
     let covariant = get_type_alias(db, "CovariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant))
+            .variance_of(db, &env, get_bound_typevar(db, covariant))
+            .evaluate(db),
         TypeVarVariance::Covariant
     );
 
     let contravariant = get_type_alias(db, "ContravariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant))
+            .variance_of(db, &env, get_bound_typevar(db, contravariant))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let invariant = get_type_alias(db, "InvariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant))
+            .variance_of(db, &env, get_bound_typevar(db, invariant))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 
     let bivariant = get_type_alias(db, "BivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
+            .variance_of(db, &env, get_bound_typevar(db, bivariant))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let covariant_alias = get_type_alias(db, "CovariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, covariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, covariant_alias))
+            .evaluate(db),
         TypeVarVariance::Covariant
     );
 
     let contravariant_alias = get_type_alias(db, "ContravariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, contravariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, contravariant_alias))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let invariant_alias = get_type_alias(db, "InvariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, invariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, invariant_alias))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 
     let bivariant_alias = get_type_alias(db, "BivariantAliasAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, bivariant_alias)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias))
+            .variance_of(db, &env, get_bound_typevar(db, bivariant_alias))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let paramspec_contravariant = get_type_alias(db, "ParamSpecContravariantAlias");
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_contravariant))
-            .variance_of(db, &env, get_bound_typevar(db, paramspec_contravariant)),
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_contravariant))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
@@ -622,47 +1007,40 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
                 db,
                 &env,
                 get_bound_typevar(db, paramspec_default_contravariant)
-            ),
+            )
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let paramspec_concatenate = get_type_alias(db, "ParamSpecConcatenateAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_concatenate)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_concatenate))
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_concatenate))
+            .evaluate(db),
         TypeVarVariance::Contravariant
     );
 
     let paramspec_bivariant = get_type_alias(db, "ParamSpecBivariantAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, paramspec_bivariant)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(paramspec_bivariant))
+            .variance_of(db, &env, get_bound_typevar(db, paramspec_bivariant))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let recursive = get_type_alias(db, "RecursiveAlias");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive))
+            .variance_of(db, &env, get_bound_typevar(db, recursive))
+            .evaluate(db),
         TypeVarVariance::Bivariant
     );
 
     let recursive2 = get_type_alias(db, "RecursiveAlias2");
     assert_eq!(
-        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2)).variance_of(
-            db,
-            &env,
-            get_bound_typevar(db, recursive2)
-        ),
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(recursive2))
+            .variance_of(db, &env, get_bound_typevar(db, recursive2))
+            .evaluate(db),
         TypeVarVariance::Invariant
     );
 

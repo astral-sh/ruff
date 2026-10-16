@@ -13,6 +13,29 @@ use crate::types::{
     TypeMapping,
 };
 
+impl<'db> CallableBinding<'db> {
+    pub(crate) fn typing_self_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.bound_type.map(|bound_type| match self.signature_type {
+            Type::BoundMethod(method) => method.typing_self_type(db),
+            _ => bound_type,
+        })
+    }
+
+    pub(crate) fn bind_unused_self(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) {
+        for overload in &mut self.overloads {
+            if let Some(signature) = overload.signature.bind_unused_self(db, env, self_type) {
+                overload.signature = signature;
+                overload.return_ty = overload.initial_return_type(db);
+            }
+        }
+    }
+}
+
 /// Bindings for a constructor call.
 ///
 /// The `entry` is the first-called constructor method (could be a metaclass `__call__`, a
@@ -82,7 +105,17 @@ impl<'db> ConstructorBinding<'db> {
             return;
         };
         let generic_context = specialization.generic_context(db);
-        if generic_context_has_paramspec(db, generic_context)
+        // A constructor can use a class specialization reached through a fixed TypeVar's domain
+        // without owning that class's type variables. Only a context inherited by the constructor
+        // signature is eligible for freshening.
+        let owns_generic_context = self.entry.overloads.iter().any(|overload| {
+            overload
+                .signature
+                .generic_context
+                .is_some_and(|owned| generic_context.is_subset_of(db, owned))
+        });
+        if !owns_generic_context
+            || generic_context_has_paramspec(db, generic_context)
             || !nonce_generator.should_freshen(db, generic_context)
         {
             return;
@@ -95,10 +128,6 @@ impl<'db> ConstructorBinding<'db> {
         };
         let fresh_instance_type =
             instance_type.apply_type_mapping(db, env, &type_mapping, TypeContext::default());
-        // Only freshen a generic context that belongs to the constructed instance itself.
-        // `class_specialization` can also find a context through a class-object type variable's
-        // bound, but freshening that context would detach the constructor parameters from the
-        // receiver.
         if fresh_instance_type == instance_type {
             return;
         }
@@ -127,11 +156,29 @@ impl<'db> ConstructorBinding<'db> {
             bound_type.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
         });
         for overload in &mut self.entry.overloads {
+            // The constructor's `Self` bound must use the same fresh class type variables as
+            // its receiver. Include only `Self` variables owned by this signature, so a caller's
+            // `Self` used as an explicit class type argument retains its original bound.
+            let signature_context = GenericContext::from_typevar_instances(
+                db,
+                env,
+                generic_context.variables(db).chain(
+                    overload
+                        .signature
+                        .generic_context
+                        .into_iter()
+                        .flat_map(|context| context.variables(db))
+                        .filter(|typevar| typevar.typevar(db).is_self(db)),
+                ),
+            );
             overload.signature = overload.signature.apply_type_mapping_impl(
                 db,
-                &type_mapping,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context: signature_context,
+                    delta,
+                },
                 TypeContext::default(),
-                &visitor,
+                &ApplyTypeMappingVisitor::new(env),
             );
             overload.set_constructor_context(db, constructor_context);
         }
@@ -398,7 +445,7 @@ impl<'db> ConstructorBinding<'db> {
             let self_parameter_specialization = static_class_literal.and_then(|lit| {
                 let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
                 let resolved_self_param_ty = overload
-                    .specialization(db)
+                    .merged_specialization(db)
                     .map_or(self_param_ty, |specialization| {
                         self_param_ty.apply_specialization(db, specialization)
                     });
@@ -412,7 +459,7 @@ impl<'db> ConstructorBinding<'db> {
                         .copied()
                         .map(|mapped_ty| {
                             let without_unknown =
-                                mapped_ty.filter_union(db, |element| !element.is_unknown());
+                                mapped_ty.filter_union(db, env, |element| !element.is_unknown());
                             let mapped_ty = if without_unknown.is_never() {
                                 mapped_ty
                             } else {
@@ -434,7 +481,11 @@ impl<'db> ConstructorBinding<'db> {
             } else {
                 refined_self_parameter_specialization
                     .or(return_specialization)
-                    .or_else(|| overload.specialization(db)?.restrict(db, class_context))
+                    .or_else(|| {
+                        overload
+                            .merged_specialization(db)?
+                            .restrict(db, class_context)
+                    })
             };
             // end TODO
 
@@ -561,7 +612,7 @@ impl<'db> ConstructorBinding<'db> {
             .unspecialized_return_type(db)
             .apply_optional_specialization(
                 db,
-                overload.specialization(db).map(|specialization| {
+                overload.merged_specialization(db).map(|specialization| {
                     self.unspecialize_class_type_variables(db, env, specialization)
                 }),
             );

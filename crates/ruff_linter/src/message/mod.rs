@@ -50,9 +50,10 @@ pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagn
         match backtrace.status() {
             BacktraceStatus::Disabled => {
                 diagnostic.sub(SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
-                        ));
+                    SubDiagnosticSeverity::Info,
+                    "run with `RUST_BACKTRACE=1` environment variable \
+                    to show the full backtrace information",
+                ));
             }
             BacktraceStatus::Captured => {
                 diagnostic.sub(SubDiagnostic::new(
@@ -124,7 +125,9 @@ where
         diagnostic.set_noqa_offset(noqa_offset);
     }
 
-    diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+    if let Some(code) = rule.noqa_code() {
+        diagnostic.set_secondary_code(SecondaryCode::new(code.to_string()));
+    }
     diagnostic.set_documentation_url(rule.url());
 
     diagnostic

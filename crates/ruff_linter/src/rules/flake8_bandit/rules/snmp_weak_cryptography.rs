@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the SNMPv3 protocol without encryption.
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-319](https://cwe.mitre.org/data/definitions/319.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Security)]
 pub(crate) struct SnmpWeakCryptography;
 
 impl Violation for SnmpWeakCryptography {

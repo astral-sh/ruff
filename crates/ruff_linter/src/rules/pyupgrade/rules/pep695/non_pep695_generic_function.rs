@@ -6,6 +6,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -84,7 +85,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }

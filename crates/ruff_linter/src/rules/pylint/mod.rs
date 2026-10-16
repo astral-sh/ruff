@@ -244,7 +244,7 @@ mod tests {
     #[test_case(Rule::LenTest, Path::new("len_as_condition.py"))]
     #[test_case(Rule::MissingMaxsplitArg, Path::new("missing_maxsplit_arg.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pylint").join(path).as_path(),
             &LinterSettings {
@@ -266,11 +266,7 @@ mod tests {
         Path::new("useless_exception_statement.py")
     )]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 
         assert_diagnostics_diff!(
             snapshot,
@@ -289,6 +285,17 @@ mod tests {
                 .with_target_version(PythonVersion::PY37),
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn continue_in_finally_python_38() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &LinterSettings::for_rule(Rule::ContinueInFinally)
+                .with_target_version(PythonVersion::PY38),
+        )?;
+        assert!(diagnostics.is_empty());
         Ok(())
     }
 

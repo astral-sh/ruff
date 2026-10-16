@@ -25,19 +25,19 @@ expression: suite
                                                 ExprCompare {
                                                     node_index: NodeIndex(None),
                                                     range: 3..9,
-                                                    left: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            node_index: NodeIndex(None),
-                                                            range: 3..4,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
                                                     ops: [
                                                         NotEq,
                                                     ],
-                                                    comparators: [
+                                                    operands: [
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                node_index: NodeIndex(None),
+                                                                range: 3..4,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),

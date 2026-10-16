@@ -73,14 +73,15 @@ For example, to run `ruff check --select B ./src` using Ruff version `0.8.0`:
 
 ## GitLab CI/CD
 
-You can add the following configuration to `.gitlab-ci.yml` to run a `ruff format` in parallel with a `ruff check` compatible with GitLab's codequality report.
+Add the following configuration to `.gitlab-ci.yml` to run `ruff format` in parallel with
+`ruff check`, which produces a report compatible with GitLab's code quality report.
 
 ```yaml
 .base_ruff:
   stage: build
   interruptible: true
   image:
-    name: ghcr.io/astral-sh/ruff:0.16.1-alpine
+    name: ghcr.io/astral-sh/ruff:0.17.1-alpine
   before_script:
     - cd $CI_PROJECT_DIR
     - ruff --version
@@ -106,7 +107,7 @@ Ruff can be used as a [pre-commit](https://pre-commit.com) hook via [`ruff-pre-c
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.16.1
+  rev: v0.17.1
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -119,7 +120,7 @@ To enable lint fixes, add the `--fix` argument to the lint hook:
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.16.1
+  rev: v0.17.1
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -133,7 +134,7 @@ To avoid running on Jupyter Notebooks, remove `jupyter` from the list of allowed
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.16.1
+  rev: v0.17.1
   hooks:
     # Run the linter.
     - id: ruff-check

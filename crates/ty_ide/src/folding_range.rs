@@ -700,11 +700,10 @@ impl<'a> SourceOrderVisitor<'a> for FoldingRangeVisitor<'a> {
             AnyNodeRef::ExprList(_) | AnyNodeRef::ExprListComp(_) | AnyNodeRef::TypeParams(_) => {
                 self.add_delimited_expression_range(node.range(), BRACKETS);
             }
-            AnyNodeRef::ExprTuple(tuple)
-                // Only fold parenthesized tuples.
-                if tuple.parenthesized => {
-                    self.add_delimited_expression_range(node.range(), PARENTHESES);
-                }
+            // Only fold parenthesized tuples.
+            AnyNodeRef::ExprTuple(tuple) if tuple.parenthesized => {
+                self.add_delimited_expression_range(node.range(), PARENTHESES);
+            }
             AnyNodeRef::ExprDict(_)
             | AnyNodeRef::ExprSet(_)
             | AnyNodeRef::ExprSetComp(_)

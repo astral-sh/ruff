@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::preview::is_up006_future_annotations_fix_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
@@ -62,7 +63,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [PEP 585]: https://peps.python.org/pep-0585/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
 pub(crate) struct NonPEP585Annotation {
     from: String,
     to: String,

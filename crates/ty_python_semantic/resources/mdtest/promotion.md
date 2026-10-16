@@ -99,6 +99,22 @@ reveal_type((1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
 ```
 
+## Callable defaults are not promoted
+
+Promoting a callable as a collection element does not change its default values. This applies both
+to defaults on the source function and to values supplied by keyword to `functools.partial`.
+
+```py
+from functools import partial
+
+def f(x: int = 5, *, y: int) -> int:
+    return x + y
+
+bound = partial(f, y=7)
+reveal_type(bound)  # revealed: partial[(x: int = 5, *, y: int = 7) -> int]
+reveal_type([bound])  # revealed: list[partial[(x: int = 5, *, y: int = 7) -> int]]
+```
+
 ## Unions of homogeneous, fixed-length tuples can be promoted to a single variadic tuple
 
 This type of promotion applies specifically when a collection literal contains at least two tuple
@@ -290,13 +306,169 @@ segments: Mapping[str, Any] = {"start": (1, 2), "end": (3, 4, 5)}
 reveal_type(segments)  # revealed: dict[str, tuple[int, ...]]
 ```
 
+## Non-tuple elements do not block tuple-size promotion
+
+A non-literal tuple blocks tuple-size promotion because its shape must be preserved. A tuple nested
+inside a non-tuple element's type arguments does not:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Box[T]: ...
+
+def _(box: Box[tuple[int, str]]) -> None:
+    # revealed: list[Box[tuple[int, str]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), box])
+```
+
+A tuple in a callable's return type does not prevent promotion either:
+
+```py
+from collections.abc import Callable
+
+def _(callback: Callable[[], tuple[int, str]]) -> None:
+    # revealed: list[(() -> tuple[int, str]) | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), callback])
+```
+
+Protocol members can also contain tuples without blocking promotion:
+
+```py
+from typing import Protocol
+
+class Proto(Protocol):
+    pair: tuple[int, str]
+
+def _(protocol: Proto) -> None:
+    reveal_type([(1,), (1, 2), protocol])  # revealed: list[Proto | tuple[int, ...]]
+```
+
+The same applies to `TypedDict` fields:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    pair: tuple[int, str]
+
+def _(payload: Payload) -> None:
+    reveal_type([(1,), (1, 2), payload])  # revealed: list[Payload | tuple[int, ...]]
+```
+
+## Recursive members do not block tuple-size promotion
+
+Tuple-valued and recursive protocol members do not prevent neighboring tuple literals from being
+promoted:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Recursive[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Recursive[int] | tuple[int, ...]]
+```
+
+The same applies to recursive `TypedDict` fields:
+
+```py
+from typing import TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+    pair: tuple[int, str]
+
+def _(x: Payload[int]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[Payload[int] | tuple[int, ...]]
+```
+
+## Type parameter declarations do not block tuple-size promotion
+
+A class parameter's bound or default does not describe the shape of instances of that class. A tuple
+in either declaration does not prevent promotion of neighboring tuple literals.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", bound=int | tuple[int, str])
+
+class Bounded(Generic[T]): ...
+
+def _(x: Bounded[int]) -> None:
+    # revealed: list[Bounded[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+The supplied type argument also takes precedence over a default:
+
+```py
+U = TypeVar("U", default=tuple[int, str])
+
+class Defaulted(Generic[U]): ...
+
+def _(x: Defaulted[int]) -> None:
+    # revealed: list[Defaulted[int] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
+A default also does not fix the type of a value annotated with the type variable:
+
+```py
+def _(x: U) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[U@_ | tuple[int, ...]]
+```
+
+## Tuple-size promotion uses alias values
+
+Tuple-size promotion inspects alias values. `Alias[Alias[str]]` resolves to `str`, so it does not
+block promotion:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias[T] = T
+
+def _(x: Alias[Alias[str]]) -> None:
+    reveal_type([(1,), (1, 2), x])  # revealed: list[str | tuple[int, ...]]
+```
+
+Even a recursively specialized alias permits promotion when its value is a `list`:
+
+```py
+type Recursive[T] = list[Recursive[list[T]]]
+
+def _(x: Recursive[int]) -> None:
+    # revealed: list[list[Recursive[list[int]]] | tuple[int, ...]]
+    reveal_type([(1,), (1, 2), x])
+```
+
 ## Invariant and contravariant return types are promoted
 
 We promote in non-covariant position in the return type of a generic function, or constructor of a
 generic class:
 
 ```py
-from typing import Callable, Literal
+from typing import Callable, Literal, Any
 
 class Bivariant[T]:
     def __init__(self, value: T): ...
@@ -351,6 +523,61 @@ reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Cova
 
 reveal_type(f12(1))  # revealed: ((int, /) -> bool) | None
 reveal_type(f13(1))  # revealed: ((bool, /) -> Invariant[int]) | None
+```
+
+This also works if the type variable is nested inside a union:
+
+```py
+def f14[T](x: T) -> Covariant[T | None]:
+    raise NotImplementedError
+
+def f15[T](x: T) -> Contravariant[T | None]:
+    raise NotImplementedError
+
+def f16[T](x: T) -> Invariant[T | None]:
+    raise NotImplementedError
+
+reveal_type(f14(1))  # revealed: Covariant[Literal[1] | None]
+reveal_type(f15(1))  # revealed: Contravariant[int | None]
+reveal_type(f16(1))  # revealed: Invariant[int | None]
+```
+
+And similarly if the type variable is nested in an intersection (note that negation flips variance):
+
+```py
+from ty_extensions import Intersection, Not
+
+def f17[T](x: T) -> Covariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+def f18[T](x: T) -> Covariant[Intersection[Any, Not[T]]]:
+    raise NotImplementedError
+
+def f19[T](x: T) -> Invariant[Intersection[Any, T]]:
+    raise NotImplementedError
+
+reveal_type(f17(1))  # revealed: Covariant[Any & Literal[1]]
+reveal_type(f18(1))  # revealed: Covariant[Any & ~int]
+reveal_type(f19(1))  # revealed: Invariant[Any & int]
+```
+
+We also promote a callable's return type, if the whole callable is in invariant position:
+
+```py
+def f20[T](x: T) -> Invariant[Callable[[], T]]:
+    raise NotImplementedError
+
+reveal_type(f20(1))  # revealed: Invariant[() -> int]
+```
+
+When the same nested type occurs in both covariant and contravariant positions, both occurrences
+contribute to promotion:
+
+```py
+def f21[T](x: T) -> tuple[Covariant[T | None], Contravariant[T | None]]:
+    raise NotImplementedError
+
+reveal_type(f21(1))  # revealed: tuple[Covariant[int | None], Contravariant[int | None]]
 ```
 
 ## Promotion is recursive
@@ -635,6 +862,21 @@ def i[T: Literal[1] | str](x: T) -> list[T]:
 
 reveal_type(i("a"))  # revealed: list[str]
 reveal_type(i(1))  # revealed: list[Literal[1]]
+```
+
+## Promotion respects inferred upper bounds
+
+Promotion must not select a solution that violates its inferred upper bound.
+
+```py
+from typing import Callable
+
+def f[T](value: T, upper: Callable[[T], None]) -> list[T]:
+    return [value]
+
+def _(upper: Callable[[int], None]):
+    # error: [invalid-argument-type]
+    reveal_type(f("x", upper))  # revealed: list[str | int]
 ```
 
 ## Literal annotations from declaration are respected

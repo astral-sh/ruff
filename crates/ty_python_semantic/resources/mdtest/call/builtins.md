@@ -381,10 +381,11 @@ def accepts_truthy_constrained_typevar(x: T_constrained_a_b) -> bool:
     if isinstance(x, (A, B)):
         return True
 
-RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])
-RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])
-RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])
-RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])
+# Invalid alias cycles still recover the non-recursive members for narrowing.
+RecursiveA = TypeAliasType("RecursiveA", Union[A, "RecursiveB"])  # error: [cyclic-type-alias-definition]
+RecursiveB = TypeAliasType("RecursiveB", Union[B, "RecursiveA"])  # error: [cyclic-type-alias-definition]
+RecursivePartialA = TypeAliasType("RecursivePartialA", Union[A, "RecursivePartialB"])  # error: [cyclic-type-alias-definition]
+RecursivePartialB = TypeAliasType("RecursivePartialB", Union[bytes, "RecursivePartialA"])  # error: [cyclic-type-alias-definition]
 
 def accepts_mutually_recursive_alias(x: RecursiveA) -> bool:
     reveal_type(isinstance(x, (A, B)))  # revealed: Literal[True]
@@ -400,10 +401,9 @@ def partial_mutually_recursive_alias(x: RecursivePartialA) -> bool:  # error: [i
 ## Generic builtins should not overfit upper-bound-only callback constraints
 
 These examples are minimized from ecosystem regressions seen while preserving explicit `Never` and
-`object` bounds through the constraint solver. The current solver picks callback parameter upper
-bounds as concrete solutions when the iterable argument is otherwise unknown. That overfits the
-result to `Sized` or `object`; ideally the element type would remain `Unknown`, while the callable
-return type would still be used where possible.
+`object` bounds through the constraint solver. Callback parameter upper bounds should not overfit
+the result when the iterable argument is otherwise unknown. The callable return type should still be
+used where possible.
 
 ```py
 from ty_extensions._internal import Unknown
@@ -412,12 +412,9 @@ def _(xs: Unknown):
     # TODO: should be `list[Unknown]`
     reveal_type(sorted(xs, key=len))  # revealed: list[Sized]
 
-    # TODO: should be `map[str]`
-    reveal_type(map("{}".format, xs))  # revealed: map[object]
+    reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    # TODO: should not emit an error and should reveal `str`
-    # error: [no-matching-overload]
-    reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
+    reveal_type("".join(map("{}".format, xs)))  # revealed: str
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -460,6 +457,14 @@ error[call-non-callable]: `NotImplemented` is not callable
   |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
+  |
+2 |     # snapshot: call-non-callable
+  -     raise NotImplemented()
+3 +     raise NotImplementedError()
+4 | def _():
+  |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```py
@@ -474,6 +479,33 @@ error[call-non-callable]: `NotImplemented` is not callable
   |
 6 |     raise NotImplemented("this module is not implemented yet!!!")
   |           --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |           |
+  |           Did you mean `NotImplementedError`?
+help: Use `NotImplementedError` instead
+  |
+5 |     # snapshot: call-non-callable
+  -     raise NotImplemented("this module is not implemented yet!!!")
+6 +     raise NotImplementedError("this module is not implemented yet!!!")
+7 | def _(NotImplementedError: object):
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+When a local binding shadows `NotImplementedError`, replacing `NotImplemented` with that name would
+not necessarily produce an exception, so we omit the fix.
+
+```py
+def _(NotImplementedError: object):
+    # snapshot: call-non-callable
+    raise NotImplemented()
+```
+
+```snapshot
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:9:11
+  |
+9 |     raise NotImplemented()
+  |           --------------^^
   |           |
   |           Did you mean `NotImplementedError`?
 ```
@@ -510,6 +542,18 @@ class Function:
 # error: [invalid-argument-type]
 for function in map(Function, [object()]):
     function()
+```
+
+## Constructing a dictionary from gradual-length tuples
+
+Each tuple supplied to `dict` must contain two elements. A gradual tuple can materialize to that
+length, and so its element type supplies both the key and value types.
+
+```py
+from typing import Any
+
+def _(values: list[tuple[Any, ...]]):
+    reveal_type(dict(values))  # revealed: dict[Any, Any]
 ```
 
 ## Failed `dict` calls do not expose internal type variables
@@ -549,6 +593,88 @@ def clean(value: dict[str, int] | str | None) -> None:
         value = dict(value)  # error: [no-matching-overload]
         for key, item in value.items():
             value[key] = item
+```
+
+## `dict` keyword arguments with a shadowed `typing` module
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+An empty first-party `typing` module hides the definitions that make `dict` generic. Calls with one
+or more named keyword arguments still check their values and recover with `Unknown`, just like
+dictionary literals.
+
+`typing.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+reveal_type(dict(a=1))  # revealed: Unknown
+reveal_type(dict(a=1, b=2))  # revealed: Unknown
+reveal_type({"a": 1})  # revealed: Unknown
+
+# error: [unresolved-reference]
+dict(a=1, b=missing)
+```
+
+## Empty `dict` calls with a non-generic stub
+
+An empty call to a non-generic dictionary class is rejected if its constructor requires an argument.
+
+```toml
+[environment]
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class int: ...
+
+class dict:
+    def __init__(self, value: int) -> None: ...
+```
+
+```py
+dict(1)
+
+dict()  # error: [missing-argument] "No argument provided for required parameter `value`"
+```
+
+## `dict` keyword arguments that violate a type variable bound
+
+A custom typeshed can constrain dictionary values. A value that violates the bound is rejected, and
+later keyword values are still checked.
+
+```toml
+[environment]
+python-version = "3.12"
+typeshed = "/typeshed"
+```
+
+`/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class str: ...
+class int: ...
+
+class dict[K, V: int]:
+    def __init__(self, **kwargs: V) -> None: ...
+```
+
+```py
+dict(a=1)
+
+# error: [invalid-argument-type] "does not satisfy upper bound `int`"
+# error: [unresolved-reference]
+dict(a="oops", b=missing)
 ```
 
 ## Failed inner `OrderedDict` calls do not invalidate outer constructors

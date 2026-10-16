@@ -3,6 +3,8 @@
 
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from enum import Enum
+from fractions import Fraction
 from ipaddress import (
     IPv4Address,
     IPv4Interface,
@@ -15,14 +17,14 @@ from pathlib import Path
 from re import Pattern
 from uuid import UUID
 
-type LaxBool = bool | float | int | str | Decimal
+type LaxBool = bool | bytes | float | int | str | Decimal
 type LaxBytes = bytearray | bytes | str
 type LaxByteSize = float | int | str | Decimal
 type LaxDate = bytes | date | datetime | float | int | str | Decimal
 type LaxDatetime = bytes | date | datetime | float | int | str | Decimal
 type LaxDecimal = float | int | str | Decimal
-type LaxFloat = bool | bytes | float | int | str | Decimal
-type LaxInt = bool | bytes | float | int | str | Decimal
+type LaxFloat = bool | bytes | float | int | str | Decimal | Fraction
+type LaxInt = bool | bytes | float | int | str | Decimal | Enum | Fraction
 type LaxIPv4Address = bytes | int | str | IPv4Address | IPv4Interface
 type LaxIPv4Interface = (
     bytes | int | str | tuple[object, object] | IPv4Address | IPv4Interface
@@ -36,7 +38,7 @@ type LaxIPv6Network = bytes | int | str | IPv6Address | IPv6Interface | IPv6Netw
 type LaxPath = str | Path
 type LaxStrPattern = str | Pattern[str]
 type LaxBytesPattern = bytes | Pattern[bytes]
-type LaxStr = bytearray | bytes | str
+type LaxStr = bytearray | bytes | str | Enum
 type LaxTime = bytes | float | int | str | time | Decimal
 type LaxTimedelta = bytes | float | int | str | timedelta | Decimal
 type LaxUUID = str | UUID
