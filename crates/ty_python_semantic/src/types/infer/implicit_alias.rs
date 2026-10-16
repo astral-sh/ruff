@@ -7,13 +7,72 @@ use ruff_python_ast::{self as ast, visitor as ast_visitor};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::{place_table, semantic_index};
 
+use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
-    binding_type,
+    any_over_type, binding_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
+
+/// Resolve an imported alias only when it has one reachable source definition.
+///
+/// Runtime lookup can merge identical types from several definitions and retain one definition's
+/// provenance. Alias interpretation needs the full set of definitions to preserve ambiguity.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn imported_alias_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Definition<'db>> {
+    let table = place_table(db, definition.scope(db));
+    let symbol = table.symbol(definition.place(db).as_symbol()?);
+    let definitions = resolve_definition(
+        db,
+        &ProgramEnvironment::from_definition(definition),
+        definition,
+        Some(symbol.name().as_str()),
+        ImportAliasResolution::ResolveAliases,
+    );
+    let [resolved] = definitions.as_slice() else {
+        return None;
+    };
+    resolved.definition()
+}
+
+/// Whether an assignment's right-hand side has syntax considered for implicit alias inference.
+/// The assignment context and type-expression validity are checked separately.
+pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
+    matches!(
+        value,
+        ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::StringLiteral(_)
+    )
+}
+
+/// Whether interpreting a value as an alias can reveal additional recursive references.
+/// Value inference uses this to decide whether to retain inputs for later alias inference.
+pub(super) fn may_require_implicit_alias_inference<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    any_over_type(db, env, ty, false, |ty| {
+        matches!(
+            ty,
+            Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
+                )
+        )
+    })
+}
 
 /// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
 ///

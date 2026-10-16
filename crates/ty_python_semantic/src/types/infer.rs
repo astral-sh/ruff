@@ -64,6 +64,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
+use alias_inputs::{AliasInferenceCache, AliasInferenceInputs, AliasInferenceInputsBuilder};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -73,6 +74,7 @@ use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
+mod alias_inputs;
 mod builder;
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
@@ -110,8 +112,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
-            diagnostics: TypeCheckDiagnostics::default(),
-            implicit_aliases: Box::default(),
+            extra: None,
         }
     },
     cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
@@ -134,8 +135,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return ImplicitAliasInference {
             ty: Ok(Type::unknown()),
-            diagnostics: TypeCheckDiagnostics::default(),
-            implicit_aliases: Box::default(),
+            extra: None,
         };
     };
     let index = semantic_index(db, program_file);
@@ -160,6 +160,12 @@ pub(super) fn infer_implicit_alias_type<'db>(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAliasInference<'db> {
     pub(super) ty: ImplicitAliasResult<'db>,
+    pub(super) extra: Option<Box<ImplicitAliasInferenceExtra<'db>>>,
+}
+
+/// Diagnostics and referenced aliases, which are absent from most alias inference results.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ImplicitAliasInferenceExtra<'db> {
     pub(super) diagnostics: TypeCheckDiagnostics,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }
@@ -1461,6 +1467,8 @@ impl<'db> DefinitionTypes<'db> {
 /// `Other` stores uncommon combinations that require multiple fields.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
+    AliasInputs(Box<AliasInferenceInputs<'db>>),
+
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
 
@@ -1493,6 +1501,8 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
@@ -1542,6 +1552,10 @@ struct OtherDefinitionInferenceExtra<'db> {
 impl<'db> DefinitionInferenceExtra<'db> {
     fn into_other(self) -> OtherDefinitionInferenceExtra<'db> {
         match self {
+            Self::AliasInputs(alias_inputs) => OtherDefinitionInferenceExtra {
+                alias_inputs: Some(alias_inputs),
+                ..OtherDefinitionInferenceExtra::default()
+            },
             Self::Qualifiers(qualifiers) => OtherDefinitionInferenceExtra {
                 qualifiers,
                 ..OtherDefinitionInferenceExtra::default()
@@ -1605,6 +1619,22 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    fn alias_inputs(&self) -> Option<&AliasInferenceInputs<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::AliasInputs(inputs)) => Some(inputs),
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.alias_inputs.as_deref(),
+            _ => None,
+        }
+    }
+
+    fn alias_inputs_mut(&mut self) -> Option<&mut AliasInferenceInputs<'db>> {
+        match self.extra.as_deref_mut() {
+            Some(DefinitionInferenceExtra::AliasInputs(inputs)) => Some(inputs),
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.alias_inputs.as_deref_mut(),
+            _ => None,
+        }
+    }
+
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1696,6 +1726,10 @@ impl<'db> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, &env, previous_inference);
+        }
+
+        if let Some(inputs) = self.alias_inputs_mut() {
+            inputs.normalize_cycle(db, &env, previous_inference.alias_inputs(), cycle);
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -1973,6 +2007,15 @@ fn widen_comparison_truthiness(
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
+    /// Name and attribute resolutions retained from value inference for later
+    /// type-expression inference of an alias, including source definitions and
+    /// lookup contexts. Also records when runtime operand types in `expressions`
+    /// can be reused.
+    ///
+    /// Kept separate from `extra` so regions with only alias inputs do not need
+    /// to allocate the larger `ExpressionInferenceExtra` struct.
+    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
+
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -2047,6 +2090,7 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            alias_inputs: None,
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
@@ -2081,6 +2125,10 @@ impl<'db> ExpressionInference<'db> {
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, env, previous);
+        }
+
+        if let Some(inputs) = &mut self.alias_inputs {
+            inputs.normalize_cycle(db, env, previous.alias_inputs.as_deref(), cycle);
         }
 
         for (expr, ty) in &mut self.expressions {

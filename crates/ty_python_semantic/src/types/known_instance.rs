@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use smallvec::SmallVec;
 
 use crate::{
     Db, DisplaySettings,
@@ -8,7 +9,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        TypeMapping, TypeVarNonce, UnionBuilder, UnionType, VarianceTerm,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -867,11 +868,11 @@ impl<'db> UnionTypeInstance<'db> {
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
         let env = ProgramEnvironment::from_scope(scope_id);
-        let mut builder = UnionBuilder::new(db, &env);
+        let mut elements = SmallVec::<[Type<'db>; 2]>::new();
         for ty in &value_expr_types {
             match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
             {
-                Ok(ty) => builder.add_in_place(ty),
+                Ok(ty) => elements.push(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
@@ -880,7 +881,7 @@ impl<'db> UnionTypeInstance<'db> {
             }
         }
 
-        let union_type = builder.build();
+        let union_type = UnionType::from_type_expression_elements(db, &env, elements, true);
 
         // `A | B | B` is the same runtime union value as `A | B`. Reuse the existing union
         // instance when its semantic union already contains the new operand, rather than storing

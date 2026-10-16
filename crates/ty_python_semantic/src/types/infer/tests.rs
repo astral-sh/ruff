@@ -574,6 +574,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     let inference = |ty, truthiness: Option<Truthiness>| {
         (
             ExpressionInference {
+                alias_inputs: None,
                 expressions: [(expression, ty)].into_iter().collect(),
                 extra: truthiness.map(|truthiness| {
                     Box::new(ExpressionInferenceExtra {
