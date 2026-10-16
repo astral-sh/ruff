@@ -184,6 +184,8 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
                 (!elements.is_empty())
                     .then(|| UnionType::from_elements_leave_aliases(db, self.env, elements))
             }
+            // Unlike union alternatives, intersection operands cannot be recovered independently.
+            Type::Intersection(_) if ty.has_unguarded_alias_cycle(db, self.env) => None,
             _ => Some(ty),
         }
     }

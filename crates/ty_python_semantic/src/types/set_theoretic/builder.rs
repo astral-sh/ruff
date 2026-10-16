@@ -1463,12 +1463,17 @@ impl<'a, 'db, L: IntersectionLimits>
         state: (&'a mut IntersectionBuilder<'db>, bool),
         _visit_body: impl FnOnce((&'a mut IntersectionBuilder<'db>, bool)) -> Self::Output,
     ) -> Self::Output {
+        let (builder, negative) = state;
+        if negative && ty.has_unguarded_alias_cycle(db, &builder.env) {
+            // Negating a circular alias's recovery type erases its recursive reference. Later
+            // inference iterations can then keep growing its specialization instead of converging.
+            return self.visit(db, traversal, ty, (builder, negative));
+        }
         // Distributing one more layer of a growing union changes the representation on every
         // intersection. Preserve its constructor so repeated bound combinations can converge.
         let (elements, recursively_defined) =
             expand_union_elements(db, ty, traversal.mapping_visitor(), true, false, true);
         let expanded = UnionType::from_elements_structural(db, elements, recursively_defined);
-        let (builder, negative) = state;
         // Preserve negated aliases after simplifying their bodies. Positive atomic bodies also
         // retain their outer reference when they contain nested references, so comparisons and
         // inference can recognize repeated expansions.

@@ -558,6 +558,32 @@ def convert(value: Nested[int]) -> Nested[str]:
     return value
 ```
 
+## Circular aliases through negation
+
+Negation does not make a circular alias valid. The reference to `A` is outside the `list` used as
+its type argument, so we reject this definition.
+
+```py
+from ty_extensions import Not
+
+# error: [cyclic-type-alias-definition]
+type A[T] = T | Not[A[list[T]]]
+```
+
+The same applies when an intersection combines positive and negative references with different type
+arguments. After reporting the circular definition, we can still check assignments involving the
+alias.
+
+```py
+from ty_extensions import Intersection
+
+# error: [cyclic-type-alias-definition]
+type Both[T] = Intersection[Both[list[T]], Not[Both[tuple[T]]]]
+
+def convert(value: Both[int]) -> Both[str]:
+    return value  # no diagnostic
+```
+
 ## Excluding a recursive alias from a list
 
 `Without[A]` describes a list that is not an `A`. Since `list[Any]` is gradual, its `Any` can stand
