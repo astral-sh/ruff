@@ -1316,7 +1316,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
-    preserve_aliases: bool,
+    preserve_positive_aliases: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1326,17 +1326,23 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
-            preserve_aliases: false,
+            preserve_positive_aliases: false,
         }
     }
 
-    /// Retain aliases when rebuilding mapped intersections.
+    /// Retain positive aliases when rebuilding mapped intersections.
+    ///
+    /// A positive alias can represent a type on its own, while `~A` is represented as an
+    /// intersection with `A` as a negative element. Negative aliases that survive simplification
+    /// are retained by default to preserve recursive self-references. Positive aliases are unfolded
+    /// by default to preserve existing intersection normalization.
     ///
     /// Unfolding aliases after their mapping has completed can repeatedly insert a recursive
-    /// type into itself. The builder expands set operations to distribute and flatten them,
-    /// but retains atomic aliases unless simplifying the intersection changes their values.
-    pub(crate) fn preserve_aliases(mut self, preserve: bool) -> Self {
-        self.preserve_aliases = preserve;
+    /// type into itself, so mapped intersections retain positive aliases as well. The builder still
+    /// expands set operations to distribute and flatten them, and simplifies elements using their
+    /// alias values.
+    pub(crate) fn preserve_positive_aliases(mut self, preserve: bool) -> Self {
+        self.preserve_positive_aliases = preserve;
         self
     }
 
@@ -1526,11 +1532,12 @@ impl<'db> IntersectionBuilder<'db> {
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
-                let element = if self.preserve_aliases && matches!(original, Type::TypeAlias(_)) {
-                    original
-                } else {
-                    ty
-                };
+                let element =
+                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
+                        original
+                    } else {
+                        ty
+                    };
                 for inner in &mut self.intersections {
                     inner.add_positive(db, &self.env, element);
                 }
@@ -1616,7 +1623,10 @@ impl<'db> IntersectionBuilder<'db> {
                 self.add_negative_impl::<L>(intersection, seen_aliases)?;
             }
             _ => {
-                let element = if self.preserve_aliases && matches!(original, Type::TypeAlias(_)) {
+                // Pass the original alias to preserve recursive self-references.
+                // `InnerIntersectionBuilder::add_negative` resolves it for simplification
+                // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
+                let element = if matches!(original, Type::TypeAlias(_)) {
                     original
                 } else {
                     ty
@@ -2776,6 +2786,29 @@ mod tests {
 
         let intersection = IntersectionBuilder::new(db, &env).build();
         assert_eq!(intersection, Type::object());
+    }
+
+    #[test]
+    fn build_intersection_preserves_negated_alias() {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "type Alias = int").unwrap();
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let alias = Type::TypeAlias(
+            global_symbol(&db, module, "Alias")
+                .place
+                .expect_type()
+                .as_type_alias()
+                .expect("Alias is a type alias"),
+        );
+
+        let negated = IntersectionBuilder::new(&db, &env)
+            .add_negative(alias)
+            .build();
+        assert!(matches!(negated, Type::Intersection(intersection)
+            if intersection.is_simple_negation(&db) && intersection.iter_negative(&db).eq([alias])));
+        assert_eq!(negated, alias.negate(&db, &env));
     }
 
     #[test]
