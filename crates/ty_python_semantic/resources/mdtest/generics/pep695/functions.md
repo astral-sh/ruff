@@ -224,6 +224,93 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Recovery from generic aliases passed as class objects
+
+Passing a generic alias where a class object is required is an error. We still use its type
+arguments to infer a return type, so subsequent calls retain useful checks.
+
+```py
+class Box[T]:
+    def __call__(self, value: T) -> T:
+        return value
+
+def instantiate[T](cls: type[T]) -> T:
+    raise NotImplementedError
+
+box = instantiate(Box[int])  # error: [invalid-argument-type]
+reveal_type(box)  # revealed: Box[int]
+box("wrong")  # error: [invalid-argument-type]
+
+def instance_or_class[T](cls: Box[T] | type[Box[T]]) -> Box[T]:
+    raise NotImplementedError
+
+box = instance_or_class(Box[int])  # error: [invalid-argument-type]
+reveal_type(box)  # revealed: Box[int]
+
+class Accessor[T]:
+    def __init__(self, cls: type[T]) -> None: ...
+
+accessor = Accessor(Box[int])  # error: [invalid-argument-type]
+reveal_type(accessor)  # revealed: Accessor[Box[int]]
+```
+
+Recovery still respects type-variable bounds:
+
+```py
+def bounded[T: int](cls: type[Box[T]]) -> T:
+    raise NotImplementedError
+
+value = bounded(Box[str])  # error: [invalid-argument-type]
+reveal_type(value)  # revealed: Unknown
+```
+
+## Overload recovery from generic aliases
+
+If an overload fails only because generic aliases were passed as class objects, we retain its
+specialized return type. When several overloads meet this condition, the first one supplies the
+recovery type.
+
+```py
+from typing import Literal, overload
+
+class Box[T]:
+    def __call__(self, value: T) -> T:
+        return value
+
+@overload
+def make[T](cls: type[Box[T]], *, precise: Literal[True] = True) -> Box[T]: ...
+@overload
+def make[T](cls: Box[T] | type[Box[T]], *, precise: bool = True) -> object: ...
+def make(cls, *, precise=True):
+    raise NotImplementedError
+
+box = make(Box[int])  # error: [no-matching-overload]
+reveal_type(box)  # revealed: Box[int]
+box("wrong")  # error: [invalid-argument-type]
+
+value = make(Box[int], precise=False)  # error: [no-matching-overload]
+reveal_type(value)  # revealed: object
+
+value = make(Box[int], precise="wrong")  # error: [no-matching-overload]
+reveal_type(value)  # revealed: Unknown
+```
+
+A valid overload takes precedence over recovery from an invalid one:
+
+```py
+from types import GenericAlias
+
+@overload
+def choose[T](cls: type[Box[T]]) -> Box[T]: ...
+@overload
+def choose(cls: GenericAlias) -> str: ...
+def choose(cls):
+    raise NotImplementedError
+
+result = choose(Box[int])  # no diagnostic
+reveal_type(result)  # revealed: str
+```
+
 ## Inferring through nested nominal generic classes
 
 When a nominal generic class is nested inside another, the outer class determines whether the inner
