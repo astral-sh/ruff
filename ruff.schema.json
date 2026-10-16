@@ -792,7 +792,7 @@
         },
         {
           "type": "integer",
-          "format": "int32"
+          "format": "int64"
         },
         {
           "$ref": "#/definitions/AllowedFloatValue"
@@ -2982,7 +2982,7 @@
           }
         },
         "allow-magic-values": {
-          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).\n\nWhen set, this option replaces the defaults entirely.",
+          "description": "Specific literal values to ignore when used as \"magic values\" (see `PLR2004`).",
           "type": [
             "array",
             "null"
@@ -2992,7 +2992,7 @@
           }
         },
         "extend-allow-magic-values": {
-          "description": "Additional literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to the default set.\n\nThis option is used to extend the default set without replacing it.",
+          "description": "Literal values to ignore when used as \"magic values\" (see `PLR2004`),\nin addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).",
           "type": [
             "array",
             "null"

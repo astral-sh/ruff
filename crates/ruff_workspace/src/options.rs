@@ -3709,8 +3709,6 @@ pub struct PylintOptions {
     allow_magic_value_types: Option<Vec<ConstantType>>,
 
     /// Specific literal values to ignore when used as "magic values" (see `PLR2004`).
-    ///
-    /// When set, this option replaces the defaults entirely.
     #[option(
         default = r#"[0, 1, -1, 0.0, 1.0, -1.0, "", "__main__"]"#,
         value_type = r#"list[str | int | float]"#,
@@ -3718,12 +3716,10 @@ pub struct PylintOptions {
             allow-magic-values = [42, 3.14, "special"]
         "#
     )]
-    pub allow_magic_values: Option<Vec<AllowedValue>>,
+    allow_magic_values: Option<Vec<AllowedValue>>,
 
-    /// Additional literal values to ignore when used as "magic values" (see `PLR2004`),
-    /// in addition to the default set.
-    ///
-    /// This option is used to extend the default set without replacing it.
+    /// Literal values to ignore when used as "magic values" (see `PLR2004`),
+    /// in addition to those included in [`allow-magic-values`](#lint_pylint_allow-magic-values).
     #[option(
         default = r#"[]"#,
         value_type = r#"list[str | int | float]"#,
@@ -3731,7 +3727,7 @@ pub struct PylintOptions {
             extend-allow-magic-values = [42, 3.14, "magic"]
         "#
     )]
-    pub extend_allow_magic_values: Option<Vec<AllowedValue>>,
+    extend_allow_magic_values: Option<Vec<AllowedValue>>,
 
     /// Dunder methods name to allow, in addition to the default set from the
     /// Python standard library (see `PLW3201`).
@@ -3813,7 +3809,7 @@ impl PylintOptions {
         let defaults = pylint::settings::Settings::default();
         let mut allow_magic_values = self
             .allow_magic_values
-            .unwrap_or_else(|| defaults.allow_magic_values.clone());
+            .unwrap_or(defaults.allow_magic_values);
         if let Some(extend) = self.extend_allow_magic_values {
             allow_magic_values.extend(extend);
         }

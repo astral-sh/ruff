@@ -14,73 +14,69 @@ use ruff_python_ast::{ExprNumberLiteral, LiteralExpressionRef, Number, UnaryOp};
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum AllowedValue {
     String(String),
-    Int(i32),
+    Int(i64),
     Float(AllowedFloatValue),
 }
 
 impl AllowedValue {
-    pub fn matches_value(
+    pub(crate) fn matches_value(
         &self,
         literal_expr: LiteralExpressionRef<'_>,
         unary_op: Option<&UnaryOp>,
     ) -> bool {
         match (self, literal_expr) {
-            (
-                AllowedValue::String(allowed),
-                LiteralExpressionRef::StringLiteral(string_literal),
-            ) => unary_op.is_none() && allowed.as_str() == string_literal.value.to_str(),
-            (AllowedValue::Int(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
-                match &number_literal.value {
-                    Number::Int(i) => {
-                        i.as_i32()
-                            .and_then(|value| apply_unary_int(value, unary_op))
-                            == Some(*allowed)
-                    }
-                    _ => false,
-                }
+            (Self::String(allowed), LiteralExpressionRef::StringLiteral(string)) => {
+                unary_op.is_none() && allowed == string.value.to_str()
             }
-            (AllowedValue::Float(allowed), LiteralExpressionRef::NumberLiteral(number_literal)) => {
-                match &number_literal.value {
-                    Number::Float(f) => apply_unary_float(*f, unary_op)
-                        .map(AllowedFloatValue::new)
-                        .is_some_and(|value| value == *allowed),
-                    _ => false,
-                }
+            (
+                Self::Int(allowed),
+                LiteralExpressionRef::NumberLiteral(ExprNumberLiteral {
+                    value: Number::Int(value),
+                    ..
+                }),
+            ) => {
+                let Some(value) = value.as_i64() else {
+                    return false;
+                };
+                let value = match unary_op {
+                    None | Some(UnaryOp::UAdd) => value,
+                    Some(UnaryOp::USub) => -value,
+                    Some(UnaryOp::Invert | UnaryOp::Not) => return false,
+                };
+                value == *allowed
+            }
+            (
+                Self::Float(allowed),
+                LiteralExpressionRef::NumberLiteral(ExprNumberLiteral {
+                    value: Number::Float(value),
+                    ..
+                }),
+            ) => {
+                let value = match unary_op {
+                    None | Some(UnaryOp::UAdd) => *value,
+                    Some(UnaryOp::USub) => -value,
+                    Some(UnaryOp::Invert | UnaryOp::Not) => return false,
+                };
+                AllowedFloatValue(value) == *allowed
             }
             _ => false,
         }
     }
 }
 
-fn apply_unary_int(value: i32, unary_op: Option<&UnaryOp>) -> Option<i32> {
-    match unary_op {
-        None | Some(UnaryOp::UAdd) => Some(value),
-        Some(UnaryOp::USub) => value.checked_neg(),
-        Some(UnaryOp::Invert | UnaryOp::Not) => None,
-    }
-}
-
-fn apply_unary_float(value: f64, unary_op: Option<&UnaryOp>) -> Option<f64> {
-    match unary_op {
-        None | Some(UnaryOp::UAdd) => Some(value),
-        Some(UnaryOp::USub) => Some(-value),
-        Some(UnaryOp::Invert | UnaryOp::Not) => None,
+impl fmt::Display for AllowedValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::String(value) => write!(f, "{value:?}"),
+            Self::Int(value) => write!(f, "{value}"),
+            Self::Float(value) => write!(f, "{:?}", value.0),
+        }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AllowedFloatValue(f64);
-
-impl AllowedFloatValue {
-    pub fn new(value: f64) -> Self {
-        Self(value)
-    }
-
-    pub fn value(&self) -> f64 {
-        self.0
-    }
-}
 
 impl PartialEq for AllowedFloatValue {
     fn eq(&self, other: &Self) -> bool {
@@ -93,24 +89,6 @@ impl Eq for AllowedFloatValue {}
 impl CacheKey for AllowedFloatValue {
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         self.0.to_bits().cache_key(state);
-    }
-}
-
-impl fmt::Display for AllowedValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            AllowedValue::String(s) => write!(f, "\"{s}\""),
-            AllowedValue::Int(i) => write!(f, "{i}"),
-            AllowedValue::Float(fl) => {
-                let value = fl.value();
-                // Ensure floats always display with decimal point
-                if value.fract() == 0.0 {
-                    write!(f, "{value:.?}")
-                } else {
-                    write!(f, "{value}")
-                }
-            }
-        }
     }
 }
 
@@ -179,9 +157,9 @@ impl Default for Settings {
                 AllowedValue::Int(0),
                 AllowedValue::Int(1),
                 AllowedValue::Int(-1),
-                AllowedValue::Float(AllowedFloatValue::new(0.0)),
-                AllowedValue::Float(AllowedFloatValue::new(1.0)),
-                AllowedValue::Float(AllowedFloatValue::new(-1.0)),
+                AllowedValue::Float(AllowedFloatValue(0.0)),
+                AllowedValue::Float(AllowedFloatValue(1.0)),
+                AllowedValue::Float(AllowedFloatValue(-1.0)),
                 AllowedValue::String(String::new()),
                 AllowedValue::String("__main__".to_string()),
             ],

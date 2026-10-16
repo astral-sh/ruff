@@ -9,7 +9,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::rules::pylint::settings::{AllowedValue, ConstantType};
+use crate::rules::pylint::settings::{ConstantType, Settings};
 
 /// ## What it does
 /// Checks for the use of unnamed hard-coded ("magic") values in comparisons.
@@ -21,7 +21,7 @@ use crate::rules::pylint::settings::{AllowedValue, ConstantType};
 /// or named constants.
 ///
 /// By default, this rule excludes a variety of common values from the
-/// magic value definition, namely `0`, `1`, `0.0`, `1.0`, `""`, and
+/// magic value definition, namely `0`, `1`, `-1`, `0.0`, `1.0`, `-1.0`, `""`, and
 /// `"__main__"`. It also exempts comparisons against `sys.version`,
 /// `sys.version_info`, and `sys.implementation.version`.
 ///
@@ -69,7 +69,7 @@ impl Violation for MagicValueComparison {
 }
 
 /// If an [`Expr`] is a literal (or unary operation on a literal), return the [`LiteralExpressionRef`]
-/// and the unary operand, if any.
+/// and its unary operator, if any.
 fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>)> {
     match expr {
         Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. })
@@ -84,18 +84,18 @@ fn as_literal(expr: &Expr) -> Option<(LiteralExpressionRef<'_>, Option<&UnaryOp>
 fn is_magic_value(
     literal_expr: LiteralExpressionRef,
     unary_op: Option<&UnaryOp>,
-    allowed_types: &[ConstantType],
-    allowed_values: &[AllowedValue],
+    settings: &Settings,
 ) -> bool {
     // Check if the literal type is in the allowed types list
     if let Some(constant_type) = ConstantType::try_from_literal_expr(literal_expr) {
-        if allowed_types.contains(&constant_type) {
+        if settings.allow_magic_value_types.contains(&constant_type) {
             return false;
         }
     }
 
     // Check if the literal value is in the allowed values list
-    if allowed_values
+    if settings
+        .allow_magic_values
         .iter()
         .any(|value| value.matches_value(literal_expr, unary_op))
     {
@@ -136,14 +136,11 @@ pub(crate) fn magic_value_comparison(checker: &Checker, operands: &[Expr]) {
         }
     }
 
-    let allowed_types: &[ConstantType] = &checker.settings().pylint.allow_magic_value_types;
-    let allowed_values: &[AllowedValue] = &checker.settings().pylint.allow_magic_values;
-
     let mut previous = None;
     let mut operands = operands.iter().peekable();
     while let Some(comparison_expr) = operands.next() {
         if let Some((value, unary_op)) = as_literal(comparison_expr)
-            && is_magic_value(value, unary_op, allowed_types, allowed_values)
+            && is_magic_value(value, unary_op, &checker.settings().pylint)
             && !previous.is_some_and(|expr| is_sys_version_comparand(expr, checker.semantic()))
             && !operands
                 .peek()
