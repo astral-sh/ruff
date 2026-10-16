@@ -649,7 +649,7 @@ The `classinfo` argument cannot be a generic alias:
 
 ```py
 def _(x: list[str] | list[int] | list[bytes]):
-    # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
+    # error: [invalid-argument-type]
     if isinstance(x, list[int]):
         # No narrowing here:
         reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]

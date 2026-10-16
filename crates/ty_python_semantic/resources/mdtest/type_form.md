@@ -456,6 +456,9 @@ def first[T](forms: tuple[TypeForm[T], ...]) -> T:
 
 reveal_type(first(stored_union_forms))  # revealed: int | str
 
+stored_generic_forms = (list[int],)
+reveal_type(first(stored_generic_forms))  # revealed: list[int]
+
 stored_special_forms = (LiteralString,)
 reveal_type(first(stored_special_forms))  # revealed: LiteralString
 

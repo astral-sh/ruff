@@ -1902,8 +1902,8 @@ def compatible_bound[T: int]() -> None:
 
 ## Generic aliases
 
-Generic class objects and aliases overlap compatible `type[...]` types; incompatible invariant
-specializations make them disjoint.
+Generic class objects overlap compatible `type[...]` types. Runtime generic aliases are disjoint
+from all class-object types, regardless of their specialization.
 
 ```toml
 [environment]
@@ -1919,26 +1919,26 @@ class GenericClass[T]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[Any]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[Any]]))
+static_assert(is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
 
 class GenericClassIntBound[T: int]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[Any]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[Any]]))
+static_assert(is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
 @final
 class GenericFinalClass[T]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[Any]]))
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[Any]]))
+static_assert(is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[Any]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```
