@@ -1359,22 +1359,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
 
-                // Function annotations are always evaluated at runtime, unless future annotations
-                // are enabled or the Python version is at least 3.14.
-                let annotation = AnnotationContext::from_function(
-                    function_def,
-                    &self.semantic,
-                    self.settings(),
-                    self.target_version(),
-                );
-
-                // The first parameter may be a single dispatch.
-                let singledispatch =
-                    flake8_type_checking::helpers::is_singledispatch_implementation(
-                        function_def,
-                        self.semantic(),
-                    );
-
                 // The default values of the parameters needs to be evaluated in the enclosing
                 // scope.
                 for parameter in parameters {
@@ -1408,6 +1392,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.visit_type_params(type_params);
                 }
 
+                // Function annotations are always evaluated at runtime, unless future annotations
+                // are enabled or the Python version is at least 3.14.
+                let annotation = AnnotationContext::from_function(
+                    function_def,
+                    &self.semantic,
+                    self.settings(),
+                    self.target_version(),
+                );
+
+                // The first parameter may be a single dispatch.
+                let singledispatch =
+                    flake8_type_checking::helpers::is_singledispatch_implementation(
+                        function_def,
+                        self.semantic(),
+                    );
+
+                let skip_generic_subscript_detection = self
+                    .settings()
+                    .flake8_type_checking
+                    .runtime_evaluated_generic_subscripts
+                    .is_empty();
+
                 for parameter in parameters {
                     if let Some(expr) = parameter.annotation() {
                         if singledispatch && !parameter.is_variadic() {
@@ -1416,6 +1422,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             match annotation {
                                 AnnotationContext::RuntimeRequired => {
                                     self.visit_runtime_required_annotation(expr);
+                                }
+                                // We may need to upgrade part of, or the entire annotation
+                                // to runtime-required or runtime-ambiguous if it starts
+                                // with a generic subscript that has defined semantics
+                                AnnotationContext::RuntimeAmbiguous | AnnotationContext::TypingOnly
+                                    if !skip_generic_subscript_detection
+                                    && let Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. } ) = expr
+                                    && let semantics @ (
+                                        flake8_type_checking::settings::RuntimeSemantics::Required
+                                        | flake8_type_checking::settings::RuntimeSemantics::Ambiguous
+                                    ) = flake8_type_checking::helpers::generic_subscript_runtime_semantics(
+                                        subscript,
+                                        self.semantic(),
+                                        self.settings(),
+                                    ) =>
+                                {
+                                    self.visit_runtime_required_annotation(value);
+                                    if semantics.is_required() {
+                                        self.visit_runtime_required_annotation(slice);
+                                    } else {
+                                        self.visit_runtime_ambiguous_annotation(slice);
+                                    }
                                 }
                                 AnnotationContext::RuntimeAmbiguous => {
                                     self.visit_runtime_ambiguous_annotation(expr);
@@ -1437,6 +1465,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         match annotation {
                             AnnotationContext::RuntimeRequired => {
                                 self.visit_runtime_required_annotation(expr);
+                            }
+                            // We may need to upgrade part of, or the entire annotation
+                            // to runtime-required or runtime-ambiguous if it starts
+                            // with a generic subscript that has defined semantics
+                            AnnotationContext::RuntimeAmbiguous | AnnotationContext::TypingOnly
+                                if !skip_generic_subscript_detection
+                                && let Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. } ) = &**expr
+                                && let semantics @ (
+                                    flake8_type_checking::settings::RuntimeSemantics::Required
+                                    | flake8_type_checking::settings::RuntimeSemantics::Ambiguous
+                                ) = flake8_type_checking::helpers::generic_subscript_runtime_semantics(
+                                    subscript,
+                                    self.semantic(),
+                                    self.settings(),
+                                ) =>
+                            {
+                                self.visit_runtime_required_annotation(value);
+                                if semantics.is_required() {
+                                    self.visit_runtime_required_annotation(slice);
+                                } else {
+                                    self.visit_runtime_ambiguous_annotation(slice);
+                                }
                             }
                             AnnotationContext::RuntimeAmbiguous => {
                                 self.visit_runtime_ambiguous_annotation(expr);
@@ -1606,6 +1656,16 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 value,
                 ..
             }) => {
+                let skip_generic_subscript_detection = self
+                    .settings()
+                    .flake8_type_checking
+                    .runtime_evaluated_generic_subscripts
+                    .is_empty();
+                // FIXME: Doing this for every AnnAssign node in the same scope
+                //        seems a little wasteful, since the outcome can't suddenly
+                //        change, we should probably keep track of the current
+                //        annotation context in the semantic model or the scope
+                //        but defer computation until we first access this property
                 match AnnotationContext::from_model(
                     &self.semantic,
                     self.settings(),
@@ -1613,6 +1673,28 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 ) {
                     AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
+                    }
+                    // We may need to upgrade part of, or the entire annotation
+                    // to runtime-required or runtime-ambiguous if it starts
+                    // with a generic subscript that has defined semantics
+                    AnnotationContext::RuntimeAmbiguous | AnnotationContext::TypingOnly
+                        if !skip_generic_subscript_detection
+                        && let Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. } ) = &**annotation
+                        && let semantics @ (
+                            flake8_type_checking::settings::RuntimeSemantics::Required
+                            | flake8_type_checking::settings::RuntimeSemantics::Ambiguous
+                        ) = flake8_type_checking::helpers::generic_subscript_runtime_semantics(
+                            subscript,
+                            self.semantic(),
+                            self.settings(),
+                        ) =>
+                    {
+                        self.visit_runtime_required_annotation(value);
+                        if semantics.is_required() {
+                            self.visit_runtime_required_annotation(slice);
+                        } else {
+                            self.visit_runtime_ambiguous_annotation(slice);
+                        }
                     }
                     AnnotationContext::RuntimeAmbiguous => {
                         self.visit_runtime_ambiguous_annotation(annotation);
@@ -1643,7 +1725,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
                             self.visit_runtime_required_annotation(annotation);
                         }
                     }
-                    AnnotationContext::TypingOnly => self.visit_annotation(annotation),
+                    AnnotationContext::TypingOnly => {
+                        self.visit_annotation(annotation);
+                    }
                 }
 
                 if let Some(expr) = value {
