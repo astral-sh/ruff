@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, ElifElseClause, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -12,8 +13,7 @@ use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::adjust_indentation;
-use crate::rules::pylint::helpers::else_line_comment;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for `else` blocks that consist of a single `if` statement.
@@ -44,6 +44,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     else:
 ///         print("Number is zero.")
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked unsafe if the `else` line has a trailing comment (e.g., `else:  # comment`),
+/// since the fix deletes the comment.
 ///
 /// ## References
 /// - [Python documentation: `if` Statements](https://docs.python.org/3/tutorial/controlflow.html#if-statements)
@@ -96,6 +100,7 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
             checker.locator(),
             checker.indexer(),
             checker.stylist(),
+            checker.comment_ranges(),
         )
     });
 }
@@ -107,6 +112,7 @@ fn convert_to_elif(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
+    comment_ranges: &CommentRanges,
 ) -> Result<Fix> {
     let inner_if_line_start = locator.line_start(first.start());
     let inner_if_line_end = locator.line_end(first.end());
@@ -129,18 +135,14 @@ fn convert_to_elif(
         stylist,
     )?;
 
-    // If there's trivia, restore it. A comment on the `else` line (e.g., `else:  # fallback`)
-    // comes first, as it precedes the comments between the `else` and the `if`.
-    let mut trivia =
-        else_line_comment(else_clause.start(), indentation, locator, stylist).unwrap_or_default();
-    if !trivia_range.is_empty() {
-        trivia += &adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
-    }
-    let trivia = if trivia.is_empty() {
+    // If there's trivia, restore it
+    let trivia = if trivia_range.is_empty() {
         None
     } else {
+        let indented_trivia =
+            adjust_indentation(trivia_range, indentation, locator, indexer, stylist)?;
         Some(Edit::insertion(
-            trivia,
+            indented_trivia,
             locator.line_start(else_clause.start()),
         ))
     };
@@ -151,12 +153,21 @@ fn convert_to_elif(
     };
     let indented = format!("{indentation}el{unindented}");
 
-    Ok(Fix::safe_edits(
+    // The `else` line is replaced, so a trailing comment on it (e.g., `else:  # comment`) is
+    // deleted. Comments between the `else` and the `if` are restored above.
+    let applicability = if comment_ranges.intersects(locator.line_range(else_clause.start())) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Ok(Fix::applicable_edits(
         Edit::replacement(
             indented,
             locator.line_start(else_clause.start()),
             inner_if_line_end,
         ),
         trivia,
+        applicability,
     ))
 }
