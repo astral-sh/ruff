@@ -54,7 +54,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // A resolved non-recursive value already describes the alias. Gradual types, unions,
         // and quoted aliases can hide recursive references, so they still need inference.
         // Even a valid union can have lost a cyclic member during value inference.
-        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
+        if !any_over_type(db, self.program_environment(), value_ty, |ty| {
             matches!(
                 ty,
                 Type::Dynamic(_)
@@ -112,7 +112,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Preserve cycle errors even when recovery removes every recursive reference. Both
         // runtime-value inference and enclosing aliases need the fallback type to converge.
         let ty = result.unwrap_or_else(|error| error.fallback_type);
-        let is_recursive = any_over_type(db, self.program_environment(), ty, false, |ty| {
+        let is_recursive = any_over_type(db, self.program_environment(), ty, |ty| {
             matches!(ty, Type::Recursive(_))
         });
         if result.is_ok() && !is_recursive {

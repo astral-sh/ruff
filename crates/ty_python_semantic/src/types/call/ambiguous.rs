@@ -92,7 +92,7 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
                 .iter()
                 .copied()
                 .find(|ty| {
-                    any_over_type(self.db, self.env, *ty, false, |ty| {
+                    any_over_type(self.db, self.env, *ty, |ty| {
                         matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
                     })
                 })

@@ -6902,6 +6902,32 @@ class NestedRightProtocol[T](Protocol):
 static_assert(not is_subtype_of(NestedLeftProtocol[int], NestedRightProtocol[int]))
 ```
 
+### Generic calls with recursive protocol arguments
+
+A recursively specialized protocol remains a valid argument to a generic function. Its members can
+recurse through independent definitions:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+type Alias[T] = list[Alias[list[T]]]
+
+class Recursive[T](Protocol):
+    child: Recursive[list[T]]
+    payload: Alias[int]
+
+def f[T](x: Recursive[T]) -> None: ...
+def _(x: Recursive[int]) -> None:
+    f(x)  # no diagnostic
+```
+
 ### Disjointness of recursive protocol and recursive final type
 
 ```py
