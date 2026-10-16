@@ -4504,6 +4504,37 @@ def as_protocol(node: Node[int]) -> HasChild:
     return node  # error: [invalid-return-type]
 ```
 
+## Recursive descriptor results inferred from callable parameters
+
+A descriptor's result can be a method type variable inferred from the instance's callable signature.
+Here, `Node[int]` accepts `Node[list[int]]` when called, so reading `child` infers that type for
+`U`. Comparing the result with `HasChild` repeats the inference with another `list` each time.
+
+```py
+from collections.abc import Callable
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Child:
+    def __get__(self, instance: Callable[[U], int], owner: type | None = None) -> U:
+        raise NotImplementedError
+
+class Node(Generic[T]):
+    child = Child()
+
+    def __call__(self, value: "Node[list[T]]") -> int:
+        return 1
+
+class HasChild(Protocol):
+    child: "HasChild"
+
+def as_protocol(node: Node[int]) -> HasChild:
+    reveal_type(node.child)  # revealed: Node[list[int]]
+    return node  # error: [invalid-return-type]
+```
+
 ## Recursive properties with growing type arguments
 
 A property can expose the same growing sequence. We stop the recursive comparison conservatively.

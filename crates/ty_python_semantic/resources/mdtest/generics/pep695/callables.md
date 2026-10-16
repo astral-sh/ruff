@@ -1472,6 +1472,39 @@ class C[T]:
 C[int]()  # error: [call-non-callable]
 ```
 
+## Recursive constructors through generic descriptor methods
+
+The descriptor class need not be generic. Here, `__get__` infers its type argument from the owner,
+so looking up `Node[int].__new__` returns `type[Node[Node[int]]]`. Constructor lookup keeps adding
+another `Node` without reaching a function signature.
+
+```py
+class Allocate:
+    def __get__[T](self, instance: object, owner: type[T]) -> "type[Node[T]]":
+        raise NotImplementedError
+
+class Node[T]:
+    __new__ = Allocate()
+
+Node[int]()  # error: [call-non-callable]
+```
+
+## Recursive calls through generic descriptor methods
+
+An instance's `__call__` can grow in the same way. The method infers `T` from the instance and
+returns another `Node` around it.
+
+```py
+class Call:
+    def __get__[T](self, instance: T, owner: type | None = None) -> "Node[T]":
+        raise NotImplementedError
+
+class Node[T]:
+    __call__ = Call()
+
+Node[int]()()  # error: [call-non-callable]
+```
+
 ## Recursive descriptor calls with changing type arguments
 
 Reading `value` calls the descriptor's `__get__`, which is itself another descriptor instance.
@@ -1509,6 +1542,26 @@ class Wrapper[T]:
 reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
 ```
 
+## Finite calls through generic descriptor methods
+
+A generic descriptor method can also remove a layer of nesting. Each lookup of `__call__` here
+returns the inner instance until it reaches `End`, whose call returns `int`.
+
+```py
+class Next:
+    def __get__[T](self, instance: "Wrapper[T]", owner: type | None = None) -> T:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__ = Next()
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
+
 ## Descriptor calls that reset type arguments
 
 The first descriptor access returns `Wrapper[None]`; the second returns `End`. This is a finite
@@ -1531,6 +1584,32 @@ class Descriptor[T]:
 
 class Wrapper[T]:
     __call__: Descriptor[T]
+
+reveal_type(Wrapper[int]()())  # revealed: int
+```
+
+## Generic descriptor methods that reset type arguments
+
+The descriptor first returns `Wrapper[None]`, then `End`. Its parameter annotation contains a method
+type variable, but neither return type depends on that variable.
+
+```py
+from typing import Any, overload
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Next:
+    @overload
+    def __get__(self, instance: "Wrapper[None]", owner: type | None = None) -> End: ...
+    @overload
+    def __get__[T: int](self, instance: "Wrapper[T]", owner: type | None = None) -> "Wrapper[None]": ...
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__ = Next()
 
 reveal_type(Wrapper[int]()())  # revealed: int
 ```

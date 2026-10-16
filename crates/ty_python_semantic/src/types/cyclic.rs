@@ -40,7 +40,7 @@ use crate::types::callable::SignatureSource;
 use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::list_members::all_end_of_scope_members;
-use crate::types::signatures::walk_signature;
+use crate::types::signatures::{CallableSignature, walk_signature};
 use crate::types::visitor::{TypeCollector, TypeVisitor, any_over_type_including_alias_arguments};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, KnownClass, MaterializationKind,
@@ -348,7 +348,7 @@ pub(crate) struct SpecializationFlowGraph<'db> {
     edges: FxHashSet<FlowEdge<'db>>,
     /// Definition references used to decide whether an unresolved flow can return to the root.
     definition_edges: Vec<(RecursiveOrigin<'db>, RecursiveOrigin<'db>)>,
-    /// Definitions whose captured outer parameters cannot be mapped to their parent specialization.
+    /// Definitions whose parameter bindings cannot be represented in the graph.
     inconclusive_definitions: FxHashSet<RecursiveOrigin<'db>>,
     /// Whether a definition body or its formal parameters could not be inspected.
     inconclusive: bool,
@@ -954,7 +954,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             }
             RecursiveDefinition::DescriptorGet(class) => {
                 // Python looks up __get__ without applying the descriptor protocol again. A
-                // callable-valued __get__ is another graph edge; a function exposes its signature.
+                // callable-valued __get__ is another graph edge; a function exposes its result.
                 if let Some(member) = class
                     .identity_specialization(db)
                     .class_member(
@@ -966,7 +966,17 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     .place
                     .ignore_possibly_undefined()
                 {
-                    traversal.visit_type(db, member);
+                    if let Some(signatures) = Self::source_signatures(db, member) {
+                        // Parameter annotations constrain the descriptor call; they are not
+                        // values inspected by the next expansion. Including them would turn
+                        // a finite projection like __get__(..., instance: Wrapper[T]) -> T
+                        // into an apparent cycle through Wrapper.
+                        for signature in &signatures.overloads {
+                            traversal.visit_type(db, signature.return_ty);
+                        }
+                    } else {
+                        traversal.visit_type(db, member);
+                    }
                 }
             }
         }
@@ -1029,6 +1039,19 @@ impl<'db> SpecializationFlowVisitor<'db> {
         }
     }
 
+    /// Read signatures without expanding callable projections or applying argument bindings.
+    fn source_signatures(db: &'db dyn Db, ty: Type<'db>) -> Option<&'db CallableSignature<'db>> {
+        match ty.underlying_function(db) {
+            Type::FunctionLiteral(function) => Some(function.signature(db)),
+            Type::Callable(callable)
+                if let SignatureSource::Explicit(signatures) = callable.signature_source(db) =>
+            {
+                Some(signatures)
+            }
+            _ => None,
+        }
+    }
+
     /// Inspect source signatures, excluding receivers and implementation-only overload types.
     fn visit_accessor_annotation(
         &self,
@@ -1037,19 +1060,9 @@ impl<'db> SpecializationFlowVisitor<'db> {
         parameter: Option<usize>,
     ) {
         let traversal = TypeVisitorContext::new(self);
-        let signatures = match accessor.underlying_function(db) {
-            Type::FunctionLiteral(function) => function.signature(db),
-            Type::Callable(callable) => {
-                let SignatureSource::Explicit(signatures) = callable.signature_source(db) else {
-                    self.inconclusive.set(true);
-                    return;
-                };
-                signatures
-            }
-            _ => {
-                self.inconclusive.set(true);
-                return;
-            }
+        let Some(signatures) = Self::source_signatures(db, accessor) else {
+            self.inconclusive.set(true);
+            return;
         };
         for signature in &signatures.overloads {
             let ty = match parameter {
@@ -1149,10 +1162,19 @@ impl<'db> TypeWalk<'db> for CallableMemberFlow<'_, 'db> {
             }
             _ => {}
         }
-        if let Some(DefinitionUse::Specialized(
-            RecursiveDefinition::Nominal(class) | RecursiveDefinition::Protocol(class),
-            arguments,
-        )) = RecursiveDefinition::from_type(db, ty)
+        // A nongeneric descriptor class can still have a generic __get__ method. Its type
+        // parameters can depend on the receiver or owner, so it must contribute a graph edge
+        // even though the descriptor instance does not need a recursive identity itself.
+        let descriptor_class = match ty {
+            Type::NominalInstance(instance) => instance
+                .stored_class(db)
+                .and_then(|class| class.static_class_literal(db)),
+            Type::ProtocolInstance(protocol) => protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db)),
+            _ => None,
+        };
+        if let Some((class, arguments)) = descriptor_class
             && !class
                 .identity_specialization(db)
                 .class_member(
@@ -1203,9 +1225,16 @@ impl<'db> TypeVisitorHooks<'db> for SpecializationFlowVisitor<'db> {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
             if !self.source_parameters.contains(&identity) {
-                // Nested definitions can capture a type variable from an outer generic scope.
-                // Specialization does not yet retain the parent mapping needed to model it.
+                // Method type parameters and captured outer parameters can depend on receiver
+                // or call arguments. Without those bindings, this graph cannot prove that
+                // specialization is finite.
                 self.inconclusive.set(true);
+                if matches!(self.source_origin, RecursiveOrigin::DescriptorGet(_)) {
+                    // Calling __get__ can infer this variable from the receiver's interface.
+                    // Its result may refer back to any definition, even if the return annotation
+                    // contains no explicit reference to that definition.
+                    self.has_unresolved_type.set(true);
+                }
             }
             return;
         }
@@ -1411,8 +1440,24 @@ impl<'db> HasIdentity<'db> for Type<'db> {
         env: &TypeOperations<'db>,
         other: &Self,
     ) -> bool {
-        self != other
-            && any_over_type_including_alias_arguments(db, env, *other, |nested| nested == *self)
+        // Callable projections store their source, not a projection of every nested argument.
+        // Compare those sources to recognize progress from Wrapper[Wrapper[End]] to Wrapper[End]
+        // while following their callable interfaces.
+        let (current, previous) = match (*self, *other) {
+            (Type::Callable(current), Type::Callable(previous))
+                if let (
+                    SignatureSource::Projected(current),
+                    SignatureSource::Projected(previous),
+                ) = (current.signature_source(db), previous.signature_source(db)) =>
+            {
+                (current.source(), previous.source())
+            }
+            _ => (*self, *other),
+        };
+        current != previous
+            && any_over_type_including_alias_arguments(db, env, previous, |nested| {
+                nested == current
+            })
     }
 }
 
