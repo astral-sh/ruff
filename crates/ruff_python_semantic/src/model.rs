@@ -25,7 +25,7 @@ use crate::reference::{
     ResolvedReference, ResolvedReferenceId, ResolvedReferences, UnresolvedReference,
     UnresolvedReferenceFlags, UnresolvedReferences,
 };
-use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
+use crate::scope::{GeneratorKind, Scope, ScopeId, ScopeKind, Scopes};
 
 pub mod all;
 
@@ -202,6 +202,10 @@ pub struct SemanticModel<'a> {
     /// Map from [`ast::ExprName`] node (represented as a [`NameId`]) to the [`Binding`] to which
     /// it resolved (represented as a [`BindingId`]).
     resolved_names: FxHashMap<NameId, BindingId>,
+
+    /// Names in the body of a class-scope generator expression that did not resolve when they were
+    /// visited, along with the state needed to resolve them again.
+    unresolved_class_generator_loads: Vec<(&'a ast::ExprName, Snapshot, UnresolvedReference)>,
 }
 
 impl<'a> SemanticModel<'a> {
@@ -239,6 +243,7 @@ impl<'a> SemanticModel<'a> {
             lazy_modules: None,
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
+            unresolved_class_generator_loads: Vec::default(),
         };
 
         let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
@@ -818,6 +823,94 @@ impl<'a> SemanticModel<'a> {
             );
             ReadResult::NotFound
         }
+    }
+
+    /// Return `true` if the model is in the body of a generator expression created in a class
+    /// body, excluding the generator's first iterable, which is evaluated in the class body.
+    ///
+    /// Unlike a comprehension, a generator expression's body runs when the generator is consumed,
+    /// which can be after the class body has finished executing:
+    ///
+    /// ```python
+    /// class C:
+    ///     a = (C for _ in range(3))
+    ///     b = [(C for _ in range(3)) for _ in range(3)]
+    /// ```
+    pub fn in_class_generator_body(&self) -> bool {
+        let mut in_generator = false;
+        for scope in self.current_scopes() {
+            match scope.kind {
+                ScopeKind::Generator { kind, .. } => {
+                    in_generator |= kind == GeneratorKind::Generator;
+                }
+                ScopeKind::Class(_) => return in_generator,
+                ScopeKind::DunderClassCell
+                | ScopeKind::Function(_)
+                | ScopeKind::Lambda(_)
+                | ScopeKind::Module
+                | ScopeKind::Type => return false,
+            }
+        }
+        false
+    }
+
+    /// Resolve a `load` reference to an [`ast::ExprName`] in the body of a class-scope generator
+    /// expression.
+    ///
+    /// If the name doesn't resolve yet, it is set aside and resolved again by
+    /// [`SemanticModel::resolve_class_generator_loads`] instead of being reported as unresolved.
+    pub fn resolve_class_generator_load(&mut self, name: &'a ast::ExprName) {
+        if matches!(
+            self.resolve_load(name),
+            ReadResult::UnboundLocal(_) | ReadResult::WildcardImport | ReadResult::NotFound
+        ) && let Some(reference) = self.unresolved_references.pop()
+        {
+            self.unresolved_class_generator_loads
+                .push((name, self.snapshot(), reference));
+        }
+    }
+
+    /// Resolve the names in class-scope generator expressions that did not resolve when they were
+    /// first visited, now that the rest of the module has been visited.
+    ///
+    /// The body of a generator expression runs when the generator is consumed, which can be after
+    /// the class body has finished executing. For example, `Foo` is bound by the time this
+    /// generator is consumed:
+    ///
+    /// ```python
+    /// class Foo:
+    ///     BAR = [1, 2, 3]
+    ///     QUX = (Foo.BAR for _ in range(3))
+    ///
+    ///
+    /// print(list(Foo.QUX))
+    /// ```
+    ///
+    /// Names that resolve when the generator is visited keep that resolution, so other rules see
+    /// the same bindings as for any other expression in the class body.
+    pub fn resolve_class_generator_loads(&mut self) {
+        let snapshot = self.snapshot();
+        for (name, load_snapshot, reference) in
+            std::mem::take(&mut self.unresolved_class_generator_loads)
+        {
+            self.restore(load_snapshot);
+
+            // A name bound by a later `for` clause of the generator itself is read before it is
+            // assigned, as in `(x for _ in range(3) if x for x in range(3))`.
+            if self
+                .current_scopes()
+                .take_while(|scope| scope.kind.is_generator())
+                .any(|scope| scope.has(name.id.as_str()))
+            {
+                self.unresolved_references.push_reference(reference);
+                continue;
+            }
+
+            self.handled_exceptions.push(reference.exceptions());
+            self.resolve_load(name);
+            self.handled_exceptions.pop();
+        }
+        self.restore(snapshot);
     }
 
     /// Lookup a symbol in the current scope without materializing lazy builtins.

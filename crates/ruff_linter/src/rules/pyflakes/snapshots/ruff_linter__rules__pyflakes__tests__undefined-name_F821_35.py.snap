@@ -1,0 +1,45 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `Foo`
+  --> F821_35.py:13:39
+   |
+12 |     # Error: a list comprehension is evaluated eagerly in the class body.
+13 |     c = [(x, y) for x in BAR for y in Foo.BAZ]
+   |                                       ^^^
+14 |
+15 |     # Error: the first iterable of a generator is also evaluated eagerly.
+   |
+
+F821 Undefined name `Foo`
+  --> F821_35.py:16:21
+   |
+15 |     # Error: the first iterable of a generator is also evaluated eagerly.
+16 |     d = (x for x in Foo.BAZ)
+   |                     ^^^
+17 |
+18 |     # Error: a name that is never bound is still reported.
+   |
+
+F821 Undefined name `undefined`
+  --> F821_35.py:19:10
+   |
+18 |     # Error: a name that is never bound is still reported.
+19 |     e = (undefined for x in BAR)
+   |          ^^^^^^^^^
+
+F821 Undefined name `x`
+  --> F821_35.py:55:37
+   |
+53 | class LaterTarget:
+54 |     # Error: `x` is bound by a later `for` clause, so it is read before it is assigned.
+55 |     generated = (x for _ in (0,) if x for x in (1,))
+   |                                     ^
+
+F821 Undefined name `x`
+  --> F821_35.py:60:41
+   |
+58 | class LaterTargetInNestedGenerator:
+59 |     # Error: `any` consumes the inner generator before the outer `for` clause assigns `x`.
+60 |     generated = (0 for _ in (0,) if any(x for _ in (0,)) for x in (1,))
+   |                                         ^
