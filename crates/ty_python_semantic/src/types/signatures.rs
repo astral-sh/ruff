@@ -21,7 +21,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
-use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
     IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
@@ -45,7 +44,7 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
+    ParamSpecAttrKind, ParamSpecValue, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
     TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     VarianceTerm, infer_complete_scope_types, todo_type,
 };
@@ -312,13 +311,13 @@ impl<'db> CallableSignature<'db> {
             db: &'db dyn Db,
             self_signature: &Signature<'db>,
             prefix_parameters: &[Parameter<'db>],
-            paramspec_value: Type<'db>,
+            paramspec_value: ParamSpecValue<'db>,
             type_mapping: &TypeMapping<'_, 'db>,
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         ) -> Option<CallableSignature<'db>> {
             match paramspec_value {
-                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                ParamSpecValue::ParamSpec(typevar) => {
                     let prefix_parameters = prefix_parameters
                         .iter()
                         .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
@@ -367,9 +366,7 @@ impl<'db> CallableSignature<'db> {
                         },
                     }))
                 }
-                Type::Callable(callable)
-                    if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
-                {
+                ParamSpecValue::Callable(callable) => {
                     let env = visitor.env;
                     Some(CallableSignature::from_overloads(
                         callable.signatures(db).iter().map(|signature| Signature {
@@ -419,7 +416,7 @@ impl<'db> CallableSignature<'db> {
                         }),
                     ))
                 }
-                _ => None,
+                ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_) => None,
             }
         }
 
@@ -430,6 +427,7 @@ impl<'db> CallableSignature<'db> {
             Self::from_overloads(self.overloads.iter().flat_map(|signature| {
                 if let Some((prefix, paramspec)) = signature.parameters.as_paramspec_with_prefix()
                     && let Some(value) = specialization.get(db, paramspec)
+                    && let Some(value) = value.as_paramspec_value(db)
                     && let Some(result) = try_apply_type_mapping_for_paramspec(
                         db,
                         signature,
@@ -1830,19 +1828,6 @@ impl<'db> Signature<'db> {
             .flat_map(OwnedConstraintSet::types)
     }
 
-    /// Returns this signature with the given specialization applied to parameters and return type.
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let type_mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
-        self.apply_type_mapping_impl(
-            db,
-            &type_mapping,
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
-        )
-    }
-
     /// Specializes a partial's full signature before matching its bound arguments again.
     pub(crate) fn specialize_for_partial_application(
         &self,
@@ -1851,20 +1836,14 @@ impl<'db> Signature<'db> {
         partial_application: &PartialApplication<'db>,
         inference: Option<TypeVarInference<'db>>,
         unspecialized_return_ty: Type<'db>,
-    ) -> Self {
+    ) -> Type<'db> {
         let signature_specialization =
             self.partial_application_specialization(db, env, partial_application, inference);
-        let signature = signature_specialization.map_or_else(
-            || self.clone(),
-            |specialization| self.apply_specialization(db, specialization),
-        );
-
-        let return_ty = signature_specialization.map_or_else(
-            || unspecialized_return_ty,
-            |specialization| unspecialized_return_ty.apply_specialization(db, specialization),
-        );
-
-        signature.with_return_type(return_ty)
+        let callable = Type::Callable(CallableType::single(
+            db,
+            self.clone().with_return_type(unspecialized_return_ty),
+        ));
+        callable.apply_optional_specialization(db, signature_specialization)
     }
 
     /// Reduces a specialized signature using bindings matched against that same signature.
@@ -5533,12 +5512,11 @@ impl<'db> Parameters<'db> {
                 continue;
             }
 
-            let Type::Callable(callable) = parameter.annotated_type() else {
+            let Some(ParamSpecValue::Callable(callable)) =
+                parameter.annotated_type().as_paramspec_value(db)
+            else {
                 continue;
             };
-            if callable.kind(db) != CallableTypeKind::ParamSpecValue {
-                continue;
-            }
 
             variadic_index = Some(index);
             paramspec_callable = Some(callable);
@@ -5559,11 +5537,8 @@ impl<'db> Parameters<'db> {
             return self.clone();
         }
 
-        let Type::Callable(keyword_callable) = keyword_variadic.annotated_type() else {
-            return self.clone();
-        };
-        if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue
-            || keyword_callable != paramspec_callable
+        if keyword_variadic.annotated_type().as_paramspec_value(db)
+            != Some(ParamSpecValue::Callable(paramspec_callable))
         {
             return self.clone();
         }
