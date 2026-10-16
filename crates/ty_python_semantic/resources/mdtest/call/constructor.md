@@ -481,6 +481,22 @@ class Factory:
 reveal_type(C())  # revealed: C
 ```
 
+### A cycle through an alias of a callable instance
+
+An alias for the callable instance preserves the constructor's return type:
+
+```py
+type FactoryAlias = Factory
+
+class C:
+    __new__: FactoryAlias
+
+class Factory:
+    __call__: type[C]
+
+reveal_type(C())  # revealed: C
+```
+
 ### A metaclass bypassing a recursive `__new__`
 
 A metaclass `__call__` that returns an unrelated type bypasses `__new__`. A recursive signature in

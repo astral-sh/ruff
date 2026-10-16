@@ -560,7 +560,7 @@ impl<'db> TypeRecursionContext<'db> {
     }
 }
 
-type TypeRecursionRevision = [u64; 22];
+type TypeRecursionRevision = [u64; 23];
 
 impl TypeRecursionContext<'_> {
     /// Identify every shared guard that can affect a cached query.
@@ -580,6 +580,7 @@ impl TypeRecursionContext<'_> {
             class_fields,
             class_constructors,
             callable_upcasts,
+            instance_call_bindings,
             abstract_methods,
             typed_dict_openness,
             narrowing_checkpoints,
@@ -607,6 +608,7 @@ impl TypeRecursionContext<'_> {
             class_fields.revision(),
             class_constructors.get().map_or(0, |guard| guard.revision()),
             callable_upcasts.get().map_or(0, |guard| guard.revision()),
+            instance_call_bindings.revision(),
             abstract_methods.revision(),
             typed_dict_openness.revision(),
             narrowing_checkpoints.revision(),
@@ -637,6 +639,12 @@ struct TypeRecursionState<'db> {
     class_fields: ActiveRecursionDetector<class::ClassFieldQuery<'db>>,
     class_constructors: OnceCell<Box<ClassConstructorRecursion<'db>>>,
     callable_upcasts: OnceCell<Box<CallableUpcastRecursion<'db>>>,
+    instance_call_bindings: ActiveRecursionDetector<(
+        Program<'db>,
+        Option<Type<'db>>,
+        Type<'db>,
+        Option<Type<'db>>,
+    )>,
     abstract_methods: ActiveRecursionDetector<ClassType<'db>>,
     typed_dict_openness: ActiveRecursionDetector<TypedDictType<'db>>,
     narrowing_checkpoints: ActiveRecursionDetector<(
@@ -6127,30 +6135,34 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Bindings<'db> {
-        self.bindings_impl(db, env, &ActiveRecursionDetector::default())
+        self.bindings_impl(
+            db,
+            env,
+            CollectBindings {
+                recursion_guard: &ActiveRecursionDetector::default(),
+                constructor: None,
+            },
+        )
     }
 
     fn bindings_impl(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        operation: CollectBindings<'_, 'db>,
     ) -> Bindings<'db> {
-        TypeQueryContext::with_root(env, CollectBindings { recursion_guard }, |root| {
-            root.visit_with(db, self, None)
-        })
-        .unwrap_or_else(|| CallableBinding::not_callable(self).into())
+        TypeQueryContext::with_root(env, operation, |root| root.visit_with(db, self, None))
+            .unwrap_or_else(|| CallableBinding::not_callable(self).into())
     }
 
     fn bindings_with_receiver<'a>(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        operation: &CollectBindings<'a, 'db>,
+        operation: CollectBindings<'a, 'db>,
         traversal: &TypeQueryContext<'_, 'db, CollectBindings<'a, 'db>, Option<Type<'db>>>,
         receiver: Option<Type<'db>>,
     ) -> Option<Bindings<'db>> {
-        let recursion_guard = operation.recursion_guard;
         if let Some(fallback) = self.materialized_divergent_fallback() {
             return traversal.visit_with(db, fallback, receiver);
         }
@@ -6409,16 +6421,11 @@ impl<'db> Type<'db> {
                 // TODO this should be called from `constructor_bindings` for better consistency
                 .known_class_literal_bindings(db, env, class)
                 .unwrap_or_else(|| {
-                    self.constructor_bindings(
-                        db,
-                        env,
-                        ClassType::NonGeneric(class),
-                        recursion_guard,
-                    )
+                    self.constructor_bindings(db, env, ClassType::NonGeneric(class), operation)
                 }),
 
             Type::GenericAlias(alias) => {
-                self.constructor_bindings(db, env, ClassType::Generic(alias), recursion_guard)
+                self.constructor_bindings(db, env, ClassType::Generic(alias), operation)
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -6426,12 +6433,12 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => {
-                    self.constructor_bindings(db, env, class, recursion_guard)
+                    self.constructor_bindings(db, env, class, operation)
                 }
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map_or_else(
                     || Binding::single(self, Signature::dynamic(Type::unknown())).into(),
                     |origin| {
-                        let bindings = self.constructor_bindings(db, env, *origin, recursion_guard);
+                        let bindings = self.constructor_bindings(db, env, *origin, operation);
                         if protocol.materialization_kind(db).is_some() {
                             bindings.with_constructed_instance_type(
                                 db,
@@ -6454,15 +6461,14 @@ impl<'db> Type<'db> {
                             {
                                 bindings
                             } else {
-                                constructor.bindings_impl(db, env, recursion_guard)
+                                constructor.bindings_impl(db, env, operation)
                             }
                         }
                         TypeVarBoundOrConstraints::Constraints(constraints) => {
                             Bindings::from_union(
                                 self,
                                 constraints.elements(db).iter().map(|ty| {
-                                    ty.to_meta_type(db, env)
-                                        .bindings_impl(db, env, recursion_guard)
+                                    ty.to_meta_type(db, env).bindings_impl(db, env, operation)
                                 }),
                             )
                         }
@@ -6493,33 +6499,41 @@ impl<'db> Type<'db> {
                 // of the original object as the "callable type". That ensures that we get errors
                 // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
                 // callable".
-                match self
-                    .member_lookup_with_policy_and_receiver(
-                        db,
-                        env,
-                        "__call__",
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        receiver,
-                    )
-                    .unwrap_or_else(|error| error.fallback_member(db))
-                    .member(db)
-                    .place
-                {
-                    Place::Defined(DefinedPlace {
-                        ty: dunder_callable,
-                        definedness: boundness,
-                        ..
-                    }) => {
-                        let mut bindings = dunder_callable.bindings_impl(db, env, recursion_guard);
-                        bindings.replace_callable_type(dunder_callable, self);
-                        bindings.set_implicitly_invoked();
-                        if boundness == Definedness::PossiblyUndefined {
-                            bindings.set_dunder_call_is_possibly_unbound();
+                // A chain of `__call__` attributes can revisit an instance without unfolding an
+                // alias. Keep the guard active through both member lookup and call binding, and
+                // share it with calls reached indirectly through descriptors.
+                env.context().state().instance_call_bindings.visit(
+                    env,
+                    &(env.program(db), operation.constructor, self, receiver),
+                    || CallableBinding::not_callable(self).into(),
+                    || match self
+                        .member_lookup_with_policy_and_receiver(
+                            db,
+                            env,
+                            "__call__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                            receiver,
+                        )
+                        .unwrap_or_else(|error| error.fallback_member(db))
+                        .member(db)
+                        .place
+                    {
+                        Place::Defined(DefinedPlace {
+                            ty: dunder_callable,
+                            definedness: boundness,
+                            ..
+                        }) => {
+                            let mut bindings = dunder_callable.bindings_impl(db, env, operation);
+                            bindings.replace_callable_type(dunder_callable, self);
+                            bindings.set_implicitly_invoked();
+                            if boundness == Definedness::PossiblyUndefined {
+                                bindings.set_dunder_call_is_possibly_unbound();
+                            }
+                            bindings
                         }
-                        bindings
-                    }
-                    Place::Undefined => CallableBinding::not_callable(self).into(),
-                }
+                        Place::Undefined => CallableBinding::not_callable(self).into(),
+                    },
+                )
             }
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
@@ -6558,11 +6572,9 @@ impl<'db> Type<'db> {
                     && let Type::NominalInstance(lookup_instance) =
                         instance_type.flatten_typevars(db, env)
                     && let Some(bindings) = {
-                        let bindings = lookup_instance.to_meta_type(db, env).bindings_impl(
-                            db,
-                            env,
-                            recursion_guard,
-                        );
+                        let bindings = lookup_instance
+                            .to_meta_type(db, env)
+                            .bindings_impl(db, env, operation);
                         bindings.has_only_constructor_items().then_some(bindings)
                     } =>
             {
@@ -6617,7 +6629,7 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db, env)
-                    .bindings_impl(db, env, recursion_guard),
+                    .bindings_impl(db, env, operation),
                 _ => CallableBinding::not_callable(self).into(),
             },
 
@@ -6634,22 +6646,18 @@ impl<'db> Type<'db> {
             Type::KnownInstance(
                 KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial),
-            ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, recursion_guard),
+            ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, operation),
 
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
                 wrapper.callables(db, env).map_or_else(
                     || CallableBinding::not_callable(self).into(),
-                    |callables| {
-                        callables
-                            .to_type(db, env)
-                            .bindings_impl(db, env, recursion_guard)
-                    },
+                    |callables| callables.to_type(db, env).bindings_impl(db, env, operation),
                 )
             }
 
             Type::KnownInstance(known_instance) => known_instance
                 .instance_fallback(db, env)
-                .bindings_impl(db, env, recursion_guard),
+                .bindings_impl(db, env, operation),
 
             Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -7033,7 +7041,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
         class: ClassType<'db>,
-        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        operation: CollectBindings<'_, 'db>,
     ) -> Bindings<'db> {
         fn bind_constructor_new<'db>(
             db: &'db dyn Db,
@@ -7152,7 +7160,14 @@ impl<'db> Type<'db> {
         // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
         // `type[C]`, and different specializations need separate expansion even if one contains
         // the other, because a constructor may ignore its nested type arguments.
+        let recursion_guard = operation.recursion_guard;
         recursion_guard.visit(env, &self_type, on_cycle, || {
+            // Instance calls inside this constructor belong to its expansion. If they lead to
+            // another constructor, that constructor retains its own cycle recovery policy.
+            let operation = CollectBindings {
+                constructor: Some(self_type),
+                ..operation
+            };
             // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
             // We preserve its full overload set here and defer constructor branching decisions
             // until call-time overload resolution.
@@ -7193,7 +7208,7 @@ impl<'db> Type<'db> {
                     ..
                 }) = self_type.resolve_dunder_new_callable(db, env, method.place)
             {
-                let bindings = new_callable.bindings_impl(db, env, recursion_guard);
+                let bindings = new_callable.bindings_impl(db, env, operation);
                 let mut bindings =
                     bind_constructor_new(db, env, bindings, self_type, constructor_instance_ty)
                         .into_constructor_bindings(
@@ -7220,7 +7235,7 @@ impl<'db> Type<'db> {
                     _,
                 ) => {
                     let mut bindings = init_method
-                        .bindings_impl(db, env, recursion_guard)
+                        .bindings_impl(db, env, operation)
                         .into_constructor_bindings(
                             constructor_instance_ty,
                             ConstructorCallableKind::Init,
@@ -7246,7 +7261,7 @@ impl<'db> Type<'db> {
                             ..
                         }) => {
                             let mut bindings = init_method
-                                .bindings_impl(db, env, recursion_guard)
+                                .bindings_impl(db, env, operation)
                                 .into_constructor_bindings(
                                     constructor_instance_ty,
                                     ConstructorCallableKind::Init,
@@ -7308,7 +7323,7 @@ impl<'db> Type<'db> {
             }) = metaclass_dunder_call.place
             {
                 let mut metaclass_bindings = metaclass_call_method
-                    .bindings_impl(db, env, recursion_guard)
+                    .bindings_impl(db, env, operation)
                     .into_constructor_bindings(
                         constructor_instance_ty,
                         ConstructorCallableKind::MetaclassCall,
@@ -10602,13 +10617,15 @@ impl<'db> DunderBindings<'db> {
     }
 }
 
+#[derive(Clone, Copy)]
 struct CollectBindings<'a, 'db> {
     recursion_guard: &'a ActiveRecursionDetector<Type<'db>>,
+    constructor: Option<Type<'db>>,
 }
 
 impl<'db> TypeQuery<'db, Option<Type<'db>>> for CollectBindings<'_, 'db> {
     fn recursion_key(&self) -> TypeQueryKey<'db> {
-        TypeQueryKey::CollectBindings
+        TypeQueryKey::CollectBindings(self.constructor)
     }
 
     type Output = Option<Bindings<'db>>;
@@ -10635,7 +10652,7 @@ impl<'db> TypeQuery<'db, Option<Type<'db>>> for CollectBindings<'_, 'db> {
         ty: Type<'db>,
         receiver: Option<Type<'db>>,
     ) -> Self::Output {
-        ty.bindings_with_receiver(db, traversal.environment(), self, traversal, receiver)
+        ty.bindings_with_receiver(db, traversal.environment(), *self, traversal, receiver)
     }
 }
 

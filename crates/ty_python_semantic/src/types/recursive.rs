@@ -2656,7 +2656,7 @@ pub(super) enum TypeQueryKey<'db> {
         Option<Definition<'db>>,
         super::infer::InferenceFlags,
     ),
-    CollectBindings,
+    CollectBindings(Option<Type<'db>>),
     ProjectMetaType,
     IsSingleton,
     InspectGenerator(super::GeneratorTypeMode),
