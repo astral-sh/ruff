@@ -42,12 +42,13 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annot
 use crate::types::typevar::{
     TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
 };
+use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
-    VarianceTerm, infer_complete_scope_types, todo_type,
+    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownInstanceType,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -832,6 +833,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     target_definition: Definition<'db>,
     relation: TypeRelation,
     typevar_evaluation: TypeVarEvaluation,
+    ordered_overloads: bool,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -840,12 +842,14 @@ impl<'db> SignatureRelationKey<'db> {
         target: &Signature<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
+        ordered_overloads: bool,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
             typevar_evaluation,
+            ordered_overloads,
         })
     }
 }
@@ -2361,6 +2365,107 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Proves a return guarantee over the target's whole input domain, rather than choosing
+    /// any compatible source overload. Earlier overloads can intercept part of that domain,
+    /// even when a later overload accepts all of it.
+    ///
+    /// For example, `(int) -> str; (float) -> bytes` does not guarantee `bytes` for integer
+    /// inputs. Treating both signatures as independent promises could infer `str & bytes`.
+    fn ordered_overload_relation(
+        &self,
+        db: &'db dyn Db,
+        source_signatures: &[Signature<'db>],
+        target: &Signature<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let env = self.env;
+        let supports_ordered_refinement = |signature: &Signature<'db>| {
+            !signature.is_paramspec_value()
+                && signature.parameters().kind() == ParametersKind::Standard
+                && signature
+                    .parameters()
+                    .iter()
+                    .all(|parameter| parameter.is_positional() && !parameter.has_default())
+                && signature
+                    .parameters()
+                    .iter()
+                    .map(Parameter::annotated_type)
+                    .chain(std::iter::once(signature.return_ty))
+                    .chain(signature.receiver_constraint_types())
+                    .all(|ty| {
+                        !any_over_type_expanding_aliases(db, env, ty, |nested| {
+                            nested.is_dynamic()
+                                || matches!(
+                                    nested,
+                                    Type::TypeVar(_)
+                                        | Type::KnownInstance(KnownInstanceType::TypeVar(_))
+                                )
+                        })
+                    })
+        };
+        // Generic metadata can remain after specialization; only remaining type variables
+        // disqualify the signature. Receiver obligations matter even with concrete parameters:
+        // solving an explicit `self: C[T]` against `C[Any]` must not certify a static guarantee.
+        // Defaults, variadics, and generic domains need a more general call-domain analysis.
+        if !supports_ordered_refinement(target) {
+            return None;
+        }
+        let target_domain = target.clone().with_return_type(Type::object());
+        let mut returns = self.always();
+        for source in source_signatures {
+            if !supports_ordered_refinement(source) {
+                return None;
+            }
+            if source.parameters().len() != target.parameters().len() {
+                continue;
+            }
+            // Comparing types positionally is insufficient if keyword arguments can route to
+            // different positions. Positional-only targets do not have this ambiguity.
+            if source
+                .parameters()
+                .iter()
+                .zip(target.parameters())
+                .any(|(source, target)| {
+                    source
+                        .keyword_name()
+                        .zip(target.keyword_name())
+                        .is_some_and(|(source, target)| source != target)
+                })
+            {
+                return None;
+            }
+            if source
+                .parameters()
+                .iter()
+                .zip(target.parameters())
+                .any(|(source, target)| {
+                    self.as_disjointness_checker()
+                        .check_type_pair(db, source.annotated_type(), target.annotated_type())
+                        .is_always_satisfied(db, env, self.inferable)
+                })
+            {
+                continue;
+            }
+            returns = returns.and(db, self.constraints, || {
+                self.check_signature_return_pair(db, source, target)
+            });
+            if returns.is_never_satisfied(db, env, self.inferable) {
+                return Some(returns);
+            }
+            // Ignore returns when proving coverage: an incompatible return must not cause us
+            // to skip an earlier matching overload in favor of a later one.
+            let source_domain = source.clone().with_return_type(Type::object());
+            if self
+                .check_signature_pair(db, &source_domain, &target_domain)
+                .is_always_satisfied(db, env, self.inferable)
+            {
+                return Some(returns);
+            }
+        }
+        // No single overload covered the domain. Separate overloads might cover its pieces,
+        // but that has not been proved here, so retain ordinary inference as a fallback.
+        None
+    }
+
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
     ///
@@ -2482,6 +2587,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
+        if source_overloads.len() > 1
+            && let Some(unsupported) = self.overload_refinement
+        {
+            return target_overloads
+                .iter()
+                .when_all(db, self.constraints, |target| {
+                    self.ordered_overload_relation(db, source_overloads, target)
+                        .unwrap_or_else(|| {
+                            unsupported.set(true);
+                            self.never()
+                        })
+                });
+        }
         if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
@@ -2770,6 +2888,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target,
             self.relation,
             self.typevar_evaluation,
+            self.overload_refinement.is_some(),
         ) else {
             return work();
         };
@@ -6847,5 +6966,184 @@ mod tests {
             func.signature(&db),
             &CallableSignature::single(expected_sig)
         );
+    }
+
+    #[test]
+    fn return_refinement_respects_overload_order() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.pyi",
+            "
+            from typing import overload
+
+            @overload
+            def f(value: int, /) -> str: ...
+            @overload
+            def f(value: object, /) -> bytes: ...
+            ",
+        )?;
+        let env = db.program_environment();
+        let source = Type::FunctionLiteral(get_function_f(&db, "/src/a.pyi"));
+        for (parameter_class, return_class, expected) in [
+            (KnownClass::Int, KnownClass::Str, true),
+            (KnownClass::Int, KnownClass::Bytes, false),
+            (KnownClass::Object, KnownClass::Bytes, false),
+        ] {
+            let target = Type::Callable(CallableType::single(
+                &db,
+                Signature::new(
+                    Parameters::standard([Parameter::positional_only(None)
+                        .with_annotated_type(parameter_class.to_instance(&db, &env))]),
+                    return_class.to_instance(&db, &env),
+                ),
+            ));
+            assert!(source.is_assignable_to(&db, &env, target));
+            assert!(source.is_subtype_of(&db, &env, target));
+            assert_eq!(
+                source.is_subtype_for_return_refinement(&db, &env, target),
+                Some(expected)
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn return_refinement_reports_unsupported_overload_domains() -> anyhow::Result<()> {
+        for first in [
+            "def f[T](value: T, /) -> str: ...",
+            "def f(value: int = 0, /) -> str: ...",
+            "def f(value: Gradual, /) -> str: ...",
+        ] {
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/a.pyi",
+                &format!(
+                    "from typing import Any, overload\ntype Gradual = Any\n@overload\n{first}\n@overload\ndef f(value: object, /) -> bytes: ..."
+                ),
+            )?;
+            let env = db.program_environment();
+            let source = Type::FunctionLiteral(get_function_f(&db, "/src/a.pyi"));
+            let target = Type::Callable(CallableType::single(
+                &db,
+                Signature::new(
+                    Parameters::standard([Parameter::positional_only(None)
+                        .with_annotated_type(KnownClass::Int.to_instance(&db, &env))]),
+                    KnownClass::Str.to_instance(&db, &env),
+                ),
+            ));
+            assert_eq!(
+                source.is_subtype_for_return_refinement(&db, &env, target),
+                None,
+                "{first}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn return_refinement_handles_reordered_keyword_parameters() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.pyi",
+            "
+            from typing import overload
+
+            @overload
+            def f(x: int, y: str) -> int: ...
+            @overload
+            def f(y: str, x: int) -> str: ...
+            ",
+        )?;
+        let env = db.program_environment();
+        let source = Type::FunctionLiteral(get_function_f(&db, "/src/a.pyi"));
+        for (positional_only, expected) in [(true, Some(true)), (false, None)] {
+            let parameters =
+                [("y", KnownClass::Str), ("x", KnownClass::Int)].map(|(name, class)| {
+                    let parameter = if positional_only {
+                        Parameter::positional_only(None)
+                    } else {
+                        Parameter::positional_or_keyword(Name::new_static(name))
+                    };
+                    parameter.with_annotated_type(class.to_instance(&db, &env))
+                });
+            let target = Type::Callable(CallableType::single(
+                &db,
+                Signature::new(
+                    Parameters::standard(parameters),
+                    KnownClass::Str.to_instance(&db, &env),
+                ),
+            ));
+            // Positional calls select the second overload, but `f(x=1, y="")` selects the
+            // first. Disjoint positional parameter types cannot rule out keyword overlap.
+            assert_eq!(
+                source.is_subtype_for_return_refinement(&db, &env, target),
+                expected,
+                "positional_only={positional_only}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn return_refinement_preserves_policy_through_equivalence_and_caching() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.pyi",
+            "
+            from typing import Protocol, overload
+
+            class First(Protocol):
+                @overload
+                def __call__(self, value: int, /) -> str: ...
+                @overload
+                def __call__(self, value: object, /) -> bytes: ...
+
+            class Reversed(Protocol):
+                @overload
+                def __call__(self, value: object, /) -> bytes: ...
+                @overload
+                def __call__(self, value: int, /) -> str: ...
+
+            def f(source: list[First], target: list[Reversed]) -> None: ...
+            ",
+        )?;
+        let env = db.program_environment();
+        let signature = get_function_f(&db, "/src/a.pyi")
+            .literal(&db)
+            .last_definition
+            .signature(&db);
+        let source = signature.parameters().as_slice()[0].annotated_type();
+        let target = signature.parameters().as_slice()[1].annotated_type();
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
+        let mut checker = TypeRelationChecker::subtyping(
+            &env,
+            &constraints,
+            TypeVarSet::None,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        assert!(
+            checker
+                .check_type_pair(&db, source, target)
+                .is_always_satisfied(&db, &env, TypeVarSet::None)
+        );
+
+        // List invariance compares its element types in both directions. Cached ordinary
+        // equivalence cannot prove that differently ordered overloads guarantee the same returns.
+        let unsupported = std::cell::Cell::new(false);
+        checker.overload_refinement = Some(&unsupported);
+        assert!(
+            checker
+                .check_type_pair(&db, source, target)
+                .is_never_satisfied(&db, &env, TypeVarSet::None)
+        );
+        assert!(!unsupported.get());
+        Ok(())
     }
 }
