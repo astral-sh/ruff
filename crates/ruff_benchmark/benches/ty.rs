@@ -1368,6 +1368,21 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+/// Measure runtime union construction for specialized generic classes.
+fn benchmark_union_construction(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 256;
+
+    let mut code = String::new();
+    for index in 0..NUM_CLASSES {
+        writeln!(code, "class C{index}[T]: ...").ok();
+    }
+    let members = (0..NUM_CLASSES)
+        .map(|index| format!("C{index}[int]"))
+        .join(" | ");
+    writeln!(code, "Alias = {members}").ok();
+    benchmark_micro_case(criterion, "ty_micro[generic_union_construction_256]", &code);
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -2534,6 +2549,7 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_union_construction,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
