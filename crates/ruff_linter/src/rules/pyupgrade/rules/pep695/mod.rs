@@ -33,6 +33,8 @@ pub(crate) enum TypeVarRestriction<'a> {
     Bound(&'a Expr),
     /// A type variable with constraints, e.g., `TypeVar("T", int, str)`.
     Constraint(Vec<&'a Expr>),
+    /// A type variable with starred constraints, e.g., `TypeVar("T", *constraints)`.
+    StarredConstraint(&'a Expr),
     /// `AnyStr` is a special case: the only public `TypeVar` defined in the standard library,
     /// and thus the only one that we recognise when imported from another module.
     AnyStr,
@@ -129,6 +131,10 @@ impl Display for DisplayTypeVar<'_> {
                     }
                     f.write_str(")")?;
                 }
+                TypeVarRestriction::StarredConstraint(expr) => {
+                    f.write_str("*")?;
+                    f.write_str(&self.source[expr.range()])?;
+                }
             }
         }
         if let Some(default) = self.type_var.default {
@@ -157,6 +163,7 @@ impl<'a> From<&'a TypeVar<'a>> for TypeParam {
                 name: Identifier::new(*name, TextRange::default()),
                 bound: match restriction {
                     Some(TypeVarRestriction::Bound(bound)) => Some(Box::new((*bound).clone())),
+                    Some(TypeVarRestriction::StarredConstraint(expr)) => Some(Box::new((*expr).clone())),
                     Some(TypeVarRestriction::Constraint(constraints)) => {
                         Some(Box::new(Expr::Tuple(ast::ExprTuple {
                             range: TextRange::default(),
@@ -345,6 +352,11 @@ pub(crate) fn expr_name_to_type_var<'a>(
                     .map(|default| &default.value);
                 let restriction = if let Some(bound) = arguments.find_keyword("bound") {
                     Some(TypeVarRestriction::Bound(&bound.value))
+                } else if let Some(starred) = arguments.args.iter().skip(1).find(|arg| matches!(**arg, Expr::Starred(_))) {
+                    Some(TypeVarRestriction::StarredConstraint(match starred {
+                        &Expr::Starred(ref starred) => &starred.value,
+                        _ => unreachable!(),
+                    }))
                 } else if arguments.args.len() > 1 {
                     Some(TypeVarRestriction::Constraint(
                         arguments.args.iter().skip(1).collect(),
