@@ -9,7 +9,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
 use ty_python_semantic::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
-use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
+use ty_python_semantic::types::ide_support::{
+    inlay_hint_call_argument_details, inlay_hint_return_type,
+};
 use ty_python_semantic::types::{Type, TypeDetail};
 use ty_python_semantic::{HasType, SemanticModel};
 
@@ -186,6 +188,38 @@ impl InlayHint {
         }
     }
 
+    fn return_type(db: &dyn Db, file: ProgramFile<'_>, position: TextSize, ty: Type<'_>) -> Self {
+        let env = ProgramEnvironment::from_file(file);
+        let details = ty.display(db, &env).to_string_parts();
+        let mut parts = vec![" -> ".into()];
+        let mut offset = 0;
+        for (range, detail) in details.targets.iter().zip(&details.details) {
+            if let TypeDetail::Type(ty) = detail
+                && range.start().to_usize() >= offset
+            {
+                let start = range.start().to_usize();
+                let end = range.end().to_usize();
+                if start > offset {
+                    parts.push(details.label[offset..start].into());
+                }
+                parts.push(
+                    InlayHintLabelPart::new(&details.label[start..end])
+                        .with_target(ty.navigation_targets(db, &env).into_iter().next()),
+                );
+                offset = end;
+            }
+        }
+        if offset < details.label.len() {
+            parts.push(details.label[offset..].into());
+        }
+        Self {
+            position,
+            kind: InlayHintKind::Type,
+            label: InlayHintLabel { parts },
+            text_edits: vec![],
+        }
+    }
+
     pub fn display(&self) -> InlayHintDisplay<'_> {
         InlayHintDisplay { inlay_hint: self }
     }
@@ -316,12 +350,16 @@ pub struct InlayHintSettings {
     /// foo("x="1)
     /// ```
     pub call_argument_names: bool,
+
+    /// Whether to show inferred return types on unannotated function definitions.
+    /// Requires `analysis.return-type-inference = "always"`.
+    pub return_types: bool,
     // Add any new setting that enables additional inlays to `any_enabled`.
 }
 
 impl InlayHintSettings {
     pub fn any_enabled(&self) -> bool {
-        self.variable_types || self.call_argument_names
+        self.variable_types || self.call_argument_names || self.return_types
     }
 }
 
@@ -330,6 +368,7 @@ impl Default for InlayHintSettings {
         Self {
             variable_types: true,
             call_argument_names: true,
+            return_types: true,
         }
     }
 }
@@ -451,8 +490,36 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 self.visit_expr(&expr.value);
                 return;
             }
+            Stmt::FunctionDef(function) => {
+                for decorator in &function.decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                self.visit_identifier(&function.name);
+                if let Some(type_params) = &function.type_params {
+                    self.visit_type_params(type_params);
+                }
+                self.visit_parameters(&function.parameters);
+
+                let position = function.parameters.end();
+                if self.settings.return_types
+                    && self.range.contains_inclusive(position)
+                    && let Some(ty) = inlay_hint_return_type(&self.model, function)
+                {
+                    self.hints.push(InlayHint::return_type(
+                        self.db,
+                        self.model.program_file(),
+                        position,
+                        ty,
+                    ));
+                }
+
+                if let Some(returns) = &function.returns {
+                    self.visit_annotation(returns);
+                }
+                self.visit_body(&function.body);
+                return;
+            }
             // TODO
-            Stmt::FunctionDef(_) => {}
             Stmt::For(_) => {}
             _ => {}
         }
@@ -784,13 +851,20 @@ mod tests {
 
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ty_project::ProjectMetadata;
+    use ty_project::metadata::options::{AnalysisOptions, Options};
+    use ty_python_semantic::ReturnTypeInference;
 
     fn inlay_hint_test(source: &str) -> InlayHintTest {
+        inlay_hint_test_with_options(source, Options::default())
+    }
+
+    fn inlay_hint_test_with_options(source: &str, options: Options) -> InlayHintTest {
         const START: &str = "<START>";
         const END: &str = "<END>";
 
-        let mut db =
-            ty_project::TestDb::new(ProjectMetadata::new("test", SystemPathBuf::from("/")));
+        let mut project = ProjectMetadata::new("test", SystemPathBuf::from("/"));
+        project.set_override_options(options);
+        let mut db = ty_project::TestDb::new(project);
 
         let source = dedent(source);
 
@@ -826,6 +900,181 @@ mod tests {
             range,
             _insta_settings_guard: insta_settings_guard,
         }
+    }
+
+    fn return_type_hint_test(source: &str) -> InlayHintTest {
+        inlay_hint_test_with_options(
+            source,
+            Options {
+                analysis: Some(AnalysisOptions {
+                    return_type_inference: Some(ReturnTypeInference::Always),
+                    ..AnalysisOptions::default()
+                }),
+                ..Options::default()
+            },
+        )
+    }
+
+    fn return_type_settings() -> InlayHintSettings {
+        InlayHintSettings {
+            variable_types: false,
+            call_argument_names: false,
+            return_types: true,
+        }
+    }
+
+    #[test]
+    fn return_types_enabled_by_default_with_inference() {
+        let source = "def foo(): return 1\n";
+        let mut test = return_type_hint_test(source);
+        assert!(test.inlay_hints().starts_with("def foo()[ -> Literal[1]]:"));
+        assert_eq!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                return_types: false,
+                ..InlayHintSettings::default()
+            }),
+            source
+        );
+        assert_eq!(inlay_hint_test(source).inlay_hints(), source);
+        assert!(return_type_settings().any_enabled());
+    }
+
+    #[test]
+    fn inferred_return_types() {
+        let mut test = return_type_hint_test(
+            r#"
+            def literal(): return 1
+            def annotated() -> int: return 1
+            def implicit_none(): pass
+            def explicit_none(): return
+            def never(): raise RuntimeError
+            def union(flag: bool):
+                if flag:
+                    return 1
+                return "a"
+            def outer():
+                def inner(): return 2
+                return inner()
+            def multiline(
+                x: int,
+            ): return x
+            def unknown(x): return x
+            def recursive(n: int):
+                if n <= 0:
+                    return 0
+                return recursive(n - 1)
+            def identity[T](x: T): return x
+            from typing import TypeVar
+            T = TypeVar("T")
+            def legacy_identity(x: T): return x
+            "#,
+        );
+        assert_snapshot!(test.inlay_hints_with_settings(&return_type_settings()));
+    }
+
+    #[test]
+    fn return_type_inference_exclusions() {
+        let source = dedent(
+            r#"
+            from typing import TYPE_CHECKING, overload
+
+            async def asynchronous(): return 1
+            def generator(): yield 1
+            if TYPE_CHECKING:
+                def type_checking_only(): return 1
+            @overload
+            def overloaded(x: int): ...
+            @overload
+            def overloaded(x: str): ...
+            def overloaded(x): return 1
+            class C:
+                def __init__(self): pass
+                def __new__(cls): return object.__new__(cls)
+            def replacement() -> int: return 1
+            def decorate(f) -> object: return replacement
+            @decorate
+            def decorated(): return "a"
+            "#,
+        );
+        assert_eq!(
+            return_type_hint_test(&source).inlay_hints_with_settings(&return_type_settings()),
+            source
+        );
+    }
+
+    #[test]
+    fn return_types_in_stubs() {
+        let mut test = return_type_hint_test("");
+        let source = "def foo(): return 1\n";
+        test.with_extra_file("stub.pyi", source);
+        test.file = system_path_to_file(&test.db, "stub.pyi").unwrap();
+        test.range = TextRange::up_to(source.text_len());
+        assert_eq!(
+            test.inlay_hints_with_settings(&return_type_settings()),
+            source
+        );
+    }
+
+    #[test]
+    fn method_return_types() {
+        let mut test = return_type_hint_test(
+            r#"
+            from abc import abstractmethod
+            from typing import final, Self
+            class Base:
+                def method(self) -> int: return 1
+                def fluent(self) -> Self: return self
+            class Child(Base):
+                def method(self): return 2
+                def fluent(self): return self
+                def unannotated_base(self): return 3
+                @final
+                def final_method(self): return 4
+                @abstractmethod
+                def abstract(self): ...
+            @final
+            class Final:
+                def method(self): return 5
+                def fluent(self): return self
+                @classmethod
+                def create(cls): return cls()
+            "#,
+        );
+        assert_snapshot!(test.inlay_hints_with_settings(&return_type_settings()));
+    }
+
+    #[test]
+    fn return_type_hint_range() {
+        let mut test = return_type_hint_test("def foo():\n    <START>return 1<END>\n");
+        assert_eq!(
+            test.inlay_hints_with_settings(&return_type_settings()),
+            "def foo():\n    return 1\n"
+        );
+    }
+
+    #[test]
+    fn return_type_hints_update_after_body_changes() {
+        let mut test = return_type_hint_test("def foo(): return 1\n");
+        assert!(
+            test.inlay_hints_with_settings(&return_type_settings())
+                .starts_with("def foo()[ -> Literal[1]]:")
+        );
+        test.with_extra_file("main.py", "def foo(): return 2\n");
+        assert!(
+            test.inlay_hints_with_settings(&return_type_settings())
+                .starts_with("def foo()[ -> Literal[2]]:")
+        );
+    }
+
+    #[test]
+    fn return_type_hint_with_parameter_hints() {
+        let mut test = return_type_hint_test(
+            "def identity(x: int) -> int: return x\ndef foo(x=identity(1)): return 2\n",
+        );
+        assert_snapshot!(test.inlay_hints_with_settings(&InlayHintSettings {
+            return_types: true,
+            ..InlayHintSettings::default()
+        }));
     }
 
     struct InlayHintTest {

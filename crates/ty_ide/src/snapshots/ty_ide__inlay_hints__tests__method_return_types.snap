@@ -1,0 +1,113 @@
+---
+source: crates/ty_ide/src/inlay_hints.rs
+expression: test.inlay_hints_with_settings(&return_type_settings())
+---
+
+from abc import abstractmethod
+from typing import final, Self
+class Base:
+    def method(self) -> int: return 1
+    def fluent(self) -> Self: return self
+class Child(Base):
+    def method(self)[ -> int]: return 2
+    def fluent(self): return self
+    def unannotated_base(self)[ -> Literal[3] | Unknown]: return 3
+    @final
+    def final_method(self)[ -> Literal[4]]: return 4
+    @abstractmethod
+    def abstract(self): ...
+@final
+class Final:
+    def method(self)[ -> Literal[5]]: return 5
+    def fluent(self)[ -> Self@fluent]: return self
+    @classmethod
+    def create(cls)[ -> Self@create]: return cls()
+
+---------------------------------------------
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/builtins.pyi:LL:7
+   |
+LL | class int:
+   |       ^^^
+info: Source
+  --> main2.py:LL:26
+   |
+LL |     def method(self)[ -> int]: return 2
+   |                          ^^^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/typing.pyi:LL:1
+   |
+LL | Literal: _SpecialForm
+   | ^^^^^^^
+info: Source
+  --> main2.py:LL:36
+   |
+LL |     def unannotated_base(self)[ -> Literal[3] | Unknown]: return 3
+   |                                    ^^^^^^^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/builtins.pyi:LL:7
+   |
+LL | class int:
+   |       ^^^
+info: Source
+  --> main2.py:LL:44
+   |
+LL |     def unannotated_base(self)[ -> Literal[3] | Unknown]: return 3
+   |                                            ^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/ty_extensions/_internal.pyi:LL:1
+   |
+LL | Unknown: _SpecialForm
+   | ^^^^^^^
+info: Source
+  --> main2.py:LL:49
+   |
+LL |     def unannotated_base(self)[ -> Literal[3] | Unknown]: return 3
+   |                                                 ^^^^^^^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/typing.pyi:LL:1
+   |
+LL | Literal: _SpecialForm
+   | ^^^^^^^
+info: Source
+  --> main2.py:LL:32
+   |
+LL |     def final_method(self)[ -> Literal[4]]: return 4
+   |                                ^^^^^^^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/builtins.pyi:LL:7
+   |
+LL | class int:
+   |       ^^^
+info: Source
+  --> main2.py:LL:40
+   |
+LL |     def final_method(self)[ -> Literal[4]]: return 4
+   |                                        ^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/typing.pyi:LL:1
+   |
+LL | Literal: _SpecialForm
+   | ^^^^^^^
+info: Source
+  --> main2.py:LL:26
+   |
+LL |     def method(self)[ -> Literal[5]]: return 5
+   |                          ^^^^^^^
+
+info[inlay-hint-location]: Inlay Hint Target
+  --> stdlib/builtins.pyi:LL:7
+   |
+LL | class int:
+   |       ^^^
+info: Source
+  --> main2.py:LL:34
+   |
+LL |     def method(self)[ -> Literal[5]]: return 5
+   |                                  ^

@@ -38,6 +38,30 @@ pub use unused_binding_support::{UnusedBinding, unused_bindings};
 static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
     LazyLock::new(|| NameMatcher::keyword("class"));
 
+/// Returns the inferred callable return type for an unannotated function definition.
+///
+/// This opts into body dependencies, unlike ordinary function signature queries, and follows
+/// the same configuration and inference exclusions as calls. Decorated definitions are only
+/// supported when the resulting callable still refers to this definition.
+pub fn inlay_hint_return_type<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+) -> Option<Type<'db>> {
+    if function.returns.is_some() || function.is_async {
+        return None;
+    }
+    let db = model.db();
+    let function_type = function.inferred_type(model)?.as_function_literal()?;
+    if function_type.last_definition(db) != function.definition(model) {
+        return None;
+    }
+    let signature = function_type.signature_with_inferred_return_type(db);
+    let [overload] = signature.overloads.as_slice() else {
+        return None;
+    };
+    (!overload.return_ty.is_unknown()).then_some(overload.return_ty)
+}
+
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
