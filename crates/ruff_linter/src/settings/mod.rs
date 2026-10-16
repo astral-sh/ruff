@@ -1059,6 +1059,7 @@ mod tests {
         	invalid-suppression-comment (RUF103),
         	unmatched-suppression-comment (RUF104),
         	rule-codes-in-suppression-comments (RUF106),
+        	block-variable-shadows-local,
         ]
 
         Removed in preview:
