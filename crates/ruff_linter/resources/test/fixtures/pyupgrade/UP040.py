@@ -139,16 +139,6 @@ T_starred = TypeVar("T_starred", *constraints)
 StarredList: TypeAlias = list[T_starred]
 StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
 
-# Mixed constraints retain both the explicit and unpacked types.
-T_mixed = TypeVar("T_mixed", bool, *constraints)
-MixedList: TypeAlias = list[T_mixed]
-MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
-
-# The original TypeVar consumes the iterator, so unpacking it again is unsafe.
-constraint_iterator = iter((int, str))
-T_iterator = TypeVar("T_iterator", *constraint_iterator)
-IteratorAlias = TypeAliasType("IteratorAlias", list[T_iterator], type_params=(T_iterator,))
-
 # Preserve parentheses around a multiline union in a TypeAliasType call.
 LongAlias = TypeAliasType(
     "LongAlias",

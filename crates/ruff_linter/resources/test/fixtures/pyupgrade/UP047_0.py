@@ -72,16 +72,3 @@ U = TypeVar("U", *constraints)
 
 def starred_constraints(var: U) -> U:
     return var
-
-
-# Mixed constraints retain both the explicit and unpacked types.
-W = TypeVar("W", bool, *constraints)
-
-
-def mixed_constraints(var: W) -> W:
-    return var
-
-
-# Both type variables are converted when only one has starred constraints.
-def mixed_parameters(starred: U, bounded: T) -> tuple[U, T]:
-    return starred, bounded

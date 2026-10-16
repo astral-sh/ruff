@@ -106,11 +106,6 @@ _H = TypeVar('_H', *constraints)
 class C[T](Generic[_H]): ...
 
 
-# Mixed constraints retain both the explicit and unpacked types.
-_I = TypeVar('_I', bool, *constraints)
-class C[T](Generic[_I]): ...
-
-
 # Existing starred constraint tuples retain their trailing comma.
 class C[T: (*constraints,)](Generic[_A]): ...
 

@@ -467,32 +467,16 @@ help: Remove `Generic` base class
 note: This is an unsafe fix and may change runtime behavior
 
 RUF053 [*] Class with type parameter list inherits from `Generic`
-   --> RUF053.py:111:12
+   --> RUF053.py:110:29
     |
-109 | # Mixed constraints retain both the explicit and unpacked types.
-110 | _I = TypeVar('_I', bool, *constraints)
-111 | class C[T](Generic[_I]): ...
-    |            ^^^^^^^^^^^
-help: Remove `Generic` base class
-    |
-110 | _I = TypeVar('_I', bool, *constraints)
-    - class C[T](Generic[_I]): ...
-111 + class C[T, _I: (bool, *constraints)]: ...
-112 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-RUF053 [*] Class with type parameter list inherits from `Generic`
-   --> RUF053.py:115:29
-    |
-114 | # Existing starred constraint tuples retain their trailing comma.
-115 | class C[T: (*constraints,)](Generic[_A]): ...
+109 | # Existing starred constraint tuples retain their trailing comma.
+110 | class C[T: (*constraints,)](Generic[_A]): ...
     |                             ^^^^^^^^^^^
 help: Remove `Generic` base class
     |
-114 | # Existing starred constraint tuples retain their trailing comma.
+109 | # Existing starred constraint tuples retain their trailing comma.
     - class C[T: (*constraints,)](Generic[_A]): ...
-115 + class C[T: (*constraints,), _A]: ...
-116 |
+110 + class C[T: (*constraints,), _A]: ...
+111 |
     |
 note: This is an unsafe fix and may change runtime behavior

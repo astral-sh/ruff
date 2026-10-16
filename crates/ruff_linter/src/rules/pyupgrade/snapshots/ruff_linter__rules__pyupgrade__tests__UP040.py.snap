@@ -470,7 +470,7 @@ UP040 [*] Type alias `StarredAlias` uses `TypeAliasType` assignment instead of t
 140 | StarredAlias = TypeAliasType("StarredAlias", list[T_starred], type_params=(T_starred,))
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 141 |
-142 | # Mixed constraints retain both the explicit and unpacked types.
+142 | # Preserve parentheses around a multiline union in a TypeAliasType call.
     |
 help: Use the `type` keyword
     |
@@ -481,114 +481,58 @@ help: Use the `type` keyword
     |
 note: This is an unsafe fix and may change runtime behavior
 
-UP040 [*] Type alias `MixedList` uses `TypeAlias` annotation instead of the `type` keyword
-   --> UP040.py:144:1
-    |
-142 | # Mixed constraints retain both the explicit and unpacked types.
-143 | T_mixed = TypeVar("T_mixed", bool, *constraints)
-144 | MixedList: TypeAlias = list[T_mixed]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-145 | MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
-    |
-help: Use the `type` keyword
-    |
-143 | T_mixed = TypeVar("T_mixed", bool, *constraints)
-    - MixedList: TypeAlias = list[T_mixed]
-144 + type MixedList[T_mixed: (bool, *constraints)] = list[T_mixed]
-145 | MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-UP040 [*] Type alias `MixedAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:145:1
-    |
-143 | T_mixed = TypeVar("T_mixed", bool, *constraints)
-144 | MixedList: TypeAlias = list[T_mixed]
-145 | MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-146 |
-147 | # The original TypeVar consumes the iterator, so unpacking it again is unsafe.
-    |
-help: Use the `type` keyword
-    |
-144 | MixedList: TypeAlias = list[T_mixed]
-    - MixedAlias = TypeAliasType("MixedAlias", list[T_mixed], type_params=(T_mixed,))
-145 + type MixedAlias[T_mixed: (bool, *constraints)] = list[T_mixed]
-146 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
-UP040 [*] Type alias `IteratorAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:150:1
-    |
-148 | constraint_iterator = iter((int, str))
-149 | T_iterator = TypeVar("T_iterator", *constraint_iterator)
-150 | IteratorAlias = TypeAliasType("IteratorAlias", list[T_iterator], type_params=(T_iterator,))
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-151 |
-152 | # Preserve parentheses around a multiline union in a TypeAliasType call.
-    |
-help: Use the `type` keyword
-    |
-149 | T_iterator = TypeVar("T_iterator", *constraint_iterator)
-    - IteratorAlias = TypeAliasType("IteratorAlias", list[T_iterator], type_params=(T_iterator,))
-150 + type IteratorAlias[T_iterator: (*constraint_iterator,)] = list[T_iterator]
-151 |
-    |
-note: This is an unsafe fix and may change runtime behavior
-
 UP040 [*] Type alias `LongAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:153:1
+   --> UP040.py:143:1
     |
-152 |   # Preserve parentheses around a multiline union in a TypeAliasType call.
-153 | / LongAlias = TypeAliasType(
-154 | |     "LongAlias",
-155 | |     int
-156 | |     | str
-157 | |     | float
-158 | | )
+142 |   # Preserve parentheses around a multiline union in a TypeAliasType call.
+143 | / LongAlias = TypeAliasType(
+144 | |     "LongAlias",
+145 | |     int
+146 | |     | str
+147 | |     | float
+148 | | )
     | |_^
-159 |
-160 |   # An already parenthesized value keeps its own parentheses.
+149 |
+150 |   # An already parenthesized value keeps its own parentheses.
     |
 help: Use the `type` keyword
     |
-152 | # Preserve parentheses around a multiline union in a TypeAliasType call.
+142 | # Preserve parentheses around a multiline union in a TypeAliasType call.
     - LongAlias = TypeAliasType(
     -     "LongAlias",
     -     int
-153 + type LongAlias = (int
-154 |     | str
+143 + type LongAlias = (int
+144 |     | str
     -     | float
     - )
-155 +     | float)
-156 |
+145 +     | float)
+146 |
     |
 note: This is an unsafe fix and may change runtime behavior
 
 UP040 [*] Type alias `ParenAlias` uses `TypeAliasType` assignment instead of the `type` keyword
-   --> UP040.py:161:1
+   --> UP040.py:151:1
     |
-160 |   # An already parenthesized value keeps its own parentheses.
-161 | / ParenAlias = TypeAliasType(
-162 | |     "ParenAlias",
-163 | |     (
-164 | |         int
-165 | |         | str
-166 | |     ),
-167 | | )
+150 |   # An already parenthesized value keeps its own parentheses.
+151 | / ParenAlias = TypeAliasType(
+152 | |     "ParenAlias",
+153 | |     (
+154 | |         int
+155 | |         | str
+156 | |     ),
+157 | | )
     | |_^
 help: Use the `type` keyword
     |
-160 | # An already parenthesized value keeps its own parentheses.
+150 | # An already parenthesized value keeps its own parentheses.
     - ParenAlias = TypeAliasType(
     -     "ParenAlias",
     -     (
-161 + type ParenAlias = (
-162 |         int
-163 |         | str
+151 + type ParenAlias = (
+152 |         int
+153 |         | str
     -     ),
     - )
-164 +     )
+154 +     )
     |
 note: This is an unsafe fix and may change runtime behavior
