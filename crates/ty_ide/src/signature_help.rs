@@ -208,32 +208,21 @@ fn create_signature_details_from_call_signature_details<'db>(
         .and_then(|def| docstring_for_call_definition(db, def));
 
     // Translate the argument index to parameter index using the mapping.
-    let active_parameter =
-        if details.argument_to_parameter_mapping.is_empty() && current_arg_index == 0 {
-            Some(0)
-        } else {
-            details
-                .argument_to_displayed_parameter_mapping
-                .get(current_arg_index)
-                .copied()
-                .flatten()
-                .or({
-                    // If we can't find a mapping for this argument, fall back to the argument
-                    // index when it still points at a displayed parameter. Otherwise, if the
-                    // last displayed parameter is variadic, keep it active for any later
-                    // positional or keyword arguments that would still bind there. The `- 1`
-                    // converts the parameter count to the zero-based index of that last entry.
-                    if current_arg_index < details.parameters.len() {
-                        Some(current_arg_index)
-                    } else if details.parameters.last().is_some_and(|parameter| {
-                        parameter.is_variadic || parameter.is_keyword_variadic
-                    }) {
-                        Some(details.parameters.len() - 1)
-                    } else {
-                        None
-                    }
-                })
-        };
+    let active_parameter = if let Some(parameter) = details
+        .argument_to_displayed_parameter_mapping
+        .get(current_arg_index)
+    {
+        *parameter
+    } else if current_arg_index < details.parameters.len() {
+        // An unfinished argument has no mapping yet. Fall back to its position, or to the final
+        // displayed parameter if it is `*args` or `**kwargs`.
+        Some(current_arg_index)
+    } else {
+        details.parameters.last().and_then(|parameter| {
+            (parameter.is_variadic || parameter.is_keyword_variadic)
+                .then(|| details.parameters.len() - 1)
+        })
+    };
 
     let parameters = create_parameters(details.parameters, documentation.as_ref());
     let active_parameter = active_parameter.filter(|&index| index < parameters.len());
@@ -786,6 +775,44 @@ def ab(a: str):
     }
 
     #[test]
+    fn signature_help_positional_argument_after_keyword() {
+        let test = cursor_test(
+            r#"
+            def f(x: int, y: int): pass
+            f(x=1, 2<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (x: int, y: int) -> Unknown
+        ---------------------------------------------
+
+        (no active parameter specified)
+        ");
+    }
+
+    #[test]
+    fn signature_help_positional_argument_after_keyword_unpacking() {
+        let test = cursor_test(
+            r#"
+            def f(x: int, y: int): pass
+            f(**{'x': 1}, 2<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (x: int, y: int) -> Unknown
+        ---------------------------------------------
+
+        (no active parameter specified)
+        ");
+    }
+
+    #[test]
     fn signature_help_overload_arity_disambiguated1() {
         let test = CursorTest::builder()
             .source(
@@ -955,9 +982,7 @@ def ab(a: int, *, c: int):
         ---------------------------------------------
         c overload
 
-        -------------- active parameter -------------
-        c: int
-        ---------------------------------------------
+        (no active parameter specified)
         ");
     }
 
@@ -1021,9 +1046,7 @@ def ab(a: int, *, c: int):
         ---------------------------------------------
         b overload
 
-        -------------- active parameter -------------
-        b: int
-        ---------------------------------------------
+        (no active parameter specified)
         ");
     }
 
