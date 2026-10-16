@@ -208,6 +208,42 @@ pub(crate) enum TypeVarEvaluation {
     Lazy,
 }
 
+/// Return whether a generic target positive has a static nominal origin missing from every
+/// source positive. Return `false` unless the source positives are nonempty and all have static
+/// nominal origins whose classes have no explicit bases.
+fn has_missing_generic_nominal_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: IntersectionType<'db>,
+    target: IntersectionType<'db>,
+) -> bool {
+    // With only nominal source positives, each nominal target positive needs a matching
+    // source positive. Classes without explicit bases can supply only their own origin or
+    // object. Since the target is generic, a missing origin proves failure without inspecting
+    // arguments, exclusions, or MROs. Keep matching origins and inheritance on the full path.
+    !source.positive(db).is_empty()
+        && target.positive(db).iter().any(|&target| {
+            // The proof also applies to non-generic targets other than object, but this extra
+            // filtering costs more than it saves for them: their general relation already
+            // avoids recursion guards and specialization checks.
+            let Type::NominalInstance(instance) = target else {
+                return false;
+            };
+            if !instance.is_definition_generic(db) {
+                return false;
+            }
+            let Some(target) = instance.class_literal(db, env).as_static() else {
+                return false;
+            };
+            source.positive(db).iter().all(|&source| {
+                source
+                    .as_nominal_instance()
+                    .and_then(|source| source.class_literal(db, env).as_static())
+                    .is_some_and(|source| source != target && !source.has_explicit_bases(db))
+            })
+        })
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     /// Return `true` if subtyping is always reflexive for this type; `T <: T` is always true for
@@ -692,6 +728,14 @@ impl<'db> Type<'db> {
 
         if self == other {
             return true;
+        }
+
+        // Avoid creating a cached relation query for comparisons that class origins alone can
+        // reject. The general relation below would also return false; this is only a shortcut.
+        if let (Type::Intersection(source), Type::Intersection(target)) = (self, other)
+            && has_missing_generic_nominal_bound(db, env, source, target)
+        {
+            return false;
         }
 
         let program = env.program(db);
