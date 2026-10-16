@@ -3017,7 +3017,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn as_literal_value_kind(self) -> Option<LiteralValueTypeKind<'db>> {
+    pub(crate) fn as_literal_value_kind(self) -> Option<LiteralValueTypeKind<'db>> {
         match self {
             Type::LiteralValue(literal) => Some(literal.kind()),
             _ => None,
@@ -3208,7 +3208,7 @@ impl<'db> Type<'db> {
     }
 
     /// Create a promotable enum literal.
-    fn enum_literal(value: EnumLiteralType<'db>) -> Self {
+    pub(crate) fn enum_literal(value: EnumLiteralType<'db>) -> Self {
         Self::LiteralValue(LiteralValueType::promotable(value))
     }
 

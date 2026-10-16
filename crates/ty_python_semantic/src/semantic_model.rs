@@ -26,16 +26,19 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
     resolve_place_load,
 };
+use crate::reachability::{PatternSubjectExpansion, type_narrowed_by_previous_patterns};
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    CycleDetector, EnumLiteralType, KnownClass, LiteralValueTypeKind, ProgramEnvironment,
+    SpecialFormType, Type, TypeQualifiers, binding_type, expand_type, infer_complete_scope_types,
+    infer_definition_types, inferred_declaration, is_discarded_dict_key_assignment,
+    pattern_binding_fallthrough_type,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
+use ty_python_core::predicate::PatternPredicateKind;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
@@ -318,6 +321,64 @@ impl<'db> SemanticModel<'db> {
                 is_type_check_only: member.is_type_check_only,
             })
             .collect()
+    }
+
+    /// Returns the shortest expression in scope that resolves to `target`.
+    ///
+    /// This also follows class and module namespaces so that a nested class can be spelled through
+    /// a visible owner, such as `Palette.Color`.
+    pub fn visible_qualifier_for_type(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+        target: Type<'db>,
+    ) -> Option<String> {
+        let qualified_name = target
+            .as_class_literal()?
+            .qualified_name(self.db)
+            .to_string();
+        let components = qualified_name.split('.').collect::<Vec<_>>();
+        let mut roots = self
+            .members_in_scope_at(node)
+            .into_iter()
+            .collect::<Vec<_>>();
+        roots.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+
+        let env = self.program_environment();
+        let mut candidates = Vec::new();
+        for (root_name, root) in roots {
+            if root.ty == target {
+                candidates.push(root_name.to_string());
+                continue;
+            }
+
+            for start in 0..components.len() {
+                let mut current = root.ty;
+                let mut path = root_name.to_string();
+                for component in &components[start..] {
+                    let Some(member) = all_members(self.db, &env, current)
+                        .into_iter()
+                        .find(|member| member.name.as_str() == *component)
+                    else {
+                        break;
+                    };
+                    current = member.ty;
+                    path.push('.');
+                    path.push_str(component);
+                }
+
+                if current == target {
+                    candidates.push(path);
+                }
+            }
+        }
+
+        candidates.into_iter().min_by(|left, right| {
+            left.matches('.')
+                .count()
+                .cmp(&right.matches('.').count())
+                .then_with(|| left.len().cmp(&right.len()))
+                .then_with(|| left.cmp(right))
+        })
     }
 
     /// Returns completions for symbols available in the scope containing the
@@ -638,6 +699,147 @@ impl<'db> SemanticModel<'db> {
             }
             _ => TypeQualifiers::empty(),
         }
+    }
+
+    /// Returns completion candidates for a pattern in a `match` statement.
+    pub fn match_case_completions(
+        &self,
+        match_stmt: &ast::StmtMatch,
+        current_case: &ast::MatchCase,
+        current_or_pattern_arm_path: &[usize],
+    ) -> MatchCaseCompletions<'db> {
+        struct MatchCaseCandidates;
+        type MatchCaseCandidatesVisitor<'db> =
+            CycleDetector<'db, MatchCaseCandidates, Type<'db>, Vec<MatchCaseCompletion<'db>>, 3>;
+
+        // Recursively expand types because a finite type can contain other expandable types. For
+        // example, expanding `bool | None` once produces `bool` and `None`, and `bool` must then be
+        // expanded again to produce `Literal[True]` and `Literal[False]`.
+        fn collect<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            visitor: &MatchCaseCandidatesVisitor<'db>,
+        ) -> Vec<MatchCaseCompletion<'db>> {
+            if let Some(candidate) = MatchCaseCompletion::try_from_ty(db, ty) {
+                return vec![candidate];
+            }
+
+            if let Type::NominalInstance(instance) = ty
+                && let Some(enum_class) = instance.class_literal(db, env).into_enum_class(db)
+            {
+                return enum_class
+                    .member_names(db)
+                    .map(|member_name| {
+                        let ty =
+                            Type::enum_literal(EnumLiteralType::new(db, enum_class, member_name));
+                        MatchCaseCompletion {
+                            ty,
+                            kind: MatchCaseCompletionKind::EnumMember {
+                                enum_class: Type::ClassLiteral(enum_class.class_literal(db)),
+                                member_name: member_name.clone(),
+                            },
+                        }
+                    })
+                    .collect();
+            }
+
+            let expanded = match ty {
+                Type::TypeAlias(alias) => vec![alias.value_type(db)],
+                Type::EnumComplement(_) | Type::Intersection(_) | Type::Union(_) => {
+                    expand_type(db, env, ty).unwrap_or_default()
+                }
+                Type::NominalInstance(instance)
+                    if instance
+                        .class_literal(db, env)
+                        .is_known(db, KnownClass::Bool) =>
+                {
+                    expand_type(db, env, ty).unwrap_or_default()
+                }
+                _ => Vec::new(),
+            };
+
+            expanded
+                .into_iter()
+                .flat_map(|expanded_ty| {
+                    visitor.visit(db, expanded_ty, || collect(db, env, expanded_ty, visitor))
+                })
+                .collect()
+        }
+
+        // Narrow `subject_ty` by all preceding alternatives in an OR pattern. For example, at the
+        // cursor in `case Color.RED | Color.GREEN | <CURSOR>`, neither `Color.RED` nor
+        // `Color.GREEN` should be suggested.
+        fn or_patterns<'db>(
+            pattern: &'db PatternPredicateKind<'db>,
+        ) -> Option<&'db [PatternPredicateKind<'db>]> {
+            match pattern {
+                PatternPredicateKind::Or(patterns) => Some(patterns),
+                PatternPredicateKind::As(Some(pattern), _) => or_patterns(pattern),
+                _ => None,
+            }
+        }
+
+        let index = semantic_index(self.db, self.file);
+        let env = self.program_environment();
+
+        let Some(predicate) = index.try_match_case_predicate(current_case) else {
+            return MatchCaseCompletions::default();
+        };
+
+        let Some(subject_ty) = match_stmt.subject.inferred_type(self) else {
+            return MatchCaseCompletions::default();
+        };
+
+        // Narrow the subject by all preceding unguarded match patterns.
+        let mut remaining_ty =
+            type_narrowed_by_previous_patterns(self.db, predicate, PatternSubjectExpansion::Raw);
+        let mut current_pattern = predicate.kind(self.db);
+
+        // Follow the OR arm path from the outermost OR pattern to the cursor. For `A | (B | C)`
+        // with the cursor on `C`, `[1, 1]` first rules out `A` and then rules out `B`.
+        for &index in current_or_pattern_arm_path {
+            let Some(patterns) = or_patterns(current_pattern) else {
+                return MatchCaseCompletions::default();
+            };
+
+            // Every arm before the selected one has already failed to match. In the example above,
+            // `previous_patterns` is `[A]` on the first iteration and `[B]` on the second.
+            let Some(previous_patterns) = patterns.get(..index) else {
+                return MatchCaseCompletions::default();
+            };
+
+            // Keep only the values that fall through all of those previous arms.
+            remaining_ty = previous_patterns
+                .iter()
+                .fold(remaining_ty, |remaining_ty, pattern| {
+                    pattern_binding_fallthrough_type(self.db, &env, pattern, remaining_ty)
+                });
+
+            let Some(pattern) = patterns.get(index) else {
+                return MatchCaseCompletions::default();
+            };
+            current_pattern = pattern;
+        }
+
+        let visitor = MatchCaseCandidatesVisitor::default();
+        let mut seen = FxHashSet::default();
+
+        let known = visitor
+            .visit(self.db, subject_ty, || {
+                collect(self.db, &env, subject_ty, &visitor)
+            })
+            .into_iter()
+            .filter(|candidate| seen.insert(candidate.clone()))
+            .collect::<Vec<_>>();
+
+        let remaining = known
+            .iter()
+            .filter(|candidate| !candidate.ty.is_disjoint_from(self.db, &env, remaining_ty))
+            .cloned()
+            .collect();
+
+        MatchCaseCompletions { known, remaining }
     }
 
     /// Returns completion candidates from a string's expected type and dictionary initializer.
@@ -1003,6 +1205,60 @@ pub struct Completion<'db> {
 pub struct ExpectedStringLiteralCompletion<'db> {
     pub value: String,
     pub ty: Type<'db>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct MatchCaseCompletion<'db> {
+    pub ty: Type<'db>,
+    pub kind: MatchCaseCompletionKind<'db>,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum MatchCaseCompletionKind<'db> {
+    None,
+    Bool(bool),
+    Int(i64),
+    String(String),
+    Bytes(Box<[u8]>),
+    EnumMember {
+        enum_class: Type<'db>,
+        member_name: Name,
+    },
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct MatchCaseCompletions<'db> {
+    pub known: Vec<MatchCaseCompletion<'db>>,
+    pub remaining: Vec<MatchCaseCompletion<'db>>,
+}
+
+impl<'db> MatchCaseCompletion<'db> {
+    fn try_from_ty(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        if ty.is_none(db) {
+            return Some(Self {
+                ty,
+                kind: MatchCaseCompletionKind::None,
+            });
+        }
+
+        let kind = match ty.as_literal_value_kind()? {
+            LiteralValueTypeKind::Int(number) => MatchCaseCompletionKind::Int(number.as_i64()),
+            LiteralValueTypeKind::Bool(value) => MatchCaseCompletionKind::Bool(value),
+            LiteralValueTypeKind::String(string) => {
+                MatchCaseCompletionKind::String(string.value(db).to_string())
+            }
+            LiteralValueTypeKind::Bytes(bytes) => {
+                MatchCaseCompletionKind::Bytes(bytes.value(db).to_vec().into_boxed_slice())
+            }
+            LiteralValueTypeKind::Enum(enum_literal) => MatchCaseCompletionKind::EnumMember {
+                enum_class: Type::ClassLiteral(enum_literal.enum_class(db)),
+                member_name: enum_literal.name(db).clone(),
+            },
+            LiteralValueTypeKind::LiteralString => return None,
+        };
+
+        Some(Self { ty, kind })
+    }
 }
 
 pub trait HasType {
