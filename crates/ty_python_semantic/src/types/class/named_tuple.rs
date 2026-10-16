@@ -282,11 +282,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
         if !self.has_known_fields(db) {
-            return TupleType::homogeneous(db, env, Type::unknown()).to_class_type(db);
+            return TupleType::homogeneous(db, env, Type::unknown()).to_class_type(db, env);
         }
 
         let field_types = self.fields(db).iter().map(|field| field.ty);
-        TupleType::heterogeneous(db, env, field_types).to_class_type(db)
+        TupleType::heterogeneous(db, env, field_types).to_class_type(db, env)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).

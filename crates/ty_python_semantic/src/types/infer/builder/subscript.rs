@@ -243,7 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db));
+        let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db, env));
 
         match value_ty {
             Type::ClassLiteral(class) => {

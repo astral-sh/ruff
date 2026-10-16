@@ -1,4 +1,4 @@
-use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData};
+use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData, rc::Rc};
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::PythonFile;
@@ -20,6 +20,7 @@ use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
+use crate::types::relation::ActiveComparison;
 use crate::{
     Db, Program,
     lint::{LintId, LintMetadata},
@@ -30,11 +31,12 @@ use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ProgramFile, semantic_index};
 
-/// The lazily resolved program used by a semantic operation.
+/// The lazily resolved program and active comparison guards of a semantic operation.
 #[derive(Clone)]
 pub struct ProgramEnvironment<'db> {
     environment: Cell<ProgramSource>,
     lifetime: PhantomData<&'db ()>,
+    pub(super) comparison: Option<Rc<ActiveComparison<'db>>>,
 }
 
 impl<'db> ProgramEnvironment<'db> {
@@ -43,6 +45,7 @@ impl<'db> ProgramEnvironment<'db> {
         Self {
             environment: Cell::new(ProgramSource::File(file.as_id())),
             lifetime: PhantomData,
+            comparison: None,
         }
     }
 
@@ -51,6 +54,7 @@ impl<'db> ProgramEnvironment<'db> {
         Self {
             environment: Cell::new(ProgramSource::Definition(definition.as_id())),
             lifetime: PhantomData,
+            comparison: None,
         }
     }
 
@@ -59,6 +63,7 @@ impl<'db> ProgramEnvironment<'db> {
         Self {
             environment: Cell::new(ProgramSource::Scope(scope.as_id())),
             lifetime: PhantomData,
+            comparison: None,
         }
     }
 
@@ -67,6 +72,7 @@ impl<'db> ProgramEnvironment<'db> {
         Self {
             environment: Cell::new(ProgramSource::Program(program.as_id())),
             lifetime: PhantomData,
+            comparison: None,
         }
     }
 
@@ -110,6 +116,19 @@ impl<'db> ProgramEnvironment<'db> {
     #[inline]
     pub(crate) fn resolver_environment(&self, db: &'db dyn Db) -> ResolverEnvironment<'db> {
         self.program(db).resolver_environment(db)
+    }
+
+    /// Whether a nested computation can depend on a comparison's recursion guard.
+    pub(super) fn has_active_comparison(&self) -> bool {
+        self.comparison.is_some()
+    }
+
+    /// Change the source environment without losing the caller's comparison guards.
+    pub(super) fn in_program(&self, program: Program<'db>) -> Self {
+        Self {
+            comparison: self.comparison.clone(),
+            ..Self::from_program(program)
+        }
     }
 }
 

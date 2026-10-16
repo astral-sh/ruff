@@ -247,7 +247,7 @@ impl<'db> NominalInstanceType<'db> {
 
     pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
         match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
+            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db, env),
             NominalInstanceInner::NonTuple(class) => class.class(db),
             NominalInstanceInner::SysVersionInfo => {
                 sys_version_info_class(db, env).unwrap_or_else(|| ClassType::object(db, env))

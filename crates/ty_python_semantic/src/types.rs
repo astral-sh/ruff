@@ -602,16 +602,27 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     }
 
     fn for_new_materialization_root(&self) -> Self {
+        self.in_environment(self.env)
+    }
+
+    /// Start a nested comparison's mapping without losing materialization cycle guards.
+    fn in_environment<'other>(
+        &self,
+        env: &'other ProgramEnvironment<'db>,
+    ) -> ApplyTypeMappingVisitor<'other, 'db>
+    where
+        'env: 'other,
+    {
         let materialization_equivalence = OnceCell::new();
         let was_empty =
             materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
         debug_assert!(was_empty.is_ok());
 
-        Self {
+        ApplyTypeMappingVisitor {
             materialization_equivalence,
             recursion_context: self.recursion_context,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
-            ..Self::new(self.env)
+            ..ApplyTypeMappingVisitor::new(env)
         }
     }
 }

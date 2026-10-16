@@ -615,6 +615,24 @@ def f(x: A):
     assert_type(x[0], WithIterable[A])
 ```
 
+## Literal elements in growing recursive tuples
+
+Iterating over a recursive tuple preserves its literal and recursive elements, even when each
+recursive reference changes the type argument. Indexing the tuple still gives the precise element
+type.
+
+```py
+from typing import Literal
+
+type Nested[T] = tuple[Literal[1, "tag"], T, Nested[list[T]]]
+
+def f(value: Nested[int]):
+    reveal_type(value[0])  # revealed: Literal[1, "tag"]
+    reveal_type(value[2][1])  # revealed: list[int]
+    for item in value:
+        reveal_type(item)  # revealed: int | Literal["tag"] | tuple[Literal[1, "tag"], list[int], Nested[list[list[int]]]]
+```
+
 ## Boolean aliases after substitution
 
 Subtracting `True` from `bool` leaves only `False`. Using aliases for the arguments to `Minus` does

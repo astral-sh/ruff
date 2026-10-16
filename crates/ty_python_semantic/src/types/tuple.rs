@@ -263,12 +263,27 @@ impl<'db> TupleType<'db> {
         )
     }
 
-    // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
-    // `static-frame` as part of the ecosystem analysis. This is because it's called
-    // from `NominalInstanceType::class()`, which is a very hot method.
+    /// Project the tuple's class while retaining guards used to simplify its element union.
+    pub(crate) fn to_class_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> ClassType<'db> {
+        if env.has_active_comparison() {
+            self.to_class_type_impl(db, &env.in_program(self.program(db)))
+        } else {
+            self.cached_class_type(db)
+        }
+    }
+
+    // Independent projections need caching: without it, checking `static-frame` takes ten
+    // minutes. Nested projections can depend on their caller's comparison guards instead.
     #[salsa::tracked(returns(copy), cycle_initial=to_class_type_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn to_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        let env = &ProgramEnvironment::from_program(self.program(db));
+    fn cached_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.to_class_type_impl(db, &ProgramEnvironment::from_program(self.program(db)))
+    }
+
+    fn to_class_type_impl(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
         let tuple_class = KnownClass::Tuple
             .try_to_class_literal(db, env)
             .expect("Typeshed should always have a `tuple` class in `builtins.pyi`");

@@ -329,7 +329,7 @@ impl<'db> ClassBase<'db> {
                             env,
                             fields.values().map(|field| field.declared_ty),
                         )
-                        .to_class_type(db)
+                        .to_class_type(db, env)
                         .into(),
                         subclass,
                     )
