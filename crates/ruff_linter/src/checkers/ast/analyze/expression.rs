@@ -1026,6 +1026,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::PytestPatchWithLambda) {
                 flake8_pytest_style::rules::patch_with_lambda(checker, call);
             }
+            if checker.is_rule_enabled(Rule::SharedClockMock) {
+                ruff::rules::shared_clock_mock(checker, call);
+            }
             if checker.any_rule_enabled(&[
                 Rule::PytestParametrizeNamesWrongType,
                 Rule::PytestParametrizeValuesWrongType,
