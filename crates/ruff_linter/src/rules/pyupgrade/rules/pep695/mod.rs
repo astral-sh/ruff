@@ -123,14 +123,16 @@ impl Display for DisplayTypeVar<'_> {
                         // A single starred expression needs a comma to form a constraint tuple:
                         // `TypeVar("T", *constraints)` becomes `T: (*constraints,)`.
                         [element] => {
-                            write!(f, "({element},)", element = &self.source[element.range()])?
+                            write!(f, "({element},)", element = &self.source[element.range()])?;
                         }
-                        _ => write!(
-                            f,
-                            "({})",
-                            vec.iter()
-                                .format_with(", ", |expr, f| f(&&self.source[expr.range()]))
-                        )?,
+                        _ => {
+                            write!(
+                                f,
+                                "({})",
+                                vec.iter()
+                                    .format_with(", ", |expr, f| f(&&self.source[expr.range()])),
+                            )?;
+                        }
                     }
                 }
             }
