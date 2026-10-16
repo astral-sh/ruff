@@ -1080,7 +1080,10 @@ impl<'db> UnionBuilder<'db> {
                 }
             };
 
-            if ty == element_type {
+            if match (ty, element_type) {
+                (Type::NominalInstance(left), Type::NominalInstance(right)) => left == right,
+                _ => ty == element_type,
+            } {
                 return;
             }
 
