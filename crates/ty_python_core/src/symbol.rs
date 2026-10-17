@@ -44,6 +44,7 @@ bitflags! {
         /// true if the symbol is assigned more than once, or if it is assigned even though it is already in use
         const IS_REASSIGNED         = 1 << 5;
         const IS_PARAMETER          = 1 << 6;
+        const HAS_NON_KEYWORD_UNPACKING_USE = 1 << 7;
     }
 }
 
@@ -64,6 +65,14 @@ impl Symbol {
     /// Is the symbol used in its containing scope?
     pub fn is_used(&self) -> bool {
         self.flags.contains(SymbolFlags::IS_USED)
+    }
+
+    /// Whether every use in this scope is a direct `**name` argument, with no nested captures.
+    pub fn is_used_only_for_keyword_unpacking(&self) -> bool {
+        self.is_used()
+            && !self
+                .flags
+                .contains(SymbolFlags::HAS_NON_KEYWORD_UNPACKING_USE)
     }
 
     /// Is the symbol given a value in its containing scope?
@@ -143,7 +152,15 @@ impl Symbol {
     }
 
     pub(super) fn mark_used(&mut self) {
+        self.insert_flags(SymbolFlags::IS_USED | SymbolFlags::HAS_NON_KEYWORD_UNPACKING_USE);
+    }
+
+    pub(super) fn mark_used_for_keyword_unpacking(&mut self) {
         self.insert_flags(SymbolFlags::IS_USED);
+    }
+
+    pub(super) fn mark_non_keyword_unpacking_use(&mut self) {
+        self.insert_flags(SymbolFlags::HAS_NON_KEYWORD_UNPACKING_USE);
     }
 
     pub(super) fn mark_declared(&mut self) {
