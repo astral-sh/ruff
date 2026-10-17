@@ -774,7 +774,11 @@ def element[T](sink: Sink[T]) -> T:
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
     # TODO: Validate and refine each specialization separately to accept this call and reveal A & B.
     # error: [invalid-argument-type] "Expected `Sink[A | B]`"
-    reveal_type(element(sink))  # revealed: A | B
+    result = element(sink)
+    reveal_type(result)  # revealed: A | B
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(element(sink))  # revealed: A
 ```
 
 Assignments to different type variables remain correlated within an alternative. Selecting the
@@ -847,9 +851,16 @@ def constrained[T: (A, B)](source: Source[T]) -> T:
 
 def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
     # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(bounded(both))  # revealed: A | B
+    bounded_result = bounded(both)
+    reveal_type(bounded_result)  # revealed: A | B
     # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(constrained(both))  # revealed: A | B
+    constrained_result = constrained(both)
+    reveal_type(constrained_result)  # revealed: A | B
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(bounded(both))  # revealed: A
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(constrained(both))  # revealed: A
     reveal_type(bounded(mixed))  # revealed: A
     reveal_type(constrained(mixed))  # revealed: A
 ```
@@ -2184,6 +2195,29 @@ However, if we pass something that does not match _any_ union element, we do emi
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
 ```
 
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never
+
+def concat[T, U](left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider[T, U, V = Never](left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
+```
+
 ## Inferring nested generic function calls
 
 We can infer type assignments in nested calls to multiple generic functions. If they use the same
@@ -2597,7 +2631,11 @@ def combine(left: A | B, right: A | B) -> Result:
     raise NotImplementedError
 
 def _(values: Iterable[Any]):
-    # revealed: Result | (A & Any) | (B & Any)
+    result = reduce(combine, values)
+    reveal_type(result)  # revealed: Result | (A & Any) | (B & Any)
+
+    # TODO: We should preserve the inferred union through the generic call.
+    # revealed: Result
     reveal_type(reduce(combine, values))
 ```
 
@@ -2953,7 +2991,7 @@ def test[T: int](items: list[T]) -> list[T]:
     ok1: list[str] | list[int] = list(items)
     ok2: list[int] | list[str] = list(items)
 
-    bad: list[str] | list[bytes] = list(items)  # error: [invalid-assignment]
+    bad: list[str] | list[bytes] = list(items)  # error: [invalid-argument-type]
     return items
 ```
 

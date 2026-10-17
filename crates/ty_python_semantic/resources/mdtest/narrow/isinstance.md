@@ -1990,8 +1990,7 @@ def narrow_aliased_typed_dict_to_dict(value: PayloadAlias) -> None:
 After narrowing `Iterable[T] | T` to a non-sized iterable, `T` might itself be an iterable whose
 items have a different type. Permissive narrowing represents that possibility with `Unknown`, so the
 constructor infers `list[T | Unknown]`. Its acceptance as `Collection[T] | T` is unsound; it does
-not establish that all elements have type `T`. The same inferred type appears with and without a
-return context.
+not establish that all elements have type `T`.
 
 ```toml
 [environment]
@@ -2008,7 +2007,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[T@maybe_iterable_to_list | Unknown]
         reveal_type(list(value))
-        # revealed: list[T@maybe_iterable_to_list | Unknown]
+        # revealed: list[T@maybe_iterable_to_list]
         return reveal_type(list(value))
     raise NotImplementedError
 ```
@@ -2033,8 +2032,8 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
         # revealed: list[object]
         reveal_type(list(value))
-        # error: [invalid-return-type]
-        # revealed: list[object]
+        # error: [invalid-argument-type]
+        # revealed: list[T@maybe_iterable_to_list]
         return reveal_type(list(value))
     raise NotImplementedError
 ```

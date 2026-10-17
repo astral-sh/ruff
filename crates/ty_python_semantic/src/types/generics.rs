@@ -14,9 +14,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
-    SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
+    CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance, ConstraintSet,
+    ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths,
+    SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -2593,6 +2593,61 @@ impl<'db> TypeVarInference<'db> {
 
         self.generic_context(db).specialize_recursive(db, types)
     }
+
+    /// Select a compatible specialization based on the declared type of a generic call.
+    pub(crate) fn choose_compatible_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        return_ty: Type<'db>,
+        expected: Type<'db>,
+    ) -> Option<Self> {
+        if matches!(
+            self.solutions(db),
+            TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+        ) {
+            return None;
+        }
+
+        // If the merged specialization is compatible with the declared type, use it.
+        if return_ty
+            .apply_specialization(db, self.merged_specialization(db))
+            .is_assignable_to(db, env, expected)
+        {
+            return Some(self);
+        }
+
+        let TypeVarInferenceSolutions::Alternatives(solutions) = self.solutions(db) else {
+            return None;
+        };
+
+        // Otherwise, if there are multiple valid specializations for this call, attempt to choose
+        // a single one, instead of merging them in a way that leads to an invalid call.
+        let generic_context = self.generic_context(db);
+        let solution = solutions.iter().find_map(|solution| {
+            let types: Box<[Option<Type<'db>>]> = solution
+                .iter()
+                .map(|ty| match ty {
+                    Some(SolutionType::Resolved(ty)) => Some(Some(*ty)),
+                    Some(SolutionType::Unresolved(_)) => None,
+                    None => Some(None),
+                })
+                .collect::<Option<_>>()?;
+
+            let specialization = generic_context.specialize_recursive(db, types.iter().copied());
+            return_ty
+                .apply_specialization(db, specialization)
+                .is_assignable_to(db, env, expected)
+                .then_some(types)
+        })?;
+
+        Some(Self::new(
+            db,
+            generic_context,
+            solution,
+            TypeVarInferenceSolutions::Single,
+        ))
+    }
 }
 
 /// The alternatives retained when solving the pending constraints, before merging each
@@ -2764,6 +2819,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.infer_from_constraint_set(set)
     }
 
+    /// Conjoin declared-type constraints with the pending inference constraints.
+    pub(crate) fn intersect_declared_constraints(&mut self, constraints: ConstraintSet<'db, 'c>) {
+        self.pending
+            .intersect(self.db, self.constraints, constraints);
+    }
+
     /// Build a merged specialization, using a caller-provided hook to select the solution for
     /// each typevar. This compatibility API discards correlations and solving completeness.
     ///
@@ -2795,11 +2856,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     |_variance, path_bound| {
                         let outcome = choose(path_bound.bound_typevar, Some(path_bound))
                             .unwrap_or_else(|| {
-                                CandidateSolutions::default_solve(
+                                path_bound.solve(
                                     db,
                                     builder.env,
                                     builder.constraints,
-                                    path_bound,
+                                    builder.inferable,
                                 )
                             });
                         // Only this explicitly merged projection accepts fallback bindings as
@@ -2948,12 +3009,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 budget,
                 |_variance, path_bound| {
                     choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        CandidateSolutions::default_solve(
-                            db,
-                            builder.env,
-                            builder.constraints,
-                            path_bound,
-                        )
+                        path_bound.solve(db, builder.env, builder.constraints, builder.inferable)
                     })
                 },
             )?;
@@ -3454,7 +3510,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
-        self.pending.intersect(db, self.constraints, constraint);
+        self.record_constraint_set(constraint);
     }
 
     pub(crate) fn inferred_type_is_assignable_to(
@@ -3498,7 +3554,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3506,7 +3562,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3514,7 +3570,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3531,9 +3587,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             self.env,
             self.inferable,
             SolutionBudget::default(),
-            |_variance, path_bound| {
-                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound)
-            },
+            |_variance, path_bound| path_bound.preliminary_solve(db, self.env, self.constraints),
         );
 
         match solutions {
@@ -4917,7 +4971,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
-                        ConstraintProvenance::Evidence,
+                        ConstraintProvenance::INFERRED,
                         typevar,
                         ty,
                     )
@@ -4995,9 +5049,7 @@ mod tests {
 
                 let inference = builder
                     .build_inference_with(|typevar, bounds| {
-                        let lower = bounds
-                            .as_ref()
-                            .and_then(|bounds| bounds.inference_lower(db, &env));
+                        let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                         (typevar == t && lower == Some(str))
                             .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
@@ -5045,7 +5097,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
         ));
@@ -5101,7 +5153,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             ));
@@ -5138,7 +5190,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5204,7 +5256,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5279,7 +5331,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5287,9 +5339,7 @@ mod tests {
 
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = bounds
-                    .as_ref()
-                    .and_then(|bounds| bounds.inference_lower(db, &env));
+                let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                 (typevar == t && lower == Some(str))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
@@ -5336,7 +5386,7 @@ mod tests {
         // individual path still contains the cycle after merging with object.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = bounds?.inference_lower(db, &env);
+                let lower = bounds?.inference_lower();
                 let ty = match (typevar, lower) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
@@ -5430,7 +5480,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
             int,
@@ -5602,7 +5652,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
@@ -5649,7 +5699,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             ty,
         );
@@ -5696,7 +5746,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5704,7 +5754,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5712,7 +5762,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
