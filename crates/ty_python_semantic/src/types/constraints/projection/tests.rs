@@ -514,6 +514,7 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         Signature::new(
             Parameters::from_annotation(
                 db,
+                &env,
                 [Parameter::positional_only(None).with_annotated_type(Type::TypeVar(s))],
             ),
             Type::TypeVar(s),

@@ -2810,9 +2810,12 @@ pub(super) fn report_unsound_return_statement(
     // `TypeIs`-annotated functions are expected to return `bool`;
     // this needs to be normalized before we figure out the error context
     // and before we display the types.
-    let expected_ty = match expected_ty.resolve_type_alias(db) {
-        Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
-        _ => expected_ty,
+    let expected_ty = if expected_ty
+        .has_outer_type(db, |ty| matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_)))
+    {
+        KnownClass::Bool.to_instance(db, env)
+    } else {
+        expected_ty
     };
 
     let settings =

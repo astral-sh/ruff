@@ -8,9 +8,9 @@ use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, TypingModule, todo_type,
+    ApplyTypeMappingVisitor, ClassLiteral, ClassType, CycleKind, DivergentType, DynamicType,
+    KnownClass, KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type,
+    TypeContext, TypeMapping, TypeQuery, TypeQueryContext, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -148,225 +148,9 @@ impl<'db> ClassBase<'db> {
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
-        match ty {
-            Type::RecursiveVar(_) => {
-                unreachable!("semantic operation on an unbound recursive variable")
-            }
-            Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::Recursive(recursive) => {
-                let unfolded = recursive.unfold(db, env).into_unfolded()?;
-                Self::try_from_type(db, env, unfolded, subclass)
-            }
-            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
-            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
-            Type::NominalInstance(instance)
-                if instance.has_known_class(db, KnownClass::GenericAlias) =>
-            {
-                Self::try_from_type(db, env, todo_type!("GenericAlias instance"), subclass)
-            }
-            Type::SubclassOf(subclass_of) => subclass_of
-                .subclass_of()
-                .into_dynamic()
-                .map(ClassBase::Dynamic),
-            Type::Intersection(inter) => {
-                let valid_element = inter
-                    .positive(db)
-                    .iter()
-                    .find_map(|elem| ClassBase::try_from_type(db, env, *elem, subclass))?;
-
-                if ty.is_disjoint_from(db, env, KnownClass::Type.to_instance(db, env)) {
-                    None
-                } else {
-                    Some(valid_element)
-                }
-            }
-            Type::Union(union) => {
-                if let Some(module) = TypingModule::from_typed_dict_type(db, ty) {
-                    return Some(ClassBase::TypedDict(module));
-                }
-
-                // We do not support full unions of MROs (yet). Until we do,
-                // support the cases where one of the types in the union is
-                // a dynamic type such as `Any` or `Unknown`, and all other
-                // types *would be* valid class bases. In this case, we can
-                // "fold" the other potential bases into the dynamic type,
-                // and return `Any`/`Unknown` as the class base to prevent
-                // invalid-base diagnostics and further downstream errors.
-                let Some(Type::Dynamic(dynamic)) = union
-                    .elements(db)
-                    .iter()
-                    .find(|elem| matches!(elem, Type::Dynamic(_)))
-                else {
-                    return None;
-                };
-
-                if union
-                    .elements(db)
-                    .iter()
-                    .all(|elem| ClassBase::try_from_type(db, env, *elem, subclass).is_some())
-                {
-                    Some(ClassBase::Dynamic(*dynamic))
-                } else {
-                    None
-                }
-            }
-            Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
-
-            // This likely means that we're in unreachable code,
-            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
-            Type::Never => Some(ClassBase::unknown()),
-
-            Type::TypeAlias(alias) => Self::try_from_type(db, env, alias.value_type(db), subclass),
-
-            Type::NewTypeInstance(newtype) => {
-                ClassBase::try_from_type(db, env, newtype.concrete_base_type(db), subclass)
-            }
-
-            Type::PropertyInstance(_)
-            | Type::SlotDescriptor(_)
-            | Type::EnumComplement(_)
-            | Type::LiteralValue(_)
-            | Type::FunctionLiteral(_)
-            | Type::Callable(..)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::TypeVar(_)
-            | Type::BoundSuper(_)
-            | Type::ProtocolInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypeForm(_)
-            | Type::TypedDict(_) => None,
-
-            Type::KnownInstance(known_instance) => match known_instance {
-                KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
-                KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
-                // A class inheriting from a newtype would make intuitive sense, but newtype
-                // wrappers are just identity callables at runtime, so this sort of inheritance
-                // doesn't work and isn't allowed.
-                KnownInstanceType::NewType(_) => None,
-                KnownInstanceType::TypeAliasType(_)
-                | KnownInstanceType::TypeVar(_)
-                | KnownInstanceType::Deprecated(_)
-                | KnownInstanceType::Field(_)
-                | KnownInstanceType::ConstraintSet(_)
-                | KnownInstanceType::ConstraintSetSolution(_)
-                | KnownInstanceType::Callable(_)
-                | KnownInstanceType::GenericContext(_)
-                | KnownInstanceType::Specialization(_)
-                | KnownInstanceType::UnionType(_)
-                | KnownInstanceType::Literal(_)
-                | KnownInstanceType::LiteralStringAlias(_)
-                | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::Sentinel(_)
-                | KnownInstanceType::Range { .. }
-                | KnownInstanceType::FunctoolsPartial(_)
-                | KnownInstanceType::MethodWrapper(_)
-                | KnownInstanceType::FunctoolsPartialCall(_) => None,
-                KnownInstanceType::TypeGenericAlias(_) => Self::try_from_type(
-                    db,
-                    env,
-                    KnownClass::Type.to_class_literal(db, env),
-                    subclass,
-                ),
-                KnownInstanceType::Annotated(ty) => match ty.inner(db) {
-                    Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-                    Type::NominalInstance(instance) => Some(Self::Class(instance.class(db, env))),
-                    _ => None,
-                },
-            },
-
-            Type::SpecialForm(special_form) => match special_form {
-                SpecialFormType::TypeQualifier(_) => None,
-
-                SpecialFormType::Annotated
-                | SpecialFormType::Literal
-                | SpecialFormType::LiteralString
-                | SpecialFormType::Union
-                | SpecialFormType::NoReturn
-                | SpecialFormType::Never
-                | SpecialFormType::TypeGuard
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypingSelf
-                | SpecialFormType::Unpack
-                | SpecialFormType::Concatenate
-                | SpecialFormType::TypeAlias
-                | SpecialFormType::Optional
-                | SpecialFormType::Not
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::Intersection
-                | SpecialFormType::TypeOf
-                | SpecialFormType::CallableTypeOf
-                | SpecialFormType::RegularCallableTypeOf
-                | SpecialFormType::Divergent
-                | SpecialFormType::Todo
-                | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy
-                | SpecialFormType::TypeForm => None,
-
-                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
-                SpecialFormType::Unknown => Some(Self::unknown()),
-                SpecialFormType::Protocol => Some(Self::Protocol),
-                SpecialFormType::Generic => Some(Self::Generic),
-                SpecialFormType::TypedDict(module) => Some(Self::TypedDict(module)),
-
-                SpecialFormType::NamedTuple => {
-                    let class = subclass?.as_static()?;
-                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
-                    Self::try_from_type(
-                        db,
-                        env,
-                        TupleType::heterogeneous(
-                            db,
-                            env,
-                            fields.values().map(|field| field.declared_ty),
-                        )
-                        .to_class_type(db)
-                        .into(),
-                        subclass,
-                    )
-                }
-
-                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
-                SpecialFormType::Type => Self::try_from_type(
-                    db,
-                    env,
-                    KnownClass::Type.to_class_literal(db, env),
-                    subclass,
-                ),
-
-                SpecialFormType::Tuple => Self::try_from_type(
-                    db,
-                    env,
-                    KnownClass::Tuple.to_class_literal(db, env),
-                    subclass,
-                ),
-
-                SpecialFormType::LegacyStdlibAlias(alias) => Self::try_from_type(
-                    db,
-                    env,
-                    alias.aliased_class().to_class_literal(db, env),
-                    subclass,
-                ),
-
-                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
-                    Self::try_from_type(
-                        db,
-                        env,
-                        todo_type!("Support for Callable as a base class"),
-                        subclass,
-                    )
-                }
-            },
-        }
+        TypeQueryContext::with_root(env, ResolveClassBase { subclass }, |root| {
+            root.visit(db, ty)
+        })
     }
 
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
@@ -541,6 +325,233 @@ impl<'db> ClassBase<'db> {
             ClassBase::Generic => f.write_str("typing.Generic"),
             ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
         })
+    }
+}
+
+struct ResolveClassBase<'db> {
+    subclass: Option<ClassLiteral<'db>>,
+}
+
+impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
+    type Output = Option<ClassBase<'db>>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        None
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Self::Output {
+        let env = traversal.environment();
+        let subclass = self.subclass;
+        match ty {
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic operation on an unbound recursive variable")
+            }
+            Type::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
+            Type::Divergent(divergent) => Some(ClassBase::Divergent(divergent)),
+            Type::ClassLiteral(literal) => {
+                Some(ClassBase::Class(literal.default_specialization(db)))
+            }
+            Type::GenericAlias(generic) => Some(ClassBase::Class(ClassType::Generic(generic))),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::GenericAlias) =>
+            {
+                traversal.visit(db, todo_type!("GenericAlias instance"))
+            }
+            Type::SubclassOf(subclass_of) => subclass_of
+                .subclass_of()
+                .into_dynamic()
+                .map(ClassBase::Dynamic),
+            Type::Intersection(inter) => {
+                let valid_element = inter
+                    .positive(db)
+                    .iter()
+                    .find_map(|elem| traversal.visit(db, *elem))?;
+
+                if ty.is_disjoint_from(db, env, KnownClass::Type.to_instance(db, env)) {
+                    None
+                } else {
+                    Some(valid_element)
+                }
+            }
+            Type::Union(union) => {
+                if let Some(module) = TypingModule::from_typed_dict_type(db, ty) {
+                    return Some(ClassBase::TypedDict(module));
+                }
+
+                // We do not support full unions of MROs (yet). Until we do,
+                // support the cases where one of the types in the union is
+                // a dynamic type such as `Any` or `Unknown`, and all other
+                // types *would be* valid class bases. In this case, we can
+                // "fold" the other potential bases into the dynamic type,
+                // and return `Any`/`Unknown` as the class base to prevent
+                // invalid-base diagnostics and further downstream errors.
+                let Some(Type::Dynamic(dynamic)) = union
+                    .elements(db)
+                    .iter()
+                    .find(|elem| matches!(elem, Type::Dynamic(_)))
+                else {
+                    return None;
+                };
+
+                if union
+                    .elements(db)
+                    .iter()
+                    .all(|elem| traversal.visit(db, *elem).is_some())
+                {
+                    Some(ClassBase::Dynamic(*dynamic))
+                } else {
+                    None
+                }
+            }
+            Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
+
+            // This likely means that we're in unreachable code,
+            // in which case we want to treat `Never` in a forgiving way and silence diagnostics
+            Type::Never => Some(ClassBase::unknown()),
+
+            Type::NewTypeInstance(newtype) => traversal.visit(db, newtype.concrete_base_type(db)),
+
+            Type::Recursive(_)
+            | Type::TypeAlias(_)
+            | Type::PropertyInstance(_)
+            | Type::SlotDescriptor(_)
+            | Type::EnumComplement(_)
+            | Type::LiteralValue(_)
+            | Type::FunctionLiteral(_)
+            | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_)
+            | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::TypeVar(_)
+            | Type::BoundSuper(_)
+            | Type::ProtocolInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeForm(_)
+            | Type::TypedDict(_) => None,
+
+            Type::KnownInstance(known_instance) => match known_instance {
+                KnownInstanceType::SubscriptedGeneric(_) => Some(ClassBase::Generic),
+                KnownInstanceType::SubscriptedProtocol(_) => Some(ClassBase::Protocol),
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity callables at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                KnownInstanceType::NewType(_) => None,
+                KnownInstanceType::TypeAliasType(_)
+                | KnownInstanceType::TypeVar(_)
+                | KnownInstanceType::Deprecated(_)
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::ConstraintSetSolution(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
+                | KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Literal(_)
+                | KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::NamedTupleSpec(_)
+                | KnownInstanceType::Sentinel(_)
+                | KnownInstanceType::Range { .. }
+                | KnownInstanceType::FunctoolsPartial(_)
+                | KnownInstanceType::MethodWrapper(_)
+                | KnownInstanceType::FunctoolsPartialCall(_) => None,
+                KnownInstanceType::TypeGenericAlias(_) => {
+                    traversal.visit(db, KnownClass::Type.to_class_literal(db, env))
+                }
+                KnownInstanceType::Annotated(ty) => match ty.inner(db) {
+                    Type::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
+                    Type::NominalInstance(instance) => {
+                        Some(ClassBase::Class(instance.class(db, env)))
+                    }
+                    _ => None,
+                },
+            },
+
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::TypeQualifier(_) => None,
+
+                SpecialFormType::Annotated
+                | SpecialFormType::Literal
+                | SpecialFormType::LiteralString
+                | SpecialFormType::Union
+                | SpecialFormType::NoReturn
+                | SpecialFormType::Never
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypingSelf
+                | SpecialFormType::Unpack
+                | SpecialFormType::Concatenate
+                | SpecialFormType::TypeAlias
+                | SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
+                | SpecialFormType::Intersection
+                | SpecialFormType::TypeOf
+                | SpecialFormType::CallableTypeOf
+                | SpecialFormType::RegularCallableTypeOf
+                | SpecialFormType::Divergent
+                | SpecialFormType::Todo
+                | SpecialFormType::AlwaysTruthy
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypeForm => None,
+
+                SpecialFormType::Any => Some(ClassBase::Dynamic(DynamicType::Any)),
+                SpecialFormType::Unknown => Some(ClassBase::unknown()),
+                SpecialFormType::Protocol => Some(ClassBase::Protocol),
+                SpecialFormType::Generic => Some(ClassBase::Generic),
+                SpecialFormType::TypedDict(module) => Some(ClassBase::TypedDict(module)),
+
+                SpecialFormType::NamedTuple => {
+                    let class = subclass?.as_static()?;
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    traversal.visit(
+                        db,
+                        TupleType::heterogeneous(
+                            db,
+                            env,
+                            fields.values().map(|field| field.declared_ty),
+                        )
+                        .to_class_type(db)
+                        .into(),
+                    )
+                }
+
+                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
+                SpecialFormType::Type => {
+                    traversal.visit(db, KnownClass::Type.to_class_literal(db, env))
+                }
+
+                SpecialFormType::Tuple => {
+                    traversal.visit(db, KnownClass::Tuple.to_class_literal(db, env))
+                }
+
+                SpecialFormType::LegacyStdlibAlias(alias) => {
+                    traversal.visit(db, alias.aliased_class().to_class_literal(db, env))
+                }
+
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                    traversal.visit(db, todo_type!("Support for Callable as a base class"))
+                }
+            },
+        }
     }
 }
 

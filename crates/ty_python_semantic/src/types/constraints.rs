@@ -1326,6 +1326,14 @@ impl<'db> ConstraintSetStorage<'db> {
                 false
             }
 
+            fn visit_recursive_type(
+                &self,
+                _db: &'db dyn Db,
+                _recursive: crate::types::RecursiveType<'db>,
+            ) {
+                self.notify_skipped_lazy_type_attributes();
+            }
+
             fn notify_skipped_lazy_type_attributes(&self) {
                 self.support.borrow_mut().mark_incomplete();
             }
@@ -2026,6 +2034,14 @@ fn max_constructor_and_typevar_depth<'db>(
 
             fn should_visit_lazy_type_attributes(&self) -> bool {
                 false
+            }
+
+            fn visit_recursive_type(
+                &self,
+                _db: &'db dyn Db,
+                _recursive: crate::types::RecursiveType<'db>,
+            ) {
+                self.notify_skipped_lazy_type_attributes();
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

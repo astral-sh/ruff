@@ -342,6 +342,25 @@ del SupportsClassDelete.x
 del RejectsClassDelete.x
 ```
 
+### Deleting attributes of recursive TypedDict values
+
+The `child` field refers to all of `Node`'s value types, which include `int`. Those values have no
+`child` attribute to delete:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: int
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def delete(node: Node):
+    value = next(iter(node.values()))
+    del value.child  # error: [unresolved-attribute]
+```
+
 ## Delete items
 
 ### Basic item deletion

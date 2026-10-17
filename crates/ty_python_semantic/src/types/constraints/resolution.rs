@@ -13,8 +13,8 @@ use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
-    BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
-    TypeContext, TypeMapping,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType,
+    Type, TypeAliasType, TypeContext, TypeMapping,
 };
 use crate::{Db, FxOrderMap, ProgramEnvironment};
 
@@ -127,6 +127,7 @@ struct VisitDependencies;
 
 /// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
+    mapping: ApplyTypeMappingVisitor<'a, 'db>,
     env: &'a ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
@@ -143,6 +144,7 @@ impl<'db> Dependencies<'_, 'db> {
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
         let visitor = Dependencies {
+            mapping: ApplyTypeMappingVisitor::new(env),
             env,
             inferable,
             query: &query,
@@ -192,6 +194,13 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             if typevar.is_inferable(db, self.inferable) {
                 self.satisfied.set((self.query)(typevar));
             }
+        } else if let Type::Recursive(recursive) = ty {
+            self.visited
+                .visit_structure(db, ty, &self.mapping, |expansion| {
+                    if let Some(body) = expansion.recursive_body(db, recursive).into_unfolded() {
+                        self.visit_type(db, body);
+                    }
+                });
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.
@@ -209,7 +218,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        self.visit_type(db, recursive.unfold(db, self.env).into_type());
+        self.visit_type(db, Type::Recursive(recursive));
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {

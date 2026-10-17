@@ -2,7 +2,8 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::recursive::{TypeInspector, TypeVisitorState};
+use crate::types::{KnownClass, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -20,27 +21,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let non_type_form_fallback = match target.resolve_type_alias(db) {
-            Type::TypeForm(_) => None,
-            Type::Union(union)
-                if union
-                    .elements(self.db())
-                    .iter()
-                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
-            {
-                Some(target.filter_union(db, env, |element| {
-                    !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
-                }))
-            }
-            _ => return None,
-        };
+        let non_type_form_fallback = TypeInspector::inspect_root(
+            db,
+            env,
+            target,
+            |_, _| None,
+            |_, target| match target {
+                Type::TypeForm(_) => Some(None),
+                Type::Union(union)
+                    if union.elements(self.db()).iter().any(|element| {
+                        element.has_outer_type(db, |ty| matches!(ty, Type::TypeForm(_)))
+                    }) =>
+                {
+                    Some(Some(target.filter_union(db, env, |element| {
+                        !element.has_outer_type(db, |ty| matches!(ty, Type::TypeForm(_)))
+                    })))
+                }
+                _ => None,
+            },
+        )?;
 
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self
             .speculate_without_diagnostics()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
-        if matches!(value_ty.resolve_type_alias(db), Type::Never)
+        if value_ty.has_outer_type(db, |ty| ty.is_never())
             || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
                 .is_some_and(|alternative| value_ty.is_assignable_to(db, env, alternative))
@@ -72,14 +78,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn contains_type_form_value(&self, expression: &ast::Expr, ty: Type<'db>) -> bool {
         struct ContainsTypeFormValue;
-        type ContainsTypeFormValueVisitor<'db> =
-            CycleDetector<'db, ContainsTypeFormValue, Type<'db>, bool, 3>;
+        type ContainsTypeFormValueVisitor<'env, 'db> =
+            TypeVisitorState<'env, 'db, ContainsTypeFormValue, Type<'db>, bool, 3>;
 
         fn imp<'db>(
             builder: &TypeInferenceBuilder<'db, '_>,
             expression: &ast::Expr,
             ty: Type<'db>,
-            visitor: &ContainsTypeFormValueVisitor<'db>,
+            visitor: &ContainsTypeFormValueVisitor<'_, 'db>,
         ) -> bool {
             let db = builder.db();
             let env = builder.program_environment();
@@ -104,9 +110,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::Intersection(intersection) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(_) | Type::Recursive(_) => visitor.visit(db, ty, || {
-                    imp(builder, expression, ty.resolve_type_alias(db), visitor)
-                }),
+                Type::TypeAlias(_) | Type::Recursive(_) => {
+                    visitor.visit_with_expansion(db, ty, |expansion| {
+                        imp(builder, expression, expansion.normalize(db, ty), visitor)
+                    })
+                }
                 Type::TypeVar(typevar) => visitor.visit(db, ty, || {
                     typevar
                         .typevar(builder.db())
@@ -128,7 +136,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self,
             expression,
             ty,
-            &ContainsTypeFormValueVisitor::default(),
+            &ContainsTypeFormValueVisitor::new(self.program_environment(), false),
         )
     }
 

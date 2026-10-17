@@ -509,6 +509,14 @@ impl<'db> StaticClassLiteral<'db> {
                 false
             }
 
+            fn visit_recursive_type(
+                &self,
+                _db: &'db dyn Db,
+                _recursive: crate::types::RecursiveType<'db>,
+            ) {
+                self.notify_skipped_lazy_type_attributes();
+            }
+
             fn visit_bound_type_var_type(
                 &self,
                 _db: &'db dyn Db,

@@ -1,5 +1,6 @@
 //! Compatibility of the values read from and written to inherited attributes.
 
+use crate::types::recursive::TypeInspector;
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
@@ -301,28 +302,50 @@ fn descriptor_write_domain<'db>(
     receiver: Type<'db>,
     storage_type: Type<'db>,
 ) -> Option<Type<'db>> {
-    let descriptor = descriptor.resolve_type_alias(db);
-    if let Type::Union(union) = descriptor {
-        let domains = union
-            .elements(db)
-            .iter()
-            .map(|element| descriptor_write_domain(db, env, *element, receiver, storage_type))
-            .collect::<Option<Vec<_>>>()?;
-        return Some(
-            IntersectionType::bounded_from_elements(db, env, domains).unwrap_or_else(Type::unknown),
-        );
-    }
-    match descriptor_setter_domain(db, env, descriptor, receiver) {
-        DescriptorSetterDomain::Known(ty) => Some(ty),
-        DescriptorSetterDomain::Deferred => Some(Type::unknown()),
-        DescriptorSetterDomain::Missing
-            if descriptor.as_property_instance().is_some()
-                || descriptor.is_data_descriptor(db, env) =>
-        {
-            None
-        }
-        DescriptorSetterDomain::Missing => Some(storage_type),
-    }
+    TypeInspector::scope(env, |inspector| {
+        descriptor_write_domain_in(db, inspector, descriptor, receiver, storage_type)
+    })
+}
+
+fn descriptor_write_domain_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    descriptor: Type<'db>,
+    receiver: Type<'db>,
+    storage_type: Type<'db>,
+) -> Option<Type<'db>> {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        descriptor,
+        |_, _| Some(Type::unknown()),
+        |inspector, descriptor| {
+            if let Type::Union(union) = descriptor {
+                let domains = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| {
+                        descriptor_write_domain_in(db, inspector, *element, receiver, storage_type)
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                return Some(
+                    IntersectionType::bounded_from_elements(db, env, domains)
+                        .unwrap_or_else(Type::unknown),
+                );
+            }
+            match descriptor_setter_domain(db, env, descriptor, receiver) {
+                DescriptorSetterDomain::Known(ty) => Some(ty),
+                DescriptorSetterDomain::Deferred => Some(Type::unknown()),
+                DescriptorSetterDomain::Missing
+                    if descriptor.as_property_instance().is_some()
+                        || descriptor.is_data_descriptor(db, env) =>
+                {
+                    None
+                }
+                DescriptorSetterDomain::Missing => Some(storage_type),
+            }
+        },
+    )
 }
 
 enum AttributeViolation<'db> {

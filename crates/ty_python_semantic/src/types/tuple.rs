@@ -328,7 +328,7 @@ impl<'db> TupleType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         self.tuple(db)
             .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -1080,7 +1080,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for ty in &self.0 {
             ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -2302,7 +2302,7 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for ty in self.prefix_elements() {
             ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -2716,7 +2716,7 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         match self {
             Tuple::Fixed(tuple) => {

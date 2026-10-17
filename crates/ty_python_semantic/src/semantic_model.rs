@@ -29,9 +29,9 @@ use crate::place_load::{
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    CycleKind, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, TypeQuery,
+    TypeQueryContext, binding_type, infer_complete_scope_types, infer_definition_types,
+    inferred_declaration, is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
@@ -651,57 +651,63 @@ impl<'db> SemanticModel<'db> {
         subscript: Option<&ast::ExprSubscript>,
     ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
         struct StringLiteralCandidates;
-        type StringLiteralCandidatesVisitor<'db> = CycleDetector<
-            'db,
-            StringLiteralCandidates,
-            Type<'db>,
-            Vec<ExpectedStringLiteralCompletion<'db>>,
-            3,
-        >;
 
-        fn collect<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            visitor: &StringLiteralCandidatesVisitor<'db>,
-        ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
-            match ty {
-                Type::LiteralValue(literal) => literal
-                    .as_string()
-                    .map(|string_literal| {
-                        let value = string_literal.value(db).to_string();
-                        vec![ExpectedStringLiteralCompletion {
-                            ty: Type::string_literal(db, &*value),
-                            value,
-                        }]
-                    })
-                    .unwrap_or_default(),
-                Type::Union(union) => union
-                    .elements(db)
-                    .iter()
-                    .flat_map(|element| collect(db, *element, visitor))
-                    .collect(),
-                Type::Intersection(intersection) => intersection
-                    .positive(db)
-                    .iter()
-                    .flat_map(|element| collect(db, *element, visitor))
-                    .collect(),
-                Type::TypeAlias(alias) => {
-                    visitor.visit(db, ty, || collect(db, alias.value_type(db), visitor))
+        impl<'db> TypeQuery<'db> for StringLiteralCandidates {
+            type Output = Vec<ExpectedStringLiteralCompletion<'db>>;
+
+            fn on_cycle(
+                &self,
+                _traversal: &TypeQueryContext<'_, 'db, Self>,
+                _ty: Type<'db>,
+                _kind: CycleKind,
+                _state: (),
+            ) -> Self::Output {
+                Vec::new()
+            }
+
+            fn visit(
+                &self,
+                db: &'db dyn Db,
+                traversal: &TypeQueryContext<'_, 'db, Self>,
+                ty: Type<'db>,
+                _state: (),
+            ) -> Self::Output {
+                match ty {
+                    Type::LiteralValue(literal) => literal
+                        .as_string()
+                        .map(|string_literal| {
+                            let value = string_literal.value(db).to_string();
+                            vec![ExpectedStringLiteralCompletion {
+                                ty: Type::string_literal(db, &*value),
+                                value,
+                            }]
+                        })
+                        .unwrap_or_default(),
+                    Type::Union(union) => union
+                        .elements(db)
+                        .iter()
+                        .flat_map(|element| traversal.visit(db, *element))
+                        .collect(),
+                    Type::Intersection(intersection) => intersection
+                        .positive(db)
+                        .iter()
+                        .flat_map(|element| traversal.visit(db, *element))
+                        .collect(),
+                    _ => Vec::new(),
                 }
-                Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                    recursive
-                        .unfold(db, &recursive.environment(db))
-                        .map(|unfolded| collect(db, unfolded, visitor))
-                        .unwrap_or_else(Vec::new)
-                }),
-                _ => Vec::new(),
             }
         }
         let db = self.db;
 
         let expected_ty = self.string_literal_completion_expected_type(string_expr);
         let mut candidates = expected_ty
-            .map(|expected_ty| collect(db, expected_ty, &StringLiteralCandidatesVisitor::default()))
+            .map(|expected_ty| {
+                TypeQueryContext::with_root(
+                    &self.program_environment(),
+                    StringLiteralCandidates,
+                    |root| root.visit(db, expected_ty),
+                )
+            })
             .unwrap_or_default();
         // Finite choices from the expected type take precedence. A string used as the complete
         // subscript key can fall back to initializer keys that fit any known expected type.

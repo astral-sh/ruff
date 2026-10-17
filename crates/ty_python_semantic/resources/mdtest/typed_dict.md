@@ -4913,6 +4913,45 @@ missing_primary_from_dict_call = Logical(primary=dict(field="a"), conditions=[di
 missing_primary_from_literal = Logical(primary={"field": "a"}, conditions=[dict(field="c", value="d")])
 ```
 
+## Displaying recursive value types
+
+A field can contain a view of the same dictionary's values. `TypeOf` lets us express that field
+type. We display the surrounding view and use `...` where expanding the recursive type would repeat
+it:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    value: TypeOf[cast("Node", {}).values()]
+
+def check(node: Node):
+    reveal_type(node["value"])  # revealed: dict_values[Literal["value"], dict_values[Literal["value"], ...]]
+```
+
+## Displaying mutually recursive value types
+
+The recursive reference can pass through another dictionary's values before returning to the
+original type:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Left(TypedDict, closed=True):
+    right: TypeOf[cast("Right", {}).values()]
+
+class Right(TypedDict, closed=True):
+    left: TypeOf[cast(Left, {}).values()]
+
+def check(left: Left):
+    # revealed: dict_values[Literal["left"], dict_values[Literal["right"], dict_values[Literal["left"], ...]]]
+    reveal_type(left["right"])
+```
+
 ## Function/assignment syntax
 
 TypedDicts can be created using the functional syntax:
@@ -9303,6 +9342,157 @@ def as_dict(value: Recursive) -> dict[str, bool]:
 
 def update(value: Recursive) -> None:
     value.update({"child": value})
+```
+
+### Recursive extra-item value types
+
+The extra-item type can refer to all values of the same TypedDict, including a declared field of
+type `Any`. We accept this declaration even though those values include the extra-item type itself:
+
+```py
+from typing import Any, cast
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(
+    TypedDict,
+    # no diagnostic
+    extra_items=ReadOnly[TypeOf[next(iter(cast("Node", {}).values()))]],
+):
+    value: Any
+```
+
+### Unpacking a recursive value type
+
+A field can refer to all values of its own TypedDict. If those values include `int`, they cannot be
+unpacked as keyword arguments:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: int
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def check(node: Node):
+    dict(**next(iter(node.values())))  # error: [invalid-argument-type]
+```
+
+### Recursive values that are TypedDicts
+
+If every concrete value is a TypedDict, unpacking those values preserves its required keys and their
+types:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Payload(TypedDict, closed=True):
+    value: int
+
+class Node(TypedDict, closed=True):
+    leaf: Payload
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def unpack(node: Node):
+    value = next(iter(node.values()))
+    Payload(**value)  # no diagnostic
+    reveal_type(dict(**value))  # revealed: dict[str, int]
+```
+
+A key-membership test also preserves the declared field type:
+
+```py
+def narrow(node: Node):
+    value = next(iter(node.values()))
+    if "value" in value:
+        reveal_type(value["value"])  # revealed: int
+```
+
+### Operations on shared recursive values
+
+These fields refer to the values of every `Node` subclass. The subclasses inherit the same fields,
+so many references lead to the same `Payload` type.
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Payload:
+    value: int
+
+class Edges(TypedDict, closed=True):
+    leaf: Payload
+    edge0: TypeOf[next(iter(cast("Node0", {}).values()))]
+    edge1: TypeOf[next(iter(cast("Node1", {}).values()))]
+    edge2: TypeOf[next(iter(cast("Node2", {}).values()))]
+    edge3: TypeOf[next(iter(cast("Node3", {}).values()))]
+    edge4: TypeOf[next(iter(cast("Node4", {}).values()))]
+    edge5: TypeOf[next(iter(cast("Node5", {}).values()))]
+    edge6: TypeOf[next(iter(cast("Node6", {}).values()))]
+    edge7: TypeOf[next(iter(cast("Node7", {}).values()))]
+    edge8: TypeOf[next(iter(cast("Node8", {}).values()))]
+    edge9: TypeOf[next(iter(cast("Node9", {}).values()))]
+    edge10: TypeOf[next(iter(cast("Node10", {}).values()))]
+
+class Node0(Edges): ...
+class Node1(Edges): ...
+class Node2(Edges): ...
+class Node3(Edges): ...
+class Node4(Edges): ...
+class Node5(Edges): ...
+class Node6(Edges): ...
+class Node7(Edges): ...
+class Node8(Edges): ...
+class Node9(Edges): ...
+class Node10(Edges): ...
+```
+
+Reading an attribute preserves its declared type, even when many recursive paths reach it:
+
+```py
+def read(node: Node0):
+    value = next(iter(node.values()))
+    reveal_type(value.value)  # revealed: int
+```
+
+The values are instances of `Payload`, so their runtime type preserves that class:
+
+```py
+def runtime_type(node: Node0):
+    value = next(iter(node.values()))
+    reveal_type(type(value))  # revealed: type[Payload]
+```
+
+Comparisons also preserve the shared type when narrowing a branch:
+
+```py
+def compare(node: Node0):
+    value = next(iter(node.values()))
+    if value != 1:
+        reveal_type(value)  # revealed: Payload
+```
+
+Checking a write to these values does not duplicate the shared types. The attribute still requires
+an `int`:
+
+```py
+def check(node: Node0):
+    value = next(iter(node.values()))
+    value.value = 1  # no diagnostic
+    value.value = "invalid"  # error: [invalid-assignment]
+```
+
+The attribute can also be deleted:
+
+```py
+def delete(node: Node0):
+    value = next(iter(node.values()))
+    del value.value  # no diagnostic
 ```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly

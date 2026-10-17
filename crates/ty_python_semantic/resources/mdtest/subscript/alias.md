@@ -48,6 +48,18 @@ def f(
     pep_695_tuple[invalid_bound:]  # error: [invalid-argument-type]
 ```
 
+## Aliased assignment targets
+
+An assignment error preserves the alias name from the receiver's annotation.
+
+```py
+type Numbers = dict[str, int]
+
+def write(numbers: Numbers):
+    # error: [invalid-assignment] "on object of type `Numbers`"
+    numbers["one"] = "invalid"
+```
+
 ## Recursive containers
 
 Indexing a recursive list can produce either another list or a string. A subsequent string key is

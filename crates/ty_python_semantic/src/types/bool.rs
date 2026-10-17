@@ -5,10 +5,11 @@ use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::types::{
-    CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
-    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    CallArguments, CallDunderError, ClassType, CycleKind, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext, TypeQuery,
+    TypeQueryContext, TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
+    constraints::ConstraintSetBuilder, context::InferContext,
+    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -23,11 +24,12 @@ impl<'db> Type<'db> {
     /// This describes the value type; a compound expression can also fail to complete because
     /// of its operands, even when its inferred result type is inhabited.
     pub(crate) fn bool(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Truthiness {
-        self.try_bool_impl(
-            db,
+        TypeQueryContext::with_root(
             env,
-            true,
-            &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+            TryBool {
+                allow_short_circuit: true,
+            },
+            |root| root.visit(db, *self),
         )
         .unwrap_or_else(|err| err.fallback_truthiness())
     }
@@ -43,12 +45,36 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
-        self.try_bool_impl(
-            db,
+        TypeQueryContext::with_root(
             env,
-            false,
-            &TryBoolVisitor::new(Ok(Truthiness::Ambiguous)),
+            TryBool {
+                allow_short_circuit: false,
+            },
+            |root| root.visit(db, *self),
         )
+    }
+}
+
+struct TryBool {
+    allow_short_circuit: bool,
+}
+
+impl<'db> TypeQuery<'db> for TryBool {
+    type Output = Result<Truthiness, BoolError<'db>>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        Ok(match kind {
+            // An exact back-edge adds no alternatives to the enclosing union. A different
+            // specialization can introduce values with either truthiness.
+            CycleKind::Exact => Truthiness::Uninhabited,
+            CycleKind::MatchingIdentity => Truthiness::Ambiguous,
+        })
     }
 
     /// Resolves the boolean value of a type.
@@ -62,14 +88,16 @@ impl<'db> Type<'db> {
     /// The advantage of that is that it would allow collecting the errors as well. However,
     /// it is significantly more complex and duplicating the logic into `bool` without the error
     /// handling didn't show any significant performance difference to when using the `allow_short_circuit` flag.
-    #[inline]
-    fn try_bool_impl(
+    fn visit(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        allow_short_circuit: bool,
-        visitor: &TryBoolVisitor<'db>,
-    ) -> Result<Truthiness, BoolError<'db>> {
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Self::Output {
+        let env = traversal.environment();
+        let allow_short_circuit = self.allow_short_circuit;
+        let ty = &ty;
         let type_to_truthiness = |ty: Type<'db>| {
             match ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
@@ -80,7 +108,7 @@ impl<'db> Type<'db> {
         };
 
         let try_dunders = || {
-            match self.try_call_dunder(
+            match ty.try_call_dunder(
                 db,
                 env,
                 "__bool__",
@@ -95,7 +123,7 @@ impl<'db> Type<'db> {
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
                             return_type,
-                            not_boolable_type: *self,
+                            not_boolable_type: *ty,
                         });
                     }
                     Ok(type_to_truthiness(return_type))
@@ -111,7 +139,7 @@ impl<'db> Type<'db> {
                         // boolean.
                         return Err(BoolError::IncorrectReturnType {
                             return_type: outcome.return_type(db, env),
-                            not_boolable_type: *self,
+                            not_boolable_type: *ty,
                         });
                     }
 
@@ -124,7 +152,7 @@ impl<'db> Type<'db> {
                 // that is inconsistent with the tuple's length. Otherwise, the special
                 // handling for tuples here isn't sound.
                 Err(CallDunderError::MethodNotAvailable)
-                    if let Type::NominalInstance(instance) = self
+                    if let Type::NominalInstance(instance) = ty
                         && let Some(tuple_spec) = instance.tuple_spec(db, env) =>
                 {
                     Ok(tuple_spec.truthiness())
@@ -134,10 +162,10 @@ impl<'db> Type<'db> {
                 // since `__bool__` takes precedence
                 // and a subclass could add a `__bool__` method.
                 Err(CallDunderError::MethodNotAvailable)
-                    if let Type::NominalInstance(instance) = self
+                    if let Type::NominalInstance(instance) = ty
                         && instance.class(db, env).is_final(db) =>
                 {
-                    match self.try_call_dunder(
+                    match ty.try_call_dunder(
                         db,
                         env,
                         "__len__",
@@ -171,19 +199,19 @@ impl<'db> Type<'db> {
                 Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                     Err(BoolError::IncorrectArguments {
                         truthiness: type_to_truthiness(bindings.return_type(db, env)),
-                        not_boolable_type: *self,
+                        not_boolable_type: *ty,
                     })
                 }
 
                 Err(CallDunderError::CallError(CallErrorKind::NotCallable, _, _)) => {
                     Err(BoolError::NotCallable {
-                        not_boolable_type: *self,
+                        not_boolable_type: *ty,
                     })
                 }
 
                 Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _)) => {
                     Err(BoolError::Other {
-                        not_boolable_type: *self,
+                        not_boolable_type: *ty,
                     })
                 }
             }
@@ -195,15 +223,14 @@ impl<'db> Type<'db> {
             let mut has_errors = false;
 
             for element in union.elements(db) {
-                let element_truthiness =
-                    match element.try_bool_impl(db, env, allow_short_circuit, visitor) {
-                        Ok(truthiness) => truthiness,
-                        Err(err) => {
-                            has_errors = true;
-                            all_not_callable &= matches!(err, BoolError::NotCallable { .. });
-                            err.fallback_truthiness()
-                        }
-                    };
+                let element_truthiness = match traversal.visit(db, *element) {
+                    Ok(truthiness) => truthiness,
+                    Err(err) => {
+                        has_errors = true;
+                        all_not_callable &= matches!(err, BoolError::NotCallable { .. });
+                        err.fallback_truthiness()
+                    }
+                };
 
                 truthiness = truthiness.union(element_truthiness);
                 if allow_short_circuit && truthiness.is_ambiguous() {
@@ -214,7 +241,7 @@ impl<'db> Type<'db> {
             if has_errors {
                 if all_not_callable {
                     return Err(BoolError::NotCallable {
-                        not_boolable_type: *self,
+                        not_boolable_type: *ty,
                     });
                 }
                 return Err(BoolError::Union { union, truthiness });
@@ -222,7 +249,7 @@ impl<'db> Type<'db> {
             Ok(truthiness)
         };
 
-        let truthiness = match self {
+        let truthiness = match ty {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -235,14 +262,11 @@ impl<'db> Type<'db> {
             | Type::Callable(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
-            | Type::TypeForm(_) => Truthiness::Ambiguous,
+            | Type::TypeForm(_)
+            | Type::TypeAlias(_)
+            | Type::Recursive(_) => Truthiness::Ambiguous,
 
             Type::Never => Truthiness::Uninhabited,
-
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
-                .map(|unfolded| unfolded.try_bool_impl(db, env, allow_short_circuit, visitor))
-                .unwrap_or(Ok(Truthiness::Ambiguous))?,
 
             Type::TypedDict(td) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
@@ -269,12 +293,7 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(property)
                 if let PropertyInstanceClass::Subclass(class) = property.instance_class(db) =>
             {
-                Type::instance(db, env, class).try_bool_impl(
-                    db,
-                    env,
-                    allow_short_circuit,
-                    visitor,
-                )?
+                traversal.visit(db, Type::instance(db, env, class))?
             }
 
             Type::FunctionLiteral(_)
@@ -293,15 +312,12 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(class) => class.metaclass_instance_type(db, env).try_bool_impl(
-                db,
-                env,
-                allow_short_circuit,
-                visitor,
-            )?,
-            Type::GenericAlias(alias) => ClassType::from(*alias)
-                .metaclass_instance_type(db, env)
-                .try_bool_impl(db, env, allow_short_circuit, visitor)?,
+            Type::ClassLiteral(class) => {
+                traversal.visit(db, class.metaclass_instance_type(db, env))?
+            }
+            Type::GenericAlias(alias) => {
+                traversal.visit(db, ClassType::from(*alias).metaclass_instance_type(db, env))?
+            }
 
             Type::SubclassOf(subclass_of_ty) => {
                 match subclass_of_ty
@@ -309,12 +325,11 @@ impl<'db> Type<'db> {
                     .with_transposed_type_var(db, env)
                 {
                     SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
-                    SubclassOfInner::Class(class) => {
-                        Type::from(class).try_bool_impl(db, env, allow_short_circuit, visitor)?
-                    }
+                    SubclassOfInner::Class(class) => traversal.visit(db, Type::from(class))?,
                     SubclassOfInner::Protocol(_) => Truthiness::Ambiguous,
-                    SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar)
-                        .try_bool_impl(db, env, allow_short_circuit, visitor)?,
+                    SubclassOfInner::TypeVar(bound_typevar) => {
+                        traversal.visit(db, Type::TypeVar(bound_typevar))?
+                    }
                 }
             }
 
@@ -322,11 +337,11 @@ impl<'db> Type<'db> {
                 match bound_typevar.typevar(db).bound_or_constraints(db, env) {
                     None => Truthiness::Ambiguous,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.try_bool_impl(db, env, allow_short_circuit, visitor)?
+                        traversal.visit(db, bound)?
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .as_type(db, env)
-                        .try_bool_impl(db, env, allow_short_circuit, visitor)?,
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        traversal.visit(db, constraints.as_type(db, env))?
+                    }
                 }
             }
 
@@ -342,22 +357,22 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
-                    alternatives.try_bool_impl(db, env, allow_short_circuit, visitor)?
+                    traversal.visit(db, alternatives)?
                 } else {
                     // TODO
                     Truthiness::Ambiguous
                 }
             }
 
-            Type::EnumComplement(complement) => complement
-                .remaining_literal_union(db, env)
-                .try_bool_impl(db, env, allow_short_circuit, visitor)?,
+            Type::EnumComplement(complement) => {
+                traversal.visit(db, complement.remaining_literal_union(db, env))?
+            }
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
-                LiteralValueTypeKind::Enum(enum_type) => enum_type
-                    .enum_class_instance(db, env)
-                    .try_bool_impl(db, env, allow_short_circuit, visitor)?,
+                LiteralValueTypeKind::Enum(enum_type) => {
+                    traversal.visit(db, enum_type.enum_class_instance(db, env))?
+                }
 
                 LiteralValueTypeKind::Int(num) => Truthiness::from(num.as_i64() != 0),
                 LiteralValueTypeKind::Bool(bool) => Truthiness::from(bool),
@@ -365,27 +380,14 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(db, *self, || {
-                alias
-                    .value_type(db)
-                    .try_bool_impl(db, env, allow_short_circuit, visitor)
-            })?,
-            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).try_bool_impl(
-                db,
-                env,
-                allow_short_circuit,
-                visitor,
-            )?,
+            Type::NewTypeInstance(newtype) => {
+                traversal.visit(db, newtype.concrete_base_type(db))?
+            }
         };
 
         Ok(truthiness)
     }
 }
-
-/// A [`CycleDetector`] that is used in `try_bool` methods.
-type TryBoolVisitor<'db> =
-    CycleDetector<'db, TryBool, Type<'db>, Result<Truthiness, BoolError<'db>>, 3>;
-struct TryBool;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoolError<'db> {

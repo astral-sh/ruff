@@ -182,6 +182,25 @@ def recursive_constraints[T: (Meta[T], int)](value: type[T]):
     type(value)
 ```
 
+### Classes of recursive TypedDict values
+
+If a TypedDict field refers to all of its values, the recursive reference does not add more classes
+to the result of `type()`:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: int
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def check(node: Node):
+    value = next(iter(node.values()))
+    reveal_type(type(value))  # revealed: type[int]
+```
+
 ## Three-argument form (dynamic class creation)
 
 A three-argument call to `type()` creates a new class. We synthesize a class type using the name

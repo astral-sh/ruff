@@ -416,6 +416,35 @@ def apply_decorator(cls: type[Base]) -> None:
     def inner() -> None: ...
 ```
 
+## Recursive decorator return types
+
+A decorator can return a value whose type refers to itself. Inferring the decorated name preserves
+the value type without repeatedly expanding that reference.
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions._internal import TypeOf
+
+class Node(TypedDict, closed=True):
+    leaf: int
+    child: TypeOf[next(iter(cast("Node", {}).values()))]
+
+def decorate(function: object) -> TypeOf[cast(Node, {})["child"]]:
+    raise NotImplementedError
+
+@decorate
+def function() -> None: ...
+
+integer: int = function  # no diagnostic
+```
+
+The decorated name refers to the returned integer value. It cannot be assigned to a string variable.
+
+```py
+text: str = function  # error: [invalid-assignment]
+```
+
 ## Class decorators
 
 Class decorator calls are validated, emitting diagnostics for invalid arguments:

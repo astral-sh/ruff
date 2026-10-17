@@ -24,6 +24,7 @@ use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::recursive::RecursiveType;
@@ -33,11 +34,11 @@ use crate::types::type_alias::QualifiedTypeAliasName;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
-    PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    ApplyTypeMappingVisitor, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    PropertyInstanceClass, PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionBuilder,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -154,6 +155,8 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Anonymous recursive types whose bodies are currently being displayed.
+    active_recursive_types: Rc<ActiveRecursionDetector<TypeIdentity<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -271,8 +274,10 @@ impl<'db> DisplaySettings<'db> {
         }
 
         let collector = AmbiguousNameCollector {
+            mapping: ApplyTypeMappingVisitor::new(env),
             env,
             visited_types: RefCell::default(),
+            active_recursive_types: ActiveRecursionDetector::default(),
             names: RefCell::default(),
         };
 
@@ -579,8 +584,10 @@ impl QualificationLevel {
 }
 
 struct AmbiguousNameCollector<'a, 'db> {
+    mapping: ApplyTypeMappingVisitor<'a, 'db>,
     env: &'a ProgramEnvironment<'db>,
     visited_types: RefCell<FxHashSet<Type<'db>>>,
+    active_recursive_types: ActiveRecursionDetector<TypeIdentity<'db>>,
     names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
@@ -689,7 +696,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
-            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::Recursive(recursive) if recursive.alias(db).is_some() => {
+                self.record(db, NamedItem::Recursive(recursive));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -711,6 +720,21 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        if recursive.alias(db).is_none() {
+            self.active_recursive_types.visit_with_expansion(
+                &Type::Recursive(recursive).to_type_identity(db),
+                &self.mapping,
+                || (),
+                |expansion| {
+                    if let Some(unfolded) =
+                        expansion.expand_recursive(db, recursive).into_unfolded()
+                    {
+                        self.visit_type(db, unfolded);
+                    }
+                },
+            );
+            return;
+        }
         // Only the alias name and its arguments are displayed, not its unfolded body.
         if let Some(arguments) = recursive.arguments(db) {
             walk_specialization_types(db, arguments, self);
@@ -968,9 +992,28 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &'env ProgramEnvironment<'db>,
     ) -> Option<impl Display + 'env> {
-        let (ty, definition, name, generic_context, value_ty) = match self {
+        let display = |ty, definition, name, generic_context, value_ty| {
+            Some(DisplayTypeAliasDeclaration {
+                db,
+                env,
+                type_alias: TypeAliasDisplay {
+                    db,
+                    ty,
+                    definition,
+                    name,
+                    settings: DisplaySettings::from_possibly_ambiguous_types(
+                        db,
+                        env,
+                        [ty, value_ty],
+                    ),
+                },
+                generic_context,
+                value_ty,
+            })
+        };
+        match self {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-            | Type::TypeAlias(alias) => (
+            | Type::TypeAlias(alias) => display(
                 Type::TypeAlias(alias),
                 alias.definition(db),
                 alias.name(db),
@@ -980,29 +1023,26 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => {
                 let (definition, name) = recursive.alias(db)?;
                 let constructor = recursive.constructor(db);
-                (
+                let mapping = ApplyTypeMappingVisitor::new(env);
+                let guard = crate::types::CycleDetector::<(), Type<'db>, (), 1>::new(());
+                guard.visit_active_with_expansion(
+                    db,
                     Type::Recursive(constructor),
-                    definition,
-                    name,
-                    constructor.parameters(db),
-                    constructor.unfold(db, env).into_type(),
+                    &mapping,
+                    |visit| {
+                        let expansion = visit.ok()?;
+                        display(
+                            Type::Recursive(constructor),
+                            definition,
+                            name,
+                            constructor.parameters(db),
+                            expansion.expand_recursive(db, constructor).into_type(),
+                        )
+                    },
                 )
             }
-            _ => return None,
-        };
-        Some(DisplayTypeAliasDeclaration {
-            db,
-            env,
-            type_alias: TypeAliasDisplay {
-                db,
-                ty,
-                definition,
-                name,
-                settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [ty, value_ty]),
-            },
-            generic_context,
-            value_ty,
-        })
+            _ => None,
+        }
     }
 }
 
@@ -1797,6 +1837,25 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     alias.materialization_kind(db),
                     f,
                 ),
+            Type::Recursive(recursive) if recursive.alias(db).is_none() => {
+                // The recursive identity also covers specializations that grow on each unfolding.
+                let result = self.settings.active_recursive_types.visit(
+                    &self.ty.to_type_identity(db),
+                    || None,
+                    || {
+                        let normalized = UnionBuilder::new(db, self.env).add(self.ty).build();
+                        (normalized != self.ty).then(|| {
+                            normalized
+                                .display_with(db, self.env, self.settings.clone())
+                                .fmt_detailed(f)
+                        })
+                    },
+                );
+                result.unwrap_or_else(|| {
+                    f.set_invalid_type_annotation();
+                    f.write_str("...")
+                })
+            }
             Type::Recursive(recursive) => TypeAliasDisplay {
                 db,
                 ty: self.ty,
@@ -4170,7 +4229,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::from_annotation(db, parameters),
+            Parameters::from_annotation(db, &db.program_environment(), parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display(db, &db.program_environment())
@@ -4183,7 +4242,7 @@ mod tests {
         return_ty: Option<Type<'db>>,
     ) -> String {
         Signature::new(
-            Parameters::from_annotation(db, parameters),
+            Parameters::from_annotation(db, &db.program_environment(), parameters),
             return_ty.unwrap_or(Type::unknown()),
         )
         .display_with(

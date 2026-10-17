@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::generics::Specialization;
+use crate::types::recursive::TypeInspector;
 use crate::types::tuple::{TupleSpec, TupleType, VariableSegment};
 use crate::types::visitor::any_over_type;
 use crate::types::{
@@ -109,15 +110,18 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         let env = self.env;
         let first = *types.first()?;
 
-        if types
-            .iter()
-            .any(|ty| matches!(ty, Type::TypeAlias(_) | Type::Recursive(_)))
-        {
-            return Some(self.merge_column(types.iter().map(|ty| match ty {
-                Type::TypeAlias(alias) => alias.value_type(db),
-                Type::Recursive(recursive) => recursive.unfold(db, env).into_type(),
-                _ => *ty,
-            })));
+        if let Some((index, ty)) = types.iter().enumerate().find(|(_, ty)| ty.is_alias_like()) {
+            return Some(TypeInspector::inspect_root(
+                db,
+                env,
+                *ty,
+                |_, _| Type::Dynamic(DynamicType::AmbiguousOverload),
+                |_, expanded| {
+                    let mut types = types.to_vec();
+                    types[index] = expanded;
+                    self.merge(&types)
+                },
+            ));
         }
 
         if let Some(tuples) = types

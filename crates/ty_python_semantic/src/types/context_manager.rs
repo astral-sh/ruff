@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
 use crate::{
     FxOrderSet, Program,
     types::{
@@ -10,6 +11,102 @@ use crate::{
 };
 use ruff_python_ast as ast;
 use ty_python_core::EvaluationMode;
+
+struct CanSuppressExceptions {
+    is_async: bool,
+}
+
+impl<'db> TypeQuery<'db> for CanSuppressExceptions {
+    type Output = bool;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        (): (),
+    ) -> bool {
+        false
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        manager: Type<'db>,
+        (): (),
+    ) -> bool {
+        if let Type::Union(union) = manager {
+            return union
+                .elements(db)
+                .iter()
+                .any(|&element| traversal.visit(db, element));
+        }
+
+        let env = traversal.environment();
+        let is_async = self.is_async;
+        if let Type::NewTypeInstance(newtype) = manager
+            && newtype
+                .concrete_base_type(db)
+                .has_outer_type(db, super::Type::is_union)
+        {
+            return traversal.visit(db, newtype.concrete_base_type(db));
+        }
+        let method = if is_async { "__aexit__" } else { "__exit__" };
+        let Some(callables) = manager
+            .member_lookup_with_policy(db, env, method, MemberLookupPolicy::NO_INSTANCE_FALLBACK)
+            .place
+            .ignore_possibly_undefined()
+            .and_then(|exit| exit.try_upcast_to_callable(db, env))
+        else {
+            return false;
+        };
+
+        let exception_type = KnownClass::BaseException.to_subclass_of(db, env);
+        let exception_instance = KnownClass::BaseException.to_instance(db, env);
+        for signature in callables
+            .iter()
+            .flat_map(|callable| callable.signatures(db))
+        {
+            if signature
+                .parameters()
+                .get_positional(0)
+                .is_some_and(|parameter| {
+                    parameter
+                        .annotated_type()
+                        .is_disjoint_from(db, env, exception_type)
+                })
+                || signature
+                    .parameters()
+                    .get_positional(1)
+                    .is_some_and(|parameter| {
+                        parameter
+                            .annotated_type()
+                            .is_disjoint_from(db, env, exception_instance)
+                    })
+            {
+                continue;
+            }
+
+            let return_type = if is_async {
+                let Ok(awaited) = signature.return_ty.try_await(db, env) else {
+                    continue;
+                };
+                awaited
+            } else {
+                signature.return_ty
+            };
+
+            if return_type.is_equivalent_to(db, env, KnownClass::Bool.to_instance(db, env))
+                || return_type.is_equivalent_to(db, env, Type::bool_literal(true))
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+}
 
 impl<'db> Type<'db> {
     /// Returns whether this context manager can suppress an exception raised inside its suite.
@@ -76,74 +173,10 @@ impl<'db> Type<'db> {
             manager: Type<'db>,
             is_async: bool,
         ) -> bool {
-            if let Some(union) = manager.as_union_like(db) {
-                return union
-                    .elements(db)
-                    .iter()
-                    .any(|&element| can_suppress_exceptions_impl(db, program, element, is_async));
-            }
-
             let env = ProgramEnvironment::from_program(program);
-            let method = if is_async { "__aexit__" } else { "__exit__" };
-            let Some(callables) = manager
-                .member_lookup_with_policy(
-                    db,
-                    &env,
-                    method,
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-                .ignore_possibly_undefined()
-                .and_then(|exit| exit.try_upcast_to_callable(db, &env))
-            else {
-                return false;
-            };
-
-            let exception_type = KnownClass::BaseException.to_subclass_of(db, &env);
-            let exception_instance = KnownClass::BaseException.to_instance(db, &env);
-            for signature in callables
-                .iter()
-                .flat_map(|callable| callable.signatures(db))
-            {
-                if signature
-                    .parameters()
-                    .get_positional(0)
-                    .is_some_and(|parameter| {
-                        parameter
-                            .annotated_type()
-                            .is_disjoint_from(db, &env, exception_type)
-                    })
-                    || signature
-                        .parameters()
-                        .get_positional(1)
-                        .is_some_and(|parameter| {
-                            parameter.annotated_type().is_disjoint_from(
-                                db,
-                                &env,
-                                exception_instance,
-                            )
-                        })
-                {
-                    continue;
-                }
-
-                let return_type = if is_async {
-                    let Ok(awaited) = signature.return_ty.try_await(db, &env) else {
-                        continue;
-                    };
-                    awaited
-                } else {
-                    signature.return_ty
-                };
-
-                if return_type.is_equivalent_to(db, &env, KnownClass::Bool.to_instance(db, &env))
-                    || return_type.is_equivalent_to(db, &env, Type::bool_literal(true))
-                {
-                    return true;
-                }
-            }
-
-            false
+            TypeQueryContext::with_root(&env, CanSuppressExceptions { is_async }, |traversal| {
+                traversal.visit(db, manager)
+            })
         }
 
         can_suppress_exceptions_impl(db, env.program(db), self, mode.is_async())

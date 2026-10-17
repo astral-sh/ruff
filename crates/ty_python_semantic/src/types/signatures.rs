@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use crate::types::recursive::TypeInspector;
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -465,7 +466,7 @@ impl<'db> CallableSignature<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for signature in &self.overloads {
             signature.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -1139,7 +1140,7 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for ty in self.receiver_constraint_types() {
             ty.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -1314,14 +1315,17 @@ impl<'db> Signature<'db> {
                 // TODO: Also intersect nested receiver type variables, such as the `T` in
                 // `self: list[T]`, with their valid specializations when constructing or solving the
                 // receiver constraint set.
-                let receiver_typevar = match annotation {
-                    Type::TypeVar(typevar) => Some(typevar),
-                    Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
-                    _ => None,
-                };
-                if receiver_typevar.is_some_and(|typevar| {
-                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
-                }) {
+                if TypeInspector::inspect_root(
+                    db,
+                    env,
+                    annotation,
+                    |_, _| false,
+                    |_, annotation| {
+                        annotation.as_typevar().is_some_and(|typevar| {
+                            Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
+                        })
+                    },
+                ) {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
                 receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
@@ -2701,13 +2705,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target = target.return_ty;
         if self.relation.is_assignability()
             && self.typevar_evaluation == TypeVarEvaluation::Lazy
-            && target.resolve_type_alias(db).is_dynamic()
-            && let Type::TypeVar(typevar) = source.return_ty.resolve_type_alias(db)
-            && source.parameters().iter().any(|parameter| {
-                any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
-                    matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
+            && target.has_outer_type(db, |ty| ty.is_dynamic())
+            && TypeInspector::inspect_root(
+                db,
+                self.env,
+                source.return_ty,
+                |_, _| false,
+                |_, ty| {
+                    ty.as_typevar().is_some_and(|typevar| {
+                        source.parameters().iter().any(|parameter| {
+                    any_over_type(db, self.env, parameter.annotated_type(), false, |ty| {
+                        matches!(ty, Type::TypeVar(other) if other.is_same_typevar_as(db, typevar))
+                    })
                 })
-            })
+                    })
+                },
+            )
         {
             // Comparing the generic callable `(value: T) -> T` against the declared type
             // `Callable[P, Any]` contributes the constraint `T <= Any`, despite the gradual return
@@ -2827,25 +2840,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             (source_parameters.variadic(), target_parameters.variadic())
             && !source_variadic.has_starred_annotation()
             && !target_variadic.has_starred_annotation()
-            && source_variadic.annotated_type().resolve_type_alias(db)
-                == target_variadic.annotated_type().resolve_type_alias(db)
+            && source_variadic
+                .annotated_type()
+                .is_same_resolved_type(db, target_variadic.annotated_type())
             && !source_variadic
                 .annotated_type()
-                .resolve_type_alias(db)
-                .is_dynamic()
+                .has_outer_type(db, |ty| ty.is_dynamic())
             && source_parameters.positional().all(|source_parameter| {
                 source_parameter.is_positional_only()
                     || source_parameter.name().is_none_or(|name| {
                         match target_parameters.keyword_by_name(name) {
                             Some((_, parameter)) => {
                                 !parameter.is_keyword_only()
-                                    || parameter.annotated_type().resolve_type_alias(db).is_never()
+                                    || parameter
+                                        .annotated_type()
+                                        .has_outer_type(db, |ty| ty.is_never())
                             }
                             None => {
                                 target_parameters
                                     .keyword_variadic()
                                     .is_none_or(|(_, parameter)| {
-                                        parameter.annotated_type().resolve_type_alias(db).is_never()
+                                        parameter
+                                            .annotated_type()
+                                            .has_outer_type(db, |ty| ty.is_never())
                                     })
                             }
                         }
@@ -4703,13 +4720,14 @@ impl<'db> Parameters<'db> {
     /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
     pub(crate) fn from_annotation(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
         let parameters = parameters.into_iter();
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
 
         for parameter in parameters {
-            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
+            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db, env) {
                 Self::push_unpacked_typed_dict(db, &mut value, &parameter, unpacked_typed_dict);
             } else {
                 value.push(parameter);
@@ -5255,6 +5273,7 @@ impl<'db> Parameters<'db> {
 
         Self::from_annotation(
             db,
+            &ProgramEnvironment::from_definition(definition),
             positional_only
                 .into_iter()
                 .chain(positional_or_keyword)
@@ -5419,8 +5438,9 @@ impl<'db> Parameters<'db> {
             .iter()
             .take_while(|parameter| {
                 parameter.is_positional_only()
-                    && parameter.annotated_type().resolve_type_alias(db)
-                        == variadic.annotated_type().resolve_type_alias(db)
+                    && parameter
+                        .annotated_type()
+                        .is_same_resolved_type(db, variadic.annotated_type())
             })
             .count();
 
@@ -5934,6 +5954,7 @@ impl<'db> Parameter<'db> {
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
             && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
                 db,
+                &ProgramEnvironment::from_definition(function_definition),
                 annotated_type,
                 annotation_flags,
             )
@@ -6005,13 +6026,25 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    fn unpacked_typed_dict(&self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
+    fn unpacked_typed_dict(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<TypedDictType<'db>> {
         (self.is_keyword_variadic()
             && matches!(
                 self.annotation_kind,
                 ParameterAnnotationKind::UnpackedTypedDictKwargs
             ))
-        .then(|| self.annotated_type.resolve_type_alias(db).as_typed_dict())
+        .then(|| {
+            TypeInspector::inspect_root(
+                db,
+                env,
+                self.annotated_type,
+                |_, _| None,
+                |_, ty| ty.as_typed_dict(),
+            )
+        })
         .flatten()
     }
 

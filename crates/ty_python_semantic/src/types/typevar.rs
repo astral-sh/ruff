@@ -17,8 +17,8 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
+        Parameter, Parameters, ProjectInstance, Specialization, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeQueryContext, TypeVarVariance, UnionBuilder, UnionType, any_over_type,
         any_over_type_including_alias_arguments, binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
@@ -428,14 +428,15 @@ impl<'db> TypeVarInstance<'db> {
     fn to_instance(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        traversal: &TypeQueryContext<'_, 'db, ProjectInstance>,
     ) -> Option<InstanceProjection<Self>> {
+        let env = traversal.environment();
         let bound_or_constraints = match self.bound_or_constraints(db, env)? {
-            TypeVarBoundOrConstraints::UpperBound(upper_bound) => upper_bound
-                .to_instance(db, env)?
+            TypeVarBoundOrConstraints::UpperBound(upper_bound) => traversal
+                .visit(db, upper_bound)?
                 .map(TypeVarBoundOrConstraints::UpperBound),
             TypeVarBoundOrConstraints::Constraints(constraints) => constraints
-                .to_instance(db, env)?
+                .to_instance(db, traversal)?
                 .map(TypeVarBoundOrConstraints::Constraints),
         };
         let identity = TypeVarIdentity::new(
@@ -471,6 +472,8 @@ impl<'db> TypeVarInstance<'db> {
             visitor: &'a TypeVarDefaultVisitor<'db>,
             seen_typevars: &'a RefCell<FxHashSet<TypeVarInstance<'db>>>,
             seen_types: &'a RefCell<SeenTypes<'db>>,
+            recursive:
+                &'a crate::types::recursive::TypeVisitorState<'a, 'db, (), Type<'db>, bool, 1>,
         }
 
         fn typevar_default_is_self_referential<'db>(
@@ -572,11 +575,13 @@ impl<'db> TypeVarInstance<'db> {
                         }
                         seen_types.push(identity);
                     }
-                    type_is_self_referential_impl(
-                        state,
-                        recursive.unfold(db, state.env).into_type(),
-                        self_identity,
-                    )
+                    state.recursive.visit_structure(db, inner_ty, |expansion| {
+                        type_is_self_referential_impl(
+                            state,
+                            expansion.recursive_body(db, recursive).into_type(),
+                            self_identity,
+                        )
+                    })
                 }
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
                     type_alias_is_self_referential(state, alias, self_identity)
@@ -588,7 +593,9 @@ impl<'db> TypeVarInstance<'db> {
         let seen_typevars = RefCell::new(FxHashSet::default());
         let seen_types = RefCell::new(SeenTypes::new());
 
+        let recursive = crate::types::recursive::TypeVisitorState::new(env, false);
         let state = State {
+            recursive: &recursive,
             db,
             env,
             visitor,
@@ -980,6 +987,14 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
+        }
+
+        fn visit_recursive_type(
+            &self,
+            _db: &'db dyn Db,
+            _recursive: crate::types::RecursiveType<'db>,
+        ) {
+            self.notify_skipped_lazy_type_attributes();
         }
 
         fn visit_bound_type_var_type(
@@ -1601,9 +1616,9 @@ impl<'db> BoundTypeVarInstance<'db> {
     pub(super) fn to_instance(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        traversal: &TypeQueryContext<'_, 'db, ProjectInstance>,
     ) -> Option<InstanceProjection<Self>> {
-        Some(self.typevar(db).to_instance(db, env)?.map(|typevar| {
+        Some(self.typevar(db).to_instance(db, traversal)?.map(|typevar| {
             Self::new(
                 db,
                 typevar,
@@ -2120,12 +2135,12 @@ impl<'db> TypeVarConstraints<'db> {
     fn to_instance(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        traversal: &TypeQueryContext<'_, 'db, ProjectInstance>,
     ) -> Option<InstanceProjection<TypeVarConstraints<'db>>> {
         let mut instance_elements = Vec::new();
         let mut is_exact = true;
         for ty in self.elements(db) {
-            let projection = ty.to_instance(db, env)?;
+            let projection = traversal.visit(db, *ty)?;
             is_exact &= projection.is_exact();
             instance_elements.push(projection.into_inner());
         }
@@ -2154,6 +2169,15 @@ impl<'db> TypeVarConstraints<'db> {
         env: &ProgramEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
+        self.filter_map_with_boundness_and_qualifiers(db, env, |ty| Some(transform_fn(ty)))
+    }
+
+    pub(crate) fn filter_map_with_boundness_and_qualifiers(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Option<PlaceAndQualifiers<'db>>,
+    ) -> PlaceAndQualifiers<'db> {
         let mut builder = UnionBuilder::new(db, env);
         let mut qualifiers = TypeQualifiers::empty();
 
@@ -2161,10 +2185,13 @@ impl<'db> TypeVarConstraints<'db> {
         let mut possibly_unbound = false;
         let mut origin = TypeOrigin::Declared;
         for ty in self.elements(db) {
-            let PlaceAndQualifiers {
+            let Some(PlaceAndQualifiers {
                 place: ty_member,
                 qualifiers: new_qualifiers,
-            } = transform_fn(ty);
+            }) = transform_fn(ty)
+            else {
+                continue;
+            };
             qualifiers |= new_qualifiers;
             match ty_member {
                 Place::Undefined => {
@@ -2276,7 +2303,7 @@ pub enum TypeVarBoundOrConstraints<'db> {
     Constraints(TypeVarConstraints<'db>),
 }
 
-pub(super) fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     bounds: TypeVarBoundOrConstraints<'db>,
     visitor: &V,

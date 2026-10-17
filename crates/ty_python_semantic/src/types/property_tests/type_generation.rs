@@ -104,6 +104,7 @@ impl CallableParams {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::from_annotation(
                 db,
+                env,
                 params.into_iter().map(|param| {
                     let parameter = match param.kind {
                         ParamKind::PositionalOnly => Parameter::positional_only(param.name),

@@ -5,6 +5,8 @@ use ruff_text_size::Ranged;
 
 use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
+use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
+use crate::{Db, ProgramEnvironment};
 use crate::{
     TypeQualifiers,
     types::{
@@ -284,38 +286,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         false
     }
 
-    fn invalid_deletion_of_final_attribute(
+    pub(super) fn report_final_attribute_deletion(
         &self,
-        object_ty: Type<'db>,
         target: &ast::ExprAttribute,
+        object_ty: Type<'db>,
         attribute: &str,
-        qualifiers: TypeQualifiers,
-        emit_diagnostics: bool,
-    ) -> bool {
+    ) {
         let db = self.db();
-        if !qualifiers.contains(TypeQualifiers::FINAL) {
-            return false;
-        }
-
-        if emit_diagnostics {
-            let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
-
-            if let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ASSIGNMENT, target.range())
-            {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Cannot delete final attribute `{attribute}` on type `{}`",
-                    object_ty.display(db, self.program_environment())
-                ));
-                diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
-                if let Some(final_declaration) = final_declaration {
-                    self.annotate_final_declaration(&mut diagnostic, final_declaration);
-                }
+        let final_declaration = self.precise_final_attribute_declaration(object_ty, attribute);
+        if let Some(builder) = self
+            .context
+            .report_lint(&INVALID_ASSIGNMENT, target.range())
+        {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Cannot delete final attribute `{attribute}` on type `{}`",
+                object_ty.display(db, self.program_environment())
+            ));
+            diagnostic.set_primary_annotation_message("`Final` attributes cannot be deleted");
+            if let Some(final_declaration) = final_declaration {
+                self.annotate_final_declaration(&mut diagnostic, final_declaration);
             }
         }
-
-        true
     }
 
     pub(super) fn validate_final_attribute_assignment(
@@ -362,52 +353,55 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             )
         })
     }
+}
 
-    pub(super) fn validate_final_attribute_deletion(
+/// Find a receiver whose declaration prevents deletion of this attribute.
+pub(super) fn final_attribute_receiver<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    object_ty: Type<'db>,
+    attribute: &str,
+) -> Option<Type<'db>> {
+    TypeQueryContext::with_root(env, FindFinalAttribute(attribute), |context| {
+        context.visit(db, object_ty)
+    })
+}
+
+struct FindFinalAttribute<'a>(&'a str);
+
+impl<'db> TypeQuery<'db> for FindFinalAttribute<'_> {
+    type Output = Option<Type<'db>>;
+
+    fn on_cycle(
         &self,
-        target: &ast::ExprAttribute,
-        object_ty: Type<'db>,
-        attribute: &str,
-        emit_diagnostics: bool,
-    ) -> bool {
-        let db = self.db();
-        match object_ty {
-            Type::Union(union) => {
-                return union.elements(db).iter().any(|element| {
-                    self.validate_final_attribute_deletion(
-                        target,
-                        *element,
-                        attribute,
-                        emit_diagnostics,
-                    )
-                });
-            }
-            Type::Intersection(intersection) => {
-                return intersection.positive(db).iter().any(|element| {
-                    self.validate_final_attribute_deletion(
-                        target,
-                        *element,
-                        attribute,
-                        emit_diagnostics,
-                    )
-                });
-            }
-            _ => {}
-        }
-        let Some(members) =
-            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
-        else {
-            return false;
-        };
+        _context: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        (): (),
+    ) -> Self::Output {
+        None
+    }
 
-        members.effective_members().any(|member| {
-            self.invalid_deletion_of_final_attribute(
-                object_ty,
-                target,
-                attribute,
-                member.qualifiers,
-                emit_diagnostics,
-            )
-        })
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        (): (),
+    ) -> Self::Output {
+        match ty {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .find_map(|ty| context.visit(db, *ty)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .find_map(|ty| context.visit(db, *ty)),
+            _ => assignment_attribute_members(db, context.environment(), ty, self.0)?
+                .effective_members()
+                .any(|member| member.qualifiers.contains(TypeQualifiers::FINAL))
+                .then_some(ty),
+        }
     }
 }

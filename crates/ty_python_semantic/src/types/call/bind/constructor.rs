@@ -6,6 +6,7 @@ use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::recursive::TypeInspector;
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
@@ -30,7 +31,7 @@ impl<'db> CallableBinding<'db> {
         for overload in &mut self.overloads {
             if let Some(signature) = overload.signature.bind_unused_self(db, env, self_type) {
                 overload.signature = signature;
-                overload.return_ty = overload.initial_return_type(db);
+                overload.return_ty = overload.initial_return_type(db, env);
             }
         }
     }
@@ -180,7 +181,7 @@ impl<'db> ConstructorBinding<'db> {
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::new(env),
             );
-            overload.set_constructor_context(db, constructor_context);
+            overload.set_constructor_context(db, env, constructor_context);
         }
 
         if let Some(downstream) = self.downstream_constructor_mut() {
@@ -609,7 +610,7 @@ impl<'db> ConstructorBinding<'db> {
         overload: &Binding<'db>,
     ) -> (Type<'db>, bool) {
         let return_ty = overload
-            .unspecialized_return_type(db)
+            .unspecialized_return_type(db, env)
             .apply_optional_specialization(
                 db,
                 overload.merged_specialization(db).map(|specialization| {
@@ -764,33 +765,51 @@ fn constructor_returns_instance<'db>(
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
-    match return_ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| constructor_returns_instance(db, env, class_literal, *element)),
-        Type::Intersection(intersection) => intersection
-            .iter_positive(db)
-            .any(|element| constructor_returns_instance(db, env, class_literal, element)),
-        // Spec says an explicit `Any` return type should be considered non-instance.
-        Type::Dynamic(DynamicType::Any) => false,
-        // But a missing return annotation should be considered instance.
-        // TODO currently this is also true for explicit annotations that resolve to `Unknown`;
-        // should it be? Other type checkers also treat it this way.
-        Type::Dynamic(_) => true,
-        // A `Never` constructor return is terminal and does not run downstream construction.
-        Type::Never => false,
-        Type::NominalInstance(instance) => instance
-            .class(db, env)
-            .is_subtype_of_class_literal(db, class_literal),
-        // We don't need to handle `ProtocolInstance` here, since the only way a protocol can be
-        // instantiated is if a nominal class inherits it. If the nominal class inherits a
-        // `__new__` from the protocol, either that `__new__` will return `Self` or equivalent,
-        // in which case we'll already solve it to the subclass and consider it an instance
-        // type, or it will return an explicit annotation of the protocol type itself, in which
-        // case we shouldn't (and don't) consider it an instance of the subclass.
-        _ => false,
-    }
+    TypeInspector::scope(env, |inspector| {
+        constructor_returns_instance_in(db, inspector, class_literal, return_ty)
+    })
+}
+
+fn constructor_returns_instance_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    class_literal: ClassLiteral<'db>,
+    return_ty: Type<'db>,
+) -> bool {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        return_ty,
+        |_, _| false,
+        |inspector, return_ty| {
+            match return_ty {
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    constructor_returns_instance_in(db, inspector, class_literal, *element)
+                }),
+                Type::Intersection(intersection) => intersection.iter_positive(db).any(|element| {
+                    constructor_returns_instance_in(db, inspector, class_literal, element)
+                }),
+                // Spec says an explicit `Any` return type should be considered non-instance.
+                Type::Dynamic(DynamicType::Any) => false,
+                // But a missing return annotation should be considered instance.
+                // TODO currently this is also true for explicit annotations that resolve to `Unknown`;
+                // should it be? Other type checkers also treat it this way.
+                Type::Dynamic(_) => true,
+                // A `Never` constructor return is terminal and does not run downstream construction.
+                Type::Never => false,
+                Type::NominalInstance(instance) => instance
+                    .class(db, env)
+                    .is_subtype_of_class_literal(db, class_literal),
+                // We don't need to handle `ProtocolInstance` here, since the only way a protocol can be
+                // instantiated is if a nominal class inherits it. If the nominal class inherits a
+                // `__new__` from the protocol, either that `__new__` will return `Self` or equivalent,
+                // in which case we'll already solve it to the subclass and consider it an instance
+                // type, or it will return an explicit annotation of the protocol type itself, in which
+                // case we shouldn't (and don't) consider it an instance of the subclass.
+                _ => false,
+            }
+        },
+    )
 }
 
 impl<'db> Binding<'db> {
@@ -801,6 +820,7 @@ impl<'db> Binding<'db> {
     fn is_self_like_constructor_return_typevar(
         &self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         return_typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
         if return_typevar.typevar(db).is_self(db) {
@@ -816,33 +836,50 @@ impl<'db> Binding<'db> {
             return false;
         };
 
-        let Type::SubclassOf(subclass_of) = cls_parameter_ty.resolve_type_alias(db) else {
-            return false;
-        };
-        let Some(cls_typevar) = subclass_of.into_type_var() else {
-            return false;
-        };
+        TypeInspector::inspect_root(
+            db,
+            env,
+            cls_parameter_ty,
+            |_, _| false,
+            |_, cls_parameter_ty| {
+                let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
+                    return false;
+                };
+                let Some(cls_typevar) = subclass_of.into_type_var() else {
+                    return false;
+                };
 
-        cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
+                cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
+            },
+        )
     }
 
     pub(super) fn set_constructor_context(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         constructor_context: ConstructorContext<'db>,
     ) {
         self.constructor_context = Some(constructor_context);
-        self.return_ty = self.initial_return_type(db);
+        self.return_ty = self.initial_return_type(db, env);
     }
 
-    pub(super) fn initial_return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.unspecialized_return_type(db)
+    pub(super) fn initial_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.unspecialized_return_type(db, env)
     }
 
     /// Return the declared return type after constructor normalization, but before applying any
     /// specialization inferred for this overload.
-    pub(super) fn unspecialized_return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_constructor_return(db)
+    pub(super) fn unspecialized_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.normalized_constructor_return(db, env)
             .unwrap_or(self.signature.return_ty)
     }
 
@@ -865,22 +902,29 @@ impl<'db> Binding<'db> {
     /// instance type.
     ///
     /// Return `None` if this is not a constructor call.
-    pub(crate) fn normalized_constructor_return(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(crate) fn normalized_constructor_return(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         let constructor_context = self.constructor_context?;
         let instance_type = constructor_context.instance_type();
 
-        match (
-            constructor_context.kind(),
-            self.signature.return_ty.resolve_type_alias(db),
-        ) {
-            (ConstructorCallableKind::Init, _) => Some(instance_type),
-            (_, ty) if ty.is_unknown() => Some(instance_type),
-            (ConstructorCallableKind::New, Type::TypeVar(typevar))
-                if self.is_self_like_constructor_return_typevar(db, typevar) =>
-            {
-                Some(instance_type)
-            }
-            _ => Some(self.signature.return_ty),
-        }
+        TypeInspector::inspect_root(
+            db,
+            env,
+            self.signature.return_ty,
+            |_, _| Some(self.signature.return_ty),
+            |_, return_ty| match (constructor_context.kind(), return_ty) {
+                (ConstructorCallableKind::Init, _) => Some(instance_type),
+                (_, ty) if ty.is_unknown() => Some(instance_type),
+                (ConstructorCallableKind::New, Type::TypeVar(typevar))
+                    if self.is_self_like_constructor_return_typevar(db, env, typevar) =>
+                {
+                    Some(instance_type)
+                }
+                _ => Some(self.signature.return_ty),
+            },
+        )
     }
 }

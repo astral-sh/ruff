@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, CycleKind, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+    TypeQuery, TypeQueryContext, TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -243,10 +243,25 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
+        TypeQueryContext::with_root(env, TryIterate(mode), |root| {
+            root.visit_with(db, self, true)
+        })
+        .map(|spec| spec.unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))))
+    }
+
+    fn try_iterate_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mode: EvaluationMode,
+        traversal: &TypeQueryContext<'_, 'db, TryIterate, bool>,
+        allow_dunders: bool,
+    ) -> Result<Option<Cow<'db, TupleSpec<'db>>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
+            traversal: &TypeQueryContext<'_, 'db, TryIterate, bool>,
         ) -> Option<Cow<'db, TupleSpec<'db>>> {
             // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
             // The threshold here is somewhat arbitrary and conservative; it could be increased if needed.
@@ -259,9 +274,10 @@ impl<'db> Type<'db> {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
-                Type::NewTypeInstance(newtype) => {
-                    non_async_special_case(db, env, newtype.concrete_base_type(db))
-                }
+                Type::NewTypeInstance(newtype) => traversal
+                    .visit_with(db, newtype.concrete_base_type(db), false)
+                    .ok()
+                    .flatten(),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
                     TupleSpec::homogeneous(todo_type!("*tuple[] annotations")),
                 )),
@@ -306,35 +322,26 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),
-                Type::Recursive(recursive) => {
-                    non_async_special_case(db, env, recursive.unfold(db, env).into_unfolded()?)
-                }
+                Type::TypeAlias(_) | Type::Recursive(_) => None,
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        non_async_special_case(db, env, bound)
+                        traversal.visit_with(db, bound, false).ok().flatten()
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        non_async_special_case(db, env, constraints.as_type(db, env))
-                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => traversal
+                        .visit_with(db, constraints.as_type(db, env), false)
+                        .ok()
+                        .flatten(),
                 },
                 Type::Union(union) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
-                        let mut elements_iter = elements.iter();
-                        let first_element_spec = elements_iter
-                            .next()?
-                            .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                            .ok()?;
+                        let mut specs = elements.iter().filter_map(|element| {
+                            traversal.visit_with(db, *element, true).transpose()
+                        });
+                        let first_element_spec = specs.next()?.ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
-                        for element in elements_iter {
-                            builder = builder.union(
-                                db,
-                                env,
-                                &*element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                                    .ok()?,
-                            );
+                        for spec in specs {
+                            builder = builder.union(db, env, &*spec.ok()?);
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
@@ -362,9 +369,7 @@ impl<'db> Type<'db> {
                         let mut specs_iter = intersection
                             .positive_elements_or_object(db)
                             .filter_map(|element| {
-                                element
-                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
-                                    .ok()
+                                traversal.visit_with(db, element, true).ok().flatten()
                             });
                         let first_spec = specs_iter.next()?;
                         let mut builder = TupleSpecBuilder::from(&*first_spec);
@@ -381,11 +386,12 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db, env).ok()
+                    traversal.visit_with(db, flattened, true).ok().flatten()
                 }
-                Type::EnumComplement(complement) => {
-                    non_async_special_case(db, env, complement.remaining_literal_union(db, env))
-                }
+                Type::EnumComplement(complement) => traversal
+                    .visit_with(db, complement.remaining_literal_union(db, env), false)
+                    .ok()
+                    .flatten(),
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
@@ -425,7 +431,7 @@ impl<'db> Type<'db> {
             if let Type::Intersection(_) = self {
                 let flattened = self.flatten_typevars(db, env);
                 if flattened != self {
-                    return flattened.try_iterate_with_mode(db, env, mode);
+                    return traversal.visit_with(db, flattened, allow_dunders);
                 }
             }
 
@@ -497,11 +503,15 @@ impl<'db> Type<'db> {
                     })
                 }
                 Err(CallDunderError::MethodNotAvailable) => Err(IterationError::UnboundAiterError),
-            };
+            }
+            .map(Some);
         }
 
-        if let Some(special_case) = non_async_special_case(db, env, self) {
-            return Ok(special_case);
+        if let Some(special_case) = non_async_special_case(db, env, self, traversal) {
+            return Ok(Some(special_case));
+        }
+        if !allow_dunders {
+            return Ok(None);
         }
 
         let try_call_dunder_getitem = || {
@@ -612,11 +622,49 @@ impl<'db> Type<'db> {
                     },
                 ),
         }
+        .map(Some)
+    }
+}
+
+struct TryIterate(EvaluationMode);
+
+impl<'db> TypeQuery<'db, bool> for TryIterate {
+    type Output = Result<Option<Cow<'db, TupleSpec<'db>>>, IterationError<'db>>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self, bool>,
+        _ty: Type<'db>,
+        kind: CycleKind,
+        _allow_dunders: bool,
+    ) -> Self::Output {
+        Ok(match kind {
+            CycleKind::Exact => None,
+            CycleKind::MatchingIdentity => {
+                Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+            }
+        })
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self, bool>,
+        ty: Type<'db>,
+        allow_dunders: bool,
+    ) -> Self::Output {
+        ty.try_iterate_impl(
+            db,
+            traversal.environment(),
+            self.0,
+            traversal,
+            allow_dunders,
+        )
     }
 }
 
 /// Error returned if a type is not (or may not be) iterable.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) enum IterationError<'db> {
     /// The object being iterated over has a bound `__(a)iter__` method,
     /// but calling it with the expected arguments results in an error.

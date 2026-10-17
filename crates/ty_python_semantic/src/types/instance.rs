@@ -482,7 +482,7 @@ impl<'db> NominalInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
@@ -625,6 +625,14 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             false
+        }
+
+        fn visit_recursive_type(
+            &self,
+            _db: &'db dyn Db,
+            _recursive: crate::types::RecursiveType<'db>,
+        ) {
+            self.notify_skipped_lazy_type_attributes();
         }
 
         fn visit_bound_type_var_type(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
@@ -1421,6 +1429,14 @@ fn non_recursive_protocol_interface<'db>(
             false
         }
 
+        fn visit_recursive_type(
+            &self,
+            _db: &'db dyn Db,
+            _recursive: crate::types::RecursiveType<'db>,
+        ) {
+            self.notify_skipped_lazy_type_attributes();
+        }
+
         fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
             self.active_aliases.visit(
                 &Type::TypeAlias(type_alias).to_type_identity(db),
@@ -2009,7 +2025,7 @@ impl<'db> ProtocolInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         match self.inner {
             Protocol::FromClass(class) => {
@@ -2190,7 +2206,7 @@ mod synthesized_protocol {
             env: &ProgramEnvironment<'db>,
             binding_context: Option<Definition<'db>>,
             typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-            visitor: &FindLegacyTypeVarsVisitor<'db>,
+            visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
         ) {
             self.0
                 .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);

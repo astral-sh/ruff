@@ -6,7 +6,7 @@ use ruff_text_size::{TextLen, TextRange};
 use ty_module_resolver::Module;
 use ty_python_core::definition::Definition;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TypeDefinition<'db> {
     Module(Module<'db>),
     /// A class created via a `class` statement.

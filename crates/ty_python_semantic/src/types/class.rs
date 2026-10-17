@@ -491,7 +491,7 @@ impl<'db> GenericAlias<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         self.specialization(db).find_legacy_typevars_impl(
             db,
@@ -1381,7 +1381,7 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         match self {
             Self::NonGeneric(_) => {}

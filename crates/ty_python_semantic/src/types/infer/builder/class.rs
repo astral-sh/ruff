@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::recursive::TypeInspector;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
@@ -385,33 +386,45 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
-            inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
-                inferred_ty
-            } else if let divergent_ty @ Type::Divergent(_) = decorated_ty.resolve_type_alias(db) {
-                // Keep the current binding to bootstrap decorators whose return annotations
-                // depend on the decorated class. Retain the cycle marker too: replacing it with
-                // only the class lets inferred lambda return types grow on every iteration.
-                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, divergent_ty])
-            } else if class_decorator_preserves_class_binding(
+            inferred_ty = TypeInspector::inspect_root(
                 db,
                 env,
-                original_class_ty,
                 decorated_ty,
-            ) {
-                merge_class_preserving_decorator_result(
-                    db,
-                    env,
-                    original_class_ty,
-                    inferred_ty,
-                    decorated_ty,
-                )
-            } else {
-                // Only record an undecorated type once a decorator actually replaces the public
-                // binding. If all decorators preserve the class, there is no alternate class type
-                // to expose.
-                undecorated_ty.get_or_insert(inferred_ty);
-                decorated_ty
-            };
+                |ty, _| ty,
+                |_, resolved| {
+                    if is_unknown_decorator_result(db, decorated_ty) {
+                        inferred_ty
+                    } else if let divergent_ty @ Type::Divergent(_) = resolved {
+                        // Keep the current binding to bootstrap decorators whose return annotations
+                        // depend on the decorated class. Retain the cycle marker too: replacing it with
+                        // only the class lets inferred lambda return types grow on every iteration.
+                        UnionType::from_elements_cycle_recovery(
+                            db,
+                            env,
+                            [inferred_ty, divergent_ty],
+                        )
+                    } else if class_decorator_preserves_class_binding(
+                        db,
+                        env,
+                        original_class_ty,
+                        decorated_ty,
+                    ) {
+                        merge_class_preserving_decorator_result(
+                            db,
+                            env,
+                            original_class_ty,
+                            inferred_ty,
+                            decorated_ty,
+                        )
+                    } else {
+                        // Only record an undecorated type once a decorator actually replaces the public
+                        // binding. If all decorators preserve the class, there is no alternate class type
+                        // to expose.
+                        undecorated_ty.get_or_insert(inferred_ty);
+                        decorated_ty
+                    }
+                },
+            );
         }
 
         self.undecorated_type = undecorated_ty;
@@ -595,13 +608,13 @@ fn type_retains_original_class<'db>(
 /// variables are specialized before the returned decorator receives the class. Explicit `Any`
 /// results do not trigger this fallback.
 fn is_unknown_decorator_result<'db>(db: &'db dyn Db, result_ty: Type<'db>) -> bool {
-    match result_ty.resolve_type_alias(db) {
+    result_ty.has_outer_type(db, |result_ty| match result_ty {
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_dynamic()
             .is_some_and(|dynamic| Type::Dynamic(dynamic).is_unknown()),
         result_ty => result_ty.is_unknown(),
-    }
+    })
 }
 
 /// Merge a class-preserving decorator result into the public binding.

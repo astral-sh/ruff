@@ -1,7 +1,7 @@
 use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, binary_heap};
-use ty_python_semantic::ProgramEnvironment;
+use ty_python_semantic::{Db as SemanticDb, ProgramEnvironment};
 
 use compact_str::{CompactString, CompactStringExt};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -21,10 +21,12 @@ use ty_module_resolver::{
 use ty_python_core::{ProgramFile, semantic_index};
 use ty_python_semantic::HasType;
 use ty_python_semantic::importer::{ImportRequest, Importer};
-use ty_python_semantic::types::{SpecialFormType, UnionType};
+use ty_python_semantic::types::{
+    CycleKind, SpecialFormType, TypeQuery, TypeQueryContext, UnionType,
+};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    types::{KnownClass, Type},
 };
 
 use crate::annotation_expression::is_in_annotation_expression;
@@ -524,9 +526,11 @@ impl<'db> CompletionBuilder<'db> {
 
             self.deprecated = ty.is_deprecated(db);
         }
-        let kind = self
-            .kind
-            .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
+        let kind = self.kind.or_else(|| {
+            self.ty.and_then(|ty| {
+                completion_kind_from_type(db, &ProgramEnvironment::from_file(program_file), ty)
+            })
+        });
         let relevance = Relevance::new(db, program_file, collection_context, query, &self);
         let (label, insert, insert_text_format, command) =
             if collection_context.should_complete_callable_parentheses(kind) {
@@ -3302,15 +3306,36 @@ fn is_name_like_token(token: &Token) -> bool {
 /// general, if callers have more specific knowledge about the kind of
 /// a completion, then they should use that to explicitly set its kind
 /// on `CompletionBuilder`.
-fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<CompletionKind> {
-    type CompletionKindVisitor<'db> =
-        CycleDetector<'db, CompletionKind, Type<'db>, Option<CompletionKind>, 3>;
+fn completion_kind_from_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<CompletionKind> {
+    TypeQueryContext::with_root(env, FindCompletionKind, |root| root.visit(db, ty))
+}
 
-    fn imp<'db>(
-        db: &'db dyn Db,
+struct FindCompletionKind;
+
+impl<'db> TypeQuery<'db> for FindCompletionKind {
+    type Output = Option<CompletionKind>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        None
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn SemanticDb,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
         ty: Type<'db>,
-        visitor: &CompletionKindVisitor<'db>,
-    ) -> Option<CompletionKind> {
+        _state: (),
+    ) -> Self::Output {
         Some(match ty {
             Type::FunctionLiteral(_)
             | Type::DataclassDecorator(_)
@@ -3340,33 +3365,24 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&ty| imp(db, ty, visitor))?,
+                .find_map(|&ty| traversal.visit(db, ty))?,
             Type::Intersection(intersection) => intersection
                 .iter_positive(db)
-                .find_map(|ty| imp(db, ty, visitor))?,
+                .find_map(|ty| traversal.visit(db, ty))?,
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Never
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => return None,
-            Type::TypeAlias(alias) => {
-                visitor.visit(db, ty, || imp(db, alias.value_type(db), visitor))?
-            }
-            Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                imp(
-                    db,
-                    recursive.unfold(db, &recursive.environment(db)).into_type(),
-                    visitor,
-                )
-            })?,
+            | Type::AlwaysFalsy
+            | Type::TypeAlias(_)
+            | Type::Recursive(_) => return None,
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
         })
     }
-    imp(db, ty, &CompletionKindVisitor::default())
 }
 
 /// Defines an ordering relating the two completions for ranking purposes.

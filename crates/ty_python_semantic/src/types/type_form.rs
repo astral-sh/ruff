@@ -1,5 +1,8 @@
 use super::variance::{VarianceInferable, VarianceTerm};
-use super::{BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, UnionType, visitor};
+use super::{
+    BoundTypeVarIdentity, CycleKind, IntersectionType, Type, TypeQuery, TypeQueryContext,
+    UnionType, visitor,
+};
 use crate::Db;
 use crate::ProgramEnvironment;
 
@@ -39,61 +42,70 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        struct TypeFormArgument;
-        type TypeFormArgumentVisitor<'db> =
-            CycleDetector<'db, TypeFormArgument, Type<'db>, Option<Type<'db>>, 3>;
+        TypeQueryContext::with_root(env, TypeFormArgument, |root| root.visit(db, self))
+            .unwrap_or(self)
+    }
+}
 
-        fn project<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            visitor: &TypeFormArgumentVisitor<'db>,
-        ) -> Option<Type<'db>> {
-            match ty {
-                Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
-                Type::TypeAlias(alias) => {
-                    visitor.visit(db, ty, || project(db, env, alias.value_type(db), visitor))
-                }
-                // Recursive bodies can contain type forms; unfold them under the same guard.
-                Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                    project(db, env, recursive.unfold(db, env).into_type(), visitor)
-                }),
-                Type::Union(union) => {
-                    let mut elements = union
-                        .elements(db)
-                        .iter()
-                        .filter_map(|element| project(db, env, *element, visitor))
-                        .peekable();
-                    elements.peek()?;
-                    Some(UnionType::from_elements(db, env, elements))
-                }
-                Type::Intersection(intersection) => {
-                    let mut elements = intersection
-                        .iter_positive(db)
-                        .filter_map(|element| project(db, env, element, visitor))
-                        .peekable();
-                    elements.peek()?;
-                    Some(IntersectionType::from_elements(db, env, elements))
-                }
-                Type::TypeVar(typevar) => visitor.visit(db, ty, || {
-                    typevar.typevar(db).bound_or_constraints(db, env).and_then(
-                        |bound_or_constraints| {
-                            project(db, env, bound_or_constraints.as_type(db, env), visitor)
-                        },
-                    )
-                }),
-                Type::SpecialForm(special_form) => special_form.type_form_argument(db, env),
-                Type::KnownInstance(instance) if instance.is_type_form_value() => {
-                    instance.type_form_argument(db, env)
-                }
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    ty.to_instance_approximation(db, env)
-                }
-                _ => None,
+struct TypeFormArgument;
+
+impl<'db> TypeQuery<'db> for TypeFormArgument {
+    type Output = Option<Type<'db>>;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _state: (),
+    ) -> Self::Output {
+        None
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeQueryContext<'_, 'db, Self>,
+        ty: Type<'db>,
+        _state: (),
+    ) -> Self::Output {
+        let env = traversal.environment();
+        match ty {
+            Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
+            Type::Union(union) => {
+                let mut elements = union
+                    .elements(db)
+                    .iter()
+                    .filter_map(|element| traversal.visit(db, *element))
+                    .peekable();
+                elements.peek()?;
+                Some(UnionType::from_elements(db, env, elements))
             }
+            Type::Intersection(intersection) => {
+                let mut elements = intersection
+                    .iter_positive(db)
+                    .filter_map(|element| traversal.visit(db, element))
+                    .peekable();
+                elements.peek()?;
+                Some(IntersectionType::from_elements(db, env, elements))
+            }
+            Type::TypeVar(typevar) => {
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .and_then(|bound_or_constraints| {
+                        traversal.visit(db, bound_or_constraints.as_type(db, env))
+                    })
+            }
+            Type::SpecialForm(special_form) => special_form.type_form_argument(db, env),
+            Type::KnownInstance(instance) if instance.is_type_form_value() => {
+                instance.type_form_argument(db, env)
+            }
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                ty.to_instance_approximation(db, env)
+            }
+            _ => None,
         }
-
-        project(db, env, self, &TypeFormArgumentVisitor::default()).unwrap_or(self)
     }
 }
 

@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspector;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, NodeIndex, PythonVersion};
 use rustc_hash::FxHashMap;
@@ -20,7 +21,7 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ClassType, IntersectionType, KnownClass, Type, TypeAndQualifiers, TypeContext, TypedDictType,
-    TypingModule, any_over_type,
+    TypingModule,
 };
 use ty_python_core::definition::Definition;
 
@@ -517,9 +518,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .as_static()
             .zip(call_expression_tcx.annotation)
             .is_some_and(|(class_literal, annotation)| {
-                any_over_type(db, env, annotation.resolve_type_alias(db), false, |ty| {
-                    ty.resolve_type_alias(db)
-                        .specialization_of(db, env, class_literal)
+                any_over_type_expanding_aliases(db, env, annotation, |ty| {
+                    ty.specialization_of(db, env, class_literal)
                         .is_some_and(|specialization| {
                             specialization
                                 .types(db)
@@ -545,13 +545,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return permits_field_inference(name.id.as_str());
                 }
 
-                self.try_expression_type(&keyword.value)
-                    .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
-                    .is_some_and(|unpacked| {
-                        unpacked.items(db).iter().all(|(name, field)| {
-                            field.is_required() && permits_field_inference(name.as_str())
-                        })
-                    })
+                self.try_expression_type(&keyword.value).is_some_and(|ty| {
+                    TypeInspector::inspect_root(
+                        db,
+                        env,
+                        ty,
+                        |_, _| false,
+                        |_, ty| {
+                            ty.as_typed_dict().is_some_and(|unpacked| {
+                                unpacked.items(db).iter().all(|(name, field)| {
+                                    field.is_required() && permits_field_inference(name.as_str())
+                                })
+                            })
+                        },
+                    )
+                })
             })
     }
 

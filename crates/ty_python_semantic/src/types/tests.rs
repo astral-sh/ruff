@@ -1,3 +1,5 @@
+use std::fmt::Write as _;
+
 use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
@@ -22,6 +24,42 @@ fn member_lookup_result_size() {
         size_of::<MemberLookupResult<'_>>(),
         size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
     );
+}
+
+#[test]
+fn member_lookup_preserves_shared_aliases() -> anyhow::Result<()> {
+    let handle = std::thread::Builder::new()
+        .name("shared-alias-member-lookup".into())
+        // Match the stack size used by ty's production worker threads.
+        .stack_size(ruff_db::STACK_SIZE)
+        .spawn(|| -> anyhow::Result<()> {
+            let mut db = TestDbBuilder::new()
+                .with_python_version(PythonVersion::PY312)
+                .build()?;
+            let mut source = String::from(
+                "from typing import Literal, assert_type\ntype A0 = Literal[0]\ntype B0 = Literal[0]\n",
+            );
+            // Every level adds two aliases, but recursively walking their bodies without sharing results
+            // doubles the work at each step.
+            for level in 1..=32 {
+                let previous = level - 1;
+                write!(
+                    source,
+                    "type A{level} = A{previous} | B{previous} | Literal[{level}]\n\
+                     type B{level} = A{previous} | B{previous} | Literal[-{level}]\n"
+                )?;
+            }
+            source.push_str("def check(value: A32):\n    assert_type(value.real, A32)\n");
+            db.write_file("/src/shared.py", source)?;
+            let file = system_path_to_file(&db, "/src/shared.py")?;
+            let diagnostics = db.check_file(file);
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            Ok(())
+        })?;
+    match handle.join() {
+        Ok(result) => result,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
 }
 
 #[test]

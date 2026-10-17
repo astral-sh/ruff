@@ -2071,6 +2071,38 @@ static_assert(is_subtype_of(Consumer[int], Consumer[bool]))
 static_assert(not is_subtype_of(Consumer[bool], Consumer[int]))
 ```
 
+### Value views
+
+A value view only reads a `TypedDict`'s items, so returning one is covariant in the value type:
+
+```py
+from typing import cast
+from typing_extensions import TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+class Values[U](TypedDict, closed=True):
+    value: U
+
+class Reader[T]:
+    def values(self) -> TypeOf[cast("Values[T]", {}).values()]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Reader[bool], Reader[int]))
+static_assert(not is_subtype_of(Reader[int], Reader[bool]))
+```
+
+Returning a view of mutable lists is invariant in the list element type:
+
+```py
+class ListReader[T]:
+    def values(self) -> TypeOf[cast("Values[list[T]]", {}).values()]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(ListReader[bool], ListReader[int]))
+static_assert(not is_subtype_of(ListReader[int], ListReader[bool]))
+```
+
 ### Nested item types
 
 Read-only items preserve the variance of their value types. A callable's argument and return types

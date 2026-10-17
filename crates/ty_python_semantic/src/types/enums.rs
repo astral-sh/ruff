@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::recursive::TypeInspector;
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -482,15 +483,32 @@ fn known_constructor_preserves_value_type<'db>(
     value: Type<'db>,
     annotation: Type<'db>,
 ) -> bool {
-    let annotation = annotation.resolve_type_alias(db);
-    match value.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| known_constructor_preserves_value_type(db, env, *element, annotation)),
-        Type::LiteralValue(literal) => literal.fallback_instance(db, env) == annotation,
-        value => value == annotation,
-    }
+    TypeInspector::scope(env, |inspector| {
+        known_constructor_preserves_value_type_in(db, inspector, value, annotation)
+    })
+}
+
+fn known_constructor_preserves_value_type_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    value: Type<'db>,
+    annotation: Type<'db>,
+) -> bool {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        value,
+        |_, _| false,
+        |inspector, value| match value {
+            Type::Union(union) => union.elements(db).iter().all(|element| {
+                known_constructor_preserves_value_type_in(db, inspector, *element, annotation)
+            }),
+            Type::LiteralValue(literal) => literal
+                .fallback_instance(db, env)
+                .is_same_resolved_type(db, annotation),
+            value => value.is_same_resolved_type(db, annotation),
+        },
+    )
 }
 
 /// Return whether constructing `data_type` from `value` preserves the value's inferred runtime
@@ -502,18 +520,35 @@ fn value_has_exact_known_class<'db>(
     value: Type<'db>,
     data_type: KnownClass,
 ) -> bool {
-    match value.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| value_has_exact_known_class(db, env, *element, data_type)),
-        Type::LiteralValue(literal) => match literal.fallback_instance(db, env) {
+    TypeInspector::scope(env, |inspector| {
+        value_has_exact_known_class_in(db, inspector, value, data_type)
+    })
+}
+
+fn value_has_exact_known_class_in<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    value: Type<'db>,
+    data_type: KnownClass,
+) -> bool {
+    let env = inspector.environment();
+    inspector.inspect(
+        db,
+        value,
+        |_, _| false,
+        |inspector, value| match value {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| value_has_exact_known_class_in(db, inspector, *element, data_type)),
+            Type::LiteralValue(literal) => match literal.fallback_instance(db, env) {
+                Type::NominalInstance(instance) => instance.has_known_class(db, data_type),
+                _ => false,
+            },
             Type::NominalInstance(instance) => instance.has_known_class(db, data_type),
             _ => false,
         },
-        Type::NominalInstance(instance) => instance.has_known_class(db, data_type),
-        _ => false,
-    }
+    )
 }
 
 impl<'db> EnumMetadata<'db> {
@@ -710,13 +745,16 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            let Type::NominalInstance(instance) = positive.resolve_type_alias(db) else {
-                rest.push(*positive);
-                continue;
-            };
-
-            let Some(enum_class_literal) = instance.class_literal(db, env).into_enum_class(db)
-            else {
+            let Some(enum_class_literal) = TypeInspector::inspect_root(
+                db,
+                env,
+                *positive,
+                |_, _| None,
+                |_, ty| {
+                    ty.as_nominal_instance()
+                        .and_then(|instance| instance.class_literal(db, env).into_enum_class(db))
+                },
+            ) else {
                 rest.push(*positive);
                 continue;
             };
@@ -732,7 +770,13 @@ impl<'db> EnumComplementType<'db> {
         }
         let mut excluded_names = FxHashSet::default();
         for negative in negative {
-            let enum_literal = negative.resolve_type_alias(db).as_enum_literal()?;
+            let enum_literal = TypeInspector::inspect_root(
+                db,
+                env,
+                *negative,
+                |_, _| None,
+                |_, ty| ty.as_enum_literal(),
+            )?;
             if enum_literal.enum_class_literal(db) != enum_class_literal {
                 return None;
             }
@@ -913,8 +957,13 @@ impl<'db> EnumComplementType<'db> {
                     .collect::<FxOrderSet<_>>(),
             ))
         } else {
-            self.to_intersection(db, visitor.env)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            let intersection = self.to_intersection(db, visitor.env);
+            let mapped = intersection.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if mapped == intersection {
+                Type::EnumComplement(self)
+            } else {
+                mapped
+            }
         }
     }
 

@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspector;
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
@@ -998,7 +999,7 @@ impl<'db> ProtocolInterface<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
+        visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for data in self.inner(db).values() {
             data.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
@@ -1801,7 +1802,7 @@ impl<'db> ProtocolMemberData<'db> {
         env: &ProgramEnvironment<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        _visitor: &FindLegacyTypeVarsVisitor<'db>,
+        _visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
     ) {
         for member_type in self.kind.member_types() {
             member_type.find_legacy_typevars(db, env, binding_context, typevars);
@@ -2469,53 +2470,59 @@ fn descriptor_decorated_protocol_member<'db>(
     protocol: ClassType<'db>,
     definition: Option<Definition<'db>>,
 ) -> Option<ProtocolMemberData<'db>> {
-    let descriptor_ty = descriptor_ty.resolve_type_alias(db);
+    TypeInspector::inspect_root(
+        db,
+        env,
+        descriptor_ty,
+        |_, _| None,
+        |_, descriptor_ty| {
+            // Applying a generic descriptor decorator to a method that refers to an enclosing type
+            // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
+            // its `__get__` result would then erase the remaining descriptor structure and weaken the
+            // protocol member to a bare `Unknown`.
+            if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
+                return None;
+            }
 
-    // Applying a generic descriptor decorator to a method that refers to an enclosing type
-    // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
-    // its `__get__` result would then erase the remaining descriptor structure and weaken the
-    // protocol member to a bare `Unknown`.
-    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
-        return None;
-    }
+            let Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = descriptor_ty
+                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                .place
+            else {
+                return None;
+            };
 
-    let Place::Defined(DefinedPlace {
-        definedness: Definedness::AlwaysDefined,
-        ..
-    }) = descriptor_ty
-        .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-        .place
-    else {
-        return None;
-    };
+            let receiver_ty = Type::instance(db, env, protocol);
+            let read_ty = descriptor_ty
+                .try_call_dunder_get(
+                    db,
+                    env,
+                    Some(receiver_ty),
+                    receiver_ty.to_meta_type(db, env),
+                )
+                .unwrap_or_else(|error| Some(error.fallback()))?
+                .return_type;
+            let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
 
-    let receiver_ty = Type::instance(db, env, protocol);
-    let read_ty = descriptor_ty
-        .try_call_dunder_get(
-            db,
-            env,
-            Some(receiver_ty),
-            receiver_ty.to_meta_type(db, env),
-        )
-        .unwrap_or_else(|error| Some(error.fallback()))?
-        .return_type;
-    let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
+            let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
+                DescriptorSetterDomain::Missing => None,
+                DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
+                    descriptor_ty,
+                    Some(domain),
+                    definition,
+                )),
+                DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
+                    descriptor_ty,
+                    None,
+                    definition,
+                )),
+            };
 
-    let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
-        DescriptorSetterDomain::Missing => None,
-        DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
-            descriptor_ty,
-            Some(domain),
-            definition,
-        )),
-        DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
-            descriptor_ty,
-            None,
-            definition,
-        )),
-    };
-
-    Some(ProtocolMemberData::property(read, write, definition))
+            Some(ProtocolMemberData::property(read, write, definition))
+        },
+    )
 }
 
 fn is_class_object_type(ty: Type<'_>) -> bool {
@@ -2598,7 +2605,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && required
                 .read()
                 .and_then(|read| read.result_type(db, env, None))
-                .is_some_and(|required| required.resolve_type_alias(db) == Type::object())
+                .is_some_and(|required| required.is_same_resolved_type(db, Type::object()))
             && receiver_ty
                 .member_lookup_with_policy(
                     db,
@@ -3611,8 +3618,8 @@ fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableT
         return false;
     };
 
-    !first.return_ty.resolve_type_alias(db).is_never()
-        && signatures.all(|signature| !signature.return_ty.resolve_type_alias(db).is_never())
+    !first.return_ty.has_outer_type(db, |ty| ty.is_never())
+        && signatures.all(|signature| !signature.return_ty.has_outer_type(db, |ty| ty.is_never()))
 }
 
 /// Protocol compatibility can only succeed if every required member is present.
