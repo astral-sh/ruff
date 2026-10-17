@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::cell::OnceCell;
 use std::fmt::Display;
 use std::hash::BuildHasherDefault;
+use std::sync::Arc;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -12,12 +13,13 @@ use rustc_hash::FxHashMap;
 use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use crate::subscript::PyIndex;
-use crate::types::tuple::{TupleLength, TupleSpec};
+use crate::types::generics::GenericContext;
+use crate::types::tuple::{TupleLength, TupleSpec, VariableSegment};
 use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
     TypedDictOpenness, UnpackedTypedDictKey, extract_unpacked_typed_dict_from_value_type,
 };
-use crate::types::{Parameters, Type, TypeContext, UnionType, expand_type};
+use crate::types::{Parameters, Type, TypeContext, TypeMapping, UnionType, expand_type};
 
 /// Maximum total number of expanded argument type combinations across all arguments
 /// in [`CallArgumentExpansions::iter`].
@@ -45,6 +47,18 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     items: Vec<CallArgument<'a, 'db>>,
+    /// The argument choice shared by every method in a constructor call.
+    constructor_arguments: ConstructorArguments,
+}
+
+#[derive(Clone, Debug, Default)]
+enum ConstructorArguments {
+    #[default]
+    Unexpanded,
+    /// Preserve the ordinary matching behavior throughout the constructor chain.
+    Original,
+    /// Lengths of homogeneous unpack segments, indexed by source argument, including receivers.
+    Lengths(Arc<[usize]>),
 }
 
 /// An argument to a call and its inferred types, when available.
@@ -516,6 +530,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
+            constructor_arguments: ConstructorArguments::Unexpanded,
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
@@ -703,6 +718,33 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index)
     }
 
+    /// Retain argument inference under the equivalent annotations of a fresh constructor method.
+    /// Existing fresh contexts take precedence over aliases from the original signature.
+    pub(super) fn freshen_constructor_contexts(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+    ) {
+        let mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        };
+        for argument in &mut self.items {
+            let types = argument.source_types_mut();
+            let original: Vec<_> = types
+                .types
+                .iter()
+                .map(|(key, value)| (*key, *value))
+                .collect();
+            for (key, value) in original {
+                let fresh = key.apply_type_mapping(db, env, &mapping, TypeContext::default());
+                types.types.entry(fresh).or_insert(value);
+            }
+        }
+    }
+
     /// The inferred source expression types, before any argument unpacking.
     pub(crate) fn source_types(&self, index: usize) -> Option<&CallArgumentTypes<'db>> {
         self.items.get(index).map(CallArgument::source_types)
@@ -744,7 +786,15 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             let mut items = Vec::with_capacity(self.items.len() + 1);
             items.push(CallArgument::new(Argument::Synthetic, bound_self));
             items.extend(self.items.iter().cloned());
-            Cow::Owned(CallArguments { items })
+            Cow::Owned(CallArguments {
+                items,
+                constructor_arguments: match &self.constructor_arguments {
+                    ConstructorArguments::Lengths(lengths) => ConstructorArguments::Lengths(
+                        std::iter::once(0).chain(lengths.iter().copied()).collect(),
+                    ),
+                    other => other.clone(),
+                },
+            })
         } else {
             Cow::Borrowed(self)
         }
@@ -758,6 +808,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
+            constructor_arguments: match &self.constructor_arguments {
+                ConstructorArguments::Lengths(lengths) => {
+                    ConstructorArguments::Lengths(lengths[index..].into())
+                }
+                other => other.clone(),
+            },
         }
     }
 
@@ -778,6 +834,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         prefix_len: usize,
     ) -> Self {
         Self {
+            constructor_arguments: match &self.constructor_arguments {
+                ConstructorArguments::Lengths(lengths) => ConstructorArguments::Lengths(
+                    indices.iter().map(|index| lengths[*index]).collect(),
+                ),
+                other => other.clone(),
+            },
             items: indices
                 .iter()
                 .map(|index| {
@@ -833,6 +895,141 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
 
         Some((bound_call_arguments, can_synthesize_signature))
+    }
+
+    /// The shared unpack lengths selected for this constructor evaluation.
+    pub(super) fn constructor_lengths(&self) -> Option<&[usize]> {
+        match &self.constructor_arguments {
+            ConstructorArguments::Lengths(lengths) => Some(lengths),
+            _ => None,
+        }
+    }
+
+    /// A downstream method must use its caller's argument choice, including an unexpanded call.
+    pub(super) fn for_downstream_constructor(&self) -> Cow<'_, Self> {
+        if matches!(self.constructor_arguments, ConstructorArguments::Unexpanded) {
+            let mut arguments = self.clone();
+            arguments.constructor_arguments = ConstructorArguments::Original;
+            Cow::Owned(arguments)
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+
+    /// Separate known tuple alternatives, then consider possible lengths within each one.
+    /// Every outer group must succeed; lengths within a group are alternative placements.
+    /// Never return a partial family when expansion exceeds the existing call budget.
+    pub(super) fn constructor_argument_groups(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        max_length: usize,
+    ) -> Option<Vec<Vec<Self>>> {
+        if !matches!(self.constructor_arguments, ConstructorArguments::Unexpanded)
+            || self
+                .items
+                .iter()
+                .any(|argument| matches!(argument, CallArgument::Keywords(_)))
+        {
+            return None;
+        }
+        let mut expanded = vec![self.clone()];
+        for (index, argument) in self.items.iter().enumerate() {
+            if matches!(argument, CallArgument::Variadic(_))
+                && let Some(alternatives) = argument.expand(db, env)
+            {
+                if expanded.len().saturating_mul(alternatives.len()) > MAX_TOTAL_EXPANSION {
+                    return None;
+                }
+                expanded = expanded
+                    .into_iter()
+                    .flat_map(|arguments| {
+                        alternatives.iter().map(move |alternative| {
+                            let mut arguments = arguments.clone();
+                            arguments.items[index] = alternative.clone();
+                            arguments
+                        })
+                    })
+                    .collect();
+            }
+        }
+
+        let mut groups = Vec::new();
+        let mut count = 0;
+        for mut arguments in expanded {
+            let mut variable_arguments = Vec::new();
+            let mut has_later_positional_input = false;
+            for (index, argument) in arguments.iter().enumerate() {
+                match argument {
+                    CallArgument::Synthetic(_) | CallArgument::Positional(_) => {
+                        has_later_positional_input |= !variable_arguments.is_empty();
+                    }
+                    CallArgument::Variadic(argument) => {
+                        let sequence = argument.sequence(db, env)?;
+                        match sequence.as_ref() {
+                            TupleSpec::Fixed(sequence) => {
+                                has_later_positional_input |= !variable_arguments.is_empty()
+                                    && sequence.iter_all_elements().next().is_some();
+                            }
+                            TupleSpec::Variable(sequence) => {
+                                if !matches!(sequence.variable(), VariableSegment::Homogeneous(_)) {
+                                    return None;
+                                }
+                                has_later_positional_input |= !variable_arguments.is_empty()
+                                    || !sequence.suffix_elements().is_empty();
+                                variable_arguments.push(index);
+                            }
+                        }
+                    }
+                    CallArgument::Keyword { .. } | CallArgument::Keywords(_) => {}
+                }
+            }
+            if !has_later_positional_input {
+                // Keep checking a trailing unpack's element type against optional parameters.
+                // A tuple union does not make it safe to treat that member as an empty tuple.
+                arguments.constructor_arguments = ConstructorArguments::Original;
+                count += 1;
+                if count > MAX_TOTAL_EXPANSION {
+                    return None;
+                }
+                groups.push(vec![arguments]);
+                continue;
+            }
+            let mut lengths = vec![vec![0; arguments.len()]];
+            for index in variable_arguments {
+                if lengths.len().saturating_mul(max_length.saturating_add(1))
+                    > MAX_TOTAL_EXPANSION.saturating_sub(count)
+                {
+                    return None;
+                }
+                lengths = lengths
+                    .into_iter()
+                    .flat_map(|lengths| {
+                        (0..=max_length).map(move |length| {
+                            let mut lengths = lengths.clone();
+                            lengths[index] = length;
+                            lengths
+                        })
+                    })
+                    .collect();
+            }
+            count += lengths.len();
+            if count > MAX_TOTAL_EXPANSION {
+                return None;
+            }
+            groups.push(
+                lengths
+                    .into_iter()
+                    .map(|lengths| {
+                        let mut arguments = arguments.clone();
+                        arguments.constructor_arguments =
+                            ConstructorArguments::Lengths(lengths.into());
+                        arguments
+                    })
+                    .collect(),
+            );
+        }
+        Some(groups)
     }
 
     /// Prepares lazy argument type expansions for overload resolution.
@@ -1069,6 +1266,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             items.push(CallArgument::new(argument, ty));
         }
 
-        Self { items }
+        Self {
+            items,
+            constructor_arguments: ConstructorArguments::Unexpanded,
+        }
     }
 }

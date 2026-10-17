@@ -2256,6 +2256,47 @@ Calling `__new__` explicitly produces only one warning.
 OldNew.__new__(OldNew)  # error: [deprecated] "old new"
 ```
 
+### Positional unpacking can select a deprecated overload
+
+An empty `before` selects the integer overload; a one-element `before` selects the deprecated string
+overload. We report that possible deprecation for both `__new__` and `__init__`.
+
+```py
+from typing import Self, overload
+from typing_extensions import deprecated
+
+class New:
+    @overload
+    @deprecated("string constructor")
+    def __new__(cls, value: str, other: object = None) -> Self: ...
+    @overload
+    def __new__(cls, value: int, other: object = None) -> Self: ...
+    def __new__(cls, value, other=None):
+        return super().__new__(cls)
+
+def _(before: list[str], value: int) -> None:
+    New(*before, value)  # error: [deprecated] "string constructor"
+```
+
+The warning also applies when the deprecated overload belongs to the initializer, after a
+non-deprecated `__new__` has accepted the arguments.
+
+```py
+class Init:
+    def __new__(cls, value: str | int, other: object = None) -> Self:
+        return super().__new__(cls)
+
+    @overload
+    @deprecated("string initializer")
+    def __init__(self, value: str, other: object = None): ...
+    @overload
+    def __init__(self, value: int, other: object = None): ...
+    def __init__(self, value, other=None): ...
+
+def _(before: list[str], value: int) -> None:
+    Init(*before, value)  # error: [deprecated] "string initializer"
+```
+
 ### Both constructor methods
 
 When both methods are deprecated, the class call produces one warning that points to both

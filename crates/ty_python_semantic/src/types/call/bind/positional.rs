@@ -203,6 +203,45 @@ impl<'db> PositionalMatches<'db> {
         segment * (self.parameter_count + 1) + parameter
     }
 
+    /// Match one shared choice of unpack lengths without changing the source argument indexes.
+    /// A repeated segment that reaches a variadic parameter still checks its element type, even
+    /// when its chosen length leaves no values for that parameter.
+    pub(super) fn at_lengths(
+        &self,
+        arguments: &CallArguments<'_, 'db>,
+        lengths: &[usize],
+    ) -> Option<(Box<[MatchedArgument<'db>]>, bool)> {
+        let mut matched = Self::empty_matches(arguments);
+        let mut position = 0;
+        let mut variadic_argument_matched = false;
+        for (index, segment) in self.segments.iter().enumerate() {
+            if segment.repeated {
+                let mut remaining = *lengths.get(segment.argument_index)?;
+                while remaining > 0 && position < self.parameter_count {
+                    if !self.can_consume[position] {
+                        return None;
+                    }
+                    segment.add_match(&mut matched, position);
+                    position += 1;
+                    remaining -= 1;
+                }
+                if self.variadic && position == self.parameter_count {
+                    segment.add_match(&mut matched, position);
+                    variadic_argument_matched = true;
+                } else if remaining > 0 {
+                    return None;
+                }
+            } else {
+                let next = self.next_state(index, position)?;
+                segment.add_match(&mut matched, position);
+                position = next % (self.parameter_count + 1);
+            }
+        }
+        Self::deduplicate_matches(&mut matched);
+        self.can_finish[self.state(self.segments.len(), position)]
+            .then_some((matched, variadic_argument_matched))
+    }
+
     /// Whether an unpack can stop before matching the current parameter.
     ///
     /// At a variadic parameter, we check its element type even if the iterable might be empty:

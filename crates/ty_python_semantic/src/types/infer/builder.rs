@@ -6359,7 +6359,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 overloads_with_binding.push((overload, binding, OnceCell::new()));
             });
         } else {
-            bindings.visit_type_context_callables(&mut |binding| {
+            bindings.visit_evaluated_type_context_callables(&mut |binding| {
                 add_overloads_from_binding(&mut overloads_with_binding, binding);
             });
         }
