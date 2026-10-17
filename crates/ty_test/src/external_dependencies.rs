@@ -3,10 +3,120 @@ use crate::db::Db;
 use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8Path;
 use ruff_db::files::File;
-use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
+use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
+use tempfile::TempDir;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_semantic::{PythonEnvironment, SysPrefixPathOrigin};
+
+/// Retains one installed environment for a Markdown file, never its test database contents.
+#[derive(Default)]
+pub(crate) struct VenvCache {
+    enabled: bool,
+    entry: Option<CachedVenv>,
+}
+
+impl VenvCache {
+    pub(crate) fn new() -> Self {
+        Self {
+            enabled: !std::env::var("MDTEST_REUSE_VENV").is_ok_and(|value| value == "0"),
+            ..Self::default()
+        }
+    }
+
+    fn key(
+        &self,
+        project: &str,
+        platform: &str,
+        lockfile: &Utf8Path,
+        upgrade: bool,
+    ) -> Option<VenvKey> {
+        if !self.enabled || upgrade {
+            return None;
+        }
+        Some(VenvKey {
+            project: project.to_owned(),
+            platform: platform.to_owned(),
+            lockfile: std::fs::read(lockfile).ok()?,
+        })
+    }
+
+    /// A matching installation still needs a fresh copy into the current test's filesystem.
+    fn copy_if_matching(
+        &mut self,
+        db: &mut Db,
+        key: &VenvKey,
+        destination: &SystemPath,
+    ) -> Result<bool> {
+        let Some(entry) = self.entry.as_ref().filter(|entry| &entry.key == key) else {
+            self.entry = None;
+            return Ok(false);
+        };
+
+        if let Err(error) = copy_site_packages_to_db(db, &entry.path, destination) {
+            self.entry = None;
+            return Err(error);
+        }
+        Ok(true)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct VenvKey {
+    project: String,
+    platform: String,
+    lockfile: Vec<u8>,
+}
+
+struct CachedVenv {
+    key: VenvKey,
+    path: SystemPathBuf,
+    _directory: TempDir,
+}
+
+/// Local, editable, Git, and unknown sources can change without changing the lockfile.
+fn reusable_lockfile(bytes: &[u8]) -> bool {
+    let Ok(contents) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    let Ok(lockfile) = toml::from_str::<toml::Table>(contents) else {
+        return false;
+    };
+    if lockfile.get("version").and_then(toml::Value::as_integer) != Some(1) {
+        return false;
+    }
+    let Some(packages) = lockfile.get("package").and_then(toml::Value::as_array) else {
+        return false;
+    };
+    let mut found_root = false;
+    for package in packages {
+        let Some(source) = package.get("source").and_then(toml::Value::as_table) else {
+            return false;
+        };
+        if source.len() != 1 {
+            return false;
+        }
+        if source
+            .get("registry")
+            .and_then(toml::Value::as_str)
+            .is_some_and(|registry| {
+                registry.starts_with("https://") || registry.starts_with("http://")
+            })
+        {
+            continue;
+        }
+        if !found_root
+            && source.get("virtual").and_then(toml::Value::as_str) == Some(".")
+            && package.get("name").and_then(toml::Value::as_str) == Some("mdtest-deps")
+            && package.get("version").and_then(toml::Value::as_str) == Some("0.1.0")
+        {
+            found_root = true;
+        } else {
+            return false;
+        }
+    }
+    found_root
+}
 
 /// Setup a virtual environment in the in-memory filesystem of `db` with
 /// the specified dependencies installed.
@@ -17,26 +127,8 @@ pub(crate) fn setup_venv(
     python_platform: &PythonPlatform,
     dest_venv_path: &SystemPath,
     lockfile_path: &Utf8Path,
+    cache: &mut VenvCache,
 ) -> Result<()> {
-    // Create a temporary directory for the project
-    let temp_dir = tempfile::Builder::new()
-        .prefix("mdtest-venv-")
-        .tempdir()
-        .context("Failed to create temporary directory for mdtest virtual environment")?;
-
-    // Canonicalize here to fix problems with `.strip_prefix()` later on Windows
-    let temp_dir_path = dunce::canonicalize(temp_dir.path())
-        .context("Failed to canonicalize temporary directory path")?;
-
-    let temp_path = SystemPath::from_std_path(&temp_dir_path)
-        .ok_or_else(|| {
-            anyhow!(
-                "Temporary directory path is not valid UTF-8: {}",
-                temp_dir_path.display()
-            )
-        })?
-        .to_path_buf();
-
     // Generate a minimal pyproject.toml
     let pyproject_toml = format!(
         r#"[project]
@@ -55,12 +147,6 @@ dependencies = [
             .join("\n")
     );
 
-    std::fs::write(
-        temp_path.join("pyproject.toml").as_std_path(),
-        pyproject_toml,
-    )
-    .context("Failed to write pyproject.toml")?;
-
     // Convert PythonPlatform to uv's platform format
     let uv_platform = match python_platform {
         PythonPlatform::Identifier(id) => match id.as_str() {
@@ -75,9 +161,50 @@ dependencies = [
     };
 
     let upgrade_lockfile = std::env::var("MDTEST_UPGRADE_LOCKFILES").is_ok_and(|v| v == "1");
+    let key = cache.key(
+        &pyproject_toml,
+        uv_platform,
+        lockfile_path,
+        upgrade_lockfile,
+    );
+    if let Some(key) = &key
+        && cache.copy_if_matching(db, key, dest_venv_path)?
+    {
+        return Ok(());
+    }
+    cache.entry = None;
+    let key = key.filter(|key| reusable_lockfile(&key.lockfile));
+
+    let temp_dir = tempfile::Builder::new()
+        .prefix("mdtest-venv-")
+        .tempdir()
+        .context("Failed to create temporary directory for mdtest virtual environment")?;
+
+    // Canonicalize here to fix problems with `.strip_prefix()` later on Windows.
+    let temp_dir_path = dunce::canonicalize(temp_dir.path())
+        .context("Failed to canonicalize temporary directory path")?;
+    let temp_path = SystemPath::from_std_path(&temp_dir_path)
+        .ok_or_else(|| {
+            anyhow!(
+                "Temporary directory path is not valid UTF-8: {}",
+                temp_dir_path.display()
+            )
+        })?
+        .to_path_buf();
+    std::fs::write(
+        temp_path.join("pyproject.toml").as_std_path(),
+        pyproject_toml,
+    )
+    .context("Failed to write pyproject.toml")?;
+
     let use_locked = if upgrade_lockfile {
         // In upgrade mode, we'll generate a new lockfile
         false
+    } else if let Some(key) = &key {
+        // Install exactly the bytes used for the cache key, even if the source lockfile changes.
+        std::fs::write(temp_path.join("uv.lock").as_std_path(), &key.lockfile)
+            .with_context(|| format!("Failed to copy lockfile from '{lockfile_path}'"))?;
+        true
     } else if lockfile_path.exists() {
         // Copy existing lockfile to temp directory
         let temp_lockfile = temp_path.join("uv.lock");
@@ -145,7 +272,15 @@ dependencies = [
 
     let venv_path = temp_path.join(".venv");
 
-    copy_site_packages_to_db(db, &venv_path, dest_venv_path, python_version)
+    copy_site_packages_to_db(db, &venv_path, dest_venv_path)?;
+    if let Some(key) = key {
+        cache.entry = Some(CachedVenv {
+            key,
+            path: venv_path,
+            _directory: temp_dir,
+        });
+    }
+    Ok(())
 }
 
 /// Copy the site-packages directory from a real virtual environment to the in-memory filesystem of `db`.
@@ -156,7 +291,6 @@ fn copy_site_packages_to_db(
     db: &mut Db,
     venv_path: &SystemPath,
     dest_venv_path: &SystemPath,
-    _python_version: PythonVersion,
 ) -> Result<()> {
     // Discover the site-packages directory in the virtual environment
     let system = OsSystem::new(venv_path);
@@ -242,4 +376,143 @@ fn copy_directory_recursive(db: &mut Db, src: &SystemPath, dest: &SystemPath) ->
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use ruff_db::Db as _;
+
+    use super::*;
+
+    const LOCKFILE: &str = r#"
+version = 1
+[[package]]
+name = "mdtest-deps"
+version = "0.1.0"
+source = { virtual = "." }
+[[package]]
+name = "dependency"
+version = "1.0"
+source = { registry = "https://pypi.org/simple" }
+"#;
+
+    #[test]
+    fn reuse_requires_matching_immutable_inputs() -> Result<()> {
+        assert!(reusable_lockfile(LOCKFILE.as_bytes()));
+        for source in [
+            r#"path = "../dependency""#,
+            r#"editable = "../dependency""#,
+            r#"git = "https://example.org/repo#revision""#,
+            r#"virtual = "../dependency""#,
+            r#"registry = "file:///tmp/index""#,
+            r#"registry = "https://pypi.org/simple", path = "../dependency""#,
+            "malformed =",
+        ] {
+            let lockfile = LOCKFILE.replace(r#"registry = "https://pypi.org/simple""#, source);
+            assert!(!reusable_lockfile(lockfile.as_bytes()), "{source}");
+        }
+
+        let directory = TempDir::new()?;
+        let lockfile = directory.path().join("test.lock");
+        let lockfile = Utf8Path::from_path(&lockfile).context("UTF-8 test path")?;
+        fs::write(lockfile, LOCKFILE)?;
+        let mut cache = VenvCache {
+            enabled: true,
+            ..VenvCache::default()
+        };
+        let project = "requires-python = '~=3.13.0'\ndependencies = ['dependency==1.0']";
+        let key = cache
+            .key(project, "linux", lockfile, false)
+            .context("key")?;
+        assert!(cache.key(project, "linux", lockfile, true).is_none());
+        cache.enabled = false;
+        assert!(cache.key(project, "linux", lockfile, false).is_none());
+        cache.enabled = true;
+
+        let mut db = Db::setup();
+        for (project, platform, contents) in [
+            (
+                project.replace("3.13", "3.12"),
+                "linux",
+                LOCKFILE.to_owned(),
+            ),
+            (project.replace("1.0", "2.0"), "linux", LOCKFILE.to_owned()),
+            (project.to_owned(), "windows", LOCKFILE.to_owned()),
+            (
+                project.to_owned(),
+                "linux",
+                format!("{LOCKFILE}# changed\n"),
+            ),
+        ] {
+            fs::write(lockfile, contents)?;
+            let changed = cache
+                .key(&project, platform, lockfile, false)
+                .context("key")?;
+            let entry_directory = TempDir::new()?;
+            cache.entry = Some(CachedVenv {
+                key: key.clone(),
+                path: SystemPath::from_std_path(entry_directory.path())
+                    .context("UTF-8 test path")?
+                    .to_path_buf(),
+                _directory: entry_directory,
+            });
+            assert!(!cache.copy_if_matching(&mut db, &changed, SystemPath::new("/.venv"))?);
+            assert!(cache.entry.is_none());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn reuse_copies_fresh_files_and_propagates_copy_failures() -> Result<()> {
+        let directory = TempDir::new()?;
+        let path = dunce::canonicalize(directory.path())?;
+        let path = SystemPath::from_std_path(&path)
+            .context("UTF-8 test path")?
+            .to_path_buf();
+        let relative_site_packages = if cfg!(windows) {
+            "Lib/site-packages"
+        } else {
+            "lib/python3.13/site-packages"
+        };
+        let site_packages = path.join(relative_site_packages);
+        fs::create_dir_all(&site_packages)?;
+        fs::write(
+            path.join("pyvenv.cfg"),
+            format!("home = {path}\nversion = 3.13.0\n"),
+        )?;
+        fs::write(site_packages.join("dependency.py"), "value = 1\n")?;
+        let key = VenvKey {
+            project: String::new(),
+            platform: "linux".to_owned(),
+            lockfile: LOCKFILE.as_bytes().to_vec(),
+        };
+        let mut cache = VenvCache {
+            entry: Some(CachedVenv {
+                key: key.clone(),
+                path: path.clone(),
+                _directory: directory,
+            }),
+            ..VenvCache::default()
+        };
+        let mut db = Db::setup();
+        let destination = SystemPath::new("/.venv");
+        let copied = destination
+            .join(relative_site_packages)
+            .join("dependency.py");
+        assert!(cache.copy_if_matching(&mut db, &key, destination)?);
+        db.write_file(&copied, "value = 2\n")?;
+        db.write_file(destination.join("test_only.py"), "")?;
+
+        db.use_in_memory_system();
+        assert!(cache.copy_if_matching(&mut db, &key, destination)?);
+        assert_eq!(db.system().read_to_string(&copied)?, "value = 1\n");
+        assert!(!db.system().path_exists(&destination.join("test_only.py")));
+
+        fs::write(site_packages.join("broken.py"), [0xff])?;
+        assert!(cache.copy_if_matching(&mut db, &key, destination).is_err());
+        assert!(cache.entry.is_none());
+        Ok(())
+    }
 }

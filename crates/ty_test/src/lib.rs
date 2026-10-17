@@ -51,6 +51,7 @@ pub fn run(
     options: RunOptions,
 ) -> anyhow::Result<()> {
     let mut db = db::Db::setup();
+    let mut venv_cache = external_dependencies::VenvCache::new();
     let fixture_paths = FixturePaths {
         absolute: absolute_fixture_path,
         relative: relative_fixture_path,
@@ -75,6 +76,7 @@ pub fn run(
                 assertion,
                 output_format,
                 options,
+                &mut venv_cache,
             )
         },
     )
@@ -94,6 +96,7 @@ fn run_test(
     assertion: &mut String,
     output_format: OutputFormat,
     options: RunOptions,
+    venv_cache: &mut external_dependencies::VenvCache,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
     let FixturePaths {
         absolute: absolute_fixture_path,
@@ -156,6 +159,7 @@ fn run_test(
             &python_platform,
             &venv_for_external_dependencies,
             &lockfile_path,
+            venv_cache,
         )
         .expect("Failed to setup in-memory virtual environment with dependencies");
     }

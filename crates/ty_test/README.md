@@ -375,8 +375,13 @@ When a test has dependencies:
 1. Configures the type checker to use these packages.
 
 **Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
-are installed fresh for each test that specifies them, so tests with many dependencies may be slower
-to run.
+are installed once and reused across consecutive sections with the same dependencies, Python version,
+platform, and lockfile contents. Each section still receives a fresh copy of the installed packages in
+its test filesystem. The environment is deleted when the Markdown file finishes.
+
+Reuse requires a lockfile containing only registry dependencies. Local, editable, Git, and other
+unsupported sources, as well as lockfile upgrades, use a fresh installation for each section. Set
+`MDTEST_REUSE_VENV=0` to disable reuse.
 
 To test dependency checks with these packages, also
 [supply dependency metadata](#supplying-dependency-metadata).
