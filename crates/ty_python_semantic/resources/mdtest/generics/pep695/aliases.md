@@ -474,6 +474,44 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## Growing aliases inside unions
+
+Comparing these specializations terminates even though each recursive reference adds another `list`
+to its argument. We conservatively reject the return when the same recursive structure repeats.
+
+```py
+type Nested[T] = list[Nested[list[T]] | list[Nested[list[T]]]]
+
+def convert(value: Nested[int]) -> Nested[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+## Growing aliases inside callable signatures
+
+The same comparison can recur through a callable's return type. We stop when its recursive structure
+repeats, even though the type arguments keep changing.
+
+```py
+from typing import Callable
+
+type Producer[T] = Callable[[], Producer[list[T]] | Callable[[], Producer[list[T]]]]
+
+def convert_producer(value: Producer[int]) -> Producer[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+Recursive references in parameter types are handled the same way.
+
+```py
+type Consumer[T] = Callable[[Consumer[list[T]] | Callable[[Consumer[list[T]]], None]], None]
+
+def convert_consumer(value: Consumer[int]) -> Consumer[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
 ## Unpacking recursive tuple aliases
 
 Each recursive reference wraps `T` in another tuple. We can infer the alias without expanding that

@@ -49,6 +49,9 @@ use crate::types::{
 };
 use crate::{Db, ProgramEnvironment};
 
+mod identity;
+use identity::StructuralTypeIdentity;
+
 /// A borrow of a recursion guard; only guard implementations can create this capability.
 pub(super) struct GuardToken<'guard>(PhantomData<&'guard ()>);
 
@@ -59,7 +62,7 @@ impl<'guard> GuardToken<'guard> {
 }
 
 /// The type identity used for recursive checks/transformations.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
@@ -84,13 +87,14 @@ pub enum TypeIdentity<'db> {
         argument_materialization: Option<MaterializationKind>,
     },
 
+    Structural(StructuralTypeIdentity<'db>),
+
     Other(Type<'db>),
 }
 
 impl<'db> Type<'db> {
     pub(crate) fn to_type_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
-        self.recursive_identity(db)
-            .unwrap_or(TypeIdentity::Other(self))
+        identity::type_identity(db, self)
     }
 
     /// Returns `false` if `self` and `other` cannot have the same [`TypeIdentity`].
@@ -107,14 +111,17 @@ impl<'db> Type<'db> {
                 a.definition(db) == b.definition(db)
             }
             (Type::NominalInstance(a), Type::NominalInstance(b)) => {
-                matches!((a.stored_class(db), b.stored_class(db)), (Some(a), Some(b))
-                    if a.class_literal(db) == b.class_literal(db))
+                match (a.stored_class(db), b.stored_class(db)) {
+                    (Some(a), Some(b)) => a.class_literal(db) == b.class_literal(db),
+                    (None, None) => {
+                        a.own_tuple_spec(db).is_some() && b.own_tuple_spec(db).is_some()
+                    }
+                    _ => false,
+                }
             }
             (Type::GenericAlias(a), Type::GenericAlias(b)) => a.origin(db) == b.origin(db),
             (Type::SubclassOf(a), Type::SubclassOf(b)) => {
-                matches!((a.subclass_of(), b.subclass_of()),
-                    (SubclassOfInner::Class(a), SubclassOfInner::Class(b))
-                    if a.class_literal(db) == b.class_literal(db))
+                Type::from(a).may_share_type_identity(db, Type::from(b))
             }
             (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
                 a.definition(db) == b.definition(db)
@@ -133,12 +140,15 @@ impl<'db> Type<'db> {
                 if a.runtime_class(db) != b.runtime_class(db) {
                     return false;
                 }
-                matches!((a.signature_source(db), b.signature_source(db)),
+                matches!(
+                    (a.signature_source(db), b.signature_source(db)),
+                    (SignatureSource::Explicit(_), SignatureSource::Explicit(_))
+                ) || matches!((a.signature_source(db), b.signature_source(db)),
                         (SignatureSource::Projected(a), SignatureSource::Projected(b))
                         if RecursiveDefinition::from_type(db, a.source()).zip(RecursiveDefinition::from_type(db, b.source()))
                             .is_some_and(|(a,b)| a.target(db).origin(db) == b.target(db).origin(db)))
             }
-            _ => false,
+            _ => mem::discriminant(&self) == mem::discriminant(&other),
         }
     }
 

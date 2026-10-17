@@ -688,6 +688,13 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Type<'db>,
 }
 
+/// Metadata used to distinguish stored signatures during recursion detection.
+///
+/// This wrapper cannot be used as a callable signature: its immediate type children are kept
+/// separately when constructing a recursion identity.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct SignatureIdentityShape<'db>(Signature<'db>);
+
 /// Signature data needed only for overload diagnostics, receiver binding, or `ParamSpec` values.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 struct SignatureExtras<'db> {
@@ -848,6 +855,33 @@ impl<'db> PartialApplication<'db> {
 }
 
 impl<'db> Signature<'db> {
+    /// Separate stored parameter and return types from the metadata that distinguishes signatures.
+    /// Deferred defaults and receiver constraints remain exact; this does not evaluate them.
+    pub(super) fn recursion_identity_parts(
+        &self,
+    ) -> (SignatureIdentityShape<'db>, Box<[Type<'db>]>) {
+        let mut types = vec![self.return_ty];
+        let parameters = self
+            .parameters
+            .iter()
+            .map(|parameter| {
+                types.push(parameter.annotated_type());
+                let mut parameter = parameter.clone().with_annotated_type(Type::unknown());
+                if let Some(default) = parameter.eager_default_type() {
+                    types.push(default);
+                    parameter = parameter.with_default_type(Type::unknown());
+                }
+                parameter
+            })
+            .collect::<Box<[_]>>();
+        let shape = Self {
+            parameters: Parameters::new(parameters, self.parameters.kind()),
+            return_ty: Type::unknown(),
+            ..self.clone()
+        };
+        (SignatureIdentityShape(shape), types.into_boxed_slice())
+    }
+
     fn map_recursive_references(
         &self,
         db: &'db dyn Db,
