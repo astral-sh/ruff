@@ -3498,14 +3498,22 @@ fn cached_protocol_interface<'db>(
                 definition,
             ),
             Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
+                ProtocolMemberData::method(
+                    db,
+                    bind_protocol_receivers(db, &env, class, callable),
+                    definition,
+                )
             }
             Type::FunctionLiteral(function)
                 if bound_on_class.is_yes()
                     || function.is_staticmethod(db)
                     || function.is_classmethod(db) =>
             {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
+                ProtocolMemberData::method(
+                    db,
+                    bind_protocol_receivers(db, &env, class, function.into_callable_type(db)),
+                    definition,
+                )
             }
             _ if bound_on_class.is_yes()
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
@@ -3525,6 +3533,53 @@ fn cached_protocol_interface<'db>(
     });
 
     ProtocolInterface::new(db, env.program(db), members)
+}
+
+/// Binds the explicit receiver annotations of a specialized generic protocol's instance method
+/// that name another specialization of the protocol.
+///
+/// ```python
+/// class Callback(Protocol[*P]):
+///     @overload
+///     def __call__(self: Callback[()]) -> Any: ...
+///     @overload
+///     def __call__(self: Callback[V], value: V, /) -> Any: ...
+/// ```
+///
+/// `Callback[str]` only requires the second overload, with `V` constrained by its receiver.
+fn bind_protocol_receivers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    callable: CallableType<'db>,
+) -> CallableType<'db> {
+    let signatures = callable.signatures(db);
+    if class.into_generic_alias().is_none()
+        || callable.is_classmethod_like(db)
+        || callable.is_staticmethod_like(db)
+        || !signatures
+            .iter()
+            .any(Signature::has_explicit_positional_receiver_annotation)
+    {
+        return callable;
+    }
+    let Some(receiver) = Type::instance(db, env, class)
+        .as_protocol_instance()
+        .and_then(|protocol| protocol.nominal_origin_instance(db))
+    else {
+        return callable;
+    };
+
+    let bound = CallableSignature::from_overloads(
+        signatures
+            .iter()
+            .filter_map(|signature| signature.bind_protocol_receiver(db, env, receiver)),
+    );
+    // Keep every overload if none of them applies, rather than leaving the method without one.
+    if bound.overloads.is_empty() {
+        return callable;
+    }
+    callable.with_signatures(db, bound)
 }
 
 fn protocol_interface_cycle_initial<'db>(
