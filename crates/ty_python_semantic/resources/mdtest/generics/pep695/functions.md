@@ -4259,6 +4259,19 @@ def caller[T](before: list[int], value: T, after: list[int]) -> None:
     strings(*before, value, *after)
 ```
 
+## Inference from an unpacked union of tuples
+
+`T` is inferred separately for each member of `values`. The one-element tuple gives `int`, and the
+two-element tuple gives `str`. The return type includes both.
+
+```py
+def first[T](a: T, b: str, c: str = "") -> T:
+    return a
+
+def _(values: tuple[int] | tuple[str, str]) -> None:
+    reveal_type(first(*values, "text"))  # revealed: int | str
+```
+
 ## Inference with a variadic positional parameter
 
 The `values` argument determines `T`; the last unpack can supply the integers for `*rest`.
