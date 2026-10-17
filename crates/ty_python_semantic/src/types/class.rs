@@ -2577,7 +2577,9 @@ impl<'db> ClassType<'db> {
                 Err(kind) => {
                     CallableTypes::one(CallableType::constructor_cycle(db, receiver, kind))
                 }
-                Ok(_) => self.compute_constructor_callables(db, env, receiver),
+                Ok(_) => self
+                    .compute_constructor_callables(db, env, receiver)
+                    .map(|callable| callable.projected_from(db, receiver)),
             },
         )
     }

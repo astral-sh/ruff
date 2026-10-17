@@ -428,7 +428,10 @@ impl<'db> Type<'db> {
                         )
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
-                        .map(|callables| callables.map(|callable| callable.into_regular(db)))
+                        .map(|callables| {
+                            callables
+                                .map(|callable| callable.into_regular(db).projected_from(db, self))
+                        })
                 } else {
                     None
                 }
@@ -1695,6 +1698,16 @@ impl<'db> CallableType<'db> {
             }),
             CallableTypeKind::Regular,
             None,
+        )
+    }
+
+    pub(super) fn projected_from(self, db: &'db dyn Db, source: Type<'db>) -> Self {
+        self.with_signature_source(
+            db,
+            SignatureSource::Projected(ProjectedSignature {
+                source,
+                callable: Some(self),
+            }),
         )
     }
 

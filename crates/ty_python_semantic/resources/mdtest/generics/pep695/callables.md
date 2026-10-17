@@ -1661,3 +1661,48 @@ class Wrapper[T]:
 
 reveal_type(Wrapper[int]()())  # revealed: int
 ```
+
+## Recursive constructor return annotations
+
+An explicitly annotated `__new__` can return successively larger specializations of its class. We
+currently reject the resulting recursive callable assignment.
+
+```py
+from typing import Callable
+
+type R = Callable[[], R]
+
+class C[T]:
+    def __new__(cls) -> "type[C[list[T]]]":
+        return C[list[T]]
+
+recursive: R = C[int]  # error: [invalid-assignment]
+```
+
+## Constructors assigned a recursive class
+
+Here, `__new__` is another specialization of the class. Expanding its constructor never reaches a
+function signature, so we reject the callable assignment.
+
+```py
+from typing import Callable
+
+class C[T]:
+    __new__: type["C[list[T]]"]
+
+callback: Callable[..., object] = C[int]  # error: [invalid-assignment]
+```
+
+## Call methods assigned a recursive instance
+
+Here, `__call__` is another instance of the class with a larger type argument. Following `__call__`
+never reaches a function signature, so we reject the callable assignment.
+
+```py
+from typing import Callable
+
+class C[T]:
+    __call__: "C[list[T]]"
+
+callback: Callable[..., object] = C[int]()  # error: [invalid-assignment]
+```
