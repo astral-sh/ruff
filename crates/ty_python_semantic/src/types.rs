@@ -1,3 +1,4 @@
+use crate::types::recursive::RecursiveReferenceMapper;
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
@@ -167,7 +168,6 @@ mod newtype;
 mod overrides;
 mod protocol_class;
 mod recursive;
-pub(crate) use recursive::RecursiveMapping;
 pub(crate) use recursive::UnfoldResult;
 pub use recursive::{RecursiveType, RecursiveVar, TypeQuery, TypeQueryContext};
 use recursive::{TypeInspector, TypeVisitorState};
@@ -1694,6 +1694,28 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        let instance_class = match self.instance_class(db) {
+            PropertyInstanceClass::Builtin => PropertyInstanceClass::Builtin,
+            PropertyInstanceClass::Enum => PropertyInstanceClass::Enum,
+            PropertyInstanceClass::Subclass(class) => {
+                PropertyInstanceClass::Subclass(mapper.map_class(db, class))
+            }
+        };
+        Self::new_internal(
+            db,
+            self.getter(db).map(|ty| mapper.map_type(db, ty)),
+            self.setter(db).map(|ty| mapper.map_type(db, ty)),
+            self.deleter(db).map(|ty| mapper.map_type(db, ty)),
+            instance_class,
+            self.accessor_definitions(db),
+        )
+    }
+
     fn new(
         db: &'db dyn Db,
         getter: Option<Type<'db>>,
@@ -9151,8 +9173,8 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => {
                 recursive.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
-            Type::RecursiveVar(reference) => {
-                reference.apply_type_mapping_impl(db, type_mapping, visitor)
+            Type::RecursiveVar(_) => {
+                unreachable!("semantic mapping of an unbound recursive variable")
             }
 
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
@@ -9335,7 +9357,6 @@ impl<'db> Type<'db> {
             Type::LiteralValue(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9357,7 +9378,6 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::ApplyRecursiveSubstitution(_)
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -11742,8 +11762,6 @@ pub enum TypeMapping<'a, 'db> {
         specialization: ApplySpecialization<'a, 'db>,
         materialization_kind: MaterializationKind,
     },
-    /// A structural substitution constructed only by the recursive-type binder.
-    ApplyRecursiveSubstitution(RecursiveMapping<'db>),
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -11844,7 +11862,6 @@ impl<'db> TypeMapping<'_, 'db> {
                 }
             }
             TypeMapping::Promote(..)
-            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -11890,7 +11907,6 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
-            | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -11899,14 +11915,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
-    }
-
-    /// Whether this mapping rewrites type structure without semantic normalization.
-    ///
-    /// Binding and unfolding may traverse open recursive bodies, so neither inference queries
-    /// nor semantic operations may run on the intermediate types.
-    const fn is_structural(&self) -> bool {
-        matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
     }
 }
 
@@ -12897,6 +12905,19 @@ fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for TypeIsType<'_> {}
 
 impl<'db> TypeIsType<'db> {
+    fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Type<'db> {
+        Type::TypeIs(Self::new(
+            db,
+            mapper.map_type(db, self.type_argument(db)),
+            self.materialization_kind(db),
+            self.place_info(db),
+        ))
+    }
+
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
         let (scope, place) = self.place_info(db)?;
         let table = place_table(db, scope);

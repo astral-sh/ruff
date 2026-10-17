@@ -1,3 +1,4 @@
+use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspector;
 use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
@@ -59,6 +60,14 @@ impl<'db> ClassType<'db> {
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        Self(mapper.map_class(db, self.0))
+    }
+
     /// Returns the protocol members of this class.
     ///
     /// A protocol's members define the interface declared by the protocol.
@@ -763,6 +772,30 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
 }
 
 impl<'db> ProtocolInterface<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.program(db),
+            self.inner(db)
+                .iter()
+                .map(|(name, data)| {
+                    (
+                        name.clone(),
+                        ProtocolMemberData {
+                            kind: data.kind.map_recursive_references(db, mapper),
+                            qualifiers: data.qualifiers,
+                            definition: data.definition,
+                        },
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+
     /// Synthesize a new protocol interface with the given members.
     ///
     /// All created members will be covariant, read-only property members
@@ -1319,6 +1352,14 @@ enum ProtocolPropertyType<'db> {
 }
 
 impl<'db> ProtocolPropertyType<'db> {
+    fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        self.with_ty(mapper.map_type(db, self.ty()))
+    }
+
     const fn new(ty: Type<'db>) -> Self {
         Self::Annotation(ProtocolAnnotation {
             ty,
@@ -1861,6 +1902,35 @@ enum ProtocolMethodKind {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
+    fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        match self {
+            Self::Method(ty, kind) => Self::Method(mapper.map_type(db, ty), kind),
+            Self::Attribute(annotation) => Self::Attribute(ProtocolAnnotation {
+                ty: mapper.map_type(db, annotation.ty),
+                self_binding_context: annotation.self_binding_context,
+            }),
+            Self::Property { read, write } => Self::Property {
+                read: read.map(|read| read.map_recursive_references(db, mapper)),
+                write: write.map(|write| match write {
+                    ProtocolMemberWrite::Type(ty) => {
+                        ProtocolMemberWrite::Type(ty.map_recursive_references(db, mapper))
+                    }
+                    ProtocolMemberWrite::Descriptor { descriptor, domain } => {
+                        ProtocolMemberWrite::Descriptor {
+                            descriptor: descriptor.map_recursive_references(db, mapper),
+                            domain: domain
+                                .map(|domain| domain.map_recursive_references(db, mapper)),
+                        }
+                    }
+                }),
+            },
+        }
+    }
+
     fn member_types(self) -> impl Iterator<Item = Type<'db>> {
         match self {
             Self::Method(method, _) => [Some(method), None, None],

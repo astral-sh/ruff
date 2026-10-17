@@ -4,6 +4,7 @@ use crate::ProgramEnvironment;
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
+use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspector;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -32,6 +33,21 @@ pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?
 }
 
 impl<'db> SubclassOfType<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Type<'db> {
+        let subclass_of = match self.subclass_of {
+            SubclassOfInner::Class(class) => SubclassOfInner::Class(mapper.map_class(db, class)),
+            SubclassOfInner::Protocol(protocol) => {
+                SubclassOfInner::Protocol(protocol.map_recursive_references(db, mapper))
+            }
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => self.subclass_of,
+        };
+        Type::SubclassOf(Self { subclass_of })
+    }
+
     /// Construct a new [`Type`] instance representing a given class object (or a given dynamic type)
     /// and all possible subclasses of that class object/dynamic type.
     ///

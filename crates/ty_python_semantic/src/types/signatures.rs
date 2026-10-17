@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspector;
 use std::fmt;
 use std::num::NonZeroU32;
@@ -166,6 +167,18 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    pub(super) fn map_recursive_references(
+        &self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads
+                .iter()
+                .map(|signature| signature.map_recursive_references(db, mapper)),
+        )
+    }
+
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
             overloads: smallvec_inline![signature],
@@ -834,6 +847,29 @@ impl<'db> PartialApplication<'db> {
 }
 
 impl<'db> Signature<'db> {
+    fn map_recursive_references(
+        &self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                self.receiver_constraints()
+                    .map(|constraints| constraints.map_recursive_references(db, mapper)),
+                self.is_paramspec_value(),
+            ),
+            parameters: self.parameters.map_recursive_references(db, mapper),
+            return_ty: if self.is_paramspec_value() {
+                self.return_ty
+            } else {
+                mapper.map_type(db, self.return_ty)
+            },
+        }
+    }
+
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
             generic_context: None,
@@ -4695,6 +4731,22 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
+    fn map_recursive_references(
+        &self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        Self::new(
+            self.data
+                .value
+                .iter()
+                .map(|parameter| parameter.map_recursive_references(db, mapper))
+                .collect::<Box<[_]>>(),
+            self.data.kind,
+        )
+        .expand_starred_variadic_annotations(db)
+    }
+
     /// Create a parameter list with an explicit kind.
     ///
     /// This constructor does not infer the kind from the parameter types or normalize an unpacked
@@ -5704,6 +5756,43 @@ enum ParameterAnnotationKind {
 }
 
 impl<'db> Parameter<'db> {
+    fn map_recursive_references(
+        &self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        let map_default = |default: &Option<ParameterDefault<'db>>| {
+            default.map(|default| default.map_type(|ty| mapper.map_type(db, ty)))
+        };
+        let kind = match &self.kind {
+            ParameterKind::PositionalOnly { default_type, name } => ParameterKind::PositionalOnly {
+                default_type: map_default(default_type),
+                name: name.clone(),
+            },
+            ParameterKind::PositionalOrKeyword { default_type, name } => {
+                ParameterKind::PositionalOrKeyword {
+                    default_type: map_default(default_type),
+                    name: name.clone(),
+                }
+            }
+            ParameterKind::KeywordOnly { default_type, name } => ParameterKind::KeywordOnly {
+                default_type: map_default(default_type),
+                name: name.clone(),
+            },
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                self.kind.clone()
+            }
+        };
+        Self {
+            annotated_type: mapper.map_type(db, self.annotated_type),
+            definition: self.definition,
+            kind,
+            inferred_annotation: self.inferred_annotation,
+            annotation_kind: self.annotation_kind,
+            source_parameter_index: self.source_parameter_index,
+        }
+    }
+
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
             annotated_type: Type::unknown(),

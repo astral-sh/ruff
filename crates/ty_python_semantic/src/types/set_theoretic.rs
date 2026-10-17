@@ -457,7 +457,7 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() || !visitor.normalize_unions {
+        if !visitor.normalize_unions {
             Self::from_elements_structural(
                 db,
                 self.elements(db)
@@ -1006,7 +1006,7 @@ impl<'db> NegativeIntersectionElements<'db> {
 
     /// Apply a transformation to all elements in this collection,
     /// and return a new collection of the transformed elements.
-    fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
+    pub(super) fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
         match self {
             NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
             NegativeIntersectionElements::Single(ty) => {
@@ -1344,17 +1344,13 @@ impl<'db> IntersectionType<'db> {
             return Type::Intersection(self);
         }
 
-        if type_mapping.is_structural() {
-            Type::Intersection(IntersectionType::new(db, positive, negative))
-        } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env)
-                .preserve_aliases(true)
-                .positive_elements(positive);
-            for element in &negative {
-                builder.add_negative_in_place(*element);
-            }
-            builder.build()
+        let mut builder = IntersectionBuilder::new(db, visitor.env)
+            .preserve_aliases(true)
+            .positive_elements(positive);
+        for element in &negative {
+            builder.add_negative_in_place(*element);
         }
+        builder.build()
     }
 
     /// Map a type transformation over all positive elements of the intersection. Leave the

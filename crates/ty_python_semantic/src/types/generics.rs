@@ -1,3 +1,4 @@
+use crate::types::recursive::RecursiveReferenceMapper;
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
@@ -1189,6 +1190,31 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    pub(super) fn map_recursive_references(
+        self,
+        db: &'db dyn Db,
+        mapper: &RecursiveReferenceMapper<'db>,
+    ) -> Self {
+        let types: Box<[_]> = self
+            .types(db)
+            .iter()
+            .map(|ty| mapper.map_type(db, *ty))
+            .collect();
+        let tuple = self
+            .tuple_inner(db)
+            .map(|tuple| tuple.map_recursive_references(db, mapper));
+        if types.as_ref() == self.types(db) && tuple == self.tuple_inner(db) {
+            return self;
+        }
+        Self::new(
+            db,
+            self.generic_context(db),
+            types,
+            self.materialization_kind(db),
+            tuple,
+        )
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -1428,9 +1454,6 @@ impl<'db> Specialization<'db> {
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
-                return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-            }
             match (typevar.variance(db), type_mapping) {
                 (
                     TypeVarVariance::Invariant,
