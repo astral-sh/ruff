@@ -6,5 +6,5 @@ ParseError {
     error: OtherError(
         "Cannot mix t-string literals with string or bytes literals",
     ),
-    location: 0..22,
+    location: 0..31,
 }

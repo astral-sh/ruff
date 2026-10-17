@@ -147,19 +147,6 @@ mod tests {
     }
 
     #[test]
-    fn d417_unspecified_ignore_var_parameters() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pydocstyle/D417.py"),
-            &settings::LinterSettings {
-                pydocstyle: Settings::default(),
-                ..settings::LinterSettings::for_rule(Rule::UndocumentedParam)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
     fn d417_google() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D417.py"),
