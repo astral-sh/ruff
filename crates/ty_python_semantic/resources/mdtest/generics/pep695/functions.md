@@ -2431,6 +2431,40 @@ def specialized(box: Box[Callable[..., Any]]) -> None:
     box.cls.whatever
 ```
 
+## Recursive callable bounds
+
+Each call to a `Callback[T]` can return a `T` or another callback that accepts `list[T]`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+
+type Callback[T] = Callable[[T], Callback[list[T]] | T]
+
+def identity[T: Callback[int] = Callback[int]](value: T) -> T:
+    return value
+```
+
+Checking a lambda that passes itself to `identity` terminates even though the callback bound has
+progressively nested type arguments. We currently infer the type parameter's default as the lambda's
+return type, which is too broad to satisfy the bound.
+
+```py
+# TODO: Preserve the lambda's self-reference instead of using the default as its return type.
+f = lambda value: identity(f)  # error: [invalid-argument-type]
+```
+
+An integer return satisfies the bound and remains precise. A string return does not satisfy it.
+
+```py
+reveal_type(identity(lambda value: 1)(0))  # revealed: Literal[1]
+identity(lambda value: "wrong")  # error: [invalid-argument-type]
+```
+
 ## Attribute access on TypeVars bounded by `type[...]`
 
 Regression test for <https://github.com/astral-sh/ty/issues/3782>.
@@ -2955,6 +2989,18 @@ def test[T: int](items: list[T]) -> list[T]:
 
     bad: list[str] | list[bytes] = list(items)  # error: [invalid-assignment]
     return items
+```
+
+## Type parameters in lambda defaults
+
+Function type parameters are not in scope in default values, including defaults of nested lambdas:
+
+```py
+from typing import cast
+
+# error: [unresolved-reference]
+def nested[T](value: T, callback=lambda outer=(lambda inner=cast(T, None): inner): outer) -> T:
+    return value
 ```
 
 ## Nested functions see typevars bound in outer function

@@ -17,7 +17,7 @@ use salsa::plumbing::AsId;
 
 use crate::types::{
     BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
-    TypeAliasType, TypeVarVariance, TypedDictType,
+    TypeAliasType, TypeVarVariance, TypedDictType, callable::LambdaSource,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -28,6 +28,7 @@ pub(crate) enum VarianceTerm<'db> {
     Variable(VarianceVariable<'db>),
     Join(VarianceSum<'db>),
     Compose(VarianceProduct<'db>),
+    Substitute(VarianceSubstitution<'db>),
 }
 
 impl<'db> VarianceTerm<'db> {
@@ -77,6 +78,20 @@ impl<'db> VarianceTerm<'db> {
         }
     }
 
+    /// Substitute arguments in both variance positions. Materialization can map a variable to
+    /// different types in parameters and returns, so one composition is not always sufficient.
+    pub(crate) fn substitute(
+        db: &'db dyn Db,
+        parameter: Self,
+        positive: Self,
+        negative: Self,
+    ) -> Self {
+        if positive == negative {
+            return parameter.compose_thunk(db, || positive);
+        }
+        Self::Substitute(VarianceSubstitution::new(db, parameter, positive, negative))
+    }
+
     /// Evaluate an expression using declared variance at protocol-parameter references.
     pub(crate) fn evaluate(self, db: &'db dyn Db) -> TypeVarVariance {
         self.evaluate_with(db, &|variable| variable.effective_variance(db))
@@ -101,6 +116,16 @@ impl<'db> VarianceTerm<'db> {
                 .left(db)
                 .evaluate_with(db, lookup)
                 .compose_thunk(|| product.right(db).evaluate_with(db, lookup)),
+            Self::Substitute(substitution) => {
+                let positive = || substitution.positive(db).evaluate_with(db, lookup);
+                let negative = || substitution.negative(db).evaluate_with(db, lookup).flip();
+                match substitution.parameter(db).evaluate_with(db, lookup) {
+                    TypeVarVariance::Bivariant => TypeVarVariance::Bivariant,
+                    TypeVarVariance::Covariant => positive(),
+                    TypeVarVariance::Contravariant => negative(),
+                    TypeVarVariance::Invariant => positive().join(negative()),
+                }
+            }
         }
     }
 
@@ -118,6 +143,17 @@ impl<'db> VarianceTerm<'db> {
                 Self::Variable(variable) => visit(variable),
                 Self::Join(sum) => pending.extend(sum.terms(db).iter().copied()),
                 Self::Compose(product) => pending.extend([product.left(db), product.right(db)]),
+                Self::Substitute(substitution) => {
+                    pending.push(substitution.parameter(db));
+                    match substitution.parameter(db).evaluate(db) {
+                        TypeVarVariance::Bivariant => {}
+                        TypeVarVariance::Covariant => pending.push(substitution.positive(db)),
+                        TypeVarVariance::Contravariant => pending.push(substitution.negative(db)),
+                        TypeVarVariance::Invariant => {
+                            pending.extend([substitution.positive(db), substitution.negative(db)]);
+                        }
+                    }
+                }
             }
         }
     }
@@ -147,6 +183,18 @@ pub(crate) struct VarianceProduct<'db> {
 
 impl get_size2::GetSize for VarianceProduct<'_> {}
 
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct VarianceSubstitution<'db> {
+    #[returns(copy)]
+    parameter: VarianceTerm<'db>,
+    #[returns(copy)]
+    positive: VarianceTerm<'db>,
+    #[returns(copy)]
+    negative: VarianceTerm<'db>,
+}
+
+impl get_size2::GetSize for VarianceSubstitution<'_> {}
+
 /// Definition bodies that can occur recursively in variance expressions.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum VarianceOrigin<'db> {
@@ -157,7 +205,7 @@ pub(crate) enum VarianceOrigin<'db> {
     TypeAlias(TypeAliasType<'db>),
     Recursive(RecursiveType<'db>),
     Function(FunctionType<'db>),
-
+    LambdaReturn(LambdaSource<'db>),
     TypedDict(ClassType<'db>),
 }
 
@@ -212,7 +260,7 @@ impl<'db> VarianceVariable<'db> {
                 recursive.variance_equation(db, &env, typevar)
             }
             VarianceOrigin::Function(function) => function.variance_equation(db, typevar),
-
+            VarianceOrigin::LambdaReturn(source) => source.return_variance(db, typevar),
             VarianceOrigin::TypedDict(class) => {
                 let env = crate::types::TypeOperations::new_root(
                     db,

@@ -36,7 +36,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
-use crate::types::callable::SignatureSource;
+use crate::types::callable::{
+    LambdaSignature, LambdaSource, SignatureSource, infer_lambda_signature,
+};
 use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::list_members::all_end_of_scope_members;
@@ -86,9 +88,9 @@ pub enum TypeIdentity<'db> {
         materialization: Option<MaterializationKind>,
         argument_materialization: Option<MaterializationKind>,
     },
-
     Structural(StructuralTypeIdentity<'db>),
-
+    /// The source and the runtime class required by this callable view.
+    GrowingLambda(LambdaSignature<'db>, Option<KnownClass>),
     Other(Type<'db>),
 }
 
@@ -143,6 +145,10 @@ impl<'db> Type<'db> {
                 matches!(
                     (a.signature_source(db), b.signature_source(db)),
                     (SignatureSource::Explicit(_), SignatureSource::Explicit(_))
+                ) || matches!(
+                    (a.signature_source(db), b.signature_source(db)),
+                    (SignatureSource::Lambda(a), SignatureSource::Lambda(b))
+                        if a.source(db) == b.source(db)
                 ) || matches!((a.signature_source(db), b.signature_source(db)),
                         (SignatureSource::Projected(a), SignatureSource::Projected(b))
                         if RecursiveDefinition::from_type(db, a.source()).zip(RecursiveDefinition::from_type(db, b.source()))
@@ -236,6 +242,9 @@ impl<'db> Type<'db> {
                                 .and_then(|args| args.materialization_kind(db)),
                         }
                     }
+                    RecursiveDefinition::Lambda(lambda) => {
+                        TypeIdentity::GrowingLambda(lambda, self.as_callable()?.runtime_class(db))
+                    }
                 })
             }
             _ => None,
@@ -266,9 +275,10 @@ pub(crate) enum RecursiveDefinition<'db> {
     /// A descriptor read, used only as an intermediate node in the specialization graph.
     DescriptorGet(StaticClassLiteral<'db>),
     Structural(RecursiveType<'db>),
+    Lambda(LambdaSignature<'db>),
 }
 
-/// The source before specialization.
+/// The source before specialization. Lambdas retain their original inference inputs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum RecursiveOrigin<'db> {
     Definition(Definition<'db>),
@@ -276,12 +286,13 @@ enum RecursiveOrigin<'db> {
     Constructor(Definition<'db>),
     CallableInstance(Definition<'db>),
     DescriptorGet(Definition<'db>),
+    Lambda(LambdaSignature<'db>),
 }
 
 /// A type parameter in one recursive source.
 ///
-/// The same type variable can occur in several recursive sources. Keeping those sources distinct
-/// prevents a reference between them from appearing to be a cycle.
+/// Two lambdas can capture the same outer variable. Keeping their parameters separate prevents
+/// a single reference between them from appearing to be a cycle.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct FlowParameter<'db> {
     origin: RecursiveOrigin<'db>,
@@ -324,6 +335,7 @@ struct FlowEdge<'db> {
 #[derive(Clone, Copy)]
 enum DefinitionUse<'db> {
     Specialized(RecursiveDefinition<'db>, Option<Specialization<'db>>),
+    Lambda(LambdaSignature<'db>),
 }
 
 /// Parameter flow between all recursive definitions reachable from one root.
@@ -434,6 +446,7 @@ impl<'db> RecursiveDefinition<'db> {
             }
             Type::Callable(callable) => {
                 return match callable.signature_source(db) {
+                    SignatureSource::Lambda(lambda) => Some(DefinitionUse::Lambda(*lambda)),
                     SignatureSource::Projected(projection) => {
                         Self::from_type(db, projection.source()).map(DefinitionUse::for_call)
                     }
@@ -453,8 +466,8 @@ impl<'db> RecursiveDefinition<'db> {
             Self::Nominal(origin) | Self::Protocol(origin) | Self::TypedDict(origin) => {
                 RecursiveOrigin::Definition(origin.definition(db))
             }
-
             Self::ClassMembers(class) => RecursiveOrigin::ClassMembers(class.definition(db)),
+            Self::Lambda(lambda) => RecursiveOrigin::Lambda(lambda),
             Self::Constructor(class) => RecursiveOrigin::Constructor(class.definition(db)),
             Self::CallableInstance(class) => {
                 RecursiveOrigin::CallableInstance(class.definition(db))
@@ -472,6 +485,7 @@ impl<'db> RecursiveDefinition<'db> {
             | RecursiveOrigin::DescriptorGet(definition) => {
                 ProgramEnvironment::from_definition(definition)
             }
+            RecursiveOrigin::Lambda(lambda) => ProgramEnvironment::from_scope(lambda.scope(db)),
         }
     }
 
@@ -486,6 +500,7 @@ impl<'db> RecursiveDefinition<'db> {
             | Self::Constructor(origin)
             | Self::CallableInstance(origin)
             | Self::DescriptorGet(origin) => origin.generic_context(db),
+            Self::Lambda(lambda) => Some(LambdaSource::of(db, lambda).captured_typevars(db)),
         }
     }
 
@@ -496,7 +511,7 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context: GenericContext<'db>,
     ) -> Specialization<'db> {
         let known_class = match self {
-            Self::TypeAlias(_) | Self::Structural(_) => None,
+            Self::TypeAlias(_) | Self::Structural(_) | Self::Lambda(_) => None,
             Self::Nominal(origin)
             | Self::ClassMembers(origin)
             | Self::Protocol(origin)
@@ -579,7 +594,7 @@ impl<'db> DefinitionUse<'db> {
             Self::Specialized(RecursiveDefinition::Constructor(class), arguments) => {
                 Self::Specialized(RecursiveDefinition::ClassMembers(class), arguments)
             }
-            Self::Specialized(..) => self,
+            Self::Specialized(..) | Self::Lambda(_) => self,
         }
     }
 
@@ -589,13 +604,14 @@ impl<'db> DefinitionUse<'db> {
             Self::Specialized(RecursiveDefinition::Nominal(class), arguments) => {
                 Self::Specialized(RecursiveDefinition::CallableInstance(class), arguments)
             }
-            Self::Specialized(..) => self,
+            Self::Specialized(..) | Self::Lambda(_) => self,
         }
     }
 
-    fn target(self, _db: &'db dyn Db) -> RecursiveDefinition<'db> {
+    fn target(self, db: &'db dyn Db) -> RecursiveDefinition<'db> {
         match self {
             Self::Specialized(target, _) => target,
+            Self::Lambda(lambda) => RecursiveDefinition::Lambda(lambda.source(db)),
         }
     }
 
@@ -607,6 +623,19 @@ impl<'db> DefinitionUse<'db> {
     ) -> Option<Vec<(BoundTypeVarIdentity<'db>, Type<'db>)>> {
         let (target, specialization) = match self {
             Self::Specialized(target, specialization) => (target, specialization),
+            Self::Lambda(lambda) => {
+                return Some(
+                    lambda
+                        .captured_arguments(db, env)
+                        .flat_map(|(parameter, arguments)| {
+                            let identity = RecursiveDefinition::parameter_identity(db, parameter);
+                            arguments
+                                .into_iter()
+                                .map(move |argument| (identity, argument))
+                        })
+                        .collect(),
+                );
+            }
         };
         let Some(context) = target.generic_context(db) else {
             return specialization.is_none().then(Vec::new);
@@ -637,6 +666,13 @@ impl<'db> DefinitionUse<'db> {
                 if let Some(specialization) = specialization {
                     for argument in specialization.types(db) {
                         visitor.visit_type(db, *argument);
+                    }
+                }
+            }
+            Self::Lambda(lambda) => {
+                for (_, arguments) in lambda.captured_arguments(db, visitor.program_environment()) {
+                    for argument in arguments {
+                        visitor.visit_type(db, argument);
                     }
                 }
             }
@@ -930,7 +966,11 @@ impl<'db> SpecializationFlowVisitor<'db> {
                     traversal.visit_type(db, extra_items.declared_ty);
                 }
             }
-
+            RecursiveDefinition::Lambda(lambda) => {
+                for signature in infer_lambda_signature(db, LambdaSource::of(db, lambda)) {
+                    walk_signature(db, signature, &traversal);
+                }
+            }
             RecursiveDefinition::Constructor(origin) => {
                 let class = origin.identity_specialization(db);
                 // Construction can return an instance of this class, whose __call__ may lead
@@ -2391,6 +2431,40 @@ mod tests {
             panic!("expected `{name}` to be a type alias");
         };
         alias
+    }
+
+    #[test]
+    fn lambda_identities_preserve_runtime_classes() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+class Node[T]:
+    def __init__(self, value: T):
+        self.callback = lambda: (value, Node([value]).callback)
+
+callback = Node(0).callback
+"#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let Type::Callable(callback) = global_symbol(&db, file, "callback").place.expect_type()
+        else {
+            panic!("expected a callable");
+        };
+        let function = Type::Callable(callback);
+        let regular = Type::Callable(callback.into_regular(&db));
+        assert_matches!(
+            function.to_type_identity(&db),
+            TypeIdentity::GrowingLambda(..)
+        );
+        assert!(!function.may_share_type_identity(&db, regular));
+        assert_ne!(
+            function.to_type_identity(&db),
+            regular.to_type_identity(&db)
+        );
+        Ok(())
     }
 
     #[test]

@@ -36,7 +36,8 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::infer::{
-    TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
+    ExpressionInferenceContext, TypeExpressionFlags, infer_deferred_types,
+    infer_function_default_types,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -56,7 +57,9 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
-use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+use ty_python_core::definition::{
+    Definition, DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+};
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -156,6 +159,13 @@ pub(crate) struct PartialSignatureApplication<'db> {
 }
 
 impl<'db> PartialSignatureApplication<'db> {
+    /// Apply argument binding to the parameters without inspecting the return type.
+    pub(super) fn parameters(&self, db: &'db dyn Db) -> Parameters<'db> {
+        self.signature
+            .partially_apply(db, &self.partial_application)
+            .parameters
+    }
+
     /// Creates a new per-overload partial-application summary.
     pub(crate) fn new(
         signature: Signature<'db>,
@@ -2268,7 +2278,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Create a new signature with the given parameters.
-    fn with_parameters(self, parameters: Parameters<'db>) -> Self {
+    pub(super) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
         Self { parameters, ..self }
     }
 
@@ -2983,12 +2993,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        let mut result = self.always();
+        let target_has_paramspec = target_parameters.as_paramspec_with_prefix().is_some();
 
-        // Avoid returning early after checking the return types in case there is a `ParamSpec` type
-        // variable in either signature to ensure that the `ParamSpec` binding is still applied even
-        // if the return types are incompatible.
-        let return_type_constraints = if target_parameters.as_paramspec_with_prefix().is_some() {
+        // Check parameters before expanding recursive returns. An incompatible parameter list
+        // already rejects the callable, and ParamSpec bindings remain available even if the
+        // return types are incompatible. Keep parameter matching in a separate frame so return
+        // comparison does not retain its local state.
+        let mut result = self.check_signature_parameter_pair(
+            db,
+            source,
+            target,
+            SignatureParameterPair {
+                source: source_parameters,
+                target: target_parameters,
+                source_has_unpacked_suffix,
+                target_has_unpacked_suffix,
+                target_typevartuple,
+            },
+        );
+        if result.is_never_satisfied(db, self.env, self.inferable) {
+            return result;
+        }
+
+        let return_type_constraints = if target_has_paramspec {
             self.check_paramspec_return_pair(db, source, target)
         } else {
             self.check_signature_return_pair(db, source, target)
@@ -3007,22 +3034,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
 
-        // Parameter matching needs substantially more local state than return comparison. Keep
-        // it in a separate frame so recursive return types do not retain that state at each step.
-        self.check_signature_parameter_pair(
-            db,
-            source,
-            target,
-            SignatureParameterPair {
-                source: source_parameters,
-                target: target_parameters,
-                source_has_unpacked_suffix,
-                target_has_unpacked_suffix,
-                target_typevartuple,
-            },
-            result,
-            return_type_checks,
-        )
+        result
     }
 
     fn check_signature_parameter_pair(
@@ -3031,8 +3043,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         parameters: SignatureParameterPair<'db>,
-        mut result: ConstraintSet<'db, 'c>,
-        return_type_checks: bool,
     ) -> ConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
@@ -3110,6 +3120,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let env = self.env;
+        let mut result = self.always();
         let SignatureParameterPair {
             source: source_parameters,
             target: target_parameters,
@@ -3798,7 +3809,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        if !return_type_checks || !keyword_collision_checks {
+        if !keyword_collision_checks {
             return result;
         }
 
@@ -4820,7 +4831,7 @@ pub struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
-    fn map_recursive_references(
+    pub(super) fn map_recursive_references(
         &self,
         db: &'db dyn Db,
         mapper: &RecursiveReferenceMapper<'db>,
@@ -4849,6 +4860,38 @@ impl<'db> Parameters<'db> {
         } else {
             self.clone()
         }
+    }
+
+    /// Consume the implicit positional receiver without inspecting a callable's return type.
+    pub(super) fn bind_receiver(&self, db: &'db dyn Db) -> Self {
+        let parameters = self.for_receiver_binding(db);
+        if parameters.get(0).is_some_and(Parameter::is_positional) {
+            parameters.without_first()
+        } else {
+            parameters
+        }
+    }
+
+    /// Compare parameter types and calling conventions, retaining default presence but not values.
+    pub(super) fn equals_ignoring_default_types(&self, other: &Self) -> bool {
+        self.without_default_types() == other.without_default_types()
+    }
+
+    /// Retain the information used to compare signatures, including whether defaults exist.
+    pub(super) fn without_default_types(&self) -> Self {
+        if !self.iter().any(Parameter::has_default) {
+            return self.clone();
+        }
+        Self::new(
+            self.iter()
+                .map(|parameter| {
+                    parameter
+                        .clone()
+                        .with_optional_default_type(parameter.has_default().then(Type::unknown))
+                })
+                .collect::<Box<[_]>>(),
+            self.kind(),
+        )
     }
 
     /// Create a parameter list with an explicit kind.
@@ -5354,8 +5397,9 @@ impl<'db> Parameters<'db> {
 
         let index = semantic_index(db, definition.program_file(db));
         let default_type = |param: &ast::ParameterWithDefault| {
-            param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+            param.default().map(|_| ParameterDefault::Deferred {
+                parameter: index.expect_single_definition(&param.parameter),
+                context: ExpressionInferenceContext::default(),
             })
         };
 
@@ -5451,7 +5495,7 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -6020,7 +6064,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Attach a default while preserving whether its value is inferred eagerly or on demand.
-    fn with_optional_default(mut self, default: Option<ParameterDefault<'db>>) -> Self {
+    pub(crate) fn with_optional_default(mut self, default: Option<ParameterDefault<'db>>) -> Self {
         let Some(default) = default else {
             return self;
         };
@@ -6353,6 +6397,16 @@ impl<'db> Parameter<'db> {
         self.default().map(|default| default.ty(db))
     }
 
+    /// Infer the default without stripping defaults from nested callable types.
+    pub(super) fn default_type_for_inference(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.default().map(|default| match default {
+            ParameterDefault::Inferred(ty) => ty,
+            ParameterDefault::Deferred { parameter, context } => {
+                raw_parameter_default_type(db, parameter, context)
+            }
+        })
+    }
+
     /// Returns a default type stored directly in the signature, without running inference.
     /// Deferred source defaults return `None`, even if their type is already cached. Use
     /// [`Self::default_type`] when the actual default type is needed.
@@ -6382,21 +6436,24 @@ pub enum ParameterDefault<'db> {
     /// An already inferred default.
     Inferred(Type<'db>),
     /// A source parameter whose default is inferred on demand.
-    Deferred(Definition<'db>),
+    Deferred {
+        parameter: Definition<'db>,
+        context: ExpressionInferenceContext<'db>,
+    },
 }
 
 impl<'db> ParameterDefault<'db> {
     fn ty(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Inferred(ty) => ty,
-            Self::Deferred(parameter) => parameter_default_type(db, parameter),
+            Self::Deferred { parameter, context } => parameter_default_type(db, parameter, context),
         }
     }
 
     fn eager_type(self) -> Option<Type<'db>> {
         match self {
             Self::Inferred(ty) => Some(ty),
-            Self::Deferred(_) => None,
+            Self::Deferred { .. } => None,
         }
     }
 
@@ -6405,42 +6462,72 @@ impl<'db> ParameterDefault<'db> {
             Self::Inferred(ty) => Self::Inferred(f(ty)),
             // A source default is a runtime value, not part of the callable's type parameters.
             // Specializing or otherwise transforming the signature must not evaluate it.
-            Self::Deferred(_) => self,
+            Self::Deferred { .. } => self,
         }
     }
 }
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
-    cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
-        ty.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_definition(parameter)), *previous, cycle)
-    },
-    heap_size=ruff_memory_usage::heap_size
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn =
+        |db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>, _| {
+            ty.cycle_normalized(
+                db,
+                &TypeOperations::new_root(db, ProgramEnvironment::from_definition(parameter)),
+                *previous,
+                cycle,
+            )
+        },
+    heap_size = ruff_memory_usage::heap_size,
 )]
-fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> Type<'db> {
-    let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) =
-        parameter.kind(db)
-    else {
-        return Type::unknown();
-    };
-    let Some(function) = parameter.scope(db).node(db).as_function() else {
-        return Type::unknown();
-    };
-    let program_file = parameter.program_file(db);
-    let function = semantic_index(db, program_file).expect_single_definition(function);
-    let module = parsed_module(db, program_file.python_file(db)).load(db);
-    let Some(default) = node.node(&module).default() else {
-        return Type::unknown();
-    };
-    // Use the function's default inference so the default retains its annotation context.
-    // Nested callable defaults still need the existing cycle-breaking normalization.
-    infer_function_default_types(db, function)
-        .expression_type(default)
-        .replace_parameter_defaults(
-            db,
-            &TypeOperations::new_root(db, ProgramEnvironment::from_definition(function)),
-        )
+fn parameter_default_type<'db>(
+    db: &'db dyn Db,
+    parameter: Definition<'db>,
+    context: ExpressionInferenceContext<'db>,
+) -> Type<'db> {
+    raw_parameter_default_type(db, parameter, context).replace_parameter_defaults(
+        db,
+        &TypeOperations::new_root(db, ProgramEnvironment::from_definition(parameter)),
+    )
+}
+
+/// Read a source default before normalizing nested defaults for signature display and comparison.
+fn raw_parameter_default_type<'db>(
+    db: &'db dyn Db,
+    parameter: Definition<'db>,
+    context: ExpressionInferenceContext<'db>,
+) -> Type<'db> {
+    match parameter.kind(db) {
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
+            let Some(function) = parameter.scope(db).node(db).as_function() else {
+                return Type::unknown();
+            };
+            let program_file = parameter.program_file(db);
+            let function = semantic_index(db, program_file).expect_single_definition(function);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
+            let Some(default) = node.node(&module).default() else {
+                return Type::unknown();
+            };
+            // Use the function's default inference so the default retains its annotation context.
+            infer_function_default_types(db, function).expression_type(default)
+        }
+        DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+            parameter: ParameterDefinitionNodeKind::Parameter(node),
+            ..
+        }) => {
+            let file = parameter.program_file(db);
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let Some(default) = node.node(&module).default() else {
+                return Type::unknown();
+            };
+            let expression = semantic_index(db, file).expression(default);
+            context
+                .infer_expression(db, expression, TypeContext::default())
+                .expression_type(default)
+        }
+        _ => Type::unknown(),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]

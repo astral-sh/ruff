@@ -1269,6 +1269,20 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Growing recursive callable aliases
+
+These callbacks accept different argument types. Their return types contain unions with recursively
+specialized callbacks; we still reject assigning one to the other.
+
+```py
+from collections.abc import Callable
+
+type Callback[T] = Callable[[T], Callback[list[T]] | T]
+
+def compare(left: Callback[int], right: Callback[str]):
+    left = right  # error: [invalid-assignment]
+```
+
 ### Growing recursive alias relations without unions
 
 ```py

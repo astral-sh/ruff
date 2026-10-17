@@ -2447,7 +2447,7 @@ error[invalid-method-override]: Invalid override of method `class_method`
    |
  4 |     def class_method(cls, x: int) -> int: ...
    |         -------------------------------- `Parent.class_method` defined here
-info: incompatible return types: `object` is not assignable to `int`
+info: parameter `x` has an incompatible type: `int` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 
@@ -2468,7 +2468,7 @@ error[invalid-method-override]: Invalid override of method `static_method`
    |
  6 |     def static_method(x: int) -> int: ...
    |         ---------------------------- `Parent.static_method` defined here
-info: incompatible return types: `object` is not assignable to `int`
+info: parameter `x` has an incompatible type: `int` is not assignable to `bool`
 info: This violates the Liskov Substitution Principle
 ```
 

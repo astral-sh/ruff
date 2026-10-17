@@ -1,12 +1,13 @@
 use crate::types::TypeOperations;
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::Program;
 
 use crate::place::{DefinedPlace, Place};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableTypeKind, LambdaSignatureKey};
 use crate::types::constraints::{
     ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
     OptionConstraintsExtension, OwnedConstraintSet,
@@ -36,7 +37,8 @@ use crate::{
 
 mod expansion;
 
-use expansion::{GuardedDisjointness, GuardedRelation};
+use expansion::GuardedDisjointness;
+pub(super) use expansion::GuardedRelation;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum ComparisonKind {
@@ -1110,7 +1112,8 @@ impl<'db> Type<'db> {
     }
 }
 
-/// Active comparisons retain their original types.
+/// Active comparisons retain their original types; completed lambda comparisons can also be
+/// reused across substitutions that do not affect the signature.
 #[derive(Debug)]
 pub(crate) struct HasRelationToVisitor<'db, 'c> {
     cycles: CycleDetector<
@@ -1120,14 +1123,33 @@ pub(crate) struct HasRelationToVisitor<'db, 'c> {
         ConstraintSet<'db, 'c>,
         1,
     >,
+    signatures: RefCell<FxHashMap<SignatureComparison<'db>, ConstraintSet<'db, 'c>>>,
 }
 
 impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         Self {
             cycles: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
+            signatures: RefCell::default(),
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum ComparisonType<'db> {
+    Exact(Type<'db>),
+    Lambda(LambdaSignatureKey<'db>, Option<KnownClass>),
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct SignatureComparison<'db> {
+    source: ComparisonType<'db>,
+    target: ComparisonType<'db>,
+    relation: TypeRelation,
+    typevar_evaluation: TypeVarEvaluation,
+    inferable: TypeVarSet<'db>,
+    provenance: ConstraintProvenance,
+    perform_expensive_checks: bool,
 }
 
 /// State for disjointness proofs, with separate guards for callable return types.
@@ -1416,6 +1438,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source: Type<'db>,
+        source_reference: Type<'db>,
         union: UnionType<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let target = Type::Union(union);
@@ -1472,7 +1495,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
-                let result = self.check_type_pair(db, source, element);
+                let result = self.check_type_pair(db, source_reference, element);
                 if let Some(context_tree) = context_tree {
                     let context = context_tree.take();
                     if !context.is_empty() {
@@ -1713,11 +1736,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         )
     }
 
+    fn signature_comparison_key(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Option<SignatureComparison<'db>> {
+        let key = |ty| {
+            if let Type::Callable(callable) = ty
+                && let Some(key) = callable.signature_comparison_key(db, self.env)
+            {
+                ComparisonType::Lambda(key, callable.runtime_class(db))
+            } else {
+                ComparisonType::Exact(ty)
+            }
+        };
+        let (source, target) = (key(source), key(target));
+        if matches!(source, ComparisonType::Exact(_)) && matches!(target, ComparisonType::Exact(_))
+        {
+            return None;
+        }
+        Some(SignatureComparison {
+            source,
+            target,
+            relation: self.relation,
+            typevar_evaluation: self.typevar_evaluation,
+            inferable: self.inferable,
+            provenance: self.provenance,
+            perform_expensive_checks: self.perform_expensive_checks,
+        })
+    }
+
     fn with_recursion_guard(
         &self,
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
+        references: (Type<'db>, Type<'db>),
         work: impl FnOnce(&GuardedRelation<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         self.env
@@ -1743,7 +1798,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         previous_source,
                         previous_target,
                     ),
-                    None => self.with_local_recursion_guard(db, source, target, work),
+                    None => self.with_local_recursion_guard(db, source, target, references, work),
                 },
             )
     }
@@ -1753,6 +1808,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
+        references: (Type<'db>, Type<'db>),
         work: impl FnOnce(&GuardedRelation<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let collect_context = self.is_context_collection_enabled();
@@ -1769,7 +1825,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 |result| {
                     !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
                 },
-                |expansion| work(&GuardedRelation::new(self, expansion)),
+                |expansion| {
+                    let Some(key) = self.signature_comparison_key(db, source, target) else {
+                        return work(&GuardedRelation::new(self, expansion, references));
+                    };
+                    let cached = self.relation_visitor.signatures.borrow().get(&key).copied();
+                    if let Some(result) = cached
+                        && (!collect_context
+                            || !result.is_never_satisfied(db, self.env, self.inferable))
+                    {
+                        return result;
+                    }
+                    let result = work(&GuardedRelation::new(self, expansion, references));
+                    self.relation_visitor
+                        .signatures
+                        .borrow_mut()
+                        .insert(key, result);
+                    result
+                },
             )
             .unwrap_or_else(|(item, previous)| {
                 self.recursive_type_pair_fallback(db, item.0, item.2, previous.0, previous.2)
@@ -1784,7 +1857,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         previous_source: Type<'db>,
         previous_target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source == previous_source && target == previous_target {
+        // An abstract cycle can still repeat the same obligation. Changes to a lambda's
+        // unused captures or default values do not change its callable signature.
+        let same_type = |current, previous| {
+            current == previous
+                || matches!((current, previous), (Type::Callable(current), Type::Callable(previous))
+                    if self.equivalent_lambda_inputs(db, current, previous))
+        };
+        if same_type(source, previous_source) && same_type(target, previous_target) {
+            return self.always();
+        }
+        // Growing captured arguments need not change the signature. In particular, a lambda
+        // can return another specialization of itself without ever returning a captured value.
+        if let (Type::Callable(source), Type::Callable(target)) = (source, target)
+            && self.equivalent_lambda_inputs(db, source, target)
+        {
             return self.always();
         }
         if let Some(nominally_satisfied) = self.try_check_nominal_protocol_cycle(db, source, target)
@@ -1899,6 +1986,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair_with_references(db, source, target, (source, target))
+    }
+
+    /// Retain the original references while inspecting their expanded bodies. Union branches
+    /// compare against those references so their guards still recognize recursive aliases.
+    fn check_type_pair_with_references(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        references: (Type<'db>, Type<'db>),
+    ) -> ConstraintSet<'db, 'c> {
         // Reflexivity and lazy constraints can bypass the RecursiveVar match arm below.
         source.assert_not_recursive_var();
         target.assert_not_recursive_var();
@@ -1919,7 +2018,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
-        self.with_recursion_guard(db, source, target, |comparison| {
+        self.with_recursion_guard(db, source, target, references, |comparison| {
             self.check_type_pair_guarded(db, comparison, source, target)
         })
     }
@@ -1928,6 +2027,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// Keep larger case-specific checks in helpers so recursive comparisons do not retain
     /// their local state at every step.
     fn check_type_pair_guarded(
+        &self,
+        db: &'db dyn Db,
+        comparison: &GuardedRelation<'_, 'c, 'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        match (source, target) {
+            (Type::Callable(source), Type::Callable(target)) => {
+                self.check_callable_pair_inner(db, source, target, comparison)
+            }
+            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
+            // which means that all instances of `bool` are also instances of `int`.
+            (Type::NominalInstance(source), Type::NominalInstance(target)) => {
+                self.check_nominal_instance_pair(db, source, target)
+            }
+            _ => self.check_type_pair_general(db, comparison, source, target),
+        }
+    }
+
+    /// Compare other type pairs without retaining this dispatcher's local state while
+    /// recursively comparing callable signatures or nominal type arguments.
+    fn check_type_pair_general(
         &self,
         db: &'db dyn Db,
         comparison: &GuardedRelation<'_, 'c, 'db>,
@@ -2461,8 +2582,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_newtype_pair(db, source_newtype, target_newtype)
             }
 
-            (Type::Union(union), _) => self.check_source_union(db, union, target),
-            (_, Type::Union(union)) => self.check_target_union(db, source, union),
+            (Type::Union(union), _) => {
+                self.check_source_union(db, union, comparison.target_reference())
+            }
+            (_, Type::Union(union)) => {
+                self.check_target_union(db, source, comparison.source_reference(), union)
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -2618,10 +2743,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::FunctionLiteral(_)
                 | Type::ModuleLiteral(_),
             ) => self.never(),
-
-            (Type::Callable(source_callable), Type::Callable(target_callable)) => {
-                self.check_callable_pair_inner(db, source_callable, target_callable, comparison)
-            }
 
             (
                 Type::Callable(source_callable),
@@ -2894,12 +3015,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             (Type::KnownInstance(source), _) => {
                 self.check_type_pair(db, source.instance_fallback(db, env), target)
-            }
-
-            // `bool` is a subtype of `int`, because `bool` subclasses `int`,
-            // which means that all instances of `bool` are also instances of `int`
-            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => {
-                self.check_nominal_instance_pair(db, source_i, target_i)
             }
 
             (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => {

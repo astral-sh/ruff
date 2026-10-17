@@ -1,10 +1,11 @@
 //! Consume deferred bodies while the comparison that opened them remains active.
 
 use crate::Db;
-use crate::types::callable::CallableTypes;
+use crate::types::callable::{CallableTypes, SignatureSource};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::recursive::{RecursiveType, TypeExpansionContext};
 use crate::types::type_alias::TypeAliasType;
+use crate::types::typevar::TypeVarSet;
 use crate::types::{CallableType, Type};
 
 use super::{ComparisonKind, ComparisonPolicy, DisjointnessChecker, TypeRelationChecker};
@@ -13,17 +14,43 @@ use super::{ComparisonKind, ComparisonPolicy, DisjointnessChecker, TypeRelationC
 ///
 /// Expansion returns a comparison result, never an alias body or signature. This keeps the
 /// expanded values inside the comparison that owns their recursion state.
-pub(super) struct GuardedRelation<'a, 'c, 'db> {
+/// Union branches retain the other operand's original reference: comparing an alias's body
+/// instead can lose the stable pair needed to detect growing recursive specializations.
+pub(in crate::types) struct GuardedRelation<'a, 'c, 'db> {
     checker: &'a TypeRelationChecker<'a, 'c, 'db>,
     expansion: &'a TypeExpansionContext<'a, 'a, 'db>,
+    references: (Type<'db>, Type<'db>),
 }
 
 impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     pub(super) fn new(
         checker: &'a TypeRelationChecker<'a, 'c, 'db>,
         expansion: &'a TypeExpansionContext<'a, 'a, 'db>,
+        references: (Type<'db>, Type<'db>),
     ) -> Self {
-        Self { checker, expansion }
+        Self {
+            checker,
+            expansion,
+            references,
+        }
+    }
+
+    pub(super) fn source_reference(&self) -> Type<'db> {
+        self.references.0
+    }
+
+    pub(super) fn target_reference(&self) -> Type<'db> {
+        self.references.1
+    }
+
+    pub(in crate::types) fn compare_expanded_pair(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.checker
+            .check_type_pair_with_references(db, source, target, self.references)
     }
 
     pub(super) fn needs_intersection_expansion(
@@ -48,7 +75,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
             self.checker
                 .check_type_pair_guarded(db, self, Type::Intersection(source), target)
         } else {
-            body.relate_as_source(db, self.checker, target)
+            body.relate_as_source(db, self, target)
         }
     }
 
@@ -63,7 +90,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
             self.checker
                 .check_type_pair_guarded(db, self, source, Type::Intersection(target))
         } else {
-            body.relate_as_target(db, self.checker, source)
+            body.relate_as_target(db, self, source)
         }
     }
 
@@ -75,7 +102,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_alias_body(db, source)
-            .relate_as_source(db, self.checker, target)
+            .relate_as_source(db, self, target)
     }
 
     pub(super) fn compare_target_alias(
@@ -86,7 +113,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_alias_body(db, target)
-            .relate_as_target(db, self.checker, source)
+            .relate_as_target(db, self, source)
     }
 
     pub(super) fn compare_source_recursive(
@@ -104,7 +131,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
         by_arguments.or(db, self.checker.constraints, || {
             self.expansion
                 .comparison_recursive_body(db, source)
-                .map(|source| source.relate_as_source(db, self.checker, target))
+                .map(|source| source.relate_as_source(db, self, target))
                 .unwrap_or(ConstraintSet::from_bool(
                     self.checker.constraints,
                     self.checker.relation.is_assignability(),
@@ -120,7 +147,7 @@ impl<'a, 'c, 'db> GuardedRelation<'a, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         self.expansion
             .comparison_recursive_body(db, target)
-            .map(|target| target.relate_as_target(db, self.checker, source))
+            .map(|target| target.relate_as_target(db, self, source))
             .unwrap_or(ConstraintSet::from_bool(
                 self.checker.constraints,
                 self.checker.relation.is_assignability(),
@@ -207,6 +234,36 @@ impl<'a, 'c, 'db> GuardedDisjointness<'a, 'c, 'db> {
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Compare saved inputs before expanding two views of the same lambda.
+    pub(super) fn equivalent_lambda_inputs(
+        &self,
+        db: &'db dyn Db,
+        source_callable: CallableType<'db>,
+        target_callable: CallableType<'db>,
+    ) -> bool {
+        if self.relation.is_subtyping()
+            || source_callable.runtime_class(db) != target_callable.runtime_class(db)
+        {
+            return false;
+        }
+        let (SignatureSource::Lambda(source), SignatureSource::Lambda(target)) = (
+            source_callable.signature_source(db),
+            target_callable.signature_source(db),
+        ) else {
+            return false;
+        };
+        self.materialization_visitor
+            .recursion_context()
+            .expand_signature(db, self.env, source_callable, || {
+                source.has_equivalent_signature(db, self.env, *target, |left, right| {
+                    self.as_equivalence_checker()
+                        .check_type_pair(db, left, right)
+                        .is_always_satisfied(db, self.env, TypeVarSet::None)
+                })
+            })
+            .unwrap_or(false)
+    }
+
     /// Check whether one callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
@@ -230,6 +287,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target.runtime_class(db) != source.runtime_class(db)
         {
             return self.never();
+        }
+        if self.equivalent_lambda_inputs(db, source, target) {
+            return self.always();
         }
         comparison.compare_signatures(db, source, target)
     }

@@ -465,6 +465,8 @@ impl<'db> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => CallableType::partially_apply(
                 db,
+                env,
+                binding.signature_type,
                 binding.partial_signature_applications(
                     db,
                     env,
@@ -8162,8 +8164,32 @@ impl<'db> Binding<'db> {
                 ));
             }
 
-            parameter_type =
-                parameter_type.apply_optional_specialization(db, env, specialization());
+            let specialization = specialization().map(|specialization| {
+                let Some(argument) = arguments_types.get(argument_index).and_then(|argument| {
+                    argument.matched_type(original_parameter_type, matched_parameter.argument_type)
+                }) else {
+                    return specialization;
+                };
+                let sources = argument.lambda_inference_sources(db, env);
+                if sources.is_empty() {
+                    return specialization;
+                }
+                // An inferred bound can depend on a lambda inside a union, tuple, or wrapper.
+                // Keep independent evidence while excluding bounds that would feed a lambda's
+                // own output back into its inference inputs.
+                specialization.generic_context(db).specialize_recursive(
+                    db,
+                    env,
+                    specialization.types(db).iter().map(|ty| {
+                        Some(if ty.depends_on_lambda_inference(db, env, sources) {
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        } else {
+                            *ty
+                        })
+                    }),
+                )
+            });
+            parameter_type = parameter_type.apply_optional_specialization(db, env, specialization);
             if let Some(expected_return_ty) = call_expression_tcx.annotation
                 && let Some(expected) = self.typevartuple_argument_context(
                     db,

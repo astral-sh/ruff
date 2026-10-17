@@ -1490,6 +1490,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         match (source.0, target.0) {
             (_, NominalInstanceInner::Object) => self.always(),
+            _ if self.relation.is_assignability() && source.inherits_from_explicit_any() => {
+                self.always()
+            }
+            (NominalInstanceInner::Object, _) => self.never(),
             (
                 NominalInstanceInner::ExactTuple(source_tuple),
                 NominalInstanceInner::ExactTuple(target_tuple),

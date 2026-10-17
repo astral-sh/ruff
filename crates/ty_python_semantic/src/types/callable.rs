@@ -3,10 +3,12 @@ use super::ErrorContext;
 use super::constraints::IteratorConstraintsExtension;
 use super::infer::TransparentCallableReturn;
 use super::protocol_class::StructuralMemberPriority;
+use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeQueryVisit;
 use crate::types::recursive::{TypeInspectionKey, TypeQueryKey};
+use itertools::Either;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 use std::borrow::Cow;
@@ -21,6 +23,7 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext,
         TypeMapping, TypeQuery, TypeQueryContext, TypeVarBoundOrConstraints, UnionType,
         function::OverloadLiteral,
+        infer::{InferenceEnvironment, ScopeInference},
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         recursive::TypeExpansionContext,
         relation::TypeRelation,
@@ -31,6 +34,11 @@ use crate::{
 };
 use ty_python_core::Program;
 use ty_python_core::definition::Definition;
+use ty_python_core::{ExpressionNodeKey, scope::ScopeId};
+
+mod lambda;
+pub(in crate::types) use lambda::LambdaSignatureKey;
+use lambda::{LambdaMapping, LambdaSignatureMapping};
 
 /// The consumer determines cycle recovery, but never how callable sources are identified.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -896,7 +904,7 @@ pub struct CallableType<'db> {
     pub(crate) deprecated: Option<OverloadLiteral<'db>>,
 }
 
-/// A callable stores signatures directly or projects the callable interface of another type.
+/// A callable has either complete signatures or the inputs for inferring a lambda signature.
 /// The signature payload can be borrowed when looking up an interned callable.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum SignatureSource<'db, S = CallableSignature<'db>> {
@@ -909,7 +917,8 @@ pub enum SignatureSource<'db, S = CallableSignature<'db>> {
     ///
     /// "Explicit" describes how the signatures are provided; their types can still be inferred.
     Explicit(S),
-
+    /// Source inputs for a lambda signature, whose return type is inferred on demand.
+    Lambda(LambdaSignature<'db>),
     /// A callable interface obtained from another type, retaining the source of its recursion.
     Projected(ProjectedSignature<'db>),
 }
@@ -944,6 +953,7 @@ impl<'db> ProjectedSignature<'db> {
 
 enum ParameterSource<'db> {
     Explicit(&'db CallableSignature<'db>),
+    Lambda(LambdaSignature<'db>),
 }
 
 /// Stored parameter annotations and declaration metadata, without access to a return type.
@@ -981,7 +991,7 @@ impl<'db> salsa::Lookup<SignatureSource<'db>> for SignatureSource<'db, &Callable
     fn into_owned(self) -> SignatureSource<'db> {
         match self {
             Self::Explicit(signatures) => SignatureSource::Explicit(signatures.clone()),
-
+            Self::Lambda(lambda) => SignatureSource::Lambda(lambda),
             Self::Projected(projection) => SignatureSource::Projected(projection),
         }
     }
@@ -993,7 +1003,7 @@ impl<'db> salsa::HashEqLike<SignatureSource<'db, &CallableSignature<'db>>>
     fn eq(&self, other: &SignatureSource<'db, &CallableSignature<'db>>) -> bool {
         match (self, other) {
             (Self::Explicit(left), SignatureSource::Explicit(right)) => left == *right,
-
+            (Self::Lambda(left), SignatureSource::Lambda(right)) => left == right,
             (Self::Projected(left), SignatureSource::Projected(right)) => left == right,
             _ => false,
         }
@@ -1021,7 +1031,12 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                     walk_signature(db, signature, visitor);
                 }
             }
-
+            SignatureSource::Lambda(lambda) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                for parameter in lambda.parameters(db) {
+                    visitor.visit_type(db, parameter.annotated_type());
+                }
+            }
             SignatureSource::Projected(projection) => {
                 visitor.notify_skipped_lazy_type_attributes();
                 projection.walk_inputs(db, visitor);
@@ -1032,6 +1047,107 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
+
+/// The parameters and source inputs for a lazily inferred lambda signature.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LambdaSignature<'db> {
+    #[returns(ref)]
+    pub(super) parameters: Parameters<'db>,
+    #[returns(copy)]
+    pub(super) scope: ScopeId<'db>,
+    #[returns(copy)]
+    body: ExpressionNodeKey,
+    #[returns(copy)]
+    return_context: TypeContext<'db>,
+    /// Bindings captured from enclosing lambdas. The current lambda is added when inferring
+    /// its body, so the stored environment always refers to an enclosing scope.
+    #[returns(copy)]
+    pub(super) environment: InferenceEnvironment<'db>,
+    /// A transformation of another source-backed lambda, independent of its inferred body.
+    #[returns(ref)]
+    mapping: Option<LambdaSignatureMapping<'db>>,
+}
+
+impl get_size2::GetSize for LambdaSignature<'_> {}
+
+#[salsa::tracked]
+impl<'db> LambdaSignature<'db> {
+    /// The original body is cached independently of callers. A transformed signature can depend
+    /// on active recursion guards, so expand it locally when continuing an existing operation.
+    fn signature(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> Cow<'db, CallableSignature<'db>> {
+        if let Some(mapping) = self.mapping(db) {
+            Cow::Owned(mapping.signature(db, env))
+        } else {
+            Cow::Borrowed(infer_lambda_signature(db, LambdaSource::of(db, self)))
+        }
+    }
+
+    /// Infer the body using the parameter types captured when this lambda was constructed.
+    pub(super) fn infer_body(self, db: &'db dyn Db) -> &'db ScopeInference<'db> {
+        InferenceEnvironment::from_lambda(self).infer_scope(
+            db,
+            self.scope(db),
+            self.return_context(db),
+        )
+    }
+}
+
+/// The original inference inputs of a lambda, before receiver binding or specialization.
+/// Variance equations refer to this source; applied arguments belong to the reference to it.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct LambdaSource<'db> {
+    #[returns(copy)]
+    input: LambdaSignature<'db>,
+}
+
+impl get_size2::GetSize for LambdaSource<'_> {}
+
+#[salsa::tracked]
+impl<'db> LambdaSource<'db> {
+    pub(super) fn of(db: &'db dyn Db, lambda: LambdaSignature<'db>) -> Self {
+        Self::new_internal(db, lambda.source(db))
+    }
+
+    /// Read the source return without applying a caller's transformations.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn return_variance(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        let source = self.input(db);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(source.scope(db)));
+        source
+            .infer_body(db)
+            .expression_type(source.body(db))
+            .variance_of(db, &env, typevar)
+    }
+}
+
+/// Complete a lambda signature without including its inferred return type in its identity.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| CallableSignature::single(Signature::dynamic(Type::divergent(id))),
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_lambda_signature<'db>(
+    db: &'db dyn Db,
+    source: LambdaSource<'db>,
+) -> CallableSignature<'db> {
+    let lambda = source.input(db);
+    CallableSignature::single(Signature::new(
+        lambda.parameters(db).clone(),
+        lambda.infer_body(db).expression_type(lambda.body(db)),
+    ))
+}
 
 /// Signatures borrowed while their expansion guard remains active.
 ///
@@ -1087,6 +1203,13 @@ impl<'scope, 'db> ExpandedSignatures<'scope, 'db> {
         Self { signatures, env }
     }
 
+    #[cfg(test)]
+    pub(super) fn single_return_display(self, db: &'db dyn Db) -> Option<String> {
+        let [signature] = self.signatures.overloads.as_slice() else {
+            return None;
+        };
+        Some(signature.return_ty.display(db, self.env).to_string())
+    }
     pub(super) fn structural_member_priority(
         self,
         db: &'db dyn Db,
@@ -1264,13 +1387,14 @@ impl<'scope, 'db> ExpandedSignatures<'scope, 'db> {
 
     pub(super) fn lambda_context(
         self,
+        callable: CallableType<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<super::infer::ContextualLambda<'db>> {
         let [signature] = self.signatures.overloads.as_slice() else {
             return None;
         };
         Some(super::infer::ContextualLambda::from_signature(
-            signature, tcx,
+            callable, signature, tcx,
         ))
     }
 
@@ -1618,7 +1742,15 @@ impl<'db> CallableType<'db> {
                     }
                 })),
             ),
-
+            SignatureSource::Lambda(lambda) => {
+                if lambda.parameters(db).get(0).is_some_and(|parameter| {
+                    parameter.is_positional() && parameter.inferred_annotation
+                }) {
+                    self.bind_self(db, env, receiver, self_type)
+                } else {
+                    self
+                }
+            }
             SignatureSource::Projected(projection) => self.with_signature_source(
                 db,
                 SignatureSource::Projected(ProjectedSignature {
@@ -1669,11 +1801,15 @@ impl<'db> CallableType<'db> {
     ) -> impl ExactSizeIterator<Item = CallableParameters<'db>> {
         match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => {
-                signatures.iter().map(|signature| CallableParameters {
+                Either::Left(signatures.iter().map(|signature| CallableParameters {
                     parameters: signature.parameters(),
                     declaration: Some(signature),
-                })
+                }))
             }
+            ParameterSource::Lambda(lambda) => Either::Right(std::iter::once(CallableParameters {
+                parameters: lambda.parameters(db),
+                declaration: None,
+            })),
         }
     }
 
@@ -1722,7 +1858,17 @@ impl<'db> CallableType<'db> {
                 db,
                 signatures.bind_self_with_receiver(db, env, self_type, self_type),
             ),
-
+            SignatureSource::Lambda(lambda) => {
+                let lambda = match self_type {
+                    Some(receiver) => lambda.bind_receiver(db, env, receiver, receiver),
+                    None => lambda.with_bound_parameters(
+                        db,
+                        env,
+                        lambda.parameters(db).bind_receiver(db),
+                    ),
+                };
+                self.with_lambda_signature(db, lambda)
+            }
             SignatureSource::Projected(projection) => self.with_signature_source(
                 db,
                 SignatureSource::Projected(ProjectedSignature {
@@ -1739,7 +1885,7 @@ impl<'db> CallableType<'db> {
     fn parameter_source(self, db: &'db dyn Db) -> ParameterSource<'db> {
         match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => ParameterSource::Explicit(signatures),
-
+            SignatureSource::Lambda(lambda) => ParameterSource::Lambda(*lambda),
             SignatureSource::Projected(projection) => projection
                 .callable
                 .unwrap_or_else(|| {
@@ -1760,8 +1906,9 @@ impl<'db> CallableType<'db> {
     ) -> impl Iterator<Item = Option<super::GenericContext<'db>>> {
         match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => {
-                signatures.iter().map(|signature| signature.generic_context)
+                Either::Left(signatures.iter().map(|signature| signature.generic_context))
             }
+            ParameterSource::Lambda(_) => Either::Right(std::iter::once(None)),
         }
     }
 
@@ -1780,7 +1927,7 @@ impl<'db> CallableType<'db> {
                     signature
                 })),
             ),
-
+            SignatureSource::Lambda(_) => self,
             SignatureSource::Projected(projection) => self.with_signature_source(
                 db,
                 SignatureSource::Projected(ProjectedSignature {
@@ -1802,7 +1949,9 @@ impl<'db> CallableType<'db> {
             SignatureSource::Explicit(signatures) => {
                 SignatureSource::Explicit(signatures.map_recursive_references(db, mapper))
             }
-
+            SignatureSource::Lambda(lambda) => {
+                SignatureSource::Lambda(lambda.map_recursive_references(db, mapper))
+            }
             SignatureSource::Projected(projection) => {
                 SignatureSource::Projected(ProjectedSignature {
                     source: mapper.map_type(db, projection.source),
@@ -1824,6 +1973,16 @@ impl<'db> CallableType<'db> {
         Self::new_internal(db, SignatureSource::Explicit(signatures), kind, None)
     }
 
+    /// Construct a lambda with a stable return-type reference and eagerly inferred parameters.
+    pub(super) fn from_lambda(db: &'db dyn Db, input: LambdaSignature<'db>) -> Self {
+        Self::new_internal(
+            db,
+            SignatureSource::<CallableSignature<'db>>::Lambda(input),
+            CallableTypeKind::FunctionLike,
+            None,
+        )
+    }
+
     /// Replace return types without evaluating a deferred body that will be discarded.
     fn with_return_type(self, db: &'db dyn Db, return_ty: Type<'db>) -> Self {
         let signatures = match self.parameter_source(db) {
@@ -1833,6 +1992,9 @@ impl<'db> CallableType<'db> {
                     .cloned()
                     .map(|signature| signature.with_return_type(return_ty)),
             ),
+            ParameterSource::Lambda(lambda) => {
+                CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty))
+            }
         };
         self.with_signatures(db, signatures)
     }
@@ -1841,7 +2003,7 @@ impl<'db> CallableType<'db> {
     fn explicit_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => Some(signatures),
-            SignatureSource::Projected(_) => None,
+            SignatureSource::Lambda(_) | SignatureSource::Projected(_) => None,
         }
     }
 
@@ -1858,7 +2020,12 @@ impl<'db> CallableType<'db> {
             SignatureSource::Explicit(signatures) => {
                 Some(inspect(ExpandedSignatures { signatures, env }))
             }
-
+            SignatureSource::Lambda(lambda) => context.expand_signature(db, env, self, || {
+                inspect(ExpandedSignatures {
+                    signatures: &lambda.signature(db, env),
+                    env,
+                })
+            }),
             SignatureSource::Projected(projection) => context
                 .expand_signature(db, env, self, || {
                     projection.callable?.inspect_signatures(db, env, inspect)
@@ -1880,7 +2047,9 @@ impl<'db> CallableType<'db> {
     ) -> Option<R> {
         let signatures = match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => Cow::Borrowed(signatures),
-
+            SignatureSource::Lambda(lambda) => {
+                expansion.expand_signature(db, self, |env| lambda.signature(db, env))?
+            }
             SignatureSource::Projected(projection) => {
                 Cow::Owned(expansion.expand_signature(db, self, |env| {
                     projection
@@ -1914,7 +2083,21 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    /// Return the variance of this callable's parameter and return types.
+    /// Obtain a comparison key while preserving the caller's active signature expansions.
+    pub(super) fn signature_comparison_key(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> Option<LambdaSignatureKey<'db>> {
+        let SignatureSource::Lambda(lambda) = self.signature_source(db) else {
+            return None;
+        };
+        env.context()
+            .expand_signature(db, env, self, || lambda.comparison_key(db, env))
+            .flatten()
+    }
+
+    /// Refer to a lambda's variance equation instead of expanding its recursive signature.
     pub(super) fn variance_of(
         self,
         db: &'db dyn Db,
@@ -1923,7 +2106,7 @@ impl<'db> CallableType<'db> {
     ) -> VarianceTerm<'db> {
         match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => signatures.variance_of(db, env, typevar),
-
+            SignatureSource::Lambda(lambda) => lambda.variance_of(db, env, typevar),
             SignatureSource::Projected(projection) => projection
                 .callable
                 .map_or(super::TypeVarVariance::Invariant.into(), |callable| {
@@ -1939,21 +2122,25 @@ impl<'db> CallableType<'db> {
     ) -> impl ExactSizeIterator<Item = &'db Parameters<'db>> {
         match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => {
-                signatures.overloads.iter().map(Signature::parameters)
+                Either::Left(signatures.overloads.iter().map(Signature::parameters))
+            }
+            ParameterSource::Lambda(lambda) => {
+                Either::Right(std::iter::once(lambda.parameters(db)))
             }
         }
     }
 
-    /// Whether any stored signature declares type parameters.
+    /// Lambda signatures have no declared generic context; captured variables belong to their source.
     pub(crate) fn has_generic_context(self, db: &'db dyn Db) -> bool {
         match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => signatures
                 .iter()
                 .any(|signature| signature.generic_context.is_some()),
+            ParameterSource::Lambda(_) => false,
         }
     }
 
-    /// Return parameters when exactly one overload is available.
+    /// Inspect the parameters of a non-overloaded callable without inferring a lambda's body.
     pub(crate) fn single_parameters(self, db: &'db dyn Db) -> Option<&'db Parameters<'db>> {
         match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => {
@@ -1962,6 +2149,7 @@ impl<'db> CallableType<'db> {
                 };
                 Some(signature.parameters())
             }
+            ParameterSource::Lambda(lambda) => Some(lambda.parameters(db)),
         }
     }
 
@@ -1983,6 +2171,15 @@ impl<'db> CallableType<'db> {
         Self::new_internal(
             db,
             SignatureSource::Explicit(signatures),
+            self.kind(db),
+            self.deprecated(db),
+        )
+    }
+
+    fn with_lambda_signature(self, db: &'db dyn Db, lambda: LambdaSignature<'db>) -> Self {
+        Self::new_internal(
+            db,
+            SignatureSource::<CallableSignature<'db>>::Lambda(lambda),
             self.kind(db),
             self.deprecated(db),
         )
@@ -2115,6 +2312,10 @@ impl<'db> CallableType<'db> {
     pub(crate) fn into_paramspec_value(self, db: &'db dyn Db) -> CallableType<'db> {
         let signatures = match self.parameter_source(db) {
             ParameterSource::Explicit(signatures) => signatures.clone(),
+            ParameterSource::Lambda(lambda) => CallableSignature::single(Signature::new(
+                lambda.parameters(db).clone(),
+                Type::unknown(),
+            )),
         };
         Self::paramspec_value_from_signatures(db, signatures)
     }
@@ -2122,9 +2323,25 @@ impl<'db> CallableType<'db> {
     /// Returns the reduced callable produced by partially applying selected overloads.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        source: Type<'db>,
         overloads: impl IntoIterator<Item = PartialSignatureApplication<'db>>,
     ) -> Option<Self> {
         let overloads: SmallVec<[_; 1]> = overloads.into_iter().collect();
+        if let [application] = overloads.as_slice()
+            && let Some(callable) = source
+                .try_upcast_to_callable(db, env)
+                .and_then(|callables| callables.exactly_one())
+            && let SignatureSource::Lambda(lambda) = callable.signature_source(db)
+        {
+            return Some(
+                Self::from_lambda(
+                    db,
+                    lambda.with_bound_parameters(db, env, application.parameters(db)),
+                )
+                .into_regular(db),
+            );
+        }
         Some(Self::new(
             db,
             CallableSignature::partially_apply(db, overloads)?,
@@ -2172,7 +2389,12 @@ impl<'db> CallableType<'db> {
             SignatureSource::Explicit(signatures) => SignatureSource::Explicit(
                 signatures.bind_method_receiver(db, env, receiver_type, typing_self_type),
             ),
-
+            SignatureSource::Lambda(lambda) => SignatureSource::Lambda(lambda.bind_receiver(
+                db,
+                env,
+                receiver_type,
+                typing_self_type,
+            )),
             SignatureSource::Projected(projection) => {
                 SignatureSource::Projected(ProjectedSignature {
                     source: projection.source,
@@ -2204,7 +2426,9 @@ impl<'db> CallableType<'db> {
             SignatureSource::Explicit(signatures) => SignatureSource::Explicit(
                 signatures.apply_self_with_receiver(db, env, receiver_type, self_type),
             ),
-
+            SignatureSource::Lambda(lambda) => {
+                SignatureSource::Lambda(lambda.apply_receiver(db, env, receiver_type, self_type))
+            }
             SignatureSource::Projected(projection) => {
                 SignatureSource::Projected(ProjectedSignature {
                     source: projection.source,
@@ -2237,7 +2461,7 @@ impl<'db> CallableType<'db> {
                 db,
                 signatures.recursive_type_normalized_impl(db, env, div, nested)?,
             ),
-
+            SignatureSource::Lambda(_) => self,
             SignatureSource::Projected(projection) => self.with_signature_source(
                 db,
                 SignatureSource::Projected(ProjectedSignature {
@@ -2274,7 +2498,23 @@ impl<'db> CallableType<'db> {
                 }
                 SignatureSource::Explicit(mapped)
             }
-
+            SignatureSource::Lambda(lambda) => {
+                let mapped = match LambdaMapping::from_type_mapping(
+                    db,
+                    visitor.env,
+                    *lambda,
+                    type_mapping,
+                ) {
+                    Some(mapping) => lambda.apply_mapping(db, mapping, tcx, visitor),
+                    None => {
+                        // A lambda's body is a separate query, just like a named function's
+                        // signature. Binding an enclosing recursive type must not run that
+                        // query or rewrite its body.
+                        lambda.map_inputs(db, type_mapping, tcx, visitor)
+                    }
+                };
+                SignatureSource::Lambda(mapped)
+            }
             SignatureSource::Projected(projection) => {
                 SignatureSource::Projected(ProjectedSignature {
                     source: projection.source.apply_type_mapping_impl(
