@@ -53,10 +53,10 @@ use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
 use crate::types::call::bind::{
-    ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
+    ArgumentMatchingMode, ArgumentTypeContext, CallableDescription, CheckTypesMode, OverloadSet,
     requires_overload_evaluation,
 };
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
@@ -6095,13 +6095,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // and check the binding directly.
         if !requires_overload_evaluation {
             self.infer_all_argument_types(
-                ast_arguments,
+                ast_arguments.clone(),
                 argument_types,
                 &arguments_tcx,
                 infer_argument_ty,
                 CallArgumentInferenceMode::Commit,
             );
 
+            bindings.match_inferred_arguments(
+                db,
+                env,
+                argument_types,
+                self.argument_matching_mode(ast_arguments, argument_types),
+            );
             return bindings.check_types_impl(
                 db,
                 env,
@@ -6126,6 +6132,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             CallArgumentInferenceMode::Speculate,
         );
 
+        bindings.match_inferred_arguments(
+            db,
+            env,
+            argument_types,
+            self.argument_matching_mode(ast_arguments.clone(), argument_types),
+        );
         let result = bindings.check_types_impl(
             db,
             env,
@@ -6221,6 +6233,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Otherwise, we have to evaluate the bindings against the newly inferred types.
             next_bindings = bindings.clone();
+            next_bindings.match_inferred_arguments(
+                db,
+                self.program_environment(),
+                &next_argument_types,
+                self.argument_matching_mode(ast_arguments.clone(), &next_argument_types),
+            );
             let _ = next_bindings.check_types_impl(
                 db,
                 self.program_environment(),
@@ -9131,6 +9149,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             env,
             [argument_type, getitem_protocol],
         ))
+    }
+
+    /// Choose a matching policy after inference. Simple values can be reused at new positions;
+    /// lambdas, collections, and calls retain the matching that supplied their inference context.
+    fn argument_matching_mode(
+        &self,
+        arguments: ArgumentsIter<'_>,
+        inferred: &CallArguments<'_, 'db>,
+    ) -> ArgumentMatchingMode {
+        let db = self.db();
+        let env = self.program_environment();
+        let can_reuse = inferred
+            .iter()
+            .any(|argument| matches!(argument.kind(), Argument::Variadic))
+            && arguments.enumerate().all(|(index, argument)| {
+                if argument.is_variadic() {
+                    return true;
+                }
+                let Some(inferred_argument) = inferred.get(index) else {
+                    return false;
+                };
+                let Some(ty) = inferred_argument.source_type() else {
+                    return false;
+                };
+                // Ordinary inference may already have specialized a class reference or
+                // interpreted an expression as a TypeForm using its original parameter.
+                matches!(
+                    argument.value(),
+                    ast::Expr::Name(_)
+                        | ast::Expr::Attribute(_)
+                        | ast::Expr::NumberLiteral(_)
+                        | ast::Expr::StringLiteral(_)
+                        | ast::Expr::BytesLiteral(_)
+                        | ast::Expr::BooleanLiteral(_)
+                        | ast::Expr::NoneLiteral(_)
+                ) && !matches!(
+                    ty,
+                    Type::ClassLiteral(_)
+                        | Type::GenericAlias(_)
+                        | Type::SubclassOf(_)
+                        | Type::TypeForm(_)
+                ) && !ty.has_provisional_marker(db, env)
+            });
+        if can_reuse {
+            ArgumentMatchingMode::PositionalAlternatives
+        } else {
+            ArgumentMatchingMode::Ordinary
+        }
     }
 
     /// Infer the variadic argument types needed for call binding and emit the shared diagnostics

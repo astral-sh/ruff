@@ -4163,5 +4163,39 @@ class BoundedSetter(Base):
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
 
+## Generic calls with variable-length unpacks
+
+Generic calls retain their existing matching behavior. The returned value can be a string list, so
+appending an integer is unsafe.
+
+```py
+def first[T](value: list[T], other: object = None) -> list[T]:
+    return value
+
+def _(before: list[list[str]], ints: list[int]) -> None:
+    result = first(*before, ints)
+    result.append(1)  # error: [invalid-argument-type]
+```
+
+## Positional unpacking preserves outer type variables
+
+A type variable bounded by `str` can fill the string parameter:
+
+```py
+def strings(a: int, text: str, b: int) -> None: ...
+def bounded[T: str](before: list[int], value: T, after: list[int]) -> None:
+    strings(*before, value, *after)  # no diagnostic
+```
+
+Without that bound, `value` might have any type. The caller's type variable cannot be specialized by
+`strings`:
+
+```py
+def caller[T](before: list[int], value: T, after: list[int]) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    strings(*before, value, *after)
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
