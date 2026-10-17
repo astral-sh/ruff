@@ -3585,7 +3585,7 @@ fn protocol_bind_self<'db>(
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|db, _, _, _, _, _| CallableType::bottom(db),
+    cycle_initial=protocol_apply_self_with_receiver_cycle_initial,
     heap_size=ruff_memory_usage::heap_size
 )]
 fn protocol_apply_self_with_receiver<'db>(
@@ -3598,6 +3598,36 @@ fn protocol_apply_self_with_receiver<'db>(
     let env = ProgramEnvironment::from_program(program);
 
     callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
+}
+
+/// Binding an explicitly annotated receiver checks the receiver against its annotation, which can
+/// lead back to this binding. For example, checking whether `Implementation` satisfies
+///
+/// ```python
+/// class HasMethod(Protocol):
+///     def method(self: "HasMethod") -> None: ...
+/// ```
+///
+/// binds `method` to `Implementation`, which checks again whether `Implementation` satisfies
+/// `HasMethod`. Like other recursive relations, this is evaluated coinductively: start from the
+/// binding that assumes the receiver satisfies its annotation. A fixed initial callable cannot do
+/// this, since the same binding is used on both sides of a member comparison.
+fn protocol_apply_self_with_receiver_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    program: Program<'db>,
+    callable: CallableType<'db>,
+    _receiver_type: Type<'db>,
+    self_type: Type<'db>,
+) -> CallableType<'db> {
+    let env = ProgramEnvironment::from_program(program);
+
+    callable.with_signatures(
+        db,
+        callable
+            .signatures(db)
+            .apply_self_assuming_receiver(db, &env, self_type),
+    )
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.
