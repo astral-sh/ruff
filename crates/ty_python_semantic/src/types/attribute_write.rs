@@ -8,8 +8,11 @@
 //! relation and constraint set.
 
 use crate::Db;
+use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
-use crate::types::{CycleKind, TypeTraversal, TypeWalk};
+use crate::types::recursive::{TypeInspectionKey, TypeQueryKey, TypeWalkKey};
+use crate::types::recursive::{TypeQueryVisit, TypeWalkVisit};
+use crate::types::{CycleKind, TypeQuery, TypeQueryContext, TypeTraversal, TypeWalk};
 use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, use_def_map};
 
@@ -24,7 +27,6 @@ use super::{
     PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
     TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
-use crate::TypeOperations;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
 };
@@ -141,7 +143,13 @@ pub(super) fn instance_setattr_dispatch<'db>(
         .nominal_class(db, env)
         .and_then(|class| class.static_class_literal(db))
         .and_then(|(class, specialization)| {
-            class.inherited_frozen_dataclass_dispatch(db, specialization, "__setattr__", attribute)
+            class.inherited_frozen_dataclass_dispatch(
+                db,
+                env,
+                specialization,
+                "__setattr__",
+                attribute,
+            )
         })
 }
 
@@ -363,25 +371,31 @@ impl<'db, R, F> TypeWalk<'db, (Option<Type<'db>>, F)> for ResolveAttributeWrite<
 where
     F: FnOnce(Option<AttributeWriteRequirement<'db>>) -> R,
 {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::ResolveAttributeWrite(ruff_python_ast::name::Name::new(self.0))
+    }
+
     type Output = R;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeTraversal<'_, 'db, Self>,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         (_receiver, evaluate): (Option<Type<'db>>, F),
     ) -> Self::Output {
         evaluate(match kind {
             CycleKind::Exact => None,
-            CycleKind::MatchingIdentity => Some(AttributeWriteRequirement::CannotAssign),
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => {
+                Some(AttributeWriteRequirement::CannotAssign)
+            }
         })
     }
 
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         object_ty: Type<'db>,
         (receiver, evaluate): (Option<Type<'db>>, F),
     ) -> Self::Output {
@@ -449,7 +463,7 @@ where
             }
 
             Type::ProtocolInstance(protocol) => protocol
-                .interface(db)
+                .interface(db, env)
                 .instance_write_requirement(db, env, receiver.unwrap_or(object_ty), attribute)
                 .map_or_else(
                     || {
@@ -783,18 +797,10 @@ fn possible_class_attribute_descriptor<'db>(
     TypeInspector::inspect_root(
         db,
         env,
+        TypeInspectionKey::PossibleClassAttributeDescriptor,
         descriptor_ty,
         |_, _| None,
-        |_, descriptor_ty| {
-            let descriptor_ty = match descriptor_ty {
-                Type::TypeForm(typeform) => typeform.type_argument(db).to_meta_type(db, env),
-                descriptor_ty => descriptor_ty,
-            };
-
-            descriptor_ty
-                .is_data_descriptor(db, env)
-                .then_some(descriptor_ty)
-        },
+        |_, descriptor_ty| descriptor_ty.data_descriptor(db),
     )
 }
 
@@ -869,19 +875,59 @@ fn shadowed_descriptor_write_type<'db>(
     env: &TypeOperations<'db>,
     attr_ty: Type<'db>,
 ) -> Type<'db> {
-    match attr_ty {
-        Type::Union(union) => {
-            union.map_leave_aliases(db, env, |ty| shadowed_descriptor_write_type(db, env, *ty))
+    TypeQueryContext::with_root(env, ShadowedDescriptorWriteType, |context| {
+        context.visit(db, attr_ty)
+    })
+    .unwrap_or(attr_ty)
+}
+
+struct ShadowedDescriptorWriteType;
+
+impl<'db> TypeQuery<'db> for ShadowedDescriptorWriteType {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::ShadowedDescriptorWriteType
+    }
+
+    type Output = Option<Type<'db>>;
+
+    fn on_cycle(
+        &self,
+        _context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        (): (),
+    ) -> Self::Output {
+        None
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        context: &TypeQueryVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        (): (),
+    ) -> Self::Output {
+        match ty {
+            Type::Union(union) => {
+                let mut changed = false;
+                let elements = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| {
+                        let mapped = context.visit(db, *element).unwrap_or(*element);
+                        changed |= mapped != *element;
+                        mapped
+                    })
+                    .collect::<Vec<_>>();
+                changed.then(|| {
+                    UnionType::from_elements_leave_aliases(db, context.environment(), elements)
+                })
+            }
+            _ if ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike) => {
+                Some(ty.underlying_function(db))
+            }
+            _ => None,
         }
-        Type::TypeAlias(alias) => {
-            let value = alias.value_type(db);
-            let write_ty = shadowed_descriptor_write_type(db, env, value);
-            if write_ty == value { attr_ty } else { write_ty }
-        }
-        _ if attr_ty.function_like_kind(db) == Some(CallableTypeKind::StaticMethodLike) => {
-            attr_ty.underlying_function(db)
-        }
-        _ => attr_ty,
     }
 }
 
@@ -1000,7 +1046,7 @@ fn effective_write_type<'db>(
     if let Type::NominalInstance(instance) = object_ty
         && let Some(converter_ty) = instance
             .class(db, env)
-            .converter_input_type_for_field(db, attribute)
+            .converter_input_type_for_field(db, env, attribute)
     {
         converter_ty
     } else {
@@ -1117,7 +1163,7 @@ pub(super) fn assignment_attribute_members<'db>(
         ) {
         object_ty.member(db, env, attribute)
     } else if let Type::ProtocolInstance(protocol) = object_ty
-        && let Some(origin) = protocol.materialized_origin_property(db, attribute)
+        && let Some(origin) = protocol.materialized_origin_property(db, env, attribute)
     {
         Type::instance(db, env, *origin).class_member(db, env, attribute)
     } else {
@@ -1218,27 +1264,10 @@ pub(super) fn descriptor_setter_domain<'db>(
     TypeInspector::inspect_root(
         db,
         env,
+        TypeInspectionKey::DescriptorSetterDomain,
         descriptor_ty,
         |_, _| DescriptorSetterDomain::Deferred,
-        |_, descriptor_ty| match descriptor_ty {
-            Type::Union(union) => {
-                let mut write_types = Vec::with_capacity(union.elements(db).len());
-                for descriptor_ty in union.elements(db) {
-                    match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
-                        DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
-                        DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
-                        DescriptorSetterDomain::Deferred => {
-                            return DescriptorSetterDomain::Deferred;
-                        }
-                    }
-                }
-                IntersectionType::bounded_from_elements(db, env, write_types).map_or(
-                    DescriptorSetterDomain::Deferred,
-                    DescriptorSetterDomain::Known,
-                )
-            }
-            _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
-        },
+        |_, descriptor_ty| descriptor_ty.descriptor_setter_domain(db, receiver_ty),
     )
 }
 
@@ -1273,17 +1302,15 @@ fn single_descriptor_setter_domain<'db>(
     };
     let mut callable_domains = Vec::with_capacity(callables.iter().len());
     for callable in &callables {
-        let mut write_types = Vec::new();
-        for signature in callable.signatures(db) {
-            match descriptor_setter_signature_domain(db, env, signature, self_ty, receiver_ty) {
-                DescriptorSetterSignatureDomain::Inapplicable => {}
-                DescriptorSetterSignatureDomain::Known(write_ty) => write_types.push(write_ty),
-                DescriptorSetterSignatureDomain::Deferred => {
-                    return DescriptorSetterDomain::Deferred;
-                }
-            }
-        }
-        callable_domains.push(UnionType::from_elements(db, env, write_types));
+        let domain = callable
+            .inspect_signatures_root(db, env, |_, signatures| {
+                signatures.descriptor_setter_domain(db, self_ty, receiver_ty)
+            })
+            .flatten();
+        let Some(domain) = domain else {
+            return DescriptorSetterDomain::Deferred;
+        };
+        callable_domains.push(domain);
     }
     IntersectionType::bounded_from_elements(db, env, callable_domains).map_or(
         DescriptorSetterDomain::Deferred,
@@ -1409,10 +1436,14 @@ pub(super) fn property_setter_value_type<'db>(
     let mut set_types = Vec::new();
     let mut definition = None;
     for callable in &setter.try_upcast_to_callable(db, env)? {
-        for signature in callable.signatures(db) {
-            set_types.push(signature.parameters().get_positional(1)?.annotated_type());
-            definition = definition.or(signature.definition());
+        for parameters in callable.parameter_lists(db) {
+            set_types.push(parameters.get_positional(1)?.annotated_type());
         }
+        definition = definition.or_else(|| {
+            callable
+                .parameter_signatures(db)
+                .find_map(super::callable::CallableParameters::definition)
+        });
     }
     Some((UnionType::from_elements(db, env, set_types), definition))
 }
@@ -1792,11 +1823,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
             .when_some_and(db, self.constraints, |callables| {
                 callables.iter().when_all(db, self.constraints, |callable| {
-                    callable.signatures(db).into_iter().when_any(
-                        db,
-                        self.constraints,
-                        |signature| {
-                            let parameters = signature.parameters();
+                    callable
+                        .parameter_lists(db)
+                        .when_any(db, self.constraints, |parameters| {
                             parameters
                                 .get_positional(parameter_index)
                                 .or_else(|| {
@@ -1812,8 +1841,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .when_some_and(db, self.constraints, |write_ty| {
                                     self.check_type_pair(db, value_ty, write_ty)
                                 })
-                        },
-                    )
+                        })
                 })
             })
     }
@@ -1843,25 +1871,29 @@ struct CheckDescriptorWrite<'db> {
 }
 
 impl<'c, 'db> TypeWalk<'db, &TypeRelationChecker<'_, 'c, 'db>> for CheckDescriptorWrite<'db> {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::CheckDescriptorWrite(self.receiver_ty, self.value_ty)
+    }
+
     type Output = ConstraintSet<'db, 'c>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeTraversal<'_, 'db, Self>,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         checker: &TypeRelationChecker<'_, 'c, 'db>,
     ) -> Self::Output {
         match kind {
             CycleKind::Exact => checker.always(),
-            CycleKind::MatchingIdentity => checker.never(),
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => checker.never(),
         }
     }
 
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         descriptor_ty: Type<'db>,
         checker: &TypeRelationChecker<'_, 'c, 'db>,
     ) -> Self::Output {
@@ -1879,5 +1911,52 @@ impl<'c, 'db> TypeWalk<'db, &TypeRelationChecker<'_, 'c, 'db>> for CheckDescript
             self.receiver_ty,
             self.value_ty,
         )
+    }
+}
+
+pub(super) fn signatures_setter_domain<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    signatures: &super::signatures::CallableSignature<'db>,
+    self_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> Option<Type<'db>> {
+    let mut write_types = Vec::new();
+    for signature in signatures {
+        match descriptor_setter_signature_domain(db, env, signature, self_ty, receiver_ty) {
+            DescriptorSetterSignatureDomain::Inapplicable => {}
+            DescriptorSetterSignatureDomain::Known(write_ty) => {
+                write_types.push(write_ty);
+            }
+            DescriptorSetterSignatureDomain::Deferred => return None,
+        }
+    }
+    Some(UnionType::from_elements(db, env, write_types))
+}
+
+pub(super) fn descriptor_setter_domain_resolved<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> DescriptorSetterDomain<'db> {
+    match descriptor_ty {
+        Type::Union(union) => {
+            let mut write_types = Vec::with_capacity(union.elements(db).len());
+            for descriptor_ty in union.elements(db) {
+                match single_descriptor_setter_domain(db, env, *descriptor_ty, receiver_ty) {
+                    DescriptorSetterDomain::Missing => return DescriptorSetterDomain::Missing,
+                    DescriptorSetterDomain::Known(write_ty) => write_types.push(write_ty),
+                    DescriptorSetterDomain::Deferred => {
+                        return DescriptorSetterDomain::Deferred;
+                    }
+                }
+            }
+            IntersectionType::bounded_from_elements(db, env, write_types).map_or(
+                DescriptorSetterDomain::Deferred,
+                DescriptorSetterDomain::Known,
+            )
+        }
+        _ => single_descriptor_setter_domain(db, env, descriptor_ty, receiver_ty),
     }
 }

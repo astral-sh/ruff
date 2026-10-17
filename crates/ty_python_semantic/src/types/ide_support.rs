@@ -1,3 +1,5 @@
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -14,7 +16,7 @@ use crate::types::{
     CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
     PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel, TypeOperations};
+use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -81,7 +83,7 @@ pub fn definitions_for_name<'db>(
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    let Some(builtins_scope) = implicit_builtins_symbol_scope(db, env, name_str) else {
+    let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str) else {
         return vec![];
     };
     // Special cases for `float` and `complex` in type annotation positions.
@@ -110,7 +112,7 @@ pub fn definitions_for_name<'db>(
             .rev()
             .filter_map(|ty| ty.as_nominal_instance())
             .filter_map(|instance| {
-                let definition = instance.class_literal(db, env).definition(db)?;
+                let definition = instance.class_literal(db, &env).definition(db)?;
                 Some(ResolvedDefinition::Definition(definition))
             })
             .collect();
@@ -130,7 +132,7 @@ pub fn definitions_for_attribute<'db>(
     };
     definition_resolution::definitions_for_attribute(
         model.db(),
-        model.program_environment(),
+        &model.program_environment(),
         lhs_ty,
         attribute.attr.as_str(),
     )
@@ -185,6 +187,7 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
     /// Creates a member-family finder for roots that resolve the member through their MRO.
     fn for_member_roots(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         roots: Vec<ClassLiteral<'db>>,
         member_name: &'name str,
         accessor_role: Option<PropertyAccessorRole>,
@@ -195,7 +198,7 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
         for root in roots {
             // Avoid scanning every known subclass when the member doesn't resolve on this root.
             let Some(root_definitions) =
-                mro_member_definitions(db, root, member_name, accessor_role)
+                mro_member_definitions(db, env, root, member_name, accessor_role)
             else {
                 continue;
             };
@@ -248,15 +251,16 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
         }
 
         let roots = &self.roots;
+        let env = &TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
         Some(match &self.kind {
             ImplementationsFinderKind::ClassFamily => {
-                class_implementations_for_file(db, file, roots)
+                class_implementations_for_file(db, env, file, roots)
             }
             ImplementationsFinderKind::MemberFamily {
                 name,
                 accessor_role,
                 ..
-            } => member_implementations_for_file(db, file, roots, name, *accessor_role),
+            } => member_implementations_for_file(db, env, file, roots, name, *accessor_role),
         })
     }
 
@@ -290,7 +294,7 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
         let env = model.program_environment();
         let mut roots = Vec::new();
         let mut seen = FxHashSet::default();
-        collect_implementation_root_classes(db, env, lhs_ty, &mut seen, &mut roots);
+        collect_implementation_root_classes(db, &env, lhs_ty, &mut seen, &mut roots);
 
         let accessor_role = match attribute.ctx {
             ast::ExprContext::Load => Some(PropertyAccessorRole::Getter),
@@ -299,7 +303,13 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
             ast::ExprContext::Invalid => None,
         };
 
-        ImplementationsFinder::for_member_roots(db, roots, attribute.attr.as_str(), accessor_role)
+        ImplementationsFinder::for_member_roots(
+            db,
+            &env,
+            roots,
+            attribute.attr.as_str(),
+            accessor_role,
+        )
     }
 
     /// Creates an `ImplementationsFinder` for a method declaration.
@@ -336,10 +346,11 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
         let class_definition = semantic_index(db, containing_scope.program_file(db))
             .expect_single_definition(class_node);
         let class_ty = binding_type(db, class_definition);
-        let root = extract_class_literal(db, env, class_ty)?;
+        let root = extract_class_literal(db, &env, class_ty)?;
 
         ImplementationsFinder::for_member_roots(
             db,
+            &env,
             vec![root],
             function.name.as_str(),
             accessor_role,
@@ -367,7 +378,7 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
         if !is_reachable_implementation_definition(db, class_definition) {
             return None;
         }
-        let root = extract_class_literal(db, env, binding_type(db, class_definition))?;
+        let root = extract_class_literal(db, &env, binding_type(db, class_definition))?;
 
         Some(ImplementationsFinder::for_class_roots(db, vec![root]))
     }
@@ -446,13 +457,14 @@ impl<'db, 'name> ImplementationsFinder<'db, 'name> {
 /// Finds subclasses of `roots` defined in `file`.
 fn class_implementations_for_file<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
 
     for candidate in reachable_class_literals_in_file(db, file) {
-        if roots.contains(&candidate) || !class_mro_intersects(db, candidate, roots) {
+        if roots.contains(&candidate) || !class_mro_intersects(db, env, candidate, roots) {
             continue;
         }
         if let Some(definition) = candidate.definition(db) {
@@ -475,13 +487,14 @@ pub fn static_member_type_for_attribute<'db>(
     let db = model.db();
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(db, model.program_environment(), attribute.attr.as_str())
+        .static_member(db, &model.program_environment(), attribute.attr.as_str())
         .ignore_possibly_undefined()
 }
 
 /// Finds member implementations contributed by subclasses of `roots` defined in `file`.
 fn member_implementations_for_file<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     file: ProgramFile<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
     member_name: &str,
@@ -495,7 +508,7 @@ fn member_implementations_for_file<'db>(
             continue;
         }
 
-        if !class_mro_intersects(db, candidate, roots) {
+        if !class_mro_intersects(db, env, candidate, roots) {
             continue;
         }
 
@@ -514,11 +527,12 @@ fn member_implementations_for_file<'db>(
 /// Returns whether any class in `class`'s MRO is one of `roots`.
 fn class_mro_intersects<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
     roots: &FxHashSet<ClassLiteral<'db>>,
 ) -> bool {
     class
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .any(|ancestor| roots.contains(&ancestor.class_literal(db)))
 }
@@ -531,12 +545,13 @@ fn class_mro_intersects<'db>(
 /// such as an overload-only method.
 fn mro_member_definitions<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: ClassLiteral<'db>,
     member_name: &str,
     accessor_role: Option<PropertyAccessorRole>,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     class
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .find_map(|class| {
             own_member_definitions(db, class.class_literal(db), member_name, accessor_role)
@@ -707,9 +722,13 @@ fn collect_implementation_root_classes<'db>(
     seen: &mut FxHashSet<ClassLiteral<'db>>,
     roots: &mut Vec<ClassLiteral<'db>>,
 ) {
-    TypeInspector::scope(env, |inspector| {
-        collect_implementation_root_classes_in(db, inspector, ty, seen, roots);
-    });
+    TypeInspector::scope(
+        env,
+        TypeInspectionKey::CollectImplementationRootClasses,
+        |inspector| {
+            collect_implementation_root_classes_in(db, inspector, ty, seen, roots);
+        },
+    );
 }
 
 fn collect_implementation_root_classes_in<'db>(
@@ -719,87 +738,11 @@ fn collect_implementation_root_classes_in<'db>(
     seen: &mut FxHashSet<ClassLiteral<'db>>,
     roots: &mut Vec<ClassLiteral<'db>>,
 ) {
-    let env = inspector.environment();
     inspector.inspect(
         db,
         ty,
         |_, _| (),
-        |inspector, ty| {
-            match ty {
-                Type::Union(union) => {
-                    // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
-                    for element in union.elements(db) {
-                        collect_implementation_root_classes_in(
-                            db, inspector, *element, seen, roots,
-                        );
-                    }
-                }
-                Type::Intersection(intersection) => {
-                    // Finite intersections can stand for alternatives like `Dog` or `Cat`.
-                    if let Some(alternatives) = intersection.finite_alternatives(db, env) {
-                        for alternative in alternatives {
-                            collect_implementation_root_classes_in(
-                                db,
-                                inspector,
-                                alternative,
-                                seen,
-                                roots,
-                            );
-                        }
-                    }
-                }
-                Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
-                    // `T: Animal` can dispatch through the `Animal` bound.
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        collect_implementation_root_classes_in(db, inspector, bound, seen, roots);
-                    }
-                    // `T: (Dog, Cat)` can dispatch through either constraint.
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        collect_implementation_root_classes_in(
-                            db,
-                            inspector,
-                            constraints.as_type(db, env),
-                            seen,
-                            roots,
-                        );
-                    }
-                    None => {}
-                },
-                Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
-                    // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
-                    // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
-                    collect_implementation_root_classes_in(
-                        db,
-                        inspector,
-                        subclass_of.to_instance(db, env),
-                        seen,
-                        roots,
-                    );
-                }
-                ty => {
-                    // `dog: Dog` maps directly to the `Dog` class root.
-                    let root = match ty {
-                        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                            extract_class_literal(db, env, ty)
-                        }
-                        Type::NominalInstance(_)
-                        | Type::ProtocolInstance(_)
-                        | Type::KnownInstance(_)
-                        | Type::LiteralValue(_)
-                        | Type::TypedDict(_)
-                        | Type::NewTypeInstance(_) => extract_class_literal(db, env, ty)
-                            .or_else(|| extract_class_literal(db, env, ty.to_meta_type(db, env))),
-                        _ => None,
-                    };
-
-                    if let Some(root) = root
-                        && seen.insert(root)
-                    {
-                        roots.push(root);
-                    }
-                }
-            }
-        },
+        |inspector, ty| ty.collect_implementation_roots(db, inspector, seen, roots),
     );
 }
 
@@ -842,7 +785,9 @@ pub fn typed_dict_key_definition<'db>(
 ) -> Option<ResolvedDefinition<'db>> {
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
-    let field = typed_dict.items(model.db()).get(key)?;
+    let env = model.program_environment();
+    let items = typed_dict.items(model.db(), &env);
+    let field = items.get(key)?;
     let definition = field.first_declaration()?;
     Some(ResolvedDefinition::Definition(definition))
 }
@@ -859,9 +804,11 @@ pub fn typed_dict_key_hover<'db>(
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let owner = value_ty
-        .display(db, model.program_environment())
+        .display(db, &model.program_environment())
         .to_string();
-    let field = typed_dict.items(model.db()).get(key)?;
+    let env = model.program_environment();
+    let items = typed_dict.items(model.db(), &env);
+    let field = items.get(key)?;
     let docstring = field
         .first_declaration()
         .and_then(|declaration| declaration.docstring(model.db()));
@@ -896,9 +843,8 @@ pub fn definitions_for_keyword_argument<'db>(
 
     if let Some(callables) = func_type.try_upcast_to_callable(db, env) {
         // For each signature, find the parameter with the matching name
-        for signature in callables.signatures(db) {
-            if let Some((_param_index, param)) =
-                signature.parameters().keyword_by_name(keyword_name_str)
+        for parameters in callables.parameter_lists(db) {
+            if let Some((_param_index, param)) = parameters.keyword_by_name(keyword_name_str)
                 && let Some(definition) = param.definition()
             {
                 resolved_definitions.push(ResolvedDefinition::Definition(definition));
@@ -925,7 +871,7 @@ pub fn definitions_for_imported_symbol<'db>(
     let env = model.program_environment();
     definition_resolution::resolve_from_import_definitions(
         model.db(),
-        env,
+        &env,
         ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
         symbol_name,
@@ -1011,11 +957,17 @@ impl<'db> CallSignatureDetails<'db> {
         binding: &crate::types::call::Binding<'db>,
     ) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
-        let specialization = binding.merged_specialization(db);
+        let specialization = binding.merged_specialization(db, env);
         let signature = binding.signature.clone();
         let display_details = signature.display(db, env).to_string_parts();
         let (parameters, parameter_to_displayed_parameter_mapping) =
-            displayed_parameters_for_signature(db, &signature, &display_details, specialization);
+            displayed_parameters_for_signature(
+                db,
+                env,
+                &signature,
+                &display_details,
+                specialization,
+            );
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
             .map(|mapping| {
@@ -1048,6 +1000,7 @@ impl<'db> CallSignatureDetails<'db> {
 /// displayed parameter types.
 fn displayed_parameters_for_signature<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     signature: &Signature<'db>,
     display_details: &crate::types::display::SignatureDisplayDetails,
     specialization: Option<crate::types::generics::Specialization<'db>>,
@@ -1056,7 +1009,7 @@ fn displayed_parameters_for_signature<'db>(
     // call-site substitutions are reflected in the rendered signature. For
     // example, if `_KT` was inferred as `str`, display `str` instead of `_KT`.
     let apply_specialization =
-        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, spec));
+        |ty: Type<'db>| specialization.map_or(ty, |spec| ty.apply_specialization(db, env, spec));
     let parameters = signature.parameters();
 
     match parameters.kind() {
@@ -1333,7 +1286,7 @@ pub fn call_argument_forms(
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
     if !func_type
-        .bindings(db, model.program_environment())
+        .bindings(db, &model.program_environment())
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
@@ -1688,10 +1641,11 @@ mod stub_mapping {
     use crate::lexical_name_path::{
         lexical_name_path_component_for_node, lexical_name_path_for_definition,
     };
+    use crate::types::TypeOperations;
     use crate::types::definition_resolution::{
         ImportAliasResolution, ResolvedDefinition, find_symbol_in_scope, resolve_definition,
     };
-    use crate::{Db, ProgramEnvironment, TypeOperations};
+    use crate::{Db, ProgramEnvironment};
     use ruff_db::files::vendored_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::SystemPath;
@@ -2208,6 +2162,83 @@ pub fn constructor_signature<'db>(
     }
 }
 
+pub(super) fn collect_implementation_roots_resolved<'db>(
+    db: &'db dyn Db,
+    inspector: &TypeInspector<'_, 'db>,
+    ty: Type<'db>,
+    seen: &mut FxHashSet<ClassLiteral<'db>>,
+    roots: &mut Vec<ClassLiteral<'db>>,
+) {
+    let env = inspector.environment();
+
+    match ty {
+        Type::Union(union) => {
+            // `pet: Dog | Cat` can dispatch through either `Dog` or `Cat`.
+            for element in union.elements(db) {
+                collect_implementation_root_classes_in(db, inspector, *element, seen, roots);
+            }
+        }
+        Type::Intersection(intersection) => {
+            // Finite intersections can stand for alternatives like `Dog` or `Cat`.
+            if let Some(alternatives) = intersection.finite_alternatives(db, env) {
+                for alternative in alternatives {
+                    collect_implementation_root_classes_in(db, inspector, alternative, seen, roots);
+                }
+            }
+        }
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, env) {
+            // `T: Animal` can dispatch through the `Animal` bound.
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                collect_implementation_root_classes_in(db, inspector, bound, seen, roots);
+            }
+            // `T: (Dog, Cat)` can dispatch through either constraint.
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                collect_implementation_root_classes_in(
+                    db,
+                    inspector,
+                    constraints.as_type(db, env),
+                    seen,
+                    roots,
+                );
+            }
+            None => {}
+        },
+        Type::SubclassOf(subclass_of) if subclass_of.is_type_var() => {
+            // Both `type[T]` and the implicit `cls` parameter of a classmethod are represented as
+            // `SubclassOf(TypeVar)`. Normalize them through the existing TypeVar handling above.
+            collect_implementation_root_classes_in(
+                db,
+                inspector,
+                subclass_of.to_instance(db, env),
+                seen,
+                roots,
+            );
+        }
+        ty => {
+            // `dog: Dog` maps directly to the `Dog` class root.
+            let root = match ty {
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                    extract_class_literal(db, env, ty)
+                }
+                Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
+                | Type::KnownInstance(_)
+                | Type::LiteralValue(_)
+                | Type::TypedDict(_)
+                | Type::NewTypeInstance(_) => extract_class_literal(db, env, ty)
+                    .or_else(|| extract_class_literal(db, env, ty.to_meta_type(db, env))),
+                _ => None,
+            };
+
+            if let Some(root) = root
+                && seen.insert(root)
+            {
+                roots.push(root);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
@@ -2245,6 +2276,7 @@ mod tests {
             ImportAliasResolution::ResolveAliases,
         );
         assert_eq!(definitions.len(), 1);
+        drop(model);
 
         let events = db.take_salsa_events();
         assert_function_query_was_not_run_by_name(&db, "infer_scope_types_impl", None, &events);

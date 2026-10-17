@@ -1,7 +1,9 @@
 //! Display implementations for types.
 
-use crate::TypeOperations;
+use super::signatures::CallableSignature;
+use crate::types::TypeOperations;
 use crate::types::typevar::TypeVarSet;
+use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
@@ -27,7 +29,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
-use crate::types::recursive::RecursiveType;
+use crate::types::recursive::{RecursiveType, TypeExpansionContext};
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
@@ -283,7 +285,7 @@ impl<'db> DisplaySettings<'db> {
         };
 
         for ty in types {
-            collector.visit_type(db, ty.into());
+            TypeVisitorContext::new(&collector).visit_type(db, ty.into());
         }
 
         build_display_settings(&collector)
@@ -393,13 +395,23 @@ impl Drop for DisplayDepth<'_> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+enum DisplayedSignature<'db> {
+    Function(FunctionType<'db>),
+    Callable(CallableType<'db>),
+}
+
+enum SignatureRecursion {
+    Repeated,
+    DepthLimit,
+}
+
 /// State for one rendering operation. Child buffers borrow the same allowance and guards;
 /// formatting a display object again starts a new operation.
 struct DisplayContext<'db> {
     budget: DisplayBudget,
     remaining_bytes: Cell<usize>,
-    functions: RefCell<Vec<FunctionType<'db>>>,
-    callables: RefCell<Vec<CallableType<'db>>>,
+    signatures: Rc<ActiveRecursionDetector<DisplayedSignature<'db>>>,
     recursive_types: ActiveRecursionDetector<TypeIdentity<'db>>,
 }
 
@@ -408,37 +420,53 @@ impl Default for DisplayContext<'_> {
         Self {
             budget: DisplayBudget::default(),
             remaining_bytes: Cell::new(MAX_DISPLAY_BYTES),
-            functions: RefCell::default(),
-            callables: RefCell::default(),
+            signatures: Rc::default(),
             recursive_types: ActiveRecursionDetector::default(),
         }
     }
 }
 
-struct DisplayStackGuard<'a, T>(&'a RefCell<Vec<T>>);
-
-impl<'a, T> DisplayStackGuard<'a, T> {
-    fn push(stack: &'a RefCell<Vec<T>>, value: T) -> Self {
-        stack.borrow_mut().push(value);
-        Self(stack)
-    }
-}
-
-impl<T> Drop for DisplayStackGuard<'_, T> {
-    fn drop(&mut self) {
-        self.0.borrow_mut().pop();
-    }
-}
-
 /// A bounded buffer, with navigation metadata when requested by an IDE client.
 /// All recursive formatting goes through `write_node`, including temporary text-only buffers.
-struct TypeWriter<'db> {
+pub(super) struct TypeWriter<'db> {
     output: TypeDisplayDetails<'db>,
     track_details: bool,
     context: Rc<DisplayContext<'db>>,
 }
 
 impl<'db> TypeWriter<'db> {
+    fn signature_recursion(
+        &self,
+        signature: DisplayedSignature<'db>,
+    ) -> Option<SignatureRecursion> {
+        if self.context.signatures.contains(&signature) {
+            Some(SignatureRecursion::Repeated)
+        } else if self.context.signatures.len() >= MAX_SIGNATURE_DISPLAY_DEPTH {
+            Some(SignatureRecursion::DepthLimit)
+        } else {
+            None
+        }
+    }
+
+    fn with_signature<R>(
+        &mut self,
+        env: &TypeOperations<'db>,
+        signature: DisplayedSignature<'db>,
+        render: impl FnOnce(&mut Self, &TypeExpansionContext<'_, '_, 'db>) -> R,
+    ) -> Result<R, SignatureRecursion> {
+        if let Some(recursion) = self.signature_recursion(signature) {
+            return Err(recursion);
+        }
+        let signatures = Rc::clone(&self.context.signatures);
+        let mapping = ApplyTypeMappingVisitor::new(env);
+        signatures.visit_with_expansion(
+            &signature,
+            &mapping,
+            || Err(SignatureRecursion::Repeated),
+            |expansion| Ok(render(self, expansion)),
+        )
+    }
+
     fn render_root(value: &impl DisplayNode<'db>, track_details: bool) -> TypeDisplayDetails<'db> {
         Self::render_with_context(value, track_details, Rc::default())
     }
@@ -755,7 +783,7 @@ enum AmbiguityState<'db> {
     RequiresFileAndLineNumber,
 }
 
-impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
+impl<'db> TypeVisitorHooks<'db> for AmbiguousNameCollector<'_, 'db> {
     fn program_environment(&self) -> &TypeOperations<'db> {
         self.env
     }
@@ -764,7 +792,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         false
     }
 
-    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+    fn visit_type(&self, db: &'db dyn Db, visit: &TypeVisit<'_, 'db, Self>, ty: Type<'db>) {
         let Some(_depth) = self.budget.enter() else {
             return;
         };
@@ -786,23 +814,31 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
             Type::ProtocolInstance(protocol) if let Some(class) = protocol.class_origin(db) => {
-                return self.visit_type(db, Type::from(class));
+                return visit.visit_type(db, Type::from(class));
             }
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
         }
 
-        if let visitor::TypeKind::NonAtomic(t) = visitor::TypeKind::from(ty) {
+        if let visitor::TypeKind::NonAtomic(_t) = visitor::TypeKind::from(ty) {
             if !self.visited_types.borrow_mut().insert(ty) {
                 // If we have already seen this type, we can skip it.
                 return;
             }
-            visitor::walk_non_atomic_type(db, t, self);
+            visit.walk_children(db);
         }
     }
 
-    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+    fn visit_recursive_type(
+        &self,
+        db: &'db dyn Db,
+        visit: &TypeVisit<'_, 'db, Self>,
+        recursive: RecursiveType<'db>,
+    ) {
+        let Some(_depth) = self.budget.enter() else {
+            return;
+        };
         if recursive.alias(db).is_none() {
             self.active_recursive_types.visit_with_expansion(
                 &Type::Recursive(recursive).to_type_identity(db),
@@ -812,7 +848,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                     if let Some(unfolded) =
                         expansion.expand_recursive(db, recursive).into_unfolded()
                     {
-                        self.visit_type(db, unfolded);
+                        unfolded.visit(db, visit);
                     }
                 },
             );
@@ -820,7 +856,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         }
         // Only the alias name and its arguments are displayed, not its unfolded body.
         if let Some(arguments) = recursive.arguments(db) {
-            walk_specialization_types(db, arguments, self);
+            walk_specialization_types(db, arguments, visit);
         }
     }
 }
@@ -895,6 +931,74 @@ impl<'db> DisplayType<'_, 'db> {
 
     pub fn to_string_parts(&self) -> TypeDisplayDetails<'db> {
         TypeWriter::render_root(self, true)
+    }
+}
+
+impl<'db> DisplayRepresentation<'_, 'db> {
+    pub(super) fn fmt_bound_method_signatures(
+        &self,
+        bound_signatures: &CallableSignature<'db>,
+        f: &mut TypeWriter<'db>,
+        function: FunctionType<'db>,
+        self_ty: Type<'db>,
+        receiver_ty: Type<'db>,
+    ) -> fmt::Result {
+        let db = self.db;
+
+        match bound_signatures.overloads.as_slice() {
+            [signature] => {
+                let hide_unused_self = signature.should_hide_self_from_display(db, self.env);
+                let type_parameters = DisplayOptionalGenericContext {
+                    generic_context: signature.generic_context.as_ref(),
+                    db,
+                    hide_unused_self,
+                };
+                f.set_invalid_type_annotation();
+                f.write_str("bound method ")?;
+                DisplayMaybeParenthesizedType {
+                    ty: self_ty,
+                    db,
+                    env: self.env,
+                    settings: self.settings.singleline(),
+                }
+                .fmt_detailed(f)?;
+                if self_ty != receiver_ty {
+                    f.write_str(" when ")?;
+                    DisplayMaybeParenthesizedType {
+                        ty: receiver_ty,
+                        db,
+                        env: self.env,
+                        settings: self.settings.singleline(),
+                    }
+                    .fmt_detailed(f)?;
+                }
+                f.write_char('.')?;
+                f.with_type(self.ty).write_str(function.name(db))?;
+                type_parameters.fmt_detailed(f)?;
+                signature
+                    .display_with(db, self.env, self.settings.disallow_signature_name())
+                    .fmt_detailed(f)
+            }
+            signatures => {
+                // TODO: How to display overloads?
+                if !self.settings.multiline {
+                    // TODO: This should ideally have a TypeDetail but we actually
+                    // don't have a type for @overload (we just detect the decorator)
+                    f.write_str("Overload")?;
+                    f.write_char('[')?;
+                }
+                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let mut join = f.join(separator);
+                for signature in signatures {
+                    join.entry(&signature.display_with(db, self.env, self.settings.clone()));
+                }
+                join.finish()?;
+                if !self.settings.multiline {
+                    f.write_str("]")?;
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -1075,41 +1179,18 @@ impl<'db> TypeAliasType<'db> {
 impl<'db> Type<'db> {
     /// Displays an alias declaration with its original type parameters, if this type denotes one.
     /// Recursive types without a source alias use ordinary type display instead.
-    pub fn display_alias_declaration<'env>(
+    pub fn display_alias_declaration(
         self,
         db: &'db dyn Db,
-        env: &'env TypeOperations<'db>,
-    ) -> Option<impl Display + 'env> {
-        let display = |ty, definition, name, generic_context, value_ty| {
-            Some(DisplayTypeAliasDeclaration {
-                db,
-                env,
-                type_alias: TypeAliasDisplay {
-                    db,
-                    ty,
-                    definition,
-                    name,
-                    settings: DisplaySettings::from_possibly_ambiguous_types(
-                        db,
-                        env,
-                        [ty, value_ty],
-                    ),
-                },
-                generic_context,
-                value_ty,
-            })
-        };
+        env: &TypeOperations<'db>,
+    ) -> Option<String> {
         match self {
             Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-            | Type::TypeAlias(alias) => display(
-                Type::TypeAlias(alias),
-                alias.definition(db),
-                alias.name(db),
-                alias.generic_context(db),
-                alias.raw_value_type(db),
-            ),
+            | Type::TypeAlias(alias) => alias.inspect_definition(db, env, |body| {
+                body.display_type_alias_declaration(db, alias)
+            }),
             Type::Recursive(recursive) => {
-                let (definition, name) = recursive.alias(db)?;
+                recursive.alias(db)?;
                 let constructor = recursive.constructor(db);
                 let mapping = ApplyTypeMappingVisitor::new(env);
                 let guard = crate::types::CycleDetector::<(), Type<'db>, (), 1>::new(());
@@ -1119,13 +1200,10 @@ impl<'db> Type<'db> {
                     &mapping,
                     |visit| {
                         let expansion = visit.ok()?;
-                        display(
-                            Type::Recursive(constructor),
-                            definition,
-                            name,
-                            constructor.parameters(db),
-                            expansion.expand_recursive(db, constructor).into_type(),
-                        )
+                        expansion
+                            .expand_recursive(db, constructor)
+                            .body_or_reference()
+                            .display_alias_declaration(db, constructor)
                     },
                 )
             }
@@ -1270,7 +1348,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
-struct DisplayRepresentation<'env, 'db> {
+pub(super) struct DisplayRepresentation<'env, 'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
     env: &'env TypeOperations<'db>,
@@ -1488,7 +1566,7 @@ impl<'db> DisplayNode<'db> for DisplayRepresentation<'_, 'db> {
                 .display_with(db, self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
-                let Some(callable) = bound_method.into_callable_type(db) else {
+                let Some(callable) = bound_method.into_callable_type(db, self.env) else {
                     f.set_invalid_type_annotation();
                     write!(
                         f,
@@ -1506,67 +1584,17 @@ impl<'db> DisplayNode<'db> for DisplayRepresentation<'_, 'db> {
                 };
                 let self_ty = bound_method.self_instance(db);
                 let receiver_ty = bound_method.signature_receiver(db);
-                let bound_signatures = callable.signatures(db);
-
-                match bound_signatures.overloads.as_slice() {
-                    [signature] => {
-                        let hide_unused_self =
-                            signature.should_hide_self_from_display(db, self.env);
-                        let type_parameters = DisplayOptionalGenericContext {
-                            generic_context: signature.generic_context.as_ref(),
-                            db,
-                            hide_unused_self,
-                        };
-                        f.set_invalid_type_annotation();
-                        f.write_str("bound method ")?;
-                        DisplayMaybeParenthesizedType {
-                            ty: self_ty,
-                            db,
-                            env: self.env,
-                            settings: self.settings.singleline(),
-                        }
-                        .fmt_detailed(f)?;
-                        if self_ty != receiver_ty {
-                            f.write_str(" when ")?;
-                            DisplayMaybeParenthesizedType {
-                                ty: receiver_ty,
-                                db,
-                                env: self.env,
-                                settings: self.settings.singleline(),
-                            }
-                            .fmt_detailed(f)?;
-                        }
-                        f.write_char('.')?;
-                        f.with_type(self.ty).write_str(function.name(db))?;
-                        type_parameters.fmt_detailed(f)?;
-                        signature
-                            .display_with(db, self.env, self.settings.disallow_signature_name())
-                            .fmt_detailed(f)
-                    }
-                    signatures => {
-                        // TODO: How to display overloads?
-                        if !self.settings.multiline {
-                            // TODO: This should ideally have a TypeDetail but we actually
-                            // don't have a type for @overload (we just detect the decorator)
-                            f.write_str("Overload")?;
-                            f.write_char('[')?;
-                        }
-                        let separator = if self.settings.multiline { "\n" } else { ", " };
-                        let mut join = f.join(separator);
-                        for signature in signatures {
-                            join.entry(&signature.display_with(
-                                db,
-                                self.env,
-                                self.settings.clone(),
-                            ));
-                        }
-                        join.finish()?;
-                        if !self.settings.multiline {
-                            f.write_str("]")?;
-                        }
-                        Ok(())
-                    }
-                }
+                callable
+                    .inspect_signatures(db, self.env, |bound_signatures| {
+                        bound_signatures.display_bound_method(
+                            self,
+                            f,
+                            function,
+                            self_ty,
+                            receiver_ty,
+                        )
+                    })
+                    .unwrap_or_else(|| f.write_str("Divergent"))
             }
             Type::KnownBoundMethod(method_type) => {
                 f.set_invalid_type_annotation();
@@ -1922,6 +1950,7 @@ impl<'db> DisplayNode<'db> for DisplayRepresentation<'_, 'db> {
                 // The recursive identity also covers specializations that grow on each unfolding.
                 let context = Rc::clone(&f.context);
                 let result = context.recursive_types.visit(
+                    self.env,
                     &self.ty.to_type_identity(db),
                     || None,
                     || {
@@ -2172,58 +2201,55 @@ impl<'db> DisplayNode<'db> for DisplayFunctionType<'_, 'db> {
         // and limit display depth for chains of different function types
         // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
         let db = self.db;
-        let context = Rc::clone(&f.context);
-        if context.functions.borrow().contains(&self.ty)
-            || context.functions.borrow().len() >= MAX_SIGNATURE_DISPLAY_DEPTH
-        {
+        f.with_signature(self.env, DisplayedSignature::Function(self.ty), |f, _| {
+            let settings = self.settings.clone();
+
+            let signature = self.ty.signature(db);
+
+            match signature.overloads.as_slice() {
+                [signature] => {
+                    let hide_unused_self = signature.should_hide_self_from_display(db, self.env);
+
+                    let type_parameters = DisplayOptionalGenericContext {
+                        generic_context: signature.generic_context.as_ref(),
+                        db,
+                        hide_unused_self,
+                    };
+                    f.set_invalid_type_annotation();
+                    f.write_str("def ")?;
+                    write!(f, "{}", self.ty.name(db))?;
+                    type_parameters.fmt_detailed(f)?;
+                    signature
+                        .display_with(db, self.env, settings.disallow_signature_name())
+                        .fmt_detailed(f)
+                }
+                signatures => {
+                    // TODO: How to display overloads?
+                    if !settings.multiline {
+                        // TODO: This should ideally have a TypeDetail but we actually
+                        // don't have a type for @overload (we just detect the decorator)
+                        f.write_str("Overload")?;
+                        f.write_char('[')?;
+                    }
+                    let separator = if settings.multiline { "\n" } else { ", " };
+                    let mut join = f.join(separator);
+                    for signature in signatures {
+                        join.entry(&signature.display_with(db, self.env, settings.clone()));
+                    }
+                    join.finish()?;
+                    if !settings.multiline {
+                        f.write_str("]")?;
+                    }
+                    Ok(())
+                }
+            }
+        })
+        .unwrap_or_else(|_| {
             f.set_invalid_type_annotation();
             f.write_str("def ")?;
             write!(f, "{}", self.ty.name(db))?;
-            return f.write_str("(...)");
-        }
-
-        let _active = DisplayStackGuard::push(&context.functions, self.ty);
-        let settings = self.settings.clone();
-
-        let signature = self.ty.signature(db);
-
-        match signature.overloads.as_slice() {
-            [signature] => {
-                let hide_unused_self = signature.should_hide_self_from_display(db, self.env);
-
-                let type_parameters = DisplayOptionalGenericContext {
-                    generic_context: signature.generic_context.as_ref(),
-                    db,
-                    hide_unused_self,
-                };
-                f.set_invalid_type_annotation();
-                f.write_str("def ")?;
-                write!(f, "{}", self.ty.name(db))?;
-                type_parameters.fmt_detailed(f)?;
-                signature
-                    .display_with(db, self.env, settings.disallow_signature_name())
-                    .fmt_detailed(f)
-            }
-            signatures => {
-                // TODO: How to display overloads?
-                if !settings.multiline {
-                    // TODO: This should ideally have a TypeDetail but we actually
-                    // don't have a type for @overload (we just detect the decorator)
-                    f.write_str("Overload")?;
-                    f.write_char('[')?;
-                }
-                let separator = if settings.multiline { "\n" } else { ", " };
-                let mut join = f.join(separator);
-                for signature in signatures {
-                    join.entry(&signature.display_with(db, self.env, settings.clone()));
-                }
-                join.finish()?;
-                if !settings.multiline {
-                    f.write_str("]")?;
-                }
-                Ok(())
-            }
-        }
+            f.write_str("(...)")
+        })
     }
 }
 
@@ -2599,27 +2625,23 @@ impl<'db> CallableType<'db> {
     }
 }
 
-pub(crate) struct DisplayCallableType<'a, 'db> {
+pub(super) struct DisplayCallableType<'a, 'db> {
     ty: CallableType<'db>,
     db: &'db dyn Db,
     env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
-impl<'db> DisplayNode<'db> for DisplayCallableType<'_, 'db> {
-    fn fmt_body(&self, f: &mut TypeWriter<'db>) -> fmt::Result {
+impl<'db> DisplayCallableType<'_, 'db> {
+    pub(super) fn fmt_signatures(
+        &self,
+        signatures: &CallableSignature<'db>,
+        f: &mut TypeWriter<'db>,
+    ) -> fmt::Result {
         let db = self.db;
-        let context = Rc::clone(&f.context);
-        if context.callables.borrow().contains(&self.ty) {
-            return f.write_str("Divergent");
-        }
-        if context.callables.borrow().len() >= MAX_SIGNATURE_DISPLAY_DEPTH {
-            f.set_invalid_type_annotation();
-            return f.write_str("(...) -> ...");
-        }
-        let _active = DisplayStackGuard::push(&context.callables, self.ty);
         let settings = self.settings.clone();
-        match self.ty.signatures(db).overloads.as_slice() {
+
+        match signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.ty.kind(db), CallableTypeKind::ParamSpecValue) {
                     if signature.parameters().is_top() {
@@ -2662,9 +2684,27 @@ impl<'db> DisplayNode<'db> for DisplayCallableType<'_, 'db> {
     }
 }
 
-impl Display for DisplayCallableType<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        fmt_display(self, f)
+impl<'db> DisplayNode<'db> for DisplayCallableType<'_, 'db> {
+    fn fmt_body(&self, f: &mut TypeWriter<'db>) -> fmt::Result {
+        let db = self.db;
+        f.with_signature(
+            self.env,
+            DisplayedSignature::Callable(self.ty),
+            |f, expansion| {
+                expansion
+                    .inspect_signatures(db, self.ty, |signatures| {
+                        signatures.display_callable(self, f)
+                    })
+                    .unwrap_or_else(|| f.write_str("Divergent"))
+            },
+        )
+        .unwrap_or_else(|recursion| match recursion {
+            SignatureRecursion::Repeated => f.write_str("Divergent"),
+            SignatureRecursion::DepthLimit => {
+                f.set_invalid_type_annotation();
+                f.write_str("(...) -> ...")
+            }
+        })
     }
 }
 
@@ -2828,7 +2868,7 @@ impl<'db> DisplayNode<'db> for DisplaySignature<'_, 'db> {
             f.write_str(" -> ")?;
 
             let should_parenthesize_return_type =
-                should_parenthesize_callable_type(db, self.return_ty, &f.context);
+                should_parenthesize_callable_type(db, self.return_ty, &f);
             if should_parenthesize_return_type {
                 f.write_char('(')?;
             }
@@ -3728,17 +3768,17 @@ impl<'db> DisplayNode<'db> for DisplayMaybeNegatedType<'_, 'db> {
 fn should_parenthesize_callable_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    context: &DisplayContext<'db>,
+    writer: &TypeWriter<'db>,
 ) -> bool {
     if let Type::Callable(callable) = ty {
-        if context.callables.borrow().contains(&callable) {
-            return false;
+        match writer.signature_recursion(DisplayedSignature::Callable(callable)) {
+            Some(SignatureRecursion::Repeated) => return false,
+            Some(SignatureRecursion::DepthLimit) => return true,
+            None => {}
         }
-        if context.callables.borrow().len() >= MAX_SIGNATURE_DISPLAY_DEPTH {
-            return true;
-        }
-        let overloads = &callable.signatures(db).overloads;
-        overloads.len() == 1 && !overloads[0].parameters().is_top()
+        callable
+            .single_parameters(db)
+            .is_some_and(|parameters| !parameters.is_top())
     } else {
         false
     }
@@ -3763,7 +3803,7 @@ impl<'db> DisplayNode<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
             f.write_char(')')
         };
         match self.ty {
-            ty if should_parenthesize_callable_type(db, ty, &f.context) => write_parentheses(f),
+            ty if should_parenthesize_callable_type(db, ty, f) => write_parentheses(f),
             Type::KnownBoundMethod(_) | Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
                 write_parentheses(f)
             }
@@ -4091,6 +4131,31 @@ impl<'db> DisplayNode<'db> for DisplayKnownInstanceRepr<'_, 'db> {
             }
         }
     }
+}
+
+pub(super) fn render_alias_declaration<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+    definition: Definition<'db>,
+    name: &'db str,
+    generic_context: Option<GenericContext<'db>>,
+    value_ty: Type<'db>,
+) -> String {
+    DisplayTypeAliasDeclaration {
+        db,
+        env,
+        type_alias: TypeAliasDisplay {
+            db,
+            ty,
+            definition,
+            name,
+            settings: DisplaySettings::from_possibly_ambiguous_types(db, env, [ty, value_ty]),
+        },
+        generic_context,
+        value_ty,
+    }
+    .to_string()
 }
 
 #[cfg(test)]

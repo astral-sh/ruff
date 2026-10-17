@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
@@ -18,7 +19,7 @@ use crate::types::constraints::{
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
-use crate::{Db, FxIndexMap, FxIndexSet, TypeOperations};
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
 /// whether we've already processed a node in an equivalent situation. If so, we don't need to

@@ -1,12 +1,15 @@
+use crate::types::TypeOperations;
+use crate::types::recursive::{TypeQueryKey, TypeWalkKey};
+use crate::types::recursive::{TypeQueryVisit, TypeWalkVisit};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
+use crate::Db;
 use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
-use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
-use crate::{Db, TypeOperations};
+use crate::types::{CycleKind, TypeQuery, TypeQueryContext, TypeTraversal, TypeWalk};
 use crate::{
     TypeQualifiers,
     types::{
@@ -55,7 +58,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
         let class_ty = object_ty.nominal_class(db, env)?;
 
-        for base in class_ty.iter_mro(db) {
+        for base in class_ty.iter_mro(db, env) {
             let Some(class) = base.into_class() else {
                 continue;
             };
@@ -205,7 +208,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let report_not_in_init = || {
             let is_dataclass_like = object_ty
                 .nominal_class(db, env)
-                .or_else(|| object_ty.to_class_type(db))
+                .or_else(|| object_ty.to_class_type(db, env))
                 .and_then(|cls| cls.static_class_literal(db))
                 .is_some_and(|(class_literal, _)| class_literal.is_dataclass_like(self.db()));
             let Some(builder) = self
@@ -249,7 +252,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && object_ty
                 .nominal_class(db, env)
                 .is_some_and(|object_class| {
-                    object_class.is_subtype_of_class_literal(db, class_ty.class_literal(db))
+                    object_class.is_subtype_of_class_literal(db, env, class_ty.class_literal(db))
                 });
         if !is_current_class_instance {
             report_not_in_init();
@@ -316,39 +319,72 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         attribute: &str,
     ) -> bool {
         let db = self.db();
-        // Check each possible receiver type separately. If one of them makes the
-        // attribute `Final`, another type must not make it writable.
-        match object_ty {
-            Type::TypeAlias(alias) => {
-                return self.validate_final_attribute_assignment(
-                    target,
-                    alias.value_type(db),
-                    attribute,
-                );
-            }
+        let env = self.program_environment().clone();
+        TypeTraversal::with_root(
+            &env,
+            FinalAttributeAssignment { target, attribute },
+            |traversal| traversal.visit_with(db, object_ty, self),
+        )
+    }
+}
+
+struct FinalAttributeAssignment<'a> {
+    target: &'a ast::ExprAttribute,
+    attribute: &'a str,
+}
+
+impl<'db, 'ast> TypeWalk<'db, &mut TypeInferenceBuilder<'db, 'ast>>
+    for FinalAttributeAssignment<'_>
+{
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::FinalAttributeAssignment(ruff_python_ast::name::Name::new(self.attribute))
+    }
+
+    type Output = bool;
+
+    fn on_cycle(
+        &self,
+        _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
+        _ty: Type<'db>,
+        _kind: CycleKind,
+        _builder: &mut TypeInferenceBuilder<'db, 'ast>,
+    ) -> bool {
+        false
+    }
+
+    fn visit(
+        &self,
+        db: &'db dyn Db,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
+        ty: Type<'db>,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+    ) -> bool {
+        // Any receiver with a Final declaration prevents the assignment.
+        match ty {
             Type::Union(union) => {
-                return union.elements(db).iter().any(|element| {
-                    self.validate_final_attribute_assignment(target, *element, attribute)
-                });
+                return union
+                    .elements(db)
+                    .iter()
+                    .any(|element| traversal.visit_with(db, *element, &mut *builder));
             }
             Type::Intersection(intersection) => {
-                return intersection.positive(db).iter().any(|element| {
-                    self.validate_final_attribute_assignment(target, *element, attribute)
-                });
+                return intersection
+                    .positive(db)
+                    .iter()
+                    .any(|element| traversal.visit_with(db, *element, &mut *builder));
             }
             _ => {}
         }
         let Some(members) =
-            assignment_attribute_members(db, self.program_environment(), object_ty, attribute)
+            assignment_attribute_members(db, traversal.environment(), ty, self.attribute)
         else {
             return false;
         };
-
         members.effective_members().any(|member| {
-            self.invalid_assignment_to_final_attribute(
-                object_ty,
-                target,
-                attribute,
+            builder.invalid_assignment_to_final_attribute(
+                ty,
+                self.target,
+                self.attribute,
                 member.qualifiers,
             )
         })
@@ -370,11 +406,15 @@ pub(super) fn final_attribute_receiver<'db>(
 struct FindFinalAttribute<'a>(&'a str);
 
 impl<'db> TypeQuery<'db> for FindFinalAttribute<'_> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::FindFinalAttribute(self.0.into())
+    }
+
     type Output = Option<Type<'db>>;
 
     fn on_cycle(
         &self,
-        _context: &TypeQueryContext<'_, 'db, Self>,
+        _context: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         (): (),
@@ -385,7 +425,7 @@ impl<'db> TypeQuery<'db> for FindFinalAttribute<'_> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        context: &TypeQueryContext<'_, 'db, Self>,
+        context: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         (): (),
     ) -> Self::Output {

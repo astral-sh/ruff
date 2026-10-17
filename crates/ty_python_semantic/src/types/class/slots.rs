@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
@@ -10,11 +11,11 @@ use crate::types::{
     ClassBase, ClassLiteral, DataclassFlags, KnownClass, SpecialFormType, Type,
     definition_expression_type, tuple::Tuple,
 };
-use crate::{Db, FxIndexSet, ProgramEnvironment, TypeOperations};
+use crate::{Db, FxIndexSet, ProgramEnvironment};
 
 /// The information that can be recovered from a class's own `__slots__` assignment.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-enum SlotDefinition {
+pub(crate) enum SlotDefinition {
     /// Every declared slot name is statically known.
     Names(Box<[Name]>),
     /// The declaration is definitely nonempty, but at least one name is unknown.
@@ -198,7 +199,7 @@ impl InstanceDictionary {
 
 /// The slots and dictionary storage inherited by instances of a class.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct InstanceLayout {
+pub(crate) struct InstanceLayout {
     slots: Box<[Name]>,
     dictionary: InstanceDictionary,
 }
@@ -284,6 +285,7 @@ impl<'db> StaticClassLiteral<'db> {
     )]
     fn slot_definition(self, db: &'db dyn Db) -> SlotDefinition {
         let body_scope = self.body_scope(db);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(body_scope));
         // A bare annotation does not bind `__slots__`, but an annotated assignment does:
         //
         //     __slots__: tuple[str, ...]
@@ -317,7 +319,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return SlotDefinition::DynamicOrNone;
             };
             let inherited_slots: FxIndexSet<_> = self
-                .iter_mro(db, None)
+                .iter_mro(db, &env)
                 .skip(1)
                 .filter_map(ClassBase::into_class)
                 .filter_map(|class| class.static_class_literal(db).map(|(class, _)| class))
@@ -327,7 +329,7 @@ impl<'db> StaticClassLiteral<'db> {
                 .collect();
             let weakref_name = Name::new_static("__weakref__");
             let mut names: Vec<_> = self
-                .fields(db, None, field_policy)
+                .fields(db, &env, None, field_policy)
                 .keys()
                 .filter(|name| !inherited_slots.contains(*name))
                 .cloned()
@@ -344,7 +346,6 @@ impl<'db> StaticClassLiteral<'db> {
         //
         //     if condition:
         //         __slots__ = ("value",)
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(body_scope));
         let use_def = use_def_map(db, body_scope);
         let bindings = use_def.end_of_scope_symbol_bindings(symbol);
         let Place::Defined(DefinedPlace {
@@ -446,6 +447,8 @@ impl<'db> StaticClassLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn instance_layout(self, db: &'db dyn Db) -> InstanceLayout {
+        let env =
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         if self.is_protocol(db) {
             return InstanceLayout::unknown();
         }
@@ -453,7 +456,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut slots = FxIndexSet::default();
         let mut dictionary = InstanceDictionary::Absent;
 
-        for base in self.iter_mro(db, None) {
+        for base in self.iter_mro(db, env) {
             let base = match base {
                 ClassBase::Class(base) => base,
                 ClassBase::Any | ClassBase::Divergent(_) | ClassBase::Dynamic(_) => {
@@ -467,7 +470,9 @@ impl<'db> StaticClassLiteral<'db> {
                 ClassLiteral::Static(base) => base,
                 // Functional named tuples synthesize empty slots, while TypedDict instances use
                 // dictionary item storage rather than an instance-attribute dictionary.
-                ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => continue,
+                ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicTypedDict(_) => {
+                    continue;
+                }
                 // Enum instances retain an instance dictionary even when the enum is created
                 // through the functional API.
                 ClassLiteral::DynamicEnum(_) => {
@@ -566,7 +571,7 @@ impl<'db> StaticClassLiteral<'db> {
         let value_ty = self
             .own_instance_member(db, env, name)
             .ignore_possibly_undefined()
-            .map(|ty| ty.apply_optional_specialization(db, specialization))
+            .map(|ty| ty.apply_optional_specialization(db, env, specialization))
             .unwrap_or_else(Type::unknown);
 
         Type::SlotDescriptor(SlotDescriptorType::new(db, value_ty))

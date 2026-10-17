@@ -201,6 +201,31 @@ class_with_callable_dunder = ClassWithNonMethodDunder()
 reveal_type(class_with_callable_dunder[0])  # revealed: str
 ```
 
+## Recursive `__call__` attributes
+
+An instance whose `__call__` attribute leads back to itself has no callable signature. We report a
+call error instead of following the attribute indefinitely. This reproduces
+<https://github.com/astral-sh/ty/issues/4148>.
+
+```py
+class C:
+    __call__: "C"
+
+C()()  # error: [call-non-callable]
+```
+
+The same applies when the cycle passes through another class:
+
+```py
+class First:
+    __call__: "Second"
+
+class Second:
+    __call__: First
+
+First()()  # error: [call-non-callable]
+```
+
 ## Dunders are looked up using the descriptor protocol
 
 Here, we demonstrate that the descriptor protocol is invoked when looking up a dunder method. Note
@@ -223,6 +248,21 @@ class ClassWithDescriptorDunder:
 class_with_descriptor_dunder = ClassWithDescriptorDunder()
 
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
+```
+
+## Recursive calls while binding descriptors
+
+Looking up `__call__` can invoke a descriptor whose `__get__` calls the original instance again. We
+stop following this cycle, leaving the call's return type unknown.
+
+```py
+class Descriptor:
+    __get__: "C"
+
+class C:
+    __call__: Descriptor
+
+reveal_type(C()())  # revealed: Unknown
 ```
 
 ## Dunders cannot be overwritten on instances

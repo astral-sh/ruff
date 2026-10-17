@@ -217,8 +217,7 @@ expanding the first tuple element below would produce over a million leaves, but
 identify the incompatible second element without visiting every repeated occurrence.
 
 ```py
-type Pair[T] = tuple[T, T]
-type Quad[T] = Pair[Pair[T]]
+type Quad[T] = tuple[T, T, T, T]
 type Sixteen[T] = Quad[Quad[T]]
 type Nested[T] = Sixteen[Sixteen[Sixteen[Sixteen[Sixteen[T]]]]]
 
@@ -228,11 +227,11 @@ def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
 
 ```snapshot
 error[invalid-return-type]: Return type does not match returned value
- --> src/mdtest_snippet.py:7:12
+ --> src/mdtest_snippet.py:6:12
   |
-6 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
+5 | def check(source: tuple[Nested[int], int]) -> tuple[Nested[object], str]:
   |                                               -------------------------- Expected `tuple[Nested[object], str]` because of return type
-7 |     return source  # snapshot: invalid-return-type
+6 |     return source  # snapshot: invalid-return-type
   |            ^^^^^^ expected `tuple[Nested[object], str]`, found `tuple[Nested[int], int]`
 info: the second tuple element is not compatible: `int` is not assignable to `str`
 ```
@@ -254,11 +253,11 @@ def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
 
 ```snapshot
 error[invalid-return-type]: Return type does not match returned value
-  --> src/mdtest_snippet.py:15:12
+  --> src/mdtest_snippet.py:14:12
    |
-14 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
+13 | def check_receiver(receiver: Receiver) -> Callable[[Nested[int], str], int]:
    |                                           --------------------------------- Expected `(Nested[int], str, /) -> int` because of return type
-15 |     return receiver.method  # snapshot: invalid-return-type
+14 |     return receiver.method  # snapshot: invalid-return-type
    |            ^^^^^^^^^^^^^^^ expected `(Nested[int], str, /) -> int`, found `bound method Receiver.method[S](x: Nested[S], y: int) -> int`
 info: the second parameter has an incompatible type: `str` is not assignable to `int`
 ```

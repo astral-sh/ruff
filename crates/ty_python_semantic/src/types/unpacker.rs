@@ -1,4 +1,4 @@
-use crate::TypeOperations;
+use crate::types::TypeOperations;
 use std::borrow::Cow;
 use std::debug_assert_matches;
 

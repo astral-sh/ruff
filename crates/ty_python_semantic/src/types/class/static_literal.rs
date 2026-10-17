@@ -1,4 +1,6 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
+use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use itertools::{Either, Itertools};
 use ruff_db::{
     PythonFile,
@@ -9,6 +11,7 @@ use ruff_db::{
 use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
+use std::borrow::Cow;
 use std::cell::RefCell;
 
 use super::implicit_attributes::implicit_attribute_names;
@@ -54,7 +57,7 @@ use crate::{
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
         variance::{MemberVariance, VarianceInferable, VarianceOrigin, VarianceTerm},
-        visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{TypeCollector, TypeVisitor},
     },
 };
 use ty_python_core::{
@@ -204,8 +207,8 @@ struct InheritedFrozenDataclassFields<'db> {
 /// ```
 ///
 /// Here, `required` is a constructor field and `value` masks an inherited `Base.value` field.
-#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct OwnClassFields<'db> {
+#[derive(Clone, Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct OwnClassFields<'db> {
     fields: FxIndexMap<Name, Field<'db>>,
     class_variables: Box<[Name]>,
 }
@@ -301,9 +304,10 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn has_ordering_method_in_mro(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> bool {
-        self.total_ordering_root_method(db, specialization)
+        self.total_ordering_root_method(db, env, specialization)
             .is_some()
     }
 
@@ -317,12 +321,13 @@ impl<'db> StaticClassLiteral<'db> {
     fn total_ordering_root_method(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Type<'db>> {
         const ORDERING_METHODS: [&str; 4] = ["__lt__", "__le__", "__gt__", "__ge__"];
 
         for name in ORDERING_METHODS {
-            for base in self.iter_mro(db, specialization) {
+            for base in self.iter_mro_specialized(db, env, specialization) {
                 let Some(base_class) = base.into_class() else {
                     continue;
                 };
@@ -336,7 +341,11 @@ impl<'db> StaticClassLiteral<'db> {
                             let base_specialization = base_class
                                 .static_class_literal(db)
                                 .and_then(|(_, spec)| spec);
-                            return Some(ty.apply_optional_specialization(db, base_specialization));
+                            return Some(ty.apply_optional_specialization(
+                                db,
+                                env,
+                                base_specialization,
+                            ));
                         }
                     }
                     ClassLiteral::Dynamic(dynamic) => {
@@ -432,8 +441,11 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> Option<GenericContext<'db>> {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
             GenericContext::from_base_classes(
                 db,
+                &env,
                 class.definition(db),
                 class
                     .explicit_bases(db)
@@ -500,7 +512,7 @@ impl<'db> StaticClassLiteral<'db> {
             recursion_guard: TypeCollector<'db>,
         }
 
-        impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
+        impl<'db> TypeVisitorHooks<'db> for CollectTypeVars<'_, 'db> {
             fn program_environment(&self) -> &TypeOperations<'db> {
                 self.env
             }
@@ -512,6 +524,7 @@ impl<'db> StaticClassLiteral<'db> {
             fn visit_recursive_type(
                 &self,
                 _db: &'db dyn Db,
+                _visit: &TypeVisit<'_, 'db, Self>,
                 _recursive: crate::types::RecursiveType<'db>,
             ) {
                 self.notify_skipped_lazy_type_attributes();
@@ -520,21 +533,32 @@ impl<'db> StaticClassLiteral<'db> {
             fn visit_bound_type_var_type(
                 &self,
                 _db: &'db dyn Db,
+                _visit: &TypeVisit<'_, 'db, Self>,
                 bound_typevar: BoundTypeVarInstance<'db>,
             ) {
                 self.typevars.borrow_mut().insert(bound_typevar);
             }
 
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            fn visit_generic_alias_type(
+                &self,
+                db: &'db dyn Db,
+                visit: &TypeVisit<'_, 'db, Self>,
+                alias: GenericAlias<'db>,
+            ) {
                 // The generic context contains the base class's formal type parameters, not type
                 // variables referenced by this class's base expression.
                 for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
+                    visit.visit_type(db, *ty);
                 }
             }
 
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            fn visit_type(
+                &self,
+                db: &'db dyn Db,
+                visit: &TypeVisit<'_, 'db, Self>,
+                _ty: Type<'db>,
+            ) {
+                visit.walk_children_once(db, &self.recursion_guard);
             }
         }
 
@@ -545,7 +569,7 @@ impl<'db> StaticClassLiteral<'db> {
             recursion_guard: TypeCollector::default(),
         };
         for base in self.explicit_bases(db) {
-            visitor.visit_type(db, *base);
+            TypeVisitorContext::new(&visitor).visit_type(db, *base);
         }
         visitor.typevars.into_inner()
     }
@@ -572,7 +596,11 @@ impl<'db> StaticClassLiteral<'db> {
     /// ## Note
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
-    fn node<'ast>(self, db: &'db dyn Db, module: &'ast ParsedModuleRef) -> &'ast ast::StmtClassDef {
+    pub(in crate::types) fn node<'ast>(
+        self,
+        db: &'db dyn Db,
+        module: &'ast ParsedModuleRef,
+    ) -> &'ast ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class().node(module)
     }
 
@@ -600,20 +628,24 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
             specialization
-                .unwrap_or_else(|| generic_context.default_specialization(db, self.known(db)))
+                .unwrap_or_else(|| generic_context.default_specialization(db, env, self.known(db)))
         })
     }
 
-    pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn top_materialization(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            let env = TypeOperations::new_root(
-                db,
-                ProgramEnvironment::from_program(generic_context.program(db)),
-            );
+            let env = env.in_environment(ProgramEnvironment::from_program(
+                generic_context.program(db),
+            ));
             generic_context
                 .unknown_specialization(db, self.known(db))
                 .materialize_impl(
@@ -627,9 +659,13 @@ impl<'db> StaticClassLiteral<'db> {
     /// Returns the default specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// applies the default specialization to the class's typevars.
-    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+    pub(crate) fn default_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context.default_specialization(db, self.known(db))
+            generic_context.default_specialization(db, env, self.known(db))
         })
     }
 
@@ -711,8 +747,12 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Iterate over the explicit bases that contribute to metaclass selection.
-    fn metaclass_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+    fn metaclass_bases(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        let env = env.in_environment(ProgramEnvironment::from_scope(self.body_scope(db)));
         self.explicit_bases(db)
             .iter()
             .copied()
@@ -836,29 +876,38 @@ impl<'db> StaticClassLiteral<'db> {
     pub(in crate::types) fn try_mro(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
-    ) -> Result<&'db Mro<'db>, &'db StaticMroError<'db>> {
+    ) -> Result<Cow<'db, Mro<'db>>, Cow<'db, StaticMroError<'db>>> {
         match specialization {
-            None => self.try_mro_unspecialized(db),
-            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db),
+            None => self
+                .try_mro_unspecialized(db)
+                .map(Cow::Borrowed)
+                .map_err(|error| Cow::Borrowed(error.as_ref())),
+            Some(specialization) => GenericAlias::new(db, self, specialization).try_mro(db, env),
         }
-        .map_err(Box::as_ref)
     }
 
     #[salsa::tracked(
         returns(as_ref),
-        cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
-            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.body_scope(db)));
+        cycle_initial = |db, _, self_: StaticClassLiteral<'db>| {
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.body_scope(db)));
             Err(Box::new(StaticMroError::cycle(
-                db, &env,
-                self_.apply_optional_specialization(db, None),
+                db,
+                &env,
+                self_.apply_optional_specialization(db, &env, None),
             )))
         },
-        heap_size=ruff_memory_usage::heap_size
+        heap_size = ruff_memory_usage::heap_size,
     )]
-    fn try_mro_unspecialized(self, db: &'db dyn Db) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
+    pub(super) fn try_mro_unspecialized(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Mro<'db>, Box<StaticMroError<'db>>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
-        Mro::of_static_class(db, self, None).map_err(Box::new)
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        Mro::of_static_class(db, &env, self).map_err(Box::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -869,24 +918,31 @@ impl<'db> StaticClassLiteral<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(crate) fn iter_mro(
+    pub(crate) fn iter_mro(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> MroIterator<'db> {
+        ClassLiteral::Static(self).iter_mro(db, env)
+    }
+
+    /// Apply type arguments to the declared ancestry within the caller's operation.
+    fn iter_mro_specialized(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> MroIterator<'db> {
-        MroIterator::new(db, ClassLiteral::Static(self), specialization)
+        MroIterator::new(db, env, ClassLiteral::Static(self), specialization)
     }
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         other: ClassType<'db>,
     ) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db, specialization)
+        self.iter_mro_specialized(db, env, specialization)
             .contains(&ClassBase::Class(other))
     }
 
@@ -903,7 +959,10 @@ impl<'db> StaticClassLiteral<'db> {
     ///
     /// class Example(metaclass=Meta): ...
     /// ```
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
     fn has_own_custom_getattribute(self, db: &'db dyn Db) -> bool {
+        let env =
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         if matches!(self.known(db), Some(KnownClass::Object | KnownClass::Type)) {
             return false;
         }
@@ -919,11 +978,11 @@ impl<'db> StaticClassLiteral<'db> {
             return false;
         }
 
-        let Some(metaclass) = self.metaclass(db).to_class_type(db) else {
+        let Some(metaclass) = self.metaclass(db).class_literal_or_origin(db) else {
             return true;
         };
 
-        metaclass.iter_mro(db).any(|base| match base {
+        metaclass.iter_mro(db, env).any(|base| match base {
             ClassBase::Any | ClassBase::Dynamic(_) | ClassBase::Divergent(_) => true,
             ClassBase::Class(base) => base.static_class_literal(db).is_none_or(|(base, _)| {
                 implicit_attribute_names(db, base.body_scope(db))
@@ -945,8 +1004,10 @@ impl<'db> StaticClassLiteral<'db> {
             db: &'db dyn Db,
             class: StaticClassLiteral<'db>,
         ) -> ClassInstanceFlags {
+            let env =
+                &TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
             let mut flags = ClassInstanceFlags::empty();
-            for base in class.iter_mro(db, None) {
+            for base in class.iter_mro(db, env) {
                 match base {
                     ClassBase::Any => flags.insert(
                         ClassInstanceFlags::INHERITS_FROM_EXPLICIT_ANY
@@ -991,7 +1052,9 @@ impl<'db> StaticClassLiteral<'db> {
     /// Return the module defining the `TypedDict` base of this class.
     #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypingModule> {
-        self.iter_mro(db, None)
+        let env =
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        self.iter_mro(db, env)
             .find_map(ClassBase::typed_dict_module)
     }
 
@@ -1011,8 +1074,11 @@ impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
     /// `typing.NamedTuple`, either directly or indirectly, including functional forms like
     /// `NamedTuple("X", ...)`).
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn has_named_tuple_class_in_mro(self, db: &'db dyn Db) -> bool {
-        self.iter_mro(db, None)
+        let env =
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        self.iter_mro(db, env)
             .filter_map(ClassBase::into_class)
             .any(|base| match base.class_literal(db) {
                 ClassLiteral::DynamicNamedTuple(_) => true,
@@ -1137,16 +1203,19 @@ impl<'db> StaticClassLiteral<'db> {
     fn inherited_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<DataclassTransformerParams<'db>> {
         self.dataclass_transformer_params(db).or_else(|| {
-            self.iter_mro(db, specialization).skip(1).find_map(|base| {
-                base.into_class().and_then(|class| {
-                    class
-                        .static_class_literal(db)
-                        .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+            self.iter_mro_specialized(db, env, specialization)
+                .skip(1)
+                .find_map(|base| {
+                    base.into_class().and_then(|class| {
+                        class
+                            .static_class_literal(db)
+                            .and_then(|(lit, _)| lit.dataclass_transformer_params(db))
+                    })
                 })
-            })
         })
     }
 
@@ -1174,7 +1243,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
         self.inferred_metaclass(db).to_type(db, &env)
     }
 
@@ -1214,10 +1283,12 @@ impl<'db> StaticClassLiteral<'db> {
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
-            let mut base_classes = class.metaclass_bases(db).peekable();
+            let mut base_classes = class.metaclass_bases(db, &env).peekable();
 
             if (base_classes.peek().is_some() && class.inheritance_cycle(db).is_some())
-                || class.try_mro(db, None).is_err_and(StaticMroError::is_cycle)
+                || class
+                    .try_mro(db, &env, None)
+                    .is_err_and(|error| error.is_cycle())
             {
                 // We emit diagnostics for cyclic class definitions elsewhere.
                 // Avoid attempting to infer the metaclass if the class is cyclically defined.
@@ -1265,7 +1336,7 @@ impl<'db> StaticClassLiteral<'db> {
                 (KnownClass::Type.to_class_literal(db, &env), None)
             };
 
-            let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
+            let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db, &env) {
                 MetaclassCandidate {
                     metaclass: metaclass_ty,
                     base,
@@ -1313,14 +1384,14 @@ impl<'db> StaticClassLiteral<'db> {
                 if metaclass == SubclassOfType::subclass_of_unknown() {
                     return Ok((ClassMetaclass::Selected(metaclass), None));
                 }
-                let Some(metaclass) = metaclass.to_class_type(db) else {
+                let Some(metaclass) = metaclass.to_class_type(db, &env) else {
                     continue;
                 };
                 if let Some(selected) = candidate
                     .metaclass
                     .most_derived_metaclass(db, &env, metaclass)
                 {
-                    let Some(metaclass) = selected.to_class_type(db) else {
+                    let Some(metaclass) = selected.to_class_type(db, &env) else {
                         return Ok((ClassMetaclass::Selected(selected), None));
                     };
                     if metaclass == candidate.metaclass {
@@ -1338,7 +1409,7 @@ impl<'db> StaticClassLiteral<'db> {
                         base_metaclass: metaclass,
                         base: base_class,
                         explicit_metaclass: explicit_metaclass
-                            .and_then(|metaclass| metaclass.to_class_type(db)),
+                            .and_then(|metaclass| metaclass.to_class_type(db, &env)),
                     },
                 });
             }
@@ -1347,7 +1418,11 @@ impl<'db> StaticClassLiteral<'db> {
                 .metaclass
                 .static_class_literal(db)
                 .and_then(|(metaclass_literal, specialization)| {
-                    metaclass_literal.inherited_dataclass_transformer_params(db, specialization)
+                    metaclass_literal.inherited_dataclass_transformer_params(
+                        db,
+                        &env,
+                        specialization,
+                    )
                 })
                 .map(|params| MetaclassTransformInfo {
                     params,
@@ -1368,8 +1443,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+            let env = ProgramEnvironment::from_scope(self.body_scope(db));
             return Ok((
                 ClassMetaclass::Selected(KnownClass::Type.to_class_literal(db, &env)),
                 None,
@@ -1418,22 +1492,33 @@ impl<'db> StaticClassLiteral<'db> {
                         env,
                         name,
                         policy,
-                        self.iter_mro(db, Some(specialization)),
+                        self.iter_mro_specialized(db, env, Some(specialization)),
                     )
                 }
                 _ => {
                     let member =
-                        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, None));
-                    let specialization = generic_context.default_specialization(db, self.known(db));
+                        self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, env));
+                    let specialization =
+                        generic_context.default_specialization(db, env, self.known(db));
                     // An inherited method's `Self` bound can still contain this class's type
                     // variables, so the default arguments must also specialize that bound.
                     member.map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
+                        ty.apply_optional_owner_specialization_to_member(
+                            db,
+                            env,
+                            Some(specialization),
+                        )
                     })
                 }
             }
         } else {
-            self.class_member_from_mro(db, env, name, policy, self.iter_mro(db, specialization))
+            self.class_member_from_mro(
+                db,
+                env,
+                name,
+                policy,
+                self.iter_mro_specialized(db, env, specialization),
+            )
         }
     }
 
@@ -1453,7 +1538,9 @@ impl<'db> StaticClassLiteral<'db> {
             match ty {
                 Type::Callable(callable_ty)
                     if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
+                        && callable_ty
+                            .parameter_lists(db)
+                            .any(|parameters| !parameters.as_slice().is_empty()) =>
                 {
                     Type::Callable(callable_ty.into_function_like(db))
                 }
@@ -1522,7 +1609,10 @@ impl<'db> StaticClassLiteral<'db> {
             match ty {
                 Type::Callable(callable_ty)
                     if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
+                        && callable_ty
+                            .single_parameters(db)
+                            .and_then(Parameters::as_paramspec)
+                            .is_some() =>
                 {
                     Type::Callable(callable_ty.into_dunder_paramspec(db))
                 }
@@ -1563,7 +1653,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
             if let Some(field) = self
-                .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
+                .own_fields(db, env, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
             {
                 let property_getter_signature = Signature::new(
@@ -1603,9 +1693,11 @@ impl<'db> StaticClassLiteral<'db> {
                     Type::FunctionLiteral(function),
                     Some(_),
                     "__new__" | "__init__",
-                ) => Type::FunctionLiteral(
-                    function.with_inherited_generic_context(db, generic_context),
-                ),
+                ) => Type::FunctionLiteral(function.with_inherited_generic_context(
+                    db,
+                    env,
+                    generic_context,
+                )),
                 _ => ty,
             }
         });
@@ -1694,7 +1786,7 @@ impl<'db> StaticClassLiteral<'db> {
         if self.total_ordering(db)
             && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
             && !self
-                .iter_mro(db, specialization)
+                .iter_mro_specialized(db, env, specialization)
                 .filter_map(ClassBase::into_class)
                 .filter_map(|class| class.static_class_literal(db))
                 .filter(|(class, _)| !class.is_known(db, KnownClass::Object))
@@ -1703,28 +1795,16 @@ impl<'db> StaticClassLiteral<'db> {
                         .ignore_possibly_undefined()
                         .is_some()
                 })
-            && self.has_ordering_method_in_mro(db, specialization)
-            && let Some(root_method_ty) = self.total_ordering_root_method(db, specialization)
+            && self.has_ordering_method_in_mro(db, env, specialization)
+            && let Some(root_method_ty) = self.total_ordering_root_method(db, env, specialization)
             && let Some(callables) = root_method_ty.try_upcast_to_callable(db, env)
         {
-            let bool_ty = KnownClass::Bool.to_instance(db, env);
             let synthesized_callables = callables.map(|callable| {
-                let signatures = CallableSignature::from_overloads(
-                    callable.signatures(db).iter().map(|signature| {
-                        // The generated methods return a union of the root method's return type
-                        // and `bool`. This is because `@total_ordering` synthesizes methods like:
-                        //     def __gt__(self, other): return not (self == other or self < other)
-                        // If `__lt__` returns `int`, then `__gt__` could return `int | bool`.
-                        let return_ty =
-                            UnionType::from_two_elements(db, env, signature.return_ty, bool_ty);
-                        Signature::new_generic(
-                            signature.generic_context,
-                            signature.parameters().clone(),
-                            return_ty,
-                        )
-                    }),
-                );
-                CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
+                callable
+                    .inspect_signatures_root(db, env, |_, original| {
+                        original.total_ordering_method(db)
+                    })
+                    .unwrap_or(callable)
             });
 
             return Some(synthesized_callables.to_type(db, env));
@@ -1747,20 +1827,20 @@ impl<'db> StaticClassLiteral<'db> {
             field_policy.is_pydantic() && pydantic::constructor_fields_are_keyword_only(db, self);
         let pydantic_constructor_fields_are_optional = name == "__init__"
             && field_policy.is_pydantic()
-            && pydantic::constructor_fields_are_optional(db, self);
+            && pydantic::constructor_fields_are_optional(db, env, self);
 
         let instance_ty = Type::instance(
             db,
             env,
-            self.apply_optional_specialization(db, specialization),
+            self.apply_optional_specialization(db, env, specialization),
         );
 
         let signature_from_fields = |mut parameters: Vec<_>, return_ty: Type<'db>| {
             if name == "__init__" && field_policy.is_pydantic() {
-                pydantic::extend_settings_constructor_parameters(db, self, &mut parameters);
+                pydantic::extend_settings_constructor_parameters(db, env, self, &mut parameters);
             }
 
-            for (field_name, field) in self.fields(db, specialization, field_policy) {
+            for (field_name, field) in self.fields(db, env, specialization, field_policy).iter() {
                 let (init, mut default_ty, kw_only, alias, converter, strict) = match &field.kind {
                     FieldKind::NamedTuple { default_ty } => (
                         true,
@@ -1871,7 +1951,7 @@ impl<'db> StaticClassLiteral<'db> {
                     && let Some(metadata) = field_policy.pydantic_metadata()
                 {
                     field_ty = pydantic::constructor_parameter_type(
-                        db, self, field_name, field_ty, strict, metadata,
+                        db, env, self, field_name, field_ty, strict, metadata,
                     );
                 }
 
@@ -1952,9 +2032,9 @@ impl<'db> StaticClassLiteral<'db> {
             parameters.sort_by_key(Parameter::is_keyword_only);
 
             if name == "__init__"
-                && field_policy
-                    .pydantic_metadata()
-                    .is_some_and(|metadata| pydantic::model_init_accepts_extra(db, self, metadata))
+                && field_policy.pydantic_metadata().is_some_and(|metadata| {
+                    pydantic::model_init_accepts_extra(db, env, self, metadata)
+                })
             {
                 let extra = pydantic::extra_parameter(&parameters);
                 parameters.push(extra);
@@ -1973,7 +2053,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         match (field_policy, name) {
             (field_policy, "__init__")
-                if field_policy.synthesizes_constructor_signature_from_fields(db, self) =>
+                if field_policy.synthesizes_constructor_signature_from_fields(db, env, self) =>
             {
                 if field_policy.is_dataclass_like()
                     && !self.has_dataclass_param(db, field_policy, DataclassFlags::INIT)
@@ -2013,7 +2093,7 @@ impl<'db> StaticClassLiteral<'db> {
                 CodeGeneratorKind::NamedTuple,
                 "__match_args__" | "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
             ) => {
-                let fields = self.fields(db, specialization, field_policy);
+                let fields = self.fields(db, env, specialization, field_policy);
                 let fields_iter = fields.iter().map(|(name, field)| {
                     let default_ty = match &field.kind {
                         FieldKind::NamedTuple { default_ty } => *default_ty,
@@ -2090,7 +2170,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let kw_only_default =
                     self.has_dataclass_param(db, field_policy, DataclassFlags::KW_ONLY);
 
-                let fields = self.fields(db, specialization, field_policy);
+                let fields = self.fields(db, env, specialization, field_policy);
                 let match_args = fields
                     .iter()
                     .filter(|(_, field)| {
@@ -2118,7 +2198,7 @@ impl<'db> StaticClassLiteral<'db> {
                                 new_upper_bound: determine_upper_bound(
                                     db,
                                     env,
-                                    self.apply_optional_specialization(db, specialization),
+                                    self.apply_optional_specialization(db, env, specialization),
                                     |base| {
                                         base.into_class()
                                             .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
@@ -2179,7 +2259,7 @@ impl<'db> StaticClassLiteral<'db> {
                         );
                     }
 
-                    let fields = self.fields(db, specialization, field_policy);
+                    let fields = self.fields(db, env, specialization, field_policy);
                     let slots = fields.keys().map(|name| Type::string_literal(db, name));
                     Type::heterogeneous_tuple(db, env, slots)
                 }),
@@ -2190,7 +2270,7 @@ impl<'db> StaticClassLiteral<'db> {
                     .as_typed_dict()
                     .expect("TypedDict code generation should use a TypedDict instance"),
                 name,
-                || TypedDictFields::Static(self.fields(db, specialization, field_policy)),
+                || TypedDictFields::Static(self.fields(db, env, specialization, field_policy)),
             ),
             _ => None,
         }
@@ -2214,13 +2294,17 @@ impl<'db> StaticClassLiteral<'db> {
             return None;
         }
 
-        let frozen_base_fields =
-            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, method.name())?;
+        let frozen_base_fields = self.inherited_non_slotted_frozen_dataclass_fields(
+            db,
+            env,
+            specialization,
+            method.name(),
+        )?;
 
         let instance_ty = Type::instance(
             db,
             env,
-            self.apply_optional_specialization(db, specialization),
+            self.apply_optional_specialization(db, env, specialization),
         );
         let method_signature = |name_ty, return_ty| {
             let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
@@ -2269,6 +2353,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn inherited_frozen_dataclass_dispatch(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         method: &str,
         name: &str,
@@ -2282,7 +2367,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let frozen_base_fields =
-            self.inherited_non_slotted_frozen_dataclass_fields(db, specialization, method)?;
+            self.inherited_non_slotted_frozen_dataclass_fields(db, env, specialization, method)?;
 
         if frozen_base_fields
             .names
@@ -2301,13 +2386,14 @@ impl<'db> StaticClassLiteral<'db> {
     fn inherited_non_slotted_frozen_dataclass_fields(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         method: &str,
     ) -> Option<InheritedFrozenDataclassFields<'db>> {
         let mut names = FxIndexSet::default();
         let mut last_frozen_base = None;
 
-        for base in self.iter_mro(db, specialization).skip(1) {
+        for base in self.iter_mro_specialized(db, env, specialization).skip(1) {
             let Some(base_class_type) = base.into_class() else {
                 break;
             };
@@ -2349,7 +2435,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                 names.extend(
                     base_class
-                        .fields(db, base_specialization, field_policy)
+                        .fields(db, env, base_specialization, field_policy)
                         .iter()
                         .filter(|(_, field)| {
                             !matches!(
@@ -2388,7 +2474,7 @@ impl<'db> StaticClassLiteral<'db> {
         if let Some(member) = self.own_synthesized_member(db, env, specialization, None, name) {
             Place::bound(member).into()
         } else {
-            let class = self.apply_optional_specialization(db, specialization);
+            let class = self.apply_optional_specialization(db, env, specialization);
             let Some(module) = self.typed_dict_module(db) else {
                 return Place::Undefined.into();
             };
@@ -2402,26 +2488,63 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn fields(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> &'db FxIndexMap<Name, Field<'db>> {
-        if field_policy == CodeGeneratorKind::NamedTuple {
-            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
-            // fields of this class only.
-            return self.own_fields(db, specialization, field_policy);
+    ) -> Cow<'db, FxIndexMap<Name, Field<'db>>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _, _, _| <FxIndexMap<Name, Field<'db>>>::default(),
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn static_class_literal_fields_inner<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            class: StaticClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
+            field_policy: CodeGeneratorKind<'db>,
+        ) -> FxIndexMap<Name, Field<'db>> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, class, specialization, field_policy)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            class: StaticClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
+            field_policy: CodeGeneratorKind<'db>,
+        ) -> FxIndexMap<Name, Field<'db>> {
+            let env = env.in_environment(ProgramEnvironment::from_scope(class.body_scope(db)));
+            env.context().state().class_fields.visit(
+                &env,
+                &super::ClassFieldQuery::Inherited(class, specialization, field_policy),
+                FxIndexMap::default,
+                || class.compute_fields(db, &env, specialization, field_policy),
+            )
         }
 
-        self.fields_inner(db, specialization, field_policy)
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            return self.own_fields(db, env, specialization, field_policy);
+        }
+
+        env.cached_or_compute(
+            || {
+                static_class_literal_fields_inner(
+                    db,
+                    env.program(db),
+                    self,
+                    specialization,
+                    field_policy,
+                )
+            },
+            || compute(db, env, self, specialization, field_policy),
+        )
     }
 
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _, _, _| FxIndexMap::default(),
-        heap_size=get_size2::GetSize::get_heap_size
-    )]
-    fn fields_inner(
+    fn compute_fields(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> FxIndexMap<Name, Field<'db>> {
@@ -2429,6 +2552,8 @@ impl<'db> StaticClassLiteral<'db> {
             Static(StaticClassLiteral<'db>, Option<Specialization<'db>>),
             DynamicTypedDict(DynamicTypedDictLiteral<'db>),
         }
+
+        let env = env.in_environment(ProgramEnvironment::from_scope(self.body_scope(db)));
 
         debug_assert_ne!(
             field_policy,
@@ -2438,7 +2563,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         let mut class_variables = FxIndexSet::default();
         let mut map: FxIndexMap<_, _> = self
-            .iter_mro(db, specialization)
+            .iter_mro_specialized(db, &env, specialization)
             .rev()
             .filter_map(|superclass| {
                 let class = superclass.into_class()?;
@@ -2462,8 +2587,12 @@ impl<'db> StaticClassLiteral<'db> {
             })
             .flat_map(|source| match source {
                 FieldSource::Static(class, specialization) => {
-                    let own_fields =
-                        class.own_fields_with_class_variables(db, specialization, field_policy);
+                    let own_fields = class.own_fields_with_class_variables(
+                        db,
+                        &env,
+                        specialization,
+                        field_policy,
+                    );
 
                     if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                         class_variables.extend(own_fields.class_variables.iter().cloned());
@@ -2473,10 +2602,11 @@ impl<'db> StaticClassLiteral<'db> {
                     }
 
                     Either::Left(
-                        own_fields
-                            .fields
-                            .iter()
-                            .map(|(name, field)| (name.clone(), field.clone())),
+                        match own_fields {
+                            Cow::Borrowed(fields) => fields.fields.clone(),
+                            Cow::Owned(fields) => fields.fields,
+                        }
+                        .into_iter(),
                     )
                 }
                 FieldSource::DynamicTypedDict(typeddict) => {
@@ -2594,39 +2724,80 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn own_fields(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> &'db FxIndexMap<Name, Field<'db>> {
-        &self
-            .own_fields_with_class_variables(db, specialization, field_policy)
-            .fields
+    ) -> Cow<'db, FxIndexMap<Name, Field<'db>>> {
+        match self.own_fields_with_class_variables(db, env, specialization, field_policy) {
+            Cow::Borrowed(fields) => Cow::Borrowed(&fields.fields),
+            Cow::Owned(fields) => Cow::Owned(fields.fields),
+        }
     }
 
     fn own_fields_with_class_variables(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> &'db OwnClassFields<'db> {
-        self.own_fields_inner(db, specialization, field_policy)
+    ) -> Cow<'db, OwnClassFields<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _, _, _| <OwnClassFields<'db>>::default(),
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn static_class_literal_own_fields_inner<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            class: StaticClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
+            field_policy: CodeGeneratorKind<'db>,
+        ) -> OwnClassFields<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, class, specialization, field_policy)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            class: StaticClassLiteral<'db>,
+            specialization: Option<Specialization<'db>>,
+            field_policy: CodeGeneratorKind<'db>,
+        ) -> OwnClassFields<'db> {
+            let env = env.in_environment(ProgramEnvironment::from_scope(class.body_scope(db)));
+            env.context().state().class_fields.visit(
+                &env,
+                &super::ClassFieldQuery::Declared(class, specialization, field_policy),
+                OwnClassFields::default,
+                || class.compute_own_fields(db, &env, specialization, field_policy),
+            )
+        }
+
+        env.cached_or_compute(
+            || {
+                static_class_literal_own_fields_inner(
+                    db,
+                    env.program(db),
+                    self,
+                    specialization,
+                    field_policy,
+                )
+            },
+            || compute(db, env, self, specialization, field_policy),
+        )
     }
 
     /// Collects ordered constructor fields and `ClassVar` masks in one pass over a class body.
     ///
     /// Keeping both together avoids reinterpreting declarations while merging inherited fields.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _, _, _| OwnClassFields::default(),
-        heap_size=get_size2::GetSize::get_heap_size
-    )]
-    fn own_fields_inner(
+    fn compute_own_fields(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
     ) -> OwnClassFields<'db> {
         let class_body_scope = self.body_scope(db);
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class_body_scope));
+        let env = env.in_environment(ProgramEnvironment::from_scope(class_body_scope));
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
@@ -2718,7 +2889,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 default_ty =
-                    default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
+                    default_ty.map(|ty| ty.apply_optional_specialization(db, &env, specialization));
 
                 let mut init = true;
                 let mut kw_only = None;
@@ -2727,8 +2898,13 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
                 let mut frozen = false;
                 if field_policy.is_pydantic() {
-                    let metadata =
-                        pydantic::field_metadata(db, first_declaration, default_ty, specialization);
+                    let metadata = pydantic::field_metadata(
+                        db,
+                        &env,
+                        first_declaration,
+                        default_ty,
+                        specialization,
+                    );
                     default_ty = metadata.default_ty;
                     init = metadata.init;
                     alias = metadata.alias;
@@ -2782,7 +2958,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 let mut field = Field {
-                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    declared_ty: attr_ty.apply_optional_specialization(db, &env, specialization),
                     kind,
                     first_declaration,
                 };
@@ -2902,7 +3078,9 @@ impl<'db> StaticClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, env, self.iter_mro(db, specialization)).instance_member(name) {
+        match MroLookup::new(db, env, self.iter_mro_specialized(db, env, specialization))
+            .instance_member(name)
+        {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db, env)
@@ -2941,7 +3119,7 @@ impl<'db> StaticClassLiteral<'db> {
         // shadows the name with a normal class attribute.
         if CodeGeneratorKind::NamedTuple.matches(db, self.into())
             && self
-                .own_fields(db, None, CodeGeneratorKind::NamedTuple)
+                .own_fields(db, env, None, CodeGeneratorKind::NamedTuple)
                 .contains_key(name)
         {
             return Member::unbound();
@@ -3041,7 +3219,7 @@ impl<'db> StaticClassLiteral<'db> {
                                     .with_qualifiers(qualifiers),
                                 }
                             }
-                        } else if self.is_own_dataclass_instance_field(db, name)
+                        } else if self.is_own_dataclass_instance_field(db, env, name)
                             && declared_ty
                                 .class_member(db, env, "__get__")
                                 .place
@@ -3138,7 +3316,12 @@ impl<'db> StaticClassLiteral<'db> {
     /// should be treated as defining an instance attribute: dataclass fields are
     /// implicitly assigned in `__init__`, so they behave as instance attributes
     /// even though no explicit binding exists in the class body.
-    pub(crate) fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
+    pub(crate) fn is_own_dataclass_instance_field(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        name: &str,
+    ) -> bool {
         let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return false;
         };
@@ -3146,7 +3329,7 @@ impl<'db> StaticClassLiteral<'db> {
             return false;
         }
 
-        let fields = self.own_fields(db, None, field_policy);
+        let fields = self.own_fields(db, env, None, field_policy);
         let Some(field) = fields.get(name) else {
             return false;
         };
@@ -3164,6 +3347,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn converter_input_type_for_field(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> Option<Type<'db>> {
         let field_policy @ CodeGeneratorKind::DataclassLike(_) =
@@ -3171,7 +3355,7 @@ impl<'db> StaticClassLiteral<'db> {
         else {
             return None;
         };
-        let fields = self.fields(db, None, field_policy);
+        let fields = self.fields(db, env, None, field_policy);
         let field = fields.get(name)?;
         if let FieldKind::Dataclass { converter, .. } = field.kind {
             converter.map(|(input_ty, _)| input_ty)
@@ -3181,7 +3365,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
+        let env = ProgramEnvironment::from_scope(self.body_scope(db));
         Type::instance(db, &env, ClassType::NonGeneric(self.into()))
     }
 
@@ -3435,7 +3619,7 @@ impl<'db> StaticClassLiteral<'db> {
             && let Some(protocol) = self.identity_specialization(db).into_protocol_class(db)
             && protocol.supports_variance_inference(db)
         {
-            return protocol.interface(db).variance_of(db, &env, typevar);
+            return protocol.interface(db, &env).variance_of(db, &env, typevar);
         }
 
         let class_body_scope = self.body_scope(db);

@@ -1,11 +1,11 @@
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::TypeOperations;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{self as ast};
 
 use crate::types::cyclic::CycleKind;
-use crate::types::recursive::{TypeTraversal, TypeWalk};
+use crate::types::recursive::{TypeTraversal, TypeWalk, TypeWalkKey, TypeWalkVisit};
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarBoundOrConstraints};
 use crate::types::{Type, UnionBuilder};
@@ -18,9 +18,13 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) 
     impl<'db> TypeWalk<'db> for TupleShape {
         type Output = bool;
 
+        fn recursion_key(&self) -> TypeWalkKey<'db> {
+            TypeWalkKey::TupleShape
+        }
+
         fn on_cycle(
             &self,
-            _traversal: &TypeTraversal<'_, 'db, Self>,
+            _traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
             _ty: Type<'db>,
             _kind: CycleKind,
             (): (),
@@ -31,7 +35,7 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) 
         fn visit(
             &self,
             db: &'db dyn Db,
-            traversal: &TypeTraversal<'_, 'db, Self>,
+            traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
             ty: Type<'db>,
             (): (),
         ) -> bool {

@@ -1,3 +1,4 @@
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
 use crate::{
     Db,
@@ -89,10 +90,10 @@ pub(super) fn check_class_method_typevar_variance<'db>(
     let env = context.program_environment();
     let instance = class.variance_receiver(db, env);
     let mut reported = FxHashSet::default();
-    for member in all_end_of_scope_members(db, class.body_scope(db))
+    for member in all_end_of_scope_members(db, env, class.body_scope(db))
         .unique_by(|member| member.member.name.clone())
     {
-        let mut member = member.member;
+        let member = member.member;
         if matches!(member.name.as_str(), "__init__" | "__new__") {
             continue;
         }
@@ -105,40 +106,18 @@ pub(super) fn check_class_method_typevar_variance<'db>(
         TypeInspector::inspect_root(
             db,
             env,
+            TypeInspectionKey::CheckClassMethodTypevarVariance,
             ty,
             |_, _| (),
             |_, ty| {
-                member.ty = ty;
-                if let Type::PropertyInstance(property) = member.ty {
-                    // Each retained accessor has its own exclusions. Checking bound accessor signatures
-                    // includes the setter's input, which an ordinary property read would not expose.
-                    for (accessor, function) in property.accessors_with_functions(db) {
-                        if function.definition(db).scope(db) == class.body_scope(db)
-                            && !exclude_from_variance(db, function)
-                        {
-                            check_method_typevar_variance(
-                                context,
-                                generic_context,
-                                function,
-                                MemberVariance::accessor(db, env, accessor, instance),
-                                &mut reported,
-                            );
-                        }
-                    }
-                    return;
-                }
-                for (function, ty) in member
-                    .local_function_bindings(db, class.body_scope(db))
-                    .filter(|(function, _)| !exclude_from_variance(db, *function))
-                {
-                    check_method_typevar_variance(
-                        context,
-                        generic_context,
-                        function,
-                        MemberVariance::of(db, env, ty, instance),
-                        &mut reported,
-                    );
-                }
+                ty.check_class_method_variance(ClassMethodVarianceCheck {
+                    context,
+                    class,
+                    generic_context,
+                    instance,
+                    member,
+                    reported: &mut reported,
+                });
             },
         );
     }
@@ -178,19 +157,22 @@ fn check_method_typevar_variance<'db>(
     let db = context.db();
     let env = context.program_environment();
     let last_definition = function.literal(db).last_definition;
-    let signatures = match member.read_ty {
-        Type::FunctionLiteral(function) => Some(function.signature(db)),
-        Type::BoundMethod(method) => method.bound_signatures(db),
-        Type::Callable(callable) => Some(callable.signatures(db)),
+    let callable = match member.read_ty {
+        Type::FunctionLiteral(function) => Some(function.into_callable_type(db)),
+        Type::BoundMethod(method) => method.into_callable_type(db, env),
+        Type::Callable(callable) => Some(callable),
         _ => None,
+    };
+    if callable.is_some_and(|callable| callable.parameter_signatures(db).len() != 1) {
+        return;
     }
-    .map(|signatures| signatures.overloads.as_slice());
-    let signature = match signatures {
-        Some([signature]) => Some(signature),
-        Some(_) => return,
-        None => None,
-    }
-    .filter(|signature| signature.definition() == Some(function.definition(db)));
+    let signature = callable.filter(|callable| {
+        callable
+            .parameter_signatures(db)
+            .next()
+            .and_then(crate::types::callable::CallableParameters::definition)
+            == Some(function.definition(db))
+    });
 
     for typevar in generic_context.variables(db) {
         let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
@@ -209,37 +191,23 @@ fn check_method_typevar_variance<'db>(
         }
         let node = last_definition.node(db, context.file(), context.module());
         let range = signature
-            .and_then(|signature| {
-                let parameters = signature.parameters().iter().filter_map(|parameter| {
-                    let annotation = node
-                        .parameters
-                        .iter()
-                        .nth(parameter.source_parameter_index()?)?
-                        .annotation()?;
-                    // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
-                    let parameter_type = match parameter.annotated_type() {
-                        Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
-                            Type::TypeVar(typevar.without_paramspec_attr(db))
-                        }
-                        ty => ty,
-                    };
-                    Some((
-                        annotation.range(),
-                        parameter_type
-                            .with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar.identity(db))
-                            .evaluate(db),
-                    ))
-                });
-                let returns = node.returns.iter().map(|annotation| {
-                    (
-                        annotation.range(),
-                        signature
-                            .return_ty
-                            .variance_of(db, env, typevar.identity(db))
-                            .evaluate(db),
-                    )
-                });
+            .and_then(|callable| {
+                let (parameter_variances, return_variance) =
+                    callable.inspect_signatures(db, env, |signatures| {
+                        signatures.single_annotation_variances(db, typevar.identity(db))
+                    })??;
+                let parameters = parameter_variances
+                    .into_iter()
+                    .filter_map(|(index, variance)| {
+                        Some((
+                            node.parameters.iter().nth(index)?.annotation()?.range(),
+                            variance,
+                        ))
+                    });
+                let returns = node
+                    .returns
+                    .iter()
+                    .map(|annotation| (annotation.range(), return_variance));
                 parameters.chain(returns).find_map(|(range, variance)| {
                     (declared_variance.join(variance) != declared_variance).then_some(range)
                 })
@@ -305,6 +273,7 @@ fn check_pep695_function_legacy_typevars<'db>(
     };
     let Some(legacy_context) = GenericContext::from_function_params(
         db,
+        env,
         definition,
         signature.parameters(),
         signature.return_ty,
@@ -643,5 +612,61 @@ fn check_legacy_typevar_ordering<'db>(
             ))
             .message(format_args!("`{}` defined here", tvar.name(db))),
         );
+    }
+}
+
+pub(in crate::types) struct ClassMethodVarianceCheck<'a, 'db, 'ast> {
+    context: &'a InferContext<'db, 'ast>,
+    class: StaticClassLiteral<'db>,
+    generic_context: GenericContext<'db>,
+    instance: Type<'db>,
+    member: crate::types::list_members::Member<'db>,
+    reported: &'a mut FxHashSet<(Definition<'db>, BoundTypeVarIdentity<'db>)>,
+}
+
+impl<'db> ClassMethodVarianceCheck<'_, 'db, '_> {
+    pub(in crate::types) fn check(self, ty: Type<'db>) {
+        let Self {
+            context,
+            class,
+            generic_context,
+            instance,
+            mut member,
+            reported,
+        } = self;
+        let db = context.db();
+        let env = context.program_environment();
+
+        member.ty = ty;
+        if let Type::PropertyInstance(property) = member.ty {
+            // Each retained accessor has its own exclusions. Checking bound accessor signatures
+            // includes the setter's input, which an ordinary property read would not expose.
+            for (accessor, function) in property.accessors_with_functions(db) {
+                if function.definition(db).scope(db) == class.body_scope(db)
+                    && !exclude_from_variance(db, function)
+                {
+                    check_method_typevar_variance(
+                        context,
+                        generic_context,
+                        function,
+                        MemberVariance::accessor(db, env, accessor, instance),
+                        reported,
+                    );
+                }
+            }
+            return;
+        }
+        for (function, ty) in member
+            .local_function_bindings(db, env, class.body_scope(db))
+            .filter(|(function, _)| !exclude_from_variance(db, *function))
+        {
+            check_method_typevar_variance(
+                context,
+                generic_context,
+                function,
+                MemberVariance::of(db, env, ty, instance),
+                reported,
+            );
+        }
     }
 }

@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use std::fmt::Write as _;
 
 use super::*;
@@ -6,7 +7,7 @@ use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
-use crate::{Db, ProgramEnvironment, TypeOperations};
+use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::assert_function_query_was_not_run_by_name;
@@ -1113,118 +1114,4 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
             polarity
         );
     }
-}
-
-#[test]
-fn eager_expansion() {
-    use crate::db::tests::TestDb;
-    use crate::place::global_symbol;
-
-    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
-        let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
-        let module = ProgramFile::new(db, module, db.program_environment().program(db));
-        let ty = global_symbol(db, module, name).place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-            type_alias,
-        ))) = ty
-        else {
-            panic!("Expected `{name}` to be a type alias");
-        };
-        Type::TypeAlias(TypeAliasType::PEP695(type_alias))
-    }
-
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/a.py",
-        r#"
-
-type IntStr = int | str
-type ListIntStr = list[IntStr]
-type RecursiveList[T] = list[T | RecursiveList[T]]
-type RecursiveIntList = RecursiveList[int]
-type Itself = Itself
-type A = B
-type B = A
-type G[T] = H[T]
-type H[T] = G[T]
-"#,
-    )
-    .unwrap();
-
-    let int_str = get_type_alias(&db, "IntStr");
-    assert_eq!(
-        int_str
-            .expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "int | str",
-    );
-
-    let list_int_str = get_type_alias(&db, "ListIntStr");
-    assert_eq!(
-        list_int_str
-            .expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "list[int | str]",
-    );
-
-    let rec_list = get_type_alias(&db, "RecursiveList");
-    assert_eq!(
-        rec_list
-            .expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "list[Divergent]",
-    );
-
-    let rec_int_list = get_type_alias(&db, "RecursiveIntList");
-    assert_eq!(
-        rec_int_list
-            .expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "list[Divergent]",
-    );
-
-    let itself = get_type_alias(&db, "Itself");
-    assert_eq!(
-        itself
-            .expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "Divergent",
-    );
-
-    let a = get_type_alias(&db, "A");
-    assert_eq!(
-        a.expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "Divergent",
-    );
-
-    let b = get_type_alias(&db, "B");
-    assert_eq!(
-        b.expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "Divergent",
-    );
-
-    let g = get_type_alias(&db, "G");
-    assert_eq!(
-        g.expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "Divergent",
-    );
-
-    let h = get_type_alias(&db, "H");
-    assert_eq!(
-        h.expand_eagerly(&db, &db.program_environment())
-            .display(&db, &db.program_environment())
-            .to_string(),
-        "Divergent",
-    );
 }

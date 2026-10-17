@@ -40,13 +40,14 @@ pub trait Db: PythonCoreDb {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::TypeOperations;
 
     use std::sync::{Arc, Mutex};
 
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{ProgramEnvironment, TypeOperations, check_file_unwrap, default_lint_registry};
+    use crate::{check_file_unwrap, default_lint_registry};
     use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
@@ -105,7 +106,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn program_environment(&self) -> TypeOperations<'_> {
-            TypeOperations::new_root(self, ProgramEnvironment::from_program(self.program()))
+            TypeOperations::for_test_program(self, self.program())
         }
 
         /// Marks `file` as open in the editor.

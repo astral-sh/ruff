@@ -474,6 +474,61 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## Growing aliases inside unions
+
+Comparing these specializations terminates even though each recursive reference adds another `list`
+to its argument. We conservatively reject the return when the same recursive structure repeats.
+
+```py
+type Nested[T] = list[Nested[list[T]] | list[Nested[list[T]]]]
+
+def convert(value: Nested[int]) -> Nested[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+## Growing aliases inside callable signatures
+
+The same comparison can recur through a callable's return type. We stop when its recursive structure
+repeats, even though the type arguments keep changing.
+
+```py
+from typing import Callable
+
+type Producer[T] = Callable[[], Producer[list[T]] | Callable[[], Producer[list[T]]]]
+
+def convert_producer(value: Producer[int]) -> Producer[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+Recursive references in parameter types are handled the same way.
+
+```py
+type Consumer[T] = Callable[[Consumer[list[T]] | Callable[[Consumer[list[T]]], None]], None]
+
+def convert_consumer(value: Consumer[int]) -> Consumer[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+## Unpacking recursive tuple aliases
+
+Each recursive reference wraps `T` in another tuple. We can infer the alias without expanding that
+sequence indefinitely.
+
+```py
+type Nested[T] = tuple[T, *Nested[tuple[T]]]  # no diagnostic
+```
+
+The same applies to the `Unpack` spelling.
+
+```py
+from typing import Unpack
+
+type Explicit[T] = tuple[T, Unpack[Explicit[tuple[T]]]]  # no diagnostic
+```
+
 ## Ambiguous overload returns through generic aliases
 
 Aliases are expanded when comparing the structure of ambiguous return types. Recursive aliases
@@ -523,6 +578,48 @@ type B[T] = Not[list[B[T]] | T]
 
 def g(x: Not[B[int]]):
     assert_type(x, list[B[int]] | int)
+```
+
+## Comparing recursive aliases inside negations
+
+Each recursive reference below wraps `T` in another `list`. We can compare these types without
+expanding every reference. The tuple's second element prevents `Nested[int]` from being assigned to
+`Nested[str]`.
+
+```py
+from ty_extensions import Not
+
+type Nested[T] = tuple[list[Not[Nested[list[T]]]], T]
+
+def convert(value: Nested[int]) -> Nested[str]:
+    # error: [invalid-return-type]
+    return value
+```
+
+## Circular aliases through negation
+
+Negation does not make a circular alias valid. The reference to `A` is outside the `list` used as
+its type argument, so we reject this definition.
+
+```py
+from ty_extensions import Not
+
+# error: [cyclic-type-alias-definition]
+type A[T] = T | Not[A[list[T]]]
+```
+
+The same applies when an intersection combines positive and negative references with different type
+arguments. After reporting the circular definition, we can still check assignments involving the
+alias.
+
+```py
+from ty_extensions import Intersection
+
+# error: [cyclic-type-alias-definition]
+type Both[T] = Intersection[Both[list[T]], Not[Both[tuple[T]]]]
+
+def convert(value: Both[int]) -> Both[str]:
+    return value  # no diagnostic
 ```
 
 ## Excluding a recursive alias from a list

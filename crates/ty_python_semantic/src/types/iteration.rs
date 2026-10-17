@@ -1,5 +1,7 @@
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 use crate::types::{
     AwaitError, Bindings, CallArguments, CallDunderError, CycleKind, KnownClass,
     LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
@@ -275,7 +277,7 @@ impl<'db> Type<'db> {
                 }
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
                 Type::NewTypeInstance(newtype) => traversal
-                    .visit_with(db, newtype.concrete_base_type(db), false)
+                    .visit_with(db, newtype.concrete_base_type(db, env), false)
                     .ok()
                     .flatten(),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
@@ -629,18 +631,22 @@ impl<'db> Type<'db> {
 struct TryIterate(EvaluationMode);
 
 impl<'db> TypeQuery<'db, bool> for TryIterate {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::TryIterate(matches!(self.0, EvaluationMode::Async))
+    }
+
     type Output = Result<Option<Cow<'db, TupleSpec<'db>>>, IterationError<'db>>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self, bool>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self, bool>,
         _ty: Type<'db>,
         kind: CycleKind,
         _allow_dunders: bool,
     ) -> Self::Output {
         Ok(match kind {
             CycleKind::Exact => None,
-            CycleKind::MatchingIdentity => {
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => {
                 Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
             }
         })
@@ -649,7 +655,7 @@ impl<'db> TypeQuery<'db, bool> for TryIterate {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self, bool>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self, bool>,
         ty: Type<'db>,
         allow_dunders: bool,
     ) -> Self::Output {

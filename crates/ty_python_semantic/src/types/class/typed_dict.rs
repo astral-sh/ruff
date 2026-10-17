@@ -1,4 +1,5 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use std::borrow::Cow;
 
 use itertools::Either;
@@ -36,27 +37,42 @@ pub(super) fn synthesize_typed_dict_method<'db>(
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     method_name: &str,
-    fields: impl Fn() -> TypedDictFields<'db>,
+    fields: impl FnOnce() -> TypedDictFields<'db>,
 ) -> Option<Type<'db>> {
     let instance_ty = Type::TypedDict(typed_dict);
     match method_name {
-        "__init__" => Some(synthesize_typed_dict_init(db, env, typed_dict, fields())),
-        "__getitem__" => Some(synthesize_typed_dict_getitem(db, env, typed_dict, fields())),
-        "__setitem__" => Some(synthesize_typed_dict_setitem(db, env, typed_dict, fields())),
-        "__delitem__" => Some(synthesize_typed_dict_delitem(db, env, typed_dict, fields())),
-        "get" => Some(synthesize_typed_dict_get(db, env, typed_dict, fields())),
-        "update" => Some(synthesize_typed_dict_update(db, env, typed_dict, fields())),
-        "pop" => Some(synthesize_typed_dict_pop(db, env, typed_dict, fields())),
+        "__init__" => Some(synthesize_typed_dict_init(db, env, typed_dict, &fields())),
+        "__getitem__" => Some(synthesize_typed_dict_getitem(
+            db,
+            env,
+            typed_dict,
+            &fields(),
+        )),
+        "__setitem__" => Some(synthesize_typed_dict_setitem(
+            db,
+            env,
+            typed_dict,
+            &fields(),
+        )),
+        "__delitem__" => Some(synthesize_typed_dict_delitem(
+            db,
+            env,
+            typed_dict,
+            &fields(),
+        )),
+        "get" => Some(synthesize_typed_dict_get(db, env, typed_dict, &fields())),
+        "update" => Some(synthesize_typed_dict_update(db, env, typed_dict, &fields())),
+        "pop" => Some(synthesize_typed_dict_pop(db, env, typed_dict, &fields())),
         "setdefault" => Some(synthesize_typed_dict_setdefault(
             db,
             env,
             typed_dict,
-            fields(),
+            &fields(),
         )),
-        "clear" if typed_dict.supports_arbitrary_key_deletion(db) => Some(
+        "clear" if typed_dict.supports_arbitrary_key_deletion(db, env) => Some(
             synthesize_typed_dict_no_argument_method(db, typed_dict, Type::none(db, env)),
         ),
-        "popitem" if typed_dict.supports_arbitrary_key_deletion(db) => {
+        "popitem" if typed_dict.supports_arbitrary_key_deletion(db, env) => {
             let return_ty = Type::heterogeneous_tuple(
                 db,
                 env,
@@ -69,7 +85,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 db, typed_dict, return_ty,
             ))
         }
-        "__iter__" if typed_dict.openness(db).is_closed() => {
+        "__iter__" if typed_dict.openness(db, env).is_closed() => {
             let return_ty = KnownClass::Iterator.to_specialized_instance(
                 db,
                 env,
@@ -79,13 +95,13 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 db, typed_dict, return_ty,
             ))
         }
-        "items" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "items" if !typed_dict.openness(db, env).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, env, typed_dict, "dict_items"),
         ),
-        "keys" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "keys" if !typed_dict.openness(db, env).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, env, typed_dict, "dict_keys"),
         ),
-        "values" if !typed_dict.openness(db).is_implicitly_open() => Some(
+        "values" if !typed_dict.openness(db, env).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, env, typed_dict, "dict_values"),
         ),
         "__or__" | "__ror__" | "__ior__" => Some(synthesize_typed_dict_merge(
@@ -99,21 +115,21 @@ pub(super) fn synthesize_typed_dict_method<'db>(
 }
 
 /// Enum unifying the field schema for both dynamic and static `TypedDict` representations.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub(super) enum TypedDictFields<'db> {
     Dynamic(&'db TypedDictSchema<'db>),
-    Static(&'db FxIndexMap<Name, super::Field<'db>>),
+    Static(Cow<'db, FxIndexMap<Name, super::Field<'db>>>),
 }
 
 impl<'db> TypedDictFields<'db> {
-    fn len(self) -> usize {
+    fn len(&self) -> usize {
         match self {
             TypedDictFields::Dynamic(schema) => schema.len(),
             TypedDictFields::Static(fields) => fields.len(),
         }
     }
 
-    fn iter(self) -> impl Iterator<Item = (&'db Name, Cow<'db, TypedDictField<'db>>)> {
+    fn iter(&self) -> impl Iterator<Item = (&Name, Cow<'_, TypedDictField<'db>>)> {
         match self {
             TypedDictFields::Dynamic(schema) => Either::Left(
                 schema
@@ -144,7 +160,7 @@ fn synthesize_typed_dict_init<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     // Only a bare generic class exposes a generic method. Explicit aliases already substitute
@@ -161,7 +177,7 @@ fn synthesize_typed_dict_init<'db>(
         .collect();
 
     let keyword_rest_param = typed_dict
-        .explicit_extra_items(db)
+        .explicit_extra_items(db, env)
         .map(|extra_items| {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(extra_items.declared_ty)
@@ -228,7 +244,7 @@ fn synthesize_typed_dict_getitem<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let overloads = fields
@@ -250,7 +266,7 @@ fn synthesize_typed_dict_getitem<'db>(
                 Parameter::positional_only(Some(Name::new_static("key")))
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
             ]),
-            if typed_dict.explicit_extra_items(db).is_some() {
+            if typed_dict.explicit_extra_items(db, env).is_some() {
                 typed_dict.value_type(db, env)
             } else {
                 Type::object()
@@ -269,7 +285,7 @@ fn synthesize_typed_dict_setitem<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let mut writable_fields = fields
@@ -328,14 +344,14 @@ fn synthesize_typed_dict_delitem<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let mut deletable_fields = fields
         .iter()
         .filter(|(_, field)| !field.is_required() && !field.is_read_only())
         .peekable();
-    let supports_arbitrary_key_deletion = typed_dict.supports_arbitrary_key_deletion(db);
+    let supports_arbitrary_key_deletion = typed_dict.supports_arbitrary_key_deletion(db, env);
 
     if deletable_fields.peek().is_none() && !supports_arbitrary_key_deletion {
         let parameters = [
@@ -381,16 +397,16 @@ fn synthesize_typed_dict_get<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
-    let fallback_value_ty = if typed_dict.openness(db).is_implicitly_open() {
+    let fallback_value_ty = if typed_dict.openness(db, env).is_implicitly_open() {
         Type::unknown()
     } else {
         typed_dict.value_type(db, env)
     };
     let str_ty = KnownClass::Str.to_instance(db, env);
-    let missing_keys = typed_dict.openness(db).is_closed().then(|| {
+    let missing_keys = typed_dict.openness(db, env).is_closed().then(|| {
         let key_ty = IntersectionBuilder::new(db, env)
             .add_positive(str_ty)
             .add_negative(typed_dict.key_type(db, env))
@@ -519,7 +535,7 @@ fn synthesize_typed_dict_update<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let keyword_parameters = fields
@@ -537,7 +553,7 @@ fn synthesize_typed_dict_update<'db>(
         })
         .chain(
             typed_dict
-                .explicit_extra_items(db)
+                .explicit_extra_items(db, env)
                 .filter(|extra_items| !extra_items.is_read_only())
                 .map(|extra_items| {
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -545,7 +561,7 @@ fn synthesize_typed_dict_update<'db>(
                 }),
         );
 
-    let update_patch_ty = Type::TypedDict(typed_dict.to_update_patch(db));
+    let update_patch_ty = Type::TypedDict(typed_dict.to_update_patch(db, env));
 
     let mapping_ty = typed_dict.dict_value_type(db, env).map(|value_ty| {
         KnownClass::Mapping.to_specialized_instance(
@@ -590,7 +606,7 @@ fn synthesize_typed_dict_pop<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let pop_overloads = |key_ty, value_ty| {
@@ -645,7 +661,7 @@ fn synthesize_typed_dict_pop<'db>(
         })
         .chain(
             typed_dict
-                .supports_arbitrary_key_deletion(db)
+                .supports_arbitrary_key_deletion(db, env)
                 .then(|| {
                     pop_overloads(
                         KnownClass::Str.to_instance(db, env),
@@ -668,7 +684,7 @@ fn synthesize_typed_dict_setdefault<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
-    fields: TypedDictFields<'db>,
+    fields: &TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
     let overloads = fields
@@ -765,7 +781,7 @@ fn synthesize_typed_dict_merge<'db>(
     let first_overload_value_ty = if name == "__ior__"
         && let Type::TypedDict(typed_dict) = instance_ty
     {
-        Type::TypedDict(typed_dict.to_update_patch(db))
+        Type::TypedDict(typed_dict.to_update_patch(db, env))
     } else {
         instance_ty
     };
@@ -783,7 +799,7 @@ fn synthesize_typed_dict_merge<'db>(
 
     if name != "__ior__" {
         let partial_ty = if let Type::TypedDict(td) = instance_ty {
-            Type::TypedDict(td.to_partial(db))
+            Type::TypedDict(td.to_partial(db, env))
         } else {
             instance_ty
         };
@@ -1001,13 +1017,18 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// `TypedDict`s use `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        let env = ProgramEnvironment::from_scope(self.scope(db));
         KnownClass::Type.to_class_literal(db, &env)
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        name: &str,
+    ) -> Member<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_scope(self.scope(db)));
         let typed_dict =
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
         synthesize_typed_dict_method(db, &env, typed_dict, name, || {
@@ -1026,7 +1047,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check synthesized members (like __getitem__, __init__, get, etc.).
-        let member = self.own_class_member(db, name);
+        let member = self.own_class_member(db, env, name);
         if !member.is_undefined() {
             return member.inner;
         }

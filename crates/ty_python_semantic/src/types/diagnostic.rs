@@ -15,6 +15,7 @@ use crate::importer::{ImportAction, ImportRequest, MembersInScope};
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place, imported_symbol, place_from_bindings};
 use crate::suppression::FileSuppressionId;
+use crate::types::TypeOperations;
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::call::bind::CallableDescription;
 use crate::types::call::{Bindings, CallDiagnosticOverride, CallError};
@@ -40,7 +41,7 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
-use crate::{Db, DisplaySettings, FxIndexMap, SemanticModel, TypeOperations, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, SemanticModel, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
 use ruff_db::{
@@ -860,14 +861,14 @@ pub(super) fn report_missing_type_arguments<'db>(
             // Don't warn if all type parameters have defaults (PEP 696).
             if generic_context
                 .variables(db)
-                .all(|tv| tv.default_type(db).is_some())
+                .all(|tv| tv.default_type(db, context.program_environment()).is_some())
             {
                 return;
             }
 
             let required_count = generic_context
                 .variables(db)
-                .filter(|tv| tv.default_type(db).is_none())
+                .filter(|tv| tv.default_type(db, context.program_environment()).is_none())
                 .count();
 
             if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
@@ -2810,9 +2811,9 @@ pub(super) fn report_unsound_return_statement<'db>(
     // `TypeIs`-annotated functions are expected to return `bool`;
     // this needs to be normalized before we figure out the error context
     // and before we display the types.
-    let expected_ty = if expected_ty
-        .has_outer_type(db, |ty| matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_)))
-    {
+    let expected_ty = if expected_ty.has_outer_type(db, env, |ty| {
+        matches!(ty, Type::TypeIs(_) | Type::TypeGuard(_))
+    }) {
         KnownClass::Bool.to_instance(db, env)
     } else {
         expected_ty
@@ -3068,7 +3069,7 @@ pub(super) fn report_implicit_return_type<'db>(
     let Some(class) = enclosing_class_of_method else {
         return;
     };
-    if class.iter_mro(db).contains(&ClassBase::Protocol) {
+    if class.iter_mro(db, env).contains(&ClassBase::Protocol) {
         diagnostic.info(format_args!(
             "Class `{}` has `typing.Protocol` in its MRO, but it is not a protocol class",
             class.name(db)
@@ -3545,7 +3546,7 @@ impl<'db> IncompatibleBases<'db> {
     /// This method therefore removes any entry in `self` that is a superclass of one or more
     /// other entries also contained in `self`, keeping only the most-derived entries. If more
     /// than one entry remains, no remaining entry is a subclass of another, so they conflict.
-    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
+    pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db, env: &TypeOperations<'db>) {
         self.0 = self
             .0
             .iter()
@@ -3559,8 +3560,8 @@ impl<'db> IncompatibleBases<'db> {
                         // base share the same layout.
                         !other_base
                             .class
-                            .default_specialization(db)
-                            .is_subtype_of_class_literal(db, disjoint_base.class)
+                            .identity_specialization(db)
+                            .is_subtype_of_class_literal(db, env, disjoint_base.class)
                     })
             })
             .map(|(base, info)| (*base, *info))
@@ -3675,7 +3676,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
         "Only protocol classes can be passed to `reveal_protocol_interface`",
     );
 
-    if let Some(class) = param_type.to_class_type(db) {
+    if let Some(class) = param_type.class_literal_or_origin(db) {
         let mut class_def_diagnostic = SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             format_args!(
@@ -3683,7 +3684,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
                 class.name(db)
             ),
         );
-        if let Some((class_literal, _)) = class.static_class_literal(db) {
+        if let Some(class_literal) = class.as_static() {
             class_def_diagnostic.annotate(Annotation::primary(class_literal.header_span(db)));
         }
         diagnostic.sub(class_def_diagnostic);
@@ -6049,7 +6050,7 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
                 builder.into_diagnostic(format_args!("Invalid definition of class `{class_name}`"));
             let env = &context.program_environment();
             let class_and_def = class
-                .iter_mro(db, None)
+                .iter_mro(db, env)
                 .filter_map(|base| base.into_class()?.class_literal(db).as_static())
                 .find_map(|class| {
                     let scope = class.body_scope(db);

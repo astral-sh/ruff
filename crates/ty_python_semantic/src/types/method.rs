@@ -1,18 +1,23 @@
-use std::borrow::Cow;
-
+use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
 use crate::{
-    Db, Program, ProgramEnvironment, TypeOperations,
+    Db, Program, ProgramEnvironment,
     types::{
-        ApplyTypeMappingVisitor, CallableType, CallableTypes, InternedType, KnownClass,
-        LiteralValueType, LiteralValueTypeKind, Parameter, Parameters, PropertyInstanceType,
-        Signature, StringLiteralType, Type, TypeContext, TypeFormType, TypeMapping, UnionType,
-        callable::CallableTypeKind, constraints::ConstraintSet, function::FunctionType,
-        known_instance::InternedConstraintSet, relation::TypeRelationChecker,
-        signatures::CallableSignature, visitor,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, CallableTypes, InternedType,
+        KnownClass, LiteralValueType, LiteralValueTypeKind, Parameter, Parameters,
+        PropertyInstanceType, Signature, StringLiteralType, Type, TypeContext, TypeFormType,
+        TypeMapping, UnionType,
+        callable::CallableTypeKind,
+        constraints::ConstraintSet,
+        function::FunctionType,
+        known_instance::InternedConstraintSet,
+        relation::TypeRelationChecker,
+        signatures::CallableSignature,
+        variance::{VarianceInferable, VarianceTerm},
+        visitor,
     },
 };
 
@@ -137,6 +142,31 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Analyze the bound callable view without expanding a lambda's return signature.
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_program(self.program(db)));
+        if matches!(self.func(db), Type::FunctionLiteral(_) | Type::Callable(_))
+            && let Some(callable) = self.into_callable_type(db, &env)
+        {
+            callable.variance_of(db, &env, typevar)
+        } else {
+            // Callable instances also expose their attributes through `__func__` and retain the
+            // additional receiver bound by classmethod through `__self__`.
+            VarianceTerm::join(
+                db,
+                [
+                    self.func(db).variance_of(db, &env, typevar),
+                    self.self_instance(db).variance_of(db, &env, typevar),
+                ],
+            )
+        }
+    }
+
     pub(crate) fn from_callable(
         db: &'db dyn Db,
         func: Type<'db>,
@@ -206,34 +236,37 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    /// The unbound signatures stored directly on an actual or synthesized function.
-    /// Note that this function returns `None` for unions or intersections
-    /// of callables. These need to be handled by the caller.
-    pub(crate) fn unbound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+    /// The unbound callable, retaining any deferred signature or projection.
+    pub(crate) fn unbound_callable(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
         match self.func(db) {
-            Type::FunctionLiteral(function) => Some(function.signature(db)),
-            Type::Callable(callable) => Some(callable.signatures(db)),
+            Type::FunctionLiteral(function) => Some(function.into_callable_type(db)),
+            Type::Callable(callable) => Some(callable),
             _ => None,
         }
     }
 
-    /// The unbound signatures, including an inferred return type for Python functions.
-    pub(super) fn unbound_signatures_with_inferred_return_type(
+    /// The unbound callable used for calls, including a Python function's inferred return type.
+    pub(super) fn unbound_callable_with_inferred_return_type(
         self,
         db: &'db dyn Db,
-    ) -> Option<Cow<'db, CallableSignature<'db>>> {
-        self.function(db)
-            .map(|function| function.signature_with_inferred_return_type(db))
-            .or_else(|| self.unbound_signatures(db).map(Cow::Borrowed))
+    ) -> Option<CallableType<'db>> {
+        match self.func(db) {
+            Type::FunctionLiteral(function) => Some(CallableType::new(
+                db,
+                function.signature_with_inferred_return_type(db).as_ref(),
+                function.callable_type_kind(db),
+            )),
+            Type::Callable(callable) => Some(callable),
+            _ => None,
+        }
     }
 
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
-    pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn typing_self_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         let self_instance = self.self_instance(db);
 
         if self.class_method(db) {
-            let env =
-                TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
+            let env = env.in_environment(ProgramEnvironment::from_program(self.program(db)));
             self_instance
                 .to_instance_approximation(db, &env)
                 .unwrap_or(Type::unknown())
@@ -276,19 +309,48 @@ impl<'db> BoundMethodType<'db> {
     ///
     /// Unions retain separate callable alternatives, each of which may contain multiple overloads.
     /// Returns `None` if the wrapped value cannot be converted to callables.
-    #[salsa::tracked(
-        returns(as_ref),
-        cycle_initial=|db, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(crate) fn callables(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
-        self.callables_with_receiver(
-            db,
-            &env,
-            self.signature_receiver(db),
-            self.typing_self_type(db),
+    pub(crate) fn callables(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |db, _, _, _| {
+                Some(crate::types::callable::CallableTypes::one(
+                    crate::types::CallableType::bottom(db),
+                ))
+            },
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn bound_method_type_callables<'db>(
+            db: &'db dyn Db,
+            program: ty_python_core::Program<'db>,
+            method: BoundMethodType<'db>,
+        ) -> Option<CallableTypes<'db>> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+            compute(db, &env, method)
+        }
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            method: BoundMethodType<'db>,
+        ) -> Option<CallableTypes<'db>> {
+            let env = env.in_environment(ProgramEnvironment::from_program(method.program(db)));
+            method.callables_with_receiver(
+                db,
+                &env,
+                method.signature_receiver(db),
+                method.typing_self_type(db, &env),
+            )
+        }
+
+        let env = env.in_environment(ProgramEnvironment::from_program(self.program(db)));
+        env.cached_or_compute(
+            || bound_method_type_callables(db, env.program(db), self),
+            || compute(db, &env, self),
         )
+        .into_owned()
     }
 
     pub(crate) fn callables_with_receiver(
@@ -311,12 +373,13 @@ impl<'db> BoundMethodType<'db> {
     ///
     /// Returns `None` if the wrapped value cannot be converted to a callable or has multiple
     /// callable alternatives. Use [`Self::callables`] to handle multiple alternatives.
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
-        self.callables(db).and_then(CallableTypes::exactly_one)
-    }
-
-    pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
-        Some(self.into_callable_type(db)?.signatures(db))
+    pub(crate) fn into_callable_type(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> Option<CallableType<'db>> {
+        self.callables(db, env)
+            .and_then(|callables| callables.exactly_one())
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -373,8 +436,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
             .and(db, self.constraints, || {
-                let (Some(source), Some(target)) = (source.callables(db), target.callables(db))
-                else {
+                let (Some(source), Some(target)) = (
+                    source.callables(db, self.env),
+                    target.callables(db, self.env),
+                ) else {
                     return self.never();
                 };
                 self.check_type_pair(
@@ -442,14 +507,10 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::MethodTypeDunderGet(method) => {
             visitor.visit_type(db, Type::BoundMethod(method));
         }
-        KnownBoundMethodType::PropertyDunderGet(property) => {
-            visitor.visit_property_instance_type(db, property);
-        }
-        KnownBoundMethodType::PropertyDunderSet(property) => {
-            visitor.visit_property_instance_type(db, property);
-        }
-        KnownBoundMethodType::PropertyDunderDelete(property) => {
-            visitor.visit_property_instance_type(db, property);
+        KnownBoundMethodType::PropertyDunderGet(property)
+        | KnownBoundMethodType::PropertyDunderSet(property)
+        | KnownBoundMethodType::PropertyDunderDelete(property) => {
+            visitor.visit_type(db, Type::PropertyInstance(property));
         }
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(

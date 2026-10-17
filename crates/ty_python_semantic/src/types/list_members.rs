@@ -5,7 +5,10 @@
 //! listing all members on a nominal-instance type or a class-literal type requires
 //! listing all members in the class's body scope.
 
+use crate::types::TypeOperations;
 use crate::types::recursive::TypeInspector;
+use crate::types::recursive::TypeWalkVisit;
+use crate::types::recursive::{TypeInspectionKey, TypeWalkKey};
 use crate::types::{CycleKind, TypeTraversal, TypeWalk};
 use std::cmp::Ordering;
 
@@ -22,9 +25,8 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         ClassBase, ClassLiteral, KnownClass, ProgramEnvironment, StaticClassLiteral,
-        SubclassOfInner, Type, TypeOperations, TypeVarBoundOrConstraints, UnionType,
-        class::CodeGeneratorKind, function::FunctionType, infer_definition_types,
-        may_exist_at_runtime,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        function::FunctionType, infer_definition_types, may_exist_at_runtime,
     },
 };
 use ty_python_core::{
@@ -36,9 +38,10 @@ use ty_python_core::{
 /// of the given scope.
 pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
+    env: &crate::types::TypeOperations<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
+    let env = env.in_environment(ProgramEnvironment::from_scope(scope_id));
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -92,9 +95,10 @@ pub(crate) fn all_end_of_scope_members<'db>(
 /// in the given scope.
 pub(crate) fn all_reachable_members<'db>(
     db: &'db dyn Db,
+    env: &crate::types::TypeOperations<'db>,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
+    let env = env.in_environment(ProgramEnvironment::from_scope(scope_id));
 
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -168,18 +172,22 @@ struct CollectMembers<'db> {
 }
 
 impl<'db> TypeWalk<'db> for CollectMembers<'db> {
+    fn recursion_key(&self) -> TypeWalkKey<'db> {
+        TypeWalkKey::CollectMembers
+    }
+
     type Output = Option<FxHashSet<Member<'db>>>;
 
     fn on_cycle(
         &self,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _state: (),
     ) -> Self::Output {
         match kind {
             CycleKind::Exact => None,
-            CycleKind::MatchingIdentity => Some(all_members(
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => Some(all_members(
                 self.db,
                 traversal.environment(),
                 Type::object(),
@@ -190,7 +198,7 @@ impl<'db> TypeWalk<'db> for CollectMembers<'db> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeTraversal<'_, 'db, Self>,
+        traversal: &TypeWalkVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> Self::Output {
@@ -288,7 +296,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, newtype.concrete_base_type(db));
+                self.extend_with_type(db, newtype.concrete_base_type(db, env));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -358,7 +366,9 @@ impl<'db> AllMembers<'_, '_, 'db> {
                             db,
                             env,
                             ty,
-                            class_type.inferred_metaclass(db).for_inheritance(db, env),
+                            class_type
+                                .inferred_metaclass(db, env)
+                                .for_inheritance(db, env),
                         );
                     }
                 }
@@ -541,14 +551,14 @@ impl<'db> AllMembers<'_, '_, 'db> {
         class_literal: ClassLiteral<'db>,
     ) {
         for parent in class_literal
-            .iter_mro(db)
+            .iter_mro(db, env)
             .filter_map(ClassBase::into_class)
             .filter_map(|class| class.static_class_literal(db).map(|(lit, _)| lit))
         {
             self.extend_with_slot_members(db, env, ty, parent);
 
             let parent_scope = parent.body_scope(db);
-            for memberdef in all_end_of_scope_members(db, parent_scope) {
+            for memberdef in all_end_of_scope_members(db, env, parent_scope) {
                 let result = ty.member(db, env, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
@@ -605,7 +615,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
         ty: Type<'db>,
         metaclass: Type<'db>,
     ) {
-        let Some(metaclass) = metaclass.to_class_type(db) else {
+        let Some(metaclass) = metaclass.to_class_type(db, env) else {
             return;
         };
 
@@ -651,7 +661,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
         // class member. This gets us the right type for each
         // member, e.g., `SomeClass.__delattr__` is not a bound
         // method, but `instance_of_SomeClass.__delattr__` is.
-        for memberdef in all_end_of_scope_members(db, class_body_scope) {
+        for memberdef in all_end_of_scope_members(db, env, class_body_scope) {
             let result = ty.member(db, env, memberdef.member.name.as_str());
             let Some(ty) = result.place.ignore_possibly_undefined() else {
                 continue;
@@ -673,7 +683,7 @@ impl<'db> AllMembers<'_, '_, 'db> {
         class_literal: StaticClassLiteral<'db>,
     ) {
         for class in class_literal
-            .iter_mro(db, None)
+            .iter_mro(db, env)
             .filter_map(ClassBase::into_class)
         {
             if let Some((class_literal, _)) = class.static_class_literal(db) {
@@ -748,7 +758,7 @@ pub struct MemberWithDefinition<'db> {
 /// members, and a [`Type`] currently (as of 2025-07-09) has no way to do
 /// ordered comparisons.
 #[derive(Clone, Debug)]
-pub struct Member<'db> {
+pub(crate) struct Member<'db> {
     pub(crate) name: Name,
     pub(crate) ty: Type<'db>,
     /// Whether this member is known to exist only during type checking.
@@ -764,9 +774,10 @@ impl<'db> Member<'db> {
     pub(super) fn local_function_bindings(
         &self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         scope: ScopeId<'db>,
     ) -> impl Iterator<Item = (FunctionType<'db>, Type<'db>)> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
+        let env = env.in_environment(ProgramEnvironment::from_scope(scope));
         let functions = self.local_functions(db, scope);
         let retained = self.local_functions_from_type(db, scope);
         let exposed = self.ty;
@@ -780,46 +791,23 @@ impl<'db> Member<'db> {
                 TypeInspector::inspect_root(
                     db,
                     &env,
+                    TypeInspectionKey::FunctionBinding,
                     binding,
                     |_, _| None,
                     |_, binding| {
                         TypeInspector::inspect_root(
                             db,
                             &env,
+                            TypeInspectionKey::ExposedFunctionBinding,
                             exposed,
                             |_, _| None,
                             |_, exposed_type| {
-                                let exposed_union = match exposed_type {
-                                    Type::Union(union) => Some(union),
-                                    Type::NewTypeInstance(newtype) => {
-                                        newtype.concrete_base_type(db).as_union()
-                                    }
-                                    _ => None,
-                                };
-                                let exposed_alternatives = exposed_union
-                                    .map_or(std::slice::from_ref(&exposed), |union| {
-                                        union.elements(db)
-                                    });
-                                let binding_union = match binding {
-                                    Type::Union(union) => Some(union),
-                                    Type::NewTypeInstance(newtype) => {
-                                        newtype.concrete_base_type(db).as_union()
-                                    }
-                                    _ => None,
-                                };
-                                let binding_alternatives = binding_union
-                                    .map_or(std::slice::from_ref(&binding), |union| {
-                                        union.elements(db)
-                                    });
-                                let retained = UnionType::from_elements(
+                                binding.retained_function_binding(
                                     db,
-                                    &env,
-                                    binding_alternatives
-                                        .iter()
-                                        .copied()
-                                        .filter(|ty| exposed_alternatives.contains(ty)),
-                                );
-                                (!retained.is_never()).then_some((function, retained))
+                                    &exposed_type,
+                                    exposed,
+                                    function,
+                                )
                             },
                         )
                     },

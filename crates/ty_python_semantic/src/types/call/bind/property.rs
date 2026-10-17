@@ -1,9 +1,9 @@
 use super::{Bindings, ConstructorCallableKind};
 use crate::db::Db;
+use crate::types::TypeOperations;
 use crate::types::call::CallArguments;
 use crate::types::{
-    ClassBase, KnownClass, MemberLookupPolicy, PropertyInstanceType, Type, TypeOperations,
-    is_property_method,
+    ClassBase, KnownClass, MemberLookupPolicy, PropertyInstanceType, Type, is_property_method,
 };
 use itertools::Itertools;
 
@@ -36,7 +36,7 @@ impl<'db> Bindings<'db> {
             let class = instance.class(db, env);
             // The first class that defines the accessor storage must be a known property class.
             let inherits_accessors = class
-                .iter_mro(db)
+                .iter_mro(db, env)
                 .filter_map(ClassBase::into_class)
                 .find_map(|base| {
                     if matches!(

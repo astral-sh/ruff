@@ -98,8 +98,14 @@ pub(super) fn validate_paramspec_components<'db>(
                         .scope(context.scope().file_scope_id(db))
                         .parent()
                         .is_some_and(|parent_scope| {
-                            resolve_typevar_reference(db, index, parent_scope, args_tv.typevar(db))
-                                .is_some()
+                            resolve_typevar_reference(
+                                db,
+                                env,
+                                index,
+                                parent_scope,
+                                args_tv.typevar(db),
+                            )
+                            .is_some()
                         });
                 if !paramspec_is_in_scope
                     && let Some(builder) =

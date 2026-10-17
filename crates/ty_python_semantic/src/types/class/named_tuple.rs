@@ -1,4 +1,5 @@
-use crate::{ProgramEnvironment, TypeOperations};
+use crate::ProgramEnvironment;
+use crate::types::TypeOperations;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::TextRange;
@@ -247,19 +248,21 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// 10. `<class 'object'>`
     #[salsa::tracked(
         returns(ref),
-        heap_size=ruff_memory_usage::heap_size,
-        cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
-            db,
-            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db))),
-            ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
-        ),
+        heap_size = ruff_memory_usage::heap_size,
+        cycle_initial = |db, _, self_: DynamicNamedTupleLiteral<'db>| {
+            Mro::from_error(
+                db,
+                &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db))),
+                ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
+            )
+        },
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(db, &env);
         std::iter::once(self_base)
-            .chain(tuple_class.iter_mro(db))
+            .chain(tuple_class.iter_mro(db, &env))
             .collect()
     }
 
@@ -267,7 +270,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ///
     /// Namedtuples always have `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+        let env = ProgramEnvironment::from_scope(self.scope(db));
         KnownClass::Type.to_class_literal(db, &env)
     }
 
@@ -282,11 +285,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
         if !self.has_known_fields(db) {
-            return TupleType::homogeneous(db, env, Type::unknown()).to_class_type(db);
+            return TupleType::homogeneous(db, env, Type::unknown()).to_class_type(db, env);
         }
 
         let field_types = self.fields(db).iter().map(|field| field.ty);
-        TupleType::heterogeneous(db, env, field_types).to_class_type(db)
+        TupleType::heterogeneous(db, env, field_types).to_class_type(db, env)
     }
 
     /// Look up an instance member defined directly on this class (not inherited).
@@ -327,7 +330,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         // First check synthesized members and fields.
-        let member = self.own_class_member(db, name);
+        let member = self.own_class_member(db, env, name);
         if !member.is_undefined() {
             return member.inner;
         }
@@ -351,8 +354,13 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ///
     /// This only checks synthesized members and field properties, without falling
     /// back to tuple or other base classes.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        name: &str,
+    ) -> Member<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_scope(self.scope(db)));
         // Handle synthesized namedtuple attributes.
         if let Some(ty) = self.synthesized_class_member(db, &env, name) {
             return Member::definitely_declared(ty);

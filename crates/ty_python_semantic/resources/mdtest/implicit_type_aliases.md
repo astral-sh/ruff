@@ -2781,7 +2781,8 @@ def invalid_second() -> Second:
 ### Unguarded recursion through generic aliases
 
 An alias that returns its argument unchanged does not make a recursive definition valid, even when
-the helper is applied more than once. We recover from these cycles before using the alias.
+the helper is applied more than once. We reject these circular definitions and recover before using
+the aliases.
 
 ```toml
 [environment]
@@ -2791,8 +2792,8 @@ python-version = "3.12"
 ```py
 type Identity[T] = T
 
-Direct = Identity["Direct"]
-Repeated = Identity[Identity["Repeated"]]
+Direct = Identity["Direct"]  # error: [cyclic-type-alias-definition]
+Repeated = Identity[Identity["Repeated"]]  # error: [cyclic-type-alias-definition]
 
 def inspect(direct: Direct, repeated: Repeated):
     reveal_type(direct)  # revealed: Divergent

@@ -912,6 +912,25 @@ fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[many_enum_members_2]", &code);
 }
 
+/// Resolving an inherited member should reuse each class's declared ancestry rather than
+/// repeatedly reconstructing every base class's MRO for the same type arguments.
+fn benchmark_generic_inheritance(criterion: &mut Criterion) {
+    let mut code = String::from("class Base[T]:\n    value: T\n\n");
+    let mut base = "Base".to_owned();
+    for index in 0..16 {
+        let child = format!("Child{index}");
+        writeln!(&mut code, "class {child}[T]({base}[T]): ...").ok();
+        base = child;
+    }
+    writeln!(
+        &mut code,
+        "\ndef read(value: {base}[int]) -> int:\n    return value.value"
+    )
+    .ok();
+
+    benchmark_micro_case(criterion, "ty_micro[generic_inheritance]", &code);
+}
+
 /// Regression benchmark for protocol-to-protocol non-assignability when the target protocol
 /// has one more member than the source protocol.
 ///
@@ -2535,6 +2554,7 @@ criterion_group!(
     benchmark_cross_str_enum_comparison,
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
+    benchmark_generic_inheritance,
     benchmark_many_protocol_members_mismatch,
     benchmark_inherited_recursive_protocol,
     benchmark_nested_recursive_protocol_receiver,

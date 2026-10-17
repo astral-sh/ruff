@@ -2,15 +2,16 @@
 //! Each of these is considered to inhabit a unique type in our model of the type system.
 
 use super::{ClassType, Type, TypeFormType, TypingModule, class::KnownClass};
+use crate::ProgramEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
+use crate::types::TypeOperations;
 use crate::types::infer::InferenceFlags;
 use crate::types::{
     CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
     generics::typing_self,
     infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
-use crate::{ProgramEnvironment, TypeOperations};
 use ruff_python_ast::PythonVersion;
 use strum_macros::EnumString;
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
@@ -810,11 +811,12 @@ impl SpecialFormType {
     pub(super) fn in_type_expression<'db>(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
         inference_flags: InferenceFlags,
     ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
-        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
+        let env = env.in_environment(ProgramEnvironment::from_scope(scope_id));
         let env = &env;
         match self {
             Self::Never | Self::NoReturn => Ok(Type::Never),
@@ -855,7 +857,8 @@ impl SpecialFormType {
                     ));
                 };
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
+                let typing_self =
+                    typing_self(db, env, scope_id, typevar_binding_context, class.into());
 
                 let in_staticmethod = typing_self.is_some_and(|typing_self| {
                     let Some(binding_definition) = typing_self.binding_context(db).definition()
@@ -877,10 +880,10 @@ impl SpecialFormType {
 
                 let is_in_metaclass = KnownClass::Type
                     .to_class_literal(db, env)
-                    .to_class_type(db)
+                    .to_class_type(db, env)
                     .is_some_and(|type_class| {
                         class
-                            .default_specialization(db)
+                            .default_specialization(db, env)
                             .is_subclass_of(db, env, type_class)
                     });
                 if is_in_metaclass {

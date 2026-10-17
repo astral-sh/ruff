@@ -1,3 +1,4 @@
+use crate::types::TypeOperations;
 use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
@@ -6,7 +7,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 use crate::{
-    Db, TypeOperations,
+    Db,
     types::{
         ClassLiteral, KnownClass, Type, TypeContext, UnionType,
         class::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec},
@@ -536,10 +537,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return (None, false);
             }
 
-            let Some(mixin_class) = ty.to_class_type(db) else {
+            let Some(mixin_class) = ty.to_class_type(db, env) else {
                 return (Some(ty), true);
             };
-            let Some(enum_base) = base_class.to_class_literal(db, env).to_class_type(db) else {
+            let Some(enum_base) = base_class.to_class_literal(db, env).to_class_type(db, env)
+            else {
                 return (Some(ty), true);
             };
             let constraints = ConstraintSetBuilder::new();

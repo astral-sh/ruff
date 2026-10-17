@@ -1,18 +1,21 @@
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 use std::fmt::Display;
 
 use ty_module_resolver::{SearchPath, file_to_module};
 
+use crate::ProgramEnvironment;
 use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, CycleKind, DivergentType, DynamicType,
-    KnownClass, KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type,
-    TypeContext, TypeMapping, TypeQuery, TypeQueryContext, TypingModule, todo_type,
+    KnownClass, KnownInstanceType, MaterializationKind, SpecialFormType, Type, TypeContext,
+    TypeMapping, TypeQuery, TypeQueryContext, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
-use crate::{ProgramEnvironment, TypeOperations};
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -86,7 +89,7 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Return a `ClassBase` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
+    pub(super) fn object(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self::Class(ClassType::object(db, env))
     }
 
@@ -177,7 +180,7 @@ impl<'db> ClassBase<'db> {
         subclass: ClassLiteral<'db>,
     ) -> ClassMetaclass<'db> {
         let metaclass = match self {
-            Self::Class(class) => return class.inferred_metaclass(db),
+            Self::Class(class) => return class.inferred_metaclass(db, env),
             Self::Protocol => {
                 if subclass.file(db).is_stub(db)
                     && file_to_module(db, subclass.program_file(db).resolver_file(db))
@@ -219,13 +222,13 @@ impl<'db> ClassBase<'db> {
     pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            let env = &TypeOperations::new_root(
-                db,
-                ProgramEnvironment::from_program(specialization.generic_context(db).program(db)),
-            );
+            let env = &env.in_environment(ProgramEnvironment::from_program(
+                specialization.generic_context(db).program(db),
+            ));
             let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
@@ -257,7 +260,7 @@ impl<'db> ClassBase<'db> {
         )
     }
 
-    pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
+    pub(super) fn has_cyclic_mro(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> bool {
         match self {
             ClassBase::Class(class) => {
                 let Some((class_literal, specialization)) = class.static_class_literal(db) else {
@@ -268,8 +271,8 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(db, specialization)
-                    .is_err_and(StaticMroError::is_cycle)
+                    .try_mro(db, env, specialization)
+                    .is_err_and(|error| error.is_cycle())
             }
             ClassBase::Any
             | ClassBase::Dynamic(_)
@@ -297,7 +300,7 @@ impl<'db> ClassBase<'db> {
             | ClassBase::Generic
             | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, env, self),
             ClassBase::Class(class) => {
-                ClassBaseMroIterator::from_class(db, class, additional_specialization)
+                ClassBaseMroIterator::from_class(db, env, class, additional_specialization)
             }
         }
     }
@@ -335,11 +338,15 @@ struct ResolveClassBase<'db> {
 }
 
 impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::ResolveClassBase(self.subclass)
+    }
+
     type Output = Option<ClassBase<'db>>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _state: (),
@@ -350,7 +357,7 @@ impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> Self::Output {
@@ -363,7 +370,7 @@ impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
             Type::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(ClassBase::Divergent(divergent)),
             Type::ClassLiteral(literal) => {
-                Some(ClassBase::Class(literal.default_specialization(db)))
+                Some(ClassBase::Class(literal.default_specialization(db, env)))
             }
             Type::GenericAlias(generic) => Some(ClassBase::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
@@ -423,7 +430,9 @@ impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
             Type::Never => Some(ClassBase::unknown()),
 
-            Type::NewTypeInstance(newtype) => traversal.visit(db, newtype.concrete_base_type(db)),
+            Type::NewTypeInstance(newtype) => {
+                traversal.visit(db, newtype.concrete_base_type(db, env))
+            }
 
             Type::Recursive(_)
             | Type::TypeAlias(_)
@@ -523,7 +532,7 @@ impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
-                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    let fields = class.own_fields(db, env, None, CodeGeneratorKind::NamedTuple);
                     traversal.visit(
                         db,
                         TupleType::heterogeneous(
@@ -531,7 +540,7 @@ impl<'db> TypeQuery<'db> for ResolveClassBase<'db> {
                             env,
                             fields.values().map(|field| field.declared_ty),
                         )
-                        .to_class_type(db)
+                        .to_class_type(db, env)
                         .into(),
                     )
                 }
@@ -612,10 +621,15 @@ impl<'db> ClassBaseMroIterator<'db> {
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
     fn from_class(
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         class: ClassType<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> Self {
-        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(db, additional_specialization))
+        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(
+            db,
+            env,
+            additional_specialization,
+        ))
     }
 }
 

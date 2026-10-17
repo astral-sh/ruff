@@ -1419,3 +1419,245 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Recursive `__call__` attributes with changing type arguments
+
+Following `__call__` never reaches a callable signature here: each step adds another `list` to the
+type argument. We report a call error even though no exact specialization repeats.
+
+```py
+class C[T]:
+    __call__: "C[list[T]]"
+
+C[int]()()  # error: [call-non-callable]
+```
+
+The growing cycle can also pass through another class.
+
+```py
+class First[T]:
+    __call__: "Second[list[T]]"
+
+class Second[T]:
+    __call__: First[T]
+
+First[int]()()  # error: [call-non-callable]
+```
+
+## Finite chains of callable instances
+
+Revisiting the same generic class can make progress. When `__call__` is a type argument, following
+it through a finite nesting of instances reaches the innermost callable.
+
+```py
+class Wrapper[T]:
+    __call__: T
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
+
+## Recursive constructor calls with changing type arguments
+
+Here, `__new__` is another specialization of the class. Calling it keeps adding a `list` to the type
+argument without reaching a function signature, so we report a call error.
+
+```py
+class C[T]:
+    __new__: type["C[list[T]]"]
+
+C[int]()  # error: [call-non-callable]
+```
+
+## Recursive constructors through generic descriptor methods
+
+The descriptor class need not be generic. Here, `__get__` infers its type argument from the owner,
+so looking up `Node[int].__new__` returns `type[Node[Node[int]]]`. Constructor lookup keeps adding
+another `Node` without reaching a function signature.
+
+```py
+class Allocate:
+    def __get__[T](self, instance: object, owner: type[T]) -> "type[Node[T]]":
+        raise NotImplementedError
+
+class Node[T]:
+    __new__ = Allocate()
+
+Node[int]()  # error: [call-non-callable]
+```
+
+## Recursive calls through generic descriptor methods
+
+An instance's `__call__` can grow in the same way. The method infers `T` from the instance and
+returns another `Node` around it.
+
+```py
+class Call:
+    def __get__[T](self, instance: T, owner: type | None = None) -> "Node[T]":
+        raise NotImplementedError
+
+class Node[T]:
+    __call__ = Call()
+
+Node[int]()()  # error: [call-non-callable]
+```
+
+## Recursive calls through generic properties
+
+The `__call__` property infers its result from the instance's `child` attribute. Each lookup returns
+another `Node` with a larger type argument, so it never reaches a function signature.
+
+```py
+from typing import Protocol
+
+class HasChild[T](Protocol):
+    @property
+    def child(self) -> T: ...
+
+class Node[T]:
+    child: "Node[list[T]]"
+
+    @property
+    def __call__[U](self: HasChild[U]) -> U:
+        raise NotImplementedError
+
+Node[int]()()  # error: [call-non-callable]
+```
+
+## Finite calls through generic properties
+
+A generic property can also expose a callable stored in a type argument. Each lookup removes one
+layer of `Wrapper` until it reaches `End`, whose call returns `int`.
+
+```py
+from typing import Protocol
+
+class HasChild[T](Protocol):
+    @property
+    def child(self) -> T: ...
+
+class Wrapper[T]:
+    child: T
+
+    @property
+    def __call__[U](self: HasChild[U]) -> U:
+        raise NotImplementedError
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[Wrapper[End]]]()())  # revealed: int
+```
+
+## Recursive descriptor calls with changing type arguments
+
+Reading `value` calls the descriptor's `__get__`, which is itself another descriptor instance.
+Looking up its `__call__` repeats the descriptor access with a larger type argument. We recover with
+`Unknown` for the descriptor result, alongside the declared instance attribute type.
+
+```py
+class Descriptor[T]:
+    __get__: "Descriptor[list[T]]"
+    __call__: "Descriptor[list[T]]"
+
+class C:
+    value: Descriptor[int]
+
+reveal_type(C().value)  # revealed: Unknown | Descriptor[int]
+```
+
+## Finite descriptor call chains
+
+A descriptor can expose the next callable through a type argument. This chain reaches `End`, whose
+call returns `int`.
+
+```py
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Descriptor[T]:
+    def __get__(self, obj: object, owner: type | None = None) -> T:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__: Descriptor[T]
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
+
+## Finite calls through generic descriptor methods
+
+A generic descriptor method can also remove a layer of nesting. Each lookup of `__call__` here
+returns the inner instance until it reaches `End`, whose call returns `int`.
+
+```py
+class Next:
+    def __get__[T](self, instance: "Wrapper[T]", owner: type | None = None) -> T:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__ = Next()
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+reveal_type(Wrapper[Wrapper[End]]()())  # revealed: int
+```
+
+## Descriptor calls that reset type arguments
+
+The first descriptor access returns `Wrapper[None]`; the second returns `End`. This is a finite
+chain even though the new type argument is not contained in the old one.
+
+```py
+from typing import Any, overload
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Descriptor[T]:
+    @overload
+    def __get__(self: "Descriptor[int]", obj: object, owner: type | None = None) -> "Wrapper[None]": ...
+    @overload
+    def __get__(self: "Descriptor[None]", obj: object, owner: type | None = None) -> End: ...
+    def __get__(self, obj: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__: Descriptor[T]
+
+reveal_type(Wrapper[int]()())  # revealed: int
+```
+
+## Generic descriptor methods that reset type arguments
+
+The descriptor first returns `Wrapper[None]`, then `End`. Its parameter annotation contains a method
+type variable, but neither return type depends on that variable.
+
+```py
+from typing import Any, overload
+
+class End:
+    def __call__(self) -> int:
+        return 1
+
+class Next:
+    @overload
+    def __get__(self, instance: "Wrapper[None]", owner: type | None = None) -> End: ...
+    @overload
+    def __get__[T: int](self, instance: "Wrapper[T]", owner: type | None = None) -> "Wrapper[None]": ...
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Wrapper[T]:
+    __call__ = Next()
+
+reveal_type(Wrapper[int]()())  # revealed: int
+```

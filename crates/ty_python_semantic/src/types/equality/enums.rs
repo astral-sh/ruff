@@ -1,6 +1,8 @@
 //! Equality reasoning for enum value domains without expanding member unions.
 
-use crate::types::recursive::{TypeExpansionContext, TypeVisitorState};
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeVisitorKey;
+use crate::types::recursive::TypeVisitorState;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use ty_python_core::Truthiness;
@@ -10,7 +12,7 @@ use crate::types::{
     EnumClassLiteral, EnumComplementType, EnumLiteralType, IntersectionBuilder, IntersectionType,
     LiteralValueType, LiteralValueTypeKind, Type, UnionBuilder,
 };
-use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment, TypeOperations};
+use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
 use super::{
     ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
@@ -36,7 +38,7 @@ pub(super) fn evaluate_enum_comparison<'db>(
         PartitionedEnumComparison::new(db, &env, target, other, branch, operator).map(
             |comparison| match comparison.evaluate(evaluator, branch, operator) {
                 ComparisonResult::CanNarrow(narrowed)
-                    if narrowed.is_same_resolved_type(db, target) =>
+                    if narrowed.is_same_resolved_type(db, &env, target) =>
                 {
                     ComparisonResult::Ambiguous
                 }
@@ -113,8 +115,8 @@ impl<'db> PartitionedEnumComparison<'db> {
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        if !target.has_outer_type(db, super::super::Type::is_union)
-            && !other.has_outer_type(db, super::super::Type::is_union)
+        if !target.has_outer_type(db, env, super::super::Type::is_union)
+            && !other.has_outer_type(db, env, super::super::Type::is_union)
         {
             return None;
         }
@@ -181,7 +183,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
 
         let env = (*evaluator.env).clone();
-        if target.has_outer_type(db, |ty| ty.is_dynamic()) {
+        if target.has_outer_type(db, &env, |ty| ty.is_dynamic()) {
             return evaluator.evaluate(target, self.other_type, branch, operator);
         }
 
@@ -359,7 +361,7 @@ impl<'db> SameEnumComparison<'db> {
     }
 }
 
-type EnumDomainVisitor<'env, 'db> = TypeVisitorState<'env, 'db, (), Type<'db>, (), 3>;
+pub(in crate::types) type EnumDomainVisitor<'env, 'db> = TypeVisitorState<'env, 'db, Type<'db>, ()>;
 
 /// The enum-member values represented by an operand, excluding non-enum intersection state.
 ///
@@ -367,7 +369,7 @@ type EnumDomainVisitor<'env, 'db> = TypeVisitorState<'env, 'db, (), Type<'db>, (
 /// make the operand more specific, but they must never be transferred to the other operand by an
 /// equality constraint.
 #[derive(Clone)]
-struct EnumValueSet<'db> {
+pub(in crate::types) struct EnumValueSet<'db> {
     enum_class: EnumClassLiteral<'db>,
     members: EnumValueSetMembers<'db>,
 }
@@ -386,62 +388,59 @@ enum EnumValueSetMembers<'db> {
 }
 
 impl<'db> EnumValueSet<'db> {
+    pub(in crate::types) fn from_normalized(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        ty: Type<'db>,
+        visitor: &EnumDomainVisitor<'_, 'db>,
+    ) -> Option<EnumValueSet<'db>> {
+        let value_set = match ty {
+            Type::LiteralValue(literal) => {
+                let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
+                    return None;
+                };
+                let enum_class = enum_literal.enum_class_literal(db);
+                let name = enum_class.resolve_member(db, enum_literal.name(db))?;
+                EnumValueSet {
+                    enum_class,
+                    members: EnumValueSetMembers::One {
+                        name,
+                        promotable: literal.is_promotable(),
+                    },
+                }
+            }
+            Type::NominalInstance(instance) => EnumValueSet {
+                enum_class: instance.class_literal(db, env).into_enum_class(db)?,
+                members: EnumValueSetMembers::All,
+            },
+            Type::NewTypeInstance(newtype) => {
+                EnumValueSet::from_type(db, newtype.concrete_base_type(db, env), visitor)?
+            }
+            Type::EnumComplement(complement) => EnumValueSet {
+                enum_class: complement.enum_class_literal(db),
+                members: EnumValueSetMembers::AllExcept(complement),
+            },
+            Type::Union(union) => EnumValueSet::from_union(db, union.elements(db), visitor)?,
+            Type::Intersection(intersection) => {
+                EnumValueSet::from_intersection(db, env, intersection, visitor)?
+            }
+            _ => return None,
+        };
+        (value_set.member_count(db) > 0).then_some(value_set)
+    }
+
     /// Extract only structural enum membership facts from `ty`.
     ///
     /// This deliberately does not use subtyping: extra nominal restrictions must not be
     /// transferred to the other comparison operand.
     fn from_type(
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
         ty: Type<'db>,
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
-        fn from_type_inner<'db>(
-            db: &'db dyn Db,
-            env: &TypeOperations<'db>,
-            ty: Type<'db>,
-            visitor: &EnumDomainVisitor<'_, 'db>,
-        ) -> Option<EnumValueSet<'db>> {
-            let value_set = match ty {
-                Type::LiteralValue(literal) => {
-                    let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
-                        return None;
-                    };
-                    let enum_class = enum_literal.enum_class_literal(db);
-                    let name = enum_class.resolve_member(db, enum_literal.name(db))?;
-                    EnumValueSet {
-                        enum_class,
-                        members: EnumValueSetMembers::One {
-                            name,
-                            promotable: literal.is_promotable(),
-                        },
-                    }
-                }
-                Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(db, env).into_enum_class(db)?,
-                    members: EnumValueSetMembers::All,
-                },
-                Type::NewTypeInstance(newtype) => {
-                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), visitor)?
-                }
-                Type::EnumComplement(complement) => EnumValueSet {
-                    enum_class: complement.enum_class_literal(db),
-                    members: EnumValueSetMembers::AllExcept(complement),
-                },
-                Type::Union(union) => {
-                    EnumValueSet::from_union(db, env, union.elements(db), visitor)?
-                }
-                Type::Intersection(intersection) => {
-                    EnumValueSet::from_intersection(db, env, intersection, visitor)?
-                }
-                _ => return None,
-            };
-            (value_set.member_count(db) > 0).then_some(value_set)
-        }
-
         visitor.visit_active_with_expansion(db, ty, |expansion| {
             let expansion = expansion.ok()?;
-            from_type_inner(db, env, expansion.normalize(db, ty), visitor)
+            expansion.normalize(db, ty).enum_values(db, visitor)
         })
     }
 
@@ -450,14 +449,13 @@ impl<'db> EnumValueSet<'db> {
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
     fn from_union(
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
         elements: &[Type<'db>],
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         let mut enum_class = None;
         let mut included = FxOrderMap::default();
         for element in elements {
-            let value_set = Self::from_type(db, env, *element, visitor)?;
+            let value_set = Self::from_type(db, *element, visitor)?;
             if let Some(enum_class) = enum_class
                 && enum_class != value_set.enum_class
             {
@@ -523,13 +521,13 @@ impl<'db> EnumValueSet<'db> {
         visitor: &EnumDomainVisitor<'_, 'db>,
     ) -> Option<Self> {
         if let Some(complement) = intersection.enum_complement(db, env) {
-            return Self::from_type(db, env, Type::EnumComplement(complement), visitor);
+            return Self::from_type(db, Type::EnumComplement(complement), visitor);
         }
 
         if intersection.positive(db).iter().any(|positive| {
-            positive.has_outer_type(db, |ty| matches!(ty, Type::NewTypeInstance(_)))
+            positive.has_outer_type(db, env, |ty| matches!(ty, Type::NewTypeInstance(_)))
         }) && let expanded = intersection.with_expanded_typevars_and_newtypes(db, env)
-            && let Some(value_set) = Self::from_type(db, env, expanded, visitor)
+            && let Some(value_set) = Self::from_type(db, expanded, visitor)
         {
             return Some(value_set);
         }
@@ -539,7 +537,7 @@ impl<'db> EnumValueSet<'db> {
         let mut value_sets = intersection
             .positive(db)
             .iter()
-            .filter_map(|positive| Self::from_type(db, env, *positive, visitor));
+            .filter_map(|positive| Self::from_type(db, *positive, visitor));
         let value_set = value_sets.next()?;
         value_sets
             .all(|other| other.enum_class == value_set.enum_class)
@@ -701,54 +699,17 @@ impl<'db> EnumDomainPartition<'db> {
     ///
     /// Return `None` when there is no enum or a type alias refers to itself.
     fn from_type(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Option<Self> {
-        fn collect<'db>(
-            db: &'db dyn Db,
-            env: &TypeOperations<'db>,
-            ty: Type<'db>,
-            enum_types: &mut Vec<Type<'db>>,
-            alternatives: &mut Vec<Type<'db>>,
-            enum_position: &mut Option<usize>,
-            visitor: &EnumDomainVisitor<'_, 'db>,
-        ) -> Option<()> {
-            if EnumValueSet::from_type(db, env, ty, visitor).is_some() {
-                enum_position.get_or_insert(alternatives.len());
-                enum_types.push(ty);
-                return Some(());
-            }
-
-            visitor.visit_active_with_expansion(db, ty, |expansion| {
-                let expansion = expansion.ok()?;
-                let Type::Union(union) = expansion.normalize(db, ty) else {
-                    alternatives.push(ty);
-                    return Some(());
-                };
-                union.elements(db).iter().try_for_each(|element| {
-                    collect(
-                        db,
-                        env,
-                        *element,
-                        enum_types,
-                        alternatives,
-                        enum_position,
-                        visitor,
-                    )
-                })
-            })
-        }
-
         let mut enum_types = Vec::new();
         let mut alternatives = Vec::new();
         let mut enum_position = None;
-        let visitor = EnumDomainVisitor::new(env, ());
-        collect(
-            db,
-            env,
-            ty,
-            &mut enum_types,
-            &mut alternatives,
-            &mut enum_position,
-            &visitor,
-        )?;
+        let visitor = EnumDomainVisitor::new(env, TypeVisitorKey::EnumDomain, ());
+        EnumPartitionCollector {
+            enum_types: &mut enum_types,
+            alternatives: &mut alternatives,
+            enum_position: &mut enum_position,
+            visitor: &visitor,
+        }
+        .collect(db, ty)?;
         let enum_position = enum_position?;
         let enum_type = enum_types
             .into_iter()
@@ -774,43 +735,13 @@ struct EnumDomainSet<'db> {
 
 impl<'db> EnumDomainSet<'db> {
     fn from_type(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Option<Self> {
-        fn collect<'db>(
-            db: &'db dyn Db,
-            env: &TypeOperations<'db>,
-            ty: Type<'db>,
-            domains: &mut Vec<EnumValueSet<'db>>,
-            visitor: &EnumDomainVisitor<'_, 'db>,
-        ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(db, env, ty, visitor) {
-                domains.push(domain);
-                return Some(());
-            }
-
-            visitor.visit_active_with_expansion(db, ty, |expansion| {
-                collect_union(db, env, ty, domains, visitor, expansion.ok()?)
-            })
-        }
-
-        fn collect_union<'db>(
-            db: &'db dyn Db,
-            env: &TypeOperations<'db>,
-            ty: Type<'db>,
-            domains: &mut Vec<EnumValueSet<'db>>,
-            visitor: &EnumDomainVisitor<'_, 'db>,
-            expansion: &TypeExpansionContext<'_, '_, 'db>,
-        ) -> Option<()> {
-            let Type::Union(union) = expansion.normalize(db, ty) else {
-                return None;
-            };
-            for element in union.elements(db) {
-                collect(db, env, *element, domains, visitor)?;
-            }
-            Some(())
-        }
-
         let mut domains = Vec::new();
-        let visitor = EnumDomainVisitor::new(env, ());
-        collect(db, env, ty, &mut domains, &visitor)?;
+        let visitor = EnumDomainVisitor::new(env, TypeVisitorKey::EnumDomain, ());
+        EnumDomainCollector {
+            domains: &mut domains,
+            visitor: &visitor,
+        }
+        .collect(db, ty)?;
         (!domains.is_empty()).then_some(Self { domains })
     }
 
@@ -1102,7 +1033,7 @@ impl<'db> EnumValueSet<'db> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-struct EnumClassKeyProfile<'db> {
+pub(crate) struct EnumClassKeyProfile<'db> {
     members_are_exhaustive: bool,
     semantics: Option<KnownComparisonSemantics>,
     members: Box<[(Name, Option<LiteralValueTypeKind<'db>>)]>,
@@ -1219,5 +1150,80 @@ fn enum_comparison_key(
             Some(kind)
         }
         _ => None,
+    }
+}
+
+pub(in crate::types) struct EnumPartitionCollector<'a, 'env, 'db> {
+    enum_types: &'a mut Vec<Type<'db>>,
+    alternatives: &'a mut Vec<Type<'db>>,
+    enum_position: &'a mut Option<usize>,
+    visitor: &'a EnumDomainVisitor<'env, 'db>,
+}
+
+impl<'db> EnumPartitionCollector<'_, '_, 'db> {
+    fn collect(&mut self, db: &'db dyn Db, ty: Type<'db>) -> Option<()> {
+        if EnumValueSet::from_type(db, ty, self.visitor).is_some() {
+            self.enum_position.get_or_insert(self.alternatives.len());
+            self.enum_types.push(ty);
+            return Some(());
+        }
+        let visitor = self.visitor;
+        visitor.visit_active_with_expansion(db, ty, |expansion| {
+            expansion
+                .ok()?
+                .normalize(db, ty)
+                .collect_enum_partition(db, self, ty)
+        })
+    }
+
+    pub(in crate::types) fn consume(
+        &mut self,
+        db: &'db dyn Db,
+        normalized: Type<'db>,
+        original: Type<'db>,
+    ) -> Option<()> {
+        let Type::Union(union) = normalized else {
+            self.alternatives.push(original);
+            return Some(());
+        };
+        for element in union.elements(db) {
+            self.collect(db, *element)?;
+        }
+        Some(())
+    }
+}
+
+pub(in crate::types) struct EnumDomainCollector<'a, 'env, 'db> {
+    domains: &'a mut Vec<EnumValueSet<'db>>,
+    visitor: &'a EnumDomainVisitor<'env, 'db>,
+}
+
+impl<'db> EnumDomainCollector<'_, '_, 'db> {
+    fn collect(&mut self, db: &'db dyn Db, ty: Type<'db>) -> Option<()> {
+        if let Some(domain) = EnumValueSet::from_type(db, ty, self.visitor) {
+            self.domains.push(domain);
+            return Some(());
+        }
+        let visitor = self.visitor;
+        visitor.visit_active_with_expansion(db, ty, |expansion| {
+            expansion
+                .ok()?
+                .normalize(db, ty)
+                .collect_enum_domains(db, self)
+        })
+    }
+
+    pub(in crate::types) fn consume(
+        &mut self,
+        db: &'db dyn Db,
+        normalized: Type<'db>,
+    ) -> Option<()> {
+        let Type::Union(union) = normalized else {
+            return None;
+        };
+        for element in union.elements(db) {
+            self.collect(db, *element)?;
+        }
+        Some(())
     }
 }

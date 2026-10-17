@@ -1,6 +1,8 @@
+use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
-use crate::{Program, ProgramEnvironment, TypeOperations};
+use crate::{Program, ProgramEnvironment};
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -26,15 +28,15 @@ use crate::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassLiteral, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
         GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy,
+        ProtocolInstanceType, SelfBinding, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
+        TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         member::class_member,
-        signatures::{CallableSignature, walk_signature},
+        signatures::CallableSignature,
         variance::infer_protocol_variance,
     },
 };
@@ -57,7 +59,7 @@ impl<'db> ClassType<'db> {
 
 /// Representation of a single `Protocol` class definition.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ProtocolClass<'db>(ClassType<'db>);
+pub(crate) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
     pub(super) fn map_recursive_references(
@@ -82,9 +84,23 @@ impl<'db> ProtocolClass<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    pub(super) fn interface(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        cached_protocol_interface(db, *self)
+        match *self {
+            ClassType::NonGeneric(class) => declared_protocol_interface(db, class),
+            ClassType::Generic(alias) => *specialized_protocol_interface(db, env, alias),
+        }
+    }
+
+    /// Specialization and materialization change member types, but not the required names.
+    /// Check those names before specializing an interface that `object` cannot satisfy.
+    pub(super) fn has_only_object_members(self, db: &'db dyn Db) -> bool {
+        let interface = declared_protocol_interface(db, self.class_literal(db));
+        non_object_protocol_member_count(db, interface) == 0
     }
 
     /// Structural variance inference currently excludes recursive type aliases and descriptor
@@ -104,13 +120,17 @@ impl<'db> ProtocolClass<'db> {
     /// invariant type variable as a read and then reuse that result as its write. Strip only the
     /// pending marker while constructing the shared interface so reads and writes can each apply
     /// the original materialization in their own variance position.
-    pub(super) fn unmaterialized_interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    pub(super) fn unmaterialized_interface(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> ProtocolInterface<'db> {
         let ClassType::Generic(alias) = *self else {
-            return self.interface(db);
+            return self.interface(db, env);
         };
         let specialization = alias.specialization(db);
         if specialization.materialization_kind(db).is_none() {
-            return self.interface(db);
+            return self.interface(db, env);
         }
 
         let alias = GenericAlias::new(
@@ -118,7 +138,7 @@ impl<'db> ProtocolClass<'db> {
             alias.origin(db),
             specialization.with_materialization_kind(db, None),
         );
-        ProtocolClass(ClassType::Generic(alias)).interface(db)
+        ProtocolClass(ClassType::Generic(alias)).interface(db, env)
     }
 
     /// Walk the effective non-method member types declared by this protocol.
@@ -140,7 +160,11 @@ impl<'db> ProtocolClass<'db> {
                 if !seen_members.insert(name.clone()) {
                     return;
                 }
-                let candidate = candidate.apply_specialization(db, specialization);
+                let candidate = candidate.apply_specialization(
+                    db,
+                    visitor.program_environment(),
+                    specialization,
+                );
                 candidate.walk_recursive_member_types(db, visitor);
             },
         );
@@ -156,7 +180,7 @@ impl<'db> ProtocolClass<'db> {
         mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
     ) {
         for (parent_scope, specialization) in self
-            .iter_mro(db)
+            .iter_mro(db, env)
             .filter_map(ClassBase::into_class)
             .filter_map(|class| {
                 let (class_literal, specialization) = class.static_class_literal(db)?;
@@ -249,13 +273,17 @@ impl<'db> ProtocolClass<'db> {
     /// class P(Protocol):
     ///     __doc__: str
     /// ```
-    pub(super) fn has_member_declaration(self, db: &'db dyn Db, name: &str) -> bool {
+    pub(super) fn has_member_declaration(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        name: &str,
+    ) -> bool {
         let Some((class, _)) = self.static_class_literal(db) else {
             return false;
         };
-        let env =
-            TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
-        self.iter_mro(db)
+        let env = env.in_environment(ProgramEnvironment::from_scope(class.body_scope(db)));
+        self.iter_mro(db, &env)
             .filter_map(ClassBase::into_class)
             .any(|superclass| {
                 let Some((superclass_literal, _)) = superclass.static_class_literal(db) else {
@@ -283,7 +311,7 @@ impl<'db> ProtocolClass<'db> {
     /// class body, or are declared in a superclass of the protocol class.
     pub(super) fn validate_members(self, context: &InferContext<'db, '_>) {
         let db = context.db();
-        let interface = self.interface(db);
+        let interface = self.interface(db, context.program_environment());
         let Some((class_literal, _)) = self.static_class_literal(db) else {
             return;
         };
@@ -299,7 +327,7 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            if self.has_member_declaration(db, symbol_name) {
+            if self.has_member_declaration(db, context.program_environment(), symbol_name) {
                 continue;
             }
 
@@ -331,13 +359,16 @@ impl<'db> ProtocolClass<'db> {
         else {
             return;
         };
-        if class.has_pep_695_type_params(db) || class.try_mro(db, None).is_err() {
+        if class.has_pep_695_type_params(db)
+            || class
+                .try_mro(db, context.program_environment(), None)
+                .is_err()
+        {
             return;
         }
-        let env =
-            TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
+        let env = context.program_environment();
         if generic_context.variables(db).any(|typevar| {
-            typevar.is_typevartuple(db) || typevar.typevar(db).default_type(db, &env).is_some()
+            typevar.is_typevartuple(db) || typevar.typevar(db).default_type(db, env).is_some()
         }) {
             return;
         }
@@ -422,7 +453,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct ProtocolInterface<'db> {
+pub(crate) struct ProtocolInterface<'db> {
     #[returns(copy)]
     pub(super) program: Program<'db>,
 
@@ -437,7 +468,7 @@ impl get_size2::GetSize for ProtocolInterface<'_> {}
 /// The original interface remains shared. A member's readable and writable types are
 /// materialized only when that member is accessed or compared.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ProtocolInterfaceView<'db> {
+pub(crate) struct ProtocolInterfaceView<'db> {
     interface: ProtocolInterface<'db>,
     materialization: Option<MaterializationKind>,
 }
@@ -487,11 +518,12 @@ impl<'db> ProtocolInterfaceView<'db> {
     }
 
     /// Returns whether structural comparison can avoid recursive member expansion.
-    pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
-        let env = TypeOperations::new_root(
-            db,
-            ProgramEnvironment::from_program(self.interface.program(db)),
-        );
+    pub(super) fn has_only_finite_members(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+    ) -> bool {
+        let env = env.in_environment(ProgramEnvironment::from_program(self.interface.program(db)));
         self.members(db).all(|member| {
             !matches!(
                 member.structural_member_priority(db, &env),
@@ -735,26 +767,17 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                 visitor.visit_type(db, method);
                 return;
             };
-            for signature in callable.signatures(db) {
-                if signature.has_implicit_positional_receiver_annotation()
-                    && kind != ProtocolMethodKind::Static
-                {
-                    let runtime_type = if kind == ProtocolMethodKind::Class {
-                        receiver_ty.to_meta_type(db, env)
-                    } else {
-                        receiver_ty
-                    };
-                    let signature = signature.bind_self_with_receiver(
-                        db,
-                        env,
-                        Some(runtime_type),
-                        Some(receiver_ty),
-                    );
-                    walk_signature(db, &signature, visitor);
+            let callable = if kind == ProtocolMethodKind::Static {
+                callable
+            } else {
+                let runtime_type = if kind == ProtocolMethodKind::Class {
+                    receiver_ty.to_meta_type(db, env)
                 } else {
-                    walk_signature(db, signature, visitor);
-                }
-            }
+                    receiver_ty
+                };
+                callable.bind_implicit_receiver(db, env, runtime_type, receiver_ty)
+            };
+            visitor.visit_type(db, Type::Callable(callable));
         }
         ProtocolMemberKind::Property { .. } => {
             walk_protocol_member_access(
@@ -1637,7 +1660,7 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
                         || (kind == ProtocolMethodKind::Instance
                             && self.access.mode == ProtocolMemberAccessMode::Instance))
                 {
-                    Type::Callable(protocol_bind_self(db, env.program(db), callable, None))
+                    Type::Callable(protocol_bind_self(db, env, callable, None))
                 } else {
                     ty
                 };
@@ -1742,7 +1765,7 @@ fn cycle_normalized_optional_type<'db>(
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ProtocolMemberData<'db> {
+pub(crate) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
@@ -1969,14 +1992,11 @@ impl<'db> ProtocolMemberKind<'db> {
                     return Self::Method(current.cycle_normalized(db, env, previous, cycle), kind);
                 };
                 debug_assert_eq!(current_callable.kind(db), previous_callable.kind(db));
-                let signatures = current_callable.signatures(db).cycle_normalized(
-                    db,
-                    env,
-                    previous_callable.signatures(db),
-                    cycle,
-                );
                 Self::Method(
-                    Type::Callable(current_callable.with_signatures(db, signatures)),
+                    current_callable
+                        .normalize_stored_cycle(db, env, previous_callable, cycle)
+                        .map(Type::Callable)
+                        .unwrap_or_else(|| current.cycle_normalized(db, env, previous, cycle)),
                     kind,
                 )
             }
@@ -2159,7 +2179,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .nominal_class(db, env)
                 })
                 .is_some_and(|class| {
-                    effective_superclass_variable_kind(db, class, Name::new(self.name))
+                    effective_superclass_variable_kind(db, env, class, &Name::new(self.name))
                         == Some(VariableKind::Instance)
                         && [
                             class
@@ -2228,21 +2248,23 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         else {
             return false;
         };
-        callable.signatures(db).iter().next().is_some()
-            && callable.signatures(db).iter().all(|signature| {
-                signature.has_implicit_positional_receiver_annotation()
-                    || (signature.has_explicit_positional_receiver_annotation()
-                        && signature.parameters().get(0).is_some_and(|parameter| {
-                            parameter
-                                .annotated_type()
-                                .as_protocol_instance()
-                                .is_some_and(|protocol| {
-                                    protocol.materialization_kind(db).is_none()
-                                        && protocol.class_origin(db).is_some_and(|class| {
-                                            class.class_literal(db) == class_origin
-                                        })
-                                })
-                        }))
+        callable.parameter_lists(db).len() > 0
+            && callable.parameter_lists(db).all(|parameters| {
+                parameters.get(0).is_some_and(|parameter| {
+                    parameter.is_positional() && parameter.inferred_annotation
+                }) || parameters.get(0).is_some_and(|parameter| {
+                    parameter.is_positional()
+                        && !parameter.inferred_annotation
+                        && parameter
+                            .annotated_type()
+                            .as_protocol_instance()
+                            .is_some_and(|protocol| {
+                                protocol.materialization_kind(db).is_none()
+                                    && protocol.class_origin(db).is_some_and(|class| {
+                                        class.class_literal(db) == class_origin
+                                    })
+                            })
+                })
             })
     }
 
@@ -2250,10 +2272,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     pub(super) fn has_explicit_receiver_annotation(&self, db: &'db dyn Db) -> bool {
         match self.data.kind {
             ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                callable
-                    .signatures(db)
-                    .iter()
-                    .any(Signature::has_explicit_positional_receiver_annotation)
+                callable.parameter_lists(db).any(|parameters| {
+                    parameters.get(0).is_some_and(|parameter| {
+                        parameter.is_positional() && !parameter.inferred_annotation
+                    })
+                })
             }
             _ => false,
         }
@@ -2302,33 +2325,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         let Type::Callable(callable) = callable else {
             return StructuralMemberPriority::Recursive;
         };
-        let signatures = callable.signatures(db);
-        let finite_priority = match signatures.iter().len() {
-            0 => return StructuralMemberPriority::Recursive,
-            1 => StructuralMemberPriority::Simple,
-            _ => StructuralMemberPriority::FiniteOverload,
-        };
-
-        let is_recursive = signatures.iter().any(|signature| {
-            signature
-                .receiver_constraint_types()
-                .chain(
-                    signature
-                        .parameters()
-                        .iter()
-                        .skip(usize::from(
-                            signature.has_implicit_positional_receiver_annotation(),
-                        ))
-                        .map(Parameter::annotated_type),
-                )
-                .chain(std::iter::once(signature.return_ty))
-                .any(is_recursive_type)
-        });
-        if is_recursive {
-            return StructuralMemberPriority::Recursive;
-        }
-
-        finite_priority
+        callable
+            .inspect_signatures_root(db, env, |_, signatures| {
+                signatures.structural_member_priority(db)
+            })
+            .unwrap_or(StructuralMemberPriority::Recursive)
     }
 
     fn is_instance_method(&self) -> bool {
@@ -2511,17 +2512,18 @@ fn property_get_member_type<'db>(
     env: &TypeOperations<'db>,
     getter: Type<'db>,
 ) -> Option<ProtocolAnnotation<'db>> {
-    let mut get_types = Vec::new();
-    let mut definition = None;
+    let mut returns = PropertyReturns {
+        types: Vec::new(),
+        definition: None,
+    };
     for callable in &getter.try_upcast_to_callable(db, env)? {
-        for signature in callable.signatures(db) {
-            get_types.push(signature.return_ty);
-            definition = definition.or(signature.definition());
-        }
+        callable.inspect_signatures_root(db, env, |_, signatures| {
+            signatures.collect_property_returns(&mut returns);
+        })?;
     }
     Some(ProtocolAnnotation {
-        ty: UnionType::from_elements(db, env, get_types),
-        self_binding_context: definition.map(BindingContext::Definition),
+        ty: UnionType::from_elements(db, env, returns.types),
+        self_binding_context: returns.definition.map(BindingContext::Definition),
     })
 }
 
@@ -2548,55 +2550,10 @@ fn descriptor_decorated_protocol_member<'db>(
     TypeInspector::inspect_root(
         db,
         env,
+        TypeInspectionKey::DescriptorDecoratedProtocolMember,
         descriptor_ty,
         |_, _| None,
-        |_, descriptor_ty| {
-            // Applying a generic descriptor decorator to a method that refers to an enclosing type
-            // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
-            // its `__get__` result would then erase the remaining descriptor structure and weaken the
-            // protocol member to a bare `Unknown`.
-            if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
-                return None;
-            }
-
-            let Place::Defined(DefinedPlace {
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = descriptor_ty
-                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-                .place
-            else {
-                return None;
-            };
-
-            let receiver_ty = Type::instance(db, env, protocol);
-            let read_ty = descriptor_ty
-                .try_call_dunder_get(
-                    db,
-                    env,
-                    Some(receiver_ty),
-                    receiver_ty.to_meta_type(db, env),
-                )
-                .unwrap_or_else(|error| Some(error.fallback()))?
-                .return_type;
-            let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
-
-            let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
-                DescriptorSetterDomain::Missing => None,
-                DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
-                    descriptor_ty,
-                    Some(domain),
-                    definition,
-                )),
-                DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
-                    descriptor_ty,
-                    None,
-                    definition,
-                )),
-            };
-
-            Some(ProtocolMemberData::property(read, write, definition))
-        },
+        |_, descriptor_ty| descriptor_ty.protocol_descriptor_member(db, protocol, definition),
     )
 }
 
@@ -2680,7 +2637,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && required
                 .read()
                 .and_then(|read| read.result_type(db, env, None))
-                .is_some_and(|required| required.is_same_resolved_type(db, Type::object()))
+                .is_some_and(|required| required.is_same_resolved_type(db, env, Type::object()))
             && receiver_ty
                 .member_lookup_with_policy(
                     db,
@@ -2751,7 +2708,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         &callables.map(|callable| {
                             protocol_apply_self_with_receiver(
                                 db,
-                                env.program(db),
+                                env,
                                 callable,
                                 implementation_receiver_binding_ty,
                                 implementation_self_binding_ty,
@@ -2759,7 +2716,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         }),
                         protocol_apply_self_with_receiver(
                             db,
-                            env.program(db),
+                            env,
                             required_callable,
                             protocol_receiver_binding_ty,
                             protocol_self_binding_ty,
@@ -2774,36 +2731,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if callable.is_function_like(db) {
                             // Require a positional receiver before binding: a zero-argument static
                             // method otherwise loses no parameters while the protocol loses `self`.
-                            let signatures = CallableSignature::from_overloads(
-                                callable
-                                    .signatures(db)
-                                    .iter()
-                                    .filter(|signature| {
-                                        let parameters = signature.parameters();
-                                        parameters.get_positional(0).is_some()
-                                            || parameters.variadic().is_some()
-                                    })
-                                    .map(|signature| {
-                                        signature.bind_self(
-                                            db,
-                                            env,
-                                            Some(implementation_self_binding_ty),
-                                        )
-                                    }),
-                            );
-                            if signatures.overloads.is_empty() {
-                                return self.never();
-                            }
-                            self.check_callable_pair(
-                                db,
-                                callable.with_signatures(db, signatures),
-                                protocol_bind_self(
-                                    db,
-                                    env.program(db),
-                                    required_callable,
-                                    Some(protocol_self_binding_ty),
-                                ),
-                            )
+                            callable
+                                .inspect_signatures(db, env, |original| {
+                                    original.compare_protocol_method(
+                                        db,
+                                        self,
+                                        *callable,
+                                        required_callable,
+                                        implementation_self_binding_ty,
+                                        protocol_self_binding_ty,
+                                    )
+                                })
+                                .unwrap_or_else(|| self.never())
                         } else {
                             self.check_callable_pair(db, *callable, required_callable)
                         }
@@ -2815,7 +2754,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 attribute_type,
                 Type::Callable(protocol_apply_self_with_receiver(
                     db,
-                    env.program(db),
+                    env,
                     required_callable,
                     protocol_receiver_binding_ty,
                     protocol_self_binding_ty,
@@ -3015,7 +2954,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         protocol
-            .interface(db)
+            .interface(db, env)
             .members(db)
             .when_all(db, self.constraints, |member| {
                 let required = member.access(ProtocolMemberAccessMode::Class);
@@ -3086,7 +3025,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 {
                     Some(Type::Callable(protocol_apply_self_with_receiver(
                         db,
-                        env.program(db),
+                        env,
                         callable,
                         source_type,
                         source_type,
@@ -3289,10 +3228,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             else {
                 return self.never();
             };
-            if !callable_has_only_non_never_returns(db, method) {
-                return self.never();
-            }
-
             let Some(callables) =
                 ty.try_upcast_to_callable_with_policy(db, env, UpcastPolicy::Sound)
             else {
@@ -3300,38 +3235,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             };
 
             callables.iter().when_all(db, self.constraints, |callable| {
-                if !callable_has_only_non_never_returns(db, *callable) {
-                    return self.never();
-                }
-
-                // Disjointness distributes over unions. Compare the overload return arms
-                // directly so that recursive return types do not require canonicalizing an
-                // intermediate union merely to distribute it again.
-                method
-                    .signatures(db)
-                    .iter()
-                    .when_all(db, self.constraints, |method_signature| {
-                        callable.signatures(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |callable_signature| {
-                                let result = self.check_type_pair(
-                                    db,
-                                    method_signature.return_ty,
-                                    callable_signature.return_ty,
-                                );
-                                if let Some(context) = self.report_context()
-                                    && result.is_always_satisfied(db, env, self.inferable)
-                                {
-                                    context.push(ErrorContext::DisjointReturnTypes {
-                                        left: method_signature.return_ty,
-                                        right: callable_signature.return_ty,
-                                    });
-                                }
-                                result
-                            },
-                        )
-                    })
+                self.check_callable_return_pair(db, method, *callable)
             })
         };
         if let Some(context) = self.report_context()
@@ -3406,9 +3310,12 @@ impl<'db> ProtocolMemberCandidate<'db> {
     fn apply_specialization(
         mut self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
-        self.ty = self.ty.apply_optional_specialization(db, specialization);
+        self.ty = self
+            .ty
+            .apply_optional_specialization(db, env, specialization);
         self
     }
 
@@ -3500,7 +3407,8 @@ fn supports_protocol_variance_inference<'db>(
     let Some(protocol) = class.identity_specialization(db).into_protocol_class(db) else {
         return false;
     };
-    let interface = protocol.interface(db);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
+    let interface = protocol.interface(db, &env);
     if interface.members(db).any(|member| {
         matches!(
             member.data.kind,
@@ -3513,47 +3421,81 @@ fn supports_protocol_variance_inference<'db>(
         return false;
     }
 
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
-    let supports_type = |ty| {
-        !any_over_type_expanding_aliases(db, &env, ty, |nested| {
-            matches!(nested, Type::ProtocolInstance(protocol) if protocol
-                .class_origin(db)
-                .is_none_or(|class| !class.supports_variance_inference(db)))
-        })
-    };
     interface.variance_types(db, &env).all(|(ty, _)| {
         if let Type::Callable(callable) = ty {
             // Bound receivers constrain when a method can be called, but they are not input
             // or output positions in variance inference. Match `Signature::variance_of`.
-            callable.signatures(db).iter().all(|signature| {
-                signature
-                    .parameters()
-                    .iter()
-                    .map(Parameter::annotated_type)
-                    .chain(std::iter::once(signature.return_ty))
-                    .all(supports_type)
-            })
+            callable
+                .inspect_signatures_root(db, &env, |_, signatures| {
+                    signatures.supports_protocol_variance_inference(db)
+                })
+                .unwrap_or(false)
         } else {
-            supports_type(ty)
+            supports_protocol_variance_type(db, &env, ty)
         }
     })
 }
 
-/// Inner Salsa query for [`ProtocolClass::interface`].
+/// A declaration has no applied type arguments, so its interface depends only on source facts.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=protocol_interface_cycle_initial,
-    cycle_fn=proto_interface_cycle_recover,
-    heap_size=ruff_memory_usage::heap_size,
+    cycle_initial =
+        |db, _, class| protocol_interface_cycle_initial(db, ClassType::NonGeneric(class)),
+    cycle_fn = |db, cycle, previous: &ProtocolInterface<'db>, value, class| {
+        protocol_interface_cycle_recover(
+            db,
+            cycle,
+            *previous,
+            value,
+            ClassType::NonGeneric(class),
+        )
+    },
+    heap_size = ruff_memory_usage::heap_size,
 )]
-fn cached_protocol_interface<'db>(
+fn declared_protocol_interface<'db>(
     db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> ProtocolInterface<'db> {
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(class.program_file(db)));
+    compute_protocol_interface(db, &env, ClassType::NonGeneric(class))
+}
+
+fn specialized_protocol_interface<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    alias: GenericAlias<'db>,
+) -> std::borrow::Cow<'db, ProtocolInterface<'db>> {
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial =
+            |db, _, _, alias| protocol_interface_cycle_initial(db, ClassType::Generic(alias)),
+        cycle_fn = |db, cycle, previous: &ProtocolInterface<'db>, value, _, alias| {
+            protocol_interface_cycle_recover(db, cycle, *previous, value, ClassType::Generic(alias))
+        },
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn specialized_protocol_interface<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        alias: GenericAlias<'db>,
+    ) -> ProtocolInterface<'db> {
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+        compute_protocol_interface(db, &env, ClassType::Generic(alias))
+    }
+    env.cached_or_compute(
+        || specialized_protocol_interface(db, env.program(db), alias),
+        || compute_protocol_interface(db, env, ClassType::Generic(alias)),
+    )
+}
+
+fn compute_protocol_interface<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    let env = TypeOperations::new_root(
-        db,
-        ProgramEnvironment::from_file(class.class_literal(db).program_file(db)),
-    );
+    let env = env.in_environment(ProgramEnvironment::from_file(
+        class.class_literal(db).program_file(db),
+    ));
     let mut members = BTreeMap::default();
 
     ProtocolClass(class).for_each_member_candidate(db, &env, |name, candidate, specialization| {
@@ -3562,8 +3504,8 @@ fn cached_protocol_interface<'db>(
         }
 
         let specialization =
-            specialization.map(|specialization| specialization.with_typevar_bounds(db));
-        let candidate = candidate.apply_specialization(db, specialization);
+            specialization.map(|specialization| specialization.with_typevar_bounds(db, &env));
+        let candidate = candidate.apply_specialization(db, &env, specialization);
         let ProtocolMemberCandidate {
             ty,
             qualifiers,
@@ -3614,7 +3556,6 @@ fn cached_protocol_interface<'db>(
 
 fn protocol_interface_cycle_initial<'db>(
     db: &'db dyn Db,
-    _id: salsa::Id,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
     ProtocolInterface::empty(
@@ -3626,11 +3567,10 @@ fn protocol_interface_cycle_initial<'db>(
     )
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn proto_interface_cycle_recover<'db>(
+fn protocol_interface_cycle_recover<'db>(
     db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &ProtocolInterface<'db>,
+    cycle: &salsa::Cycle<'_>,
+    previous: ProtocolInterface<'db>,
     value: ProtocolInterface<'db>,
     class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
@@ -3638,7 +3578,7 @@ fn proto_interface_cycle_recover<'db>(
         db,
         ProgramEnvironment::from_file(class.class_literal(db).program_file(db)),
     );
-    value.cycle_normalized(db, &env, *previous, cycle)
+    value.cycle_normalized(db, &env, previous, cycle)
 }
 
 /// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
@@ -3651,10 +3591,42 @@ fn proto_interface_cycle_recover<'db>(
 /// Protocol interfaces can be prepared before their receiver is known, so we do not use
 /// [`CallableType::bind_self`] here. Preserve all overloads and record receiver constraints for
 /// later compatibility checks instead of specializing or filtering signatures here.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn protocol_bind_self<'db>(
     db: &'db dyn Db,
-    program: Program<'db>,
+    env: &TypeOperations<'db>,
+    callable: CallableType<'db>,
+    self_type: Option<Type<'db>>,
+) -> CallableType<'db> {
+    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    fn protocol_bind_self<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        callable: CallableType<'db>,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+        compute(db, &env, program, callable, self_type)
+    }
+    fn compute<'db>(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        program: Program<'db>,
+        callable: CallableType<'db>,
+        self_type: Option<Type<'db>>,
+    ) -> CallableType<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_program(program));
+        bind_protocol_self_in_operation(db, &env, callable, self_type)
+    }
+
+    let program = env.program(db);
+    *env.cached_or_compute(
+        || protocol_bind_self(db, program, callable, self_type),
+        || compute(db, env, program, callable, self_type),
+    )
+}
+fn bind_protocol_self_in_operation<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
@@ -3662,48 +3634,58 @@ fn protocol_bind_self<'db>(
         return callable.into_regular(db);
     }
 
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
-    callable
-        .with_signatures(
-            db,
-            callable
-                .signatures(db)
-                .bind_self_with_receiver(db, &env, self_type, self_type),
-        )
-        .into_regular(db)
+    callable.bind_protocol_receiver(db, env, self_type)
 }
 
 /// Cache receiver and `Self` binding only for protocol-member compatibility checks.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|db, _, _, _, _, _| CallableType::bottom(db),
-    heap_size=ruff_memory_usage::heap_size
-)]
 fn protocol_apply_self_with_receiver<'db>(
     db: &'db dyn Db,
-    program: Program<'db>,
+    env: &TypeOperations<'db>,
     callable: CallableType<'db>,
     receiver_type: Type<'db>,
     self_type: Type<'db>,
 ) -> CallableType<'db> {
-    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = |db, _, _, _, _, _| crate::types::CallableType::bottom(db),
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn protocol_apply_self_with_receiver<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        callable: CallableType<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+        compute(db, &env, program, callable, receiver_type, self_type)
+    }
+    fn compute<'db>(
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        program: Program<'db>,
+        callable: CallableType<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let env = env.in_environment(ProgramEnvironment::from_program(program));
+        apply_protocol_self_in_operation(db, &env, callable, receiver_type, self_type)
+    }
 
-    callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
+    let program = env.program(db);
+    *env.cached_or_compute(
+        || protocol_apply_self_with_receiver(db, program, callable, receiver_type, self_type),
+        || compute(db, env, program, callable, receiver_type, self_type),
+    )
 }
-
-/// Return `true` if a callable has at least one overload and none return `Never`.
-///
-/// Return-type disjointness is a pragmatic approximation for method members: a callable returning
-/// `Never` could satisfy otherwise-incompatible signatures, so it must not establish disjointness.
-fn callable_has_only_non_never_returns<'db>(db: &'db dyn Db, callable: CallableType<'db>) -> bool {
-    let mut signatures = callable.signatures(db).iter();
-    let Some(first) = signatures.next() else {
-        // An empty signature previously produced `Unknown`, which cannot establish disjointness.
-        return false;
-    };
-
-    !first.return_ty.has_outer_type(db, |ty| ty.is_never())
-        && signatures.all(|signature| !signature.return_ty.has_outer_type(db, |ty| ty.is_never()))
+fn apply_protocol_self_in_operation<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    callable: CallableType<'db>,
+    receiver_type: Type<'db>,
+    self_type: Type<'db>,
+) -> CallableType<'db> {
+    callable.apply_self_with_receiver(db, env, receiver_type, self_type)
 }
 
 /// Protocol compatibility can only succeed if every required member is present.
@@ -3716,11 +3698,11 @@ pub(super) fn has_all_protocol_members_defined<'db>(
     ty: Type<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
-    let target_interface = protocol.interface(db);
+    let target_interface = protocol.interface(db, env);
 
     match ty {
         Type::ProtocolInstance(source_protocol) => {
-            let source_interface = source_protocol.interface(db);
+            let source_interface = source_protocol.interface(db, env);
 
             (source_interface.member_count(db) >= target_interface.member_count(db)
                 || source_interface.member_count(db)
@@ -3744,4 +3726,118 @@ pub(super) fn has_all_protocol_members_defined<'db>(
                     .is_definitely_bound()
         }),
     }
+}
+
+pub(super) struct PropertyReturns<'db> {
+    types: Vec<Type<'db>>,
+    definition: Option<Definition<'db>>,
+}
+
+impl<'db> PropertyReturns<'db> {
+    pub(super) fn collect(&mut self, signatures: &CallableSignature<'db>) {
+        for signature in signatures {
+            self.types.push(signature.return_ty);
+            self.definition = self.definition.or(signature.definition());
+        }
+    }
+}
+
+impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    pub(super) fn check_protocol_method_signatures(
+        &self,
+        db: &'db dyn Db,
+        callable: CallableType<'db>,
+        required_callable: CallableType<'db>,
+        implementation_self_binding_ty: Type<'db>,
+        protocol_self_binding_ty: Type<'db>,
+        original: &CallableSignature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
+        let signatures = CallableSignature::from_overloads(
+            original
+                .iter()
+                .filter(|signature| {
+                    let parameters = signature.parameters();
+                    parameters.get_positional(0).is_some() || parameters.variadic().is_some()
+                })
+                .map(|signature| {
+                    signature.bind_self(db, env, Some(implementation_self_binding_ty))
+                }),
+        );
+        if signatures.overloads.is_empty() {
+            return self.never();
+        }
+        self.check_callable_pair(
+            db,
+            callable.with_signatures(db, signatures),
+            protocol_bind_self(db, env, required_callable, Some(protocol_self_binding_ty)),
+        )
+    }
+}
+
+pub(super) fn supports_protocol_variance_type<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+) -> bool {
+    !any_over_type_expanding_aliases(
+        db,
+        env,
+        ty,
+        |nested| matches!(nested, Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_none_or(|class| !class.supports_variance_inference(db))),
+    )
+}
+
+pub(super) fn protocol_descriptor_member_resolved<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    descriptor_ty: Type<'db>,
+    protocol: ClassType<'db>,
+    definition: Option<Definition<'db>>,
+) -> Option<ProtocolMemberData<'db>> {
+    // Applying a generic descriptor decorator to a method that refers to an enclosing type
+    // variable can currently materialize that variable as `Unknown`. Reducing the descriptor to
+    // its `__get__` result would then erase the remaining descriptor structure and weaken the
+    // protocol member to a bare `Unknown`.
+    if super::visitor::any_over_type(db, env, descriptor_ty, false, |ty| ty.is_unknown()) {
+        return None;
+    }
+
+    let Place::Defined(DefinedPlace {
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = descriptor_ty
+        .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+    else {
+        return None;
+    };
+
+    let receiver_ty = Type::instance(db, env, protocol);
+    let read_ty = descriptor_ty
+        .try_call_dunder_get(
+            db,
+            env,
+            Some(receiver_ty),
+            receiver_ty.to_meta_type(db, env),
+        )
+        .unwrap_or_else(|error| Some(error.fallback()))?
+        .return_type;
+    let read = Some(ProtocolPropertyType::with_definition(read_ty, definition));
+
+    let write = match descriptor_setter_domain(db, env, descriptor_ty, receiver_ty) {
+        DescriptorSetterDomain::Missing => None,
+        DescriptorSetterDomain::Known(domain) => Some(ProtocolMemberWrite::descriptor(
+            descriptor_ty,
+            Some(domain),
+            definition,
+        )),
+        DescriptorSetterDomain::Deferred => Some(ProtocolMemberWrite::descriptor(
+            descriptor_ty,
+            None,
+            definition,
+        )),
+    };
+
+    Some(ProtocolMemberData::property(read, write, definition))
 }

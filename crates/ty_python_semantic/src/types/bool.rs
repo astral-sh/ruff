@@ -1,5 +1,7 @@
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 use crate::types::typevar::TypeVarSet;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
@@ -60,11 +62,15 @@ struct TryBool {
 }
 
 impl<'db> TypeQuery<'db> for TryBool {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::TryBool(self.allow_short_circuit)
+    }
+
     type Output = Result<Truthiness, BoolError<'db>>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         kind: CycleKind,
         _state: (),
@@ -73,7 +79,7 @@ impl<'db> TypeQuery<'db> for TryBool {
             // An exact back-edge adds no alternatives to the enclosing union. A different
             // specialization can introduce values with either truthiness.
             CycleKind::Exact => Truthiness::Uninhabited,
-            CycleKind::MatchingIdentity => Truthiness::Ambiguous,
+            CycleKind::MatchingIdentity | CycleKind::Reentrant => Truthiness::Ambiguous,
         })
     }
 
@@ -91,7 +97,7 @@ impl<'db> TypeQuery<'db> for TryBool {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> Self::Output {
@@ -269,10 +275,13 @@ impl<'db> TypeQuery<'db> for TryBool {
             Type::Never => Truthiness::Uninhabited,
 
             Type::TypedDict(td) => {
-                if td.items(db).values().any(TypedDictField::is_required) {
+                if td.items(db, env).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
-                } else if td.openness(db).is_closed()
-                    && td.items(db).values().all(|field| !field.may_be_present(db))
+                } else if td.openness(db, env).is_closed()
+                    && td
+                        .items(db, env)
+                        .values()
+                        .all(|field| !field.may_be_present(db, env))
                 {
                     Truthiness::AlwaysFalse
                 } else {
@@ -381,7 +390,7 @@ impl<'db> TypeQuery<'db> for TryBool {
             },
 
             Type::NewTypeInstance(newtype) => {
-                traversal.visit(db, newtype.concrete_base_type(db))?
+                traversal.visit(db, newtype.concrete_base_type(db, env))?
             }
         };
 

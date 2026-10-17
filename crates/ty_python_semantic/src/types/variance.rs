@@ -1,5 +1,6 @@
+use crate::types::TypeOperations;
 use crate::{
-    Db, TypeOperations,
+    Db,
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},

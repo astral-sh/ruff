@@ -1,3 +1,5 @@
+use crate::Db;
+use crate::types::TypeOperations;
 use crate::types::generics::specialization_variance;
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::contains_growing_type;
@@ -5,9 +7,8 @@ use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, TypeOperations};
 
-pub(super) enum GenericIntersection<'db> {
+pub(in crate::types) enum GenericIntersection<'db> {
     /// Replace both intersection elements with this equivalent type.
     /// For example, intersecting `list[int]` and `list[Any]` produces `list[int]`.
     Simplified(Type<'db>),
@@ -38,7 +39,7 @@ pub(super) enum GenericIntersection<'db> {
 /// For example, `list[int] & list[Any]` simplifies to `list[int]`, while
 /// `Sequence[int] & Sequence[Any]` simplifies to `Sequence[int & Any]`.
 /// A recursive pair is returned separately so callers can also skip relation-based reductions.
-pub(super) fn generic_gradual_intersection<'db>(
+pub(in crate::types) fn generic_gradual_intersection<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     left: Type<'db>,
@@ -94,7 +95,7 @@ fn base_top_intersection<'db>(
 
     let inherited_specialization = subclass_class
         .identity_specialization(db)
-        .iter_mro(db)
+        .iter_mro(db, env)
         .find_map(|ancestor| match ancestor {
             ClassBase::Class(ClassType::Generic(alias)) if alias.origin(db) == base_class => {
                 Some(alias.specialization(db))
@@ -187,7 +188,7 @@ fn base_top_intersection<'db>(
     let specialized = Type::instance(
         db,
         env,
-        subclass_class.apply_optional_specialization(db, Some(specialization)),
+        subclass_class.apply_optional_specialization(db, env, Some(specialization)),
     );
     Some(GenericIntersection::Simplified(
         if subclass_specialization.materialization_kind(db) == Some(MaterializationKind::Top) {
@@ -345,6 +346,6 @@ fn dynamic_generalization_intersection<'db>(
     Some(Type::instance(
         db,
         env,
-        general_class.apply_optional_specialization(db, Some(specialization)),
+        general_class.apply_optional_specialization(db, env, Some(specialization)),
     ))
 }

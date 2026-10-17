@@ -1,10 +1,11 @@
 use crate::Db;
 use crate::FxOrderSet;
-use crate::TypeOperations;
 use crate::place::PlaceAndQualifiers;
+use crate::types::TypeOperations;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::recursive::RecursiveReferenceMapper;
+use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -12,8 +13,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
     DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
     MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
-    TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    todo_type,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
 use ty_python_core::definition::Definition;
 
@@ -97,7 +97,7 @@ impl<'db> SubclassOfType<'db> {
         let subclass_of = match ty {
             Type::Dynamic(dynamic) => SubclassOfInner::Dynamic(dynamic),
             Type::ClassLiteral(literal) => {
-                SubclassOfInner::Class(literal.default_specialization(db))
+                SubclassOfInner::Class(literal.default_specialization(db, env))
             }
             Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
             Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
@@ -185,7 +185,7 @@ impl<'db> SubclassOfType<'db> {
             return None;
         };
         protocol
-            .interface(db)
+            .interface(db, env)
             .meta_write_requirement(db, env, Type::ProtocolInstance(protocol), name)
             .map(|(write_ty, mut qualifiers)| {
                 // `ClassVar` prohibits instance writes, not writes through the class object.
@@ -223,13 +223,10 @@ impl<'db> SubclassOfType<'db> {
                 TypeInspector::inspect_root(
                     db,
                     env,
+                    TypeInspectionKey::ExactTypevarUpperBound,
                     bound,
                     |_, _| None,
-                    |_, bound| {
-                        let bound = Self::try_from_instance(db, env, bound).ok()?;
-                        matches!(bound, Type::ClassLiteral(_) | Type::GenericAlias(_))
-                            .then_some(bound)
-                    },
+                    |_, bound| bound.exact_class_for_bound(db),
                 )
             })
     }
@@ -304,7 +301,7 @@ impl<'db> SubclassOfType<'db> {
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
+            && let Some(member) = protocol.interface(db, env).meta_member(db, env, name)
         {
             return Some(member);
         }
@@ -374,16 +371,12 @@ impl<'db> SubclassOfType<'db> {
         Type::SubclassOf(self).to_meta_type(db, env)
     }
 
-    pub(super) fn to_meta_type_with_recursion(
+    pub(super) fn metaclass_upper_bound(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
-        context: &TypeRecursionContext<'db>,
     ) -> Type<'db> {
-        match self
-            .subclass_of
-            .with_transposed_type_var_with_recursion(db, env, context)
-        {
+        match self.subclass_of.with_transposed_type_var(db, env) {
             SubclassOfInner::Dynamic(dynamic) => {
                 SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
             }
@@ -391,10 +384,10 @@ impl<'db> SubclassOfType<'db> {
             // rather than being a class literal. Projecting to instances preserves this
             // constraint when computing its possible subclasses.
             SubclassOfInner::Class(class) => class
-                .inferred_metaclass(db)
+                .inferred_metaclass(db, env)
                 .for_inheritance(db, env)
                 .to_instance_approximation(db, env)
-                .map(|instance| instance.to_meta_type_with_recursion(db, env, context))
+                .map(|instance| instance.to_meta_type(db, env))
                 .unwrap_or(SubclassOfType::subclass_of_unknown()),
             // Structural implementations of a protocol can have arbitrary metaclasses. The only
             // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
@@ -408,11 +401,11 @@ impl<'db> SubclassOfType<'db> {
                     // `with_transposed_type_var` always adds a bound for unbounded TypeVars
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.to_meta_type_with_recursion(db, env, context)
+                        bound.to_meta_type(db, env)
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .as_type(db, env)
-                        .to_meta_type_with_recursion(db, env, context),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db, env).to_meta_type(db, env)
+                    }
                 }
             }
         }
@@ -646,37 +639,31 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Self {
-        self.with_transposed_type_var_with_recursion(db, env, &TypeRecursionContext::default())
-    }
-
-    fn with_transposed_type_var_with_recursion(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-        context: &TypeRecursionContext<'db>,
-    ) -> Self {
         let Some(bound_typevar) = self.into_type_var() else {
             return self;
         };
 
-        let bound_typevar = bound_typevar.map_bound_or_constraints(db, |bound_or_constraints| {
-            Some(match bound_or_constraints {
-                None => TypeVarBoundOrConstraints::UpperBound(
-                    SubclassOfType::try_from_instance(db, env, bound_typevar.domain(db).top(db))
+        let bound_typevar =
+            bound_typevar.map_bound_or_constraints(db, env, |bound_or_constraints| {
+                Some(match bound_or_constraints {
+                    None => TypeVarBoundOrConstraints::UpperBound(
+                        SubclassOfType::try_from_instance(
+                            db,
+                            env,
+                            bound_typevar.domain(db).top(db),
+                        )
                         .unwrap_or(SubclassOfType::subclass_of_unknown()),
-                ),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    TypeVarBoundOrConstraints::UpperBound(
-                        bound.to_meta_type_with_recursion(db, env, context),
-                    )
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
-                        constraint.to_meta_type_with_recursion(db, env, context)
-                    }))
-                }
-            })
-        });
+                    ),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        TypeVarBoundOrConstraints::UpperBound(bound.to_meta_type(db, env))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        TypeVarBoundOrConstraints::Constraints(
+                            constraints.map(db, |constraint| constraint.to_meta_type(db, env)),
+                        )
+                    }
+                })
+            });
 
         Self::TypeVar(bound_typevar)
     }

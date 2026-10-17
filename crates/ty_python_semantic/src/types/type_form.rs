@@ -4,7 +4,9 @@ use super::{
     UnionType, visitor,
 };
 use crate::Db;
-use crate::TypeOperations;
+use crate::types::TypeOperations;
+use crate::types::recursive::TypeQueryKey;
+use crate::types::recursive::TypeQueryVisit;
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
@@ -46,11 +48,15 @@ impl<'db> Type<'db> {
 struct TypeFormArgument;
 
 impl<'db> TypeQuery<'db> for TypeFormArgument {
+    fn recursion_key(&self) -> TypeQueryKey<'db> {
+        TypeQueryKey::TypeFormArgument
+    }
+
     type Output = Option<Type<'db>>;
 
     fn on_cycle(
         &self,
-        _traversal: &TypeQueryContext<'_, 'db, Self>,
+        _traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         _ty: Type<'db>,
         _kind: CycleKind,
         _state: (),
@@ -61,7 +67,7 @@ impl<'db> TypeQuery<'db> for TypeFormArgument {
     fn visit(
         &self,
         db: &'db dyn Db,
-        traversal: &TypeQueryContext<'_, 'db, Self>,
+        traversal: &TypeQueryVisit<'_, '_, 'db, Self>,
         ty: Type<'db>,
         _state: (),
     ) -> Self::Output {

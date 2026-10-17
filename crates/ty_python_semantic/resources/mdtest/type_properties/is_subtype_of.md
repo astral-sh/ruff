@@ -642,11 +642,9 @@ static_assert(not is_subtype_of(Literal[0], AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysTruthy))
 static_assert(not is_subtype_of(str, AlwaysFalsy))
 
-# TODO: No errors
-# error: [static-assert-error]
 static_assert(is_subtype_of(bool, Literal[False] | AlwaysTruthy))
-# error: [static-assert-error]
 static_assert(is_subtype_of(bool, Literal[True] | AlwaysFalsy))
+# TODO: No error
 # error: [static-assert-error]
 static_assert(is_subtype_of(LiteralString, Literal[""] | AlwaysTruthy))
 static_assert(not is_subtype_of(Literal[True] | AlwaysFalsy, Literal[False] | AlwaysTruthy))

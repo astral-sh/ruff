@@ -18,9 +18,9 @@ pub fn goto_type_definition(
     let ty = goto_target.inferred_type(&model)?;
     let env = model.program_environment();
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db, env));
+    tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
 
-    let navigation_targets = ty.navigation_targets(db, env);
+    let navigation_targets = ty.navigation_targets(db, &env);
 
     Some(RangedValue {
         range: FileRange::new(file.file(db), goto_target.range()),

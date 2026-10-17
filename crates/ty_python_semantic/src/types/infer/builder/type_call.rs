@@ -163,7 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
                 let members: Box<[(ast::name::Name, Type<'db>)]> = typed_dict
-                    .items(db)
+                    .items(db, env)
                     .iter()
                     .map(|(name, field)| (name.clone(), field.declared_ty))
                     .collect();
@@ -269,7 +269,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 report_inconsistent_dynamic_generic_bases(&self.context, dynamic_class, bases_arg);
 
                 // MRO succeeded, check for instance-layout-conflict.
-                disjoint_bases.remove_redundant_entries(db);
+                disjoint_bases.remove_redundant_entries(db, env);
                 if disjoint_bases.len() > 1 {
                     report_instance_layout_conflict(
                         &self.context,

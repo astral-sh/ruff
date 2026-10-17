@@ -1,5 +1,6 @@
 //! [`PathAssignments`] and friends
 
+use crate::types::TypeOperations;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -22,7 +23,7 @@ use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, TypeOperations};
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 /// The position of an assignment in insertion order.
 #[newtype_index]
@@ -734,7 +735,7 @@ impl PathAssignments {
 
         let constraint_data = storage.constraint_data(constraint);
         if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
-            let added = self.add_sequents(db, env, storage, map);
+            let added = self.add_sequents(db, env, storage, &map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
             // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
@@ -798,7 +799,7 @@ impl PathAssignments {
                 continue;
             };
             self.elaborated_pairs.insert((a, b));
-            let added = self.add_sequents(db, env, storage, map);
+            let added = self.add_sequents(db, env, storage, &map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
             // each constraint. Since we are salsa-caching sequent derivation, we don't have easy

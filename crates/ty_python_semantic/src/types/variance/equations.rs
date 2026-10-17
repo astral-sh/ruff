@@ -19,7 +19,7 @@ use crate::types::{
     BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
     TypeAliasType, TypeVarVariance, TypedDictType,
 };
-use crate::{Db, ProgramEnvironment, TypeOperations};
+use crate::{Db, ProgramEnvironment};
 
 /// A variance expression whose recursive references name equations rather than expand types.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -157,6 +157,7 @@ pub(crate) enum VarianceOrigin<'db> {
     TypeAlias(TypeAliasType<'db>),
     Recursive(RecursiveType<'db>),
     Function(FunctionType<'db>),
+
     TypedDict(ClassType<'db>),
 }
 
@@ -206,10 +207,14 @@ impl<'db> VarianceVariable<'db> {
             }
             VarianceOrigin::GenericAlias(alias) => alias.variance_equation(db, typevar),
             VarianceOrigin::TypeAlias(alias) => alias.variance_equation(db, typevar),
-            VarianceOrigin::Recursive(recursive) => recursive.variance_equation(db, typevar),
+            VarianceOrigin::Recursive(recursive) => {
+                let env = crate::types::TypeOperations::new_root(db, recursive.environment(db));
+                recursive.variance_equation(db, &env, typevar)
+            }
             VarianceOrigin::Function(function) => function.variance_equation(db, typevar),
+
             VarianceOrigin::TypedDict(class) => {
-                let env = TypeOperations::new_root(
+                let env = crate::types::TypeOperations::new_root(
                     db,
                     ProgramEnvironment::from_file(class.class_literal(db).program_file(db)),
                 );

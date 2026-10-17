@@ -1,5 +1,6 @@
 //! Parameters of implicit type aliases, including parameters used only in forward references.
 
+use crate::types::TypeOperations;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::Visitor;
@@ -13,7 +14,7 @@ use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
     binding_type,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment, TypeOperations};
+use crate::{Db, FxOrderSet, ProgramEnvironment};
 
 /// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
 ///
@@ -39,6 +40,7 @@ pub(in crate::types) fn implicit_alias_parameters<'db>(
     let value = definition.kind(db).value(&parsed)?;
     let mut collector = ImplicitAliasLegacyTypeVarCollector {
         db,
+        operations: TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
         alias_definition: definition,
         index: semantic_index(db, file),
         string_annotation_scope: None,
@@ -46,16 +48,13 @@ pub(in crate::types) fn implicit_alias_parameters<'db>(
     };
     collector.visit_expr(value);
     (!collector.variables.is_empty()).then(|| {
-        GenericContext::from_typevar_instances(
-            db,
-            &TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
-            collector.variables,
-        )
+        GenericContext::from_typevar_instances(db, &collector.operations, collector.variables)
     })
 }
 
 struct ImplicitAliasLegacyTypeVarCollector<'a, 'db> {
     db: &'db dyn Db,
+    operations: TypeOperations<'db>,
     alias_definition: Definition<'db>,
     index: &'a ty_python_core::SemanticIndex<'db>,
     string_annotation_scope: Option<FileScopeId>,
@@ -97,11 +96,7 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
             }
             ast::Expr::Attribute(attribute) => self
                 .expression_type(&attribute.value)?
-                .member(
-                    db,
-                    &TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
-                    &attribute.attr,
-                )
+                .member(db, &self.operations, &attribute.attr)
                 .ignore_possibly_undefined(),
             _ => None,
         }

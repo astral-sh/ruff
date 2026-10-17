@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::TypeOperations;
 use itertools::{Either, Itertools};
 use ruff_db::{diagnostic::Annotation, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
@@ -210,7 +211,10 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         let mut field_with_default_encountered = None;
 
-        for (field_name, field) in class.own_fields(db, None, CodeGeneratorKind::NamedTuple) {
+        for (field_name, field) in class
+            .own_fields(db, env, None, CodeGeneratorKind::NamedTuple)
+            .iter()
+        {
             if field_name.starts_with('_') {
                 report_named_tuple_field_with_leading_underscore(
                     context,
@@ -505,7 +509,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             );
         }
 
-        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, base_class) {
+        if let Some(ordered_base_class) = ordered_dataclass_base_class(db, env, base_class) {
             // Suppress the diagnostic if the child class manually overrides all comparison
             // methods, since the user has explicitly fixed the LSP violation.
             if !class.has_own_comparison_methods(db)
@@ -538,7 +542,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check that the class's MRO is resolvable
     let mut inconsistent_generic_bases = false;
-    match class.try_mro(db, None) {
+    match class.try_mro(db, env, None) {
         Err(mro_error) => match mro_error.reason() {
             StaticMroErrorKind::DuplicateBases(duplicates) => {
                 for duplicate in duplicates {
@@ -612,7 +616,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             }
         },
         Ok(_) => {
-            disjoint_bases.remove_redundant_entries(db);
+            disjoint_bases.remove_redundant_entries(db, env);
 
             if disjoint_bases.len() > 1 {
                 report_instance_layout_conflict(
@@ -637,7 +641,9 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check that `@total_ordering` has a valid ordering method in the MRO
-    if class.total_ordering(db) && !class.has_ordering_method_in_mro(db, None) {
+    if class.total_ordering(db)
+        && !class.has_ordering_method_in_mro(db, context.program_environment(), None)
+    {
         // Find the `@total_ordering` decorator to report the diagnostic at its location
         if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
             file_expression_type(&decorator.expression)
@@ -834,7 +840,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     "__init_subclass__",
                     MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                     // skip(1) to skip the current class and only consider base classes.
-                    class.iter_mro(db, None).skip(1),
+                    class.iter_mro(db, env).skip(1),
                 )
                 .ignore_possibly_undefined();
 
@@ -981,7 +987,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             if let Some(generic_context) = class.generic_context(db) {
                 for self_typevar in generic_context.variables(db) {
                     let name = self_typevar.typevar(db).name(db);
-                    for enclosing in enclosing_generic_contexts(db, index, parent) {
+                    for enclosing in enclosing_generic_contexts(db, env, index, parent) {
                         if let Some(other_typevar) = enclosing.binds_named_typevar(db, name) {
                             report_shadowed_type_variable(
                                 context,
@@ -1001,7 +1007,7 @@ pub(crate) fn check_static_class_definitions<'db>(
             // variables from enclosing scopes (by identity).
             for base_typevar in class.typevars_referenced_in_bases(db) {
                 let typevar = base_typevar.typevar(db);
-                for enclosing in enclosing_generic_contexts(db, index, parent) {
+                for enclosing in enclosing_generic_contexts(db, env, index, parent) {
                     if let Some(other_typevar) = enclosing.binds_typevar(db, typevar) {
                         report_shadowed_type_variable(
                             context,
@@ -1025,7 +1031,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     {
         let specialization = None;
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
-        let own_fields = class.own_fields(db, specialization, field_policy);
+        let own_fields = class.own_fields(db, env, specialization, field_policy);
 
         let kw_only_sentinel_fields: Vec<_> = own_fields
             .iter()
@@ -1034,7 +1040,8 @@ pub(crate) fn check_static_class_definitions<'db>(
         let mut field_order_violations = vec![];
         let mut previous_default_field = None;
 
-        for (name, field) in class.fields(db, specialization, field_policy) {
+        let fields = class.fields(db, env, specialization, field_policy);
+        for (name, field) in fields.iter() {
             // Extract dataclass field properties
             let FieldKind::Dataclass {
                 default_ty,
@@ -1085,6 +1092,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     && !own_fields.contains_key(name)
                     && has_inherited_dataclass_field_order_violation(
                         db,
+                        env,
                         class,
                         default_name,
                         default_field,
@@ -1173,6 +1181,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 /// provenance preserves diagnostics when a subclass redeclares either field.
 fn has_inherited_dataclass_field_order_violation<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     class: StaticClassLiteral<'db>,
     default_name: &Name,
     default_field: &Field<'db>,
@@ -1180,7 +1189,7 @@ fn has_inherited_dataclass_field_order_violation<'db>(
     required_field: &Field<'db>,
 ) -> bool {
     class
-        .iter_mro(db, None)
+        .iter_mro(db, env)
         .skip(1)
         .filter_map(ClassBase::into_class)
         .filter_map(|ancestor| ancestor.static_class_literal(db))
@@ -1194,7 +1203,7 @@ fn has_inherited_dataclass_field_order_violation<'db>(
                 return false;
             }
 
-            let fields = ancestor.fields(db, specialization, field_policy);
+            let fields = ancestor.fields(db, env, specialization, field_policy);
             let Some((default_index, _, inherited_default_field)) = fields.get_full(default_name)
             else {
                 return false;
@@ -1239,7 +1248,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     let table = index.place_table(scope);
     let use_def = index.use_def_map(scope);
 
-    let Some(metaclass) = metaclass.to_class_type(db) else {
+    let Some(metaclass) = metaclass.to_class_type(db, env) else {
         return;
     };
 
@@ -1248,7 +1257,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
     let mut metaclass_instance_members = FxHashSet::default();
     let mut metaclass_assigned_members = FxHashSet::default();
     for metaclass in metaclass
-        .iter_mro(db)
+        .iter_mro(db, env)
         .filter_map(ClassBase::into_class)
         .filter_map(|class| class.static_class_literal(db).map(|(literal, _)| literal))
     {
@@ -1370,9 +1379,13 @@ fn check_class_namespace_against_metaclass_members<'db>(
 
 fn ordered_dataclass_base_class<'db>(
     db: &'db dyn Db,
+    env: &TypeOperations<'db>,
     base_class: ClassType<'db>,
 ) -> Option<ClassType<'db>> {
-    for ancestor in base_class.iter_mro(db).filter_map(ClassBase::into_class) {
+    for ancestor in base_class
+        .iter_mro(db, env)
+        .filter_map(ClassBase::into_class)
+    {
         let Some((ancestor_literal, _)) = ancestor.static_class_literal(db) else {
             continue;
         };
@@ -1416,7 +1429,7 @@ fn check_final_class_abstract_methods<'db>(
     let env = context.program_environment();
 
     let class_type = class.identity_specialization(db);
-    let abstract_methods = AbstractMethods::of_class(db, class_type);
+    let abstract_methods = AbstractMethods::of_class(db, env, class_type);
 
     // If there are no abstract methods, we're done.
     let Some(first_method_name) = abstract_methods.first_name() else {

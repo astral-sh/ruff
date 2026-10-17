@@ -49,7 +49,9 @@
 //! the public type of `f` is resolved at position 3, correctly giving you all of the overloads
 //! (and the implementation).
 
+use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
+use smallvec::SmallVec;
 use std::{borrow::Cow, str::FromStr};
 
 use bitflags::bitflags;
@@ -64,10 +66,9 @@ use salsa::plumbing::AsId;
 use ty_module_resolver::{KnownModule, file_to_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
-use crate::types::callable::CallableTypeKind;
+use crate::types::callable::{CallableTypeKind, ExpandedSignatures};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
-use crate::types::cyclic::ActiveRecursionDetector;
 
 use crate::types::generics::{
     GenericContext, Specialization, typing_self, walk_specialization_types,
@@ -87,50 +88,11 @@ use crate::types::{
     SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
     definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment, TypeOperations};
+use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{FileScopeId, ProgramFile, SemanticIndex, semantic_index};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecursiveTypeNormalizationKey {
-    function_literal: salsa::Id,
-    nested: bool,
-}
-
-// Keep this detector thread-local rather than threading it through every recursive
-// normalization helper. Passing an explicit visitor would model the recursion state more
-// directly, but it would touch a wide slice of the type-normalization plumbing for no current
-// behavioral benefit. This works because recursive normalization currently stays on a single
-// thread/query stack; if that ever changes, revisit this and prefer explicit visitor propagation.
-std::thread_local! {
-    static ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS: ActiveRecursionDetector<RecursiveTypeNormalizationKey> =
-        ActiveRecursionDetector::default();
-}
-
-/// Runs recursive type normalization under a scoped guard keyed by function literal identity.
-///
-/// `TypeOf` can make a function signature refer back to the same function through many different
-/// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
-fn visit_recursive_type_normalization<R>(
-    function_literal: FunctionLiteral<'_>,
-    nested: bool,
-    on_cycle: impl FnOnce() -> R,
-    func: impl FnOnce() -> R,
-) -> R {
-    ACTIVE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
-        detector.visit(
-            &RecursiveTypeNormalizationKey {
-                function_literal: function_literal.last_definition.as_id(),
-                nested,
-            },
-            on_cycle,
-            func,
-        )
-    })
-}
 
 /// A collection of useful spans for annotating functions.
 ///
@@ -558,11 +520,27 @@ impl<'db> OverloadLiteral<'db> {
     pub(crate) fn decorated_signatures(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
     ) -> impl Iterator<Item = Signature<'db>> + Clone + 'db {
         match binding_type(db, self.definition(db)) {
-            Type::Callable(callable) => {
-                Either::Left(callable.signatures(db).overloads.iter().cloned())
-            }
+            Type::Callable(callable) => Either::Left(
+                callable
+                    .inspect_signatures_root(
+                        db,
+                        &env.in_environment(ProgramEnvironment::from_definition(
+                            self.definition(db),
+                        )),
+                        |_, signatures| {
+                            let mut result = DefinitionSignatures {
+                                overloads: SmallVec::new(),
+                            };
+                            signatures.collect_definition_signatures(&mut result);
+                            result.overloads
+                        },
+                    )
+                    .unwrap_or_default()
+                    .into_iter(),
+            ),
             _ => Either::Right(std::iter::once(self.signature(db))),
         }
     }
@@ -634,7 +612,7 @@ impl<'db> OverloadLiteral<'db> {
             // then `self`/`cls` are only implicitly positional-only if
             // it is a protocol class.
             original_class_type(db, class_definition)
-                .map(|class_literal| class_literal.default_specialization(db))
+                .map(|class_literal| class_literal.identity_specialization(db))
                 .is_some_and(|class| class.is_protocol(db))
         }
 
@@ -730,8 +708,8 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.program_file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
-                    .expect(
+                let typing_self =
+                    typing_self(db, env, scope_id, typevar_binding_context, class.into()).expect(
                         "We should always find the surrounding class \
                      for an implicit self: Self annotation",
                     );
@@ -958,6 +936,10 @@ impl<'db> FunctionLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_definition(self.last_definition.definition(db)),
+        );
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let (overloads, implementation) = self.overloads_and_implementation(db);
@@ -977,24 +959,29 @@ impl<'db> FunctionLiteral<'db> {
                             .with_source_overload_index(Some(source_overload_index)),
                     ))
                 } else {
-                    Either::Right(overload.decorated_signatures(db).map(move |signature| {
-                        signature.with_source_overload_index(Some(source_overload_index))
-                    }))
+                    Either::Right(
+                        overload
+                            .decorated_signatures(db, &env)
+                            .map(move |signature| {
+                                signature.with_source_overload_index(Some(source_overload_index))
+                            }),
+                    )
                 }
             },
         ))
     }
 
-    /// Typed externally-visible signature of the last overload or implementation of this function.
-    ///
-    /// ## Warning
-    ///
-    /// This uses the semantic index to find the definition of the function. This means that if the
-    /// calling query is not in the same file as this function is defined in, then this will create
-    /// a cross-module dependency directly on the full AST which will lead to cache
-    /// over-invalidation.
+    /// Cache the source declaration before applying changes to the function's implementation.
     fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
-        self.last_definition.signature(db)
+        #[salsa::tracked(
+            returns(clone),
+            cycle_initial=|_, _, _| Signature::bottom(),
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(db: &'db dyn Db, definition: OverloadLiteral<'db>) -> Signature<'db> {
+            definition.signature(db)
+        }
+        cached(db, self.last_definition)
     }
 
     /// Typed externally-visible "raw" signature of the last overload or implementation of this function.
@@ -1208,7 +1195,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
     }
     if let Some(callables) = function.updated_implementation_callables(db) {
         for callable in callables {
-            visitor.visit_callable_type(db, *callable);
+            visitor.visit_type(db, Type::Callable(*callable));
         }
     }
     if let Some(specialization) = function.class_specialization(db) {
@@ -1287,16 +1274,6 @@ impl<'db> FunctionType<'db> {
             .and_then(|updated| updated.signature.as_ref())
     }
 
-    fn updated_implementation_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
-        let [callable] = self.updated_implementation_callables(db)? else {
-            return None;
-        };
-        let [signature] = callable.signatures(db).overloads.as_slice() else {
-            return None;
-        };
-        Some(signature)
-    }
-
     fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         self.updated_signatures(db)
             .as_deref()
@@ -1315,7 +1292,7 @@ impl<'db> FunctionType<'db> {
             || {
                 Cow::Owned(vec![CallableType::single(
                     db,
-                    self.last_definition_signature(db).clone(),
+                    self.stored_last_definition_signature(db),
                 )])
             },
             Cow::Borrowed,
@@ -1343,6 +1320,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn with_inherited_generic_context(
         self,
         db: &'db dyn Db,
+        env: &TypeOperations<'db>,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
         let updated_signature = self
@@ -1353,12 +1331,21 @@ impl<'db> FunctionType<'db> {
             self.implementation_callables(db)
                 .iter()
                 .map(|callable| {
-                    callable.with_signatures(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, inherited_generic_context),
-                    )
+                    callable
+                        .inspect_signatures_root(
+                            db,
+                            &env.in_environment(ProgramEnvironment::from_definition(
+                                self.definition(db),
+                            )),
+                            |_, signatures| {
+                                signatures.inherit_generic_context(
+                                    db,
+                                    *callable,
+                                    inherited_generic_context,
+                                )
+                            },
+                        )
+                        .unwrap_or(*callable)
                 })
                 .collect()
         });
@@ -1839,7 +1826,7 @@ impl<'db> FunctionType<'db> {
         // We currently skip return type inference for the `__call__` method of metaclasses.
         if self.name(db) == "__call__"
             && class.is_some_and(|class| {
-                class.iter_mro(db).any(|base| {
+                class.iter_mro(db, &env).any(|base| {
                     base.into_class()
                         .is_some_and(|base| base.class_literal(db).is_known(db, KnownClass::Type))
                 })
@@ -1859,7 +1846,7 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
-        return_type.apply_optional_specialization(db, self.class_specialization(db))
+        return_type.apply_optional_specialization(db, &env, self.class_specialization(db))
     }
 
     #[salsa::tracked(
@@ -1876,7 +1863,7 @@ impl<'db> FunctionType<'db> {
             index.class_definition_of_method(scope.file_scope_id(db))?,
         )?;
 
-        for base_class in class.iter_mro(db).skip(1) {
+        for base_class in class.iter_mro(db, &env).skip(1) {
             let member = class.class_member_from_mro(
                 db,
                 &env,
@@ -1909,9 +1896,10 @@ impl<'db> FunctionType<'db> {
                 // this more carefully. Maybe we should instead return `None` for such cases.
                 signature.return_ty.apply_optional_specialization(
                     db,
+                    &env,
                     signature
                         .generic_context
-                        .map(|context| context.default_specialization(db, None)),
+                        .map(|context| context.default_specialization(db, &env, None)),
                 ),
             );
         }
@@ -1922,19 +1910,24 @@ impl<'db> FunctionType<'db> {
     /// computed signature changes. Updated signatures are already stored on the interned function.
     #[salsa::tracked(
         returns(ref),
-        cycle_initial=|db, id, function: FunctionType<'db>| {
-            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(
-                function.literal(db).last_definition.body_scope(db),
-            ));
+        cycle_initial = |db, id, function: FunctionType<'db>| {
+            let env = TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db)),
+            );
             CallableSignature::cycle_initial(db, &env, id)
         },
-        cycle_fn=|db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
-            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(
-                function.literal(db).last_definition.body_scope(db),
-            ));
-            value.cycle_normalized(db, &env, previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size,
+        cycle_fn =
+            |db, cycle, previous, value: CallableSignature<'db>, function: FunctionType<'db>| {
+                let env = TypeOperations::new_root(
+                    db,
+                    ProgramEnvironment::from_scope(
+                        function.literal(db).last_definition.body_scope(db),
+                    ),
+                );
+                value.cycle_normalized(db, &env, previous, cycle)
+            },
+        heap_size = ruff_memory_usage::heap_size,
     )]
     fn literal_signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.literal(db).signature(db)
@@ -1968,26 +1961,34 @@ impl<'db> FunctionType<'db> {
         self.signature(db).variance_of(db, &env, typevar)
     }
 
-    /// Typed externally-visible signature of the last overload or implementation of this function.
-    ///
-    /// ## Why is this a salsa query?
-    ///
-    /// This is a salsa query to short-circuit the invalidation
-    /// when the function's AST node changes.
-    ///
-    /// Were this not a salsa query, then the calling query
-    /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(
-        returns(ref),
-        cycle_initial=|_, _, _|Signature::bottom(),
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    /// Inspect the effective implementation while any deferred signature remains guarded.
+    /// A decorator with no single implementation signature falls back to the source declaration.
+    pub(super) fn inspect_last_definition_signature<R>(
+        self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        mut inspect: impl FnMut(ExpandedSignatures<'_, 'db>) -> R,
+    ) -> R {
+        if self.literal(db).has_separate_implementation(db)
+            && let Some([callable]) = self.updated_implementation_callables(db)
+            && let Some(Some(result)) = callable.inspect_signatures(db, env, |signatures| {
+                signatures
+                    .has_single_signature()
+                    .then(|| inspect(signatures))
+            })
+        {
+            return result;
+        }
+
+        let signatures = CallableSignature::single(self.stored_last_definition_signature(db));
+        inspect(ExpandedSignatures::from_stored(&signatures, env))
+    }
+
+    /// Read a stored signature or source declaration without expanding a decorated callable.
+    fn stored_last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let literal = self.literal(db);
         if literal.has_separate_implementation(db) {
-            self.updated_implementation_signature(db)
-                .cloned()
-                .unwrap_or_else(|| literal.last_definition_signature(db))
+            literal.last_definition_signature(db)
         } else {
             self.updated_signature(db)
                 .and_then(|signature| signature.overloads.last().cloned())
@@ -2046,7 +2047,7 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn find_legacy_typevars_impl(
+    pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
@@ -2067,9 +2068,9 @@ impl<'db> FunctionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        visit_recursive_type_normalization(
-            self.literal(db),
-            nested,
+        env.context().state().function_normalization.visit(
+            env,
+            &(self.literal(db).last_definition.as_id(), nested),
             || None,
             || {
                 let mut literal = self.literal(db);
@@ -2202,7 +2203,7 @@ pub(super) fn function_body_kind<'db>(
 
 /// Classification of function body kinds.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum FunctionBodyKind {
+pub(crate) enum FunctionBodyKind {
     /// The function body only consists of `...`, `pass`, and/or a docstring.
     Stub,
     /// The function body consists of a single `raise NotImplementedError` statement,
@@ -2469,6 +2470,17 @@ pub(super) fn report_revealed_type<'db>(
                 revealed_type.display(db, env).preserve_long_unions()
             )),
         );
+    }
+}
+
+/// Collect signatures while inferring a function definition's source-level type.
+pub(super) struct DefinitionSignatures<'db> {
+    overloads: SmallVec<[Signature<'db>; 1]>,
+}
+
+impl<'db> DefinitionSignatures<'db> {
+    pub(super) fn extend(&mut self, signatures: &CallableSignature<'db>) {
+        self.overloads.extend(signatures.iter().cloned());
     }
 }
 

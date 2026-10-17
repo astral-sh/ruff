@@ -244,7 +244,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                             let in_type_expression = inferred
                                 .inner_type()
-                                .in_type_expression(db, self.scope(), None, self.inference_flags())
+                                .in_type_expression(
+                                    db,
+                                    env,
+                                    self.scope(),
+                                    None,
+                                    self.inference_flags(),
+                                )
                                 .unwrap_or_else(|err| {
                                     err.into_fallback_type(
                                         &self.context,
