@@ -5,7 +5,9 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging;
 use ruff_linter::settings::flags;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{
+    PyprojectConfig, Resolver, match_exclusion_or_ancestor, project_file_at_path,
+};
 
 use crate::args::ConfigArguments;
 use crate::diagnostics::{Diagnostics, lint_stdin};
@@ -30,9 +32,12 @@ pub(crate) fn check_stdin(
                 return Ok(Diagnostics::default());
             }
 
-            if filename.file_name().is_some_and(|name| {
-                match_exclusion(filename, name, &resolver.base_settings().linter.exclude)
-            }) {
+            let settings = resolver.base_settings();
+            if match_exclusion_or_ancestor(
+                filename,
+                &settings.file_resolver.project_root,
+                &settings.linter.exclude,
+            ) {
                 if fix_mode.is_apply() {
                     parrot_stdin()?;
                 }

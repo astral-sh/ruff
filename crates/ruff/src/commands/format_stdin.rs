@@ -4,10 +4,13 @@ use std::path::Path;
 use anyhow::Result;
 use log::error;
 
+use ruff_linter::fs;
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
-use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, project_file_at_path};
+use ruff_workspace::resolver::{
+    PyprojectConfig, Resolver, match_exclusion_or_ancestor, project_file_at_path,
+};
 
 use crate::ExitStatus;
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -37,9 +40,12 @@ pub(crate) fn format_stdin(
                 return Ok(ExitStatus::Success);
             }
 
-            if filename.file_name().is_some_and(|name| {
-                match_exclusion(filename, name, &resolver.base_settings().formatter.exclude)
-            }) {
+            let settings = resolver.base_settings();
+            if match_exclusion_or_ancestor(
+                &fs::normalize_path(filename),
+                &settings.file_resolver.project_root,
+                &settings.formatter.exclude,
+            ) {
                 if mode.is_write() {
                     parrot_stdin()?;
                 }

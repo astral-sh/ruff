@@ -12,7 +12,7 @@ use ruff_linter::source_kind::SourceKind;
 use ruff_linter::warn_user_once;
 use ruff_python_ast::{PySourceType, SourceType};
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
+    PyprojectConfig, ResolvedFile, match_exclusion_or_ancestor, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -71,9 +71,9 @@ pub(crate) fn add_noqa(
                 .and_then(|package| *package);
             let settings = resolver.resolve(path);
             if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                && match_exclusion(
+                && match_exclusion_or_ancestor(
                     resolved_file.path(),
-                    resolved_file.file_name(),
+                    &settings.file_resolver.project_root,
                     &settings.linter.exclude,
                 )
             {

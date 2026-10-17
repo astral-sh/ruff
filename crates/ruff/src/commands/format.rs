@@ -38,7 +38,7 @@ use ruff_source_file::{LineIndex, LineRanges, OneIndexed, SourceFile, SourceFile
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, Resolver, match_exclusion, project_files_in_path,
+    PyprojectConfig, ResolvedFile, Resolver, match_exclusion_or_ancestor, project_files_in_path,
 };
 
 use crate::args::{ConfigArguments, FormatArguments, FormatRange};
@@ -130,9 +130,9 @@ pub(crate) fn format(
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                        && match_exclusion(
+                        && match_exclusion_or_ancestor(
                             path,
-                            resolved_file.file_name(),
+                            &settings.file_resolver.project_root,
                             &settings.formatter.exclude,
                         )
                     {

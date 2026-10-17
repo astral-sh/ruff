@@ -488,6 +488,105 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/8267>
+#[test]
+fn exclude_directory() -> Result<()> {
+    let test = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+[format]
+exclude = ["excluded", "nested/excluded"]
+"#,
+        ),
+        ("main.py", "x    = 1\n"),
+        ("excluded/first.py", "x    = 1\n"),
+        ("excluded/sub/second.py", "x    = 1\n"),
+        ("nested/third.py", "x    = 1\n"),
+        ("nested/excluded/fourth.py", "x    = 1\n"),
+    ])?;
+
+    // Files inside an excluded directory are excluded, at any depth.
+    assert_cmd_snapshot!(test.format_command().args(["--check", "."]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+     --> main.py:1:3
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
+    unformatted: File would be reformatted
+     --> nested/third.py:1:3
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
+    2 files would be reformatted
+
+    ----- stderr -----
+    ");
+
+    // Excluded files passed to the CLI directly are formatted, unless `--force-exclude` is set.
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--check", "excluded/sub/second.py", "nested/excluded/fourth.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+     --> excluded/sub/second.py:1:3
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
+    unformatted: File would be reformatted
+     --> nested/excluded/fourth.py:1:3
+      |
+      - x    = 1
+    1 + x = 1
+      |
+
+    2 files would be reformatted
+
+    ----- stderr -----
+    "
+    );
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--check", "--force-exclude", "excluded/sub/second.py", "nested/excluded/fourth.py"]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    "
+    );
+
+    // The same applies to `--stdin-filename`.
+    assert_cmd_snapshot!(
+        test.format_command()
+            .args(["--force-exclude", "--stdin-filename", "excluded/sub/second.py"])
+            .pass_stdin("x    = 1\n"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    x    = 1
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
 /// Regression test for <https://github.com/astral-sh/ruff/issues/18980>
 #[test]
 fn extend_exclude_cli() -> Result<()> {

@@ -23,7 +23,7 @@ use ruff_linter::{IOError, Violation, fs, warn_user_once};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::resolver::{
-    PyprojectConfig, ResolvedFile, match_exclusion, project_files_in_path,
+    PyprojectConfig, ResolvedFile, match_exclusion_or_ancestor, project_files_in_path,
 };
 
 use crate::args::ConfigArguments;
@@ -92,9 +92,9 @@ pub(crate) fn check(
                 let settings = resolver.resolve(path);
 
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                    && match_exclusion(
+                    && match_exclusion_or_ancestor(
                         resolved_file.path(),
-                        resolved_file.file_name(),
+                        &settings.file_resolver.project_root,
                         &settings.linter.exclude,
                     )
                 {

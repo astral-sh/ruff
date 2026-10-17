@@ -242,6 +242,99 @@ OTHER = "OTHER"
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/8267>
+#[test]
+fn exclude_directory() -> Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ruff.toml",
+            r#"
+[lint]
+exclude = ["excluded", "nested/excluded"]
+"#,
+        ),
+        ("main.py", "import os\n"),
+        ("excluded/first.py", "import os\n"),
+        ("excluded/sub/second.py", "import os\n"),
+        ("nested/third.py", "import os\n"),
+        ("nested/excluded/fourth.py", "import os\n"),
+    ])?;
+
+    // Files inside an excluded directory are excluded, at any depth.
+    assert_cmd_snapshot!(case.check_command().arg("."), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:8: F401 [*] `os` imported but unused
+    nested/third.py:1:8: F401 [*] `os` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+
+    // Excluded files passed to the CLI directly are linted, unless `--force-exclude` is set.
+    assert_cmd_snapshot!(
+        case.check_command()
+            .args(["excluded/sub/second.py", "nested/excluded/fourth.py"]),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    excluded/sub/second.py:1:8: F401 [*] `os` imported but unused
+    nested/excluded/fourth.py:1:8: F401 [*] `os` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with `--fix`.
+
+    ----- stderr -----
+    "
+    );
+    assert_cmd_snapshot!(
+        case.check_command()
+            .arg("--force-exclude")
+            .args(["excluded/sub/second.py", "nested/excluded/fourth.py"]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/8267>
+#[test]
+fn exclude_directory_stdin() -> Result<()> {
+    let case = CliTest::with_file(
+        "ruff.toml",
+        r#"
+[lint]
+exclude = ["excluded"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.check_command()
+            .args(["--force-exclude", "--stdin-filename", "excluded/sub/a.py"])
+            .arg("-")
+            .pass_stdin("import os\n"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
 /// Regression test for <https://github.com/astral-sh/ruff/issues/20035>
 #[test]
 fn deduplicate_directory_and_explicit_file() -> Result<()> {

@@ -900,6 +900,40 @@ fn match_candidate_exclusion(
     exclusion.is_match_candidate(file_path) || exclusion.is_match_candidate(file_basename)
 }
 
+/// Return `true` if the given file, or any of its ancestors up to (and including) the project
+/// root, matches the exclusion criteria.
+///
+/// Unlike [`match_exclusion`], this also excludes files inside an excluded directory, e.g.,
+/// `lint.exclude = ["directory"]` excludes `directory/foo.py`.
+pub fn match_exclusion_or_ancestor(path: &Path, project_root: &Path, exclusion: &GlobSet) -> bool {
+    if exclusion.is_empty() {
+        return false;
+    }
+    ancestors_up_to_project_root(path, project_root).any(|path| {
+        path.file_name().is_some_and(|basename| {
+            match_candidate_exclusion(&Candidate::new(path), &Candidate::new(basename), exclusion)
+        })
+    })
+}
+
+/// Return an iterator over the given [`Path`] and its ancestors, stopping after the project root
+/// (excludes etc. are thus "rooted" to the project).
+fn ancestors_up_to_project_root<'a>(
+    path: &'a Path,
+    project_root: &'a Path,
+) -> impl Iterator<Item = &'a Path> {
+    let mut ancestors = path.ancestors();
+    let mut reached_project_root = false;
+    std::iter::from_fn(move || {
+        if reached_project_root {
+            return None;
+        }
+        let path = ancestors.next()?;
+        reached_project_root = path == project_root;
+        Some(path)
+    })
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum ExclusionKind {
     /// The exclusion came from the `exclude` setting.
@@ -931,7 +965,7 @@ pub fn match_any_exclusion(
     lint_exclude: Option<&GlobSet>,
     format_exclude: Option<&GlobSet>,
 ) -> Option<ExclusionKind> {
-    for path in path.ancestors() {
+    for path in ancestors_up_to_project_root(path, &resolver_settings.project_root) {
         if let Some(basename) = path.file_name() {
             let path = Candidate::new(path);
             let basename = Candidate::new(basename);
@@ -951,11 +985,6 @@ pub fn match_any_exclusion(
                     return Some(ExclusionKind::FormatExclude);
                 }
             }
-        }
-        if path == resolver_settings.project_root {
-            // Bail out; we'd end up past the project root on the next iteration
-            // (excludes etc. are thus "rooted" to the project).
-            break;
         }
     }
     None
@@ -1013,8 +1042,8 @@ mod tests {
     use crate::pyproject::find_settings_toml;
     use crate::resolver::{
         ConfigurationOrigin, ConfigurationTransformer, PyprojectConfig, PyprojectDiscoveryStrategy,
-        ResolvedFile, Resolver, is_file_excluded, match_exclusion, project_files_in_path,
-        resolve_root_settings,
+        ResolvedFile, Resolver, is_file_excluded, match_exclusion, match_exclusion_or_ancestor,
+        project_files_in_path, resolve_root_settings,
     };
     use crate::settings::Settings;
     use crate::tests::test_resource_path;
@@ -1185,6 +1214,36 @@ mod tests {
             file_basename,
             &make_exclusion(exclude),
         ));
+    }
+
+    #[test]
+    fn exclusions_or_ancestor() {
+        // The project lives inside a directory that has the same name as the excluded directory.
+        let project_root = Path::new("project")
+            .absolutize_from(Path::new("/tmp/directory"))
+            .into_owned();
+        let exclude = make_exclusion(FilePattern::User(
+            "directory".to_string(),
+            GlobPath::normalize("directory", &project_root),
+        ));
+
+        for (path, excluded) in [
+            ("directory", true),
+            ("directory/foo.py", true),
+            ("directory/sub/foo.py", true),
+            ("nested/directory/foo.py", true),
+            ("foo.py", false),
+            ("directory_foo.py", false),
+            ("nested/foo.py", false),
+        ] {
+            let path = Path::new(path).absolutize_from(&project_root);
+            assert_eq!(
+                match_exclusion_or_ancestor(&path, &project_root, &exclude),
+                excluded,
+                "{}",
+                path.display()
+            );
+        }
     }
 
     #[test]

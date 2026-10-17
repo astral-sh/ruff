@@ -13,7 +13,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
 use ruff_python_ast::SourceType;
-use ruff_workspace::resolver::{ResolvedFile, match_exclusion, project_files_in_path};
+use ruff_workspace::resolver::{ResolvedFile, match_exclusion_or_ancestor, project_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -139,9 +139,9 @@ pub(crate) fn analyze_graph(
 
                 // Skip excluded files.
                 if (settings.file_resolver.force_exclude || !resolved_file.is_root())
-                    && match_exclusion(
+                    && match_exclusion_or_ancestor(
                         resolved_file.path(),
-                        resolved_file.file_name(),
+                        &settings.file_resolver.project_root,
                         &settings.analyze.exclude,
                     )
                 {
