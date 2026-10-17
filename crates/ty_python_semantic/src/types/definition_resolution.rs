@@ -529,7 +529,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
 /// end-of-scope bindings. Nested comprehensions can produce a chain of these proxies. Only
 /// follow sources that resolve to the same variable, so `global` and `nonlocal` writes do not
 /// become definitions of each other.
-pub(super) fn user_visible_definitions<'db>(
+pub(crate) fn user_visible_definitions<'db>(
     db: &'db dyn Db,
     definitions: impl IntoIterator<Item = Definition<'db>>,
 ) -> FxIndexSet<Definition<'db>> {
