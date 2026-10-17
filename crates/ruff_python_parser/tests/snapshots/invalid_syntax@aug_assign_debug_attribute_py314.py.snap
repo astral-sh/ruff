@@ -1,0 +1,58 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_debug_attribute_py314.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..61,
+        body: [
+            AugAssign(
+                StmtAugAssign {
+                    node_index: NodeIndex(None),
+                    range: 44..60,
+                    target: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 44..55,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 46..55,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 59..60,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.14"}
+2 | x.__debug__ += 1
+  | ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__` on Python 3.14 (syntax was removed in 3.14)
