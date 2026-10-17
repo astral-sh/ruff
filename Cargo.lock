@@ -3608,6 +3608,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.13.2",
  "bstr",
+ "char_str",
  "datatest-stable",
  "drop_bomb",
  "get-size2",

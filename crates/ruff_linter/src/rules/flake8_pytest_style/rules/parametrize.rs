@@ -319,7 +319,7 @@ fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -
                 }
                 acc
             })
-            .into_boxed_str(),
+            .into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         flags,
@@ -370,7 +370,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
+                                        value: (*name).into(),
                                         range: TextRange::default(),
                                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         flags: checker.default_string_flags(),
@@ -402,7 +402,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                                 .iter()
                                 .map(|name| {
                                     Expr::from(ast::StringLiteral {
-                                        value: Box::from(*name),
+                                        value: (*name).into(),
                                         range: TextRange::default(),
                                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                                         flags: checker.default_string_flags(),
