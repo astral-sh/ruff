@@ -491,7 +491,7 @@ source = { registry = "https://pypi.org/simple" }
         let mut cache = VenvCache {
             entry: Some(CachedVenv {
                 key: key.clone(),
-                path: path.clone(),
+                path,
                 _directory: directory,
             }),
             ..VenvCache::default()
