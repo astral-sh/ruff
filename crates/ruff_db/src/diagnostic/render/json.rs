@@ -89,7 +89,7 @@ pub(super) fn diagnostic_to_json<'a>(
 
     let fix = diagnostic.fix().map(|fix| JsonFix {
         applicability: fix.applicability(),
-        message: diagnostic.first_help_text(),
+        message: diagnostic.fix_title(),
         edits: ExpandedEdits {
             edits: fix.edits(),
             notebook_index,
@@ -252,6 +252,7 @@ struct JsonEdit<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::diagnostic::{
         DiagnosticFormat,
         render::tests::{
@@ -259,6 +260,28 @@ mod tests {
             create_syntax_error_diagnostics,
         },
     };
+    use ruff_diagnostics::Fix;
+    use ruff_text_size::TextSize;
+
+    // An explicitly selected fix title must take precedence over earlier help messages in JSON.
+    #[test]
+    fn explicit_fix_title() -> serde_json::Result<()> {
+        let mut env = TestEnvironment::new();
+        env.format(DiagnosticFormat::Json);
+        env.add("test.py", r#"value: "invalid syntax""#);
+        let mut diagnostic = env.err().primary("test.py", "1:8", "1:23", "").build();
+        diagnostic.help(r#"Did you mean `typing.Literal["invalid syntax"]`?"#);
+        diagnostic.help_with_fix_title("Wrap in `Literal[...]`");
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::replacement(
+            r#"Literal["invalid syntax"]"#.into(),
+            TextSize::new(7),
+            TextSize::new(23),
+        )));
+        let diagnostics: Vec<Value> = serde_json::from_str(&env.render_diagnostics(&[diagnostic]))?;
+        assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+        assert_eq!(diagnostics[0]["fix"]["message"], "Wrap in `Literal[...]`");
+        Ok(())
+    }
 
     #[test]
     fn output() {

@@ -417,7 +417,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             }
 
             assert!(
-                !(fixable && diagnostic.first_help_text().is_none()),
+                !(fixable && diagnostic.fix_title().is_none()),
                 "Diagnostic emitted by {rule:?} is fixable but \
                 `Violation::fix_title` returns `None`"
             );
