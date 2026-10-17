@@ -89,7 +89,7 @@ use super::{
     MaterializationKind, Type, TypeContext, TypeMapping, TypeRecursionContext, TypedDictType,
     VarianceTerm,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, TypeOperations};
 
 mod structural;
 pub(super) use structural::RecursiveReferenceMapper;
@@ -300,7 +300,7 @@ pub(crate) struct TypeVisitorState<'env, 'db, Tag, T: HasIdentity<'db>, R, const
 impl<'env, 'db, Tag, T: HasIdentity<'db>, R, const N: usize>
     TypeVisitorState<'env, 'db, Tag, T, R, N>
 {
-    pub(super) fn new(env: &'env ProgramEnvironment<'db>, fallback: R) -> Self {
+    pub(super) fn new(env: &'env TypeOperations<'db>, fallback: R) -> Self {
         Self {
             cycles: CycleDetector::new(fallback),
             mapping: ApplyTypeMappingVisitor::new(env),
@@ -425,7 +425,7 @@ struct TypeTraversalTag;
 /// for operations that compute a reusable result from a type and immutable input.
 pub(crate) struct TypeTraversal<'env, 'db, O, Mode = SemanticTraversal> {
     operation: O,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     mapping: TraversalMapping<'env, 'db>,
     active: CycleDetector<'db, TypeTraversalTag, Type<'db>, (), 3>,
@@ -433,11 +433,11 @@ pub(crate) struct TypeTraversal<'env, 'db, O, Mode = SemanticTraversal> {
 }
 
 impl<'env, 'db, O, Mode: TypeTraversalMode> TypeTraversal<'env, 'db, O, Mode> {
-    fn new(env: &'env ProgramEnvironment<'db>, operation: O) -> Self {
+    fn new(env: &'env TypeOperations<'db>, operation: O) -> Self {
         Self {
             operation,
             env,
-            recursion_context: None,
+            recursion_context: Some(env.context()),
             mapping: TraversalMapping::Owned(OnceCell::new()),
             active: CycleDetector::new(()),
             mode: PhantomData,
@@ -446,14 +446,14 @@ impl<'env, 'db, O, Mode: TypeTraversalMode> TypeTraversal<'env, 'db, O, Mode> {
 
     /// Run an operation with one borrowed traversal for its entire recursion.
     pub(crate) fn with_root<R>(
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         operation: O,
         visit: impl FnOnce(&Self) -> R,
     ) -> R {
         visit(&Self::new(env, operation))
     }
 
-    pub(crate) fn environment(&self) -> &ProgramEnvironment<'db> {
+    pub(crate) fn environment(&self) -> &TypeOperations<'db> {
         self.env
     }
 
@@ -468,7 +468,7 @@ impl<'env, 'db, O, Mode: TypeTraversalMode> TypeTraversal<'env, 'db, O, Mode> {
     }
 
     fn new_with_recursion_context(
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         operation: O,
         context: &'env TypeRecursionContext<'db>,
     ) -> Self {
@@ -668,7 +668,7 @@ where
 
     /// Run a query with one cache and one set of guards for all recursive calls.
     pub fn with_root<R>(
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         query: Q,
         visit: impl FnOnce(&Self) -> R,
     ) -> R {
@@ -676,7 +676,7 @@ where
     }
 
     pub(super) fn with_recursion_context<R>(
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         query: Q,
         context: &'env TypeRecursionContext<'db>,
         visit: impl FnOnce(&Self) -> R,
@@ -686,7 +686,7 @@ where
         )))
     }
 
-    pub(crate) fn environment(&self) -> &ProgramEnvironment<'db> {
+    pub(crate) fn environment(&self) -> &TypeOperations<'db> {
         self.traversal.environment()
     }
 
@@ -877,10 +877,7 @@ where
 }
 
 impl<'env, 'db> TypeInspector<'env, 'db> {
-    pub(super) fn scope<R>(
-        env: &'env ProgramEnvironment<'db>,
-        inspect: impl FnOnce(&Self) -> R,
-    ) -> R {
+    pub(super) fn scope<R>(env: &'env TypeOperations<'db>, inspect: impl FnOnce(&Self) -> R) -> R {
         inspect(&Self {
             traversal: StructuralTypeTraversal::new(env, InspectType),
         })
@@ -895,14 +892,14 @@ impl<'env, 'db> TypeInspector<'env, 'db> {
         })
     }
 
-    pub(super) fn environment(&self) -> &ProgramEnvironment<'db> {
+    pub(super) fn environment(&self) -> &TypeOperations<'db> {
         self.traversal.environment()
     }
 
     /// Start a complete inspection. Recursive helpers borrow the inspector passed to `inspect`.
     pub(super) fn inspect_root<R>(
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         ty: Type<'db>,
         on_cycle: impl FnOnce(Type<'db>, CycleKind) -> R,
         inspect: impl FnOnce(&TypeInspector<'_, 'db>, Type<'db>) -> R,
@@ -1159,7 +1156,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1222,8 +1219,8 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The program in which the recursive type's body was constructed.
-    pub(crate) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
-        ProgramEnvironment::from_definition(self.definition(db))
+    pub(crate) fn environment(self, db: &'db dyn Db) -> TypeOperations<'db> {
+        TypeOperations::new_root(db, ProgramEnvironment::from_definition(self.definition(db)))
     }
 
     /// Substitute closed types for references before exposing the body.
@@ -1593,7 +1590,7 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _env: &ProgramEnvironment<'db>,
+        _env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         VarianceTerm::variable(db, VarianceOrigin::Recursive(self), typevar)

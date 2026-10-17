@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use rustc_hash::FxHashSet;
 
 use ruff_python_ast::{self as ast};
@@ -12,7 +12,7 @@ use crate::types::{Type, UnionBuilder};
 
 /// Return whether the outer type may be a tuple, without searching nested arguments or members.
 /// A recursion cutoff conservatively counts as a possible tuple.
-fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+fn may_be_tuple<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> bool {
     struct TupleShape;
 
     impl<'db> TypeWalk<'db> for TupleShape {
@@ -82,7 +82,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn record_inferred_expression_type(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
@@ -96,7 +96,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn record_unpromotable_type(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
@@ -123,7 +123,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// If no source expression is available, any tuple type blocks tuple-size promotion.
     pub(crate) fn allows_expression(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         expression: Option<&ast::Expr>,
         ty: Type<'db>,
     ) -> bool {
@@ -136,7 +136,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// empty tuple (and hence is eligible for tuple size promotion).
     fn is_promotable_tuple_literal(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
     ) -> bool {
@@ -157,7 +157,7 @@ enum TupleSizePromotionCandidate<'db> {
 impl<'db> TupleSizePromotionCandidate<'db> {
     /// Returns an eligible candidate if the given type represents one (i.e., it is a
     /// fixed-length homogeneous tuple or the empty tuple).
-    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Option<Self> {
         let tuple_spec = ty.exact_tuple_instance_spec(db)?;
         let TupleSpec::Fixed(tuple) = tuple_spec.as_ref() else {
             return None;
@@ -207,7 +207,7 @@ impl<'db> HomogeneousTupleUnionGroup<'db> {
 /// candidates for tuple size promotion, and another for groups of homogeneous tuple elements that are.
 fn partition_tuple_union_elements<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     elements: impl IntoIterator<Item = Type<'db>>,
 ) -> (Vec<Type<'db>>, Vec<HomogeneousTupleUnionGroup<'db>>) {
     let mut other_union_elements = Vec::new();
@@ -264,7 +264,7 @@ impl<'db> Type<'db> {
     pub(crate) fn promote_tuple_size_in_union(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         let Type::Union(union) = self else {
             return self;

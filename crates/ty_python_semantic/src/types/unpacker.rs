@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use std::borrow::Cow;
 use std::debug_assert_matches;
 
@@ -51,7 +51,7 @@ impl<'ast> Visitor<'ast> for UnknownTargetCollector<'_, '_> {
 impl<'db, 'ast> Unpacker<'db, 'ast> {
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'ast ProgramEnvironment<'db>,
+        env: &'ast TypeOperations<'db>,
         target_scope: ScopeId<'db>,
         program_file: ProgramFile<'db>,
         module: &'ast ParsedModuleRef,
@@ -415,7 +415,7 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn cycle_normalized(
         mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
@@ -593,7 +593,7 @@ fn sequence_from_type<'db, 'ast>(
 /// literal elements can widen without changing the type of the original sequence.
 pub(super) fn collected_list_type<'db, 'ast>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     values: impl ExactSizeIterator<Item = (Type<'db>, Option<&'ast ast::Expr>)>,
 ) -> Type<'db> {
     let is_empty = values.len() == 0;

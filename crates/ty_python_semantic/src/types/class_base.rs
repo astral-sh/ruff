@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use ty_module_resolver::{SearchPath, file_to_module};
 
-use crate::ProgramEnvironment;
 use crate::types::class::{ClassMetaclass, CodeGeneratorKind};
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
@@ -13,6 +12,7 @@ use crate::types::{
     TypeContext, TypeMapping, TypeQuery, TypeQueryContext, TypingModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
+use crate::{ProgramEnvironment, TypeOperations};
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -50,7 +50,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -86,7 +86,7 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Return a `ClassBase` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    pub(super) fn object(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         Self::Class(ClassType::object(db, env))
     }
 
@@ -128,7 +128,7 @@ impl<'db> ClassBase<'db> {
     /// Convert an explicit base while preserving a direct use of the `Any` special form.
     pub(super) fn try_from_explicit_base(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
@@ -144,7 +144,7 @@ impl<'db> ClassBase<'db> {
     /// Return `None` if `ty` is not an acceptable type for a class base.
     pub(super) fn try_from_type(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
@@ -173,7 +173,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn inferred_metaclass(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         subclass: ClassLiteral<'db>,
     ) -> ClassMetaclass<'db> {
         let metaclass = match self {
@@ -222,8 +222,10 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            let env =
-                &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+            let env = &TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_program(specialization.generic_context(db).program(db)),
+            );
             let new_self = self.apply_type_mapping_impl(
                 db,
                 &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
@@ -244,7 +246,7 @@ impl<'db> ClassBase<'db> {
     fn materialize(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         kind: MaterializationKind,
     ) -> Self {
         self.apply_type_mapping_impl(
@@ -282,7 +284,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn mro(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         additional_specialization: Option<Specialization<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> + Clone {
         match self {
@@ -303,7 +305,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn display(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> impl std::fmt::Display {
         self.display_with(db, env, DisplaySettings::default())
     }
@@ -311,7 +313,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         display_settings: DisplaySettings<'db>,
     ) -> impl Display + 'env {
         std::fmt::from_fn(move |f| match self {
@@ -591,18 +593,14 @@ enum ClassBaseMroIterator<'db> {
 
 impl<'db> ClassBaseMroIterator<'db> {
     /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
-    fn length_2(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        first_element: ClassBase<'db>,
-    ) -> Self {
+    fn length_2(db: &'db dyn Db, env: &TypeOperations<'db>, first_element: ClassBase<'db>) -> Self {
         ClassBaseMroIterator::Length2([first_element, ClassBase::object(db, env)].into_iter())
     }
 
     /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
     fn length_3(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         element_1: ClassBase<'db>,
         element_2: ClassBase<'db>,
     ) -> Self {

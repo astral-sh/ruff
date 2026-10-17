@@ -6,7 +6,7 @@ use rustc_hash::FxHashSet;
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, ProgramEnvironment, TypeOperations};
 use ty_python_core::static_dunder_all::static_dunder_all;
 use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
@@ -31,7 +31,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxH
 /// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
-    env: ProgramEnvironment<'db>,
+    env: TypeOperations<'db>,
     file: ProgramFile<'db>,
 
     /// The semantic index for the module.
@@ -52,7 +52,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     fn new(db: &'db dyn Db, file: ProgramFile<'db>, index: &'db SemanticIndex<'db>) -> Self {
         Self {
             db,
-            env: ProgramEnvironment::from_file(file),
+            env: TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
             file,
             index,
             origin: None,
@@ -229,8 +229,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     }
 }
 
-impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
-    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+impl<'ast> StatementVisitor<'ast> for DunderAllNamesCollector<'_> {
+    fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         if self.invalid {
             return;
         }

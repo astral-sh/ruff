@@ -704,8 +704,8 @@ fn incomplete_solution_discards_the_projection() {
 
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
-        let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-            let lower = candidate.inference_lower(db, &env);
+        let choose = |_: TypeVarVariance, candidate: &_| {
+            let lower = CandidateTypeVarSolution::inference_lower(candidate, db, &env);
             if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
@@ -771,8 +771,8 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     fallback: Some(str),
                 },
             ] {
-                let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-                    let lower = candidate.inference_lower(db, &env);
+                let choose = |_: TypeVarVariance, candidate: &_| {
+                    let lower = CandidateTypeVarSolution::inference_lower(candidate, db, &env);
                     if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
                     } else if lower == Some(str) {

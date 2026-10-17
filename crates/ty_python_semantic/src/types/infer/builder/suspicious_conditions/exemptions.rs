@@ -23,7 +23,7 @@ use ty_python_core::{
 };
 
 use crate::{
-    Db, Program, ProgramEnvironment,
+    Db, Program, ProgramEnvironment, TypeOperations,
     place::{
         ConsideredDefinitions, Provenance, RequiresExplicitReExport, place_by_id,
         place_from_bindings,
@@ -403,7 +403,7 @@ fn place_condition_definition_info<'db>(
         && let Some(place) = PlaceExpr::try_from_expr(expression)
     {
         let scope = scope.to_scope_id(db, file);
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         let resolution = resolve_place_load(
             db,
             index,
@@ -586,7 +586,7 @@ fn resolved_condition_definition_info<'db>(
         db,
         &resolve_definition(
             db,
-            &ProgramEnvironment::from_scope(scope),
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope)),
             definition,
             symbol_name,
             ImportAliasResolution::ResolveAliases,
@@ -671,7 +671,7 @@ fn attribute_condition_definition_info<'db>(
         db,
         &definitions_for_attribute(
             db,
-            &ProgramEnvironment::from_program(program),
+            &TypeOperations::new_root(db, ProgramEnvironment::from_program(program)),
             receiver,
             &name,
         ),

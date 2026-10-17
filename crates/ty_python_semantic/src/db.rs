@@ -46,7 +46,7 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ty_python_core::platform::PythonPlatform;
 
-    use crate::{ProgramEnvironment, check_file_unwrap, default_lint_registry};
+    use crate::{ProgramEnvironment, TypeOperations, check_file_unwrap, default_lint_registry};
     use ruff_db::Db as SourceDb;
     use ruff_db::files::Files;
     use ruff_db::system::{
@@ -104,8 +104,8 @@ pub(crate) mod tests {
             self.program().python_version(self)
         }
 
-        pub(crate) fn program_environment(&self) -> ProgramEnvironment<'_> {
-            ProgramEnvironment::from_program(self.program())
+        pub(crate) fn program_environment(&self) -> TypeOperations<'_> {
+            TypeOperations::new_root(self, ProgramEnvironment::from_program(self.program()))
         }
 
         /// Marks `file` as open in the editor.

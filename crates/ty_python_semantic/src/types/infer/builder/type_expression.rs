@@ -226,7 +226,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &self,
         expression: impl Ranged,
         message: impl std::fmt::Display,
-    ) -> Option<LintDiagnosticGuard<'_, '_>> {
+    ) -> Option<LintDiagnosticGuard<'db, '_>> {
         self.context
             .report_lint(&INVALID_TYPE_FORM, expression)
             .map(|builder| {

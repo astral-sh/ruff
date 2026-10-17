@@ -193,7 +193,7 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::cell::RefCell;
 
 use crate::{
@@ -260,7 +260,8 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
         return match expansion {
             PatternSubjectExpansion::Raw => subject_ty,
             PatternSubjectExpansion::Expanded => {
-                let env = ProgramEnvironment::from_scope(subject.scope(db));
+                let env =
+                    TypeOperations::new_root(db, ProgramEnvironment::from_scope(subject.scope(db)));
                 expand_type(db, &env, subject_ty)
                     .map(|types| UnionType::from_elements(db, &env, types))
                     .unwrap_or(subject_ty)
@@ -282,7 +283,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
     cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(predicate.subject(db).scope(db)));
         result.cycle_normalized(db, &env, *previous, cycle)
     },
     heap_size = ruff_memory_usage::heap_size
@@ -329,7 +330,10 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let env = ProgramEnvironment::from_file(predicate.program_file(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(predicate.program_file(db)),
+    );
     pattern_binding_fallthrough_type(db, &env, predicate.kind(db), subject_ty)
 }
 
@@ -393,7 +397,7 @@ fn enum_literal_subject_names<'db>(
 /// canonical member names before returning.
 fn enum_member_pattern_name<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
@@ -423,7 +427,7 @@ struct EnumMemberPatternCoverage {
 /// produces only a lower bound: it definitely matches `Color.GREEN`, but can match other members.
 fn enum_member_pattern_coverage<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     enum_class: EnumClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> EnumMemberPatternCoverage {
@@ -463,7 +467,7 @@ fn enum_member_pattern_coverage<'db>(
 /// conservatively treated as ambiguous.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Option<Truthiness> {
@@ -526,7 +530,10 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_scope(predicate.subject(db).scope(db)),
+    );
     let subject_ty =
         infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
@@ -683,7 +690,7 @@ fn non_terminal_call_predicates<'db>(
 
 fn analyze_non_terminal_calls<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     call_predicates: &[ScopedPredicateId],
 ) {
@@ -714,7 +721,7 @@ fn analyze_non_terminal_call_range<'db>(
     index: usize,
 ) {
     if level == 0 {
-        let env = ProgramEnvironment::from_scope(scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
         let use_def = use_def_map(db, scope);
         let call_predicates = non_terminal_call_predicates(db, scope);
         let start = index * NON_TERMINAL_CALL_CHUNK_SIZE;
@@ -838,7 +845,7 @@ fn evaluate_reachability_path<'db>(
     mut id: ScopedReachabilityConstraintId,
     mut use_checkpoint: bool,
 ) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     let mut visited = 0;
     let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
     let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
@@ -959,7 +966,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
 
 pub(crate) fn narrow_type_by_constraint<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     evaluator: &NarrowingEvaluator<'_, 'db>,
     base_ty: Type<'db>,
     place: ScopedPlaceId,
@@ -985,7 +992,7 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 
 fn apply_accumulated_narrowing<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     base_ty: Type<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
@@ -1096,7 +1103,7 @@ impl<'db> ProjectedNarrowingCheckpoint<'db> {
     cycle_fn = |db: &'db dyn Db, cycle, previous: &ProjectedNarrowingCheckpoint<'db>, result: ProjectedNarrowingCheckpoint<'db>, scope: ScopeId<'db>, _, _, base_ty| {
         match result {
             ProjectedNarrowingCheckpoint::Narrowed(ty) => ProjectedNarrowingCheckpoint::Narrowed(
-                ty.cycle_normalized(db, &ProgramEnvironment::from_scope(scope), previous.ty(base_ty), cycle)
+                ty.cycle_normalized(db, &TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope)), previous.ty(base_ty), cycle)
             ),
             _ => result,
         }
@@ -1110,7 +1117,7 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
     constraint: ScopedNarrowingConstraint,
     base_ty: Type<'db>,
 ) -> ProjectedNarrowingCheckpoint<'db> {
-    let env = ProgramEnvironment::from_scope(scope);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope));
     let use_def = use_def_map(db, scope);
     let evaluator = use_def.narrowing_evaluator(constraint);
     let mut projector = NarrowingProjector::new(
@@ -1133,7 +1140,7 @@ fn evaluate_projected_narrowing_checkpoint<'db>(
 /// Narrows bindings of one place while reusing their shared constraint suffixes.
 pub(crate) struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     predicate_narrowing_targets: &'a PredicateNarrowingTargets,
@@ -1149,7 +1156,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         predicate_narrowing_targets: &'a PredicateNarrowingTargets,
@@ -1571,7 +1578,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Caches each shared suffix for the binding type being narrowed.
@@ -1664,7 +1671,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
 
 fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
     precomputed_definite_match_ty: Option<Type<'db>>,
@@ -1833,7 +1840,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 )]
 fn analyze_non_terminal_call<'db>(db: &'db dyn Db, call: CallableAndCallExpr<'db>) -> Truthiness {
     let callable = call.callable(db);
-    let env = ProgramEnvironment::from_scope(callable.scope(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(callable.scope(db)));
     // We first infer just the type of the callable. In the most likely case that the function is
     // not marked with `NoReturn`, or that it always returns `NoReturn`, doing so allows us to avoid
     // the more expensive work of inferring the entire call expression (which could involve
@@ -1851,7 +1858,7 @@ fn analyze_non_terminal_call<'db>(db: &'db dyn Db, call: CallableAndCallExpr<'db
 /// The result type is only needed when overload selection, generics, or awaiting can affect it.
 pub(crate) fn is_non_terminal_call<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     is_await: bool,
     call_type: impl FnOnce() -> Type<'db>,
@@ -1924,7 +1931,7 @@ fn context_manager_suppresses<'db>(
     expression: Expression<'db>,
     evaluation_mode: EvaluationMode,
 ) -> bool {
-    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(expression.scope(db)));
     infer_same_file_expression_type(db, expression, TypeContext::default()).can_suppress_exceptions(
         db,
         &env,
@@ -1975,7 +1982,7 @@ fn expression_truthiness<'db>(
     expression: Expression<'db>,
     context: ExpressionContext,
 ) -> Truthiness {
-    let env = ProgramEnvironment::from_scope(expression.scope(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(expression.scope(db)));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let node = expression.node_ref(db).node(&module);
@@ -1993,7 +2000,11 @@ fn expression_truthiness<'db>(
 /// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
 /// In particular, treating `Never` as ambiguous can introduce loop bindings that then exclude each
 /// other, causing inference to settle on different types depending on file-checking order.
-fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
+fn analyze_single<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    predicate: &Predicate<'db>,
+) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {

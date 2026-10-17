@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::{
     AwaitError, Bindings, CallArguments, CallDunderError, CycleKind, KnownClass,
     LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
@@ -114,7 +114,7 @@ fn iterable_factory_definition<'db>(
 /// so these elements do not describe an iteration order or an exact length.
 pub(super) fn extract_literal_container_element_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     expression: &ast::Expr,
     expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
@@ -135,13 +135,13 @@ pub(super) fn extract_literal_container_element_types<'db>(
 /// recursively unpacking starred elements whose iterables are also fixed-length.
 pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     iterable: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
     fn extend_fixed_length_iterable<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         iterable: &ast::Expr,
         expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
         element_types: &mut Vec<Type<'db>>,
@@ -189,7 +189,7 @@ impl<'db> Type<'db> {
     pub(super) fn coroutine_returning_async_iterable(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         let Type::NominalInstance(instance) = self else {
             return None;
@@ -214,7 +214,7 @@ impl<'db> Type<'db> {
     pub(super) fn iterate(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Cow<'db, TupleSpec<'db>> {
         self.try_iterate(db, env).unwrap_or_else(|err| {
             Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
@@ -232,7 +232,7 @@ impl<'db> Type<'db> {
     pub(super) fn try_iterate(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         self.try_iterate_with_mode(db, env, EvaluationMode::Sync)
     }
@@ -240,7 +240,7 @@ impl<'db> Type<'db> {
     pub(super) fn try_iterate_with_mode(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         TypeQueryContext::with_root(env, TryIterate(mode), |root| {
@@ -252,14 +252,14 @@ impl<'db> Type<'db> {
     fn try_iterate_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         mode: EvaluationMode,
         traversal: &TypeQueryContext<'_, 'db, TryIterate, bool>,
         allow_dunders: bool,
     ) -> Result<Option<Cow<'db, TupleSpec<'db>>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             traversal: &TypeQueryContext<'_, 'db, TryIterate, bool>,
         ) -> Option<Cow<'db, TupleSpec<'db>>> {
@@ -717,7 +717,7 @@ impl<'db> IterationError<'db> {
     pub(super) fn fallback_element_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         self.element_type(db, env).unwrap_or(Type::unknown())
     }
@@ -726,7 +726,7 @@ impl<'db> IterationError<'db> {
     pub(super) fn element_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Type<'db>> {
         let return_type = |result: Result<Bindings<'db>, CallDunderError<'db>>| {
             result
@@ -835,13 +835,13 @@ impl<'db> IterationError<'db> {
         /// based on the variant of iteration error.
         struct Reporter<'env, 'a> {
             db: &'a dyn Db,
-            env: &'env ProgramEnvironment<'a>,
-            builder: LintDiagnosticGuardBuilder<'a, 'a>,
+            env: &'env TypeOperations<'a>,
+            builder: LintDiagnosticGuardBuilder<'a, 'env>,
             iterable_type: Type<'a>,
             mode: EvaluationMode,
         }
 
-        impl<'a> Reporter<'_, 'a> {
+        impl<'env, 'a> Reporter<'env, 'a> {
             /// Emit a diagnostic that is certain that `iterable_type` is not iterable.
             ///
             /// `because` should explain why `iterable_type` is not iterable.
@@ -850,7 +850,7 @@ impl<'db> IterationError<'db> {
                 self,
                 because: impl std::fmt::Display,
                 error_context: ErrorContext,
-            ) -> LintDiagnosticGuard<'a, 'a> {
+            ) -> LintDiagnosticGuard<'a, 'env> {
                 let db = self.db;
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` is not {maybe_async}iterable",
@@ -880,7 +880,7 @@ impl<'db> IterationError<'db> {
                 self,
                 because: impl std::fmt::Display,
                 error_context: ErrorContext,
-            ) -> LintDiagnosticGuard<'a, 'a> {
+            ) -> LintDiagnosticGuard<'a, 'env> {
                 let db = self.db;
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` may not be {maybe_async}iterable",

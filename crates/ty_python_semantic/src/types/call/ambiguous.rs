@@ -8,7 +8,7 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ClassType, DynamicType, GenericAlias, KnownClass, SubclassOfInner, SubclassOfType, Type,
 };
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 
 /// Retains the shared structure of ambiguous overload return types.
 ///
@@ -17,7 +17,7 @@ use crate::{Db, ProgramEnvironment};
 /// preserved. Differing unions, intersections, and callable signatures fall back to `Unknown`.
 pub(super) fn merge_ambiguous_returns<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     types: &[Type<'db>],
 ) -> Type<'db> {
     AmbiguousReturnMerger {
@@ -52,7 +52,7 @@ impl<'db> HasIdentity<'db> for ReturnTypes<'db> {
 
 struct AmbiguousReturnMerger<'env, 'db> {
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     visitor: CycleDetector<'db, MergeAmbiguousReturns, ReturnTypes<'db>, Type<'db>, 1>,
 }
 

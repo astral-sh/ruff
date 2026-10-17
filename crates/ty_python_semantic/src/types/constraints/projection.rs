@@ -8,7 +8,7 @@ use super::{
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 
 /// Limits for one projection, including preprocessing, path collection, and its result.
 #[derive(Clone, Copy, Debug)]
@@ -117,7 +117,7 @@ impl<'db> ConstraintSet<'db, '_> {
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
         let builder = self.builder;
@@ -133,7 +133,7 @@ impl<'db> ConstraintSet<'db, '_> {
     fn bounded_path_bounds(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
     ) -> Result<CandidateSolutions<'db>, ProjectionError> {
@@ -164,7 +164,7 @@ impl<'db> ConstraintSet<'db, '_> {
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
@@ -202,7 +202,7 @@ impl<'db> ConstraintSet<'db, '_> {
     pub(crate) fn try_fold_solutions<T>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,

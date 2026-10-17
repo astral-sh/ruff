@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::borrow::Cow;
 
 use itertools::Either;
@@ -33,7 +33,7 @@ use ty_python_core::scope::ScopeId;
 
 pub(super) fn synthesize_typed_dict_method<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     method_name: &str,
     fields: impl Fn() -> TypedDictFields<'db>,
@@ -142,7 +142,7 @@ impl<'db> TypedDictFields<'db> {
 ///    Keyword-only. Fields that are not valid Python identifiers are collapsed into `**kwargs`.
 fn synthesize_typed_dict_init<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -226,7 +226,7 @@ fn synthesize_typed_dict_init<'db>(
 /// Synthesize the `__getitem__` method for a `TypedDict`.
 fn synthesize_typed_dict_getitem<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -267,7 +267,7 @@ fn synthesize_typed_dict_getitem<'db>(
 /// Synthesize the `__setitem__` method for a `TypedDict`.
 fn synthesize_typed_dict_setitem<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -326,7 +326,7 @@ fn synthesize_typed_dict_setitem<'db>(
 /// Synthesize the `__delitem__` method for a `TypedDict`.
 fn synthesize_typed_dict_delitem<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -379,7 +379,7 @@ fn synthesize_typed_dict_delitem<'db>(
 /// Synthesize the `get` method for a `TypedDict`.
 fn synthesize_typed_dict_get<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -517,7 +517,7 @@ fn synthesize_typed_dict_get<'db>(
 /// Synthesize the `update` method for a `TypedDict`.
 fn synthesize_typed_dict_update<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -588,7 +588,7 @@ fn synthesize_typed_dict_update<'db>(
 /// Synthesize the `pop` method for a `TypedDict`.
 fn synthesize_typed_dict_pop<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -666,7 +666,7 @@ fn synthesize_typed_dict_pop<'db>(
 /// Synthesize the `setdefault` method for a `TypedDict`.
 fn synthesize_typed_dict_setdefault<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
@@ -731,7 +731,7 @@ fn synthesize_typed_dict_no_argument_method<'db>(
 /// Synthesize `items`, `keys`, or `values` for a closed or extra-items `TypedDict`.
 fn synthesize_typed_dict_view_method<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     view_name: &str,
 ) -> Type<'db> {
@@ -756,7 +756,7 @@ fn synthesize_typed_dict_view_method<'db>(
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
 fn synthesize_typed_dict_merge<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
@@ -867,7 +867,7 @@ impl<'db> DynamicTypedDictAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -913,7 +913,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -988,7 +988,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         let object_class = ClassType::object(db, &env);
         Mro::from([
             self_base,
@@ -1001,13 +1001,13 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// `TypedDict`s use `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         KnownClass::Type.to_class_literal(db, &env)
     }
 
     /// Look up a class-level member defined directly on this `TypedDict` (not inherited).
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         let typed_dict =
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)));
         synthesize_typed_dict_method(db, &env, typed_dict, name, || {
@@ -1021,7 +1021,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -1047,7 +1047,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
 /// Resolves members of a schema that has no defining `TypedDict` class.
 pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     synthesized: SynthesizedTypedDictType<'db>,
     lookup_policy: MemberLookupPolicy,
     name: &str,
@@ -1073,7 +1073,7 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
 
 pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
@@ -1091,7 +1091,7 @@ pub(super) fn typed_dict_fallback_class_member<'db>(
 
 pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassType<'db>,
     module: TypingModule,
     lookup_policy: MemberLookupPolicy,
@@ -1110,7 +1110,7 @@ pub(super) fn typed_dict_class_member<'db>(
 
 fn typed_dict_inherited_class_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     typed_dict: TypedDictType<'db>,
     module: TypingModule,
     lookup_policy: MemberLookupPolicy,

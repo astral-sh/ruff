@@ -1,6 +1,6 @@
 //! Display implementations for types.
 
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -248,7 +248,7 @@ impl<'db> DisplaySettings<'db> {
     #[must_use]
     pub(crate) fn from_possibly_ambiguous_types<I, T>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         types: I,
     ) -> Self
     where
@@ -664,7 +664,7 @@ impl QualificationLevel {
 
 struct AmbiguousNameCollector<'a, 'db> {
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     visited_types: RefCell<FxHashSet<Type<'db>>>,
     budget: DisplayBudget,
     active_recursive_types: ActiveRecursionDetector<TypeIdentity<'db>>,
@@ -756,7 +756,7 @@ enum AmbiguityState<'db> {
 }
 
 impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+    fn program_environment(&self) -> &TypeOperations<'db> {
         self.env
     }
 
@@ -829,7 +829,7 @@ impl<'db> Type<'db> {
     pub fn display<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> DisplayType<'env, 'db> {
         DisplayType {
             ty: self,
@@ -842,7 +842,7 @@ impl<'db> Type<'db> {
     pub(crate) fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayType<'env, 'db> {
         DisplayType {
@@ -856,7 +856,7 @@ impl<'db> Type<'db> {
     fn representation<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayRepresentation<'env, 'db> {
         DisplayRepresentation {
@@ -871,7 +871,7 @@ impl<'db> Type<'db> {
 pub struct DisplayType<'env, 'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -1078,7 +1078,7 @@ impl<'db> Type<'db> {
     pub fn display_alias_declaration<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> Option<impl Display + 'env> {
         let display = |ty, definition, name, generic_context, value_ty| {
             Some(DisplayTypeAliasDeclaration {
@@ -1145,7 +1145,7 @@ struct TypeAliasDisplay<'db> {
 impl<'db> TypeAliasDisplay<'db> {
     fn fmt_specialized(
         &self,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         materialization: Option<MaterializationKind>,
         f: &mut TypeWriter<'db>,
@@ -1209,7 +1209,7 @@ impl<'db> DisplayNode<'db> for TypeAliasDisplay<'db> {
 /// A source-style display of a type alias declaration.
 struct DisplayTypeAliasDeclaration<'env, 'db> {
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     type_alias: TypeAliasDisplay<'db>,
     generic_context: Option<GenericContext<'db>>,
     value_ty: Type<'db>,
@@ -1247,7 +1247,7 @@ impl Display for DisplayTypeAliasDeclaration<'_, '_> {
 /// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
 fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     guard: T,
     settings: &DisplaySettings<'db>,
     f: &mut TypeWriter<'db>,
@@ -1273,7 +1273,7 @@ fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
 struct DisplayRepresentation<'env, 'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -1983,7 +1983,7 @@ impl<'db> TupleSpec<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTuple<'a, 'db> {
         DisplayTuple {
@@ -1998,7 +1998,7 @@ impl<'db> TupleSpec<'db> {
 struct DisplayTuple<'a, 'db> {
     tuple: &'a TupleSpec<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2089,7 +2089,7 @@ impl<'db> OverloadLiteral<'db> {
     fn display<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> DisplayOverloadLiteral<'env, 'db> {
         Self::display_with(self, db, env, DisplaySettings::default())
     }
@@ -2097,7 +2097,7 @@ impl<'db> OverloadLiteral<'db> {
     fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayOverloadLiteral<'env, 'db> {
         DisplayOverloadLiteral {
@@ -2112,7 +2112,7 @@ impl<'db> OverloadLiteral<'db> {
 pub(crate) struct DisplayOverloadLiteral<'env, 'db> {
     literal: OverloadLiteral<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2147,7 +2147,7 @@ impl<'db> FunctionType<'db> {
     fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayFunctionType<'env, 'db> {
         DisplayFunctionType {
@@ -2162,7 +2162,7 @@ impl<'db> FunctionType<'db> {
 struct DisplayFunctionType<'env, 'db> {
     ty: FunctionType<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2231,7 +2231,7 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn display<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> DisplayGenericAlias<'env, 'db> {
         self.display_with(db, env, DisplaySettings::default())
     }
@@ -2239,7 +2239,7 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'env, 'db> {
         DisplayGenericAlias {
@@ -2256,7 +2256,7 @@ pub(crate) struct DisplayGenericAlias<'env, 'db> {
     origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2425,7 +2425,7 @@ impl<'db> Specialization<'db> {
     fn display_full<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> DisplaySpecialization<'env, 'db> {
         DisplaySpecialization {
             specialization: self,
@@ -2441,7 +2441,7 @@ impl<'db> Specialization<'db> {
     fn display_short<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         tuple_specialization: TupleSpecialization,
         settings: DisplaySettings<'db>,
     ) -> DisplaySpecialization<'env, 'db> {
@@ -2459,7 +2459,7 @@ impl<'db> Specialization<'db> {
 struct DisplaySpecialization<'env, 'db> {
     specialization: Specialization<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     tuple_specialization: TupleSpecialization,
     settings: DisplaySettings<'db>,
     full: bool,
@@ -2587,7 +2587,7 @@ impl<'db> CallableType<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'a, 'db> {
         DisplayCallableType {
@@ -2602,7 +2602,7 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     ty: CallableType<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2683,7 +2683,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn display<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
     ) -> DisplaySignature<'a, 'db> {
         Self::display_with(
             self,
@@ -2703,7 +2703,7 @@ impl<'db> Signature<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplaySignature<'a, 'db> {
         DisplaySignature {
@@ -2724,7 +2724,7 @@ pub(crate) struct DisplaySignature<'a, 'db> {
     parameters: &'a Parameters<'db>,
     return_ty: Type<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -2869,7 +2869,7 @@ impl<'db> Parameters<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameters<'a, 'db> {
         DisplayParameters {
@@ -2884,7 +2884,7 @@ impl<'db> Parameters<'db> {
 struct DisplayParameters<'a, 'db> {
     parameters: &'a Parameters<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3032,7 +3032,7 @@ impl<'db> Parameter<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayParameter<'a, 'db> {
         DisplayParameter {
@@ -3047,7 +3047,7 @@ impl<'db> Parameter<'db> {
 struct DisplayParameter<'a, 'db> {
     param: &'a Parameter<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3174,7 +3174,7 @@ impl<'db> UnionType<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayUnionType<'a, 'db> {
         DisplayUnionType {
@@ -3189,7 +3189,7 @@ impl<'db> UnionType<'db> {
 struct DisplayUnionType<'a, 'db> {
     ty: &'a UnionType<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3463,7 +3463,7 @@ impl<'db> DisplayNode<'db> for DisplayUnionType<'_, 'db> {
 struct DisplayKnownUnion<'env, 'db> {
     union: KnownUnion,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3484,7 +3484,7 @@ impl<'db> DisplayNode<'db> for DisplayKnownUnion<'_, 'db> {
 struct DisplaySubclassOfGroup<'env, 'db> {
     types: &'env [SubclassOfType<'db>],
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3595,7 +3595,7 @@ impl<'db> DisplayNode<'db> for DisplaySubclassOfGroup<'_, 'db> {
 struct DisplayLiteralGroup<'env, 'db> {
     literals: &'env [Type<'db>],
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3643,7 +3643,7 @@ impl<'db> IntersectionType<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayIntersectionType<'a, 'db> {
         DisplayIntersectionType {
@@ -3658,7 +3658,7 @@ impl<'db> IntersectionType<'db> {
 struct DisplayIntersectionType<'a, 'db> {
     ty: &'a IntersectionType<'db>,
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3697,7 +3697,7 @@ impl<'db> DisplayNode<'db> for DisplayIntersectionType<'_, 'db> {
 struct DisplayMaybeNegatedType<'env, 'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     negated: bool,
     settings: DisplaySettings<'db>,
 }
@@ -3747,7 +3747,7 @@ fn should_parenthesize_callable_type<'db>(
 struct DisplayMaybeParenthesizedType<'env, 'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3790,7 +3790,7 @@ trait TypeArrayDisplay<'db> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db>;
 }
@@ -3799,7 +3799,7 @@ impl<'db> TypeArrayDisplay<'db> for Box<[Type<'db>]> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
@@ -3815,7 +3815,7 @@ impl<'db> TypeArrayDisplay<'db> for Vec<Type<'db>> {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
@@ -3831,7 +3831,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
     fn display_with<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayTypeArray<'a, 'db> {
         DisplayTypeArray {
@@ -3846,7 +3846,7 @@ impl<'db> TypeArrayDisplay<'db> for [Type<'db>] {
 struct DisplayTypeArray<'b, 'db> {
     types: &'b [Type<'db>],
     db: &'db dyn Db,
-    env: &'b ProgramEnvironment<'db>,
+    env: &'b TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3866,7 +3866,7 @@ impl<'db> DisplayNode<'db> for DisplayTypeArray<'_, 'db> {
 pub(crate) struct DisplayKnownInstanceRepr<'env, 'db> {
     known_instance: KnownInstanceType<'db>,
     db: &'db dyn Db,
-    env: &'env ProgramEnvironment<'db>,
+    env: &'env TypeOperations<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -3874,7 +3874,7 @@ impl<'db> KnownInstanceType<'db> {
     pub(crate) fn display_with<'env>(
         self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
         settings: DisplaySettings<'db>,
     ) -> DisplayKnownInstanceRepr<'env, 'db> {
         DisplayKnownInstanceRepr {

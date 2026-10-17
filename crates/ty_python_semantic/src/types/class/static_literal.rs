@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use itertools::{Either, Itertools};
 use ruff_db::{
     PythonFile,
@@ -141,7 +141,7 @@ impl<'db> FrozenDataclassDispatch<'db> {
     pub(crate) fn receiver(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         object_ty: Type<'db>,
     ) -> Type<'db> {
         match self {
@@ -495,13 +495,13 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
     ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
         struct CollectTypeVars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
+            env: &'a TypeOperations<'db>,
             typevars: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
             recursion_guard: TypeCollector<'db>,
         }
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            fn program_environment(&self) -> &TypeOperations<'db> {
                 self.env
             }
 
@@ -538,7 +538,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         let visitor = CollectTypeVars {
             env: &env,
             typevars: RefCell::default(),
@@ -610,7 +610,10 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            let env = ProgramEnvironment::from_program(generic_context.program(db));
+            let env = TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_program(generic_context.program(db)),
+            );
             generic_context
                 .unknown_specialization(db, self.known(db))
                 .materialize_impl(
@@ -709,7 +712,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Iterate over the explicit bases that contribute to metaclass selection.
     fn metaclass_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         self.explicit_bases(db)
             .iter()
             .copied()
@@ -845,7 +848,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         returns(as_ref),
         cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
-            let env = ProgramEnvironment::from_scope(self_.body_scope(db));
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.body_scope(db)));
             Err(Box::new(StaticMroError::cycle(
                 db, &env,
                 self_.apply_optional_specialization(db, None),
@@ -1171,7 +1174,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         self.inferred_metaclass(db).to_type(db, &env)
     }
 
@@ -1207,7 +1210,7 @@ impl<'db> StaticClassLiteral<'db> {
         {
             let program_file = class.program_file(db);
             let python_file = program_file.python_file(db);
-            let env = ProgramEnvironment::from_file(program_file);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
             tracing::trace!("StaticClassLiteral::try_metaclass: {}", class.name(db));
 
             // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -1365,7 +1368,8 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if !self.has_explicit_bases(db) && !self.has_explicit_metaclass(db) {
-            let env = ProgramEnvironment::from_scope(self.body_scope(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
             return Ok((
                 ClassMetaclass::Selected(KnownClass::Type.to_class_literal(db, &env)),
                 None,
@@ -1382,7 +1386,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -1392,7 +1396,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn class_member_inner(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -1436,14 +1440,14 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn class_member_from_mro(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(
             db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
+            env: &TypeOperations<'d>,
             ty: Type<'d>,
         ) -> Type<'d> {
             match ty {
@@ -1505,14 +1509,14 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn own_class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inherited_generic_context: Option<GenericContext<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
         fn into_dunder_paramspec_callable<'d>(
             db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
+            env: &TypeOperations<'d>,
             ty: Type<'d>,
         ) -> Type<'d> {
             match ty {
@@ -1673,7 +1677,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn own_synthesized_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
@@ -2202,7 +2206,7 @@ impl<'db> StaticClassLiteral<'db> {
     fn own_frozen_dataclass_subclass_method(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         method: FrozenDataclassMethod,
     ) -> Option<Type<'db>> {
@@ -2376,7 +2380,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(crate) fn typed_dict_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -2622,7 +2626,7 @@ impl<'db> StaticClassLiteral<'db> {
         field_policy: CodeGeneratorKind<'db>,
     ) -> OwnClassFields<'db> {
         let class_body_scope = self.body_scope(db);
-        let env = ProgramEnvironment::from_scope(class_body_scope);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class_body_scope));
         let table = place_table(db, class_body_scope);
 
         let use_def = use_def_map(db, class_body_scope);
@@ -2890,7 +2894,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn instance_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
@@ -2925,7 +2929,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn own_instance_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> Member<'db> {
         // TODO: There are many things that are not yet implemented here:
@@ -3177,7 +3181,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(super) fn to_non_generic_instance(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
         Type::instance(db, &env, ClassType::NonGeneric(self.into()))
     }
 
@@ -3383,7 +3387,7 @@ fn expanded_fixed_length_starred_class_base_tuple<'db>(
     };
 
     let starred_ty = definition_expression_type(db, class_definition, &starred.value);
-    let env = ProgramEnvironment::from_definition(class_definition);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(class_definition));
     let Tuple::Fixed(tuple) = starred_ty.tuple_instance_spec(db, &env)?.into_owned() else {
         return None;
     };
@@ -3394,7 +3398,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _: &ProgramEnvironment<'db>,
+        _: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         VarianceTerm::variable(db, VarianceOrigin::Class(self), typevar)
@@ -3412,7 +3416,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        let env = ProgramEnvironment::from_scope(self.body_scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.body_scope(db)));
 
         if self.is_typed_dict(db) {
             return TypedDictType::new(self.identity_specialization(db))
@@ -3625,7 +3629,8 @@ fn explicit_bases_cycle_fn<'db>(
     literal: StaticClassLiteral<'db>,
 ) -> Box<[Type<'db>]> {
     if previous.len() == current.len() {
-        let env = ProgramEnvironment::from_scope(literal.body_scope(db));
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_scope(literal.body_scope(db)));
         // As long as the length of bases hasn't changed, use the same "monotonic widening"
         // strategy that we use with most types, to avoid oscillations.
         current

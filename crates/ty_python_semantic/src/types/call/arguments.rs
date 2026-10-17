@@ -10,7 +10,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::FxIndexMap;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::subscript::PyIndex;
 use crate::types::tuple::{TupleLength, TupleSpec};
 use crate::types::type_expansion::expand_elements;
@@ -147,7 +147,7 @@ impl<'a, 'db> CallArgument<'a, 'db> {
         })
     }
 
-    fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ArgumentExpansion<'a, 'db> {
+    fn expand(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> ArgumentExpansion<'a, 'db> {
         Some(match self {
             Self::Variadic(argument) => argument
                 .expand(db, env)?
@@ -200,7 +200,7 @@ impl<'db> VariadicArgument<'db> {
     pub(crate) fn sequence(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Cow<'_, TupleSpec<'db>>> {
         Some(match self {
             Self::Type(_) => self.source_type()?.iterate(db, env),
@@ -208,7 +208,7 @@ impl<'db> VariadicArgument<'db> {
         })
     }
 
-    fn is_fixed_sequence(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+    fn is_fixed_sequence(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> bool {
         match self {
             Self::Type(_) => self
                 .source_type()
@@ -218,7 +218,7 @@ impl<'db> VariadicArgument<'db> {
         }
     }
 
-    fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Vec<Self>> {
+    fn expand(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Vec<Self>> {
         Some(match self {
             Self::Type(_) => expand_type(db, env, self.source_type()?)?
                 .into_iter()
@@ -239,7 +239,7 @@ impl<'db> VariadicArgument<'db> {
     pub(crate) fn matching(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         preserve_union_alternatives: bool,
     ) -> VariadicArgumentMatch<'db> {
         if let Self::Sequence { sequence, .. } = self {
@@ -372,7 +372,7 @@ impl<'db> KeywordArgument<'db> {
             .filter_map(|(name, key)| key.is_required.then_some(name))
     }
 
-    fn expand(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Vec<Self>> {
+    fn expand(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Vec<Self>> {
         Some(match self {
             Self::Type(_) => expand_type(db, env, self.source_type()?)?
                 .into_iter()
@@ -403,7 +403,7 @@ impl<'db> KeywordArgument<'db> {
     pub(crate) fn unpack(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<UnpackedKeywords<'db>> {
         if let Self::Known { keywords, .. } = self {
             return Some(keywords.clone());
@@ -418,7 +418,7 @@ impl<'db> KeywordArgument<'db> {
     pub(crate) fn value_type(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: Option<&str>,
     ) -> Type<'db> {
         if let Self::Known { keywords, .. } = self {
@@ -807,7 +807,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(crate) fn functools_partial_bound_arguments(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<(Self, bool)> {
         let bound_call_arguments = self.start_from(1);
         let mut can_synthesize_signature = true;
@@ -839,7 +839,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(super) fn expansions<'s>(
         &'s self,
         db: &'db dyn Db,
-        env: &'s ProgramEnvironment<'db>,
+        env: &'s TypeOperations<'db>,
     ) -> CallArgumentExpansions<'s, 'a, 'db> {
         CallArgumentExpansions {
             arguments: self,
@@ -852,12 +852,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     pub(super) fn display<'env>(
         &'env self,
         db: &'db dyn Db,
-        env: &'env ProgramEnvironment<'db>,
+        env: &'env TypeOperations<'db>,
     ) -> impl Display + 'env {
         struct DisplayCallArgumentTypes<'env, 'a, 'db> {
             types: &'a CallArgumentTypes<'db>,
             db: &'db dyn Db,
-            env: &'env ProgramEnvironment<'db>,
+            env: &'env TypeOperations<'db>,
         }
 
         impl std::fmt::Display for DisplayCallArgumentTypes<'_, '_, '_> {
@@ -913,7 +913,7 @@ type ArgumentExpansion<'a, 'db> = Option<Vec<CallArgument<'a, 'db>>>;
 pub(super) struct CallArgumentExpansions<'s, 'a, 'db> {
     arguments: &'s CallArguments<'a, 'db>,
     db: &'db dyn Db,
-    env: &'s ProgramEnvironment<'db>,
+    env: &'s TypeOperations<'db>,
     types: OnceCell<Box<[OnceCell<ArgumentExpansion<'a, 'db>>]>>,
 }
 

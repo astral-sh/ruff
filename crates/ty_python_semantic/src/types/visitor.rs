@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
@@ -40,7 +40,7 @@ use crate::types::{
 /// but it makes it easy for implementors of the trait to do so.
 /// See [`any_over_type`] for an example of how to do this.
 pub(crate) trait TypeVisitor<'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db>;
+    fn program_environment(&self) -> &TypeOperations<'db>;
 
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
@@ -486,7 +486,7 @@ pub(super) enum DynamicContentMode {
 /// Determine whether `ty` contains any dynamic type.
 pub(super) fn dynamic_content<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
     dynamic_content_impl(db, env, ty, DynamicContentMode::All)
@@ -510,7 +510,7 @@ pub(super) fn dynamic_content<'db>(
 /// because each recursive edge creates a new specialization.
 pub(super) fn non_any_dynamic_content<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
     dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny)
@@ -518,12 +518,12 @@ pub(super) fn non_any_dynamic_content<'db>(
 
 pub(super) fn dynamic_content_impl<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     mode: DynamicContentMode,
 ) -> DynamicContent {
     struct DynamicContentVisitor<'a, 'db> {
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         mapping: ApplyTypeMappingVisitor<'a, 'db>,
         recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
@@ -543,7 +543,7 @@ pub(super) fn dynamic_content_impl<'db>(
     }
 
     impl<'db> TypeVisitor<'db> for DynamicContentVisitor<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
             self.env
         }
 
@@ -710,19 +710,19 @@ pub(super) fn dynamic_content_impl<'db>(
 /// are not included in the specialization-flow analysis used by [`TypeIdentity`].
 pub(super) fn contains_growing_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> bool {
     struct GrowingTypeVisitor<'visit, 'a, 'db> {
         recursive: &'visit StructuralTypeTraversal<'a, 'db, VisitRecursiveBody>,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         found: Cell<bool>,
     }
 
     impl<'db> TypeVisitor<'db> for GrowingTypeVisitor<'_, '_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
             self.env
         }
 
@@ -838,7 +838,7 @@ impl TypeSearchMode {
 /// Shared implementation for type searches.
 fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     mode: TypeSearchMode,
     query: F,
@@ -849,7 +849,7 @@ where
 {
     struct AnyOverTypeVisitor<'db, 'a, 'visit, U> {
         recursive: &'visit StructuralTypeTraversal<'a, 'db, VisitRecursiveBody>,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<U>,
@@ -860,7 +860,7 @@ where
     where
         U: Copy + Default + PartialEq,
     {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
             self.env
         }
 
@@ -931,7 +931,7 @@ where
 /// are visited or not.
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
@@ -950,7 +950,7 @@ pub(super) fn any_over_type<'db>(
 /// Shared arguments use the same recursion guard, so their descendants are not visited repeatedly.
 pub(super) fn any_over_type_including_alias_arguments<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
@@ -964,13 +964,13 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
 /// `Identity[Identity[int]]` are still considered finite.
 pub(super) fn any_over_type_expanding_aliases<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     fn search<'db>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         query: &impl Fn(Type<'db>) -> bool,
         active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
@@ -1038,7 +1038,7 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
 /// are visited or not.
 pub(super) fn find_over_type<'db, T>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> Option<T>,

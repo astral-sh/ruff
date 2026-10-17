@@ -24,9 +24,8 @@ use ty_python_semantic::types::ide_support::{
 };
 use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, ProgramEnvironment, SemanticModel,
-    TypeQualifiers, definitions_for_imported_symbol, definitions_for_name,
-    fixture_bindings_for_parameter,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeOperations, TypeQualifiers,
+    definitions_for_imported_symbol, definitions_for_name, fixture_bindings_for_parameter,
 };
 
 #[derive(Clone, Debug)]
@@ -261,7 +260,7 @@ impl<'db> Definitions<'db> {
 
     pub(crate) fn from_ty(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
     ) -> Option<Self> {
         let ty_def = ty.definition(db, env)?;

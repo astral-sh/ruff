@@ -11,7 +11,7 @@ use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt::{self, Display};
 use ty_python_core::ProgramFile;
-use ty_python_semantic::ProgramEnvironment;
+use ty_python_semantic::TypeOperations;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
 use ty_python_semantic::types::{KnownInstanceType, SpecialFormType, Type, TypeVarVariance};
 
@@ -34,7 +34,7 @@ pub fn hover<'db>(
         AnnotationContext::Source,
     ) && let Some(docstring) = Definitions::from_ty(
         db,
-        &model.program_environment(),
+        model.program_environment(),
         Type::SpecialForm(special_form),
     )
     .and_then(|definitions| definitions.docstring(db))
@@ -118,7 +118,7 @@ pub fn hover<'db>(
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
+        tracing::debug!("Inferred type of covering node is {}", ty.display(db, env));
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
@@ -135,12 +135,12 @@ pub fn hover<'db>(
                     },
                 )
             }
-            ty if let Some(declaration) = ty.display_alias_declaration(db, &env) => {
-                alias_docstring = Definitions::from_ty(db, &env, ty)
+            ty if let Some(declaration) = ty.display_alias_declaration(db, env) => {
+                alias_docstring = Definitions::from_ty(db, env, ty)
                     .and_then(|def| def.docstring(db))
                     .or_else(|| match ty {
                         Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
-                            Definitions::from_ty(db, &env, alias.value_type(db))
+                            Definitions::from_ty(db, env, alias.value_type(db))
                                 .and_then(|def| def.docstring(db))
                         }
                         _ => None,
@@ -333,7 +333,9 @@ impl<'db> Hover<'db> {
     pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
         std::fmt::from_fn(move |f| {
             let mut first = true;
-            let env = ProgramEnvironment::from_file(self.program_file);
+            let env = ty_python_semantic::SemanticModel::new(db, self.program_file)
+                .program_environment()
+                .clone();
             for content in &self.contents {
                 if !first {
                     kind.horizontal_line().fmt(f)?;
@@ -401,7 +403,7 @@ impl<'db> HoverContent<'db> {
     fn display<'a>(
         &'a self,
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         kind: MarkupKind,
     ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
@@ -415,7 +417,7 @@ impl<'db> HoverContent<'db> {
 
 pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
 }

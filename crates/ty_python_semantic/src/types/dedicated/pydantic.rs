@@ -1,5 +1,5 @@
-use crate::ProgramEnvironment;
 use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
+use crate::{ProgramEnvironment, TypeOperations};
 use char_str::CharStr;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{
@@ -308,7 +308,7 @@ impl<'db> FieldMetadata<'db> {
 
         if let Some(init) = call.arguments.find_keyword("init") {
             let init = definition_expression_type(db, definition, &init.value);
-            let env = ProgramEnvironment::from_definition(definition);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
             self.init &= !init.bool(db, &env).is_always_false();
         }
 
@@ -523,10 +523,10 @@ pub(in crate::types) enum SetAttrBehavior {
 }
 
 /// Return the model's assignment behavior for `attribute`, or `None` if it cannot be determined.
-pub(in crate::types) fn setattr_behavior(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    ty: Type<'_>,
+pub(in crate::types) fn setattr_behavior<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
     attribute: &str,
 ) -> Option<SetAttrBehavior> {
     let (class, _) = ty
@@ -911,7 +911,7 @@ pub(in crate::types) fn constructor_parameter_type<'db>(
         return field_type;
     }
 
-    let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(class.body_scope(db)));
     lax_input_type(db, &env, field_type)
 }
 
@@ -1017,7 +1017,7 @@ fn function_has_before_or_plain_field_validator<'db>(
 /// Return the documented Python input type accepted by Pydantic for `field_type` in lax mode.
 fn lax_input_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     field_type: Type<'db>,
 ) -> Type<'db> {
     LaxInputTraversal::with_root(env, LaxInputType, |traversal| {
@@ -1063,7 +1063,7 @@ impl<'db> TypeWalk<'db, &mut FxHashSet<Type<'db>>, StructuralTraversal> for LaxI
 
 fn lax_input_type_body<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
     traversal: &LaxInputTraversal<'_, 'db>,
@@ -1206,7 +1206,7 @@ fn lax_input_type_body<'db>(
 /// `IntList` instance and an `Iterable[LaxInt]`.
 fn root_model_input_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     field_type: Type<'db>,
     expanding_types: &mut FxHashSet<Type<'db>>,
     traversal: &LaxInputTraversal<'_, 'db>,
@@ -1252,7 +1252,7 @@ fn root_model_input_type<'db>(
 /// here.
 fn model_input_type<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     field_type: Type<'db>,
 ) -> Option<Type<'db>> {
     let (class, _) = field_type
@@ -1287,7 +1287,7 @@ fn model_input_type<'db>(
 /// Return the known module, name, and class literal for an instance's nominal class.
 fn instance_symbol<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<(KnownModule, &'db str, StaticClassLiteral<'db>)> {
     let class = ty.nominal_class(db, env)?.class_literal(db).as_static()?;
@@ -1296,7 +1296,7 @@ fn instance_symbol<'db>(
 }
 
 /// Return a lax-input alias like `LaxInt` from `ty_extensions.pydantic`.
-fn lax_alias<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
+fn lax_alias<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, name: &str) -> Type<'db> {
     match known_module_symbol(db, env, KnownModule::TyExtensionsPydantic, name)
         .place
         .ignore_possibly_undefined()

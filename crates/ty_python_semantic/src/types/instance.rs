@@ -1,7 +1,7 @@
 //! Instance types: both nominal and structural.
 
-use crate::ProgramEnvironment;
 use crate::types::recursive::RecursiveReferenceMapper;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::debug_assert_matches;
@@ -61,7 +61,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn instance(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         class: ClassType<'db>,
     ) -> Self {
         match class.class_literal(db) {
@@ -109,7 +109,7 @@ impl<'db> Type<'db> {
 
     pub fn homogeneous_tuple(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         element: Type<'db>,
     ) -> Self {
         Type::tuple(TupleType::homogeneous(db, env, element))
@@ -117,7 +117,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn heterogeneous_tuple<I, T>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         elements: I,
     ) -> Self
     where
@@ -131,7 +131,7 @@ impl<'db> Type<'db> {
         ))
     }
 
-    pub(crate) fn empty_tuple(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+    pub(crate) fn empty_tuple(db: &'db dyn Db, env: &TypeOperations<'db>) -> Self {
         Type::tuple(TupleType::empty(db, env))
     }
 
@@ -164,7 +164,7 @@ impl<'db> Type<'db> {
     /// Synthesize a protocol instance type with a given set of read-only property members.
     pub(super) fn protocol_with_readonly_members<'a, M>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         members: M,
     ) -> Self
     where
@@ -180,7 +180,7 @@ impl<'db> Type<'db> {
     /// Synthesize a protocol instance type with a given set of methods.
     pub(super) fn protocol_with_methods<'a, M>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         methods: M,
     ) -> Self
     where
@@ -199,7 +199,7 @@ impl<'db> Type<'db> {
     pub(super) fn instance_type_for_meta_protocol(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Self {
         let constructor_ty = self.to_class_type(db).map_or(self, Type::from);
         constructor_ty.bindings(db, env).return_type(db, env)
@@ -262,7 +262,7 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn class(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> ClassType<'db> {
+    pub(super) fn class(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class.class(db),
@@ -277,7 +277,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn class_literal(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> ClassLiteral<'db> {
         self.class(db, env).class_literal(db)
     }
@@ -309,7 +309,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn tuple_spec(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
@@ -422,7 +422,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -464,7 +464,7 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         SubclassOfType::from(db, env, self.class(db, env))
     }
 
@@ -496,7 +496,7 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -546,7 +546,7 @@ fn protocol_materialization_is_noop<'db>(
     program: crate::Program<'db>,
     class: ProtocolClass<'db>,
 ) -> bool {
-    let env = ProgramEnvironment::from_program(program);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
     protocol_materialization_is_noop_by_inspection(
         db,
         &env,
@@ -579,7 +579,7 @@ fn protocol_materialization_is_noop<'db>(
 /// the gradual return type `int | Any`.
 fn protocol_materialization_is_noop_by_inspection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     protocol: ProtocolInstanceType<'db>,
 ) -> bool {
     dynamic_content_impl(
@@ -624,11 +624,11 @@ fn protocol_materialization_is_noop_by_inspection<'db>(
 /// rejects provisional interface results.
 fn protocol_materialization_is_noop_with_type_parameters<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ProtocolClass<'db>,
 ) -> bool {
     struct ParameterVisitor<'a, 'db> {
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         origin: ClassLiteral<'db>,
         class_context: Option<crate::types::generics::GenericContext<'db>>,
         invalid: Cell<bool>,
@@ -636,7 +636,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
     }
 
     impl<'db> TypeVisitor<'db> for ParameterVisitor<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
             self.env
         }
 
@@ -823,7 +823,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
 /// the protocol's own parameters, whose bounds and defaults are checked separately.
 fn specialization_argument_is_static<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     class_context: Option<crate::types::generics::GenericContext<'db>>,
 ) -> bool {
@@ -1430,7 +1430,7 @@ fn non_recursive_protocol_interface<'db>(
     receiver_ty: Type<'db>,
 ) -> ProtocolInterface<'db> {
     struct ProtocolReferenceFinder<'a, 'db> {
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         origin: ClassLiteral<'db>,
         found: Cell<bool>,
         recursion_guard: TypeCollector<'db>,
@@ -1438,7 +1438,7 @@ fn non_recursive_protocol_interface<'db>(
     }
 
     impl<'db> TypeVisitor<'db> for ProtocolReferenceFinder<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        fn program_environment(&self) -> &TypeOperations<'db> {
             self.env
         }
 
@@ -1482,7 +1482,10 @@ fn non_recursive_protocol_interface<'db>(
         }
     }
 
-    let env = ProgramEnvironment::from_file(protocol.class_literal(db).program_file(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_file(protocol.class_literal(db).program_file(db)),
+    );
     interface.filter_members(db, |member| {
         let visitor = ProtocolReferenceFinder {
             env: &env,
@@ -1511,7 +1514,10 @@ fn non_recursive_protocol_constraints<'db>(
     source: ProtocolInstanceType<'db>,
     target: ProtocolInterfaceView<'db>,
 ) -> OwnedConstraintSet<'db> {
-    let env = ProgramEnvironment::from_program(target.base().program(db));
+    let env = TypeOperations::new_root(
+        db,
+        ProgramEnvironment::from_program(target.base().program(db)),
+    );
     let constraints = ConstraintSetBuilder::new();
     constraints.into_owned(|constraints| {
         let relation_visitor = HasRelationToVisitor::default(constraints);
@@ -1666,7 +1672,7 @@ enum NominalInstanceInner<'db> {
 
 fn sys_version_info_class<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
 ) -> Option<ClassType<'db>> {
     KnownClass::VersionInfo
         .try_to_class_literal(db, env)
@@ -1683,7 +1689,7 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         self.class(db, env).variance_of(db, env, typevar)
@@ -1851,7 +1857,7 @@ impl<'db> ProtocolInstanceType<'db> {
     fn materialization_changes_requirements(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: ProtocolInstanceType<'db>,
     ) -> bool {
         self.materialization_kind(db).is_some()
@@ -1868,7 +1874,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn display_materialization_kind(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<MaterializationKind> {
         let Protocol::Materialized(materialized) = self.inner else {
             return None;
@@ -1890,7 +1896,7 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Return the structural meta-type of this protocol-instance type.
-    pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self.inner {
             Protocol::FromClass(_) | Protocol::Materialized(_) => {
                 SubclassOfType::from_protocol(self)
@@ -1917,7 +1923,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn to_nominal_meta_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         self.class_origin(db).map_or_else(
             || self.to_meta_type(db, env),
@@ -1949,7 +1955,10 @@ impl<'db> ProtocolInstanceType<'db> {
                 return false;
             }
 
-            let env = ProgramEnvironment::from_program(interface.base().program(db));
+            let env = TypeOperations::new_root(
+                db,
+                ProgramEnvironment::from_program(interface.base().program(db)),
+            );
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
@@ -1975,7 +1984,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1991,7 +2000,7 @@ impl<'db> ProtocolInstanceType<'db> {
     fn materialized_interface_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> Option<PlaceAndQualifiers<'db>> {
         self.materialization_kind(db)?;
@@ -2004,7 +2013,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(crate) fn instance_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         match self.inner {
@@ -2059,7 +2068,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -2117,7 +2126,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         self.inner.variance_of(db, env, typevar)
@@ -2162,7 +2171,7 @@ impl<'db> Protocol<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -2190,7 +2199,7 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self {
@@ -2212,7 +2221,7 @@ mod synthesized_protocol {
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance,
         FindLegacyTypeVarsVisitor, Type, TypeContext, TypeMapping, VarianceInferable, VarianceTerm,
     };
-    use crate::{Db, FxOrderSet, ProgramEnvironment};
+    use crate::{Db, FxOrderSet, TypeOperations};
     use ty_python_core::definition::Definition;
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
@@ -2240,7 +2249,7 @@ mod synthesized_protocol {
         pub(super) fn find_legacy_typevars_impl(
             self,
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             binding_context: Option<Definition<'db>>,
             typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
             visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -2256,7 +2265,7 @@ mod synthesized_protocol {
         pub(in crate::types) fn recursive_type_normalized_impl(
             self,
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             div: Type<'db>,
             nested: bool,
         ) -> Option<Self> {
@@ -2271,7 +2280,7 @@ mod synthesized_protocol {
         fn variance_of(
             self,
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             typevar: BoundTypeVarIdentity<'db>,
         ) -> VarianceTerm<'db> {
             self.0.variance_of(db, env, typevar)

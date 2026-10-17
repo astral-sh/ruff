@@ -7,7 +7,7 @@ use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::cell::RefCell;
 
-use crate::ProgramEnvironment;
+use crate::TypeOperations;
 use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
@@ -79,7 +79,7 @@ impl<'db> Type<'db> {
     pub(crate) fn identity_comparison_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Type<'db> {
         struct IdentityComparisonUpcasting;
 
@@ -257,7 +257,7 @@ impl<'db> Type<'db> {
 
         fn upcast_bound_method<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             method: BoundMethodType<'db>,
             visitor: &UpcastingVisitor<'_, 'db>,
         ) -> BoundMethodType<'db> {
@@ -272,7 +272,7 @@ impl<'db> Type<'db> {
 
         fn upcast_property<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             property: PropertyInstanceType<'db>,
             visitor: &UpcastingVisitor<'_, 'db>,
         ) -> PropertyInstanceType<'db> {
@@ -314,7 +314,7 @@ impl<'db> Type<'db> {
 
         fn upcast<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
             visitor: &UpcastingVisitor<'_, 'db>,
         ) -> UpcastResult<'db> {
@@ -574,7 +574,7 @@ impl<'db> Type<'db> {
     pub(crate) fn identity_comparison_truthiness(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> Truthiness {
         let is_singleton_or_intersection_with_singleton = |ty: Type<'db>| {
@@ -740,7 +740,7 @@ impl NonIdentityOperator {
     fn truthiness<'db>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         left: Type<'db>,
         right: Type<'db>,
         soundness_policy: ComparisonSoundnessPolicy,

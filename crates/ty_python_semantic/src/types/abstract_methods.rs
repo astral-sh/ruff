@@ -11,7 +11,7 @@ use ty_python_core::{
 };
 
 use crate::{
-    Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
+    Db, FxIndexMap, ProgramEnvironment, TypeOperations, TypeQualifiers,
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
     types::{
@@ -42,7 +42,7 @@ impl<'db> AbstractMethods<'db> {
     pub(super) fn annotate_diagnostic(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         diagnostic: &mut LintDiagnosticGuard,
     ) {
         let Some((first_method_name, abstract_method)) = self.methods.iter().next() else {
@@ -288,7 +288,10 @@ impl<'db> ClassType<'db> {
         }
 
         let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
-        let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        let env = &TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_file(self.class_literal(db).program_file(db)),
+        );
 
         // Iterate through the MRO in reverse order,
         // skipping `object` (we know it doesn't define any abstract methods)

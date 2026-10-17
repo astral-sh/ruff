@@ -1,5 +1,5 @@
 use crate::{
-    Db, ProgramEnvironment,
+    Db, TypeOperations,
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
@@ -13,11 +13,7 @@ pub(super) use equations::{VarianceOrigin, VarianceTerm, infer_protocol_variance
 impl<'db> StaticClassLiteral<'db> {
     /// Keeps `Self` symbolic while inspecting a class's interface. Substituting `C[T]` would
     /// incorrectly make a parameter annotated as `Self` consume the class's `T`.
-    pub(super) fn variance_receiver(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(super) fn variance_receiver(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         Type::TypeVar(BoundTypeVarInstance::synthetic_self(
             db,
             Type::instance(db, env, self.identity_specialization(db)),
@@ -38,7 +34,7 @@ impl<'db> MemberVariance<'db> {
     /// Resolves the instance read and descriptor write types of a class member.
     pub(super) fn of(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         receiver: Type<'db>,
     ) -> Self {
@@ -59,7 +55,7 @@ impl<'db> MemberVariance<'db> {
     /// An accessor contributes its bound callable signature, including a setter's input.
     pub(super) fn accessor(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         receiver: Type<'db>,
     ) -> Self {
@@ -71,7 +67,7 @@ impl<'db> MemberVariance<'db> {
 
     fn bind(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         ty: Type<'db>,
         receiver: Type<'db>,
     ) -> Type<'db> {
@@ -85,7 +81,7 @@ impl<'db> VarianceInferable<'db> for MemberVariance<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let write = match self.write_domain {
@@ -234,7 +230,7 @@ pub(crate) trait VarianceInferable<'db>: Sized {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db>;
 
@@ -271,7 +267,7 @@ where
     fn variance_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let WithPolarity {

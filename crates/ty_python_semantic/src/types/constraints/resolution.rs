@@ -16,7 +16,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType,
     Type, TypeAliasType, TypeContext, TypeMapping,
 };
-use crate::{Db, FxOrderMap, ProgramEnvironment};
+use crate::{Db, FxOrderMap, TypeOperations};
 
 /// Whether a selected type is independent of the other inferable variables in its alternative.
 ///
@@ -33,7 +33,7 @@ pub(crate) enum SolutionType<'db> {
 /// `solution`; references outside `inferable` retain their original bound-variable identity.
 pub(crate) fn resolve_solution<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     inferable: TypeVarSet<'db>,
     solution: &[TypeVarSolution<'db>],
 ) -> Box<[SolutionType<'db>]> {
@@ -63,7 +63,7 @@ pub(crate) fn resolve_solution<'db>(
 struct ResolveBinding;
 
 struct Resolver<'a, 'db> {
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     inferable: TypeVarSet<'db>,
     solution: &'a [TypeVarSolution<'db>],
     indices: FxHashMap<BoundTypeVarIdentity<'db>, usize>,
@@ -128,7 +128,7 @@ struct VisitDependencies;
 /// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
     mapping: ApplyTypeMappingVisitor<'a, 'db>,
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
     satisfied: Cell<bool>,
@@ -138,7 +138,7 @@ struct Dependencies<'a, 'db> {
 impl<'db> Dependencies<'_, 'db> {
     fn check(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         inferable: TypeVarSet<'db>,
         ty: Type<'db>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
@@ -166,7 +166,7 @@ impl<'db> Dependencies<'_, 'db> {
 }
 
 impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
-    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+    fn program_environment(&self) -> &TypeOperations<'db> {
         self.env
     }
 

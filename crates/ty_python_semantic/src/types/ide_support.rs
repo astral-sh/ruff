@@ -14,7 +14,7 @@ use crate::types::{
     CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
     PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
-use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
+use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel, TypeOperations};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
@@ -81,7 +81,7 @@ pub fn definitions_for_name<'db>(
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    let Some(builtins_scope) = implicit_builtins_symbol_scope(db, &env, name_str) else {
+    let Some(builtins_scope) = implicit_builtins_symbol_scope(db, env, name_str) else {
         return vec![];
     };
     // Special cases for `float` and `complex` in type annotation positions.
@@ -110,7 +110,7 @@ pub fn definitions_for_name<'db>(
             .rev()
             .filter_map(|ty| ty.as_nominal_instance())
             .filter_map(|instance| {
-                let definition = instance.class_literal(db, &env).definition(db)?;
+                let definition = instance.class_literal(db, env).definition(db)?;
                 Some(ResolvedDefinition::Definition(definition))
             })
             .collect();
@@ -130,7 +130,7 @@ pub fn definitions_for_attribute<'db>(
     };
     definition_resolution::definitions_for_attribute(
         model.db(),
-        &model.program_environment(),
+        model.program_environment(),
         lhs_ty,
         attribute.attr.as_str(),
     )
@@ -140,17 +140,17 @@ pub fn definitions_for_attribute<'db>(
 ///
 /// Preparing the finder resolves the class roots and the implementations selected for those roots.
 /// Candidate subclasses can then be scanned one file at a time.
-pub struct ImplementationsFinder<'a> {
+pub struct ImplementationsFinder<'db, 'name> {
     /// Definitions selected directly for the goto target's roots:
     /// - Root class definitions for a class-family search
     /// - Definitions found through each root's MRO for a member-family search.
-    initial_definitions: Vec<ResolvedDefinition<'a>>,
+    initial_definitions: Vec<ResolvedDefinition<'db>>,
 
     /// Classes whose known subclasses should be scanned for additional implementations.
-    roots: FxHashSet<ClassLiteral<'a>>,
+    roots: FxHashSet<ClassLiteral<'db>>,
 
     /// Whether scanning should return subclass definitions or same-named members on subclasses.
-    kind: ImplementationsFinderKind<'a>,
+    kind: ImplementationsFinderKind<'name>,
 }
 
 enum ImplementationsFinderKind<'a> {
@@ -162,9 +162,9 @@ enum ImplementationsFinderKind<'a> {
     },
 }
 
-impl<'a> ImplementationsFinder<'a> {
+impl<'db, 'name> ImplementationsFinder<'db, 'name> {
     /// Creates a class-family finder from resolved class roots.
-    fn for_class_roots(db: &'a dyn Db, roots: Vec<ClassLiteral<'a>>) -> Self {
+    fn for_class_roots(db: &'db dyn Db, roots: Vec<ClassLiteral<'db>>) -> Self {
         let mut initial_definitions = Vec::new();
         for root in &roots {
             if let Some(definition) = root.definition(db) {
@@ -184,9 +184,9 @@ impl<'a> ImplementationsFinder<'a> {
 
     /// Creates a member-family finder for roots that resolve the member through their MRO.
     fn for_member_roots(
-        db: &'a dyn Db,
-        roots: Vec<ClassLiteral<'a>>,
-        member_name: &'a str,
+        db: &'db dyn Db,
+        roots: Vec<ClassLiteral<'db>>,
+        member_name: &'name str,
         accessor_role: Option<PropertyAccessorRole>,
     ) -> Option<Self> {
         let mut initial_definitions = Vec::new();
@@ -261,7 +261,7 @@ impl<'a> ImplementationsFinder<'a> {
     }
 
     /// Returns the definitions selected directly for the finder's roots.
-    pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'a>> {
+    pub fn into_initial_definitions(self) -> Vec<ResolvedDefinition<'db>> {
         self.initial_definitions
     }
 
@@ -282,15 +282,15 @@ impl<'a> ImplementationsFinder<'a> {
     /// declared in the class body (`sound: str = ...`, `sound = ...`, or a bare `sound: str`) or
     /// assigned to `self` in a method body (`self.sound = ...`).
     pub fn for_attribute(
-        model: &SemanticModel<'a>,
-        attribute: &'a ast::ExprAttribute,
+        model: &SemanticModel<'db>,
+        attribute: &'name ast::ExprAttribute,
     ) -> Option<Self> {
         let db = model.db();
         let lhs_ty = attribute.value.inferred_type(model)?;
         let env = model.program_environment();
         let mut roots = Vec::new();
         let mut seen = FxHashSet::default();
-        collect_implementation_root_classes(db, &env, lhs_ty, &mut seen, &mut roots);
+        collect_implementation_root_classes(db, env, lhs_ty, &mut seen, &mut roots);
 
         let accessor_role = match attribute.ctx {
             ast::ExprContext::Load => Some(PropertyAccessorRole::Getter),
@@ -317,8 +317,8 @@ impl<'a> ImplementationsFinder<'a> {
     /// along with same-named methods defined on known transitive subclasses. This does not walk to
     /// parent classes: on `Dog.speak`, the root is `Dog`, so `Animal.speak` is not included.
     pub fn for_method(
-        model: &SemanticModel<'a>,
-        function: &'a ast::StmtFunctionDef,
+        model: &SemanticModel<'db>,
+        function: &'name ast::StmtFunctionDef,
     ) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
@@ -336,7 +336,7 @@ impl<'a> ImplementationsFinder<'a> {
         let class_definition = semantic_index(db, containing_scope.program_file(db))
             .expect_single_definition(class_node);
         let class_ty = binding_type(db, class_definition);
-        let root = extract_class_literal(db, &env, class_ty)?;
+        let root = extract_class_literal(db, env, class_ty)?;
 
         ImplementationsFinder::for_member_roots(
             db,
@@ -360,14 +360,14 @@ impl<'a> ImplementationsFinder<'a> {
     /// The clicked class is the root and is returned first, followed by its known transitive
     /// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
     /// returns that class and its own subclasses, not its parents.
-    pub fn for_class(model: &SemanticModel<'a>, class: &ast::StmtClassDef) -> Option<Self> {
+    pub fn for_class(model: &SemanticModel<'db>, class: &ast::StmtClassDef) -> Option<Self> {
         let db = model.db();
         let env = model.program_environment();
         let class_definition = class.definition(model);
         if !is_reachable_implementation_definition(db, class_definition) {
             return None;
         }
-        let root = extract_class_literal(db, &env, binding_type(db, class_definition))?;
+        let root = extract_class_literal(db, env, binding_type(db, class_definition))?;
 
         Some(ImplementationsFinder::for_class_roots(db, vec![root]))
     }
@@ -394,9 +394,9 @@ impl<'a> ImplementationsFinder<'a> {
     /// object (for example an instance variable or method), so callers can fall back to member
     /// handling.
     pub fn for_class_reference(
-        db: &'a dyn Db,
-        env: &ProgramEnvironment<'a>,
-        resolved_definitions: &[ResolvedDefinition<'a>],
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        resolved_definitions: &[ResolvedDefinition<'db>],
     ) -> Option<Self> {
         let mut roots = Vec::new();
         let mut seen = FxHashSet::default();
@@ -475,7 +475,7 @@ pub fn static_member_type_for_attribute<'db>(
     let db = model.db();
     let lhs_ty = attribute.value.inferred_type(model)?;
     lhs_ty
-        .static_member(db, &model.program_environment(), attribute.attr.as_str())
+        .static_member(db, model.program_environment(), attribute.attr.as_str())
         .ignore_possibly_undefined()
 }
 
@@ -702,7 +702,7 @@ fn member_implementation_definition<'db>(
 /// Normalizes a receiver type into the class roots used for implementation lookup.
 fn collect_implementation_root_classes<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     seen: &mut FxHashSet<ClassLiteral<'db>>,
     roots: &mut Vec<ClassLiteral<'db>>,
@@ -859,7 +859,7 @@ pub fn typed_dict_key_hover<'db>(
     let value_ty = subscript.value.inferred_type(model)?;
     let typed_dict = value_ty.as_typed_dict()?;
     let owner = value_ty
-        .display(db, &model.program_environment())
+        .display(db, model.program_environment())
         .to_string();
     let field = typed_dict.items(model.db()).get(key)?;
     let docstring = field
@@ -925,7 +925,7 @@ pub fn definitions_for_imported_symbol<'db>(
     let env = model.program_environment();
     definition_resolution::resolve_from_import_definitions(
         model.db(),
-        &env,
+        env,
         ImportingFile::File(model.file(), env.resolver_environment(model.db())),
         import_node,
         symbol_name,
@@ -1007,7 +1007,7 @@ pub struct CallSignatureParameter<'db> {
 impl<'db> CallSignatureDetails<'db> {
     fn from_binding(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding: &crate::types::call::Binding<'db>,
     ) -> Self {
         let argument_to_parameter_mapping = binding.argument_matches().to_vec();
@@ -1333,7 +1333,7 @@ pub fn call_argument_forms(
 
     // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
     if !func_type
-        .bindings(db, &model.program_environment())
+        .bindings(db, model.program_environment())
         .iter_flat()
         .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
     {
@@ -1513,11 +1513,7 @@ pub fn definitions_for_unary_op<'db>(
 /// Promotes types in `self` positions.
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
-fn promote_for_self<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> Type<'db> {
+fn promote_for_self<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, ty: Type<'db>) -> Type<'db> {
     match ty {
         Type::BoundMethod(method) => Type::BoundMethod(method.map_self_type(db, |self_ty| {
             self_ty
@@ -1695,7 +1691,7 @@ mod stub_mapping {
     use crate::types::definition_resolution::{
         ImportAliasResolution, ResolvedDefinition, find_symbol_in_scope, resolve_definition,
     };
-    use crate::{Db, ProgramEnvironment};
+    use crate::{Db, ProgramEnvironment, TypeOperations};
     use ruff_db::files::vendored_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::SystemPath;
@@ -1715,7 +1711,7 @@ mod stub_mapping {
             trace!("Found arbitrary FileWithRange while stub mapping, giving up");
             return None;
         };
-        let env = ProgramEnvironment::from_file(stub_program_file);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(stub_program_file));
 
         // If the file isn't a stub, this is presumably the real definition
         let stub_file = stub_program_file.file(db);
@@ -1875,7 +1871,7 @@ pub struct TypeHierarchyClass<'db> {
 /// subsequent requests for supertypes or subtypes.
 pub fn type_hierarchy_prepare<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<TypeHierarchyClass<'db>> {
     let class_literal = extract_class_literal(db, env, ty)?;
@@ -1890,7 +1886,7 @@ pub fn type_hierarchy_prepare<'db>(
 /// This includes `object` when the given class has no direct base classes.
 pub fn type_hierarchy_supertypes<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Vec<TypeHierarchyClass<'db>> {
     let Some(class_literal) = extract_class_literal(db, env, ty) else {
@@ -1923,7 +1919,7 @@ pub fn type_hierarchy_supertypes<'db>(
 /// returns an empty sequence.
 pub fn type_hierarchy_subtypes<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
     modules: &[Module<'db>],
 ) -> Vec<TypeHierarchyClass<'db>> {
@@ -1944,7 +1940,7 @@ pub fn type_hierarchy_subtypes<'db>(
 /// For `Animal`, this returns `Dog`, but not `LoudDog`.
 fn direct_subtypes<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     target_class: ClassLiteral<'db>,
     modules: &[Module<'db>],
 ) -> Vec<TypeHierarchyClass<'db>> {
@@ -1984,7 +1980,7 @@ fn direct_subtypes<'db>(
         }
 
         let program_file = ProgramFile::new(db, file, env.program(db));
-        let file_env = ProgramEnvironment::from_file(program_file);
+        let file_env = env.in_environment(ProgramEnvironment::from_file(program_file));
 
         // Subtype searches can scan many modules, so release closed files' ASTs as we go. Keep the
         // guard through class search and range collection, which can also load this file's AST.
@@ -2016,7 +2012,7 @@ fn reachable_class_literals_in_file<'db>(
     db: &'db dyn Db,
     file: ProgramFile<'db>,
 ) -> Vec<ClassLiteral<'db>> {
-    let env = ProgramEnvironment::from_file(file);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(file));
     let index = semantic_index(db, file);
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let mut classes = Vec::new();
@@ -2051,7 +2047,7 @@ fn reachable_class_literals_in_file<'db>(
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
 fn extract_class_literal<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<ClassLiteral<'db>> {
     match ty {
@@ -2163,12 +2159,15 @@ fn class_literal_to_hierarchy_info<'db>(
     }
 }
 
-pub fn constructor_signature(model: &SemanticModel, call_expr: &ast::ExprCall) -> Option<String> {
+pub fn constructor_signature<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<String> {
     let function_ty = call_expr.func.inferred_type(model)?;
     let db = model.db();
     let class_name = function_ty.as_class_literal()?.name(db);
     let env = &model.program_environment();
-    let display_sig = |signature: &Signature| {
+    let display_sig = |signature: &Signature<'db>| {
         let params = signature
             .display(db, env)
             .multiline()

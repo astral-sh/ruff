@@ -22,7 +22,7 @@ use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, TypeOperations};
 
 /// The position of an assignment in insertion order.
 #[newtype_index]
@@ -298,7 +298,7 @@ impl PathAssignments {
     pub(super) fn visit<'db, V>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         node: NodeId,
         visitor: &mut V,
@@ -427,7 +427,7 @@ impl PathAssignments {
     pub(super) fn walk_edge<'db, R>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         assignment: ConstraintAssignment,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
@@ -570,13 +570,13 @@ impl PathAssignments {
     fn add_sequents<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         map: &SequentMap<'db>,
     ) -> Range<usize> {
         fn intern_sequents<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             storage: &mut ConstraintSetStorage<'db>,
             sequents: &[Sequent<InternedSequentConstraint<'db>>],
             dest: &mut Vec<Sequent<ConstraintId, u16>>,
@@ -721,7 +721,7 @@ impl PathAssignments {
     fn discover_constraint<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraint: ConstraintId,
     ) {
@@ -821,7 +821,7 @@ impl PathAssignments {
     fn drain_assignment_queue<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         source_constraint: ConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
@@ -850,7 +850,7 @@ impl PathAssignments {
     fn add_assignment<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         assignment: ConstraintAssignment,
         source_constraint: ConstraintId,
@@ -985,7 +985,7 @@ impl PathAssignments {
     fn check_sequent<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         sequent: Sequent<ConstraintId, u16>,
     ) -> Result<(), PathAssignmentConflict> {
@@ -1033,7 +1033,7 @@ impl PathAssignments {
     fn check_single_tautology<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         ante: ConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
@@ -1060,7 +1060,7 @@ impl PathAssignments {
     fn check_pair_impossibility<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,
@@ -1089,7 +1089,7 @@ impl PathAssignments {
     fn check_triple_impossibility<'db>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         ante1: ConstraintId,
         ante2: ConstraintId,

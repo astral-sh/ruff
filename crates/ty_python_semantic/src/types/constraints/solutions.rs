@@ -18,7 +18,7 @@ use crate::types::constraints::{
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
-use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, TypeOperations};
 
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
 /// whether we've already processed a node in an equivalent situation. If so, we don't need to
@@ -232,7 +232,7 @@ impl<'db> SolutionWalker<'db> {
     pub(super) fn is_never_satisfied(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         polarity: Polarity,
@@ -258,7 +258,7 @@ impl<'db> SolutionWalker<'db> {
     pub(super) fn visit_node<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -379,7 +379,7 @@ impl<'db> SolutionWalker<'db> {
     fn visit_node_and_then<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -484,7 +484,7 @@ impl<'db> SolutionWalker<'db> {
     fn node_is_satisfiable_on_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -563,7 +563,7 @@ impl<'db> SolutionWalker<'db> {
     fn visit_edge<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -626,7 +626,7 @@ impl<'db> SolutionWalker<'db> {
     fn visit_constraints_and_then<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -661,7 +661,7 @@ impl<'db> SolutionWalker<'db> {
 
     fn candidate_evidence(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         constraints: impl Iterator<Item = ConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
@@ -691,7 +691,7 @@ impl<'db> SolutionWalker<'db> {
     fn inferred_lower_satisfies_upper_bound<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -813,7 +813,7 @@ impl<'db> SolutionWalker<'db> {
     fn evidence_satisfies_declared_constraint(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         evidence: &CandidateTypeVarSolution<'db>,
         constrained_ty: Type<'db>,
@@ -854,7 +854,7 @@ impl<'db> SolutionWalker<'db> {
     fn constraint_failure_evidence<L: SolutionLimits>(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         evidence: &CandidateTypeVarSolution<'db>,
@@ -965,7 +965,7 @@ impl<'db> SolutionWalker<'db> {
     fn validate_satisfied_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -996,7 +996,7 @@ impl<'db> SolutionWalker<'db> {
     fn validate_upper_bound<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -1063,7 +1063,7 @@ impl<'db> SolutionWalker<'db> {
     fn validate_constrained<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -1388,7 +1388,7 @@ impl<'db> SolutionWalker<'db> {
     fn validate_single_declared_constraint<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -1460,7 +1460,7 @@ impl<'db> SolutionWalker<'db> {
     fn pending_candidate_solution(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
         typevar_violations: Option<
@@ -1600,7 +1600,7 @@ impl<'db> SolutionWalker<'db> {
     fn found_satisfied_path<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &PathAssignments,
@@ -1622,7 +1622,7 @@ impl<'db> SolutionWalker<'db> {
     fn attribute_typevar_failures<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
@@ -1797,7 +1797,7 @@ struct DeclaredConstraint<'db> {
 impl<'db> Validations<'db> {
     fn from_support(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         all_typevars: &Support,
     ) -> Self {
@@ -1822,7 +1822,7 @@ impl<'db> Validations<'db> {
     fn add_typevar(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
@@ -1857,7 +1857,7 @@ impl<'db> Validations<'db> {
 
     fn intern_typevar_constraints(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
@@ -1888,7 +1888,7 @@ impl<'db> Validations<'db> {
     fn add_upper_bound(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
@@ -1920,7 +1920,7 @@ impl<'db> Validations<'db> {
     fn add_constrained(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
@@ -1966,7 +1966,7 @@ impl<'db> Constrained<'db> {
     fn preferred_constraint(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         has_lower_bound_evidence: bool,
         is_eligible: impl Fn(usize) -> bool,
     ) -> Option<usize> {

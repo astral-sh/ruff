@@ -10,7 +10,7 @@ use crate::types::{
     IntersectionType, KnownClass, MaterializationKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Program, ProgramEnvironment};
+use crate::{Program, ProgramEnvironment, TypeOperations};
 use itertools::Either;
 use quickcheck::{Arbitrary, Gen};
 use ruff_db::files::system_path_to_file;
@@ -95,11 +95,7 @@ pub(crate) enum CallableParams {
 }
 
 impl CallableParams {
-    fn into_parameters<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Parameters<'db> {
+    fn into_parameters<'db>(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Parameters<'db> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
             CallableParams::List(params) => Parameters::from_annotation(
@@ -221,7 +217,7 @@ fn create_bound_method<'db>(
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    let env = ProgramEnvironment::from_program(program);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
     let self_instance = builtins_class.to_instance_approximation(db, &env).unwrap();
     Type::BoundMethod(BoundMethodType::new(
         db,
@@ -231,11 +227,7 @@ fn create_bound_method<'db>(
 }
 
 impl Ty {
-    pub(crate) fn into_type<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn into_type<'db>(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
@@ -362,7 +354,7 @@ impl Ty {
 
 fn divergent<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     id_bits: u64,
     materialization: Option<MaterializationKind>,
 ) -> Type<'db> {
@@ -376,7 +368,7 @@ fn divergent<'db>(
     }
 }
 
-fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &str) -> Type<'db> {
+fn newtype_instance<'db>(db: &'db dyn Db, env: &TypeOperations<'db>, name: &str) -> Type<'db> {
     let file = system_path_to_file(db, super::setup::PROPERTY_TEST_MODULE_PATH)
         .expect("Property-test module must exist");
     let file = ProgramFile::new(db, file, env.program(db));
@@ -417,11 +409,7 @@ fn newtype_instance<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, name: &
 pub(crate) struct FullyStaticTy(Ty);
 
 impl FullyStaticTy {
-    pub(crate) fn into_type<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn into_type<'db>(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         let ty = self.0.into_type(db, env);
         assert!(
             ty.is_fully_static(db, env),
@@ -784,7 +772,7 @@ impl Arbitrary for FullyStaticTy {
 
 pub(crate) fn intersection<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     IntersectionType::from_elements(db, env, tys)
@@ -792,7 +780,7 @@ pub(crate) fn intersection<'db>(
 
 pub(crate) fn union<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
     UnionType::from_elements(db, env, tys)

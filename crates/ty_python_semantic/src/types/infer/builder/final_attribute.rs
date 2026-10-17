@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::place::place_from_declarations;
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::{CycleKind, TypeQuery, TypeQueryContext};
-use crate::{Db, ProgramEnvironment};
+use crate::{Db, TypeOperations};
 use crate::{
     TypeQualifiers,
     types::{
@@ -358,7 +358,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 /// Find a receiver whose declaration prevents deletion of this attribute.
 pub(super) fn final_attribute_receiver<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     object_ty: Type<'db>,
     attribute: &str,
 ) -> Option<Type<'db>> {

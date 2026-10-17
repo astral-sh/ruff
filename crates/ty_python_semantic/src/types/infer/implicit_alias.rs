@@ -13,7 +13,7 @@ use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
     binding_type,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxOrderSet, ProgramEnvironment, TypeOperations};
 
 /// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
 ///
@@ -48,7 +48,7 @@ pub(in crate::types) fn implicit_alias_parameters<'db>(
     (!collector.variables.is_empty()).then(|| {
         GenericContext::from_typevar_instances(
             db,
-            &ProgramEnvironment::from_file(file),
+            &TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
             collector.variables,
         )
     })
@@ -97,7 +97,11 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
             }
             ast::Expr::Attribute(attribute) => self
                 .expression_type(&attribute.value)?
-                .member(db, &ProgramEnvironment::from_file(file), &attribute.attr)
+                .member(
+                    db,
+                    &TypeOperations::new_root(db, ProgramEnvironment::from_file(file)),
+                    &attribute.attr,
+                )
                 .ignore_possibly_undefined(),
             _ => None,
         }

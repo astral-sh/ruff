@@ -1,5 +1,5 @@
 use crate::types::recursive::RecursiveReferenceMapper;
-use crate::{Program, ProgramEnvironment};
+use crate::{Program, ProgramEnvironment, TypeOperations};
 use std::borrow::Cow;
 use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
@@ -264,7 +264,7 @@ pub(crate) fn typing_self<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
-    let env = ProgramEnvironment::from_scope(scope_id);
+    let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(scope_id));
     let index = semantic_index(db, scope_id.program_file(db));
 
     let identity = TypeVarIdentity::new(
@@ -434,7 +434,7 @@ impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of `BoundTypeVarInstance`s.
     pub(crate) fn from_typevar_instances(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
         Self::from_typevar_instances_in_program(db, env.program(db), type_params)
@@ -595,7 +595,7 @@ impl<'db> GenericContext<'db> {
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
     ) -> Option<Self> {
-        let env = ProgramEnvironment::from_definition(definition);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
         // Find all of the legacy typevars mentioned in the function signature.
         let mut variables = FxOrderSet::default();
         for param in parameters {
@@ -644,7 +644,7 @@ impl<'db> GenericContext<'db> {
         definition: Definition<'db>,
         bases: impl Iterator<Item = Type<'db>>,
     ) -> Option<Self> {
-        let env = ProgramEnvironment::from_definition(definition);
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_definition(definition));
         let mut variables = FxOrderSet::default();
         for base in bases {
             base.find_legacy_typevars(db, &env, Some(definition), &mut variables);
@@ -688,7 +688,10 @@ impl<'db> GenericContext<'db> {
                 FxHashSet<BoundTypeVarInstance<'db>>,
                 FxHashMap<CallableType<'db>, CallableType<'db>>,
             ) {
-                let env = ProgramEnvironment::from_definition(function_definition);
+                let env = TypeOperations::new_root(
+                    db,
+                    ProgramEnvironment::from_definition(function_definition),
+                );
                 let mut found_only_inside_callable_return = FxHashSet::default();
                 let replacements = self
                     .found_inside_callable_return
@@ -748,7 +751,7 @@ impl<'db> GenericContext<'db> {
         /// A visitor that walks through the parameter and return type annotations, recording
         /// whether each typevar appears inside and/or outside of a return type `Callable`.
         struct FindTypeVarLocations<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
+            env: &'a TypeOperations<'db>,
             mapping: ApplyTypeMappingVisitor<'a, 'db>,
             locations: RefCell<TypeVarLocations<'db>>,
             recursion_guard: TypeCollector<'db>,
@@ -758,7 +761,7 @@ impl<'db> GenericContext<'db> {
         }
 
         impl<'db> TypeVisitor<'db> for FindTypeVarLocations<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            fn program_environment(&self) -> &TypeOperations<'db> {
                 self.env
             }
 
@@ -836,7 +839,8 @@ impl<'db> GenericContext<'db> {
         let Some(generic_context) = generic_context else {
             return (None, return_type);
         };
-        let env = ProgramEnvironment::from_definition(function_definition);
+        let env =
+            TypeOperations::new_root(db, ProgramEnvironment::from_definition(function_definition));
 
         // Find whether each typevar appears inside and/or outside a return type Callable.
         let mut find_typevar_locations = FindTypeVarLocations {
@@ -893,7 +897,8 @@ impl<'db> GenericContext<'db> {
     ) -> Specialization<'db> {
         let partial = self.specialize_partial(db, std::iter::repeat_n(None, self.len(db)));
         if known_class == Some(KnownClass::Tuple) {
-            let env = ProgramEnvironment::from_program(self.program(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
             Specialization::new(
                 db,
                 self,
@@ -931,7 +936,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         known_class: Option<KnownClass>,
     ) -> Specialization<'db> {
-        let env = ProgramEnvironment::from_program(self.program(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
         Specialization::new(
             db,
             self,
@@ -961,7 +966,7 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn binds_named_typevar(
         self,
         db: &'db dyn Db,
-        name: &'db ast::name::Name,
+        name: &ast::name::Name,
     ) -> Option<BoundTypeVarInstance<'db>> {
         self.variables(db)
             .find(|self_bound_typevar| self_bound_typevar.typevar(db).name(db) == name)
@@ -1019,7 +1024,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         mut types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
-        let env = ProgramEnvironment::from_program(self.program(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
         let len = types.len();
         let variables = self.variables(db).collect_vec();
         loop {
@@ -1075,7 +1080,7 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        let env = ProgramEnvironment::from_program(self.program(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(self.program(db)));
         let types = types.into_iter();
         let variables = self.variables(db);
         assert_eq!(self.len(db), types.len());
@@ -1287,7 +1292,10 @@ impl<'db> Specialization<'db> {
     /// `str` when the argument is `Any`. Using `Any & str` lets structural comparisons
     /// materialize the member in either direction without losing that bound.
     pub(super) fn with_typevar_bounds(self, db: &'db dyn Db) -> Self {
-        let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(self.generic_context(db).program(db)),
+        );
         let types = self.map_types(db, |_, typevar, ty| {
             if !any_over_type_expanding_aliases(db, &env, ty, |ty| ty.is_dynamic()) {
                 return ty;
@@ -1361,7 +1369,10 @@ impl<'db> Specialization<'db> {
             return self;
         }
 
-        let env = ProgramEnvironment::from_program(self.generic_context(db).program(db));
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(self.generic_context(db).program(db)),
+        );
         Self::new(
             db,
             self.generic_context(db),
@@ -1399,7 +1410,10 @@ impl<'db> Specialization<'db> {
     /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
     /// MRO of `B[int]`.
     fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
-        let env = &ProgramEnvironment::from_program(other.generic_context(db).program(db));
+        let env = &TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(other.generic_context(db).program(db)),
+        );
         self.apply_specialization_impl(db, other, false, &ApplyTypeMappingVisitor::new(env))
     }
 
@@ -1533,7 +1547,10 @@ impl<'db> Specialization<'db> {
     pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
         let generic_context = self.generic_context(db);
         assert_eq!(other.generic_context(db), generic_context);
-        let env = ProgramEnvironment::from_program(generic_context.program(db));
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(generic_context.program(db)),
+        );
         // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
         // confusing/wrong results in cases where there was a mapping found for a typevar, and it
         // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
@@ -1556,7 +1573,7 @@ impl<'db> Specialization<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -1682,7 +1699,7 @@ impl<'db> Specialization<'db> {
     pub(crate) fn is_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Self,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -1706,7 +1723,7 @@ impl<'db> Specialization<'db> {
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         binding_context: Option<Definition<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'_, 'db>,
@@ -2442,7 +2459,7 @@ impl<'db> Type<'db> {
     pub(crate) fn substitute_one_typevar(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         bound_typevar: BoundTypeVarInstance<'db>,
         replacement: Type<'db>,
     ) -> Type<'db> {
@@ -2473,7 +2490,7 @@ struct InferSpecializationVisitor<'env, 'db> {
 }
 
 impl<'env, 'db> InferSpecializationVisitor<'env, 'db> {
-    fn new(env: &'env ProgramEnvironment<'db>) -> Self {
+    fn new(env: &'env TypeOperations<'db>) -> Self {
         Self {
             cycles: InferSpecializationCycles::new(Ok(())),
             mapping: ApplyTypeMappingVisitor::new(env),
@@ -2502,7 +2519,10 @@ impl<'db> InferSpecialization<'db> {
         if matches!(identity, TypeIdentity::Other(_)) {
             return (identity, Box::default());
         }
-        let env = ProgramEnvironment::from_program(self.generic_context.program(db));
+        let env = TypeOperations::new_root(
+            db,
+            ProgramEnvironment::from_program(self.generic_context.program(db)),
+        );
         let specialization = match ty {
             Type::TypeAlias(alias) => alias.specialization(db),
             Type::Recursive(recursive) => recursive.arguments(db),
@@ -2551,7 +2571,7 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db, 'c> {
     db: &'db dyn Db,
-    env: &'c ProgramEnvironment<'db>,
+    env: &'c TypeOperations<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
@@ -2717,7 +2737,7 @@ impl<'db> ConstraintSetAnalysis<'db> {
     fn specialization_error(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> Option<SpecializationError<'db>> {
         let Self::Unsatisfiable(failures) = self else {
             return None;
@@ -2783,7 +2803,7 @@ fn relation_directions<T: Copy>(
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
+        env: &'c TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
     ) -> Self {
@@ -3710,7 +3730,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Option<ConstraintSet<'db, 'c>> {
         fn is_string_keyed_mapping<'db>(
             db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
+            env: &TypeOperations<'db>,
             ty: Type<'db>,
         ) -> bool {
             TypeInspector::inspect_root(

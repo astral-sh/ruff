@@ -305,8 +305,8 @@ fn script_metadata_tokens(tag: &ScriptTag, range: Option<TextRange>) -> Vec<Sema
 
 /// AST visitor that collects semantic tokens.
 #[expect(clippy::struct_excessive_bools)]
-struct SemanticTokenVisitor<'db> {
-    model: &'db SemanticModel<'db>,
+struct SemanticTokenVisitor<'model, 'db> {
+    model: &'model SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_form: bool,
@@ -316,8 +316,8 @@ struct SemanticTokenVisitor<'db> {
     range_filter: Option<TextRange>,
 }
 
-impl<'db> SemanticTokenVisitor<'db> {
-    fn new(model: &'db SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
+impl<'model, 'db> SemanticTokenVisitor<'model, 'db> {
+    fn new(model: &'model SemanticModel<'db>, range_filter: Option<TextRange>) -> Self {
         Self {
             model,
             tokens: Vec::new(),
@@ -812,7 +812,7 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
+impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
         // If we have a range filter and this node doesn't intersect, skip it
         // and all its children as an optimization

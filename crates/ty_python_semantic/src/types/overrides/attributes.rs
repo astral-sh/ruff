@@ -7,7 +7,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use ty_python_core::definition::{Definition, DefinitionKind};
 
 use crate::{
-    Db, ProgramEnvironment, attribute_declarations,
+    Db, TypeOperations, attribute_declarations,
     lint::LintMetadata,
     place::{DefinedPlace, Place, TypeOrigin},
     types::{
@@ -109,7 +109,7 @@ fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// With `owner = Base` and a `Child` receiver, the read contract remains `int`.
 fn member_contract<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     owner: ClassType<'db>,
     receiver: Type<'db>,
     name: &str,
@@ -297,7 +297,7 @@ fn member_contract<'db>(
 /// whose input domain cannot yet be represented.
 fn descriptor_write_domain<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     descriptor: Type<'db>,
     receiver: Type<'db>,
     storage_type: Type<'db>,
@@ -367,7 +367,7 @@ enum AttributeViolation<'db> {
 /// Read types are covariant and write types are contravariant.
 fn attribute_violation<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     receiver: Type<'db>,
     target_receiver: Type<'db>,
     name: &str,
@@ -533,7 +533,7 @@ impl<'db> AttributeOverrideViolation<'db> {
 /// Diagnostic settings do not affect which check applies.
 pub(super) fn check_override<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     class: ClassType<'db>,
     superclass: ClassType<'db>,
     inherited_owner: Option<ClassType<'db>>,

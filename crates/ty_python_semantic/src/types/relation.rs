@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use std::borrow::Cow;
 
 use itertools::Itertools;
@@ -214,7 +214,7 @@ pub(crate) enum TypeVarEvaluation {
 /// nominal origins whose classes have no explicit bases.
 fn has_missing_generic_nominal_bound<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     source: IntersectionType<'db>,
     target: IntersectionType<'db>,
 ) -> bool {
@@ -333,7 +333,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_subtype_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
@@ -344,7 +344,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_subtype_of<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -362,7 +362,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_subtype_of<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -384,7 +384,7 @@ impl<'db> Type<'db> {
     pub fn is_assignable_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
         self.when_assignable_to_owned(db, env, target, TypeVarSet::None)
@@ -395,7 +395,7 @@ impl<'db> Type<'db> {
     pub(super) fn is_attribute_writable_with(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         value_ty: Type<'db>,
     ) -> bool {
@@ -424,7 +424,7 @@ impl<'db> Type<'db> {
     pub(crate) fn assignability_error_context(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
         self.relation_error_context(db, env, TypeRelation::Assignability, target)
@@ -441,7 +441,7 @@ impl<'db> Type<'db> {
     pub(crate) fn pure_redundancy_error_context(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
         self.relation_error_context(db, env, TypeRelation::Redundancy { pure: true }, target)
@@ -454,7 +454,7 @@ impl<'db> Type<'db> {
     fn relation_error_context(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         relation: TypeRelation,
         target: Type<'db>,
     ) -> ErrorContextTree<'db> {
@@ -481,7 +481,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_constraint_set_assignable_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
@@ -494,12 +494,13 @@ impl<'db> Type<'db> {
     pub(super) fn is_constraint_set_subtype_of(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> bool {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
         fn is_constraint_set_subtype_of_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
-            let env = ProgramEnvironment::from_program(types.program(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
             let constraints = ConstraintSetBuilder::new();
             types
                 .first(db)
@@ -522,7 +523,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -540,7 +541,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_assignable_to_owned(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
@@ -555,7 +556,7 @@ impl<'db> Type<'db> {
             inferable: TypeVarSet<'db>,
         ) -> OwnedConstraintSet<'db> {
             let program = types.program(db);
-            let env = ProgramEnvironment::from_program(program);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -622,7 +623,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_assignable_to_owned(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
@@ -635,7 +636,7 @@ impl<'db> Type<'db> {
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
             let program = types.program(db);
-            let env = ProgramEnvironment::from_program(program);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
             let constraints = ConstraintSetBuilder::new();
             constraints.into_owned(|constraints| {
                 let source = types.first(db);
@@ -668,7 +669,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_assignable_to<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -684,7 +685,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_assignable_to_with_provenance<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         provenance: ConstraintProvenance,
@@ -707,13 +708,13 @@ impl<'db> Type<'db> {
     pub(super) fn is_redundant_with(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
-            let env = ProgramEnvironment::from_program(program);
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
             types
                 .first(db)
                 .has_relation_to(
@@ -750,7 +751,7 @@ impl<'db> Type<'db> {
     pub(super) fn is_pure_redundant_with(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
         if self == other {
@@ -758,7 +759,7 @@ impl<'db> Type<'db> {
         }
 
         let program = env.program(db);
-        let env = ProgramEnvironment::from_program(program);
+        let env = env.in_environment(ProgramEnvironment::from_program(program));
         self.has_relation_to(
             db,
             &env,
@@ -773,7 +774,7 @@ impl<'db> Type<'db> {
     pub(super) fn has_relation_to<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -795,7 +796,7 @@ impl<'db> Type<'db> {
     fn has_relation_to_with_typevar_evaluation<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -839,7 +840,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_equivalent_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
         self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
@@ -865,7 +866,7 @@ impl<'db> Type<'db> {
     pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
@@ -882,7 +883,7 @@ impl<'db> Type<'db> {
     pub(super) fn when_constraint_set_equivalent_to_owned(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
@@ -894,7 +895,8 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             types: TypePair<'db>,
         ) -> OwnedConstraintSet<'db> {
-            let env = ProgramEnvironment::from_program(types.program(db));
+            let env =
+                TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program(db)));
             let constraints = ConstraintSetBuilder::new();
             let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
             constraints.into_owned(|constraints| {
@@ -923,7 +925,7 @@ impl<'db> Type<'db> {
     pub(super) fn is_constraint_set_equivalent_to(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
         if self == other {
@@ -977,7 +979,7 @@ impl<'db> Type<'db> {
     pub(crate) fn is_disjoint_from(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
@@ -988,7 +990,7 @@ impl<'db> Type<'db> {
     pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -1016,7 +1018,7 @@ impl<'db> Type<'db> {
     pub(crate) fn disjointness_error_context(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
     ) -> ErrorContextTree<'db> {
         let constraints = ConstraintSetBuilder::new();
@@ -1043,7 +1045,7 @@ impl<'db> Type<'db> {
     pub(crate) fn when_trivially_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         other: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -1122,7 +1124,7 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
 
 #[derive(Clone)]
 pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
-    pub(super) env: &'a ProgramEnvironment<'db>,
+    pub(super) env: &'a TypeOperations<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
@@ -1147,7 +1149,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// Create a relation checker that eagerly evaluates type variables.
     #[expect(clippy::too_many_arguments)]
     pub(super) fn new(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         relation: TypeRelation,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
@@ -1173,7 +1175,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn subtyping(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
@@ -1194,7 +1196,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn constraint_set_assignability(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
@@ -1217,7 +1219,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn constraint_set_assignability_with_context(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
@@ -1241,7 +1243,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     pub(super) fn assignability_with_context(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
         disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
@@ -3172,7 +3174,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
-    env: &'a ProgramEnvironment<'db>,
+    env: &'a TypeOperations<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
@@ -3242,7 +3244,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 }
 
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
-    pub(super) env: &'a ProgramEnvironment<'db>,
+    pub(super) env: &'a TypeOperations<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
@@ -3263,7 +3265,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
 
 impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
-        env: &'a ProgramEnvironment<'db>,
+        env: &'a TypeOperations<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: TypeVarSet<'db>,
         relation_visitor: &'a HasRelationToVisitor<'db, 'c>,

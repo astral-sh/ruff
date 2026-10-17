@@ -1,4 +1,4 @@
-use crate::ProgramEnvironment;
+use crate::{ProgramEnvironment, TypeOperations};
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::TextRange;
@@ -28,7 +28,7 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// generic context in the synthesized `__new__` signature.
 pub(super) fn synthesize_namedtuple_class_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    env: &TypeOperations<'db>,
     name: &str,
     instance_ty: Type<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
@@ -173,7 +173,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -207,7 +207,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     /// Returns an instance type for this dynamic namedtuple.
-    fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn to_instance(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
         Type::instance(db, env, ClassType::NonGeneric(self.into()))
     }
 
@@ -250,12 +250,12 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
             db,
-            &ProgramEnvironment::from_scope(self_.scope(db)),
+            &TypeOperations::new_root(db, ProgramEnvironment::from_scope(self_.scope(db))),
             ClassType::NonGeneric(ClassLiteral::DynamicNamedTuple(self_)),
         ),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let tuple_class = self.tuple_base_class(db, &env);
         std::iter::once(self_base)
@@ -267,7 +267,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     ///
     /// Namedtuples always have `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         KnownClass::Type.to_class_literal(db, &env)
     }
 
@@ -277,7 +277,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(crate) fn tuple_base_class(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
     ) -> ClassType<'db> {
         // If fields are unknown, return `tuple[Unknown, ...]` to avoid false positives
         // like index-out-of-bounds errors.
@@ -305,7 +305,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(crate) fn instance_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
         // First check own instance members.
@@ -322,7 +322,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
@@ -352,7 +352,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// This only checks synthesized members and field properties, without falling
     /// back to tuple or other base classes.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_scope(self.scope(db)));
         // Handle synthesized namedtuple attributes.
         if let Some(ty) = self.synthesized_class_member(db, &env, name) {
             return Member::definitely_declared(ty);
@@ -372,7 +372,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     fn synthesized_class_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         name: &str,
     ) -> Option<Type<'db>> {
         let instance_ty = self.to_instance(db, env);
@@ -541,7 +541,7 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
@@ -589,7 +589,7 @@ impl<'db> NamedTupleSpec<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        env: &TypeOperations<'db>,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
