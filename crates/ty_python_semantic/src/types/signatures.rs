@@ -10,11 +10,11 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
-use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::RecursiveReferenceMapper;
 use crate::types::recursive::TypeInspectionKey;
 use crate::types::recursive::TypeInspector;
+use crate::{Program, ProgramEnvironment};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -179,6 +179,23 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    pub(super) fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
+    ) -> Option<Self> {
+        let overloads = self
+            .overloads
+            .iter()
+            .map(|signature| {
+                signature.try_specialize_stored(db, program, specialization, specialize_self_domain)
+            })
+            .collect::<Option<SmallVec<[Signature<'db>; 1]>>>()?;
+        Some(Self::from_overloads(overloads))
+    }
+
     pub(super) fn map_recursive_references(
         &self,
         db: &'db dyn Db,
@@ -892,6 +909,77 @@ impl<'db> Signature<'db> {
         (SignatureIdentityShape(shape), types.into_boxed_slice())
     }
 
+    /// Rewrite an explicit signature when every changed type is already stored.
+    fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
+    ) -> Option<Self> {
+        if self.receiver_constraints().is_some()
+            || matches!(
+                self.parameters.kind(),
+                ParametersKind::ParamSpec(_)
+                    | ParametersKind::Concatenate(ConcatenateTail::ParamSpec(_))
+            )
+        {
+            return None;
+        }
+        let map = |ty: Type<'db>| {
+            ty.try_specialize_stored(db, program, specialization, specialize_self_domain)
+        };
+        let return_ty = if self.is_paramspec_value() {
+            self.return_ty
+        } else {
+            map(self.return_ty)?
+        };
+        let mut parameters = self.parameters.clone();
+        for (index, parameter) in self.parameters.iter().enumerate() {
+            if parameter.has_starred_annotation() {
+                return None;
+            }
+            let mut mapped = parameter.clone();
+            mapped.annotated_type = map(parameter.annotated_type)?;
+            if let ParameterKind::PositionalOnly { default_type, .. }
+            | ParameterKind::PositionalOrKeyword { default_type, .. }
+            | ParameterKind::KeywordOnly { default_type, .. } = &mut mapped.kind
+                && let Some(ParameterDefault::Inferred(ty)) = default_type
+            {
+                *ty = map(*ty)?;
+            }
+            if mapped != *parameter {
+                Arc::make_mut(&mut parameters.data).value[index] = mapped;
+            }
+        }
+        Some(Self {
+            generic_context: if let Some(context) = self.generic_context {
+                let variables = context.variables(db).filter(|&variable| {
+                    match specialization.get(db, variable) {
+                        None => true,
+                        Some(Type::TypeVar(mapped)) => mapped.identity(db) == variable.identity(db),
+                        Some(_) => false,
+                    }
+                });
+                let env = ProgramEnvironment::from_program(program);
+                Some(if specialize_self_domain {
+                    let variables = variables
+                        .map(|variable| map(Type::TypeVar(variable))?.as_typevar())
+                        .collect::<Option<SmallVec<[_; 2]>>>()?;
+                    GenericContext::from_typevar_instances(db, &env, variables)
+                } else {
+                    GenericContext::from_typevar_instances(db, &env, variables)
+                })
+            } else {
+                None
+            },
+            definition: self.definition,
+            extras: self.extras.clone(),
+            parameters,
+            return_ty,
+        })
+    }
+
     fn map_recursive_references(
         &self,
         db: &'db dyn Db,
@@ -1388,14 +1476,16 @@ impl<'db> Signature<'db> {
                 // TODO: Also intersect nested receiver type variables, such as the `T` in
                 // `self: list[T]`, with their valid specializations when constructing or solving the
                 // receiver constraint set.
-                if TypeInspector::inspect_root(
-                    db,
-                    env,
-                    TypeInspectionKey::BindSelfWithReceiver,
-                    annotation,
-                    |_, _| false,
-                    |_, annotation| annotation.receiver_violates_typevar_domain(db, receiver),
-                ) {
+                if !receiver.is_type_var()
+                    && TypeInspector::inspect_root(
+                        db,
+                        env,
+                        TypeInspectionKey::BindSelfWithReceiver,
+                        annotation,
+                        |_, _| false,
+                        |_, annotation| annotation.receiver_violates_typevar_domain(db, receiver),
+                    )
+                {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
                 receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
@@ -1781,7 +1871,6 @@ impl<'db> Signature<'db> {
             TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
         let receiver_visitor = ApplyTypeMappingVisitor::new(env);
         let self_visitor = ApplyTypeMappingVisitor::new(env);
-        let inferable = self.inferable_typevars(db);
         let receiver_constraints = self
             .map_receiver_constraints(
                 db,
@@ -1798,11 +1887,7 @@ impl<'db> Signature<'db> {
                     &self_visitor,
                 )
             })
-            .filter(|constraints| {
-                !constraints.query(|_builder, constraints| {
-                    constraints.is_always_satisfied(db, env, inferable)
-                })
-            });
+            .filter(|constraints| !constraints.is_trivially_always_satisfied());
         if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
@@ -1861,10 +1946,9 @@ impl<'db> Signature<'db> {
     ) -> Option<OwnedConstraintSet<'db>> {
         let constraints =
             Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
-        (!constraints.query(|_builder, constraints| {
-            constraints.is_always_satisfied(db, visitor.env, self.inferable_typevars(db))
-        }))
-        .then_some(constraints)
+        // Substitution retains the receiver's requirements. Compatibility checking solves
+        // them after the caller has installed the relation's recursion guard.
+        (!constraints.is_trivially_always_satisfied()).then_some(constraints)
     }
 
     fn map_constraints(
@@ -5523,12 +5607,13 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
-        let value: Box<[_]> = self
-            .data
-            .value
-            .iter()
-            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-            .collect();
+        let mut parameters = self.clone();
+        for (index, parameter) in self.data.value.iter().enumerate() {
+            let mapped = parameter.apply_type_mapping_impl(db, &type_mapping, tcx, visitor);
+            if mapped != *parameter {
+                Arc::make_mut(&mut parameters.data).value[index] = mapped;
+            }
+        }
 
         let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
             let freshen = |paramspec| {
@@ -5550,7 +5635,10 @@ impl<'db> Parameters<'db> {
         } else {
             self.data.kind
         };
-        Self::new(value, kind).expand_starred_variadic_annotations(db)
+        if kind != parameters.data.kind {
+            Arc::make_mut(&mut parameters.data).kind = kind;
+        }
+        parameters.expand_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()

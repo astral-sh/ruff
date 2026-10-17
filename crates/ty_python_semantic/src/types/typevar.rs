@@ -1,7 +1,7 @@
 use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use crate::types::recursive::TypeVisitorKey;
-use crate::types::visitor::{TypeVisit, TypeVisitorContext, TypeVisitorHooks};
+use crate::types::visitor::{TypeKind, TypeVisit, TypeVisitorContext, TypeVisitorHooks};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -112,6 +112,12 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> bool {
+        match self {
+            Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_) => return true,
+            Type::NominalInstance(instance) if !instance.is_definition_generic(db) => return false,
+            _ if matches!(TypeKind::from(self), TypeKind::Atomic) => return false,
+            _ => {}
+        }
         any_over_type(db, env, self, false, |ty| {
             matches!(
                 ty,
@@ -322,6 +328,11 @@ impl<'db> TypeVarInstance<'db> {
         )
     }
 
+    /// Whether a bound or constraints are declared, without evaluating either.
+    pub(super) fn has_bound_or_constraints(self, db: &'db dyn Db) -> bool {
+        self._bound_or_constraints(db).is_some()
+    }
+
     pub(crate) fn constraints(
         self,
         db: &'db dyn Db,
@@ -339,17 +350,17 @@ impl<'db> TypeVarInstance<'db> {
     pub(crate) fn bound_or_constraints(
         self,
         db: &'db dyn Db,
-        env: &TypeOperations<'db>,
+        _env: &TypeOperations<'db>,
     ) -> Option<TypeVarBoundOrConstraints<'db>> {
         self._bound_or_constraints(db).and_then(|w| match w {
             TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
                 Some(bound_or_constraints)
             }
             TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
-                .lazy_bound(db, env)
+                .lazy_bound(db)
                 .map(TypeVarBoundOrConstraints::UpperBound),
             TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
-                .lazy_constraints(db, env)
+                .lazy_constraints(db)
                 .map(TypeVarBoundOrConstraints::Constraints),
         })
     }
@@ -383,6 +394,9 @@ impl<'db> TypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if self._bound_or_constraints(db).is_none() && self._default(db).is_none() {
+            return self;
+        }
         Self::new(
             db,
             self.identity(db),
@@ -394,14 +408,14 @@ impl<'db> TypeVarInstance<'db> {
                             .into(),
                     ),
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
-                        self.lazy_bound(db, visitor.env).map(|bound| {
+                        self.lazy_bound(db).map(|bound| {
                             TypeVarBoundOrConstraints::UpperBound(bound)
                                 .materialize_impl(db, materialization_kind, visitor)
                                 .into()
                         })
                     }
                     TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db, visitor.env).map(|constraints| {
+                        self.lazy_constraints(db).map(|constraints| {
                             TypeVarBoundOrConstraints::Constraints(constraints)
                                 .materialize_impl(db, materialization_kind, visitor)
                                 .into()
@@ -477,15 +491,14 @@ impl<'db> TypeVarInstance<'db> {
         .visit(ty)
     }
 
-    /// Returns the "unchecked" upper bound of a type variable instance.
-    /// `lazy_bound` checks if the upper bound type is generic (generic upper bound is not allowed).
+    /// Infer a declaration-site upper bound and reject bounds that contain type variables.
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_bound_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_bound_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn lazy_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let program_file = definition.program_file(db);
         let python_file = program_file.python_file(db);
@@ -505,28 +518,18 @@ impl<'db> TypeVarInstance<'db> {
             _ => return None,
         };
 
-        Some(ty)
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_file(program_file));
+        (!ty.has_typevar_or_typevar_instance(db, &env)).then_some(ty)
     }
 
-    fn lazy_bound(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<Type<'db>> {
-        let bound = self.lazy_bound_unchecked(db)?;
-
-        if bound.has_typevar_or_typevar_instance(db, env) {
-            return None;
-        }
-
-        Some(bound)
-    }
-
-    /// Returns the "unchecked" constraints of a type variable instance.
-    /// `lazy_constraints` checks if any of the constraint types are generic (generic constraints are not allowed).
+    /// Infer declaration-site constraints and reject constraints that contain type variables.
     #[salsa::tracked(
         returns(copy),
         cycle_fn=lazy_constraints_cycle_recover,
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn lazy_constraints_unchecked(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
+    fn lazy_constraints(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
         let definition = self.definition(db)?;
         let program_file = definition.program_file(db);
         let python_file = program_file.python_file(db);
@@ -563,20 +566,10 @@ impl<'db> TypeVarInstance<'db> {
             _ => return None,
         };
 
-        Some(constraints)
-    }
-
-    fn lazy_constraints(
-        self,
-        db: &'db dyn Db,
-        env: &TypeOperations<'db>,
-    ) -> Option<TypeVarConstraints<'db>> {
-        let constraints = self.lazy_constraints_unchecked(db)?;
-
         if constraints
             .elements(db)
             .iter()
-            .any(|ty| ty.has_typevar_or_typevar_instance(db, env))
+            .any(|ty| ty.has_typevar_or_typevar_instance(db, &env))
         {
             return None;
         }
@@ -1142,6 +1135,53 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
+    /// Rewrite an eagerly stored `Self` domain without opening a declaration or alias body.
+    pub(super) fn try_specialize_stored_self_domain(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Option<Self> {
+        let typevar = self.typevar(db);
+        let program = self.binding_context(db).program(db);
+        let map = |ty: Type<'db>| ty.try_specialize_stored(db, program, specialization, false);
+        let bound_or_constraints = match typevar._bound_or_constraints(db) {
+            None => None,
+            Some(TypeVarBoundOrConstraintsEvaluation::Eager(bounds)) => Some(match bounds {
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    TypeVarBoundOrConstraints::UpperBound(map(bound)?)
+                }
+                TypeVarBoundOrConstraints::Constraints(constraints) => {
+                    TypeVarBoundOrConstraints::Constraints(TypeVarConstraints::new(
+                        db,
+                        constraints
+                            .elements(db)
+                            .iter()
+                            .copied()
+                            .map(map)
+                            .collect::<Option<Box<[_]>>>()?,
+                    ))
+                }
+            }),
+            Some(
+                TypeVarBoundOrConstraintsEvaluation::LazyUpperBound
+                | TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
+            ) => return None,
+        };
+        Some(Self::new(
+            db,
+            TypeVarInstance::new(
+                db,
+                typevar.identity(db),
+                bound_or_constraints.map(TypeVarBoundOrConstraintsEvaluation::Eager),
+                typevar.explicit_variance(db),
+                typevar._default(db),
+            ),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            self.freshness(db),
+        ))
+    }
+
     /// Applies a specialization to this occurrence's declared upper bound or constraints, if any.
     fn apply_specialization_to_bound_or_constraints(
         self,
@@ -1409,7 +1449,14 @@ impl<'db> BoundTypeVarInstance<'db> {
                     self,
                 )
             },
-            || compute(db, &env, self),
+            || {
+                env.caches().materialized_bounds.get_or_compute(
+                    db,
+                    &env,
+                    (env.program(db), self),
+                    || compute(db, &env, self),
+                )
+            },
         )
     }
 }
@@ -1419,6 +1466,22 @@ fn top_materialized_upper_bound_in_operation<'db>(
     env: &TypeOperations<'db>,
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
+    // A stored upper bound can often be materialized without inspecting another bound.
+    // These transformations cannot encounter a bound cycle or depend on an active one.
+    match bound_typevar.typevar(db).bound_or_constraints(db, env) {
+        None => return None,
+        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+            if let Some(materialized) = bound.try_materialize_without_expansion(
+                db,
+                env.program(db),
+                MaterializationKind::Top,
+            ) {
+                return Some(materialized);
+            }
+        }
+        Some(TypeVarBoundOrConstraints::Constraints(_)) => {}
+    }
+
     env.context()
         .state()
         .materialized_bounds
@@ -2456,7 +2519,7 @@ mod tests {
 
         drop(env);
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "lazy_bound_unchecked", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "lazy_bound", None, &events);
     }
 
     #[test]

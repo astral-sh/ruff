@@ -116,9 +116,9 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
@@ -342,6 +342,20 @@ impl<'db> OwnedConstraintSet<'db> {
     /// acceptable.
     pub(crate) fn is_trivially_always_satisfied(&self) -> bool {
         self.node == ALWAYS_TRUE
+    }
+
+    /// Check a completed set without copying its nodes into another constraint builder.
+    pub(super) fn is_always_satisfied(
+        &self,
+        db: &'db dyn Db,
+        env: &TypeOperations<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        match self.node.node() {
+            Node::AlwaysTrue => true,
+            Node::AlwaysFalse => false,
+            Node::Interior(_) => self.query(|_, set| set.is_always_satisfied(db, env, inferable)),
+        }
     }
 
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
@@ -3423,18 +3437,58 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: TypeVarSet<'db>,
     ) -> CandidateSolutions<'db> {
-        let when = self.when_constraint_set_assignable_to_owned(db, env, target);
-        when.query(|builder, when| {
-            let mut storage = builder.storage.borrow_mut();
-            CandidateSolutions::compute(
-                db,
-                env,
-                &mut storage,
-                when.node,
-                inferable,
-                when.source_order,
-            )
-        })
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial = |_, _, _, _| CandidateSolutions::Unsatisfiable,
+            heap_size = ruff_memory_usage::heap_size,
+        )]
+        fn cached<'db>(
+            db: &'db dyn Db,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> CandidateSolutions<'db> {
+            let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(types.program));
+            compute(db, &env, types, inferable)
+        }
+
+        fn compute<'db>(
+            db: &'db dyn Db,
+            env: &TypeOperations<'db>,
+            types: TypePair<'db>,
+            inferable: TypeVarSet<'db>,
+        ) -> CandidateSolutions<'db> {
+            let when = types
+                .first
+                .when_constraint_set_assignable_to_owned(db, env, types.second);
+            when.query(|builder, when| {
+                let mut storage = builder.storage.borrow_mut();
+                CandidateSolutions::compute(
+                    db,
+                    env,
+                    &mut storage,
+                    when.node,
+                    inferable,
+                    when.source_order,
+                )
+            })
+        }
+
+        let types = TypePair {
+            program: env.program(db),
+            first: self,
+            second: target,
+        };
+        env.cached_or_compute(
+            || cached(db, types, inferable),
+            || {
+                env.caches()
+                    .solutions
+                    .get_or_compute(db, env, (types, inferable), || {
+                        compute(db, env, types, inferable)
+                    })
+            },
+        )
+        .into_owned()
     }
 }
 

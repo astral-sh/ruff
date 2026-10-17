@@ -26,8 +26,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource,
     ClassType, CycleDetector, CycleKind, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
-    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeQuery, TypeQueryContext,
-    TypeTraversal, TypeVarBoundOrConstraints, TypeWalk, UnionBuilder, binding_type,
+    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeQuery, TypeTraversal,
+    TypeVarBoundOrConstraints, TypeWalk, UnionBuilder, binding_type,
     class_pattern_positional_sources, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
@@ -3947,7 +3947,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             env: &TypeOperations<'db>,
             ty: Type<'db>,
         ) -> Option<ClassLiteral<'db>> {
-            TypeQueryContext::with_root(env, RuntimeClass, |context| context.visit(db, ty))
+            RuntimeClass.evaluate(db, env, ty, ())
         }
 
         /// Return the expression being tested by an exact runtime-class check.
@@ -5080,9 +5080,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     // `NarrowingConstraint::intersection` at the call site instead of constructing a replacement
     // type here.
     fn narrow_with_present_key(&self, ty: Type<'db>, key: &str) -> Type<'db> {
-        TypeQueryContext::with_root(&self.env, NarrowWithPresentKey(key), |root| {
-            root.visit(self.db, ty)
-        })
+        NarrowWithPresentKey(key).evaluate(self.db, &self.env, ty, ())
     }
 
     /// Narrow unions of tuples by comparing an element's value.
@@ -5334,9 +5332,7 @@ fn is_or_contains_typeddict<'db>(
     env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> bool {
-    TypeQueryContext::with_root(env, ContainsTypedDict { key: None }, |root| {
-        root.visit(db, ty)
-    })
+    ContainsTypedDict { key: None }.evaluate(db, env, ty, ())
 }
 
 fn typeddict_declares_key<'db>(
@@ -5345,9 +5341,7 @@ fn typeddict_declares_key<'db>(
     ty: Type<'db>,
     key: &str,
 ) -> bool {
-    TypeQueryContext::with_root(env, ContainsTypedDict { key: Some(key) }, |root| {
-        root.visit(db, ty)
-    })
+    ContainsTypedDict { key: Some(key) }.evaluate(db, env, ty, ())
 }
 
 struct ContainsTypedDict<'a> {

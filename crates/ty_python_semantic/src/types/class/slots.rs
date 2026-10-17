@@ -569,7 +569,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let value_ty = self
-            .own_instance_member(db, env, name)
+            .own_instance_member(db, Name::new(name))
             .ignore_possibly_undefined()
             .map(|ty| ty.apply_optional_specialization(db, env, specialization))
             .unwrap_or_else(Type::unknown);

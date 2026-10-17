@@ -9,9 +9,8 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::types::{
     CallArguments, CallDunderError, ClassType, CycleKind, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, PropertyInstanceClass, SubclassOfInner, Type, TypeContext, TypeQuery,
-    TypeQueryContext, TypeVarBoundOrConstraints, UnionType, call::CallErrorKind,
-    constraints::ConstraintSetBuilder, context::InferContext,
-    diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
+    TypeVarBoundOrConstraints, UnionType, call::CallErrorKind, constraints::ConstraintSetBuilder,
+    context::InferContext, diagnostic::UNSUPPORTED_BOOL_CONVERSION, typed_dict::TypedDictField,
 };
 use ty_python_core::Truthiness;
 
@@ -26,13 +25,10 @@ impl<'db> Type<'db> {
     /// This describes the value type; a compound expression can also fail to complete because
     /// of its operands, even when its inferred result type is inhabited.
     pub(crate) fn bool(&self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Truthiness {
-        TypeQueryContext::with_root(
-            env,
-            TryBool {
-                allow_short_circuit: true,
-            },
-            |root| root.visit(db, *self),
-        )
+        TryBool {
+            allow_short_circuit: true,
+        }
+        .evaluate(db, env, *self, ())
         .unwrap_or_else(|err| err.fallback_truthiness())
     }
 
@@ -47,13 +43,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
-        TypeQueryContext::with_root(
-            env,
-            TryBool {
-                allow_short_circuit: false,
-            },
-            |root| root.visit(db, *self),
-        )
+        TryBool {
+            allow_short_circuit: false,
+        }
+        .evaluate(db, env, *self, ())
     }
 }
 

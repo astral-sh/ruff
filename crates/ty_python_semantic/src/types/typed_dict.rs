@@ -7,6 +7,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 
 use bitflags::bitflags;
 use ordermap::OrderSet;
@@ -30,7 +31,7 @@ use super::{
     Type, TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, UnionType, VarianceInferable,
     VarianceTerm, definition_expression_annotation, definition_expression_type, visitor,
 };
-use super::{CycleKind, TypeQuery, TypeQueryContext};
+use super::{CycleKind, TypeQuery};
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
@@ -661,9 +662,23 @@ impl<'db> TypedDictType<'db> {
                     return Cow::Borrowed(class.items(db));
                 }
 
+                if let Some((class, None)) = defining_class.static_class_literal(db)
+                    && class.generic_context(db).is_none()
+                    && let Some(items) = class.try_stored_typed_dict_items(db, env.program(db))
+                {
+                    return Cow::Borrowed(items);
+                }
+
                 env.cached_or_compute(
                     || typed_dict_type_class_based_items(db, env.program(db), defining_class),
-                    || compute(db, env, defining_class),
+                    || {
+                        env.caches().typed_dict_items.get_or_compute(
+                            db,
+                            env,
+                            (env.program(db), defining_class),
+                            || compute(db, env, defining_class),
+                        )
+                    },
                 )
             }
             Self::Synthesized(synthesized) => Cow::Borrowed(synthesized.items(db)),
@@ -1008,6 +1023,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_items = source.items(db, env);
         let target_items = target.items(db, env);
+        // A mismatched literal field can settle the comparison before we inspect recursive
+        // fields. Preserve field order when collecting an explanation for a diagnostic.
+        if !self.is_context_collection_enabled()
+            && target_items.iter().any(|(name, target_field)| {
+                source_items.get(name).is_some_and(|source_field| {
+                    source_field.declared_ty.trivial_relation(
+                        target_field.declared_ty,
+                        self.relation,
+                        self.typevar_evaluation,
+                    ) == Some(false)
+                        || !target_field.is_read_only()
+                            && target_field.declared_ty.trivial_relation(
+                                source_field.declared_ty,
+                                self.relation,
+                                self.typevar_evaluation,
+                            ) == Some(false)
+                })
+            })
+        {
+            return self.never();
+        }
         let source_openness = source.openness(db, env);
         let target_openness = target.openness(db, env);
         // Many rules violations short-circuit with "never", but asking whether one field is
@@ -2109,9 +2145,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     env: &TypeOperations<'db>,
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
-    TypeQueryContext::with_root(env, UnpackTypedDict, |root| root.visit(db, ty))
-        .ok()
-        .flatten()
+    UnpackTypedDict.evaluate(db, env, ty, ()).ok().flatten()
 }
 
 struct UnpackTypedDict;
@@ -3423,7 +3457,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::SalsaValue)]
-pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
+pub struct TypedDictSchema<'db>(Arc<BTreeMap<Name, TypedDictField<'db>>>);
 
 impl<'db> TypedDictSchema<'db> {
     pub(super) fn recursive_type_normalized_impl(
@@ -3433,21 +3467,23 @@ impl<'db> TypedDictSchema<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        self.iter()
-            .map(|(name, field)| {
-                let declared_ty = field
-                    .declared_ty
-                    .recursive_type_normalized_impl(db, env, div, true);
-                let declared_ty = if nested {
-                    declared_ty?
-                } else {
-                    declared_ty.unwrap_or(div)
-                };
+        let mut normalized = self.clone();
+        for (name, field) in self {
+            let declared_ty = field
+                .declared_ty
+                .recursive_type_normalized_impl(db, env, div, true);
+            let declared_ty = if nested {
+                declared_ty?
+            } else {
+                declared_ty.unwrap_or(div)
+            };
+            if declared_ty != field.declared_ty {
                 let mut field = field.clone();
                 field.declared_ty = declared_ty;
-                Some((name.clone(), field))
-            })
-            .collect()
+                normalized.insert(name.clone(), field);
+            }
+        }
+        Some(normalized)
     }
 }
 
@@ -3461,13 +3497,13 @@ impl<'db> Deref for TypedDictSchema<'db> {
 
 impl DerefMut for TypedDictSchema<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        Arc::make_mut(&mut self.0)
     }
 }
 
-impl<'a> IntoIterator for &'a TypedDictSchema<'_> {
-    type Item = (&'a Name, &'a TypedDictField<'a>);
-    type IntoIter = std::collections::btree_map::Iter<'a, Name, TypedDictField<'a>>;
+impl<'a, 'db> IntoIterator for &'a TypedDictSchema<'db> {
+    type Item = (&'a Name, &'a TypedDictField<'db>);
+    type IntoIter = std::collections::btree_map::Iter<'a, Name, TypedDictField<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
@@ -3476,7 +3512,7 @@ impl<'a> IntoIterator for &'a TypedDictSchema<'_> {
 
 impl<'db> FromIterator<(Name, TypedDictField<'db>)> for TypedDictSchema<'db> {
     fn from_iter<T: IntoIterator<Item = (Name, TypedDictField<'db>)>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self(Arc::new(iter.into_iter().collect()))
     }
 }
 
@@ -3561,7 +3597,7 @@ impl<'db> TypedDictFieldBuilder<'db> {
         self
     }
 
-    fn first_declaration(mut self, definition: Option<Definition<'db>>) -> Self {
+    pub(super) fn first_declaration(mut self, definition: Option<Definition<'db>>) -> Self {
         self.first_declaration = definition;
         self
     }

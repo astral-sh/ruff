@@ -1897,7 +1897,7 @@ fn simplify_intersection_pair<'db>(
         types: TypePair<'db>,
         polarity: IntersectionPolarity,
     ) -> IntersectionSimplification {
-        let env = env.in_environment(ProgramEnvironment::from_program(types.program(db)));
+        let env = env.in_environment(ProgramEnvironment::from_program(types.program));
         let context = env.context();
         if !context.state().normalization.is_empty() {
             return IntersectionSimplification::Unchanged;
@@ -1909,17 +1909,13 @@ fn simplify_intersection_pair<'db>(
             .try_visit_active(
                 db,
                 &env,
-                (
-                    types.first(db),
-                    (env.program(db), polarity),
-                    types.second(db),
-                ),
+                (types.first, (env.program(db), polarity), types.second),
                 || {
                     compute_intersection_simplification(
                         db,
                         &env,
-                        types.first(db),
-                        types.second(db),
+                        types.first,
+                        types.second,
                         polarity,
                     )
                 },
@@ -1967,10 +1963,21 @@ fn simplify_intersection_pair<'db>(
         };
     }
 
-    let types = TypePair::new(db, env.program(db), first, second);
+    let types = TypePair {
+        program: env.program(db),
+        first,
+        second,
+    };
     *env.cached_or_compute(
         || simplify_intersection_pair_query(db, env.program(db), types, polarity),
-        || compute(db, env, types, polarity),
+        || {
+            env.caches().intersection_simplifications.get_or_compute(
+                db,
+                env,
+                (types, polarity),
+                || compute(db, env, types, polarity),
+            )
+        },
     )
 }
 

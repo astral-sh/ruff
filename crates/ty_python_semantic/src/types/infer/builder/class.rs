@@ -14,7 +14,7 @@ use crate::types::{
     },
     special_form::TypeQualifier,
 };
-use crate::types::{CycleKind, TypeOperations, TypeQuery, TypeQueryContext};
+use crate::types::{CycleKind, TypeOperations, TypeQuery};
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
@@ -530,14 +530,11 @@ fn class_decorator_preserves_class_binding<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    TypeQueryContext::with_root(
-        env,
-        ClassBinding {
-            original_class,
-            allow_intersections: false,
-        },
-        |context| context.visit(db, decorated_class),
-    )
+    ClassBinding {
+        original_class,
+        allow_intersections: false,
+    }
+    .evaluate(db, env, decorated_class, ())
 }
 
 /// Return true if a type still contains the original class object, even if it also carries extra
@@ -548,14 +545,11 @@ fn type_retains_original_class<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    TypeQueryContext::with_root(
-        env,
-        ClassBinding {
-            original_class,
-            allow_intersections: true,
-        },
-        |context| context.visit(db, decorated_class),
-    )
+    ClassBinding {
+        original_class,
+        allow_intersections: true,
+    }
+    .evaluate(db, env, decorated_class, ())
 }
 
 struct ClassBinding<'db> {

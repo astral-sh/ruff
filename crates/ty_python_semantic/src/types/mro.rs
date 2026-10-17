@@ -4,9 +4,11 @@ use crate::ProgramEnvironment;
 use crate::types::TypeOperations;
 use std::borrow::Cow;
 use std::collections::VecDeque;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
+use std::sync::Arc;
 
 use rustc_hash::FxHashSet;
+use ty_python_core::Program;
 
 use crate::types::class::{DynamicClassLiteral, DynamicEnumLiteral, GenericAlias};
 use crate::types::class_base::ClassBase;
@@ -15,7 +17,7 @@ use crate::types::{
     ClassLiteral, ClassType, KnownInstanceType, SpecialFormType, StaticClassLiteral, Type,
 };
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 
 /// The inferred method resolution order of a given class.
 ///
@@ -37,7 +39,7 @@ use itertools::{Either, Itertools};
 ///
 /// See [`ClassType::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
+pub(crate) struct Mro<'db>(Arc<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
     /// Type arguments change the types of inherited members, but cannot change the order of
@@ -52,6 +54,33 @@ impl<'db> Mro<'db> {
         std::iter::once(ClassBase::Class(ClassType::Generic(alias)))
             .chain(self.iter().skip(1).map(|base| {
                 base.apply_optional_specialization(db, env, Some(alias.specialization(db)))
+            }))
+            .collect()
+    }
+
+    /// Substitute stored arguments without opening definitions or applying materialization.
+    pub(super) fn try_specialize_stored(
+        &self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        alias: GenericAlias<'db>,
+    ) -> Option<Self> {
+        let specialization = alias.specialization(db);
+        if specialization.materialization_kind(db).is_some() {
+            return None;
+        }
+        std::iter::once(Some(ClassBase::Class(ClassType::Generic(alias))))
+            .chain(self.iter().skip(1).map(|base| {
+                if let ClassBase::Class(ClassType::Generic(base)) = *base {
+                    let Type::GenericAlias(specialized) = Type::GenericAlias(base)
+                        .try_specialize_stored(db, program, specialization, false)?
+                    else {
+                        return None;
+                    };
+                    Some(ClassBase::Class(ClassType::Generic(specialized)))
+                } else {
+                    Some(*base)
+                }
             }))
             .collect()
     }
@@ -568,13 +597,13 @@ impl<'db> Mro<'db> {
 
 impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
     fn from(value: [ClassBase<'db>; N]) -> Self {
-        Self(Box::from(value))
+        Self(Arc::from(value))
     }
 }
 
 impl<'db> From<Vec<ClassBase<'db>>> for Mro<'db> {
     fn from(value: Vec<ClassBase<'db>>) -> Self {
-        Self(value.into_boxed_slice())
+        Self(value.into())
     }
 }
 
@@ -632,10 +661,34 @@ pub(crate) struct MroIterator<'db> {
     subsequent_elements: Option<MroElements<'db>>,
 }
 
-type MroElements<'db> = Either<
-    std::iter::Copied<std::slice::Iter<'db, ClassBase<'db>>>,
-    std::vec::IntoIter<ClassBase<'db>>,
->;
+#[derive(Clone)]
+enum MroElements<'db> {
+    Borrowed(std::iter::Copied<std::slice::Iter<'db, ClassBase<'db>>>),
+    Shared {
+        mro: Mro<'db>,
+        indices: Range<usize>,
+    },
+}
+
+impl<'db> Iterator for MroElements<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Borrowed(elements) => elements.next(),
+            Self::Shared { mro, indices } => mro.get(indices.next()?).copied(),
+        }
+    }
+}
+
+impl DoubleEndedIterator for MroElements<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Borrowed(elements) => elements.next_back(),
+            Self::Shared { mro, indices } => mro.get(indices.next_back()?).copied(),
+        }
+    }
+}
 
 impl<'db> MroIterator<'db> {
     pub(super) fn new(
@@ -675,6 +728,12 @@ impl<'db> MroIterator<'db> {
         }
     }
 
+    /// Iterate over the bases without constructing the class's own specialization.
+    pub(super) fn skip_first(mut self) -> Self {
+        self.first_element_yielded = true;
+        self
+    }
+
     /// Materialize the full MRO of the class.
     /// Return an iterator over that MRO which skips the first element of the MRO.
     fn full_mro_except_first_element(&mut self) -> &mut MroElements<'db> {
@@ -704,8 +763,11 @@ impl<'db> MroIterator<'db> {
                 }),
             };
             let mut elements = match mro {
-                Cow::Borrowed(mro) => Either::Left(mro.iter().copied()),
-                Cow::Owned(mro) => Either::Right(mro.0.into_vec().into_iter()),
+                Cow::Borrowed(mro) => MroElements::Borrowed(mro.iter().copied()),
+                Cow::Owned(mro) => MroElements::Shared {
+                    indices: 0..mro.len(),
+                    mro,
+                },
             };
             elements.next();
             elements

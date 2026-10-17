@@ -6,7 +6,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use super::enums::EnumClassLiteral;
-use super::{CycleKind, Type, TypeOperations, TypeQuery, TypeQueryContext};
+use super::{CycleKind, Type, TypeOperations, TypeQuery};
 use crate::Db;
 
 /// A broad category for presenting a type in an editor.
@@ -27,7 +27,7 @@ impl<'db> Type<'db> {
     /// Classify the first recognizable alternative after expanding aliases.
     /// Unions and positive intersection elements retain their existing order.
     pub fn category(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Option<TypeCategory> {
-        TypeQueryContext::with_root(env, FindTypeCategory, |query| query.visit(db, self))
+        FindTypeCategory.evaluate(db, env, self, ())
     }
 
     /// Collect string literals from aliases, unions, and positive intersection elements.
@@ -37,7 +37,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Vec<String> {
-        TypeQueryContext::with_root(env, StringLiteralCandidates, |query| query.visit(db, self))
+        StringLiteralCandidates.evaluate(db, env, self, ())
     }
 
     /// Return one enum class and the canonical names of its literal members.
@@ -47,7 +47,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &TypeOperations<'db>,
     ) -> Option<(EnumClassLiteral<'db>, FxHashSet<Name>)> {
-        TypeQueryContext::with_root(env, EnumLiteralSubjectNames, |query| query.visit(db, self))
+        EnumLiteralSubjectNames.evaluate(db, env, self, ())
     }
 }
 

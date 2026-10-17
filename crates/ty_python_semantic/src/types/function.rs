@@ -88,7 +88,7 @@ use crate::types::{
     SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
     definition_expression_type, walk_signature,
 };
-use crate::{Db, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxOrderSet, Program, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -1280,6 +1280,14 @@ impl<'db> FunctionType<'db> {
             .and_then(|updated| updated.class_specialization)
     }
 
+    fn should_retain_class_specialization(self, db: &'db dyn Db) -> bool {
+        db.analysis_settings(self.file(db))
+            .return_type_inference
+            .is_active()
+            && !self.file(db).is_stub(db)
+            && !self.has_explicit_return_annotation(db)
+    }
+
     fn updated_implementation_callables(self, db: &'db dyn Db) -> Option<&'db [CallableType<'db>]> {
         self.updated_signatures(db)
             .as_deref()
@@ -1361,6 +1369,54 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(super) fn try_specialize_stored(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
+    ) -> Option<Self> {
+        let literal = self.literal(db);
+        let signature = self.signature(db).try_specialize_stored(
+            db,
+            program,
+            specialization,
+            specialize_self_domain,
+        )?;
+        let implementation = if literal.has_separate_implementation(db) {
+            Some(
+                self.implementation_callables(db)
+                    .iter()
+                    .map(|callable| {
+                        callable.try_specialize_stored(
+                            db,
+                            program,
+                            specialization,
+                            specialize_self_domain,
+                        )
+                    })
+                    .collect::<Option<_>>()?,
+            )
+        } else {
+            None
+        };
+        let class_specialization = match self.class_specialization(db) {
+            Some(owner) => Some(owner.try_map_stored_arguments(db, program, |ty| {
+                ty.try_specialize_stored(db, program, specialization, specialize_self_domain)
+            })?),
+            None if specialize_self_domain && self.should_retain_class_specialization(db) => {
+                Some(specialization)
+            }
+            None => None,
+        };
+        Some(Self::new_internal(
+            db,
+            literal,
+            UpdatedFunctionSignatures::new(Some(signature), implementation, class_specialization),
+            self.descriptor_kind(db),
+        ))
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -1415,12 +1471,7 @@ impl<'db> FunctionType<'db> {
                 TypeMapping::ApplySpecialization(specialization)
                 | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
                     if specialization.specialize_self_domain()
-                        && db
-                            .analysis_settings(self.file(db))
-                            .return_type_inference
-                            .is_active()
-                        && !self.file(db).is_stub(db)
-                        && !self.has_explicit_return_annotation(db) =>
+                        && self.should_retain_class_specialization(db) =>
                 {
                     // When we call an unannotated method on a type like `Box[int]`, where `Box[T]`
                     // is a generic type, we might later need to specialize the inferred return type

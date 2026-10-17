@@ -1,13 +1,14 @@
-use crate::Db;
 use crate::types::TypeOperations;
 use crate::types::recursive::StructuralTypeVisit;
 use crate::types::recursive::TypeWalkKey;
 use crate::types::recursive::{StructuralTraversal, StructuralTypeTraversal};
+use crate::{Db, ProgramEnvironment};
 use std::cell::{Cell, RefCell};
 use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
+use ty_python_core::Program;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -671,7 +672,7 @@ type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
-enum SmallSet<T, const INLINE_CAPACITY: usize> {
+pub(super) enum SmallSet<T, const INLINE_CAPACITY: usize> {
     Inline(SmallVec<[T; INLINE_CAPACITY]>),
     Spilled(FxHashSet<T>),
 }
@@ -684,7 +685,7 @@ impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
 
 impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
     #[inline]
-    fn insert(&mut self, value: T) -> bool
+    pub(super) fn insert(&mut self, value: T) -> bool
     where
         T: Hash + Eq,
     {
@@ -703,6 +704,43 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
                 true
             }
             Self::Spilled(set) => set.insert(value),
+        }
+    }
+
+    pub(super) fn len(&self) -> usize {
+        match self {
+            Self::Inline(inline) => inline.len(),
+            Self::Spilled(set) => set.len(),
+        }
+    }
+
+    pub(super) fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub(super) fn contains(&self, value: &T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => inline.contains(value),
+            Self::Spilled(set) => set.contains(value),
+        }
+    }
+
+    pub(super) fn remove(&mut self, value: &T) -> bool
+    where
+        T: Hash + Eq,
+    {
+        match self {
+            Self::Inline(inline) => {
+                let Some(index) = inline.iter().position(|element| element == value) else {
+                    return false;
+                };
+                inline.swap_remove(index);
+                true
+            }
+            Self::Spilled(set) => set.remove(value),
         }
     }
 
@@ -725,7 +763,7 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
 }
 
 /// Whether a type contains a dynamic type matching the requested filter.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum DynamicContent {
     /// The type was fully inspected and contains no matching dynamic type.
     Absent,
@@ -741,7 +779,7 @@ impl DynamicContent {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum DynamicContentMode {
     All,
     NonAny,
@@ -783,6 +821,40 @@ pub(super) fn non_any_dynamic_content<'db>(
 }
 
 pub(super) fn dynamic_content_impl<'db>(
+    db: &'db dyn Db,
+    env: &TypeOperations<'db>,
+    ty: Type<'db>,
+    mode: DynamicContentMode,
+) -> DynamicContent {
+    #[salsa::tracked(
+        returns(ref),
+        cycle_initial = |_, _, _, _, _| DynamicContent::Indeterminate,
+        heap_size = ruff_memory_usage::heap_size,
+    )]
+    fn cached<'db>(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        ty: Type<'db>,
+        mode: DynamicContentMode,
+    ) -> DynamicContent {
+        let env = TypeOperations::new_root(db, ProgramEnvironment::from_program(program));
+        compute_dynamic_content(db, &env, ty, mode)
+    }
+
+    let program = env.program(db);
+    *env.cached_or_compute(
+        || cached(db, program, ty, mode),
+        || {
+            env.caches()
+                .dynamic_content
+                .get_or_compute(db, env, (program, ty, mode), || {
+                    compute_dynamic_content(db, env, ty, mode)
+                })
+        },
+    )
+}
+
+fn compute_dynamic_content<'db>(
     db: &'db dyn Db,
     env: &TypeOperations<'db>,
     ty: Type<'db>,
@@ -1461,8 +1533,27 @@ mod tests {
     };
 
     use super::{
-        CollectedTypes, DynamicContentMode, any_over_type, dynamic_content, dynamic_content_impl,
+        CollectedTypes, DynamicContentMode, SmallSet, any_over_type, dynamic_content,
+        dynamic_content_impl,
     };
+
+    #[test]
+    fn small_set_removes_inline_and_spilled_entries() {
+        for size in [2, 3] {
+            let mut set = SmallSet::<_, 2>::default();
+            for value in 0..size {
+                assert!(set.insert(value));
+            }
+            assert_eq!(set.len(), size);
+            for value in 0..size {
+                assert!(set.contains(&value));
+                assert!(set.remove(&value));
+                assert!(!set.contains(&value));
+                assert!(!set.remove(&value));
+            }
+            assert!(set.is_empty());
+        }
+    }
 
     #[test]
     fn visits_callable_values_inside_wrappers() {

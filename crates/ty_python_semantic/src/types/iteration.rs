@@ -245,10 +245,9 @@ impl<'db> Type<'db> {
         env: &TypeOperations<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
-        TypeQueryContext::with_root(env, TryIterate(mode), |root| {
-            root.visit_with(db, self, true)
-        })
-        .map(|spec| spec.unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))))
+        TryIterate(mode)
+            .evaluate(db, env, self, true)
+            .map(|spec| spec.unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown()))))
     }
 
     fn try_iterate_impl(

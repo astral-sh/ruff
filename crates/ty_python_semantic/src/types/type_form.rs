@@ -1,7 +1,6 @@
 use super::variance::{VarianceInferable, VarianceTerm};
 use super::{
-    BoundTypeVarIdentity, CycleKind, IntersectionType, Type, TypeQuery, TypeQueryContext,
-    UnionType, visitor,
+    BoundTypeVarIdentity, CycleKind, IntersectionType, Type, TypeQuery, UnionType, visitor,
 };
 use crate::Db;
 use crate::types::TypeOperations;
@@ -40,8 +39,7 @@ impl<'db> Type<'db> {
     /// elements that do not represent type forms are ignored, as are negative intersection
     /// elements. If no type-form component can be projected, this returns the original type.
     pub(crate) fn project_type_form(self, db: &'db dyn Db, env: &TypeOperations<'db>) -> Type<'db> {
-        TypeQueryContext::with_root(env, TypeFormArgument, |root| root.visit(db, self))
-            .unwrap_or(self)
+        TypeFormArgument.evaluate(db, env, self, ()).unwrap_or(self)
     }
 }
 

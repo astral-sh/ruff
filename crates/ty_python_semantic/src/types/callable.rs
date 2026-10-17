@@ -1,6 +1,7 @@
 use super::DynamicType;
 use super::ErrorContext;
 use super::constraints::IteratorConstraintsExtension;
+use super::generics::Specialization;
 use super::infer::TransparentCallableReturn;
 use super::protocol_class::StructuralMemberPriority;
 use crate::ProgramEnvironment;
@@ -21,7 +22,7 @@ use crate::{
         ClassType, CycleKind, FindLegacyTypeVarsVisitor, FunctionType, InternedType,
         KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
         MemberLookupPolicy, Parameter, Parameters, Signature, SubclassOfInner, Type, TypeContext,
-        TypeMapping, TypeQuery, TypeQueryContext, TypeVarBoundOrConstraints, UnionType,
+        TypeMapping, TypeQuery, TypeVarBoundOrConstraints, UnionType,
         function::OverloadLiteral,
         infer::{InferenceEnvironment, ScopeInference},
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
@@ -79,8 +80,8 @@ impl Default for CallableExpansionRecursion<'_> {
 }
 
 impl CallableExpansionRecursion<'_> {
-    pub(super) fn revision(&self) -> u64 {
-        self.visits.revision()
+    pub(super) fn state(&self) -> super::cyclic::RecursionGuardState<'_> {
+        self.visits.state()
     }
 }
 
@@ -185,9 +186,7 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        TypeQueryContext::with_root(env, FunctionDescriptorGet { instance, owner }, |context| {
-            context.visit(db, self)
-        })
+        FunctionDescriptorGet { instance, owner }.evaluate(db, env, self, ())
     }
 
     /// Create a callable type with a single non-overloaded signature.
@@ -2477,6 +2476,29 @@ impl<'db> CallableType<'db> {
                 }),
             ),
         })
+    }
+
+    pub(super) fn try_specialize_stored(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
+    ) -> Option<Self> {
+        let SignatureSource::Explicit(signatures) = self.signature_source(db) else {
+            return None;
+        };
+        Some(Self::new_internal(
+            db,
+            SignatureSource::Explicit(signatures.try_specialize_stored(
+                db,
+                program,
+                specialization,
+                specialize_self_domain,
+            )?),
+            self.kind(db),
+            self.deprecated(db),
+        ))
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(

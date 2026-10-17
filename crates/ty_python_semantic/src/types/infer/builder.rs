@@ -139,10 +139,10 @@ use crate::types::{
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
     ParamSpecAttrKind, Parameter, ParameterDefault, Parameters, PropertyDeprecations,
     SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeQuery, TypeQueryContext,
-    TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator,
-    UnionBuilder, UnionType, any_over_type, extract_fixed_length_iterable_element_types,
-    infer_complete_scope_types, is_discarded_dict_key_assignment, todo_type,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeQuery, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -3445,9 +3445,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let env = self.program_environment();
         let Err(Some(AttributeDeletionError { object_ty, kind })) =
-            TypeQueryContext::with_root(env, AttributeDeletion { attribute }, |context| {
-                context.visit(db, object_ty)
-            })
+            AttributeDeletion { attribute }.evaluate(db, env, object_ty, ())
         else {
             return;
         };
@@ -5845,11 +5843,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
         // extended explanation.
         let inferred_ty = propagatable_kind
-            .and_then(|kind| {
-                TypeQueryContext::with_root(env, PropagateCallableKind(kind), |root| {
-                    root.visit(db, return_ty)
-                })
-            })
+            .and_then(|kind| PropagateCallableKind(kind).evaluate(db, env, return_ty, ()))
             .unwrap_or(return_ty);
 
         if let Some(decorated_function) = decorated_function
@@ -11484,12 +11478,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value_type
                     };
 
-                    let elements_missing_the_attribute: FxIndexSet<_> =
-                        TypeQueryContext::with_root(
-                            env,
-                            MissingAttribute(attr_name),
-                            |traversal| traversal.visit_with(db, union_like_type, false),
-                        )
+                    let elements_missing_the_attribute: FxIndexSet<_> = MissingAttribute(attr_name)
+                        .evaluate(db, env, union_like_type, false)
                         .into_iter()
                         .collect();
                     if !elements_missing_the_attribute.is_empty() {
