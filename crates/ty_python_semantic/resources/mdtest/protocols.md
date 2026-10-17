@@ -4139,6 +4139,27 @@ static_assert(is_subtype_of(Text, ConsoleRenderable))
 static_assert(is_assignable_to(Text, ConsoleRenderable))
 ```
 
+## Receiver parameter names
+
+Receiver parameter names do not affect method compatibility, including methods with explicit
+protocol receiver restrictions.
+
+```py
+from typing import Protocol
+
+class Receiver(Protocol):
+    value: int
+
+class Required(Protocol):
+    def method(self: Receiver) -> None: ...
+
+class Implementation:
+    def method(receiver: Receiver) -> None: ...
+
+def check(value: Implementation) -> Required:
+    return value  # no diagnostic
+```
+
 ## Recursive protocol receiver binding
 
 A classmethod on a generic protocol can cause receiver binding for another method to depend on
