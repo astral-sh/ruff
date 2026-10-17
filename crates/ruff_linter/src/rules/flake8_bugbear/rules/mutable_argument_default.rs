@@ -184,16 +184,20 @@ fn move_initialization(
     let _ = write!(&mut content, "if {} is None:", parameter.parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
+
+    // Determine the indentation depth of the function body.
+    let indentation = indentation_at_offset(statement.start(), locator.contents())?;
+
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let _ = write!(
-            &mut content,
-            "{} = {}",
-            parameter.parameter.name(),
-            locator.slice(
-                parenthesized_range(default.into(), parameter.into(), checker.tokens())
-                    .unwrap_or(default.range())
-            )
-        );
+        let _ = write!(&mut content, "{} = ", parameter.parameter.name());
+        // Indent only the statement lines. The default expression is appended
+        // verbatim below so that continuation lines inside multi-line string
+        // literals keep their exact contents.
+        content = textwrap::indent(&content, indentation).to_string();
+        content.push_str(locator.slice(
+            parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                .unwrap_or(default.range())
+        ));
     } else {
         let _ = write!(
             &mut content,
@@ -201,15 +205,10 @@ fn move_initialization(
             parameter.name(),
             checker.generator().expr(default)
         );
+        content = textwrap::indent(&content, indentation).to_string();
     }
 
     content.push_str(stylist.line_ending().as_str());
-
-    // Determine the indentation depth of the function body.
-    let indentation = indentation_at_offset(statement.start(), locator.contents())?;
-
-    // Indent the edit to match the body indentation.
-    let mut content = textwrap::indent(&content, indentation).to_string();
 
     // Find the position to insert the initialization after docstring and imports
     let mut pos = locator.line_start(statement.start());
