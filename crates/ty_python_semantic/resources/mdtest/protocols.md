@@ -4310,6 +4310,84 @@ class Box[T](Protocol):
 reveal_type(Box.first())  # revealed: Box[Unknown]
 ```
 
+## Protocol methods with the protocol as explicit receiver
+
+A protocol method can annotate its receiver with the protocol itself. Checking whether a class
+satisfies the protocol then binds that receiver to the class, which asks the same question again.
+Like other recursive protocol comparisons, this one holds unless another part of the comparison
+fails.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class HasMethod(Protocol):
+    def method(self: "HasMethod", value: int, /) -> object: ...
+
+class Implementation:
+    def method(self, value: int) -> None: ...
+
+class WrongImplementation:
+    def method(self, value: str) -> None: ...
+
+static_assert(is_assignable_to(Implementation, HasMethod))
+static_assert(is_subtype_of(Implementation, HasMethod))
+static_assert(not is_assignable_to(WrongImplementation, HasMethod))
+static_assert(not is_subtype_of(WrongImplementation, HasMethod))
+
+x: HasMethod = Implementation()  # no diagnostic
+```
+
+## Callback protocols with the protocol as explicit receiver
+
+The same applies to a `__call__` method whose receiver is annotated with the protocol. Any callable
+with a compatible signature satisfies it:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Protocol
+
+class Callback(Protocol):
+    def __call__(self: "Callback", value: int, /) -> object: ...
+
+class Handlers:
+    def method(self, value: int) -> None: ...
+    @classmethod
+    def class_method(cls, value: int) -> None: ...
+
+class CallableInstance:
+    def __call__(self, value: int) -> None: ...
+
+def function(value: int) -> None: ...
+def with_prefix(prefix: str, value: int) -> None: ...
+def wrong(value: str) -> None: ...
+
+a: Callback = function  # no diagnostic
+b: Callback = Handlers().method  # no diagnostic
+c: Callback = Handlers.class_method  # no diagnostic
+d: Callback = lambda value: None  # no diagnostic
+e: Callback = CallableInstance()  # no diagnostic
+f: Callback = partial(with_prefix, "prefix")  # no diagnostic
+g: Callback = wrong  # error: [invalid-assignment]
+```
+
+The receiver can also be a specialization of a generic protocol:
+
+```py
+class Handler[*Ts](Protocol):
+    def __call__[V](self: "Handler[V]", value: V, /) -> object: ...
+
+h: Handler[int] = function  # no diagnostic
+i: Handler[int] = Handlers().method  # no diagnostic
+j: Handler[int] = lambda value: None  # no diagnostic
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
