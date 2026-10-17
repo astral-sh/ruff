@@ -6187,7 +6187,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         let mut iteration = 0;
-        let mut next_bindings = bindings.clone();
         let mut prev_argument_types = argument_types.clone();
 
         let (converged_builder, converged_argument_types) = loop {
@@ -6220,7 +6219,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Otherwise, we have to evaluate the bindings against the newly inferred types.
-            next_bindings = bindings.clone();
+            let mut next_bindings = bindings.clone();
             let _ = next_bindings.check_types_impl(
                 db,
                 self.program_environment(),
@@ -6261,12 +6260,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             prev_argument_types = next_argument_types;
         };
 
-        // Discard any non-matching constructors overloads now that the inferred types have converged.
-        let result = next_bindings.finalize_argument_inference(
+        // Solve and validate the final specialization now that the inferred types have converged.
+        let mut next_bindings = bindings.clone();
+        let result = next_bindings.check_types_impl(
             db,
             self.program_environment(),
+            constraints,
             &converged_argument_types,
+            call_expression_tcx,
             &self.dataclass_field_specifiers,
+            CheckTypesMode::Finalize,
         );
 
         // If the set of candidate bindings contained multiple matching overloads, re-infer the argument
