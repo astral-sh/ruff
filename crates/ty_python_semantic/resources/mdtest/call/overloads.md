@@ -1469,6 +1469,31 @@ def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
     reveal_type(f(*args2))  # revealed: tuple[int, ...]
 ```
 
+### Positional arguments between unpacks
+
+If the last unpack can fill `*rest`, we prefer the overload with the variadic parameter. Without
+that unpack, `before` must stop before `text` and cannot reach `*rest`. We then select the first
+matching overload.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(a: int, text: str) -> str: ...
+@overload
+def f(a: int, text: str, *rest: int) -> bytes: ...
+```
+
+```py
+from overloaded import f
+
+def _(before: list[int], after: list[int], text: str) -> None:
+    reveal_type(f(*before, text, *after))  # revealed: bytes
+    reveal_type(f(*before, text))  # revealed: str
+```
+
 ### Simple `**kwargs`
 
 `overloaded.pyi`:
