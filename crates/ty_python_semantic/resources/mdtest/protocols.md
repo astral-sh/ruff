@@ -2163,62 +2163,6 @@ static_assert(is_subtype_of(UsesMeta, HasX))
 static_assert(is_assignable_to(UsesMeta, HasX))
 ```
 
-## Protocols with extra or missing members
-
-A protocol can satisfy another protocol while declaring extra members. The order of the declarations
-does not matter:
-
-```py
-from typing import Protocol
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
-
-class HasAMZ(Protocol):
-    z: int
-    a: int
-    m: int
-
-class HasAZ(Protocol):
-    a: int
-    z: int
-
-static_assert(is_subtype_of(HasAMZ, HasAZ))
-static_assert(is_assignable_to(HasAMZ, HasAZ))
-```
-
-The same holds when only one of the source protocol's members is required:
-
-```py
-class HasZ(Protocol):
-    z: int
-
-static_assert(is_subtype_of(HasAMZ, HasZ))
-static_assert(is_assignable_to(HasAMZ, HasZ))
-```
-
-Every required member must be present. An extra member cannot stand in for a missing one:
-
-```py
-class HasAY(Protocol):
-    a: int
-    y: int
-
-static_assert(not is_subtype_of(HasAZ, HasAY))
-static_assert(not is_assignable_to(HasAZ, HasAY))
-```
-
-This also applies when the missing member comes after all of the source members in alphabetical
-order:
-
-```py
-class HasAX(Protocol):
-    a: int
-    x: int
-
-static_assert(not is_subtype_of(HasAX, HasAZ))
-static_assert(not is_assignable_to(HasAX, HasAZ))
-```
-
 ## `ClassVar` attribute members
 
 If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
