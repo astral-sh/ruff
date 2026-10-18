@@ -16,14 +16,16 @@ pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, FrozenDataclassDispatch, StaticClassLiteral,
     expanded_class_base_entries,
 };
+use self::typed_dict::runtime_dict_merge_signature;
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_class_member,
 };
 use super::dedicated::pydantic;
 use super::display;
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
-    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy,
+    MroIterator, SpecialFormType, SubclassOfType, Type, TypeQualifiers, class_base::ClassBase,
+    function::FunctionType,
 };
 use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
 use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
@@ -1900,13 +1902,46 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, env, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
-                env,
-                Some(generic.specialization(db)),
-                name,
-                policy,
-            ),
+            Self::Generic(generic) => {
+                let class_literal = generic.origin(db);
+                let specialization = generic.specialization(db);
+                let member =
+                    class_literal.class_member_inner(db, env, Some(specialization), name, policy);
+
+                if matches!(name, "__or__" | "__ror__")
+                    && matches!(
+                        specialization.materialization_kind(db),
+                        None | Some(MaterializationKind::Top)
+                    )
+                    && specialization.types(db).iter().all(Type::is_unknown)
+                    && class_literal.known(db) == Some(KnownClass::Dict)
+                {
+                    return member.map_type(|ty| {
+                        let Some(callables) = ty.try_upcast_to_callable(db, env) else {
+                            return ty;
+                        };
+                        let signature =
+                            runtime_dict_merge_signature(db, env, Type::instance(db, env, self));
+                        let original_signatures = callables.signatures(db).cloned();
+                        // A top dictionary needs the same result when a union is passed to the
+                        // method directly and when binary inference distributes over its arms.
+                        let signatures = if specialization.materialization_kind(db)
+                            == Some(MaterializationKind::Top)
+                        {
+                            Either::Left(std::iter::once(signature).chain(original_signatures))
+                        } else {
+                            Either::Right(original_signatures.chain(std::iter::once(signature)))
+                        };
+                        Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::from_overloads(signatures),
+                            CallableTypeKind::FunctionLike,
+                        ))
+                    });
+                }
+
+                member
+            }
         }
     }
 

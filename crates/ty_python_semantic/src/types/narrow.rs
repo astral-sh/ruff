@@ -577,12 +577,19 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 }
             };
 
-            if use_generic_filtering {
+            let constraint = if use_generic_filtering {
                 constraint
             } else {
                 // Strict positive narrowing and negative narrowing both cover every
                 // materialization. Materialize the whole type, including gradual protocol members.
                 constraint.top_materialization(db, env)
+            };
+
+            match self.function {
+                ClassInfoConstraintFunction::IsInstance => {
+                    include_runtime_typed_dicts(db, env, constraint)
+                }
+                ClassInfoConstraintFunction::IsSubclass => constraint,
             }
         };
 
@@ -761,6 +768,54 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
             | Type::NominalInstance(_)
             | Type::NewTypeInstance(_) => None,
         }
+    }
+}
+
+/// Return the constraint imposed by an `isinstance()` check against a known class.
+///
+/// Class patterns use the same constraint, including `TypedDict` values when the class accepts
+/// their runtime `dict` type.
+pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassLiteral<'db>,
+) -> Type<'db> {
+    let constraint =
+        Type::instance(db, env, class.unknown_specialization(db)).top_materialization(db, env);
+    include_runtime_typed_dicts(db, env, constraint)
+}
+
+/// Include structural dictionary types that pass a runtime check despite their static interface.
+fn include_runtime_typed_dicts<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    constraint: Type<'db>,
+) -> Type<'db> {
+    if let Type::ProtocolInstance(protocol) = constraint {
+        let dict = KnownClass::Dict.to_specialized_instance(
+            db,
+            env,
+            &[KnownClass::Str.to_instance(db, env), Type::any()],
+        );
+        let all_members_present = protocol
+            .interface(db)
+            .members(db)
+            .all(|member| member.is_present_on_runtime_dict(db, env));
+
+        return if all_members_present && dict.is_disjoint_from(db, env, constraint) {
+            UnionType::from_two_elements(db, env, constraint, Type::open_empty_typed_dict(db))
+        } else {
+            constraint
+        };
+    }
+
+    let runtime_dict = KnownClass::Dict
+        .to_instance(db, env)
+        .top_materialization(db, env);
+    if runtime_dict.is_assignable_to(db, env, constraint) {
+        UnionType::from_two_elements(db, env, constraint, Type::open_empty_typed_dict(db))
+    } else {
+        constraint
     }
 }
 
@@ -2523,13 +2578,6 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                 } else {
                     intersect(subject_ty)
                 }
-            }
-            Type::TypedDict(_)
-                if class.is_some_and(|class| {
-                    typed_dict_matches_class_pattern(db, &self.env, class)
-                }) =>
-            {
-                subject_ty
             }
             Type::Callable(_) if matches!(class_ty, Type::Callable(_)) => subject_ty,
             _ if subject_ty.is_subtype_of(db, &self.env, class_ty) => subject_ty,

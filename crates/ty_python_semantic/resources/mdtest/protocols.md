@@ -1406,7 +1406,8 @@ def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
     reveal_type(x)  # revealed: Hashable | UnhashableDataclass
 ```
 
-Type variables and protocols that can contain unhashable values also remain in the union:
+Type variables, `TypedDict`s, and protocols that can contain unhashable values also remain in the
+union:
 
 ```py
 from typing import TypeVar, TypedDict
@@ -1419,9 +1420,8 @@ class Payload(TypedDict):
 def check_hashable_or_typevar(x: Hashable | T):
     reveal_type(x)  # revealed: Hashable | T@check_hashable_or_typevar
 
-# TODO: Preserve TypedDict types, which are unhashable at runtime.
 def check_hashable_or_typed_dict(x: Hashable | Payload):
-    reveal_type(x)  # revealed: Hashable
+    reveal_type(x)  # revealed: Hashable | Payload
 
 def check_hashable_or_protocol(x: Hashable | HasX):
     reveal_type(x)  # revealed: Hashable | HasX

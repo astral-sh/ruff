@@ -3248,6 +3248,11 @@ impl<'db> Type<'db> {
         Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
+    /// Return the structural top type of all `TypedDict`s.
+    fn open_empty_typed_dict(db: &'db dyn Db) -> Self {
+        Self::TypedDict(TypedDictType::open_empty(db))
+    }
+
     #[must_use]
     fn negate(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.

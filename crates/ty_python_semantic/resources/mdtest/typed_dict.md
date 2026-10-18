@@ -2826,6 +2826,27 @@ def _(destination: Named, patch: AbsentCountPatch):
     destination.update(patch)
 ```
 
+## Empty `TypedDict` interfaces
+
+A declared empty `TypedDict` is different from the special empty `TypedDict` that represents any
+`TypedDict` after a runtime check. The declared type still uses the usual rules for indexing and
+merging `TypedDict`s:
+
+```py
+from typing import TypedDict
+
+class EmptyTypedDict(TypedDict):
+    pass
+
+class Year(TypedDict):
+    year: int
+
+def use_empty_typed_dict(dst: EmptyTypedDict, src: Year) -> None:
+    # error: [invalid-key]
+    reveal_type(dst["unknown"])  # revealed: Unknown
+    reveal_type(dst | src)  # revealed: EmptyTypedDict
+```
+
 ## Methods on `TypedDict`
 
 ```py
@@ -6552,8 +6573,12 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 
 ## Disjointness with other types
 
+Every `TypedDict` object is a dictionary at runtime, but never an instance of a proper `dict`
+subclass:
+
 ```py
-from typing import TypedDict, Mapping
+from collections.abc import MutableMapping
+from typing import Mapping, TypedDict
 from ty_extensions import static_assert
 from ty_extensions._internal import is_disjoint_from
 
@@ -6561,22 +6586,41 @@ class TD(TypedDict):
     x: int
 
 class RegularNonTD: ...
+class DictSubclass(dict[str, object]): ...
 
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
+static_assert(not is_disjoint_from(TD, dict[str, int]))
+static_assert(is_disjoint_from(TD, DictSubclass))
+```
 
-# TODO: We approximate disjointness with other types `T` by asking whether `dict[str, Any]` is
-# assignable to `T`. That covers common cases like the ones above, but does it have some false
-# negatives with `dict` types. A `TypedDict` is almost never assignable to a `dict` (or vice versa),
-# even when all of the `TypedDict`'s field types match the `dict`'s value type (and are mutable).
-# The problem is that the `TypedDict` could have been assigned to from *another* `TypedDict` with
-# additional fields, and we don't usually know anything about the types or mutability of those. On
-# the other hand, the assignment to `dict` can be allowed if the `TypedDict` has mutable
-# `extra_items` of a compatible type. See: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-with-dict
-static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-error]
+We do not yet use required field types to prove that a `TypedDict` and a dictionary have
+incompatible values:
+
+```py
+# TODO: This should be disjoint.
 static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
+```
+
+## Narrowing an unknown `TypedDict` by a tag
+
+After `isinstance(value, dict)`, the value may be any `TypedDict`. Not every `TypedDict` has a
+`"tag"` key, so reading that key is an error and the comparison cannot discard this possibility:
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+def narrow_unknown_typed_dict(value: object) -> None:
+    if isinstance(value, dict):
+        # error: [invalid-argument-type]
+        if value["tag"] == "foo":
+            reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
 ```
 
 ## Narrowing tagged unions of `TypedDict`s

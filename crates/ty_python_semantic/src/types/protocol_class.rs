@@ -23,10 +23,10 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
         CallableType, ClassBase, ClassLiteral, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
-        GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
-        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
-        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
+        GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownClass,
+        KnownFunction, KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy,
+        Parameter, ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type,
+        TypeMapping, TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -2103,6 +2103,27 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     pub(super) fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    /// Return whether a runtime `dict` provides this protocol member.
+    ///
+    /// Runtime protocol checks test member presence rather than static signatures. A method set
+    /// to `None`, such as `dict.__hash__`, does not satisfy the corresponding runtime check.
+    pub(super) fn is_present_on_runtime_dict(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        KnownClass::Dict
+            .to_specialized_instance(
+                db,
+                env,
+                &[KnownClass::Str.to_instance(db, env), Type::any()],
+            )
+            .member(db, env, self.name())
+            .place
+            .ignore_possibly_undefined()
+            .is_some_and(|member_ty| !self.is_method() || !member_ty.is_none(db))
     }
 
     /// Returns whether this member has a form supported by

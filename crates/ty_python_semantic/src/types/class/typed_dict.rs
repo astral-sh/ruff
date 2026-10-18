@@ -390,6 +390,11 @@ fn synthesize_typed_dict_get<'db>(
         typed_dict.value_type(db, env)
     };
     let str_ty = KnownClass::Str.to_instance(db, env);
+    let fallback_key_ty = if typed_dict == TypedDictType::open_empty(db) {
+        Type::object()
+    } else {
+        str_ty
+    };
     let missing_keys = typed_dict.openness(db).is_closed().then(|| {
         let key_ty = IntersectionBuilder::new(db, env)
             .add_positive(str_ty)
@@ -399,7 +404,7 @@ fn synthesize_typed_dict_get<'db>(
     });
     let fallback_types = missing_keys
         .into_iter()
-        .chain(std::iter::once((str_ty, fallback_value_ty)));
+        .chain(std::iter::once((fallback_key_ty, fallback_value_ty)));
     let overloads = fields
         .iter()
         .flat_map(|(field_name, field)| {
@@ -760,6 +765,12 @@ fn synthesize_typed_dict_merge<'db>(
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
+    if matches!(name, "__or__" | "__ror__")
+        && instance_ty == Type::TypedDict(TypedDictType::open_empty(db))
+    {
+        return synthesize_open_empty_typed_dict_merge(db, env, instance_ty, name);
+    }
+
     let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]>;
 
     let first_overload_value_ty = if name == "__ior__"
@@ -831,6 +842,90 @@ fn synthesize_typed_dict_merge<'db>(
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
     ))
+}
+
+/// Preserves built-in merge overloads, including support for `frozendict` on Python 3.15.
+fn synthesize_open_empty_typed_dict_merge<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    instance_ty: Type<'db>,
+    name: &str,
+) -> Type<'db> {
+    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]> =
+        smallvec::smallvec![runtime_dict_merge_signature(db, env, instance_ty)];
+
+    if let Some(callables) = KnownClass::Dict
+        .to_specialized_class_type(
+            db,
+            env,
+            &[KnownClass::Str.to_instance(db, env), Type::object()],
+        )
+        .and_then(|class| {
+            class
+                .class_member(db, env, name, MemberLookupPolicy::default())
+                .ignore_possibly_undefined()
+        })
+        .and_then(|member| member.try_upcast_to_callable(db, env))
+    {
+        overloads.extend(callables.signatures(db).map(|signature| {
+            let parameters = signature
+                .parameters()
+                .iter()
+                .enumerate()
+                .map(|(index, parameter)| {
+                    if index == 0 {
+                        parameter.clone().with_annotated_type(instance_ty)
+                    } else {
+                        parameter.clone()
+                    }
+                });
+            Signature::new_generic(
+                signature.generic_context,
+                Parameters::standard(parameters),
+                signature.return_ty,
+            )
+            .with_definition(signature.definition)
+            .with_source_overload_index(signature.source_overload_index())
+        }));
+    }
+
+    Type::Callable(CallableType::new(
+        db,
+        CallableSignature::from_overloads(overloads),
+        CallableTypeKind::FunctionLike,
+    ))
+}
+
+/// Synthesizes non-mutating merges for the types used by runtime `dict` narrowing.
+///
+/// Ordinary dictionaries and `TypedDict`s can both appear after `isinstance(value, dict)`.
+/// Each arm must accept the other, including when the special method is called directly.
+pub(super) fn runtime_dict_merge_signature<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    instance_ty: Type<'db>,
+) -> Signature<'db> {
+    let runtime_dict_top = UnionType::from_elements(
+        db,
+        env,
+        [
+            KnownClass::Dict
+                .to_instance_unknown(db, env)
+                .top_materialization(db, env),
+            Type::TypedDict(TypedDictType::open_empty(db)),
+        ],
+    );
+    let return_ty = KnownClass::Dict.to_instance_unknown(db, env);
+
+    Signature::new(
+        Parameters::standard([
+            Parameter::positional_only(Some(Name::new_static("self")))
+                .with_annotated_type(instance_ty),
+            Parameter::positional_only(Some(Name::new_static("value")))
+                .with_annotated_type(runtime_dict_top),
+        ]),
+        return_ty,
+    )
 }
 
 /// Represents a `TypedDict` created via the functional form:
@@ -1054,9 +1149,13 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let typed_dict = TypedDictType::Synthesized(synthesized);
 
-    if let Some(member) = synthesize_typed_dict_method(db, env, typed_dict, name, || {
-        TypedDictFields::Dynamic(synthesized.items(db))
-    }) {
+    // The open empty schema has no mutable keys, so `pop` and `setdefault` would have no
+    // overloads. Use the fallback signatures with `Never` keys for these methods.
+    if !(typed_dict == TypedDictType::open_empty(db) && matches!(name, "pop" | "setdefault"))
+        && let Some(member) = synthesize_typed_dict_method(db, env, typed_dict, name, || {
+            TypedDictFields::Dynamic(synthesized.items(db))
+        })
+    {
         return Member::definitely_declared(member).inner;
     }
 

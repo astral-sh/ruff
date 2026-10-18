@@ -16,6 +16,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
+use crate::types::narrow::runtime_instance_constraint_for_class_literal;
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::visitor::any_over_type;
@@ -308,10 +309,8 @@ fn class_pattern_is_exhaustive<'pattern, 'db>(
     kind: &'pattern ClassPatternPredicateKind<'db>,
     cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
-    let class_instance_ty = Type::instance(db, env, class.top_materialization(db));
-    let is_typed_dict_match = is_typed_dict_runtime_domain(db, env, subject_ty)
-        && typed_dict_matches_class_pattern(db, env, class);
-    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, env, class_instance_ty) {
+    let class_instance_ty = runtime_instance_constraint_for_class_literal(db, env, class);
+    if !subject_ty.is_subtype_of(db, env, class_instance_ty) {
         return false;
     }
 
@@ -1217,15 +1216,9 @@ fn subject_independent_definite_match_pattern_type<'db>(
     match kind {
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_empty() => {
-                    let class_instance_ty =
-                        Type::instance(db, env, class.unknown_specialization(db))
-                            .top_materialization(db, env);
-                    let typed_dict_adds_runtime_matches =
-                        typed_dict_matches_class_pattern(db, env, class)
-                            && !Type::object().is_subtype_of(db, env, class_instance_ty);
-                    (!typed_dict_adds_runtime_matches).then_some(class_instance_ty)
-                }
+                Type::ClassLiteral(class) if kind.is_empty() => Some(
+                    runtime_instance_constraint_for_class_literal(db, env, class),
+                ),
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     Some(Type::Callable(CallableType::top(db)))
@@ -1284,8 +1277,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, env, class.unknown_specialization(db))
-                        .top_materialization(db, env)
+                    runtime_instance_constraint_for_class_literal(db, env, class)
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
                     Type::Callable(CallableType::top(db))

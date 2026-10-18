@@ -2559,8 +2559,13 @@ A `TypedDict` value is a dictionary at runtime, so argumentless `dict` and `Mapp
 match it. The positional `dict` pattern does as well. This also applies when the subject is a
 truthiness-narrowed intersection or a type variable bounded by or constrained to `TypedDict`s:
 
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
 ```py
-from collections.abc import Mapping
+from collections.abc import Mapping, MutableMapping
 from typing import TypeVar, TypedDict
 
 class Movie(TypedDict):
@@ -2574,6 +2579,23 @@ class Series(TypedDict):
 
 T = TypeVar("T", bound=Movie)
 U = TypeVar("U", Movie, Series)
+
+def dict_pattern_narrows_union(value: Movie | int) -> None:
+    match value:
+        case dict():
+            reveal_type(value)  # revealed: Movie
+        case _:
+            reveal_type(value)  # revealed: int
+
+def dict_pattern_from_object(value: object) -> None:
+    match value:
+        case dict():
+            reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+
+def mutable_mapping_pattern_from_object(value: object) -> None:
+    match value:
+        case MutableMapping():
+            reveal_type(value)  # revealed: Top[MutableMapping[Unknown, Unknown]] | <TypedDict with no items>
 
 def argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
@@ -2635,7 +2657,7 @@ class AlternatePayload(TypedDict):
     value: int
 
 class Marker(Protocol):
-    marker: int
+    def clear(self) -> None: ...
 
 P = TypeVar("P", bound=RequiredPayload)
 Q = TypeVar("Q", RequiredPayload, AlternatePayload)

@@ -1864,6 +1864,181 @@ def f(fn: Callable[P, R] | classmethod[Any, P, R]) -> Callable[P, R]:
     return fn
 ```
 
+## Narrowing `TypedDict`s to runtime dictionary classes
+
+A `TypedDict` object is a `dict` and a `MutableMapping` at runtime, even though its static interface
+does not allow arbitrary mutation. Narrowing from `object` therefore allows both ordinary
+dictionaries and any `TypedDict`:
+
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+from typing_extensions import Never
+
+class Movie(TypedDict):
+    title: str
+
+def narrow_object(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+
+    if isinstance(value, MutableMapping):
+        reveal_type(value)  # revealed: Top[MutableMapping[Unknown, Unknown]] | <TypedDict with no items>
+
+    if isinstance(value, Mapping):
+        reveal_type(value)  # revealed: Top[Mapping[Unknown, object]]
+
+def narrow_movie(movie: Movie) -> None:
+    if isinstance(movie, MutableMapping):
+        reveal_type(movie)  # revealed: Movie
+        reveal_type(reversed(movie))  # revealed: Iterator[str]
+```
+
+For an unconstrained type variable, neither the ordinary dictionary possibility nor the `TypedDict`
+possibility can be discarded:
+
+```py
+from typing import TypeVar
+
+TDict = TypeVar("TDict")
+
+def _(value: Movie | TDict):
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Movie | (TDict@_ & Top[dict[Unknown, Unknown]]) | (TDict@_ & <TypedDict with no items>)
+```
+
+The possibility of a `TypedDict` preserves read-only dictionary operations without exposing
+arbitrary mutation. The ordinary dictionary's top materialization also prevents indexing because its
+key type is unknown:
+
+```py
+def takes_dict(value: dict[str, object]) -> None: ...
+def use_narrowed_dict(
+    value: object,
+    key: object,
+    missing: Never,
+    keys: list[str],
+    item: int,
+) -> None:
+    if isinstance(value, dict):
+        reveal_type(value.get(key))  # revealed: object
+        reveal_type(reversed(value))  # revealed: Iterator[object]
+        reveal_type(value.keys())  # revealed: dict_keys[object, object]
+        reveal_type(value.fromkeys(keys, item))  # revealed: dict[str, int]
+        reveal_type(value.copy())  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        value.clear()  # error: [unresolved-attribute]
+        value.pop(missing)  # no diagnostic
+        value.setdefault(missing, missing)  # no diagnostic
+        takes_dict(value)  # error: [invalid-argument-type]
+        value["title"]  # error: [invalid-argument-type]
+```
+
+Merging two values narrowed to `dict` produces an ordinary dictionary. Calling the corresponding
+special methods directly has the same result:
+
+```py
+def merge_narrowed_dicts(left: object, right: object) -> None:
+    if isinstance(left, dict) and isinstance(right, dict):
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
+        reveal_type(right.__ror__(left))  # revealed: dict[Unknown, Unknown]
+```
+
+Narrowing a union with a concrete dictionary keeps its methods callable with `IntEnum` keys:
+
+```py
+from enum import IntEnum
+from typing import Protocol
+
+class Field(IntEnum):
+    MESSAGE = 1
+
+class Result(Protocol):
+    def error_field(self, fieldcode: int) -> bytes | None: ...
+
+def _(info: Result | dict[int, bytes | None] | None):
+    if isinstance(info, dict):
+        reveal_type(info.get(Field.MESSAGE))  # revealed: object
+    elif info:
+        reveal_type(info.error_field(Field.MESSAGE))  # revealed: bytes | None
+```
+
+Runtime protocol checks preserve `TypedDict` possibilities by checking the concrete `dict` members.
+Compatible protocols retain their structural refinement, while an incompatible static signature
+cannot eliminate a runtime-compatible `TypedDict`:
+
+```py
+from typing import runtime_checkable
+
+@runtime_checkable
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+@runtime_checkable
+class HasKeysReturningInt(Protocol):
+    def keys(self) -> int: ...
+
+@runtime_checkable
+class HasMissingMember(Protocol):
+    def missing(self) -> None: ...
+
+@runtime_checkable
+class HasHash(Protocol):
+    def __hash__(self) -> int: ...
+    def keys(self) -> object: ...
+
+@runtime_checkable
+class HasDisabledHash(Protocol):
+    __hash__: None = None
+
+def preserve_empty_typed_dict_protocol(value: object) -> None:
+    if isinstance(value, dict) and isinstance(value, HasClear):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | (<TypedDict with no items> & HasClear)
+        value.clear()  # no diagnostic
+
+def runtime_protocols_use_dict_member_presence(movie: Movie) -> None:
+    if isinstance(movie, HasKeysReturningInt):
+        # Runtime protocol checks ignore the incompatible static return type.
+        reveal_type(movie)  # revealed: Movie
+    else:
+        reveal_type(movie)  # revealed: Never
+
+    if isinstance(movie, HasMissingMember):
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
+
+    if isinstance(movie, HasHash):
+        # `dict.__hash__` exists but is explicitly disabled with `None`.
+        reveal_type(movie)  # revealed: Never
+    else:
+        reveal_type(movie)  # revealed: Movie
+
+    if isinstance(movie, HasDisabledHash):
+        # A data member only needs to exist, so its value may be `None`.
+        # TODO: Should be `Movie`. Runtime checks do not require the attribute to be writable.
+        reveal_type(movie)  # revealed: Movie & HasDisabledHash
+    else:
+        # TODO: Should be `Never`, since every runtime dictionary provides `__hash__ = None`.
+        reveal_type(movie)  # revealed: Movie & ~HasDisabledHash
+```
+
+`TypedDict` objects have exact runtime type `dict`, so they cannot be instances of a proper `dict`
+subclass:
+
+```py
+from collections import defaultdict
+
+def narrow_typed_dict_defaultdict(movie: Movie) -> None:
+    if isinstance(movie, defaultdict):
+        reveal_type(movie)  # revealed: Never
+```
+
 ## Narrowing with TypedDict unions
 
 Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
@@ -1886,6 +2061,161 @@ def test(a: Any, items: list[T]) -> None:
     v = combined[0]
     if isinstance(v, dict):
         cast(T, v)  # no panic
+```
+
+Both branches retain only the possible union members:
+
+```py
+def narrow_typeddict_union(value: T) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: A | B
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+The negative branch removes the `TypedDict` before iterating a list of the same type:
+
+```py
+def consume(value: A | list[A]) -> None:
+    if isinstance(value, dict):
+        reveal_type(value["x"])  # revealed: str
+    else:
+        for item in value:
+            consume(item)  # no diagnostic
+```
+
+It also makes attributes from a remaining class available:
+
+```py
+class Package:
+    name: str
+
+def narrow_typeddict_or_class(value: A | Package) -> None:
+    if isinstance(value, dict):
+        pass
+    else:
+        reveal_type(value.name)  # revealed: str
+```
+
+## Narrowing runtime dictionaries in gradual mode
+
+Permissive generic narrowing uses a gradual `dict` type but still preserves the possibility of a
+`TypedDict`, including its restrictions on arbitrary mutation:
+
+```toml
+[analysis]
+strict-generic-narrowing = false
+```
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def narrow_object(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: dict[Unknown, Unknown] | <TypedDict with no items>
+        value.clear()  # error: [unresolved-attribute]
+
+def narrow_movie(value: Movie | int) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Movie
+        value.clear()  # error: [unresolved-attribute]
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+Read-only merges remain valid in gradual mode, including direct special-method calls:
+
+```py
+def merge_narrowed_dicts(left: object, right: object) -> None:
+    if isinstance(left, dict) and isinstance(right, dict):
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
+        reveal_type(right.__ror__(left))  # revealed: dict[Unknown, Unknown]
+```
+
+Arbitrary updates, removals, and in-place merges could invalidate a `TypedDict` schema:
+
+```py
+def mutate_narrowed_dict(value: object, patch: dict[str, int]) -> None:
+    if isinstance(value, dict):
+        value.update(patch)  # error: [invalid-argument-type]
+        value.pop("title")  # error: [invalid-argument-type]
+        value.setdefault("title", "Alien")  # error: [invalid-argument-type]
+        value["title"] = "Alien"  # error: [invalid-assignment]
+        del value["title"]  # error: [invalid-argument-type]
+        value.__setitem__("title", "Alien")  # error: [invalid-argument-type]
+        value.__delitem__("title")  # error: [invalid-argument-type]
+        value |= patch  # error: [unsupported-operator]
+```
+
+## Dictionary merge overloads
+
+The merge signatures used for narrowed dictionaries retain the ordinary overloads for a concrete
+dictionary and a gradual dictionary:
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge_dicts(left: dict[Unknown, Unknown], right: dict[str, int]) -> None:
+    reveal_type(left | right)  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type(left.__or__(right))  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type(left.__ror__(right))  # revealed: dict[Unknown | str, Unknown | int]
+```
+
+## Dictionary merge overloads with `frozendict`
+
+In Python 3.15, a merge can also take a `frozendict`. The result uses the left operand's container
+type, including when the special methods are called directly:
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge_frozen_dicts(left: dict[Unknown, Unknown], right: frozendict[str, int]) -> None:
+    reveal_type(left | right)  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type(right | left)  # revealed: frozendict[str | Unknown, int | Unknown]
+    reveal_type(left.__or__(right))  # revealed: dict[Unknown | str, Unknown | int]
+    reveal_type(left.__ror__(right))  # revealed: frozendict[Unknown | str, Unknown | int]
+```
+
+These operations remain valid after a runtime check, including when the value might be a
+`TypedDict`:
+
+```py
+def merge_narrowed_frozen_dicts(left: object, right: frozendict[str, int]) -> None:
+    if isinstance(left, dict):
+        left | right  # no diagnostic
+        right | left  # no diagnostic
+        left.__or__(right)  # no diagnostic
+        left.__ror__(right)  # no diagnostic
+```
+
+## Dictionary merges with `frozendict` in strict mode
+
+The same operations are valid when narrowing produces a top materialization:
+
+```toml
+[environment]
+python-version = "3.15"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+def merge_narrowed_frozen_dicts(left: object, right: frozendict[str, int]) -> None:
+    if isinstance(left, dict):
+        left | right  # no diagnostic
+        right | left  # no diagnostic
+        left.__or__(right)  # no diagnostic
+        left.__ror__(right)  # no diagnostic
 ```
 
 ## Narrowing with named expressions (walrus operator)

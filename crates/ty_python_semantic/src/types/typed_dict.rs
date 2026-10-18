@@ -230,6 +230,17 @@ impl<'db> TypedDictType<'db> {
         Self::Class(defining_class)
     }
 
+    /// Returns the structural top type of all `TypedDict`s.
+    ///
+    /// Every `TypedDict` is a subtype of an empty schema with read-only `object` extra items.
+    pub(crate) fn open_empty(db: &'db dyn Db) -> Self {
+        Self::from_schema_items_with_openness(
+            db,
+            TypedDictSchema::default(),
+            TypedDictOpenness::extra(db, Type::object(), true),
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

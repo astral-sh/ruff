@@ -205,7 +205,8 @@ use crate::{
         NarrowingConstraint, SpecialFormType, TruthinessAnalyzer, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
+        infer_same_file_expression_type, mapping_pattern_type,
+        narrow::runtime_instance_constraint_for_class_literal, pattern_binding_fallthrough_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
@@ -1743,7 +1744,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                     Type::ClassLiteral(class) => {
-                        Type::instance(db, env, class.top_materialization(db))
+                        runtime_instance_constraint_for_class_literal(db, env, class)
                     }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         Type::Callable(CallableType::top(db))

@@ -825,6 +825,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         protocol: ProtocolInstanceType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if matches!(ty, Type::TypedDict(_))
+            && let Some(member) = protocol
+                .interface(db)
+                .members(db)
+                .find(|member| !member.is_present_on_runtime_dict(db, self.env))
+        {
+            if let Some(context) = self.report_context() {
+                context.push(ErrorContext::ProtocolMemberNotDefined {
+                    member_name: member.name().into(),
+                    ty,
+                });
+            }
+            return self.never();
+        }
+
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
         // members incompatibly.
         let mut result = self.never();

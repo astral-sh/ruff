@@ -3352,11 +3352,20 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if let Some(context) = self.report_context() {
                     context.take();
                 }
+                let is_typed_dict = matches!(other, Type::TypedDict(_));
+                let runtime_member_missing =
+                    is_typed_dict && !member.is_present_on_runtime_dict(db, env);
                 let attribute = other
                     .member(db, env, member.name())
                     .place
-                    .ignore_possibly_undefined();
+                    .ignore_possibly_undefined()
+                    .filter(|_| !runtime_member_missing);
                 let Some(attribute_type) = attribute else {
+                    // A TypedDict deliberately hides schema-unsafe methods such as `clear`.
+                    // Their absence from its static interface does not prove runtime absence.
+                    if is_typed_dict && !runtime_member_missing {
+                        return self.never();
+                    }
                     if let Some(context) = self.report_context() {
                         context.push(ErrorContext::ProtocolMemberNotDefined {
                             member_name: member.name().into(),
@@ -3959,6 +3968,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
+                | Type::TypedDict(..)
                 | Type::GenericAlias(..)),
                 Type::ProtocolInstance(protocol),
             )
@@ -3968,6 +3978,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
                 | Type::ModuleLiteral(..)
+                | Type::TypedDict(..)
                 | Type::GenericAlias(..)),
             ) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
