@@ -604,6 +604,17 @@ def update(value: list[int] | tuple[int, ...]) -> None:
     value[0] += 1
 ```
 
+A tuple remains read-only when it contains a recursive list. An augmented assignment still writes
+its result back to the tuple entry.
+
+```py
+recursive = []
+recursive.append(recursive)
+values = (recursive,)
+# error: [invalid-assignment]
+values[0] += []
+```
+
 ## Typed dictionary assignments with multiple possible keys
 
 A key that can select fields with different value types must only be assigned a value accepted by

@@ -4997,17 +4997,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_definition(assignment);
         } else {
             // Non-name assignment targets are inferred as ordinary expressions, not definitions.
-            // A divergent result is provisional cycle recovery, not a value that can constrain a
-            // collection initializer or satisfy a concrete write contract.
-            if let Ok(result_ty) = self.infer_augment_assignment(assignment)
-                && !any_over_type(
-                    self.db(),
-                    self.program_environment(),
-                    result_ty,
-                    false,
-                    |ty| ty.is_divergent(),
-                )
-            {
+            if let Ok(result_ty) = self.infer_augment_assignment(assignment) {
                 let target = assignment.target.as_ref();
                 match target {
                     ast::Expr::Attribute(attribute) => {
