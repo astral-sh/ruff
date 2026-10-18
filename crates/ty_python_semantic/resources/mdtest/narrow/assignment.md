@@ -181,6 +181,122 @@ c.desc = -1
 reveal_type(c.desc)  # revealed: int
 ```
 
+### Dynamic attributes
+
+An attribute provided by `__getattr__` retains its read type after assignment. A custom
+`__setattr__` can transform or discard the assigned value, so the assignment does not determine what
+a subsequent read returns.
+
+```py
+from typing import Any
+
+class Props:
+    def __getattr__(self, name: str) -> Any: ...
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update(props: Props) -> None:
+    props.status = "Closed"
+    reveal_type(props.status)  # revealed: Any
+    props.status.name  # no diagnostic
+
+    if hasattr(props, "other"):
+        props.status = "Open"
+        reveal_type(props.status)  # revealed: Any
+
+    if hasattr(props, "status"):
+        props.status = "Open"
+        reveal_type(props.status)  # revealed: Any
+```
+
+The same rule applies when the getter returns a static type.
+
+```py
+class Values:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update(values: Values) -> None:
+    values.value = 1
+    reveal_type(values.value)  # revealed: int | str
+
+    if isinstance(values.value, int):
+        reveal_type(values.value)  # revealed: int
+        values.value = 2
+        reveal_type(values.value)  # revealed: int | str
+```
+
+The getter also determines the read type when there is no custom setter. The assignment is still
+invalid because the class does not provide the attribute or a setter that accepts it.
+
+```py
+class ReadOnlyProps:
+    def __getattr__(self, name: str) -> Any: ...
+
+def update(props: ReadOnlyProps) -> None:
+    props.status = "Closed"  # error: [unresolved-attribute]
+    reveal_type(props.status)  # revealed: Any
+    props.status.name  # no diagnostic
+```
+
+### Known attributes with dynamic access
+
+Declared and inferred attributes still narrow after assignment, even when the class has custom
+`__getattr__` and `__setattr__` methods. This preserves narrowing for ordinary fields on classes
+that also provide dynamic attributes.
+
+```py
+from typing import Any
+
+class Base:
+    cache: list[int] | None = None
+    inferred = None
+
+    def __init__(self) -> None:
+        self.instance = None
+
+    def __getattr__(self, name: str) -> Any: ...
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class Child(Base): ...
+
+def update(obj: Child) -> None:
+    if obj.cache is None:
+        obj.cache = []
+    reveal_type(obj.cache)  # revealed: list[int]
+    obj.cache.append(1)  # no diagnostic
+
+    obj.inferred = 1
+    reveal_type(obj.inferred)  # revealed: Literal[1]
+    obj.instance = 1
+    reveal_type(obj.instance)  # revealed: Literal[1]
+
+    if hasattr(obj, "other"):
+        obj.cache = []
+        reveal_type(obj.cache)  # revealed: list[int]
+```
+
+### Dynamic attributes on union receivers
+
+An assignment cannot narrow an attribute when one of the possible receivers supplies it through
+`__getattr__`.
+
+```py
+class Dynamic:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class Declared:
+    value: int | str
+
+def update(obj: Dynamic | Declared) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
 ## Subscript
 
 ### Specialization for builtin types

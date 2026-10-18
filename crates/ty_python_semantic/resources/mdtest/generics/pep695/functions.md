@@ -2458,6 +2458,32 @@ def union_bound[T: type[A] | type[B]](cls: T) -> None:
     reveal_type(cls.attr)  # revealed: str | int
 ```
 
+## Assignment narrowing of dynamic attributes
+
+When a type variable can refer to an object with a dynamic attribute, assignment preserves the
+getter's read type. This applies to both upper bounds and constraints.
+
+```py
+class Dynamic:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class Declared:
+    value: int | str
+
+def update_bound[T: Dynamic | Declared](obj: T) -> T:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+    return obj
+
+def update_constrained[T: (Dynamic, Declared)](obj: T) -> T:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+    return obj
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
