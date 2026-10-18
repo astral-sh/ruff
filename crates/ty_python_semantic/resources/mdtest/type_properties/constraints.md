@@ -1247,8 +1247,7 @@ def components[A, B, C]():
 Each of twelve tuples refers to the next two. The equations also imply their own unrolled forms,
 such as `T7 = tuple[Literal[7], T8, tuple[Literal[9], T10, T11]]`, which describe the same solution.
 
-TODO: Each tuple should be written once. Constraint extraction currently substitutes some equations
-before constructing the recursive solution, so their tuple bodies are repeated.
+Each tuple is written once, even when the equations contain several equivalent unfoldings.
 
 ```py
 from typing import Literal
@@ -1269,8 +1268,7 @@ def branching[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11]():
         & ConstraintSet.equality(T10, tuple[Literal[10], T11, T0])
         & ConstraintSet.equality(T11, tuple[Literal[11], T0, T1])
     )
-    # TODO: revealed: tuple[Solution[T0=μ{$0; $1 = tuple[Literal[1], $2, $3]; $2 = tuple[Literal[2], $3, $4]; $3 = tuple[Literal[3], $4, $5]; $4 = tuple[Literal[4], $5, $6]; $5 = tuple[Literal[5], $6, $7]; $6 = tuple[Literal[6], $7, $8]; $7 = tuple[Literal[7], $8, $9]; $8 = tuple[Literal[8], $9, $10]; $9 = tuple[Literal[9], $10, $11]; $10 = tuple[Literal[10], $11, $0]; $11 = tuple[Literal[11], $0, $1]}. tuple[Literal[0], $1, $2]]]
-    # revealed: tuple[Solution[T0=μ{$0; $1 = tuple[Literal[1], $2, $3]; $2 = tuple[Literal[2], $3, $4]; $3 = tuple[Literal[3], $4, $5]; $4 = tuple[Literal[4], $5, $6]; $5 = tuple[Literal[5], $6, $7]; $6 = tuple[Literal[6], $7, $8]; $7 = tuple[Literal[7], $8, tuple[Literal[9], $9, tuple[Literal[11], $0, $1]]]; $8 = tuple[Literal[8], tuple[Literal[9], $9, tuple[Literal[11], $0, $1]], $9]; $9 = tuple[Literal[10], tuple[Literal[11], $0, $1], $0]}. tuple[Literal[0], $1, $2]]]
+    # revealed: tuple[Solution[T0=μ{$0; $1 = tuple[Literal[1], $2, $3]; $2 = tuple[Literal[2], $3, $4]; $3 = tuple[Literal[3], $4, $5]; $4 = tuple[Literal[4], $5, $6]; $5 = tuple[Literal[5], $6, $7]; $6 = tuple[Literal[6], $7, $8]; $7 = tuple[Literal[7], $8, $9]; $8 = tuple[Literal[8], $9, $10]; $9 = tuple[Literal[9], $10, $11]; $10 = tuple[Literal[10], $11, $0]; $11 = tuple[Literal[11], $0, $1]}. tuple[Literal[0], $1, $2]]]
     reveal_type(constraints.solutions_for(T0, inferable=tuple[T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11]))
 ```
 
@@ -1361,17 +1359,20 @@ def contains_itself[T]():
 ```
 
 The same holds for variables that are equal to each other. `T`, `U`, and `V` share one solution.
-TODO: all three variables should use the same recursive representation.
 
 ```py
 def equal_variables[T, U, V]():
     constraints = ConstraintSet.equality(T, int | tuple[U]) & ConstraintSet.equality(U, V) & ConstraintSet.equality(V, T)
-    # revealed: tuple[Solution[T=μ{$0; $1 = int | tuple[$0]}. int | tuple[$1]]]
+    # revealed: tuple[Solution[T=μ$0. int | tuple[$0]]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[T, U, V]))
     # revealed: tuple[Solution[U=μ$0. int | tuple[$0]]]
     reveal_type(constraints.solutions_for(U, inferable=tuple[T, U, V]))
-    # revealed: tuple[Solution[V=μ{$0; $1 = int | tuple[$0]}. int | tuple[$1]]]
+    # revealed: tuple[Solution[V=μ$0. int | tuple[$0]]]
     reveal_type(constraints.solutions_for(V, inferable=tuple[T, U, V]))
+
+    reordered = ConstraintSet.equality(V, T) & ConstraintSet.equality(U, V) & ConstraintSet.equality(T, int | tuple[U])
+    # revealed: tuple[Solution[T=μ$0. int | tuple[$0]]]
+    reveal_type(reordered.solutions_for(T, inferable=tuple[V, U, T]))
 ```
 
 A reference in an intersection restricts it instead, and the equations are left unsolved.

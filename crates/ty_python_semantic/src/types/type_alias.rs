@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::structural::StructuralTypeMapper;
 use std::fmt::Write;
 
 use crate::{
@@ -37,61 +38,6 @@ impl<'db> Type<'db> {
     /// in `T | list[U]`.
     pub(super) fn unguarded_typevars(self, db: &'db dyn Db) -> Box<[BoundTypeVarInstance<'db>]> {
         AliasCycleSummary::from_type(db, self).typevars
-    }
-
-    /// Substitutes types for the unguarded occurrences of type variables. A variable without a
-    /// replacement is removed from the union that it is an element of. Returns `None` if a
-    /// variable occurs where that is not possible: in a type alias, whose definition is fixed,
-    /// negated in an intersection, or, for a variable to remove, anywhere but in a union.
-    pub(super) fn replace_unguarded_typevars(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        replacements: &[(BoundTypeVarInstance<'db>, Option<Type<'db>>)],
-    ) -> Option<Type<'db>> {
-        let replacement_of = |exposed: BoundTypeVarInstance<'db>| {
-            replacements
-                .iter()
-                .find(|(variable, _)| variable.is_same_typevar_as(db, exposed))
-                .map(|(_, replacement)| *replacement)
-        };
-        let exposes_replaced = |ty: Type<'db>| {
-            ty.unguarded_typevars(db)
-                .iter()
-                .any(|exposed| replacement_of(*exposed).is_some())
-        };
-        match self {
-            _ if replacements.is_empty() => Some(self),
-            Type::TypeVar(exposed) => replacement_of(exposed).unwrap_or(Some(self)),
-            Type::Union(union) => {
-                let elements: Option<Vec<_>> = union
-                    .elements(db)
-                    .iter()
-                    .filter(|element| {
-                        element
-                            .as_typevar()
-                            .is_none_or(|exposed| replacement_of(exposed) != Some(None))
-                    })
-                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
-                    .collect();
-                Some(UnionType::from_elements(db, env, elements?))
-            }
-            Type::Intersection(intersection) => {
-                if intersection.iter_negative(db).any(exposes_replaced) {
-                    return None;
-                }
-                let positive: Option<Vec<_>> = intersection
-                    .iter_positive(db)
-                    .map(|element| element.replace_unguarded_typevars(db, env, replacements))
-                    .collect();
-                let mut positive = positive?.into_iter();
-                Some(
-                    intersection
-                        .map_positive(db, env, |_| positive.next().unwrap_or_else(Type::object)),
-                )
-            }
-            _ => (!exposes_replaced(self)).then_some(self),
-        }
     }
 }
 
@@ -527,6 +473,37 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
+        let Some(specialization) = self.specialization(db) else {
+            return self;
+        };
+        let mapped = specialization.map_structure(db, mapper);
+        if mapped == specialization {
+            return self;
+        }
+        match self {
+            Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.rhs_scope(db),
+                Some(mapped),
+                alias.materialization_kind(db),
+            )),
+            Self::ManualPEP695(alias) => Self::ManualPEP695(ManualPEP695TypeAliasType::new(
+                db,
+                alias.name(db),
+                alias.definition(db),
+                alias.typing_module(db),
+                Some(mapped),
+                alias.materialization_kind(db),
+            )),
+        }
+    }
+
     /// Summarize an alias's raw definition once, sharing the result across references.
     /// Specializations reuse this summary and check their exposed arguments separately.
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
@@ -762,9 +739,6 @@ impl<'db> TypeAliasType<'db> {
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
         match type_mapping {
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
-                Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
-            }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
                 .value_type_with_recursion(db, visitor.recursion_context)
@@ -822,39 +796,6 @@ impl<'db> TypeAliasType<'db> {
                     mapped
                 }
             }
-        }
-    }
-
-    /// Rewrite stored arguments without evaluating the alias's definition or defaults.
-    fn map_stored_specialization(
-        self,
-        db: &'db dyn Db,
-        mapping: &TypeMapping<'_, 'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let Some(specialization) = self.specialization(db) else {
-            return self;
-        };
-        let mapped = specialization.apply_type_mapping_impl(db, mapping, &[], visitor);
-        if mapped == specialization {
-            return self;
-        }
-        match self {
-            Self::PEP695(alias) => Self::PEP695(PEP695TypeAliasType::new(
-                db,
-                alias.name(db),
-                alias.rhs_scope(db),
-                Some(mapped),
-                alias.materialization_kind(db),
-            )),
-            Self::ManualPEP695(alias) => Self::ManualPEP695(ManualPEP695TypeAliasType::new(
-                db,
-                alias.name(db),
-                alias.definition(db),
-                alias.typing_module(db),
-                Some(mapped),
-                alias.materialization_kind(db),
-            )),
         }
     }
 

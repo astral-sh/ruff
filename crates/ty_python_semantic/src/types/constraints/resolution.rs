@@ -1,5 +1,9 @@
 //! Resolve dependencies between the selected bindings of one solution alternative.
 
+mod equations;
+
+use equations::EquationGraph;
+
 use std::cell::{Cell, OnceCell, RefCell};
 
 use rustc_hash::FxHashMap;
@@ -190,7 +194,7 @@ impl<'db> Resolver<'_, 'db> {
                 .any(|dependency| group.contains(dependency))
         });
         let types = if is_recursive {
-            let Some(types) = RecursiveType::from_equations(db, self.env, &equations) else {
+            let Some(types) = EquationGraph::solve(db, self.env, &equations) else {
                 return;
             };
             // The bounds of each path were compared before the solutions referred to

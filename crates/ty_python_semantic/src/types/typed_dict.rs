@@ -1,3 +1,4 @@
+use crate::types::structural::StructuralTypeMapper;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -226,6 +227,48 @@ pub enum SynthesizedTypedDictKind {
 }
 
 impl<'db> TypedDictType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(mapper.map_class(db, class)),
+            Self::Synthesized(synthesized) => {
+                let items = synthesized
+                    .items(db)
+                    .iter()
+                    .map(|(name, field)| {
+                        (
+                            name.clone(),
+                            TypedDictField {
+                                declared_ty: mapper.map_type(db, field.declared_ty),
+                                flags: field.flags,
+                                first_declaration: field.first_declaration,
+                            },
+                        )
+                    })
+                    .collect::<TypedDictSchema<'db>>();
+                let openness = match synthesized.openness(db) {
+                    TypedDictOpenness::ImplicitlyOpen => TypedDictOpenness::ImplicitlyOpen,
+                    TypedDictOpenness::Closed => TypedDictOpenness::Closed,
+                    TypedDictOpenness::Extra(extra) => {
+                        TypedDictOpenness::Extra(TypedDictExtraItems {
+                            declared_ty: mapper.map_type(db, extra.declared_ty),
+                            is_read_only: extra.is_read_only,
+                        })
+                    }
+                };
+                Self::Synthesized(SynthesizedTypedDictType::new(
+                    db,
+                    items,
+                    synthesized.kind(db),
+                    openness,
+                ))
+            }
+        }
+    }
+
     pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
         Self::Class(defining_class)
     }
