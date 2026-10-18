@@ -106,7 +106,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
-use crate::types::constraints::resolution::SolutionType;
+use crate::types::constraints::resolution::{Dependencies, SolutionType};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
@@ -3926,10 +3926,11 @@ impl<'db> CandidateSolutions<'db> {
             solved_typevars,
             validity: candidate.validity.clone(),
         };
-        solution.resolve(db, env, inferable);
+        let mut dependencies = Dependencies::new(env);
+        solution.resolve(db, &mut dependencies, inferable);
         // A budget fallback is not a selected witness and cannot refute the original path.
         if !exceeded_budget
-            && !solution.validate_resolution(db, env, inferable, candidate, &selected)
+            && !solution.validate_resolution(db, &mut dependencies, inferable, candidate, &selected)
         {
             return None;
         }

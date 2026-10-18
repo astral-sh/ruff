@@ -2,7 +2,7 @@
 
 mod equations;
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{OnceCell, RefCell};
 
 use equations::EquationGraph;
 use rustc_hash::FxHashMap;
@@ -22,7 +22,7 @@ use crate::types::{
     BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
     TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints,
 };
-use crate::{Db, FxOrderMap, ProgramEnvironment};
+use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
 /// Whether a selected type is independent of the other inferable variables in its alternative.
 ///
@@ -46,8 +46,9 @@ impl<'db> SolutionType<'db> {
 
 /// Resolves each group of mutually dependent solutions once all of its dependencies are
 /// resolved, by finding the strongly connected components of the dependency graph.
-struct Resolver<'a, 'db> {
+struct Resolver<'a, 'env, 'db> {
     env: &'a ProgramEnvironment<'db>,
+    type_dependencies: &'a mut Dependencies<'env, 'db>,
     inferable: TypeVarSet<'db>,
     solution: &'a [TypeVarSolution<'db>],
     /// The solutions that each solution refers to, or `None` if one of them is missing.
@@ -60,16 +61,17 @@ struct Resolver<'a, 'db> {
     is_pending: Vec<bool>,
 }
 
-impl<'a, 'db> Resolver<'a, 'db> {
+impl<'a, 'env, 'db> Resolver<'a, 'env, 'db> {
     /// Resolves dependencies between the selected solutions. Solutions that depend on each other, such
     /// as `T = int | tuple[T]`, are closed together as recursive types. References outside
     /// `inferable` retain their original bound-variable identity.
     fn resolve(
         db: &'db dyn Db,
-        env: &'a ProgramEnvironment<'db>,
+        type_dependencies: &'a mut Dependencies<'env, 'db>,
         inferable: TypeVarSet<'db>,
         solution: &'a [TypeVarSolution<'db>],
     ) -> Box<[SolutionType<'db>]> {
+        let env = type_dependencies.env;
         // Variadic bindings are still selected by compatibility inference after ordinary
         // solutions. Keep them symbolic here, including in a recursive constructor's arguments.
         let inferable = TypeVarSet::from_typevars(
@@ -94,16 +96,13 @@ impl<'a, 'db> Resolver<'a, 'db> {
             .iter()
             .map(|binding| {
                 // A dependency without a selected solution cannot be substituted.
-                let dependencies = RefCell::new(Some(Vec::new()));
-                Dependencies::check(db, env, inferable, [binding.solution.ty()], |dependency| {
-                    let mut dependencies = dependencies.borrow_mut();
-                    match index_of(dependency) {
-                        Some(index) => dependencies.iter_mut().for_each(|found| found.push(index)),
-                        None => *dependencies = None,
-                    }
-                    true
-                });
-                dependencies.into_inner()
+                type_dependencies
+                    .get(db, binding.solution.ty())
+                    .iter()
+                    .copied()
+                    .filter(|variable| variable.is_inferable(db, inferable))
+                    .map(index_of)
+                    .collect::<Option<Vec<_>>>()
             })
             .collect();
         let is_independent =
@@ -117,6 +116,7 @@ impl<'a, 'db> Resolver<'a, 'db> {
 
         let mut resolver = Resolver {
             env,
+            type_dependencies,
             inferable,
             solution,
             dependencies,
@@ -208,9 +208,10 @@ impl<'a, 'db> Resolver<'a, 'db> {
         // Some type forms preserve captured variables when specialized. For example, an alias
         // changes its explicit arguments but can retain a free variable in its body. Verify
         // closure on the actual results without performing further substitutions.
-        if Dependencies::check(db, self.env, self.inferable, types.iter().copied(), |_| {
-            false
-        }) {
+        if self
+            .type_dependencies
+            .is_closed(db, self.inferable, types.iter().copied())
+        {
             for (index, ty) in group.iter().zip(types) {
                 self.resolved[*index] = Some(ty);
             }
@@ -299,10 +300,10 @@ impl<'db> Solution<'db> {
     pub(super) fn resolve(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        dependencies: &mut Dependencies<'_, 'db>,
         inferable: TypeVarSet<'db>,
     ) {
-        let resolved = Resolver::resolve(db, env, inferable, &self.solved_typevars);
+        let resolved = Resolver::resolve(db, dependencies, inferable, &self.solved_typevars);
         for (binding, resolved) in self.solved_typevars.iter_mut().zip(resolved) {
             binding.solution = resolved;
         }
@@ -313,11 +314,12 @@ impl<'db> Solution<'db> {
     pub(super) fn validate_resolution(
         &mut self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        dependencies: &mut Dependencies<'_, 'db>,
         inferable: TypeVarSet<'db>,
         candidate: &CandidateSolution<'db>,
         selected: &[Type<'db>],
     ) -> bool {
+        let env = dependencies.env;
         // Invalid candidates retain the evidence needed to explain their declaration failure.
         if !self.is_valid() {
             return true;
@@ -341,11 +343,17 @@ impl<'db> Solution<'db> {
             types: &types,
             skip: None,
         });
-        let substitute = |ty: Type<'db>| {
-            let ty = ty.apply_type_mapping(db, env, &mapping, TypeContext::default());
-            Dependencies::check(db, env, inferable, [ty], |_| false).then_some(ty)
+        // Each selected type can be compared against several bounds under the same substitution.
+        let mut substituted = FxHashMap::default();
+        let mut substitute = |ty: Type<'db>| {
+            *substituted.entry(ty).or_insert_with(|| {
+                let mapped = ty.apply_type_mapping(db, env, &mapping, TypeContext::default());
+                dependencies
+                    .is_closed(db, inferable, [mapped])
+                    .then_some(mapped)
+            })
         };
-        let satisfies = |source: Type<'db>, target: Type<'db>| {
+        let mut satisfies = |source: Type<'db>, target: Type<'db>| {
             let (Some(mapped_source), Some(mapped_target)) =
                 (substitute(source), substitute(target))
             else {
@@ -426,38 +434,58 @@ impl<'db> Solution<'db> {
 
 struct VisitDependencies;
 
-/// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
-struct Dependencies<'a, 'db> {
+/// Shares complete type-variable dependency sets within one solution alternative.
+pub(super) struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
-    inferable: TypeVarSet<'db>,
-    query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
-    satisfied: Cell<bool>,
+    types: FxHashMap<Type<'db>, Box<[BoundTypeVarInstance<'db>]>>,
+}
+
+impl<'a, 'db> Dependencies<'a, 'db> {
+    /// Starts dependency analysis for one solution alternative.
+    pub(super) fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+        Self {
+            env,
+            types: FxHashMap::default(),
+        }
+    }
+
+    fn get(&mut self, db: &'db dyn Db, ty: Type<'db>) -> &[BoundTypeVarInstance<'db>] {
+        self.types.entry(ty).or_insert_with(|| {
+            let visitor = DependencyCollector {
+                env: self.env,
+                found: RefCell::default(),
+                visited: CycleDetector::new(()),
+            };
+            visitor.visit_type(db, ty);
+            // A nested visit can omit dependencies through an active recursion guard. Cache only
+            // the complete traversal of a root, never such a partial result.
+            visitor.found.into_inner().into_iter().collect()
+        })
+    }
+
+    /// Whether the types contain no occurrences of inferable variables.
+    fn is_closed(
+        &mut self,
+        db: &'db dyn Db,
+        inferable: TypeVarSet<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
+    ) -> bool {
+        types.into_iter().all(|ty| {
+            self.get(db, ty)
+                .iter()
+                .all(|variable| !variable.is_inferable(db, inferable))
+        })
+    }
+}
+
+/// Collects type-variable occurrences without visiting their declarations' bounds and defaults.
+struct DependencyCollector<'a, 'db> {
+    env: &'a ProgramEnvironment<'db>,
+    found: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
     visited: CycleDetector<'db, VisitDependencies, Type<'db>, (), 3>,
 }
 
-impl<'db> Dependencies<'_, 'db> {
-    /// Whether `query` accepts every inferable variable that occurs in `types`. The types of a
-    /// recursive solution unfold to each other, and are visited once in total.
-    fn check(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
-        types: impl IntoIterator<Item = Type<'db>>,
-        query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
-    ) -> bool {
-        let visitor = Dependencies {
-            env,
-            inferable,
-            query: &query,
-            satisfied: Cell::new(true),
-            visited: CycleDetector::new(()),
-        };
-        for ty in types {
-            visitor.visit_type(db, ty);
-        }
-        visitor.satisfied.get()
-    }
-
+impl<'db> DependencyCollector<'_, 'db> {
     fn signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
         walk_signature(db, signature, self);
         for parameter in signature.parameters() {
@@ -468,7 +496,7 @@ impl<'db> Dependencies<'_, 'db> {
     }
 }
 
-impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
+impl<'db> TypeVisitor<'db> for DependencyCollector<'_, 'db> {
     fn program_environment(&self) -> &ProgramEnvironment<'db> {
         self.env
     }
@@ -478,9 +506,6 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if !self.satisfied.get() {
-            return;
-        }
         // Recursive specialization can introduce dependencies in an alias's changing arguments.
         // Inspect them even when the recursion guard skips another visit to the alias's body.
         let specialization = match ty {
@@ -494,9 +519,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             }
         }
         if let Type::TypeVar(typevar) = ty {
-            if typevar.is_inferable(db, self.inferable) {
-                self.satisfied.set((self.query)(typevar));
-            }
+            self.found.borrow_mut().insert(typevar);
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.
@@ -556,7 +579,7 @@ mod tests {
     use ruff_python_ast::name::Name;
     use ty_python_core::ProgramFile;
 
-    use super::{Resolver, SolutionType};
+    use super::{Dependencies, Resolver, SolutionType};
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::constraints::TypeVarSolution;
@@ -628,7 +651,7 @@ mod tests {
             ] {
                 let resolved = Resolver::resolve(
                     db,
-                    &env,
+                    &mut Dependencies::new(&env),
                     TypeVarSet::from_typevars(db, [t, u]),
                     &[binding(t, alias), binding(u, int)],
                 );
@@ -696,12 +719,22 @@ mod tests {
                 .expect_type();
             let inferable = TypeVarSet::from_typevars(db, [t, u]);
             assert_eq!(
-                Resolver::resolve(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                Resolver::resolve(
+                    db,
+                    &mut Dependencies::new(&env),
+                    inferable,
+                    &[binding(t, alias)]
+                )
+                .as_ref(),
                 [SolutionType::Unresolved(alias)],
                 "{name}: missing dependency"
             );
-            let resolved =
-                Resolver::resolve(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
+            let resolved = Resolver::resolve(
+                db,
+                &mut Dependencies::new(&env),
+                inferable,
+                &[binding(t, alias), binding(u, int)],
+            );
             let [
                 SolutionType::Resolved(mapped),
                 SolutionType::Resolved(resolved_u),
@@ -714,7 +747,7 @@ mod tests {
             assert_eq!(
                 Resolver::resolve(
                     db,
-                    &env,
+                    &mut Dependencies::new(&env),
                     TypeVarSet::from_typevars(db, [t]),
                     &[binding(t, alias)]
                 )
@@ -773,14 +806,25 @@ mod tests {
             let alias = parameter.annotated_type();
             let inferable = TypeVarSet::from_typevars(db, [t, u]);
             assert_eq!(
-                Resolver::resolve(db, &env, inferable, &[binding(t, alias)]).as_ref(),
+                Resolver::resolve(
+                    db,
+                    &mut Dependencies::new(&env),
+                    inferable,
+                    &[binding(t, alias)]
+                )
+                .as_ref(),
                 [SolutionType::Unresolved(alias)],
                 "{parameter:?}: missing captured dependency"
             );
             // Specializing an alias's arguments cannot replace a variable captured in its body.
             assert_eq!(
-                Resolver::resolve(db, &env, inferable, &[binding(t, alias), binding(u, int)])
-                    .as_ref(),
+                Resolver::resolve(
+                    db,
+                    &mut Dependencies::new(&env),
+                    inferable,
+                    &[binding(t, alias), binding(u, int)]
+                )
+                .as_ref(),
                 [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
                 "{parameter:?}: retained captured dependency"
             );
@@ -811,7 +855,7 @@ mod tests {
             let tree = global_symbol(db, file, name).place.expect_type();
             let resolved = Resolver::resolve(
                 db,
-                &env,
+                &mut Dependencies::new(&env),
                 TypeVarSet::from_typevars(db, [t]),
                 &[binding(t, tree)],
             );
@@ -822,7 +866,7 @@ mod tests {
             let expected = Type::tuple(TupleType::heterogeneous(db, &env, [tree, int]));
             let resolved = Resolver::resolve(
                 db,
-                &env,
+                &mut Dependencies::new(&env),
                 TypeVarSet::from_typevars(db, [t, u]),
                 &[binding(t, pair), binding(u, int)],
             );
@@ -879,7 +923,7 @@ mod tests {
         ] {
             let resolved = Resolver::resolve(
                 db,
-                &env,
+                &mut Dependencies::new(&env),
                 TypeVarSet::from_typevars(db, [t, u]),
                 &[binding(t, Type::KnownInstance(partial)), binding(u, int)],
             );
