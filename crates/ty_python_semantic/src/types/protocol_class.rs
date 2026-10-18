@@ -3076,19 +3076,41 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: ProtocolInterfaceView<'db>,
         target: ProtocolInterfaceView<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.member_count(db) < target.member_count(db)
+        let source_member_count = source.member_count(db);
+        let target_member_count = target.member_count(db);
+        if source_member_count < target_member_count
             && !self.is_context_collection_enabled()
-            && source.member_count(db) < non_object_protocol_member_count(db, target.interface)
+            && source_member_count < non_object_protocol_member_count(db, target.interface)
         {
             return self.never();
         }
 
         let env = self.env;
+        // Scan similarly sized interfaces; use direct lookups for sparse targets.
+        let use_ordered_walk = source_member_count <= target_member_count.saturating_mul(2);
+        let mut source_members = source.members(db).peekable();
+        let mut previous_target_name = None;
         target
             .members(db)
             .sorted_by_cached_key(|member| member.structural_member_priority(db, env))
             .when_all(db, self.constraints, |target_member| {
-                let source_member = source.member_by_name(db, target_member.name);
+                let source_member = if use_ordered_walk {
+                    // The stable priority sort preserves name order within each group. Restart
+                    // the source walk when the next group returns to an earlier name.
+                    if previous_target_name.is_some_and(|name| name > target_member.name) {
+                        source_members = source.members(db).peekable();
+                    }
+                    previous_target_name = Some(target_member.name);
+                    while source_members
+                        .peek()
+                        .is_some_and(|source_member| source_member.name < target_member.name)
+                    {
+                        source_members.next();
+                    }
+                    source_members.next_if(|source_member| source_member.name == target_member.name)
+                } else {
+                    source.member_by_name(db, target_member.name)
+                };
 
                 if source_member.is_none()
                     && source.includes_member_or_object_fallback(db, env, target_member.name)
