@@ -1,11 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Expr, ExprAttribute};
+use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::{self as ast, Expr, ExprAttribute, Int, Number};
 use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_sep_split_enabled;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `.split(os.sep)`
@@ -49,18 +52,32 @@ use crate::codes::Category;
 /// it can be less performant than working directly with strings,
 /// especially on older versions of Python.
 ///
+/// ## Fix safety
+/// The fix is always unsafe because `Path` normalizes trailing separators and
+/// `.` components, which can change the result. Receivers with a custom `split`
+/// method can also behave differently. The fix may remove comments.
+///
 /// ## References
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.281", category = Category::Pedantic)]
-pub(crate) struct OsSepSplit;
+pub(crate) struct OsSepSplit {
+    fixable: bool,
+}
 
 impl Violation for OsSepSplit {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Replace `.split(os.sep)` with `Path.parts`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        self.fixable
+            .then(|| "Replace with `Path(...).name`".to_string())
     }
 }
 
@@ -70,7 +87,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Expr::Attribute(ExprAttribute { attr, .. }) = call.func.as_ref() else {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = call.func.as_ref() else {
         return;
     };
 
@@ -96,5 +113,73 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    checker.report_diagnostic(OsSepSplit, attr.range());
+    let last_item = last_split_item(checker, call).filter(|_| !value.is_bytes_literal_expr());
+    let mut diagnostic = checker.report_diagnostic(
+        OsSepSplit {
+            fixable: last_item.is_some(),
+        },
+        attr.range(),
+    );
+
+    let Some(subscript) = last_item else {
+        return;
+    };
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+        let path_range = parenthesized_range(
+            value.as_ref().into(),
+            call.func.as_ref().into(),
+            checker.tokens(),
+        )
+        .unwrap_or(value.range());
+
+        Ok(Fix::unsafe_edits(
+            Edit::range_replacement(
+                format!("{binding}({}).name", checker.locator().slice(path_range)),
+                subscript.range(),
+            ),
+            [import_edit],
+        ))
+    });
+}
+
+fn last_split_item<'a>(
+    checker: &'a Checker,
+    call: &ast::ExprCall,
+) -> Option<&'a ast::ExprSubscript> {
+    if !is_fix_os_sep_split_enabled(checker.settings()) {
+        return None;
+    }
+
+    let Expr::Subscript(subscript) = checker.semantic().current_expression_parent()? else {
+        return None;
+    };
+    if subscript.value.range() != call.range() || subscript.ctx != ast::ExprContext::Load {
+        return None;
+    }
+
+    let Expr::UnaryOp(ast::ExprUnaryOp {
+        op: ast::UnaryOp::USub,
+        operand,
+        ..
+    }) = subscript.slice.as_ref()
+    else {
+        return None;
+    };
+    if !matches!(
+        operand.as_ref(),
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            ..
+        })
+    ) {
+        return None;
+    }
+
+    Some(subscript)
 }

@@ -155,6 +155,11 @@ pub(crate) const fn is_fix_os_path_dirname_enabled(settings: &LinterSettings) ->
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/issues/2331
+pub(crate) const fn is_fix_os_sep_split_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/19404
 pub(crate) const fn is_fix_os_chmod_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
