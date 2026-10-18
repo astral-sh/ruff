@@ -244,6 +244,49 @@ impl<'a, 'db> Resolver<'a, 'db> {
 }
 
 impl<'db> Solution<'db> {
+    /// Compares both sides under this alternative's simultaneous substitution. Only inferable
+    /// variables are substituted; outer variables remain rigid even if the path mentions them.
+    pub(crate) fn are_types_assignable(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        comparisons: &[(Type<'db>, Type<'db>)],
+    ) -> bool {
+        let closed: FxOrderMap<_, _> = self
+            .solved_typevars
+            .iter()
+            .filter_map(|binding| {
+                if !binding.bound_typevar.is_inferable(db, inferable) {
+                    return None;
+                }
+                match binding.solution {
+                    SolutionType::Resolved(ty) => Some((
+                        binding.bound_typevar.identity(db),
+                        (binding.bound_typevar, ty),
+                    )),
+                    SolutionType::Unresolved(_) => None,
+                }
+            })
+            .collect();
+        let context = GenericContext::from_typevar_instances(
+            db,
+            env,
+            closed.values().map(|(variable, _)| *variable),
+        );
+        let types: Vec<_> = closed.values().map(|(_, ty)| *ty).collect();
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+            generic_context: context,
+            types: &types,
+            skip: None,
+        });
+        comparisons.iter().all(|(inferred, preferred)| {
+            let inferred = inferred.apply_type_mapping(db, env, &mapping, TypeContext::default());
+            let preferred = preferred.apply_type_mapping(db, env, &mapping, TypeContext::default());
+            inferred.is_assignable_to(db, env, preferred)
+        })
+    }
+
     /// Resolves each selected binding against the other bindings of this path.
     pub(super) fn resolve(
         &mut self,

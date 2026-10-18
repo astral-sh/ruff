@@ -3493,22 +3493,48 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.pending.intersect(db, self.constraints, constraint);
     }
 
-    pub(crate) fn inferred_type_is_assignable_to(
+    /// Checks contextual preferences under each call-wide solution, before merging the
+    /// substitution's alternatives. Incomplete inference cannot disprove a preference.
+    pub(crate) fn inferred_types_are_assignable_to(
         &mut self,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-        ty: Type<'db>,
+        preferences: impl IntoIterator<Item = (BoundTypeVarIdentity<'db>, Type<'db>)>,
     ) -> bool {
         let db = self.db;
         let LegacyTypeMappings::Available(types) = &mut self.types else {
-            return false;
+            return true;
         };
-
-        // An unsolved type variable is always compatible.
-        types.get_mut(&bound_typevar).is_none_or(|inferred_ty| {
-            inferred_ty
-                .get_or_build(db, self.env)
-                .is_assignable_to(db, self.env, ty)
-        })
+        let comparisons: Vec<_> = preferences
+            .into_iter()
+            .filter_map(|(identity, preferred)| {
+                types
+                    .get_mut(&identity)
+                    .map(|inferred| (inferred.get_or_build(db, self.env), preferred))
+            })
+            .collect();
+        if comparisons.is_empty() {
+            return true;
+        }
+        match self.pending.solutions_with(
+            db,
+            self.env,
+            self.inferable,
+            SolutionBudget::default(),
+            |_variance, bounds| {
+                CandidateSolutions::preliminary_solve(db, self.env, self.constraints, bounds)
+            },
+        ) {
+            Ok(Solutions::Constrained(SolutionPaths::Complete(paths))) => paths
+                .iter()
+                .any(|path| path.are_types_assignable(db, self.env, self.inferable, &comparisons)),
+            Ok(Solutions::Unconstrained | Solutions::Unsatisfiable(SolutionPaths::Complete(_))) => {
+                // Failed or variadic inference can have only compatibility bindings. Keep their
+                // contextual choice available for diagnostics without inventing a solution path.
+                comparisons.iter().all(|(inferred, preferred)| {
+                    inferred.is_assignable_to(db, self.env, *preferred)
+                })
+            }
+            _ => true,
+        }
     }
 
     /// Add a type mapping for a bound typevar using the given variance to determine how the
@@ -5638,7 +5664,7 @@ mod tests {
         );
 
         builder.project_for_legacy_fallback(&analysis);
-        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
+        assert!(builder.inferred_types_are_assignable_to([(typevar.identity(db), int)]));
     }
 
     #[test]
@@ -5746,8 +5772,8 @@ mod tests {
         assert!(analysis.specialization_error(db, &env).is_none());
 
         builder.project_for_legacy_fallback(&analysis);
-        assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
-        assert!(!builder.inferred_type_is_assignable_to(typevar.identity(db), str));
+        assert!(builder.inferred_types_are_assignable_to([(typevar.identity(db), int)]));
+        assert!(!builder.inferred_types_are_assignable_to([(typevar.identity(db), str)]));
     }
 
     #[test]

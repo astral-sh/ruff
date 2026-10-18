@@ -1819,7 +1819,7 @@ class's own type variables.
 class Remapped(Generic[T]):
     def __init__(self: "Remapped[list[V]]", value: V) -> None: ...
 
-reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+reveal_type(Remapped(1))  # revealed: Remapped[list[int]]
 ```
 
 ### Type variables from enclosing scopes in `__init__` receiver annotations
@@ -3947,6 +3947,64 @@ def narrow_intersection(value: Intersection[Parent[S], Other[S]]) -> None:
 def narrow_intersection_bounded(value: Intersection[Parent[BoundedS], Other[BoundedS]]) -> None:
     if isinstance(value, ChildBoth):
         reveal_type(value)  # revealed: ChildBoth[BoundedS@narrow_intersection_bounded]
+```
+
+## Return contexts with dependent type variables
+
+Copying an array's axes preserves the element type supplied by the return annotation, even though
+only the axis type can be inferred from the constructor argument.
+
+```toml
+[environment]
+python-version = "3.11"
+
+[rules]
+unsound-return-statement = "error"
+
+[analysis]
+strict-equality-semantics = true
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+Element = TypeVar("Element", covariant=True)
+Axis = TypeVar("Axis", covariant=True)
+
+class Iterator(Protocol[T_co]):
+    def __next__(self) -> T_co: ...
+
+class Iterable(Protocol[T_co]):
+    def __iter__(self) -> Iterator[T_co]: ...
+
+class Array(Generic[Element, Axis]):
+    _axes: tuple[Axis, ...]
+
+    def __init__(self, axes: Iterable[Axis]) -> None: ...
+    def copy(self) -> "Array[Element, Axis]":
+        return Array(self._axes)  # no diagnostic
+```
+
+A constructor with its own type parameters can likewise preserve both sources' element types when
+called from a generic method.
+
+```py
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Source(Protocol[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+class Pairs(Generic[T_co]):
+    def __new__(cls, left: Source[T], right: Source[U]) -> "Pairs[tuple[T, U]]":
+        raise NotImplementedError
+
+class Seq(Source[T]):
+    def zip(self, other: Source[U]) -> Pairs[tuple[T, U]]:
+        return Pairs(self, other)  # no diagnostic
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

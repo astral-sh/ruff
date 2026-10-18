@@ -6810,12 +6810,12 @@ impl<'db> CallInference<'_, 'db> {
             builder,
             !preferred_type_mappings.is_empty(),
             specialization_errors,
-        ) && preferred_type_mappings
-            .iter()
-            .all(|(&identity, &preferred_ty)| {
-                partially_specialized_declared_type.contains(&identity)
-                    || builder.inferred_type_is_assignable_to(identity, preferred_ty)
-            })
+        ) && builder.inferred_types_are_assignable_to(
+            preferred_type_mappings
+                .iter()
+                .filter(|(identity, _)| !partially_specialized_declared_type.contains(identity))
+                .map(|(&identity, &preferred_ty)| (identity, preferred_ty)),
+        )
     }
 }
 

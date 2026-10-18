@@ -3038,5 +3038,56 @@ def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]
         reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
 ```
 
+## Return contexts with dependent type variables
+
+Copying an array's axes preserves the element type supplied by the return annotation, even though
+only the axis type can be inferred from the constructor argument.
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+unsound-return-statement = "error"
+
+[analysis]
+strict-equality-semantics = true
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Protocol
+
+class Iterator[T](Protocol):
+    def __next__(self) -> T: ...
+
+class Iterable[T](Protocol):
+    def __iter__(self) -> Iterator[T]: ...
+
+class Array[Element, Axis]:
+    _axes: tuple[Axis, ...]
+
+    def __init__(self, axes: Iterable[Axis]) -> None: ...
+    def copy(self) -> "Array[Element, Axis]":
+        return Array(self._axes)  # no diagnostic
+```
+
+A constructor with its own type parameters can likewise preserve both sources' element types when
+called from a generic method.
+
+```py
+class Source[T](Protocol):
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Pairs[C]:
+    def __new__[T, U](cls, left: Source[T], right: Source[U]) -> "Pairs[tuple[T, U]]":
+        raise NotImplementedError
+
+class Seq[T](Source[T]):
+    def zip[U](self, other: Source[U]) -> Pairs[tuple[T, U]]:
+        return Pairs(self, other)  # no diagnostic
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
