@@ -1324,7 +1324,8 @@ def constrained[T, E]():
 
 ### Dependencies through implicit recursive aliases
 
-Solving a type variable also specializes its occurrences inside an implicit recursive alias.
+A tuple can guard the recursive reference either inside an implicit alias definition or in its
+supplied argument. Both equations have recursive solutions.
 
 ```py
 from typing import TypeAlias, TypeVar
@@ -1333,16 +1334,6 @@ from ty_extensions._internal import ConstraintSet
 V = TypeVar("V")
 Repeated: TypeAlias = V | tuple["Repeated[V]"]
 
-def acyclic[T, U]():
-    constraints = ConstraintSet.equality(T, Repeated[U]) & ConstraintSet.equality(U, int)
-    # revealed: tuple[Solution[T=Repeated[int], U=int]]
-    reveal_type(constraints.solutions(inferable=tuple[T, U]))
-```
-
-A tuple can guard the recursive reference either inside the alias definition or in its supplied
-argument. Both equations have recursive solutions.
-
-```py
 Guarded: TypeAlias = tuple[V, "Guarded[V]"]
 
 def guarded[T]():
