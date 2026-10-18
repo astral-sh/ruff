@@ -966,78 +966,6 @@ fn benchmark_many_protocol_members_mismatch(criterion: &mut Criterion) {
     });
 }
 
-/// Checks protocol pairs with dense and sparse targets, mixed member priorities, and mismatches
-/// that can fail on the first target member. These full checks also include parsing and type inference.
-fn benchmark_protocol_member_matching(criterion: &mut Criterion) {
-    const NUM_MEMBERS: usize = 800;
-    const NUM_FUNCTIONS: usize = 400;
-
-    setup_rayon();
-
-    let scenarios = [
-        ("dense_match", 0..NUM_MEMBERS, None, false),
-        ("sparse_match", NUM_MEMBERS - 1..NUM_MEMBERS, None, false),
-        ("dense_early_mismatch", 0..NUM_MEMBERS, Some(0), false),
-        ("sparse_early_mismatch", 0..1, Some(0), false),
-        ("mixed_priority_match", 0..NUM_MEMBERS, None, true),
-    ];
-
-    for (name, target_members, incompatible_member, mixed_priority) in scenarios {
-        let imports = if mixed_priority {
-            "from typing import Protocol, overload"
-        } else {
-            "from typing import Protocol"
-        };
-        let mut code = format!("\n        {imports}");
-        for (class_name, members, mismatch) in [
-            ("Source", 0..NUM_MEMBERS, None),
-            ("Target", target_members, incompatible_member),
-        ] {
-            write!(&mut code, "\n\n        class {class_name}(Protocol):").ok();
-            for i in members {
-                if mixed_priority && i == 0 {
-                    // Finite overloads are compared after simple attributes, so the target
-                    // traversal returns to the first name after visiting the last one.
-                    code.push_str(
-                        "
-            @overload
-            def member_0000(self, value: int) -> int: ...
-            @overload
-            def member_0000(self, value: str) -> str: ...",
-                    );
-                } else {
-                    let annotation = if mismatch == Some(i) { "str" } else { "int" };
-                    // Zero padding keeps declaration order and lexicographic member order the same.
-                    write!(&mut code, "\n            member_{i:04}: {annotation}").ok();
-                }
-            }
-        }
-
-        for i in 0..NUM_FUNCTIONS {
-            writeln!(
-                &mut code,
-                "
-        def check_{i}(value: Source) -> Target:
-            return value"
-            )
-            .ok();
-        }
-
-        let expected_diagnostics = if incompatible_member.is_some() {
-            NUM_FUNCTIONS
-        } else {
-            0
-        };
-        criterion.bench_function(&format!("ty_micro[protocol_members_{name}]"), |b| {
-            b.iter_batched_ref(
-                || setup_micro_case(&code),
-                |case| assert_eq!(case.db.check().len(), expected_diagnostics),
-                BatchSize::SmallInput,
-            );
-        });
-    }
-}
-
 /// Regression benchmarks for ty#4269: recursive protocol inference and assignment diagnostics.
 ///
 /// Explicit receiver annotations can repeatedly expand inherited recursive protocol members
@@ -2595,7 +2523,6 @@ criterion_group!(
     benchmark_mixed_str_enum_comparison,
     benchmark_many_enum_members_2,
     benchmark_many_protocol_members_mismatch,
-    benchmark_protocol_member_matching,
     benchmark_inherited_recursive_protocol,
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
