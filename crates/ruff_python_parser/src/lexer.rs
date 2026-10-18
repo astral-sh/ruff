@@ -691,7 +691,7 @@ impl<'src> Lexer<'src> {
         let bytes = self.cursor.rest().as_bytes();
         let ascii_len = 'ascii: {
             // Fixed-size batches let the compiler unroll the lookups without unchecked reads.
-            let (chunks, rest) = bytes.as_chunks::<8>();
+            let (chunks, rest) = bytes.as_chunks::<16>();
             let mut offset = 0;
             for chunk in chunks {
                 if let Some(end) = chunk
@@ -700,7 +700,7 @@ impl<'src> Lexer<'src> {
                 {
                     break 'ascii offset + end;
                 }
-                offset += 8;
+                offset += 16;
             }
             offset
                 + rest
