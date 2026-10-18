@@ -1179,6 +1179,18 @@ impl<'db> UnionBuilder<'db> {
                     self.collapse_to_object();
                     return;
                 }
+            } else if !self.cycle_recovery
+                && let (alias @ Type::Recursive(_), Type::Intersection(negated))
+                | (Type::Intersection(negated), alias @ Type::Recursive(_)) = (ty, element_type)
+                && negated.is_simple_negation(db)
+                && negated.negative(db).contains(&alias)
+                && !alias.has_unguarded_alias_cycle(db)
+                && alias.is_subtype_of(db, &self.env, alias)
+            {
+                // Apply the same complement law to an exact recursive alias pair. Avoid
+                // provisional binders, and require reflexive subtyping to exclude gradual types.
+                self.collapse_to_object();
+                return;
             }
         }
 
@@ -1626,13 +1638,8 @@ impl<'db> IntersectionBuilder<'db> {
                 // Pass the original alias to preserve recursive self-references.
                 // `InnerIntersectionBuilder::add_negative` resolves it for simplification
                 // (for example, `~Any` becomes `Any`) and stores it if it remains negative.
-                let element = if matches!(original, Type::TypeAlias(_)) {
-                    original
-                } else {
-                    ty
-                };
                 for inner in &mut self.intersections {
-                    inner.add_negative(db, &self.env, element);
+                    inner.add_negative(db, &self.env, original);
                 }
             }
         }

@@ -483,6 +483,47 @@ def inspect(value: Nested):
     reveal_type(value)  # revealed: Nested
 ```
 
+## Recursive aliases and their complements
+
+A fully static alias and its complement cover every object, even when the alias refers to itself.
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A] | A]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+## Negated recursive aliases
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A]]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+## Gradual recursive aliases and their complements
+
+The `Any` in each union member can have a different materialization, so the union does not simplify
+to `object`.
+
+```py
+from typing import Any, TypeAlias
+from ty_extensions import Not
+
+B: TypeAlias = "list[tuple[Any, B]]"
+
+def f(x: B | Not[B]):
+    reveal_type(x)  # revealed: B | ~B
+```
+
 ## Specializing non-generic recursive aliases
 
 A recursive alias without type variables cannot be specialized. Quoting the entire definition does
@@ -597,6 +638,14 @@ T = TypeVar("T")
 Alias: TypeAlias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
 Growing: TypeAlias = "T | Growing[list[T]]"  # error: [cyclic-type-alias-definition]
 reveal_type(Growing)  # revealed: str
+```
+
+Adding the alias's complement does not make an unguarded cycle valid.
+
+```py
+from ty_extensions import Not
+
+Complemented: TypeAlias = "T | Complemented[T] | Not[Complemented[T]]"  # error: [cyclic-type-alias-definition]
 ```
 
 Invalid generic aliases use a divergent type for recovery with or without type arguments.

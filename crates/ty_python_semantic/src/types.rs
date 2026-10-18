@@ -3267,17 +3267,6 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
-                .map(|unfolded| unfolded.negate(db, env))
-                .unwrap_or_else(|| {
-                    Type::Intersection(IntersectionType::new(
-                        db,
-                        FxOrderSet::default(),
-                        NegativeIntersectionElements::Single(*self),
-                    ))
-                }),
-
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
             Type::AlwaysTruthy
@@ -3313,6 +3302,7 @@ impl<'db> Type<'db> {
             )),
 
             Type::TypeAlias(_)
+            | Type::Recursive(_)
             | Type::Union(_)
             | Type::Intersection(_)
             | Type::EnumComplement(_) => IntersectionBuilder::new(db, env)

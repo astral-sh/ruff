@@ -3284,3 +3284,14 @@ def inspect(
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
 ```
+
+### Recursive aliases and their complements
+
+```py
+from ty_extensions import Not
+
+A = list["A | Not[A]"]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
