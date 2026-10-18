@@ -120,6 +120,34 @@ reveal_type(result)
 result.nonexistent()
 ```
 
+## Inferring lambda parameters from other arguments
+
+An argument's type provides context for a lambda even when the lambda also contributes to the same
+type variable.
+
+```py
+from typing import Callable
+
+def update[T](value: T, transform: Callable[[T], T]) -> T:
+    return transform(value)
+
+def check[T](value: T) -> None:
+    result = update(value, lambda item: reveal_type(item))  # revealed: T@check
+    reveal_type(result)  # revealed: T@check
+```
+
+The same context is available when forwarding generic callbacks and preserving an enclosing
+function's return type.
+
+```py
+def transform[T, U](value: T, observe: Callable[[T], None], convert: Callable[[T], U]) -> list[U]:
+    observe(value)
+    return [convert(value)]
+
+def forward[T](value: T, observe: Callable[[T], None]) -> list[T]:
+    return transform(value, observe, lambda item: reveal_type(item))  # revealed: T@forward
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -3528,9 +3556,7 @@ regression test.
 from functools import reduce
 
 def _(keys: list[str]):
-    # TODO: revealed: int
-    # revealed: Literal[0] | Unknown
-    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))  # revealed: int
 ```
 
 ### Transitive constraints preserve typevar domains

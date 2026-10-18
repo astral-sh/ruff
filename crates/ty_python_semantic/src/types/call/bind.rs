@@ -8210,6 +8210,8 @@ impl<'db> Binding<'db> {
                 let call_expression_constraints = return_type_solutions.get(&identity).copied();
                 let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
+                    // Other arguments can provide context before a lambda's type is known.
+                    .map(|ty| ty.filter_union(db, env, |ty| !ty.has_provisional_marker(db, env)))
                     .filter(|ty| !ty.has_provisional_marker(db, env))
                     .map(|ty| {
                         let promoted = ty.promote(db, env);

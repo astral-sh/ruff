@@ -63,6 +63,37 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+## Inferring lambda parameters from other arguments
+
+An argument's type provides context for a lambda even when the lambda also contributes to the same
+type variable.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def update(value: T, transform: Callable[[T], T]) -> T:
+    return transform(value)
+
+def check(value: T) -> None:
+    result = update(value, lambda item: reveal_type(item))  # revealed: T@check
+    reveal_type(result)  # revealed: T@check
+```
+
+The same context is available when forwarding generic callbacks and preserving an enclosing
+function's return type.
+
+```py
+def transform(value: T, observe: Callable[[T], None], convert: Callable[[T], U]) -> list[U]:
+    observe(value)
+    return [convert(value)]
+
+def forward(value: T, observe: Callable[[T], None]) -> list[T]:
+    return transform(value, observe, lambda item: reveal_type(item))  # revealed: T@forward
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
