@@ -8,7 +8,7 @@ use ruff_python_ast::{Mod, Stmt};
 // pre-order.
 #[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
-use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges};
+use ruff_python_trivia::{CommentLinePosition, CommentRanges, TriviaRanges, is_python_whitespace};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -34,6 +34,8 @@ pub(super) struct CommentsVisitor<'a, 'builder> {
     parents: Vec<AnyNodeRef<'a>>,
     preceding_node: Option<AnyNodeRef<'a>>,
     comment_ranges: Peekable<std::slice::Iter<'a, TextRange>>,
+    /// The [`DecoratedComment::comment_block`] of the last visited comment.
+    comment_block: TextRange,
 }
 
 impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
@@ -48,6 +50,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
             parents: Vec::new(),
             preceding_node: None,
             comment_ranges: comment_ranges.iter().peekable(),
+            comment_block: TextRange::default(),
         }
     }
 
@@ -66,6 +69,29 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
         self.comment_ranges
             .peek()
             .is_none_or(|next_comment| next_comment.start() >= node_end)
+    }
+
+    /// Returns the [`DecoratedComment::comment_block`] of the next comment, which starts at
+    /// `comment_range`.
+    ///
+    /// Every comment belongs to exactly one block, and each block is only computed once, when
+    /// visiting its first comment. This keeps the total cost linear in the number of comments.
+    fn comment_block(&mut self, comment_range: TextRange) -> TextRange {
+        if comment_range.end() > self.comment_block.end() {
+            let source = self.source_code.as_str();
+            let mut end = comment_range.end();
+            // The first comment is the one at `comment_range`.
+            for next in self.comment_ranges.clone().skip(1) {
+                let gap =
+                    source[TextRange::new(end, next.start())].trim_matches(is_python_whitespace);
+                if !matches!(gap, "\n" | "\r\n" | "\r") {
+                    break;
+                }
+                end = next.end();
+            }
+            self.comment_block = TextRange::new(comment_range.start(), end);
+        }
+        self.comment_block
     }
 }
 
@@ -94,6 +120,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                     self.source_code.as_str(),
                 ),
                 slice: self.source_code.slice(*comment_range),
+                comment_block: self.comment_block(*comment_range),
             };
 
             self.builder.push_comment(comment);
@@ -137,6 +164,7 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                     self.source_code.as_str(),
                 ),
                 slice: self.source_code.slice(*comment_range),
+                comment_block: self.comment_block(*comment_range),
             };
 
             self.builder.push_comment(comment);
@@ -184,6 +212,24 @@ pub(crate) struct DecoratedComment<'a> {
     parent: Option<AnyNodeRef<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
+    /// The range of the run of comments that contains this comment, where each comment is
+    /// separated from the next only by whitespace and a single line break.
+    ///
+    /// ```python
+    /// a = 1
+    /// # comment 1
+    /// # comment 2
+    ///
+    /// # comment 3
+    /// b = 2
+    /// ```
+    ///
+    /// Here, `# comment 1` and `# comment 2` form one block and `# comment 3` forms another.
+    ///
+    /// [`DecoratedComment::range_before`] and [`DecoratedComment::range_after`] use it to avoid
+    /// lexing the other comments of the block again for every comment in the block, which is
+    /// quadratic in the number of comments between two nodes.
+    comment_block: TextRange,
 }
 
 impl<'a> DecoratedComment<'a> {
@@ -322,6 +368,22 @@ impl<'a> DecoratedComment<'a> {
     /// Returns the slice into the source code.
     pub(crate) fn slice(&self) -> &SourceCodeSlice {
         &self.slice
+    }
+
+    /// Returns the range from `start` to the start of this comment's block.
+    ///
+    /// The skipped part of `start..comment.start()` only contains comments and whitespace without
+    /// empty lines, so it never contains a token.
+    pub(super) fn range_before(&self, start: TextSize) -> TextRange {
+        TextRange::new(start, self.comment_block.start().clamp(start, self.start()))
+    }
+
+    /// Returns the range from the end of this comment's block to `end`.
+    ///
+    /// The skipped part of `comment.end()..end` only contains comments and whitespace without
+    /// empty lines, so it never contains a token or an empty line.
+    pub(super) fn range_after(&self, end: TextSize) -> TextRange {
+        TextRange::new(self.comment_block.end().clamp(self.end(), end), end)
     }
 }
 

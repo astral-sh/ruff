@@ -1,0 +1,86 @@
+---
+source: crates/ruff_python_formatter/src/comments/mod.rs
+expression: comments.debug(test_case.source_code)
+---
+{
+    Node {
+        kind: StmtAssign,
+        range: 1..6,
+        source: `a = 1`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing a 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# trailing a 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: StmtAssign,
+        range: 66..71,
+        source: `b = 2`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading b 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# leading b 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+    Node {
+        kind: ExprName,
+        range: 88..89,
+        source: `x`,
+    }: {
+        "leading": [],
+        "dangling": [],
+        "trailing": [
+            SourceComment {
+                text: "# trailing x 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# trailing x 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+    },
+    Node {
+        kind: ExprName,
+        range: 201..202,
+        source: `y`,
+    }: {
+        "leading": [
+            SourceComment {
+                text: "# leading y 1",
+                position: OwnLine,
+                formatted: false,
+            },
+            SourceComment {
+                text: "# leading y 2",
+                position: OwnLine,
+                formatted: false,
+            },
+        ],
+        "dangling": [],
+        "trailing": [],
+    },
+}

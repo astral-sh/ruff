@@ -132,7 +132,7 @@ fn handle_parenthesized_comment<'a>(
     //     ),
     // ]
     // ```
-    let range = TextRange::new(preceding.end(), comment.start());
+    let range = comment.range_before(preceding.end());
     let tokenizer = SimpleTokenizer::new(source, range);
     if tokenizer
         .skip_trivia()
@@ -163,7 +163,7 @@ fn handle_parenthesized_comment<'a>(
     //     y
     // ]
     // ```
-    let range = TextRange::new(comment.end(), following.start());
+    let range = comment.range_after(following.start());
     let tokenizer = SimpleTokenizer::new(source, range);
     if tokenizer
         .skip_trivia()
@@ -489,10 +489,9 @@ fn handle_own_line_comment_around_body<'a>(
     //     # default placement comment
     //     def inline_after_else(): ...
     // ```
-    let maybe_token =
-        SimpleTokenizer::new(source, TextRange::new(preceding.end(), comment.start()))
-            .skip_trivia()
-            .next();
+    let maybe_token = SimpleTokenizer::new(source, comment.range_before(preceding.end()))
+        .skip_trivia()
+        .next();
     if maybe_token.is_some() {
         return CommentPlacement::Default(comment);
     }
@@ -569,7 +568,7 @@ fn handle_own_line_comment_between_statements<'a>(
     //
     // y = 2
     // ```
-    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
+    if max_empty_lines(&source[comment.range_after(following.start())]) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         CommentPlacement::trailing(preceding, comment)
@@ -1113,7 +1112,7 @@ fn handle_module_level_own_line_comment_before_class_or_function_comment<'a>(
     }
 
     // Make the comment a leading comment if there's no empty line between the comment and the function / class header
-    if max_empty_lines(&source[TextRange::new(comment.end(), following.start())]) == 0 {
+    if max_empty_lines(&source[comment.range_after(following.start())]) == 0 {
         CommentPlacement::leading(following, comment)
     } else {
         // Otherwise attach the comment as trailing comment to the previous statement

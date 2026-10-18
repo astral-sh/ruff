@@ -1056,4 +1056,34 @@ else:
 
         assert_debug_snapshot!(comments.debug(test_case.source_code));
     }
+
+    #[test]
+    fn consecutive_comments() {
+        let source = r"
+a = 1
+# trailing a 1
+# trailing a 2
+
+# leading b 1
+# leading b 2
+b = 2
+[
+    (
+        x
+        # trailing x 1
+        # trailing x 2
+    ),
+    (
+        # leading y 1
+        # leading y 2
+        y
+    ),
+]
+";
+        let test_case = CommentsTestCase::from_code(source);
+
+        let comments = test_case.to_comments();
+
+        assert_debug_snapshot!(comments.debug(test_case.source_code));
+    }
 }
