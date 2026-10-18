@@ -689,10 +689,25 @@ impl<'src> Lexer<'src> {
         // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
         // needs the full identifier-continuation check below.
         let bytes = self.cursor.rest().as_bytes();
-        let ascii_len = bytes
-            .iter()
-            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
-            .unwrap_or(bytes.len());
+        let ascii_len = 'ascii: {
+            // Fixed-size batches let the compiler unroll the lookups without unchecked reads.
+            let (chunks, rest) = bytes.as_chunks::<8>();
+            let mut offset = 0;
+            for chunk in chunks {
+                if let Some(end) = chunk
+                    .iter()
+                    .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+                {
+                    break 'ascii offset + end;
+                }
+                offset += 8;
+            }
+            offset
+                + rest
+                    .iter()
+                    .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+                    .unwrap_or(rest.len())
+        };
         self.cursor.skip_bytes(ascii_len);
 
         if bytes.get(ascii_len).is_some_and(|byte| !byte.is_ascii()) {
@@ -2155,6 +2170,30 @@ if first:
                 ("ascii", false),
             ]
         );
+    }
+
+    #[test]
+    fn identifier_boundaries() {
+        for len in [1, 7, 8, 9, 15, 16, 17, 31, 32, 33] {
+            for suffix in ["", "β", "\u{0301}", "β_tail0"] {
+                let name = format!("{}{suffix}", "a".repeat(len));
+                for ending in ["", " ", "\n", "=", "\0", "€", "😀"] {
+                    let source = format!("{name}{ending}");
+                    let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                    assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source:?}");
+                    assert_eq!(
+                        lexer.current_range(),
+                        TextRange::up_to(name.text_len()),
+                        "{source:?}"
+                    );
+                    assert_eq!(
+                        lexer.current_flags().is_non_ascii_identifier(),
+                        !suffix.is_empty(),
+                        "{source:?}"
+                    );
+                }
+            }
+        }
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
