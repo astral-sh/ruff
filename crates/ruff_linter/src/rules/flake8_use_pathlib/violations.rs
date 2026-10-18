@@ -97,6 +97,13 @@ pub(crate) enum Joiner {
 /// ext = path.suffix
 /// ```
 ///
+/// ## Fix safety
+/// The fix is available in preview mode for accesses to the extension using `[1]` or `[-1]`.
+/// It is always unsafe because `Path` normalizes paths and does not accept bytes. For example,
+/// `os.path.splitext("report.csv/")[1]` returns `""`, while `Path("report.csv/").suffix`
+/// returns `".csv"`. Suffix handling also differs for filenames ending in a dot on Python
+/// versions before 3.14. The fix can remove comments within the replaced expression.
+///
 /// ## Known issues
 /// While using `pathlib` can improve the readability and type safety of your code,
 /// it can be less performant than the lower-level alternatives that work directly with strings,
@@ -112,13 +119,22 @@ pub(crate) enum Joiner {
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.231", category = Category::Pedantic)]
-pub(crate) struct OsPathSplitext;
+pub(crate) struct OsPathSplitext {
+    pub(crate) fixable: bool,
+}
 
 impl Violation for OsPathSplitext {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`os.path.splitext()` should be replaced by `Path.suffix`, `Path.stem`, and `Path.parent`"
             .to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        self.fixable
+            .then(|| "Replace with `Path(...).suffix`".to_string())
     }
 }
 

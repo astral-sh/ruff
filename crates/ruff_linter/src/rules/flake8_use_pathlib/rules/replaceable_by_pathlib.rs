@@ -1,9 +1,10 @@
 use ruff_diagnostics::Applicability;
-use ruff_python_ast::{Expr, ExprCall};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Int, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_path_splitext_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     is_file_descriptor, is_keyword_only_argument_non_default,
 };
@@ -36,7 +37,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         }
         // PTH122
         ["os", "path", "splitext"] => {
-            checker.report_diagnostic_if_enabled(OsPathSplitext, range);
+            os_path_splitext(checker, call);
         }
         // PTH124
         ["py", "path", "local"] => {
@@ -92,4 +93,80 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
 
         _ => {}
     }
+}
+
+fn os_path_splitext(checker: &Checker, call: &ExprCall) {
+    let extension = splitext_extension(checker, call);
+    let Some(mut diagnostic) = checker.report_diagnostic_if_enabled(
+        OsPathSplitext {
+            fixable: extension.is_some(),
+        },
+        call.func.range(),
+    ) else {
+        return;
+    };
+
+    let Some((subscript, path)) = extension else {
+        return;
+    };
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        Ok(Fix::unsafe_edits(
+            Edit::range_replacement(
+                format!("{binding}({}).suffix", checker.locator().slice(path)),
+                subscript.range(),
+            ),
+            [import_edit],
+        ))
+    });
+}
+
+fn splitext_extension<'a>(
+    checker: &'a Checker,
+    call: &'a ExprCall,
+) -> Option<(&'a ast::ExprSubscript, &'a Expr)> {
+    if !is_fix_os_path_splitext_enabled(checker.settings()) || !call.arguments.keywords.is_empty() {
+        return None;
+    }
+
+    let [path] = call.arguments.args.as_ref() else {
+        return None;
+    };
+    if path.is_starred_expr() || path.is_bytes_literal_expr() {
+        return None;
+    }
+
+    let Some(Expr::Subscript(subscript)) = checker.semantic().current_expression_parent() else {
+        return None;
+    };
+    if subscript.value.range() != call.range() || subscript.ctx != ast::ExprContext::Load {
+        return None;
+    }
+
+    // Both indices select the extension from the tuple.
+    let index = match subscript.slice.as_ref() {
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::USub,
+            operand,
+            ..
+        }) => operand.as_ref(),
+        index => index,
+    };
+    if !matches!(
+        index,
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Int(Int::ONE),
+            ..
+        })
+    ) {
+        return None;
+    }
+
+    Some((subscript, path))
 }
