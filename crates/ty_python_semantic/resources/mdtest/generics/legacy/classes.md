@@ -1650,6 +1650,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: D[int]
 ```
 
+The initializer's receiver annotation still determines the specialization when the inherited
+`__new__` comes from a base whose type argument contains `Any`.
+
+```py
+from typing import Any
+
+class Values(Generic[T]):
+    value: T
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return object.__new__(cls)
+
+class FloatValues(Values[T | Any], Generic[T]):
+    def __init__(self: "FloatValues[float]") -> None: ...
+
+reveal_type(FloatValues())  # revealed: FloatValues[float]
+```
+
 ### Generic class inherits `__init__` from generic base class
 
 ```py

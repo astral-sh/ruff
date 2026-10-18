@@ -926,6 +926,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 reveal_type(D(1))  # revealed: C[Unknown, int]
 ```
 
+The initializer's receiver annotation still determines the specialization when the inherited
+`__new__` comes from a base whose type argument contains `Any`.
+
+```py
+from typing import Any, Self
+
+class Values[T]:
+    value: T
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return object.__new__(cls)
+
+class FloatValues[T](Values[T | Any]):
+    def __init__(self: "FloatValues[float]") -> None: ...
+
+reveal_type(FloatValues())  # revealed: FloatValues[float]
+```
+
 ### Explicit access to constructors of bare generic classes
 
 Bare `__new__` and `__init__` members retain the class type variables in their generic contexts.
