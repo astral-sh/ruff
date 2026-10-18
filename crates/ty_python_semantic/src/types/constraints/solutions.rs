@@ -688,7 +688,7 @@ impl<'db> SolutionWalker<'db> {
             let (order, _) = self.source_orders.insert_full(assignment.constraint());
             (order, assignment.constraint())
         });
-        if !path.assign(db, env, storage, assignment, source) {
+        if !path.assign(db, env, storage, self.inferable, assignment, source) {
             return ControlFlow::Continue(());
         }
         self.visit_node_and_then(

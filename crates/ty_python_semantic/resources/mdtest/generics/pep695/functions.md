@@ -3514,7 +3514,7 @@ from functools import reduce
 
 def _(keys: list[str]):
     # TODO: revealed: int
-    # revealed: Unknown | Literal[0]
+    # revealed: Literal[0] | Unknown
     reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
 ```
 

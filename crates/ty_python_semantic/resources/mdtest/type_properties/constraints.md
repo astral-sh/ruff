@@ -1724,6 +1724,53 @@ def legacy_joint(source: S, target: T) -> None:
     reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[S=str, T=str]]
 ```
 
+### Joint inference through gradual bounds
+
+`Any` does not erase incompatible static parts of a bound. When several variables are inferred
+together, their bounds must remain compatible after the other variables are specialized.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def invariant[T, U]():
+    bounds = ConstraintSet.range(list[U | Any], T, list[int])
+    invalid = bounds & ConstraintSet.lower_bound(str, U)
+    reveal_type(invalid.solutions(inferable=tuple[T, U]))  # revealed: None
+
+    valid = bounds & ConstraintSet.lower_bound(int, U)
+    static_assert(not valid.is_never_satisfied(inferable=tuple[T, U]))
+
+def covariant[T, U]():
+    bounds = ConstraintSet.range(tuple[U | Any], T, tuple[int])
+    invalid = bounds & ConstraintSet.lower_bound(str, U)
+    reveal_type(invalid.solutions(inferable=tuple[T, U]))  # revealed: None
+
+    valid = bounds & ConstraintSet.lower_bound(int, U)
+    static_assert(not valid.is_never_satisfied(inferable=tuple[T, U]))
+
+def recursive[T, U]():
+    bounds = ConstraintSet.range(tuple[T] | list[U | Any], T, tuple[object] | list[int])
+    invalid = bounds & ConstraintSet.lower_bound(str, U)
+    reveal_type(invalid.solutions(inferable=tuple[T, U]))  # revealed: None
+```
+
+A declared upper bound imposes the same restriction:
+
+```py
+def declared[T: list[int], U]():
+    bounds = ConstraintSet.lower_bound(list[U | Any], T) & ConstraintSet.lower_bound(str, U)
+    reveal_type(bounds.solutions(inferable=tuple[T, U]))  # revealed: None
+
+T = TypeVar("T", bound=list[int])
+U = TypeVar("U")
+
+def legacy_declared(target: T, source: U):
+    bounds = ConstraintSet.lower_bound(list[U | Any], T) & ConstraintSet.lower_bound(str, U)
+    reveal_type(bounds.solutions(inferable=tuple[T, U]))  # revealed: None
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that

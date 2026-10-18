@@ -218,6 +218,7 @@ impl<'db> SolutionPath<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         assignment: ConstraintAssignment,
         source: (usize, ConstraintId),
     ) -> bool {
@@ -334,10 +335,24 @@ impl<'db> SolutionPath<'db> {
                         }
                         let lower_type = lower.lower.resolve_type_alias(db);
                         let upper_type = upper.upper.resolve_type_alias(db);
+                        // Declared ranges restrict materializations; their gradual components
+                        // are not inference evidence. Exact declared choices remain unchanged.
                         let relation = ConstraintRelation {
                             kind: lower.kind.compose(upper.kind),
-                            lower: lower.lower,
-                            upper: upper.upper,
+                            lower: if lower.provenance == ConstraintProvenance::Validity
+                                && lower.kind == RelationKind::Assignable
+                            {
+                                lower.lower.bottom_materialization(db, env)
+                            } else {
+                                lower.lower
+                            },
+                            upper: if upper.provenance == ConstraintProvenance::Validity
+                                && upper.kind == RelationKind::Assignable
+                            {
+                                upper.upper.top_materialization(db, env)
+                            } else {
+                                upper.upper
+                            },
                             provenance: ConstraintProvenance::derived(
                                 lower.provenance,
                                 upper.provenance,
@@ -365,10 +380,11 @@ impl<'db> SolutionPath<'db> {
                             _ if relation.lower != relation.upper
                                 && !relation.lower.is_never()
                                 && !relation.upper.is_object()
-                                // Gradual assignability is not transitive. Preserve those bounds
-                                // for solution selection without deriving structural constraints.
-                                && relation.lower.is_static_sequent_eligible(db, env)
-                                && relation.upper.is_static_sequent_eligible(db, env)
+                                // Gradual bounds are checked when selecting this variable's
+                                // solution, but cannot prove a contradiction about a rigid one.
+                                && (variable.is_inferable(db, inferable)
+                                    || (relation.lower.is_static_sequent_eligible(db, env)
+                                        && relation.upper.is_static_sequent_eligible(db, env)))
                                 && self.compared.insert(relation) =>
                             {
                                 self.comparisons.push((relation, source));
