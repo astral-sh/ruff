@@ -50,10 +50,10 @@ impl Indentation {
     }
 
     #[must_use]
-    pub(super) fn add_space(self) -> Self {
+    pub(super) fn add_spaces(self, count: u32) -> Self {
         Self {
-            character: Character(self.character.0 + 1),
-            column: Column(self.column.0 + 1),
+            character: Character(self.character.0 + count),
+            column: Column(self.column.0 + count),
         }
     }
 

@@ -229,10 +229,15 @@ impl<'src> Lexer<'src> {
         let mut indentation = Indentation::root();
 
         loop {
+            while self.cursor.rest().starts_with("    ") {
+                self.cursor.skip_bytes(4);
+                indentation = indentation.add_spaces(4);
+            }
+
             match self.cursor.first() {
                 ' ' => {
                     self.cursor.bump();
-                    indentation = indentation.add_space();
+                    indentation = indentation.add_spaces(1);
                 }
                 '\t' => {
                     self.cursor.bump();
