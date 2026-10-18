@@ -376,6 +376,7 @@ mod tests {
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]
+    #[test_case(Path::new("trailing_comma_as_imports.py"))]
     #[test_case(Path::new("trailing_comment.py"))]
     #[test_case(Path::new("trailing_suffix.py"))]
     #[test_case(Path::new("two_space.py"))]
