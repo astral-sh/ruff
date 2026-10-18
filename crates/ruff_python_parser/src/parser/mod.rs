@@ -433,12 +433,15 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the current token is not of the given kind.
+    #[inline]
     fn bump(&mut self, kind: TokenKind) {
         assert_eq!(self.current_token_kind(), kind);
 
         self.do_bump(kind);
     }
 
+    #[expect(clippy::inline_always, reason = "reduces identifier parsing overhead")]
+    #[inline(always)]
     fn bump_identifier(&mut self) -> Name {
         let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_identifier() {

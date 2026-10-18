@@ -254,6 +254,11 @@ impl<'src> Parser<'src> {
         })
     }
 
+    #[expect(
+        clippy::inline_always,
+        reason = "reduces expression-parser call overhead"
+    )]
+    #[inline(always)]
     fn parse_binary_expression_or_higher_recursive(
         &mut self,
         mut left: ParsedExpr,
@@ -329,6 +334,11 @@ impl<'src> Parser<'src> {
     /// is valid in that context. For example, a unary operator is not valid
     /// in an `await` expression in which case the `left_precedence` would
     /// be [`OperatorPrecedence::Await`].
+    #[expect(
+        clippy::inline_always,
+        reason = "reduces expression-parser call overhead"
+    )]
+    #[inline(always)]
     fn parse_lhs_expression(
         &mut self,
         left_precedence: OperatorPrecedence,
@@ -466,6 +476,8 @@ impl<'src> Parser<'src> {
     /// field will be [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
+    #[expect(clippy::inline_always, reason = "reduces identifier parsing overhead")]
+    #[inline(always)]
     pub(super) fn parse_name(&mut self, context: ExpressionContext) -> ast::ExprName {
         let identifier = self.parse_identifier_with_context(context);
 
@@ -503,6 +515,8 @@ impl<'src> Parser<'src> {
         self.parse_identifier_with_context(ExpressionContext::default())
     }
 
+    #[expect(clippy::inline_always, reason = "reduces identifier parsing overhead")]
+    #[inline(always)]
     fn parse_identifier_with_context(&mut self, context: ExpressionContext) -> ast::Identifier {
         let range = self.current_token_range();
 
@@ -525,6 +539,14 @@ impl<'src> Parser<'src> {
                 node_index: AtomicNodeIndex::NONE,
             };
         }
+
+        self.parse_invalid_identifier(context)
+    }
+
+    /// Recovers from an invalid identifier, keeping error handling out of the common path.
+    #[cold]
+    fn parse_invalid_identifier(&mut self, context: ExpressionContext) -> ast::Identifier {
+        let range = self.current_token_range();
 
         // test_err incomplete_attribute_before_for_in_delimiter
         // [item. for item in xs]
