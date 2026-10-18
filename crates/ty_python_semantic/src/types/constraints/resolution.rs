@@ -324,29 +324,30 @@ impl<'db> Solution<'db> {
         if !self.is_valid() {
             return true;
         }
-        let closed: Vec<_> = self
-            .solved_typevars
-            .iter()
-            .filter_map(|binding| match binding.solution {
-                SolutionType::Resolved(ty) => Some((binding.bound_typevar, ty)),
-                SolutionType::Unresolved(_) => None,
-            })
-            .collect();
-        let context = GenericContext::from_typevar_instances(
-            db,
-            env,
-            closed.iter().map(|(variable, _)| *variable),
-        );
-        let types: Vec<_> = closed.iter().map(|(_, ty)| *ty).collect();
-        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
-            generic_context: context,
-            types: &types,
-            skip: None,
-        });
+        let substitution = OnceCell::new();
         // Each selected type can be compared against several bounds under the same substitution.
         let mut substituted = FxHashMap::default();
         let mut substitute = |ty: Type<'db>| {
             *substituted.entry(ty).or_insert_with(|| {
+                let (context, types) = substitution.get_or_init(|| {
+                    let (variables, types): (Vec<_>, Vec<_>) = self
+                        .solved_typevars
+                        .iter()
+                        .filter_map(|binding| match binding.solution {
+                            SolutionType::Resolved(ty) => Some((binding.bound_typevar, ty)),
+                            SolutionType::Unresolved(_) => None,
+                        })
+                        .unzip();
+                    (
+                        GenericContext::from_typevar_instances(db, env, variables),
+                        types,
+                    )
+                });
+                let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
+                    generic_context: *context,
+                    types,
+                    skip: None,
+                });
                 let mapped = ty.apply_type_mapping(db, env, &mapping, TypeContext::default());
                 dependencies
                     .is_closed(db, inferable, [mapped])
@@ -354,6 +355,11 @@ impl<'db> Solution<'db> {
             })
         };
         let mut satisfies = |source: Type<'db>, target: Type<'db>| {
+            // These relations remain satisfied under simultaneous substitution, so they need
+            // neither a substitution nor another proof after resolving the selected bindings.
+            if source.is_trivially_constraint_set_assignable_to(db, target) {
+                return true;
+            }
             let (Some(mapped_source), Some(mapped_target)) =
                 (substitute(source), substitute(target))
             else {
