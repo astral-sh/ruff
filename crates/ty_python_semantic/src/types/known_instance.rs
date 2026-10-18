@@ -326,7 +326,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::ConstraintSetSolution(solution) => {
             for binding in solution.bindings(db) {
-                visitor.visit_type(db, binding.solution);
+                visitor.visit_type(db, binding.solution.ty());
             }
         }
         KnownInstanceType::Field(field) => {

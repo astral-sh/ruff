@@ -13,7 +13,7 @@ use crate::types::callable::walk_callable_type;
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
-use crate::types::constraints::resolution::{SolutionType, resolve_solution};
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
@@ -2824,6 +2824,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     builder.constraints,
                                     path_bound,
                                 )
+                            })
+                            .map(|ty| {
+                                builder.remove_inferable_typevar_artifacts_from_solution(
+                                    path_bound.bound_typevar,
+                                    ty,
+                                )
                             });
                         // Only this explicitly merged projection accepts fallback bindings as
                         // ordinary types. Correlated inference retains their incomplete outcome.
@@ -2839,7 +2845,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     },
                     |mut inference, solution, budget| {
                         for binding in solution {
-                            budget.charge_type(db, binding.solution)?;
+                            budget.charge_type(db, binding.solution.ty())?;
                         }
                         builder.merge_solution(&mut inference.merged_types, solution);
                         Ok(inference)
@@ -2970,14 +2976,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 builder.inferable,
                 budget,
                 |_variance, path_bound| {
-                    choose(path_bound.bound_typevar, Some(path_bound)).unwrap_or_else(|| {
-                        CandidateSolutions::default_solve(
-                            db,
-                            builder.env,
-                            builder.constraints,
-                            path_bound,
-                        )
-                    })
+                    choose(path_bound.bound_typevar, Some(path_bound))
+                        .unwrap_or_else(|| {
+                            CandidateSolutions::default_solve(
+                                db,
+                                builder.env,
+                                builder.constraints,
+                                path_bound,
+                            )
+                        })
+                        .map(|ty| {
+                            builder.remove_inferable_typevar_artifacts_from_solution(
+                                path_bound.bound_typevar,
+                                ty,
+                            )
+                        })
                 },
             )?;
             Ok(match solutions {
@@ -3038,10 +3051,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             types
                 .entry(binding.bound_typevar.identity(db))
                 .and_modify(|existing| {
-                    *existing =
-                        UnionType::from_two_elements(db, self.env, *existing, binding.solution);
+                    *existing = UnionType::from_two_elements(
+                        db,
+                        self.env,
+                        *existing,
+                        binding.solution.ty(),
+                    );
                 })
-                .or_insert(binding.solution);
+                .or_insert(binding.solution.ty());
         }
     }
 
@@ -3120,20 +3137,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
         }
 
-        // `merged_types` is consumed by `specialize_recursive`, which substitutes bindings
-        // repeatedly. For `T = list[U], U = T`, each pass adds another `list` layer, so close
-        // such a cycle as a recursive type first. If that is not possible, use the legacy type
-        // map (or `Unknown` if unavailable) for `merged_types` to avoid that infinite loop. The
-        // individual alternatives in `solutions` still preserve their independent bindings.
+        // Resolved bindings are closed before merging. Unresolved bindings can still form an
+        // expanding cycle that repeated specialization cannot consume. Recover their merged
+        // projection from the legacy map while retaining the unresolved alternatives.
         let has_expanding_cycle =
             |builder: &Self, types: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>| {
                 types.iter().any(|(identity, ty)| {
                     builder.has_expanding_cycle(generic_context, types, *identity, *ty)
                 })
             };
-        if has_expanding_cycle(self, types) {
-            self.close_recursive_types(generic_context, types);
-        }
         if has_expanding_cycle(self, types) {
             inference.merged_types = self
                 .solve_hash_map_with(generic_context, &mut |typevar, bounds| {
@@ -3152,7 +3164,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let db = self.db;
         let generic_context = self.generic_context;
         let PendingInference {
-            merged_types: mut types,
+            merged_types: types,
             solutions,
         } = inference;
         let solutions = match solutions {
@@ -3165,38 +3177,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let complete = matches!(solutions, SolutionPaths::Complete(_));
         let single = complete && solutions.as_slice().len() == 1;
 
-        // The compatibility projection must be cleaned after merging, independently of these
-        // alternatives: a bare `U` survives on one path, but is removed from a merged `U | int`.
-        let mut is_recursive = false;
         let resolved_paths: Vec<FxHashMap<_, _>> = solutions
             .into_vec()
             .into_iter()
-            .map(|mut path| {
-                path.solved_typevars.retain_mut(|binding| {
-                    if !generic_context.contains(db, binding.bound_typevar.identity(db)) {
-                        return false;
-                    }
-                    binding.solution = self.remove_inferable_typevar_artifacts_from_solution(
-                        binding.bound_typevar,
-                        binding.solution,
-                    );
-                    true
-                });
-                let resolution =
-                    resolve_solution(db, self.env, self.inferable, &path.solved_typevars);
-                is_recursive |= resolution.is_recursive;
+            .map(|path| {
                 path.solved_typevars
-                    .iter()
-                    .zip(resolution.types)
-                    .map(|(binding, ty)| (binding.bound_typevar.identity(db), ty))
+                    .into_iter()
+                    .filter(|binding| {
+                        generic_context.contains(db, binding.bound_typevar.identity(db))
+                    })
+                    .map(|binding| (binding.bound_typevar.identity(db), binding.solution))
                     .collect()
             })
             .collect();
-        // Resolving a path has already inspected its types, which makes this the place to
-        // learn that the merged types refer to themselves as well, as in `T = tuple[T] | int`.
-        if is_recursive {
-            self.close_recursive_types(generic_context, &mut types);
-        }
 
         let mut paths = Vec::with_capacity(resolved_paths.len());
         for path_types in resolved_paths {
@@ -3237,35 +3230,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             TypeVarInferenceSolutions::Incomplete(paths)
         };
         self.typevar_inference(&types, solutions)
-    }
-
-    /// Replaces merged types that refer to each other, such as `T = tuple[T] | int`, with
-    /// recursive types. Other types are left to `specialize_recursive`.
-    fn close_recursive_types(
-        &self,
-        generic_context: GenericContext<'db>,
-        types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
-    ) {
-        let db = self.db;
-        let merged: Vec<_> = generic_context
-            .variables_inner(db)
-            .iter()
-            .filter_map(|(identity, variable)| {
-                Some(TypeVarSolution {
-                    bound_typevar: *variable,
-                    solution: *types.get(identity)?,
-                })
-            })
-            .collect();
-        let resolution = resolve_solution(db, self.env, self.inferable, &merged);
-        if !resolution.is_recursive {
-            return;
-        }
-        for (binding, resolved) in merged.iter().zip(resolution.types) {
-            if let SolutionType::Resolved(ty) = resolved {
-                types.insert(binding.bound_typevar.identity(db), ty);
-            }
-        }
     }
 
     fn has_expanding_cycle(
@@ -3648,7 +3612,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             for binding in &solution.solved_typevars {
                 let solution = self.remove_inferable_typevar_artifacts_from_solution(
                     binding.bound_typevar,
-                    binding.solution,
+                    binding.solution.ty(),
                 );
                 self.insert_hash_map_type_mapping(binding.bound_typevar, solution);
             }
@@ -4510,7 +4474,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(paths)) => paths
                             .iter()
                             .flat_map(|solution| &solution.solved_typevars)
-                            .any(|binding| is_gradual(binding.solution)),
+                            .any(|binding| is_gradual(binding.solution.ty())),
                         ConstraintSetAnalysis::Unsatisfiable(failures) => {
                             failures.iter().any(|failure| match &failure.error {
                                 SpecializationError::MismatchedBound { argument, .. }
@@ -5394,49 +5358,38 @@ mod tests {
         let context = GenericContext::from_typevar_instances(db, &env, typevars);
         let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         builder.record_constraint_set(exact_alternatives(
             db,
             &constraints,
             typevars,
-            [[int, str], [str, int]],
+            [
+                [list_of_u, Type::TypeVar(t)],
+                [Type::object(), Type::object()],
+            ],
         ));
 
-        // Select T = list[U], U = T on one path and T = U = object on the other. Only the
-        // individual path retains the recursive list after merging with object.
+        // Only the individual path retains the recursive list after merging with object.
         let inference = builder
-            .build_inference_with(|typevar, bounds| {
-                let lower = bounds?.inference_lower(db, &env);
-                let ty = match (typevar, lower) {
-                    (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
-                    (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
-                    _ => Type::object(),
-                };
-                Some(PathBoundSolution::Solved(ty))
-            })
+            .build_inference_with(|_, _| None)
             .map_err(|_| anyhow::anyhow!("an expanding cycle should recover"))?;
         let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
             anyhow::bail!("expected complete alternatives with a recursive solution");
         };
         assert_eq!(paths.len(), 2);
         for path in paths {
-            match &**path {
-                [
-                    Some(Resolved(Type::Recursive(t))),
-                    Some(Resolved(Type::Recursive(u))),
-                ] => {
-                    // Both are a list of the same recursive list.
-                    let list_of_u =
-                        KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(*u)]);
-                    assert_eq!(t.unfold(db, &env).into_type(), list_of_u);
-                    assert_eq!(u.unfold(db, &env).into_type(), list_of_u);
-                }
-                [Some(Resolved(t)), Some(Resolved(u))] => {
-                    assert_eq!((*t, *u), (Type::object(), Type::object()));
-                }
-                _ => anyhow::bail!("expected closed alternatives, got {path:?}"),
+            let [Some(Resolved(t)), Some(Resolved(u))] = &**path else {
+                anyhow::bail!("expected closed alternatives, got {path:?}");
+            };
+            if t.is_object() {
+                assert!(u.is_object());
+            } else {
+                let Type::Recursive(recursive) = u else {
+                    anyhow::bail!("expected the recursive list");
+                };
+                let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[*u]);
+                assert_eq!(recursive.unfold(db, &env).into_type(), list_of_u);
+                assert!(t.is_equivalent_to(db, &env, *u));
             }
         }
         assert_eq!(
@@ -5459,7 +5412,7 @@ mod tests {
     }
 
     #[test]
-    fn resolved_single_path_preserves_merged_projection() -> anyhow::Result<()> {
+    fn resolved_single_path_is_shared_with_merged_projection() -> anyhow::Result<()> {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5475,15 +5428,8 @@ mod tests {
                 (typevar == t).then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
             .map_err(|_| anyhow::anyhow!("expected a satisfiable dependency chain"))?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!("resolved bindings differ from the merged projection");
-        };
-        assert_eq!(paths.len(), 1);
-        assert_eq!(&*paths[0], [Some(Resolved(int)); 2]);
-        assert_eq!(
-            inference.merged_types(db),
-            [Some(Type::TypeVar(u)), Some(int)]
-        );
+        assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
+        assert_eq!(inference.merged_types(db), [Some(int); 2]);
         assert_eq!(inference.merged_specialization(db).types(db), [int, int]);
         Ok(())
     }
@@ -5577,28 +5523,23 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        builder.record_constraint_set(exact_alternatives(db, &constraints, typevars, [[int; 3]]));
+        builder.record_constraint_set(exact_alternatives(
+            db,
+            &constraints,
+            typevars,
+            [[list_of_u, Type::TypeVar(t), int]],
+        ));
 
         // T = list[U], U = T closes as one recursive list type, alongside V = int.
         let inference = builder
-            .build_inference_with(|variable, _| {
-                if variable == t {
-                    Some(PathBoundSolution::Solved(list_of_u))
-                } else if variable == u {
-                    Some(PathBoundSolution::Solved(Type::TypeVar(t)))
-                } else {
-                    None
-                }
-            })
+            .build_inference_with(|_, _| None)
             .map_err(|_| anyhow::anyhow!("a cyclic alternative remains satisfiable"))?;
         assert_eq!(inference.solutions(db), &TypeVarInferenceSolutions::Single);
-        let [Some(Type::Recursive(t)), Some(Type::Recursive(u)), Some(v)] =
-            inference.merged_types(db)
-        else {
+        let [Some(t), Some(Type::Recursive(u)), Some(v)] = inference.merged_types(db) else {
             anyhow::bail!("expected recursive bindings and an independent binding");
         };
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::Recursive(*u)]);
-        assert_eq!(t.unfold(db, &env).into_type(), list_of_u);
+        assert!(t.is_equivalent_to(db, &env, Type::Recursive(*u)));
         assert_eq!(u.unfold(db, &env).into_type(), list_of_u);
         assert_eq!(*v, int);
         Ok(())

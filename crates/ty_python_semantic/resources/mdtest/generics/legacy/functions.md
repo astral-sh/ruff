@@ -3611,6 +3611,41 @@ def either(flag: bool):
     reveal_type(root if flag else None)  # revealed: (μ$0. tuple[$0] | int) | None
 ```
 
+## Alternative recursive callback solutions
+
+Each overload selects a different element type for a recursive tree. Combining their results
+preserves the element type throughout each tree.
+
+```py
+from typing import Callable, TypeAlias, TypeVar, overload
+
+T = TypeVar("T")
+U = TypeVar("U")
+E = TypeVar("E")
+
+def alternatives(callback: Callable[[T], tuple[T, E] | None], consumer: Callable[[E], None]) -> T:
+    raise NotImplementedError
+
+def identity(value: U) -> U:
+    return value
+
+@overload
+def consume(value: int) -> None: ...
+@overload
+def consume(value: str) -> None: ...
+def consume(value: int | str) -> None: ...
+
+root = alternatives(identity, consume)
+reveal_type(root)  # revealed: (μ$0. tuple[$0, int] | None) | (μ$0. tuple[$0, str] | None)
+
+IntTree: TypeAlias = tuple["IntTree", int] | None
+StrTree: TypeAlias = tuple["StrTree", str] | None
+
+def accept_tree(value: IntTree | StrTree) -> None: ...
+
+accept_tree(root)  # no diagnostic
+```
+
 ## Mutually recursive callback solutions
 
 Each callback relates its parameter to a type that mentions the other type variable, so the two are
@@ -3654,6 +3689,44 @@ def fixed_cycle(
 
 # revealed: μ{$0; $1 = tuple[str, $2, $3]; $2 = tuple[bytes, $3, $0]; $3 = tuple[None, $0, $1]}. tuple[int, $1, $2]
 reveal_type(fixed_cycle(identity, identity, identity, identity))
+```
+
+## Recursive callback solutions through finite aliases
+
+A tuple introduced by a non-recursive alias can contain the inferred result. Referring to that alias
+through another alias has the same solution.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+V = TypeVar("V")
+Node = TypeAliasType("Node", tuple[V] | None, type_params=(V,))
+Wrapped = TypeAliasType("Wrapped", Node[V], type_params=(V,))
+
+def identity(value: T) -> T:
+    return value
+
+def node(callback: Callable[[T], Node[T]]) -> T:
+    raise NotImplementedError
+
+def wrapped(callback: Callable[[T], Wrapped[T]]) -> T:
+    raise NotImplementedError
+
+first = node(identity)
+second = wrapped(identity)
+reveal_type(first)  # revealed: μ$0. tuple[$0] | None
+reveal_type(second)  # revealed: μ$0. tuple[$0] | None
+if second is not None:
+    reveal_type(second[0])  # revealed: μ$0. tuple[$0] | None
+
+Tree: TypeAlias = tuple["Tree"] | None
+
+def accept_tree(value: Tree) -> None: ...
+
+accept_tree(first)  # no diagnostic
+accept_tree(second)  # no diagnostic
 ```
 
 ## Mutually recursive callback solutions through explicit aliases

@@ -47,10 +47,6 @@ impl get_size2::GetSize for UnionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> UnionType<'db> {
-    /// Create a union from a list of elements
-    /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
-    ///
-    /// For performance reasons, consider using [`UnionType::from_two_elements`] if
     /// Flattens stored unions without comparing their potentially open elements.
     pub(super) fn from_elements_structural(
         db: &'db dyn Db,
@@ -83,6 +79,10 @@ impl<'db> UnionType<'db> {
         }
     }
 
+    /// Create a union from a list of elements
+    /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
+    ///
+    /// For performance reasons, consider using [`UnionType::from_two_elements`] if
     /// the union is constructed from exactly two elements.
     pub fn from_elements<I, T>(
         db: &'db dyn Db,
@@ -783,7 +783,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     }
 
     /// Shrink the capacity of the collection as much as possible.
-    fn shrink_to_fit(&mut self) {
+    pub(super) fn shrink_to_fit(&mut self) {
         match self {
             Self::Empty | Self::Single(_) => {}
             Self::Multiple(set) => set.shrink_to_fit(),

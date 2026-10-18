@@ -1,5 +1,9 @@
 //! Solve finite recursive equations by identifying states with the same unfolding.
 
+use std::cell::{Cell, RefCell};
+
+use rustc_hash::FxHashMap;
+
 use crate::types::RecursivelyDefined;
 use crate::types::generics::{ApplySpecialization, GenericContext};
 use crate::types::structural::StructuralTypeMapper;
@@ -9,10 +13,8 @@ use crate::types::{
     TypeContext, TypeMapping, UnionType,
 };
 use crate::{Db, FxIndexSet, ProgramEnvironment};
-use rustc_hash::FxHashMap;
-use std::cell::{Cell, RefCell};
 
-/// Each stored subexpression is a state; occurrences of equation variables point to their roots.
+/// Each stored subexpression is a state; equation variables transparently refer to their roots.
 pub(super) struct EquationGraph<'db> {
     variables: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
     nodes: RefCell<FxIndexSet<Type<'db>>>,
@@ -212,6 +214,10 @@ impl<'db> EquationGraph<'db> {
                 break;
             };
             let expanded = match body {
+                Type::TypeVar(variable) => graph
+                    .variables
+                    .get(&variable.identity(db))
+                    .map(|body| graph.map_type(db, *body)),
                 Type::TypeAlias(alias) if !Self::alias_is_recursive(db, env, alias) => {
                     Some(graph.map_type(db, alias.value_type(db)))
                 }
@@ -386,14 +392,8 @@ impl<'db> EquationGraph<'db> {
 
 impl<'db> StructuralTypeMapper<'db> for EquationGraph<'db> {
     fn map_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        let ty = match ty {
-            Type::TypeVar(variable) => self
-                .variables
-                .get(&variable.identity(db))
-                .copied()
-                .unwrap_or(ty),
-            _ => ty,
-        };
+        // Keep references distinct from literal alias occurrences. Substituting a variable's
+        // body here would repeatedly reconstruct the alias in `T = Container[T]`.
         let index = self.nodes.borrow_mut().insert_full(ty).0;
         RecursiveVar::equation(db, index)
     }
@@ -414,8 +414,10 @@ impl<'db> StructuralTypeMapper<'db> for Quotient<'_, 'db> {
     fn map_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match ty {
             Type::RecursiveVar(variable) if let Some(index) = variable.equation_entry(db) => {
-                if self.expansions[index].is_some() {
-                    self.nodes[index].map_structure(db, self)
+                if let Type::TypeAlias(alias) = self.nodes[index]
+                    && self.expansions[index].is_some()
+                {
+                    Type::TypeAlias(alias.map_structure(db, self))
                 } else {
                     RecursiveVar::equation(db, self.classes[index])
                 }

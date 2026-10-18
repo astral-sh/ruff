@@ -1320,6 +1320,16 @@ def constrained[T, E]():
     reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
+A non-recursive alias can provide the tuple that guards the recursive reference.
+
+```py
+type Container[V] = tuple[V]
+
+def container[T]():
+    constraints = ConstraintSet.equality(T, Container[T])
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=μ$0. tuple[$0]]]
+```
+
 ### Dependencies through implicit recursive aliases
 
 A tuple can guard the recursive reference either inside an implicit alias definition or in its

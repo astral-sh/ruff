@@ -58,15 +58,17 @@ impl<'db> Type<'db> {
                 union.elements(db).iter().map(|ty| mapper.map_type(db, *ty)),
                 union.recursively_defined(db),
             ),
-            Type::Intersection(intersection) => Type::Intersection(IntersectionType::new(
-                db,
-                intersection
+            Type::Intersection(intersection) => {
+                let mut positive: FxOrderSet<_> = intersection
                     .positive(db)
                     .iter()
                     .map(|ty| mapper.map_type(db, *ty))
-                    .collect::<FxOrderSet<_>>(),
-                intersection.negative(db).map(|ty| mapper.map_type(db, *ty)),
-            )),
+                    .collect();
+                let mut negative = intersection.negative(db).map(|ty| mapper.map_type(db, *ty));
+                positive.shrink_to_fit();
+                negative.shrink_to_fit();
+                Type::Intersection(IntersectionType::new(db, positive, negative))
+            }
             Type::EnumComplement(complement) => {
                 Type::EnumComplement(complement.map_structure(db, mapper))
             }

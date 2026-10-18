@@ -1062,7 +1062,7 @@ fn specialize_generic_class_for_subject<'db>(
     let inferable = generic_context.inferable_typevars(db);
     let solutions = Type::instance(db, env, source)
         .assignable_solutions_with_inferable(db, env, Type::instance(db, env, target), inferable)
-        .solve(db, env, &constraints);
+        .solve(db, env, &constraints, inferable);
 
     specialize_generic_class_from_solutions(db, env, target_class, solutions)
 }
@@ -1090,7 +1090,7 @@ fn specialize_generic_class_from_solutions<'db>(
                 .solved_typevars
                 .iter()
                 .find(|binding| binding.bound_typevar == typevar)
-                .map(|binding| binding.solution)
+                .map(|binding| binding.solution.ty())
                 .or_else(|| unknown_specialization.get(db, typevar))
         })
         .collect::<Option<Vec<_>>>()?;

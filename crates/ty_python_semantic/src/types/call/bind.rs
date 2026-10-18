@@ -3189,7 +3189,8 @@ impl<'db> Bindings<'db> {
                                 env,
                                 paths.into_vec().into_iter().map(|path| {
                                     let path: Box<[_]> = path
-                                        .resolved_typevars(db, env, inferable)
+                                        .solved_typevars
+                                        .into_iter()
                                         .filter(|binding| binding.bound_typevar == typevar)
                                         .collect();
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
@@ -3258,8 +3259,7 @@ impl<'db> Bindings<'db> {
                                     Type::KnownInstance(KnownInstanceType::ConstraintSetSolution(
                                         InternedConstraintSetSolution::new(
                                             db,
-                                            path.resolved_typevars(db, env, inferable)
-                                                .collect::<Box<[_]>>(),
+                                            path.solved_typevars.into_iter().collect::<Box<[_]>>(),
                                         ),
                                     ))
                                 }),
@@ -6184,30 +6184,35 @@ impl<'db> CallInference<'_, 'db> {
                     self.inferable_typevars,
                 );
 
-                let solutions = path_bounds.solve_with(|variance, path_bound| {
-                    let outcome = CandidateSolutions::preliminary_solve(
-                        db,
-                        self.env,
-                        constraints,
-                        path_bound,
-                    );
-                    // Each path has already combined its lower and upper evidence; having both
-                    // makes its variance invariant. Paths are alternatives, so invariant evidence
-                    // on one path cannot justify selecting an upper-only preference on another.
-                    // Apply the contextual-preference policy per path, without discarding
-                    // unsatisfiability or incomplete-solution status.
-                    if variance.is_covariant() {
-                        match outcome {
-                            PathBoundSolution::Solved(_) => PathBoundSolution::Unsolved,
-                            PathBoundSolution::BudgetExceeded { .. } => {
-                                PathBoundSolution::BudgetExceeded { fallback: None }
+                let solutions = path_bounds.solve_with(
+                    db,
+                    self.env,
+                    self.inferable_typevars,
+                    |variance, path_bound| {
+                        let outcome = CandidateSolutions::preliminary_solve(
+                            db,
+                            self.env,
+                            constraints,
+                            path_bound,
+                        );
+                        // Each path has already combined its lower and upper evidence; having both
+                        // makes its variance invariant. Paths are alternatives, so invariant evidence
+                        // on one path cannot justify selecting an upper-only preference on another.
+                        // Apply the contextual-preference policy per path, without discarding
+                        // unsatisfiability or incomplete-solution status.
+                        if variance.is_covariant() {
+                            match outcome {
+                                PathBoundSolution::Solved(_) => PathBoundSolution::Unsolved,
+                                PathBoundSolution::BudgetExceeded { .. } => {
+                                    PathBoundSolution::BudgetExceeded { fallback: None }
+                                }
+                                outcome => outcome,
                             }
-                            outcome => outcome,
+                        } else {
+                            outcome
                         }
-                    } else {
-                        outcome
-                    }
-                });
+                    },
+                );
 
                 let Solutions::Constrained(solutions) = solutions else {
                     return None;
@@ -6225,7 +6230,7 @@ impl<'db> CallInference<'_, 'db> {
                         let inferred_ty = builder
                             .remove_inferable_typevar_artifacts_from_solution(
                                 binding.bound_typevar,
-                                binding.solution,
+                                binding.solution.ty(),
                             )
                             .filter_union(db, self.env, |ty| {
                                 if ty.has_provisional_marker(db, self.env) {
@@ -8163,7 +8168,7 @@ impl<'db> Binding<'db> {
                 inferable,
             );
 
-            let solutions = path_bounds.solve_with(|_variance, path_bound| {
+            let solutions = path_bounds.solve_with(db, env, inferable, |_variance, path_bound| {
                 CandidateSolutions::preliminary_solve(db, env, constraints, path_bound)
             });
             if let Solutions::Constrained(solutions) = solutions {
@@ -8177,10 +8182,10 @@ impl<'db> Binding<'db> {
                                     db,
                                     env,
                                     *existing,
-                                    binding.solution,
+                                    binding.solution.ty(),
                                 );
                             })
-                            .or_insert(binding.solution);
+                            .or_insert(binding.solution.ty());
                     }
                 }
             }

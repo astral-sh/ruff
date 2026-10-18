@@ -73,9 +73,9 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
-use super::structural::StructuralTypeMapper;
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
+
+use rustc_hash::FxHashMap;
 
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -83,6 +83,7 @@ use ty_python_core::place_table;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
+use super::structural::StructuralTypeMapper;
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
