@@ -675,6 +675,22 @@ class NameAttribute[T: (object, str)]:
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+Gradual type arguments are preserved when they are compatible with more than one declared
+constraint. An invariant container does not force `Any` to one of its possible specializations.
+
+```py
+from typing import Any
+
+class File[T: (str, bytes)]:
+    content: T
+
+class AsyncFile[T: (str, bytes)]:
+    def __init__(self, file: File[T]) -> None: ...
+
+def wrap(file: File[Any]):
+    reveal_type(AsyncFile(file))  # revealed: AsyncFile[Any]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type

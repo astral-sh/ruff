@@ -1180,6 +1180,21 @@ info: Type variable defined here
   |       ^^^^^^^^^^^^^^
 ```
 
+## Inferring a constrained typevar from an empty invariant container
+
+An empty list does not discard the more specific type inferred from another argument.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+def bounds[T: (Base, Derived)](default: T, values: list[T]) -> tuple[T, T]:
+    raise NotImplementedError
+
+def check(value: Derived):
+    reveal_type(bounds(value, []))  # revealed: tuple[Derived, Derived]
+```
+
 ## Inferring a constrained typevar from a covariant container
 
 The element type of a covariant container contributes to the inferred type variable. Here, `bytes`

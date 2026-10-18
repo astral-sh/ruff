@@ -1771,6 +1771,23 @@ def legacy_declared(target: T, source: U):
     reveal_type(bounds.solutions(inferable=tuple[T, U]))  # revealed: None
 ```
 
+### Gradual evidence and declared choices
+
+An exact gradual bound can represent several declared choices without being equivalent to any
+individual choice. Static evidence outside all choices is still rejected.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def choices[T: (str, bytes)]():
+    gradual = ConstraintSet.equality(T, Any)
+    reveal_type(gradual.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=Any]]
+
+    invalid = ConstraintSet.equality(T, int)
+    reveal_type(invalid.solutions(inferable=tuple[T]))  # revealed: None
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that

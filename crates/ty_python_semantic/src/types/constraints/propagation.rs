@@ -338,7 +338,7 @@ impl<'db> SolutionPath<'db> {
                         // Declared ranges restrict materializations; their gradual components
                         // are not inference evidence. Exact declared choices remain unchanged.
                         let relation = ConstraintRelation {
-                            kind: lower.kind.compose(upper.kind),
+                            kind: lower.compose(upper),
                             lower: if lower.provenance == ConstraintProvenance::Validity
                                 && lower.kind == RelationKind::Assignable
                             {

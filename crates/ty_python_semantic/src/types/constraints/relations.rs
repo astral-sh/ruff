@@ -21,21 +21,26 @@ pub(super) struct ConstraintRelation<'db> {
     pub(super) provenance: ConstraintProvenance,
 }
 
+impl ConstraintRelation<'_> {
+    /// Declared choices restrict materializations of gradual evidence, not its exact type.
+    pub(super) const fn compose(self, other: Self) -> RelationKind {
+        match (self.kind, other.kind, self.provenance, other.provenance) {
+            (
+                RelationKind::Equivalent,
+                RelationKind::Equivalent,
+                ConstraintProvenance::Evidence,
+                ConstraintProvenance::Evidence,
+            ) => RelationKind::Equivalent,
+            _ => RelationKind::Assignable,
+        }
+    }
+}
+
 /// Exact equality retains gradual types; assignability only restricts their materializations.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) enum RelationKind {
     Assignable,
     Equivalent,
-}
-
-impl RelationKind {
-    /// Equality is retained only when both consecutive relations are exact.
-    pub(super) const fn compose(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Equivalent, Self::Equivalent) => Self::Equivalent,
-            _ => Self::Assignable,
-        }
-    }
 }
 
 impl<'db> Constraint<'db> {
