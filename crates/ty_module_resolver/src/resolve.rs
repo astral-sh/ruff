@@ -32,11 +32,15 @@ For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
 */
 
+mod search;
+
 use std::borrow::Cow;
 use std::fmt;
 use std::iter::FusedIterator;
+use std::sync::LazyLock;
 
 use compact_str::format_compact;
+use memchr::memmem::Finder;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::PythonFile;
@@ -56,6 +60,9 @@ use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathR
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
+
+use self::search::ModuleSearchCursor;
+pub(crate) use self::search::{list_all_modules, list_root_modules, list_submodules};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -223,7 +230,7 @@ impl ModuleResolveMode {
     /// places due to being unable to resolve builtin symbols. This is similar
     /// behaviour to other type checkers such as mypy:
     /// <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
-    pub(super) fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
+    fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
         // Builtin modules are never shadowable, no matter what.
         if ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name) {
             return true;
@@ -828,10 +835,12 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
+            // Resolve symlinks so site-packages outside the environment keeps its own file watch,
+            // and imports use the same path as the reported changes.
+            let path = canonicalize(path, system);
             tracing::debug!("Adding site-packages search path `{path}`");
             let path = strategy.fallback_opt(
-                SearchPath::site_packages(system, path.clone())
-                    .map_err(SearchPathSettingsError::from),
+                SearchPath::site_packages(system, path).map_err(SearchPathSettingsError::from),
                 |err| {
                     tracing::debug!("Skipping invalid site-packages search-path: {err}");
                 },
@@ -1132,8 +1141,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             // (Most importantly, don't register a root for editable installations from the project
             // directory as that would change the durability of files within those folders).
             // Not having an exact file root for editable installs just means that
-            // some queries (like `list_modules_in`) will run slightly more frequently
-            // than they would otherwise.
+            // some queries will run slightly more frequently than they would otherwise.
             if files.root(db, path).is_none() {
                 files.try_add_root(db, path, FileRootKind::SearchPath);
             }
@@ -1206,16 +1214,8 @@ fn resolve_name<'db>(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames<'db>> {
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-
-    match mode {
-        ModuleResolveMode::Typing => {
-            resolver.resolve_typing(stub_package_index(db, resolver_environment))
-        }
-        ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
-            resolver.resolve_runtime(search_paths(db, resolver_environment, mode))
-        }
-    }
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    ModuleSearchCursor::with_configured_search_paths(&context).resolve_name(name)
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1231,38 +1231,14 @@ fn desperately_resolve_name<'db>(
 ) -> Option<ResolvedNames<'db>> {
     let importing_file = ResolverFile::new(db, importing_file, resolver_environment);
     let search_paths = absolute_desperate_search_paths(db, importing_file).unwrap_or_default();
-    let resolver = NameResolver::new(db, resolver_environment, name, mode);
-    let stub_packages = mode
-        .is_typing()
-        .then(|| StubPackageIndex::from_search_paths(db, search_paths.iter()));
-    let mut candidates = resolver.discover_roots(
-        name.first_component(),
-        resolver.is_non_shadowable,
-        search_paths.iter(),
-        stub_packages
-            .as_ref()
-            .map_or_else(StubPackagePaths::default, StubPackageIndex::all),
-    );
-    let mut components = name.components().skip(1).peekable();
-
-    candidates = normalize_candidates(db, candidates, components.peek().is_some());
-    while let Some(component) = components.next() {
-        candidates = resolver.advance_candidates(
-            candidates,
-            component,
-            ComponentFileFilter::ByMode,
-            components.peek().is_some(),
-        );
-    }
-
-    (!candidates.is_empty()).then_some(candidates)
+    let context = ResolverContext::new(db, resolver_environment, mode);
+    ModuleSearchCursor::with_supplied_search_paths(&context, search_paths).resolve_name(name)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum ResolvedModule {
     NamespacePackage,
-    LegacyNamespacePackage(File),
-    RegularPackage(File),
+    Package(File),
     Module(File),
 }
 
@@ -1280,7 +1256,7 @@ enum ComponentFileFilter {
 /// Variants are declared from highest to lowest precedence so that derived ordering can be used
 /// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
 /// sorts used by the resolver preserve search-path order between candidates in the same tier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
 enum CandidatePrecedence {
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
@@ -1322,7 +1298,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1330,11 +1306,12 @@ impl<'db> ModuleResolutionCandidate<'db> {
     }
 
     // Is this some kind of namespace package?
-    fn is_any_namespace_package(&self) -> bool {
+    fn is_any_namespace_package(&self, context: &ResolverContext) -> bool {
         match self.module {
             ResolvedModule::NamespacePackage => true,
-            ResolvedModule::LegacyNamespacePackage(_) => true,
-            ResolvedModule::RegularPackage(_) => false,
+            ResolvedModule::Package(init) => {
+                is_legacy_namespace_package(self.directory.path(), context, init)
+            }
             ResolvedModule::Module(_) => false,
         }
     }
@@ -1351,23 +1328,8 @@ impl<'db> ModuleResolutionCandidate<'db> {
                 tracing::trace!("Resolve namespace package `{name}`");
                 Module::namespace_package(db, resolver_environment, Cow::Borrowed(name))
             }
-            ResolvedModule::LegacyNamespacePackage(file) => {
-                // legacy namespace packages behave like regular packages
-                // when they're the target of the resolution
-                tracing::trace!(
-                    "Resolved legacy namespace package `{name}` to `{path}`",
-                    path = file.path(db)
-                );
-                Module::file_module(
-                    db,
-                    file,
-                    resolver_environment,
-                    Cow::Borrowed(name),
-                    ModuleKind::Package,
-                    self.directory.into_search_path(),
-                )
-            }
-            ResolvedModule::RegularPackage(file) => {
+            ResolvedModule::Package(file) => {
+                // Legacy namespace packages also use their defining file when resolved directly.
                 tracing::trace!(
                     "Resolved package `{name}` to `{path}`",
                     path = file.path(db)
@@ -1395,7 +1357,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         }
     }
 
-    fn missing_submodule_is_terminal(&self) -> bool {
+    fn missing_submodule_is_terminal(&self, context: &ResolverContext) -> bool {
         if matches!(self.py_typed, PyTyped::Partial) {
             return false;
         }
@@ -1404,10 +1366,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         // in a higher-priority search path is not shadowed by
         // `foo/__init__.py` in a lower-priority one. Note that both
         // shadow namespace packages.
-        matches!(
-            self.module,
-            ResolvedModule::RegularPackage(_) | ResolvedModule::Module(_)
-        )
+        !self.is_any_namespace_package(context)
     }
 
     fn to_str<'a>(&self, db: &'a dyn Db) -> Cow<'a, str> {
@@ -1419,272 +1378,10 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     .unwrap_or_default()
                     .to_string(),
             ),
-            ResolvedModule::LegacyNamespacePackage(file) => Cow::Borrowed(file.path(db).as_str()),
-            ResolvedModule::RegularPackage(file) => Cow::Borrowed(file.path(db).as_str()),
-            ResolvedModule::Module(file) => Cow::Borrowed(file.path(db).as_str()),
-        }
-    }
-}
-
-/// Provides the context and candidate selection operations used to search
-/// for a module name in either typing or runtime mode.
-struct NameResolver<'db, 'name> {
-    context: ResolverContext<'db>,
-    name: &'name ModuleName,
-    is_non_shadowable: bool,
-}
-
-impl<'db, 'name> NameResolver<'db, 'name> {
-    fn new(
-        db: &'db dyn Db,
-        resolver_environment: ResolverEnvironment<'db>,
-        name: &'name ModuleName,
-        mode: ModuleResolveMode,
-    ) -> Self {
-        let python_version = resolver_environment.python_version(db);
-        Self {
-            context: ResolverContext::new(db, resolver_environment, mode),
-            name,
-            is_non_shadowable: mode.is_non_shadowable(python_version.minor, name.as_str()),
-        }
-    }
-
-    /// Resolves the name as seen by a type checker.
-    ///
-    /// This includes PEP 561 stub packages and user-provided stub overlays, with runtime source as
-    /// a fallback when no stub provides the requested module. A stub overlay may use runtime
-    /// packages as parents, but its final module must come from a stub file.
-    fn resolve_typing(&self, stub_packages: &StubPackageIndex) -> Option<ResolvedNames<'db>> {
-        if self.name.components().nth(1).is_none() {
-            let candidates = self.discover_roots(
-                self.name.first_component(),
-                self.is_non_shadowable,
-                search_paths(
-                    self.context.db,
-                    self.context.resolver_environment,
-                    ModuleResolveMode::Typing,
-                ),
-                stub_packages.all(),
-            );
-            return self.resolve_remaining(candidates, ComponentFileFilter::ByMode);
-        }
-
-        // Only submodules need separate overlay resolution: their extra-path namespace parent can
-        // be shadowed before the resolver reaches the requested stub. Reuse those roots for the
-        // normal fallback so that each extra path is probed only once.
-        let (overlay_stub_packages, remaining_stub_packages) = stub_packages.split_by_extra_paths();
-        let mut candidates = self.discover_roots(
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .take_while(|search_path| search_path.is_extra()),
-            overlay_stub_packages,
-        );
-        if let Some(resolved) =
-            self.resolve_remaining(candidates.clone(), ComponentFileFilter::StubOnly)
-        {
-            return Some(resolved);
-        }
-
-        let remaining_candidates = self.discover_roots(
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths(
-                self.context.db,
-                self.context.resolver_environment,
-                ModuleResolveMode::Typing,
-            )
-            .skip_while(|search_path| search_path.is_extra()),
-            remaining_stub_packages,
-        );
-        candidates.extend(remaining_candidates);
-
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    /// Resolves the name to the implementation that is available at runtime.
-    ///
-    /// The runtime resolver ignores stub packages and `.pyi` files. Its search paths also use the
-    /// real standard library instead of typeshed.
-    fn resolve_runtime<'a>(
-        &self,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-    ) -> Option<ResolvedNames<'db>> {
-        let candidates = self.discover_roots(
-            self.name.first_component(),
-            self.is_non_shadowable,
-            search_paths,
-            StubPackagePaths::default(),
-        );
-        self.resolve_remaining(candidates, ComponentFileFilter::ByMode)
-    }
-
-    fn resolve_remaining(
-        &self,
-        mut cur_candidates: ResolvedNames<'db>,
-        final_filter: ComponentFileFilter,
-    ) -> Option<ResolvedNames<'db>> {
-        if cur_candidates.is_empty() {
-            return None;
-        }
-
-        let mut components = self.name.components().skip(1).peekable();
-
-        // Keep a partial stub package's namespace while resolving the next part of the module
-        // name. Once the complete name is resolved, a concrete package or module shadows that
-        // namespace.
-        cur_candidates =
-            normalize_candidates(self.context.db, cur_candidates, components.peek().is_some());
-
-        while let Some(component) = components.next() {
-            let has_remaining_components = components.peek().is_some();
-            let file_filter = if has_remaining_components {
-                ComponentFileFilter::ByMode
-            } else {
-                final_filter
-            };
-
-            cur_candidates = self.advance_candidates(
-                cur_candidates,
-                component,
-                file_filter,
-                has_remaining_components,
-            );
-
-            if cur_candidates.is_empty() {
-                return None;
+            ResolvedModule::Package(file) | ResolvedModule::Module(file) => {
+                Cow::Borrowed(file.path(db).as_str())
             }
         }
-
-        Some(cur_candidates)
-    }
-
-    /// Finds candidates for the root component of a module name (i.e. `foo`
-    /// from `foo.bar.baz`) across the supplied search paths and stub packages.
-    ///
-    /// Callers should pass `true` for `is_non_shadowable` only when the given
-    /// `root_component` is the complete module name being resolved and that name
-    /// is non-shadowable according to `ModuleResolveMode::is_non_shadowable`.
-    /// This prevents a standard library module name like `types` from being
-    /// shadowed by a local source.
-    ///
-    /// Conversely, if `root_component` is only the prefix of the module name
-    /// being resolved (e.g., when using this method to discover roots for the
-    /// module name `types.child`), `is_non_shadowable` should be `false`.
-    ///
-    /// Before the resulting candidates can be advanced for subsequent components
-    /// of a modules name (see [`NameResolver::advance_candidates`]), they should
-    /// be combined with candidates discovered from other search paths and normalized
-    /// with [`normalize_candidates`] (with `form_module_name_prefix` set to `true`).
-    fn discover_roots<'a>(
-        &self,
-        root_component: &str,
-        is_non_shadowable: bool,
-        search_paths: impl Iterator<Item = &'a SearchPath>,
-        stub_paths: StubPackagePaths<'_>,
-    ) -> ResolvedNames<'db> {
-        let context = &self.context;
-        let mut cur_candidates = Vec::new();
-        let stub_name = (!stub_paths.is_empty() && !is_non_shadowable)
-            .then(|| format!("{root_component}-stubs"));
-        let mut pending_stub_paths = Vec::new();
-
-        if let Some(stub_name) = &stub_name {
-            cur_candidates.extend(stub_paths.before_stdlib.iter().filter_map(|search_path| {
-                resolve_stub_package_in_search_path(context, search_path, stub_name)
-            }));
-            // Defer file probes after stdlib until we know that stdlib does not win.
-            pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-                ModuleDirectory::new(context, search_path.to_module_path())
-                    .may_contain_name(stub_name)
-            }));
-        }
-
-        for search_path in search_paths {
-            // When a builtin module is imported, standard module resolution is bypassed:
-            // the module name always resolves to the stdlib module,
-            // even if there's a module of the same name in the first-party root
-            // (which would normally result in the stdlib module being overridden).
-            // TODO: offer a diagnostic if there is a first-party module of the same name
-            if is_non_shadowable && !search_path.is_standard_library() {
-                continue;
-            }
-
-            let is_stdlib = search_path.is_standard_library();
-            // A terminal candidate can stop the search unless a matching post-stdlib stub package
-            // could still override it. A terminal stdlib candidate always stops the search.
-            let can_stop = is_stdlib || pending_stub_paths.is_empty();
-            let mut candidate = ModuleResolutionCandidate::root(context, search_path);
-            let resolved = resolve_component(
-                context,
-                &mut candidate,
-                root_component,
-                ComponentFileFilter::ByMode,
-            )
-            .is_ok();
-            let terminal = candidate.missing_submodule_is_terminal();
-            if resolved {
-                cur_candidates.push(candidate);
-            }
-            // A terminal candidate shadows all later search paths. Earlier candidates remain in
-            // play because they already shadow this candidate.
-            if terminal && can_stop {
-                break;
-            }
-
-            // Reaching this point for stdlib means that it did not provide a terminal candidate.
-            // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
-            if is_stdlib && let Some(stub_name) = &stub_name {
-                cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
-                    resolve_stub_package_in_search_path(context, search_path, stub_name)
-                }));
-            }
-        }
-
-        cur_candidates
-    }
-
-    /// Finds candidates for the next component of a module name, starting from
-    /// candidates for its parent prefix. `filter` determines which file types
-    /// may supply the component.
-    ///
-    /// Input candidates must already be ordered by priority, with shadowed
-    /// namespace portions removed.
-    ///
-    /// Callers should pass `true` for `component_name_is_prefix` when more
-    /// module name components will be resolved. This preserves partial namespace
-    /// portions from stub-only packages so they can supply later components, even
-    /// when an ordinary package or module exists for the same prefix.
-    ///
-    /// Otherwise, callers should pass `false` to resolve the complete module
-    /// name. An ordinary package or plain module then shadows namespace portions.
-    fn advance_candidates(
-        &self,
-        mut candidates: ResolvedNames<'db>,
-        component_name: &str,
-        filter: ComponentFileFilter,
-        component_name_is_prefix: bool,
-    ) -> ResolvedNames<'db> {
-        let context = &self.context;
-        let mut remaining_are_shadowed = false;
-        candidates.retain_mut(|candidate| {
-            if remaining_are_shadowed {
-                return false;
-            }
-
-            let resolved = resolve_component(context, candidate, component_name, filter).is_ok();
-
-            // A terminal candidate shadows every lower-priority candidate, even if resolving
-            // this component fails. Higher-priority candidates remain in play.
-            remaining_are_shadowed = candidate.missing_submodule_is_terminal();
-
-            resolved
-        });
-        normalize_candidates(context.db, candidates, component_name_is_prefix)
     }
 }
 
@@ -1714,14 +1411,25 @@ fn resolve_stub_package_in_search_path<'db>(
     }
 }
 
+/// Orders candidates for the same module name by precedence and removes shadowed namespace packages.
+///
+/// Regular packages and file modules shadow namespace packages, including legacy namespaces.
+/// When `for_module_name_prefix` is true, partial namespaces with higher precedence than every
+/// competing regular package or file module remain available to supply descendants. Candidates
+/// within the same precedence tier retain their search-path order.
 fn normalize_candidates<'db>(
-    db: &dyn Db,
+    context: &ResolverContext,
     mut candidates: ResolvedNames<'db>,
     for_module_name_prefix: bool,
 ) -> ResolvedNames<'db> {
+    // Namespace classification cannot affect precedence without competing candidates.
+    if candidates.len() < 2 {
+        return candidates;
+    }
+
     let best_concrete_precedence = candidates
         .iter()
-        .filter(|candidate| !candidate.is_any_namespace_package())
+        .filter(|candidate| !candidate.is_any_namespace_package(context))
         .map(|candidate| candidate.precedence)
         .min();
 
@@ -1733,7 +1441,7 @@ fn normalize_candidates<'db>(
     // partial. The stub-package candidate is ordered first so it takes priority. Other candidates
     // are only used when the stub package fails to find a submodule in a partial sub-package.
     candidates.retain(|candidate| {
-        if !candidate.is_any_namespace_package() {
+        if !candidate.is_any_namespace_package(context) {
             return true;
         }
 
@@ -1756,7 +1464,7 @@ fn normalize_candidates<'db>(
         tracing::trace!(
             "Discarding namespace package `{}` because a non-namespace entry of the same name \
              was found",
-            candidate.to_str(db),
+            candidate.to_str(context.db),
         );
         false
     });
@@ -1790,12 +1498,8 @@ fn resolve_component<'db>(
         && let Some(init) =
             resolve_file_module_with_filter(subdirectory, context, "__init__", file_filter)
     {
-        // Check for a regular package first (highest priority).
-        candidate.module = if is_legacy_namespace_package(subdirectory.path(), context, init) {
-            ResolvedModule::LegacyNamespacePackage(init)
-        } else {
-            ResolvedModule::RegularPackage(init)
-        };
+        // Packages with an initializer take precedence over file modules.
+        candidate.module = ResolvedModule::Package(init);
         candidate.py_typed = subdirectory
             .path()
             .py_typed(context)
@@ -1810,12 +1514,12 @@ fn resolve_component<'db>(
     } else {
         // Last resort, check if a folder with the given name exists. If so,
         // then this is a namespace package. We need to skip this check for
-        // typeshed because the `resolve_file_module` can also return `None` if the
+        // typeshed because `resolve_file_module_with_filter` can also return `None` if the
         // `__init__.py` exists but isn't available for the current Python version.
         // Let's assume that the `xml` module is only available on Python 3.11+ and
         // we're resolving for Python 3.10:
         //
-        // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+        // * Looking up `xml/__init__.pyi` returns `None` even though
         //   the file exists but the module isn't available for the current Python
         //   version.
         // * The check here would now return `true` because the `xml` directory
@@ -1848,25 +1552,6 @@ fn resolve_component<'db>(
 }
 
 type ResolvedNames<'db> = Vec<ModuleResolutionCandidate<'db>>;
-
-/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
-/// [`File`].
-///
-/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
-pub(super) fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-) -> Option<File> {
-    let mut parent = module.clone();
-    parent.pop();
-
-    resolve_file_module_with_filter(
-        &ModuleDirectory::new(resolver_state, parent),
-        resolver_state,
-        module.file_stem()?,
-        ComponentFileFilter::ByMode,
-    )
-}
 
 fn resolve_file_module_with_filter(
     directory: &ModuleDirectory,
@@ -1919,11 +1604,33 @@ fn is_legacy_namespace_package(
     context: &ResolverContext,
     init: File,
 ) -> bool {
+    static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
+
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
         return false;
     }
 
+    // Both namespace idioms reference `pkgutil` or `pkg_resources`. Keep non-ASCII
+    // sources as candidates because Python normalizes identifiers with NFKC.
+    // This best-effort filter does not account for escaped or concatenated module names.
+    let source = source_text(context.db, init);
+    if source.is_ascii() && PKG_FINDER.find(source.as_bytes()).is_none() {
+        return false;
+    }
+
+    has_legacy_namespace_declaration(
+        context.db,
+        PythonFile::new(
+            context.db,
+            init,
+            context.resolver_environment.python_version(context.db),
+        ),
+    )
+}
+
+#[salsa::tracked(returns(copy))]
+fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
     //
     // The benefit of being syntax-only is speed and avoiding circular dependencies
@@ -1931,22 +1638,15 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(
-        context.db,
-        PythonFile::new(
-            context.db,
-            init,
-            context.resolver_environment.python_version(context.db),
-        ),
-    );
+    let parsed = ruff_db::parsed::parsed_module(db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(context.db).suite());
+    visitor.visit_body(parsed.load(db).suite());
 
     visitor.is_legacy_namespace_package
 }
 
 /// Info about the `py.typed` file for this package
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
 pub(crate) enum PyTyped {
     /// No `py.typed` was found
     Untyped,

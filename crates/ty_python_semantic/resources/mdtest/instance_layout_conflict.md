@@ -310,6 +310,50 @@ class Task(asyncio.Task[Any]): ...
 class SubClass(Task, Future): ...  # fine
 ```
 
+## Disjoint bases with a common ancestor
+
+Adding a base whose disjoint base is a common ancestor of two conflicting disjoint bases does not
+resolve the conflict. Here, `Plain` contributes the disjoint base `object`, which is an ancestor of
+both `int` and `str`:
+
+```py
+class Plain: ...
+class A(Plain, int, str): ...  # error: [instance-layout-conflict]
+class B(int, str, Plain): ...  # error: [instance-layout-conflict]
+```
+
+A shared ancestor with non-empty `__slots__` also does not resolve conflicts between its subclasses,
+even when that ancestor appears directly in the bases list:
+
+```py
+class Base:
+    __slots__ = ("base",)
+
+class Left(Base):
+    __slots__ = ("left",)
+
+class Right(Base):
+    __slots__ = ("right",)
+
+# snapshot
+class C(Left, Right, Base): ...
+```
+
+```snapshot
+error[instance-layout-conflict]: Class will raise `TypeError` at runtime due to incompatible bases
+  --> src/mdtest_snippet.py:14:7
+   |
+14 | class C(Left, Right, Base): ...
+   |       ^^^^^^^^^^^^^^^^^^^^ Bases `Left` and `Right` cannot be combined in multiple inheritance
+info: Two classes cannot coexist in a class's MRO if their instances have incompatible memory layouts
+  --> src/mdtest_snippet.py:14:9
+   |
+14 | class C(Left, Right, Base): ...
+   |         ----  ----- `Right` instances have a distinct memory layout because `Right` defines non-empty `__slots__`
+   |         |
+   |         `Left` instances have a distinct memory layout because `Left` defines non-empty `__slots__`
+```
+
 ## Slot names declared in a list
 
 A list of slot names restricts the instance layout just like a tuple.

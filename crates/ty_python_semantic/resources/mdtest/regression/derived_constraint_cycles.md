@@ -226,8 +226,8 @@ def equal_cycle[T, U, V]():
 ## Equal variables inside a finite tuple
 
 Equality between variables does not make a tuple containing them recursive. The element variables
-are all constrained to `int`. The tuple binding retains their references, without accumulating
-intermediate tuples with partially substituted elements.
+are all constrained to `int`. The tuple binding resolves these references to `int` without making
+the tuple recursive.
 
 ```py
 from ty_extensions._internal import ConstraintSet
@@ -239,14 +239,45 @@ def aliases[A, B, C, R]():
         & ConstraintSet.equality(R, tuple[A, B, C])
         & ConstraintSet.equality(A, int)
     )
-    # revealed: tuple[Solution[A=B@aliases | C@aliases | int]]
+    # revealed: tuple[Solution[A=int]]
     reveal_type(constraints.solutions_for(A, inferable=tuple[A, B, C, R]))
-    # revealed: tuple[Solution[B=A@aliases | C@aliases | int]]
+    # revealed: tuple[Solution[B=int]]
     reveal_type(constraints.solutions_for(B, inferable=tuple[A, B, C, R]))
-    # revealed: tuple[Solution[C=A@aliases | B@aliases | int]]
+    # revealed: tuple[Solution[C=int]]
     reveal_type(constraints.solutions_for(C, inferable=tuple[A, B, C, R]))
-    # revealed: tuple[Solution[R=tuple[A@aliases, B@aliases, C@aliases]]]
+    # revealed: tuple[Solution[R=tuple[int, int, int]]]
     reveal_type(constraints.solutions_for(R, inferable=tuple[A, B, C, R]))
+```
+
+## Recursive requirements with a finite upper bound
+
+An equality or lower bound that requires arbitrarily many tuple layers is incompatible with a finite
+upper bound. The result is the same whether the upper bound is declared on the type variable or
+supplied as a separate constraint, and whether the recursion involves one variable or two.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Layer[T] = int | tuple[T]
+type Limit = Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[int]]]]]]]]]]]]
+
+def declared[T: Limit]() -> None:
+    recursive = ConstraintSet.equality(T, int | tuple[T])
+    reveal_type(recursive.solutions(inferable=tuple[T]))  # revealed: None
+    finite = ConstraintSet.equality(T, int)
+    reveal_type(finite.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=int]]
+
+def explicit[T]() -> None:
+    recursive = ConstraintSet.lower_bound(int | tuple[T], T) & ConstraintSet.upper_bound(T, Limit)
+    reveal_type(recursive.solutions(inferable=tuple[T]))  # revealed: None
+
+def mutual[T, U]() -> None:
+    recursive = (
+        ConstraintSet.equality(T, int | tuple[U])
+        & ConstraintSet.equality(U, int | tuple[T])
+        & ConstraintSet.upper_bound(T, Limit)
+    )
+    reveal_type(recursive.solutions(inferable=tuple[T, U]))  # revealed: None
 ```
 
 [ty#24660]: https://github.com/astral-sh/ruff/pull/24660

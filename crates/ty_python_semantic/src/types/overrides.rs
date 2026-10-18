@@ -3,6 +3,8 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+mod attributes;
+
 use bitflags::bitflags;
 use ruff_db::{
     diagnostic::{Annotation, Span},
@@ -22,24 +24,22 @@ use crate::{
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
         TypeContext, TypeQualifiers,
         call::CallArguments,
-        callable::CallableTypeKind,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_MUTABLE_OVERRIDE,
+            INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
+            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_incompatible_base_method, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
-        signatures::CallableSignature,
         tuple::Tuple,
     },
 };
@@ -91,7 +91,7 @@ pub(super) fn check_class<'db>(
     let enum_info = enum_metadata(db, class.into());
 
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
-    if configuration.check_method_liskov_violations() {
+    if configuration.check_liskov_violations() {
         let generic_bases: FxHashMap<_, _> = bases
             .iter()
             .filter_map(|base| base.into_class()?.into_generic_alias())
@@ -113,6 +113,10 @@ pub(super) fn check_class<'db>(
                     .map(|ancestor| ClassBase::Class(ClassType::Generic(ancestor))),
             );
         }
+    }
+
+    if configuration.check_attribute_type_violations() {
+        attributes::check_instance_overrides(context, class_specialized, &bases);
     }
 
     #[expect(
@@ -646,16 +650,16 @@ fn check_class_declaration<'db>(
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
     let mut has_typeddict_in_mro = false;
-    let mut liskov_diagnostic_emitted = false;
+    let mut liskov_check_complete = false;
     let mut missing_override_target: Option<MissingOverrideTarget<'db>> = None;
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
-    // Track the first superclass that defines this method so we can distinguish inherited
+    // Track the first superclass that defines this member so we can distinguish inherited
     // conflicts from violations introduced by the child.
-    let mut inherited_method_owner = None;
+    let mut inherited_member_owner = None;
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
@@ -692,6 +696,19 @@ fn check_class_declaration<'db>(
                         }
                         (Some((superclass_scope, id)), MethodKind::default())
                     } else {
+                        // A method can declare an instance attribute without adding its name
+                        // to the class-body symbol table:
+                        //
+                        // ```python
+                        // class Base:
+                        //     def __init__(self):
+                        //         self.value: int = 0
+                        //
+                        // class Child(Base):
+                        //     value: str  # Incompatible with Base.value.
+                        // ```
+                        //
+                        // Keep this base as an override target even without a class-body symbol.
                         if superclass_literal
                             .own_synthesized_member(
                                 db,
@@ -701,6 +718,9 @@ fn check_class_declaration<'db>(
                                 &member.name,
                             )
                             .is_none()
+                            && superclass
+                                .own_instance_member(db, env, &member.name)
+                                .is_undefined()
                         {
                             continue;
                         }
@@ -750,7 +770,24 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            inherited_method_owner.get_or_insert(superclass);
+            // An inferred receiver assignment is still an override target, but it does not
+            // take ownership of a conflict inherited from an earlier declaration.
+            if !superclass
+                .own_class_member(db, env, None, &member.name)
+                .is_undefined()
+                || matches!(
+                    superclass
+                        .own_instance_member(db, env, &member.name)
+                        .inner
+                        .place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        ..
+                    })
+                )
+            {
+                inherited_member_owner.get_or_insert(superclass);
+            }
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
@@ -809,9 +846,9 @@ fn check_class_declaration<'db>(
             // is about Liskov Substitution Principle checks
             // **********************************************************
 
-            // Only one Liskov diagnostic should be emitted per each invalid override,
-            // even if it overrides multiple superclasses incorrectly!
-            if liskov_diagnostic_emitted {
+            // Stop after the first violation of an enabled rule, even if its diagnostic
+            // is suppressed or the override is incompatible with multiple superclasses.
+            if liskov_check_complete {
                 continue;
             }
 
@@ -875,9 +912,39 @@ fn check_class_declaration<'db>(
                             subclass_kind,
                             superclass_variable_kind,
                         );
-                        liskov_diagnostic_emitted = true;
+                        liskov_check_complete = true;
                         continue;
                     }
+                }
+            }
+
+            // Constructors may change their signature. Leave their special receiver
+            // binding and `@override` checks to the method checker below.
+            if !is_constructor_like_method(&member.name) {
+                match attributes::check_override(
+                    db,
+                    env,
+                    class,
+                    superclass,
+                    inherited_member_owner,
+                    &member.name,
+                    *first_reachable_definition,
+                ) {
+                    attributes::OverrideCheck::Callable => {}
+                    attributes::OverrideCheck::Attribute(Some(violation)) => {
+                        violation.report(
+                            context,
+                            superclass,
+                            &member.name,
+                            *first_reachable_definition,
+                            superclass_symbol
+                                .and_then(|(scope, id)| symbol_definition(db, scope, id)),
+                        );
+                        liskov_check_complete = context.is_lint_enabled(violation.rule());
+                        continue;
+                    }
+                    attributes::OverrideCheck::Attribute(None)
+                    | attributes::OverrideCheck::Unavailable => continue,
                 }
             }
 
@@ -918,7 +985,7 @@ fn check_class_declaration<'db>(
 
             // Do not repeat a violation that already exists in the parent's hierarchy.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some(method_owner) = inherited_method_owner
+            if let Some(method_owner) = inherited_member_owner
                 && method_owner != superclass
                 && is_inherited_method_violation(
                     db,
@@ -951,7 +1018,7 @@ fn check_class_declaration<'db>(
                 },
             );
 
-            liskov_diagnostic_emitted = true;
+            liskov_check_complete = true;
         }
     }
 
@@ -1048,43 +1115,18 @@ fn bind_new_for_override<'db>(
     }
     let receiver = Type::from(class);
     let instance_of_class = Type::instance(db, env, class);
-    let Some(callables) = Place::bound(ty)
-        .try_call_dunder_get(db, env, receiver)
+    let Some(callables) = receiver
+        .resolve_dunder_new_callable(db, env, Place::bound(ty))
         .ignore_possibly_undefined()
         .and_then(|ty| ty.try_upcast_to_callable(db, env))
     else {
         return ty;
     };
+    // Overloads specialized for other subclasses do not constrain this override.
+    // Compare call signatures independently of descriptor behavior.
     callables
-        .map(|callable| {
-            let signature = callable.signatures(db);
-            let bound_signature = if signature.overloads.len() > 1
-                && signature
-                    .overloads
-                    .iter()
-                    .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                // Overloads specialized for other subclasses do not constrain this override.
-                CallableSignature::from_overloads(
-                    signature
-                        .overloads
-                        .iter()
-                        .filter_map(|signature| {
-                            signature.bind_self_if_compatible(db, env, receiver, instance_of_class)
-                        })
-                        .flat_map(|signature| signature.overloads),
-                )
-            } else {
-                signature.bind_self_with_receiver(db, env, Some(receiver), Some(instance_of_class))
-            };
-            CallableType::new(
-                db,
-                bound_signature,
-                // Compare call signatures independently of descriptor behavior.
-                CallableTypeKind::Regular,
-            )
-        })
-        .into_type(db, env)
+        .map(|callable| callable.bind_self(db, env, receiver, instance_of_class))
+        .to_type(db, env)
 }
 
 /// Returns whether the selected inherited method already violates this ancestor's contract.
@@ -1186,10 +1228,8 @@ fn method_override_types<'db>(
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
-            if let Some(subclass_function) = subclass_method.function(db)
-                && let Some(superclass_function) = superclass_method.function(db) =>
+            if let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
         {
-            let superclass_signature = superclass_function.signature(db);
             let explicit_receiver = match superclass_signature.overloads.as_slice() {
                 [signature] => signature
                     .parameters()
@@ -1216,25 +1256,22 @@ fn method_override_types<'db>(
             // Both signatures describe calls on the subclass. In particular, inherited `Self`
             // annotations refer to the subclass even when the receiver is implicitly annotated.
             (
-                Type::Callable(subclass_function.into_bound_callable_with_receiver(
-                    db,
-                    env,
-                    receiver,
-                    typing_self_type,
-                )),
-                Type::Callable(superclass_function.into_bound_callable_with_receiver(
-                    db,
-                    env,
-                    receiver,
-                    typing_self_type,
-                )),
+                subclass_method
+                    .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .to_type(db, env),
+                superclass_method
+                    .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .to_type(db, env),
             )
         }
         _ => (subclass_type, superclass_type),
     };
-    let superclass_callable = superclass_type.try_upcast_to_callable(db, env)?;
 
-    Some((subclass_type, superclass_callable.into_type(db, env)))
+    let superclass_callable = superclass_type
+        .try_upcast_to_callable(db, env)?
+        .map(|callable| callable.into_regular(db));
+
+    Some((subclass_type, superclass_callable.to_type(db, env)))
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.
@@ -1416,14 +1453,16 @@ fn variable_kind<'db>(
     // class Sub(Base):
     //     def f(self) -> int: ...
     // ```
-    if matches!(
-        class_member.place,
-        Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(_),
-            ..
-        })
-    ) {
-        return None;
+    if let Place::Defined(DefinedPlace { ty, .. }) = class_member.place {
+        let alternatives = ty
+            .as_union()
+            .map_or(std::slice::from_ref(&ty), |union| union.elements(db));
+        if alternatives
+            .iter()
+            .all(|ty| matches!(ty, Type::FunctionLiteral(_) | Type::PropertyInstance(_)))
+        {
+            return None;
+        }
     }
 
     // Descriptor values are not normal instance variables: lookup calls `__get__`, so the value
@@ -1539,6 +1578,8 @@ bitflags! {
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
         const MISSING_OVERRIDE_DECORATOR = 1 << 9;
+        const LISKOV_PROPERTIES = 1 << 10;
+        const LISKOV_MUTABLE = 1 << 11;
     }
 }
 
@@ -1554,6 +1595,12 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_ATTRIBUTES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_PROPERTY_TYPE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_PROPERTIES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_MUTABLE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_MUTABLE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
@@ -1597,9 +1644,16 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
     }
 
+    const fn check_attribute_type_violations(self) -> bool {
+        self.intersects(
+            Self::LISKOV_ATTRIBUTES
+                .union(Self::LISKOV_PROPERTIES)
+                .union(Self::LISKOV_MUTABLE),
+        )
+    }
+
     const fn check_liskov_violations(self) -> bool {
-        self.contains(OverrideRulesConfig::LISKOV_METHODS)
-            || self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
+        self.check_method_liskov_violations() || self.check_attribute_type_violations()
     }
 
     const fn check_final_method_overridden(self) -> bool {

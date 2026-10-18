@@ -44,8 +44,7 @@ def grounded[X, A]() -> None:
     body = ConstraintSet.equality(X, int) & ConstraintSet.upper_bound(A, Invariant[X])
     quantified = body.exists(tuple[X])
 
-    # TODO: revealed: tuple[Solution[X=int, A=list[int]]]
-    # revealed: tuple[Solution[X=int, A=Invariant[X@grounded]]]
+    # revealed: tuple[Solution[X=int, A=Invariant[int]]]
     reveal_type(body.solutions(inferable=tuple[X, A]))
     # TODO: revealed: tuple[Solution[A=list[int]]]
     # revealed: tuple[Solution[A=Invariant[int]]]
@@ -71,7 +70,7 @@ def relational_bridge[X, U, V]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[V=object, U=object]]
-    # revealed: tuple[Solution[V=U@relational_bridge, U=V@relational_bridge]]
+    # revealed: tuple[Solution[U=V@relational_bridge, V=U@relational_bridge]]
     reveal_type(quantified.solutions(inferable=tuple[U, V]))
 
     # U ≤ V
@@ -102,7 +101,7 @@ def inverse_image[X, A, B]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object, X=object]]
-    # revealed: tuple[Solution[A=Invariant[X@inverse_image], B=X@inverse_image, X=B@inverse_image]]
+    # revealed: tuple[Solution[A=Invariant[X@inverse_image], X=B@inverse_image, B=X@inverse_image]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=Invariant[object], B=object]]
     # revealed: tuple[()]
@@ -145,7 +144,7 @@ def witness_sensitive[X, A, B]() -> None:
 
     # Each solution for A and B depends on the compatible choice of X.
     # TODO: revealed: tuple[Solution[X=object, A=object, B=Invariant[object]]]
-    # revealed: tuple[Solution[X=A@witness_sensitive, A=X@witness_sensitive, B=Invariant[X@witness_sensitive]]]
+    # revealed: tuple[Solution[A=X@witness_sensitive, X=A@witness_sensitive, B=Invariant[X@witness_sensitive]]]
     reveal_type(body.solutions(inferable=tuple[X, A, B]))
     # TODO: revealed: tuple[Solution[A=object, B=Invariant[object]]]
     # revealed: tuple[()]
@@ -194,8 +193,7 @@ def correlated_outputs[X, Y, Z]() -> None:
     body = c1 & c2
     quantified = body.exists(tuple[X])
 
-    # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[X@correlated_outputs]], Solution[X=str, Y=str, Z=Invariant[X@correlated_outputs]]]
+    # revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     reveal_type(quantified.solutions(inferable=tuple[Y, Z]))
@@ -237,7 +235,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     quantified = body.exists(tuple[X])
 
     # TODO: revealed: tuple[Solution[X=int, Y=int, Z=Invariant[int]], Solution[X=str, Y=str, Z=Invariant[str]]]
-    # revealed: tuple[Solution[Y=X@finite_domain, X=Y@finite_domain, Z=Invariant[X@finite_domain]]]
+    # revealed: tuple[Solution[X=Y@finite_domain, Y=X@finite_domain, Z=Invariant[X@finite_domain]]]
     reveal_type(body.solutions(inferable=tuple[X, Y, Z]))
     # TODO: revealed: tuple[Solution[Y=int, Z=Invariant[int]], Solution[Y=str, Z=Invariant[str]]]
     # revealed: tuple[Solution[Z=Invariant[Y@finite_domain]]]
@@ -264,7 +262,7 @@ def finite_domain[X: (int, str), Y, Z]() -> None:
     invalid_domain = ConstraintSet.equality(Y, bytes) & ConstraintSet.equality(Z, Invariant[bytes])
     static_assert(not (quantified & invalid_domain))
     # TODO: revealed: None
-    # revealed: tuple[Solution[Z=Invariant[Y@finite_domain] | Invariant[bytes], Y=bytes]]
+    # revealed: tuple[Solution[Z=Invariant[bytes], Y=bytes]]
     reveal_type((quantified & invalid_domain).solutions(inferable=tuple[Y, Z]))
 ```
 

@@ -79,14 +79,12 @@ impl<'db> Bindings<'db> {
                 call_arguments
                     .iter()
                     .zip(overload.argument_matches())
-                    .find_map(|((_, argument_types), argument_matches)| {
+                    .find_map(|(argument, argument_matches)| {
                         let parameter = argument_matches
                             .parameters
                             .iter()
                             .find(|parameter| parameter.index == parameter_index)?;
-                        parameter
-                            .argument_type
-                            .or_else(|| argument_types.get_default())
+                        argument.matched_type(None, parameter.argument_type)
                     })
                     .filter(|ty| !ty.is_none(db))
             };

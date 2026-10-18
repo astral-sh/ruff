@@ -916,6 +916,201 @@ reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: Unknown
 ```
 
+### A literal `__all__` after a wildcard import
+
+An explicit `__all__` restricts the names re-exported from a wildcard import, even if the source
+module does not define its own `__all__`.
+
+`source.py`:
+
+```py
+included: int = 1
+excluded: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+# The __all__ list limits what this module exports.
+__all__ = ["included"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(included)  # revealed: int
+# error: [unresolved-reference]
+reveal_type(excluded)  # revealed: Unknown
+```
+
+### An `__all__` assignment followed by a conditional mutation
+
+The source module has no `__all__`, so ty conservatively treats its public names as potential
+exports when it cannot determine the effect of a conditional mutation.
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+excluded: bool = True
+```
+
+`exporter.py`:
+
+```py
+import os
+from source import *
+
+__all__ = ["first"]
+if os.getenv("EXTRA") is not None:
+    __all__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+reveal_type(excluded)  # revealed: bool
+```
+
+### An `__all__` assignment followed by a slice assignment
+
+Slice assignments fall back to treating all public names as potential exports.
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+__all__ = ["first"]
+__all__[:] = ["second"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+```
+
+### Unicode identifiers can modify `__all__`
+
+Python normalizes identifiers, so a different spelling can refer to the same `__all__` variable.
+
+`exporter.py`:
+
+```py
+first: int = 1
+second: str = ""
+__all__ = ["first"]
+__aℓℓ__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+```
+
+### A later wildcard import can replace `__all__`
+
+`source.py`:
+
+```py
+__all__ = ["__all__", "other"]
+other: str = ""
+```
+
+`exporter.py`:
+
+```py
+included: int = 1
+__all__ = ["included"]
+from source import *
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(other)  # revealed: str
+# error: [unresolved-reference]
+reveal_type(included)  # revealed: Unknown
+```
+
+### Names excluded from `__all__` do not reassign `Final` symbols
+
+A wildcard import does not bind public or private names that are absent from the exporting module's
+`__all__`, so those names cannot overwrite existing `Final` declarations.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 1
+_PRIVATE: Final[int] = 2
+
+__all__ = []
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+EXCLUDED: Final[int] = 3
+_PRIVATE: Final[int] = 4
+
+from exporter import *
+```
+
+### Names included in `__all__` still reassign `Final` symbols
+
+An explicitly exported name is genuinely imported, so existing `Final` declarations still reject the
+reassignment.
+
+`exporter.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+__all__ = ["VALUE"]
+```
+
+`importer.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 2
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+from exporter import *
+```
+
 ### `__all__` with additions later on in the global scope
 
 The

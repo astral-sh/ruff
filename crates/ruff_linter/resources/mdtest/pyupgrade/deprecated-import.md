@@ -50,3 +50,37 @@ help: Import from `collections.abc`
 4 + lazy from collections.abc import Iterable
   |
 ```
+
+## `TypeForm`
+
+On Python 3.15 and later, `TypeForm` can be imported from `typing`.
+
+```py
+from typing_extensions import TypeForm  # snapshot: deprecated-import
+```
+
+```snapshot
+error[UP035]: Import from `typing` instead: `TypeForm`
+ --> src/mdtest_snippet.py:1:1
+  |
+1 | from typing_extensions import TypeForm  # snapshot: deprecated-import
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Import from `typing`
+  |
+  - from typing_extensions import TypeForm  # snapshot: deprecated-import
+1 + from typing import TypeForm  # snapshot: deprecated-import
+  |
+```
+
+## `TypeForm` before Python 3.15
+
+```toml
+target-version = "py314"
+
+[lint]
+select = ["UP035"]
+```
+
+```py
+from typing_extensions import TypeForm  # no diagnostic
+```

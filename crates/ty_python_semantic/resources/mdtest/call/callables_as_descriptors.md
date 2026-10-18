@@ -526,6 +526,23 @@ reveal_type(D.class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> s
 reveal_type(D().class_method)  # revealed: ((int, /) -> int) | ((int, str, /) -> str)
 ```
 
+In the following example, both decorators return a union of callables with instance-method behavior.
+Stacking them preserves that behavior, so calling the method supplies the receiver to either
+alternative.
+
+```py
+def instance_decorator(function: object) -> Callable[[object, int], int] | Callable[[object, int], str]:
+    raise NotImplementedError
+
+class E:
+    @instance_decorator
+    @instance_decorator
+    def method(self, value: int) -> int:
+        return value
+
+reveal_type(E().method(1))  # revealed: int | str
+```
+
 ## Decorators returning a possibly non-callable value
 
 A decorator might return a non-callable value. We report an error when `staticmethod` is applied to
@@ -673,6 +690,30 @@ reveal_type(Child.method(1))  # revealed: int
 reveal_type(Other.method("x"))  # revealed: str
 Base.method("x")  # error: [no-matching-overload]
 Other.method(1)  # error: [no-matching-overload]
+```
+
+The same overload selection applies when we pass these bound methods as callbacks. Here,
+`Executor.submit` forwards arguments to the supplied method and returns a future for its result, so
+the selected overload determines both the accepted arguments and the future's result type. The
+simplified definitions below are based on typeshed's `concurrent.futures` stubs.
+
+```py
+from typing import Callable, Generic, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class Future(Generic[R]): ...
+
+class Executor:
+    def submit(self, fn: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> Future[R]:
+        raise NotImplementedError
+
+def check(executor: Executor):
+    reveal_type(executor.submit(Base.method, 1))  # revealed: Future[int]
+    reveal_type(executor.submit(Other.method, "x"))  # revealed: Future[str]
+    executor.submit(Base.method, "x")  # error: [invalid-argument-type] "Expected `int`"
+    executor.submit(Other.method, 1)  # error: [invalid-argument-type] "Expected `str`"
 ```
 
 ## Extracted `__call__` methods do not bind again

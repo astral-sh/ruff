@@ -8,6 +8,22 @@ Before starting work on an issue and again before opening a pull request, follow
 [guidance on avoiding duplicate work](CONTRIBUTING.md#avoiding-duplicate-work). If an open pull
 request already addresses the issue, do not submit a competing one without maintainer agreement.
 
+## PR conventions
+
+Before opening a PR, inspect the repository's available GitHub labels and their descriptions,
+excluding archived labels. Also inspect the current Rooster configuration, including required and
+ignored labels, in the `[tool.rooster]` and
+`[tool.rooster.section-labels]` sections of [Ruff's `pyproject.toml`](pyproject.toml) and
+[ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml). Labels such as
+`internal`, `testing`, and `ci` can exclude a PR from a changelog. Decide whether and how the change
+should appear in each changelog, then select appropriate labels for the PR's content.
+
+When working on ty, PR titles should start with `[ty]`. If you can, add the `ty` GitHub label.
+
+If you have permission, apply the selected labels when creating the PR or afterward, then verify
+that the PR's actual labels include them and have the intended effect on each changelog. If the
+available labels or a Rooster configuration could not be inspected, say so when reporting the PR.
+
 ## Code Review Rules
 
 For security reviews of Ruff and ty runtime changes, use the
@@ -42,18 +58,18 @@ Preserve useful human-written comments unless the code change makes them inaccur
 
 ## Running Tests
 
-Run all tests (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
+File-watcher tests rely on operating-system events that some execution environments do not deliver. Do not run tests that depend on these events in a Codex sandbox or another sandbox where these events may not be delivered; for example, the `ty` crate's `file_watching` integration tests can time out waiting for them. The commands below exclude that test binary. It is usually unnecessary to run file-watcher tests locally before filing a change unless you are certain that the change affects file-watching behavior. To run the `file_watching` binary, use an environment that delivers file-watcher events and run `cargo nextest run -p ty --test file_watching` or `cargo test -p ty --test file_watching`, using the snapshot environment variables shown below.
+
+Run the workspace tests except `file_watching` (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run --workspace -E 'not binary(=file_watching)'
 ```
 
-File-watcher tests do not work inside the sandbox. It is usually unnecessary to run them locally before filing a change unless you are certain that the change affects file-watching behavior.
-
-Run tests for a specific crate:
+Run tests for a specific crate. Keep the filter when substituting another crate, including `ty`:
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -E 'not binary(=file_watching)'
 ```
 
 Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder. Include `--test mdtest` to avoid building unrelated test binaries:
@@ -70,12 +86,19 @@ MDTEST_TEST_FILTER="<filter>" INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDA
 
 ### Fallback without nextest
 
-If `cargo nextest` is not available, use `cargo test` with the same environment variables:
+If `cargo nextest` is not available, use `cargo test` with the same environment variables. For the workspace, exclude `ty` and then run its other test targets explicitly. If new non-watcher test targets are added to `ty`, add them to the `ty` command below; `cargo metadata --no-deps --format-version 1` lists each crate's targets:
 
 ```sh
-# Run all tests.
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test
+# Run workspace tests outside the ty crate.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test --workspace --exclude ty
 
+# Run ty tests except file_watching.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty --lib --bins --test cli --test self_environment
+```
+
+To run tests for one crate, use the `ty` command above for `ty`; for other crates, use:
+
+```sh
 # Run tests for a specific crate.
 INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic
 
@@ -96,13 +119,15 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 ## Writing mdtests
 
-- Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading. Code blocks for the same file within a section are concatenated, so do not repeat imports or definitions.
+- Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
+- Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
+- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, normally add a `# no diagnostic` comment on or above the statement. Statements used as setup for later assertions do not need such comments.
 - Prioritize document structure and readability over avoiding duplicated setup. Add a test to an existing section when its heading accurately describes the new scenario, adding or improving introductory prose as needed; otherwise, create a separate sibling section, even if that requires repeating a small fixture.
 - Order mdtests from basic, common behavior to more specialized cases. Place narrow regression tests alongside closely related examples when they fit naturally; otherwise, put them near the end of the relevant section or file. Do not put an obscure special case at the beginning simply because it is the newest regression.
-- Introduce each scenario with a short prose paragraph explaining the code immediately below. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
-- Describe the behavior being specified and why it is expected. References to issues or previous behavior can provide useful background, but must not substitute for a self-contained explanation of the behavior and its rationale.
+- Aim for readable documents that serve as both documentation and tests. Use prose to explain the key type checker behavior and its rationale where helpful. A sentence or fragment may suffice; avoid repeating what the heading, surrounding explanation, or assertions already make clear. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
+- Prefer examples whose purpose is understandable without following issue links. For narrow regressions, a brief issue reference can be enough when additional explanation would merely restate the code or obscure the relevant behavior.
 - Prefer direct, present-tense descriptions of behavior over abstract requirements: write "We reject this assignment" rather than "We must reject this assignment."
-- Minimize regression examples to the behavior under test. When adapting real-world code or an issue reproducer, remove incidental types, methods, type parameters, imports, and domain-specific details. Preserve complexity only when necessary to reproduce the regression or distinguish the intended behavior, and reuse nearby fixtures or simple built-in types when doing so keeps the test easy to understand.
+- Keep each code example as simple as possible while still demonstrating the key behavior. When adapting real-world code or an issue reproducer, remove incidental types, methods, type parameters, imports, and domain-specific details. Preserve complexity only when necessary to reproduce the regression or distinguish the intended behavior, and reuse nearby fixtures or simple built-in types when doing so keeps the test easy to understand.
 - Prefer a minimal, purpose-built custom type over a standard-library type when a regression depends on particular attributes, methods, bounds, or constraints. Define the relevant behavior in the test so readers do not need to look up the standard-library type to understand the scenario. For commonly used standard-library types, consider adding a separate regression using the real type to protect against changes in typeshed.
 - Place each mdtest in a file for the behavior it actually tests, and assert that behavior directly. Prefer an existing file when one already covers that behavior; create a new file when no existing file is a good fit. Do not choose a file solely because its directive or helper can express the assertion.
 - When testing generic behavior supported by both legacy and PEP 695 syntax, add equivalent cases under `generics/legacy/` and `generics/pep695/`.
@@ -110,7 +135,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 ## Running Clippy
 
 ```sh
-cargo clippy --workspace --all-targets --all-features -- -D warnings
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features
 ```
 
 ## Running Debug Builds
@@ -137,7 +162,7 @@ The guidance in this section applies to edits to `ty*` crates, reviews of ty PRs
 
 When the task matches a more specific ty workflow, also read and follow that skill from the repository root:
 
-- Diagnostic changes, diagnostic message changes, or diagnostic reviews: `.agents/skills/adding-ty-diagnostics/SKILL.md`.
+- Adding new ty rules, changing diagnostics or diagnostic messages, or reviewing diagnostics: `.agents/skills/adding-ty-diagnostics/SKILL.md`.
 - Ecosystem report summaries: `.agents/skills/summarise-ecosystem-results/SKILL.md`.
 - Reproducing, investigating, or minimizing ecosystem or primer differences: `.agents/skills/minimizing-ty-ecosystem-changes/SKILL.md`.
 
@@ -156,12 +181,6 @@ To inspect one evaluation task, run `cargo run --package ty_completion_eval -- s
 ### Ad hoc reproductions
 
 When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
-
-### PR conventions
-
-When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label if you have permission to do so;
-if you don't, however, automation should add it anyway, so there's no need to worry about it. Similarly, add the `server`
-label if your change only affects the LSP server and you have permission to add that label.
 
 ### The `db` parameter
 

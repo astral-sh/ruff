@@ -364,7 +364,7 @@ reveal_type(dunder_all_names(exporter))
 __all__ = ["A", "B"]
 __all__.remove("A")
 
-# Non-existant symbol in `__all__` at this point
+# Non-existent symbol in `__all__` at this point
 # TODO: This raises `ValueError` at runtime, maybe we should raise a diagnostic as well?
 __all__.remove("C")
 

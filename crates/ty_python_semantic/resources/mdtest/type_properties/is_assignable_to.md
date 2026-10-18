@@ -285,6 +285,20 @@ static_assert(not is_assignable_to(TypeOf[Bar[int]], type[Foo[bool]]))
 static_assert(not is_assignable_to(TypeOf[Foo[bool]], type[Bar[int]]))
 ```
 
+## Gradual class types in constraint-producing assignability
+
+`type[Any]` is assignable to class-object types, including specialized generic classes.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_constraint_set_assignable_to
+
+static_assert(is_constraint_set_assignable_to(type, type[Any]))
+static_assert(is_constraint_set_assignable_to(type[Any], TypeOf[list[int]]))
+static_assert(not is_constraint_set_assignable_to(object, type[Any]))
+```
+
 ## `type[]` is not assignable to types disjoint from `builtins.type`
 
 ```py
@@ -779,29 +793,43 @@ def source_type_variables[T]() -> None:
     )
 ```
 
-TODO: Gradual-length comparisons do not yet generate evidence for type variables in target elements
-supplied by the gradual segment. These comparisons currently fail even when the variable is nested
-inside another type or hidden behind an alias.
+Each element supplied by the gradual segment contributes its own constraints, even when the variable
+is hidden behind an alias or nested within a container.
 
 ```py
 type Identity[T] = T
 
-def nested_type_variables[T]() -> None:
+def _[T, U, V]():
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[T]) == ConstraintSet.lower_bound(Any, T))
+    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.lower_bound(Any, T))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T, U, V])
+        == (ConstraintSet.lower_bound(int, T) & ConstraintSet.lower_bound(Any, U) & ConstraintSet.lower_bound(str, V))
+    )
+    static_assert(not is_constraint_set_assignable_to(tuple[int, *tuple[Any, ...], str], tuple[T]))
+
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[T, *tuple[int, ...]]) == ConstraintSet.lower_bound(Any, T)
+    )
+    static_assert(
+        is_constraint_set_assignable_to(tuple[Dynamic, ...], tuple[*tuple[int, ...], T]) == ConstraintSet.lower_bound(Any, T)
+    )
+
     static_assert(is_assignable_to(tuple[Any, ...], tuple[list[T]]))
     # TODO: This should be ConstraintSet.equality(T, Any).
-    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.never())
-    static_assert(is_assignable_to(tuple[Any, ...], tuple[Identity[T]]))
-    # TODO: This should be ConstraintSet.lower_bound(Any, T).
-    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[Identity[T]]) == ConstraintSet.never())
+    static_assert(is_constraint_set_assignable_to(tuple[Any, ...], tuple[list[T]]) == ConstraintSet.always())
 ```
 
 A symbolic `TypeVarTuple` is not gradual: its specialization can have a different length from a
 fixed target tuple.
 
 ```py
-def symbolic_pack[*Ts]() -> None:
+def symbolic_pack[T, *Ts]() -> None:
     static_assert(not is_assignable_to(tuple[*Ts], tuple[int]))
     static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[int]) == ConstraintSet.never())
+    static_assert(is_constraint_set_assignable_to(tuple[*Ts], tuple[T]) == ConstraintSet.never())
 ```
 
 ## Union types

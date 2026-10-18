@@ -126,7 +126,7 @@ impl<'db> AbstractMethods<'db> {
                         db,
                         Signature::new(Parameters::gradual_form(), Type::none(db, env)),
                     )
-                    .is_assignable_to(db, env, callables.into_type(db, env))
+                    .is_assignable_to(db, env, callables.to_type(db, env))
                 {
                     diagnostic.help(format_args!(
                         "Change the body of `{first_method_name}` to `return` \
@@ -364,6 +364,10 @@ impl<'db> ClassType<'db> {
                     abstract_methods.shift_remove(name);
                 }
             }
+
+            // Slot descriptors override abstract properties. Dataclass-generated slots can also
+            // replace abstract properties defined in this class's body.
+            abstract_methods.retain(|name, _| !class_literal.has_own_slot_descriptor(db, name));
         }
 
         abstract_methods.shrink_to_fit();

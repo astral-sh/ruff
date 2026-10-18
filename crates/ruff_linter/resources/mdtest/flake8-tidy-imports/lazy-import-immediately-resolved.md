@@ -65,7 +65,6 @@ OtherBase()  # error: [lazy-import-immediately-resolved]
 target-version = "py315"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
 
@@ -127,20 +126,77 @@ json.dumps({})
 
 ### Older target versions
 
-A declaration expresses intended lazy imports even when the target version predates the `lazy`
-keyword.
-
 ```toml
-target-version = "py314"
+target-version = "py39"
 
 [lint]
-preview = true
 select = ["TID255"]
 ```
+
+#### Immediate uses
+
+A declaration expresses intended lazy imports even when the target version predates the `lazy`
+keyword.
 
 ```py
 __lazy_modules__ = ["json"]
 import json
 
 json.dumps({})  # error: [lazy-import-immediately-resolved]
+```
+
+#### Annotations
+
+Ordinary annotations do not immediately resolve lazy imports. On Python versions where
+`__lazy_modules__` makes imports lazy (3.15+), annotations are deferred (3.14+), even if the
+configured target version is older.
+
+```py
+__lazy_modules__ = ["pathlib"]
+
+from pathlib import Path
+from typing import Annotated
+
+path: Path  # ok
+
+class C:
+    path: Path  # ok
+
+def identity(path: Path) -> Path: ...  # both ok
+
+annotated: Annotated[Path, Path(".")]  # both ok
+```
+
+#### Runtime-required annotations
+
+Registering a `singledispatch` implementation evaluates its parameter annotation to determine the
+dispatch type, immediately resolving the lazy import.
+
+```py
+__lazy_modules__ = ["pathlib"]
+
+from pathlib import Path
+from functools import singledispatch
+
+@singledispatch
+def process(value): ...
+
+@process.register
+def process_path(value: Path): ...  # error: [lazy-import-immediately-resolved]
+```
+
+#### Dataclass annotations
+
+The `dataclass` decorator evaluates field annotations, immediately resolving the lazy import.
+This is a known false negative.
+
+```py
+__lazy_modules__ = ["pathlib"]
+
+from pathlib import Path
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    path: Path  # false negative
 ```

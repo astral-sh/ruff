@@ -385,10 +385,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::AmbiguousVariableName) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
-                    if !checker.semantic.current_scope().kind.is_class() {
-                        if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                            flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
-                        }
+                    if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+                        flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
                 _ => {}
@@ -769,14 +767,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::StripWithMultiCharacters) {
                 flake8_bugbear::rules::strip_with_multi_characters(checker, expr, func, args);
             }
-            if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
-                flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
-            }
-            if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
-                flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
-            }
-            if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
-                flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
+            if keywords.is_empty() {
+                if checker.is_rule_enabled(Rule::GetAttrWithConstant) {
+                    flake8_bugbear::rules::getattr_with_constant(checker, expr, func, args);
+                }
+                if checker.is_rule_enabled(Rule::DelAttrWithConstant) {
+                    flake8_bugbear::rules::delattr_with_constant(checker, expr, func, args);
+                }
+                if checker.is_rule_enabled(Rule::SetAttrWithConstant) {
+                    flake8_bugbear::rules::setattr_with_constant(checker, expr, func, args);
+                }
             }
             if checker.is_rule_enabled(Rule::UselessContextlibSuppress) {
                 flake8_bugbear::rules::useless_contextlib_suppress(checker, expr, func, args);

@@ -102,16 +102,13 @@ class Child(Parent):
 class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
-    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
-    # type or on an instance, it will behave the same from the caller's perspective. The only
-    # difference is whether the method body gets access to `self`, which is not a
-    # concern of Liskov.
+    # The static method accepts the same instance calls as the inherited method, but
+    # overriding a final method is still prohibited.
     @staticmethod
     # error: [override-of-final-method]
-    # error: [invalid-method-override]
     def foo(): ...
     @property
-    # TODO: we should emit a Liskov violation here too
+    # error: [invalid-property-type-override]
     # error: [override-of-final-method]
     def my_property1(self) -> str: ...
     # TODO: we should emit a Liskov violation here too
@@ -346,7 +343,7 @@ class Base:
 `other.py`:
 
 ```py
-def replacement_method() -> None: ...
+def replacement_method(self) -> None: ...
 ```
 
 `derived.py`:
@@ -1296,7 +1293,7 @@ class Base(ABC):
 @final
 # snapshot: abstract-method-in-final-class
 class Bad(Base):
-    method: int
+    method: int  # error: [invalid-attribute-override]
 ```
 
 ```snapshot
@@ -1316,7 +1313,7 @@ info: The instance-attribute annotation for `method` does not override the abstr
 help: Either assign a value or add `ClassVar` to this declaration
   --> src/mdtest_snippet.py:11:5
    |
-11 |     method: int
+11 |     method: int  # error: [invalid-attribute-override]
    |     ------ Instance-attribute declaration
 ```
 

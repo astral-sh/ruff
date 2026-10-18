@@ -4,7 +4,8 @@
 
 name: ty ecosystem-report
 
-permissions: {}
+permissions:
+  contents: read
 
 # Third-party builds must not write caches consumed by other jobs.
 # GitHub-hosted runners use GitHub's cache service, which enforces this mode.
@@ -39,12 +40,22 @@ jobs:
         with:
           persist-credentials: false
 
+      # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
+      - name: Fetch full history without tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git fetch --no-tags --filter=blob:none --unshallow origin
+
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true
           save-cache: false
-          version: "0.12.11"
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.1"
+          checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -59,10 +70,9 @@ jobs:
 
       - name: Create report
         shell: bash
+        env:
+          UV_CONSTRAINT: ${{ github.workspace }}/.github/ty-ecosystem-constraints.txt
         run: |
-          # Faster to do this separately than to use `fetch-depth: 0` with `actions/checkout`
-          git fetch --no-tags --filter=blob:none --unshallow origin
-
           echo "Enabling configuration overloads (see .github/ty-ecosystem.toml)"
           mkdir -p ~/.config/ty
           cp .github/ty-ecosystem.toml ~/.config/ty/ty.toml

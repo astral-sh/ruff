@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{
-    AsName, AssignTargetExpression, Attribute, Dot, Expression, Import, ImportAlias, ImportFrom,
-    ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
+    AsName, AssignTargetExpression, Attribute, Dot, Expression, ImportAlias, ImportNames, Name,
+    NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::debug;
 
@@ -16,7 +16,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::cst::matchers::{match_import, match_import_from, match_statement};
+use crate::cst::matchers::{match_aliases, match_import, match_import_from, match_statement};
 use crate::fix::codemods::CodegenStylist;
 use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -128,7 +128,12 @@ fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Opt
     (clean_aliases, mock_aliases)
 }
 
-fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -> String {
+fn format_mocks(
+    aliases: Vec<Option<AsName>>,
+    is_lazy: bool,
+    indent: &str,
+    stylist: &Stylist,
+) -> String {
     let mut content = String::new();
     for alias in aliases {
         match alias {
@@ -137,6 +142,9 @@ fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -
                     content.push_str(&stylist.line_ending());
                     content.push_str(indent);
                 }
+                if is_lazy {
+                    content.push_str("lazy ");
+                }
                 content.push_str("from unittest import mock");
             }
             Some(as_name) => {
@@ -144,6 +152,9 @@ fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -
                     if !content.is_empty() {
                         content.push_str(&stylist.line_ending());
                         content.push_str(indent);
+                    }
+                    if is_lazy {
+                        content.push_str("lazy ");
                     }
                     content.push_str("from unittest import mock as ");
                     content.push_str(name.value);
@@ -163,20 +174,18 @@ fn format_import(
 ) -> Result<String> {
     let module_text = locator.slice(stmt);
     let mut tree = match_statement(module_text)?;
-    let import = match_import(&mut tree)?;
-
-    let Import { names, .. } = import.clone();
-    let (clean_aliases, mock_aliases) = clean_import_aliases(names);
+    let (names, is_lazy) = match_import(&mut tree)?;
+    let (clean_aliases, mock_aliases) = clean_import_aliases(names.clone());
 
     Ok(if clean_aliases.is_empty() {
-        format_mocks(mock_aliases, indent, stylist)
+        format_mocks(mock_aliases, is_lazy, indent, stylist)
     } else {
-        import.names = clean_aliases;
+        *names = clean_aliases;
 
         let mut content = tree.codegen_stylist(stylist);
         content.push_str(&stylist.line_ending());
         content.push_str(indent);
-        content.push_str(&format_mocks(mock_aliases, indent, stylist));
+        content.push_str(&format_mocks(mock_aliases, is_lazy, indent, stylist));
         content
     })
 }
@@ -189,16 +198,12 @@ fn format_import_from(
     stylist: &Stylist,
 ) -> Result<String> {
     let module_text = locator.slice(stmt);
-    let mut tree = match_statement(module_text).unwrap();
-    let import = match_import_from(&mut tree)?;
+    let mut tree = match_statement(module_text)?;
+    let (module, names, is_lazy) = match_import_from(&mut tree)?;
 
-    if let ImportFrom {
-        names: ImportNames::Star(..),
-        ..
-    } = import
-    {
+    if let ImportNames::Star(..) = names {
         // Ex) `from mock import *`
-        import.module = Some(NameOrAttribute::A(Box::new(Attribute {
+        *module = Some(NameOrAttribute::A(Box::new(Attribute {
             value: Box::new(Expression::Name(Box::new(Name {
                 value: "unittest",
                 lpar: vec![],
@@ -217,18 +222,15 @@ fn format_import_from(
             rpar: vec![],
         })));
         Ok(tree.codegen_stylist(stylist))
-    } else if let ImportFrom {
-        names: ImportNames::Aliases(aliases),
-        ..
-    } = import
-    {
+    } else {
+        let aliases = match_aliases(names)?;
         // Ex) `from mock import mock`
         let (clean_aliases, mock_aliases) = clean_import_aliases(aliases.clone());
         Ok(if clean_aliases.is_empty() {
-            format_mocks(mock_aliases, indent, stylist)
+            format_mocks(mock_aliases, is_lazy, indent, stylist)
         } else {
-            import.names = ImportNames::Aliases(clean_aliases);
-            import.module = Some(NameOrAttribute::A(Box::new(Attribute {
+            *names = ImportNames::Aliases(clean_aliases);
+            *module = Some(NameOrAttribute::A(Box::new(Attribute {
                 value: Box::new(Expression::Name(Box::new(Name {
                     value: "unittest",
                     lpar: vec![],
@@ -251,12 +253,10 @@ fn format_import_from(
             if !mock_aliases.is_empty() {
                 content.push_str(&stylist.line_ending());
                 content.push_str(indent);
-                content.push_str(&format_mocks(mock_aliases, indent, stylist));
+                content.push_str(&format_mocks(mock_aliases, is_lazy, indent, stylist));
             }
             content
         })
-    } else {
-        panic!("Expected ImportNames::Aliases | ImportNames::Star");
     }
 }
 
@@ -296,9 +296,11 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
             .iter()
             .any(|name| &name.name == "mock" || &name.name == "mock.mock") =>
         {
-            // The CST-based fixer does not support explicit lazy import syntax.
-            let can_fix = !*is_lazy
-                && names
+            // Explicit `lazy` imports stay lazy because the fix preserves the keyword.
+            // Otherwise, changing the module must preserve whether `__lazy_modules__`
+            // makes the import lazy.
+            let can_fix = *is_lazy
+                || names
                     .iter()
                     .filter(|name| matches!(name.name.as_str(), "mock" | "mock.mock"))
                     .all(|name| checker.import_rewrite_preserves_laziness(&name.name, "unittest"));
@@ -370,8 +372,8 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                     stmt.range(),
                 );
                 diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
-                let can_fix = !*is_lazy
-                    && names.iter().all(|name| {
+                let can_fix = *is_lazy
+                    || names.iter().all(|name| {
                         let target = if name.name.as_str() == "mock" {
                             "unittest"
                         } else {

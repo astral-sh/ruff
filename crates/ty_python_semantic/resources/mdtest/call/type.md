@@ -52,9 +52,9 @@ def rotating(value: Rotate[int, str]):
 
 ### Classes of recursive aliases with growing specializations
 
-This invalid cyclic alias introduces classes beyond the initial type argument. During error
-recovery, class inference terminates even when the type arguments keep growing, conservatively
-returning `type`.
+After reporting this invalid cyclic definition, class inference uses the non-recursive type
+argument. The recursive branch is discarded during error recovery even when its type arguments keep
+growing.
 
 ```toml
 [environment]
@@ -65,7 +65,7 @@ python-version = "3.12"
 type Growing[T] = T | Growing[list[T]]  # error: [cyclic-type-alias-definition]
 
 def growing(value: Growing[int]):
-    reveal_type(type(value))  # revealed: type
+    reveal_type(type(value))  # revealed: type[int]
 ```
 
 ### Classes of recursive class aliases with growing specializations

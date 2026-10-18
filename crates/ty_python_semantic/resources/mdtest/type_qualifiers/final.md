@@ -202,6 +202,412 @@ FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 ```
 
+### Imported `Final` qualifiers survive re-exports
+
+An import does not declare the imported type, but a `Final` qualifier still prevents reassignment
+after direct or wildcard re-exports. An incompatible reassignment also reports the source type
+without treating that type as a local declaration. Repeated reassignment errors do not label the
+previous invalid assignment as a `Final` declaration.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`forwarded.py`:
+
+```py
+from source import VALUE as VALUE
+```
+
+`wildcard.py`:
+
+```py
+from source import *
+```
+
+`main.py`:
+
+```py
+from forwarded import VALUE as forwarded_value
+from wildcard import VALUE as wildcard_value
+from source import VALUE as imported_twice
+from source import VALUE as wrong_type
+
+from source import VALUE as imported_twice
+
+forwarded_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `forwarded_value` is not allowed"
+# snapshot: invalid-assignment
+forwarded_value = 3
+wildcard_value = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+imported_twice = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `imported_twice` is not allowed"
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `wrong_type` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int`"
+wrong_type = "wrong"
+
+def overwrite_wildcard() -> None:
+    global wildcard_value
+    wildcard_value = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `wildcard_value` is not allowed"
+```
+
+```snapshot
+error[invalid-assignment]: Reassignment of `Final` symbol `forwarded_value` is not allowed
+  --> src/main.py:10:1
+   |
+10 | forwarded_value = 3
+   | ^^^^^^^^^^^^^^^^^^^ Reassignment of `Final` symbol
+```
+
+### Imported `Final` qualifiers survive loop bindings
+
+An imported `Final` value remains protected when a loop introduces synthetic bindings for its name.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+```py
+from source import VALUE
+
+for _ in range(2):
+    VALUE = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `VALUE` is not allowed"
+```
+
+### Imported `Final` qualifiers do not replace earlier declared types
+
+An incompatible imported value is checked against the existing declaration, which remains the
+authoritative declared type. A later incompatible reassignment reports both the type mismatch and
+the imported `Final` restriction.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+value: str
+from source import VALUE as value  # error: [invalid-assignment]
+
+reveal_type(value)  # revealed: str
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `str`"
+value = 2
+```
+
+### Imported `Final` qualifiers apply across nested scopes
+
+An imported final value in an enclosing scope prevents `nonlocal` assignments, including when the
+imported name already has a separate type annotation.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+def enclosing() -> None:
+    local_value: int
+    from source import VALUE as local_value
+
+    def replace_nonlocal() -> None:
+        nonlocal local_value
+        local_value = 2  # error: [invalid-assignment]
+```
+
+### Imported `Final` qualifiers apply inside `global` scopes
+
+Importing a final value into a name declared `global` preserves the qualifier for subsequent
+assignments in the same forwarding scope.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+value: int = 0
+
+def replace_global() -> None:
+    global value
+    from source import VALUE as value
+
+    value = 2  # error: [invalid-assignment]
+```
+
+### Non-final imports replace forwarded imported `Final` qualifiers
+
+Importing a non-final value into a `global` name should replace the owner's earlier imported `Final`
+qualifier.
+
+TODO: Subsequent assignments are incorrectly rejected because ty retains the owner's earlier `Final`
+qualifier. Pyrefly correctly permits these assignments.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`main.py`:
+
+```py
+from constant import VALUE as global_value
+
+def replace_global() -> None:
+    global global_value
+    from mutable import VALUE as global_value
+
+    global_value = 2  # error: [invalid-assignment]
+```
+
+### Imported `Final` qualifiers apply to class members
+
+An imported `Final` qualifier prevents subclass overrides and assignments through the class object
+or its instances. An earlier class-member annotation retains its declared type.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+class Base:
+    VALUE: int
+    from source import VALUE
+
+reveal_type(Base.VALUE)  # revealed: int
+
+class Derived(Base):
+    VALUE = 2  # error: [override-of-final-variable]
+
+Base.VALUE = 3  # error: [invalid-assignment]
+Base().VALUE = 4  # error: [invalid-assignment]
+```
+
+### Conditional imports preserve `Final` qualifiers
+
+A conditionally re-exported name remains final if a reachable import supplies a `Final` qualifier,
+even when an earlier import in another branch is not final.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`mutable_first.py`:
+
+```py
+def choose() -> bool:
+    return True
+
+if choose():
+    from mutable import VALUE as VALUE
+else:
+    from constant import VALUE as VALUE
+```
+
+`main.py`:
+
+```py
+from mutable_first import VALUE as mutable_first
+
+mutable_first = 2  # error: [invalid-assignment]
+```
+
+### Conditional imports combine `Final` source types
+
+Without a local annotation, reassignment is checked against the union of the reachable final
+imports' source types, in addition to the restriction on reassigning a final name.
+
+`source.py`:
+
+```py
+from typing import Final
+
+NUMBER: Final[int] = 1
+TEXT: Final[str] = "text"
+```
+
+`main.py`:
+
+```py
+def reassign(flag: bool) -> None:
+    if flag:
+        from source import NUMBER as value
+    else:
+        from source import TEXT as value
+
+    # error: [invalid-assignment] "Reassignment of `Final` symbol `value` is not allowed"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to `int | str`"
+    value = None
+```
+
+### Stub annotations preserve `Final` qualifiers from private imports
+
+A genuine stub annotation exports its name even when a subsequent import omits the redundant alias
+used for explicit re-exports. The imported `Final` qualifier still applies to that exported name.
+
+`source.pyi`:
+
+```pyi
+from typing import Final
+
+VALUE: Final[int]
+```
+
+`forwarded.pyi`:
+
+```pyi
+VALUE: int
+from source import VALUE
+```
+
+`main.py`:
+
+```py
+from forwarded import VALUE
+
+VALUE = 2  # error: [invalid-assignment]
+```
+
+### Statically unreachable imports do not introduce `Final` qualifiers
+
+An imported `Final` qualifier has the same reachability constraints as its import. An import
+excluded by the configured Python version cannot affect later assignments.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+import sys
+
+version_value = 0
+
+if sys.version_info >= (3, 12):
+    from source import VALUE as version_value
+
+version_value = 2
+```
+
+### Imported `Final` qualifiers are replaced by later imports
+
+A subsequent direct import, wildcard import, or module import replaces an earlier imported value. If
+the replacement is not final, later ordinary assignments remain valid.
+
+`constant.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`mutable.py`:
+
+```py
+VALUE: int = 0
+```
+
+`main.py`:
+
+```py
+from constant import VALUE as direct_value
+from mutable import VALUE as direct_value
+
+direct_value = 2
+
+from constant import VALUE
+from mutable import *
+
+VALUE = 2
+
+from constant import VALUE as module_value
+import os as module_value
+
+module_value = 2
+```
+
+### Imported `Final` qualifiers are replaced by later annotations
+
+An explicit annotation after an import establishes a new declaration and replaces qualifiers
+inherited solely from the imported value.
+
+`source.py`:
+
+```py
+from typing import Final
+
+VALUE: Final[int] = 1
+```
+
+`main.py`:
+
+```py
+from source import VALUE as value
+
+value: int | None
+value = None
+value = 2
+```
+
 ### Reassignment after conditional assignment
 
 If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a
@@ -412,6 +818,112 @@ def intersection_one_final(arg: Intersection[HasFinal, NotFinal]):
 def intersection_augmented(arg: Intersection[HasFinal, NotFinal]):
     # error: [invalid-assignment]
     arg.x += 1
+```
+
+### Instance attributes on unions and protocol intersections
+
+An instance attribute remains `Final` when another union member allows assignment. Narrowing the
+receiver through a protocol also preserves the nominal class's `Final` restriction.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Protocol
+from typing_extensions import TypeIs
+
+class Fixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class AlsoFixed:
+    def __init__(self) -> None:
+        self.value: Final[int] = 1
+
+class Mutable:
+    value: int = 1
+
+class Marker(Protocol):
+    @property
+    def marker(self) -> bool: ...
+
+def has_marker(value: object) -> TypeIs[Marker]:
+    return True
+
+def assign(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    either.value = 2  # error: [invalid-assignment]
+    either.value += 1  # error: [invalid-assignment]
+    both.value = 2  # error: [invalid-assignment]
+    if has_marker(fixed):
+        fixed.value = 2  # error: [invalid-assignment]
+    if has_marker(either):
+        either.value = 2  # error: [invalid-assignment]
+    if has_marker(mutable):
+        mutable.value = 2  # no diagnostic
+```
+
+The same restriction applies to deletion, even when a protocol component permits it:
+
+```py
+def delete(fixed: Fixed, either: Fixed | Mutable, both: Fixed | AlsoFixed, mutable: Mutable) -> None:
+    del either.value  # error: [invalid-assignment]
+    if has_marker(fixed):
+        del fixed.value  # error: [invalid-assignment]
+    if has_marker(either):
+        del either.value  # error: [invalid-assignment]
+    if has_marker(both):
+        del both.value  # error: [invalid-assignment]
+    if has_marker(mutable):
+        del mutable.value  # no diagnostic
+```
+
+Narrowing `self` still allows initialization. That exemption does not apply to another parameter:
+
+```py
+class Initialized:
+    def __init__(self, other: "Initialized | Mutable") -> None:
+        self.value: Final[int] = 1
+        if has_marker(self):
+            self.value = 2  # no diagnostic
+        if has_marker(other):
+            other.value = 2  # error: [invalid-assignment]
+```
+
+Diagnostics point to the nominal class that declares the attribute:
+
+```py
+class Declared:
+    value: Final[int]
+
+    def __init__(self) -> None:
+        self.value = 1
+
+def assign_declared(value: Declared | Mutable) -> None:
+    value.value = 2  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Cannot assign to final attribute `value` on type `Declared`
+  --> src/mdtest_snippet.py:56:5
+   |
+56 |     value.value = 2  # snapshot: invalid-assignment
+   |     ^^^^^^^^^^^ `Final` attributes can only be assigned in the class body or `__init__`
+   |
+  ::: src/mdtest_snippet.py:50:12
+   |
+50 |     value: Final[int]
+   |            ---------- Attribute declared as `Final` here
+```
+
+A type alias in a union preserves the `Final` restriction on the aliased class's instance attribute.
+
+```py
+type FixedAlias = Fixed
+
+def assign_aliased(value: FixedAlias | Mutable) -> None:
+    value.value = 2  # error: [invalid-assignment]
 ```
 
 ## Mutability

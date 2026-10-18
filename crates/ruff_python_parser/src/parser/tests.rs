@@ -1,8 +1,9 @@
 use std::assert_matches;
 
 use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{Mode, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseOptions, parse, parse_cells_unchecked, parse_expression, parse_module};
 
 // Keep recursive ASTs shallow enough for Windows's 1 MiB test-thread stacks.
 const RECURSIVE_AST_TEST_DEPTH: usize = 1_000;
@@ -520,4 +521,23 @@ fn nested_unary_chains_grow_stack() {
 
     let source = format!("{}True\n", "not ".repeat(depth));
     parse_module(&source).unwrap();
+}
+
+/// The module range of a cell-wise parse matches a whole-source parse, so that offsets in the
+/// notebook's trailing newline (for example, past the end of an empty last cell) are inside it.
+#[test]
+fn cells_module_range_spans_source() {
+    // Two cells, `x = 1` and an empty one, each followed by a `\n` separator.
+    let source = "x = 1\n\n";
+    let ranges = [
+        TextRange::new(TextSize::new(0), TextSize::new(5)),
+        TextRange::empty(TextSize::new(6)),
+    ];
+
+    let parsed = parse_cells_unchecked(source, ranges, &ParseOptions::from(Mode::Ipython));
+
+    assert_eq!(
+        parsed.syntax().range(),
+        parse_module(source).unwrap().syntax().range()
+    );
 }
