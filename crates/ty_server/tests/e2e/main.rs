@@ -1702,7 +1702,8 @@ impl TestContext {
             "<temp_dir>/",
         );
         settings.add_filter(r#"\\\\"#, "/");
-        // For windows
+        // redact project path on windows. Must be after the line above that converts everything
+        // to slashes
         settings.add_filter(
             &tempdir_filter(project_dir.as_str().replace('\\', "/")),
             "<temp_dir>/",
