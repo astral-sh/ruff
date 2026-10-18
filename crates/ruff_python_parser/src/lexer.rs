@@ -903,7 +903,13 @@ impl<'src> Lexer<'src> {
                     }
                 }
                 _ => {
-                    self.cursor.bump();
+                    // All delimiters are ASCII, so the stopping position is a UTF-8 boundary.
+                    let length = interpolated_string::literal_text_length(
+                        self.cursor.rest().as_bytes(),
+                        interpolated_string.quote_char() as u8,
+                        interpolated_string.is_triple_quoted(),
+                    );
+                    self.cursor.skip_bytes(length);
                 }
             }
         }

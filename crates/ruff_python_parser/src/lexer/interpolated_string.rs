@@ -1,3 +1,8 @@
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::{
+    _mm_and_si128, _mm_cmpeq_epi8, _mm_loadu_si128, _mm_movemask_epi8, _mm_or_si128, _mm_set1_epi8,
+};
+
 use ruff_python_ast::StringFlags;
 
 use crate::string::InterpolatedStringKind;
@@ -155,3 +160,113 @@ impl InterpolatedStrings {
 
 #[derive(Debug, Clone)]
 pub(crate) struct InterpolatedStringsCheckpoint(Vec<InterpolatedStringContext>);
+
+/// Finds the next byte that requires the interpolated-string state machine.
+/// Only ASCII bytes stop the scan, including when a UTF-8 codepoint spans two chunks.
+#[cfg(target_arch = "x86_64")]
+// Keep the vector loop out of the hot `Lexer::next_token` function.
+#[inline(never)]
+#[expect(
+    unsafe_code,
+    reason = "SSE2 is guaranteed on x86-64 and every load is bounded by a 16-byte chunk"
+)]
+pub(super) fn literal_text_length(source: &[u8], quote: u8, triple_quoted: bool) -> usize {
+    // SAFETY: SSE2 is part of the x86-64 baseline.
+    unsafe { literal_text_length_sse2(source, quote, triple_quoted) }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse2")]
+#[expect(
+    unsafe_code,
+    reason = "every vector load is bounded by a 16-byte chunk"
+)]
+unsafe fn literal_text_length_sse2(source: &[u8], quote: u8, triple_quoted: bool) -> usize {
+    let quote_vector = _mm_set1_epi8(quote.cast_signed());
+    let open = _mm_set1_epi8(b'{'.cast_signed());
+    let close = _mm_set1_epi8(b'}'.cast_signed());
+    let escape = _mm_set1_epi8(b'\\'.cast_signed());
+    let cr = _mm_set1_epi8(b'\r'.cast_signed());
+    let lf = _mm_set1_epi8(b'\n'.cast_signed());
+    let newline_mask = _mm_set1_epi8(if triple_quoted { 0 } else { -1 });
+    let (chunks, tail) = source.as_chunks::<16>();
+    for (index, chunk) in chunks.iter().enumerate() {
+        // SAFETY: The chunk contains all sixteen bytes read by this unaligned load.
+        let bytes = unsafe { _mm_loadu_si128(chunk.as_ptr().cast()) };
+        let quote_or_escape = _mm_or_si128(
+            _mm_cmpeq_epi8(bytes, quote_vector),
+            _mm_cmpeq_epi8(bytes, escape),
+        );
+        let braces = _mm_or_si128(_mm_cmpeq_epi8(bytes, open), _mm_cmpeq_epi8(bytes, close));
+        let newlines = _mm_and_si128(
+            newline_mask,
+            _mm_or_si128(_mm_cmpeq_epi8(bytes, cr), _mm_cmpeq_epi8(bytes, lf)),
+        );
+        let mask = _mm_movemask_epi8(_mm_or_si128(
+            _mm_or_si128(quote_or_escape, braces),
+            newlines,
+        ));
+        if mask != 0 {
+            return index * 16 + mask.trailing_zeros() as usize;
+        }
+    }
+    tail.iter()
+        .position(|byte| {
+            *byte == quote
+                || matches!(byte, b'{' | b'}' | b'\\')
+                || (!triple_quoted && matches!(byte, b'\r' | b'\n'))
+        })
+        .map_or(source.len(), |index| chunks.len() * 16 + index)
+}
+
+/// Finds the next delimiter with bounded searches on other targets.
+#[cfg(not(target_arch = "x86_64"))]
+#[inline(never)]
+pub(super) fn literal_text_length(source: &[u8], quote: u8, triple_quoted: bool) -> usize {
+    let mut offset = 0;
+    for chunk in source.chunks(64) {
+        let special = memchr::memchr3(b'{', b'}', b'\\', chunk).unwrap_or(chunk.len());
+        let delimiter = if triple_quoted {
+            memchr::memchr(quote, &chunk[..special])
+        } else {
+            memchr::memchr3(quote, b'\r', b'\n', &chunk[..special])
+        };
+        if let Some(delimiter) = delimiter {
+            return offset + delimiter;
+        }
+        if special != chunk.len() {
+            return offset + special;
+        }
+        offset += chunk.len();
+    }
+    source.len()
+}
+
+#[cfg(test)]
+mod literal_text_tests {
+    use super::literal_text_length;
+
+    #[test]
+    fn bulk_scan_matches_scalar_at_chunk_boundaries() {
+        for &quote in b"'\"" {
+            for triple in [false, true] {
+                for length in 0..130 {
+                    for special in [quote, b'{', b'}', b'\\', b'\n', b'\r', 0, 0xc3, 0xa9] {
+                        let mut source = vec![b'a'; length];
+                        source.push(special);
+                        source.extend_from_slice(b"ordinary tail");
+                        let expected = source
+                            .iter()
+                            .position(|byte| {
+                                *byte == quote
+                                    || matches!(byte, b'{' | b'}' | b'\\')
+                                    || (!triple && matches!(byte, b'\n' | b'\r'))
+                            })
+                            .unwrap_or(source.len());
+                        assert_eq!(literal_text_length(&source, quote, triple), expected);
+                    }
+                }
+            }
+        }
+    }
+}
