@@ -252,6 +252,38 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
 ```
 
+## Inferring from matching protocol overloads
+
+An overload that cannot accept the protocol's parameter type does not contribute to the inferred
+return type. Here, string indexing returns `list[Any]`, but integer indexing does not.
+
+```py
+from typing import Any, Protocol, overload
+
+class Indexed[T](Protocol):
+    def __getitem__(self, key: int, /) -> T: ...
+
+class Records:
+    def __len__(self) -> int:
+        return 0
+
+    @overload
+    def __getitem__(self, key: int, /) -> Any: ...
+    @overload
+    def __getitem__(self, key: int | slice, /) -> list[str]: ...
+    @overload
+    def __getitem__(self, key: str, /) -> list[Any]: ...
+    def __getitem__(self, key):
+        raise NotImplementedError
+
+def first[T](values: Indexed[T]) -> T:
+    return values[0]
+
+def check(values: Records):
+    reveal_type(first(values))  # revealed: Any | list[str]
+    reveal_type(reversed(values))  # revealed: reversed[Any | list[str]]
+```
+
 ## Inferring through nested nominal generic classes
 
 When a nominal generic class is nested inside another, the outer class determines whether the inner

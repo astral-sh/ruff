@@ -186,10 +186,17 @@ impl<'db> SolutionWalker<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
-        source_orders: FxIndexSet<ConstraintId>,
+        mut source_orders: FxIndexSet<ConstraintId>,
         inferable: TypeVarSet<'db>,
         original_node: NodeId,
     ) -> Self {
+        // Construction history can include rejected alternatives. Only surviving constraints
+        // may contribute inference evidence when an implication recovers them on another path.
+        let mut constraints = FxHashSet::default();
+        original_node.for_each_unique_constraint(storage, &mut |constraint| {
+            constraints.insert(constraint);
+        });
+        source_orders.retain(|constraint| constraints.contains(constraint));
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,

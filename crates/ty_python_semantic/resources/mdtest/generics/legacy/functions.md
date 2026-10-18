@@ -202,6 +202,41 @@ def pick(x: object) -> str | bool:
 reveal_type(pick([1]))  # revealed: bool
 ```
 
+## Inferring from matching protocol overloads
+
+An overload that cannot accept the protocol's parameter type does not contribute to the inferred
+return type. Here, string indexing returns `list[Any]`, but integer indexing does not.
+
+```py
+from typing import Any, Protocol, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Indexed(Protocol[T_co]):
+    def __getitem__(self, key: int, /) -> T_co: ...
+
+class Records:
+    def __len__(self) -> int:
+        return 0
+
+    @overload
+    def __getitem__(self, key: int, /) -> Any: ...
+    @overload
+    def __getitem__(self, key: int | slice, /) -> list[str]: ...
+    @overload
+    def __getitem__(self, key: str, /) -> list[Any]: ...
+    def __getitem__(self, key):
+        raise NotImplementedError
+
+def first(values: Indexed[T]) -> T:
+    return values[0]
+
+def check(values: Records):
+    reveal_type(first(values))  # revealed: Any | list[str]
+    reveal_type(reversed(values))  # revealed: reversed[Any | list[str]]
+```
+
 ## Inferring generic typed-dictionary parameters
 
 A type variable that appears only inside a typed dictionary still makes the function generic, so
