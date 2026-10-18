@@ -174,7 +174,7 @@ impl<'db> CallableSignature<'db> {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.map_structure(db, mapper)),
+                .map(|signature| mapper.map_signature(db, signature)),
         )
     }
 
@@ -846,7 +846,11 @@ impl<'db> PartialApplication<'db> {
 }
 
 impl<'db> Signature<'db> {
-    fn map_structure(&self, db: &'db dyn Db, mapper: &impl StructuralTypeMapper<'db>) -> Self {
+    pub(super) fn map_structure(
+        &self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,

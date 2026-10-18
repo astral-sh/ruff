@@ -73,9 +73,9 @@
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -83,15 +83,17 @@ use ty_python_core::place_table;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
+use super::signatures::Signature;
 use super::structural::StructuralTypeMapper;
+use super::tuple::{Tuple, TupleType, VariableSegment};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use super::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
-    TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
+    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, GenericContext,
+    MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, VarianceTerm,
 };
-use crate::{Db, FxIndexSet, Program, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, Program, ProgramEnvironment};
 
 /// A recursive variable, named by an alias's query cycle or by its position in a solution.
 /// An escaping reference has no type semantics; in particular, it is neither a
@@ -102,7 +104,7 @@ pub struct RecursiveVar<'db> {
     /// Refers to the nearest enclosing recursive binder of this kind.
     #[returns(copy)]
     cycle: RecursiveCycle,
-    /// The unspecialized arguments of this occurrence, in the alias definition's scope.
+    /// The unspecialized arguments of this occurrence, in the constructor's scope.
     /// For `Tree = tuple[T, "Tree[list[T]] | None"]`, these are `[list[T]]`.
     /// Unfolding substitutes the enclosing application's arguments for the type parameters.
     #[returns(copy)]
@@ -173,8 +175,19 @@ impl<'db> StructuralTypeMapper<'db> for RecursiveReferenceMapper<'db> {
                             RecursiveCycle::Alias(_) => {
                                 recursive.with_arguments(db, variable.arguments(db))
                             }
-                            RecursiveCycle::Equation(entry) => recursive.at(db, entry),
+                            RecursiveCycle::Equation(entry) => recursive
+                                .at(db, entry)
+                                .with_arguments(db, variable.arguments(db)),
                         })
+                    }
+                    RecursiveSubstitution::Parameterize(arguments)
+                        if variable.equation_entry(db).is_some() =>
+                    {
+                        Type::RecursiveVar(RecursiveVar::new_internal(
+                            db,
+                            variable.cycle(db),
+                            arguments,
+                        ))
                     }
                     _ => Type::RecursiveVar(variable),
                 }
@@ -192,16 +205,6 @@ impl<'db> StructuralTypeMapper<'db> for RecursiveReferenceMapper<'db> {
                             db,
                             RecursiveCycle::Alias(cycle),
                             arguments,
-                        ))
-                    }
-                    RecursiveSubstitution::BindSolution(placeholders)
-                        if recursive.equations(db) == placeholders
-                            && recursive.is_placeholder(db) =>
-                    {
-                        Type::RecursiveVar(RecursiveVar::new_internal(
-                            db,
-                            RecursiveCycle::Equation(recursive.entry(db)),
-                            None,
                         ))
                     }
                     _ => {
@@ -245,8 +248,8 @@ enum RecursiveSubstitution<'db> {
     /// Replace applications of the target binder with variables to form an open body.
     /// In the module example, this replaces `Tree[list[T]]` with `F[list[T]]`.
     Bind(#[get_size(ignore)] salsa::Id),
-    /// Replace each placeholder of a solution with the variable of its equation.
-    BindSolution(RecursiveEquations<'db>),
+    /// Every reference in a solution passes the same formal parameters to the other entries.
+    Parameterize(Option<Specialization<'db>>),
 }
 
 impl<'db> RecursiveSubstitution<'db> {
@@ -256,7 +259,7 @@ impl<'db> RecursiveSubstitution<'db> {
         let target = match self {
             Self::Unfold(recursive) => recursive.origin(db),
             Self::Bind(cycle) => return binder.origin(db).alias_cycle() == Some(cycle),
-            Self::BindSolution(_) => return true,
+            Self::Parameterize(_) => return true,
         };
         match target {
             RecursiveOrigin::Alias { cycle, .. } => binder.origin(db).alias_cycle() == Some(cycle),
@@ -377,7 +380,6 @@ impl<'db> RecursiveType<'db> {
             let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
-            // Solution placeholders also need their binder when exposed through an alias.
             if let Some(Type::RecursiveVar(variable)) = summary.cycle {
                 summary.cycle = Some(match variable.cycle(db) {
                     RecursiveCycle::Alias(cycle) => Type::divergent_alias(cycle),
@@ -420,7 +422,7 @@ impl<'db> RecursiveType<'db> {
             self.origin(db),
             self.equations(db),
             entry,
-            None,
+            self.arguments(db),
             self.materialization_kind(db),
         )
     }
@@ -575,12 +577,19 @@ impl<'db> RecursiveType<'db> {
         let unfolded = RecursiveReferenceMapper::new(RecursiveSubstitution::Unfold(self))
             .map_type(db, self.body(db));
         match self.arguments(db) {
-            Some(arguments) => unfolded.apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
-                TypeContext::default(),
-            ),
+            Some(arguments) => {
+                let specialization = match self.origin(db) {
+                    RecursiveOrigin::Alias { .. } => ApplySpecialization::TypeAlias(arguments),
+                    // Solutions capture free variables from function signatures as well as stored types.
+                    RecursiveOrigin::Solution(_) => ApplySpecialization::specialization(arguments),
+                };
+                unfolded.apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                )
+            }
             None => unfolded,
         }
     }
@@ -599,19 +608,8 @@ impl<'db> RecursiveType<'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(_)
-            | TypeMapping::ReplaceSelf { .. }
-                if matches!(self.origin(db), RecursiveOrigin::Solution(_)) =>
-            {
-                // A solution has no parameters: free variables occur in its bodies instead.
-                self.map_solution(db, mapping, tcx, visitor)
-            }
-            TypeMapping::ApplySpecialization(_)
-            | TypeMapping::ApplySpecializationWithMaterialization { .. }
-            | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::FreshenBoundTypeVars { .. }
-            | TypeMapping::BindSelf(_)
             | TypeMapping::ReplaceSelf { .. } => {
-                // These mappings substitute free variables, which are captured by the alias's
+                // These mappings substitute free variables, which are captured by the constructor's
                 // arguments. Its formal body must remain independent of the calling context.
                 let arguments = self
                     .arguments(db)
@@ -677,50 +675,6 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    /// A closed stand-in for the entry at the same position of a solution being formed. Ordinary
-    /// type operations can inspect the types that contain it, and `BindSolution` then replaces
-    /// it with that entry's variable. It unfolds to itself, like the `μa. a` of an alias query.
-    fn placeholders(db: &'db dyn Db, program: Program<'db>, len: usize) -> Self {
-        let variables = (0..len).map(|entry| {
-            Type::RecursiveVar(RecursiveVar::new_internal(
-                db,
-                RecursiveCycle::Equation(entry),
-                None,
-            ))
-        });
-        Self::new_internal(
-            db,
-            RecursiveOrigin::Solution(program),
-            RecursiveEquations::new_internal(db, variables.collect::<Box<[_]>>()),
-            0,
-            None,
-            None,
-        )
-    }
-
-    fn is_placeholder(self, db: &'db dyn Db) -> bool {
-        self.arguments(db).is_none()
-            && self.materialization_kind(db).is_none()
-            && matches!(self.body(db), Type::RecursiveVar(variable)
-                if variable.cycle(db) == RecursiveCycle::Equation(self.entry(db)))
-    }
-
-    /// Binds the placeholders in `bodies` under one binder, and returns its entries.
-    fn bind_solution(
-        db: &'db dyn Db,
-        placeholders: Self,
-        bodies: impl Iterator<Item = Type<'db>>,
-    ) -> impl Iterator<Item = Self> {
-        let mapper = RecursiveReferenceMapper::new(RecursiveSubstitution::BindSolution(
-            placeholders.equations(db),
-        ));
-        let bodies: Box<[_]> = bodies.map(|body| mapper.map_type(db, body)).collect();
-        let equations = RecursiveEquations::new_internal(db, bodies);
-        (0..equations.bodies(db).len()).map(move |entry| {
-            Self::new_internal(db, placeholders.origin(db), equations, entry, None, None)
-        })
-    }
-
     /// Encloses structurally constructed equation bodies in one recursive binder.
     /// Every equation reference must name an entry in `bodies`.
     pub(super) fn bind_equations(
@@ -731,7 +685,27 @@ impl<'db> RecursiveType<'db> {
         if bodies.iter().any(|body| body.has_unguarded_alias_cycle(db)) {
             return None;
         }
-        let equations = RecursiveEquations::new_internal(db, bodies);
+        let parameters = SolutionParameters::default();
+        for body in &bodies {
+            parameters.map_type(db, *body);
+        }
+        let variables = parameters.free.into_inner();
+        let arguments = (!variables.is_empty()).then(|| {
+            GenericContext::from_typevar_instances(
+                db,
+                &ProgramEnvironment::from_program(program),
+                variables.into_values(),
+            )
+            .identity_specialization(db)
+        });
+        let mapper = RecursiveReferenceMapper::new(RecursiveSubstitution::Parameterize(arguments));
+        let equations = RecursiveEquations::new_internal(
+            db,
+            bodies
+                .into_iter()
+                .map(|body| mapper.map_type(db, body))
+                .collect::<Box<[_]>>(),
+        );
         Some(
             (0..equations.bodies(db).len())
                 .map(|entry| {
@@ -740,7 +714,7 @@ impl<'db> RecursiveType<'db> {
                         RecursiveOrigin::Solution(program),
                         equations,
                         entry,
-                        None,
+                        arguments,
                         None,
                     )
                 })
@@ -774,46 +748,6 @@ impl<'db> RecursiveType<'db> {
         members
     }
 
-    /// Maps the free variables of a solution, which occur in its bodies. The bodies are closed
-    /// with placeholders while they are mapped, and bound again afterwards.
-    fn map_solution(
-        self,
-        db: &'db dyn Db,
-        mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Type<'db> {
-        if self.is_placeholder(db) {
-            return Type::Recursive(self);
-        }
-        visitor.visit(db, Type::Recursive(self), mapping, || {
-            let RecursiveOrigin::Solution(program) = self.origin(db) else {
-                return Type::Recursive(self);
-            };
-            let bodies = self.equations(db).bodies(db);
-            let placeholders = Self::placeholders(db, program, bodies.len());
-            let close = RecursiveReferenceMapper::new(RecursiveSubstitution::Unfold(placeholders));
-            let mut changed = false;
-            let mapped: Vec<_> = bodies
-                .iter()
-                .map(|body| {
-                    let closed = close.map_type(db, *body);
-                    let mapped = closed.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                    changed |= mapped != closed;
-                    mapped
-                })
-                .collect();
-            if !changed {
-                return Type::Recursive(self);
-            }
-            let entry =
-                Self::bind_solution(db, placeholders, mapped.into_iter()).nth(self.entry(db));
-            entry.map_or(Type::Recursive(self), |entry| {
-                Type::Recursive(entry.with_materialization(db, self.materialization_kind(db)))
-            })
-        })
-    }
-
     pub(in crate::types) fn variance_equation(
         self,
         db: &'db dyn Db,
@@ -823,6 +757,73 @@ impl<'db> RecursiveType<'db> {
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
+    }
+}
+
+/// Collect free occurrences in equation bodies, respecting callable and recursive binders.
+#[derive(Default)]
+struct SolutionParameters<'db> {
+    free: RefCell<FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>>,
+    bound: Cell<Option<GenericContext<'db>>>,
+    seen: RefCell<FxHashSet<(Type<'db>, Option<GenericContext<'db>>)>>,
+}
+
+impl<'db> StructuralTypeMapper<'db> for SolutionParameters<'db> {
+    fn map_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        if !self.seen.borrow_mut().insert((ty, self.bound.get())) {
+            return ty;
+        }
+        if let Type::TypeVar(variable) = ty {
+            // ParamSpec components are substituted through their shared base variable.
+            let variable = if variable.is_paramspec(db) {
+                variable.without_paramspec_attr(db)
+            } else {
+                variable
+            };
+            if !self.bound.get().is_some_and(|context| {
+                context
+                    .variables(db)
+                    .any(|bound| bound.is_same_typevar_as(db, variable))
+            }) {
+                self.free
+                    .borrow_mut()
+                    .entry(variable.identity(db))
+                    .or_insert(variable);
+            }
+        } else {
+            if let Type::FunctionLiteral(function) = ty {
+                // Specialization also enters signatures that have not been stored on the function.
+                function.signature(db).map_structure(db, self);
+                if function.literal(db).has_separate_implementation(db) {
+                    for callable in function.implementation_callables(db).iter() {
+                        self.map_type(db, Type::Callable(*callable));
+                    }
+                }
+            }
+            ty.map_structure(db, self);
+        }
+        ty
+    }
+
+    fn map_tuple(&self, db: &'db dyn Db, tuple: TupleType<'db>) -> TupleType<'db> {
+        if let Tuple::Variable(tuple) = tuple.tuple(db)
+            && let VariableSegment::TypeVarTuple(variable) = tuple.variable()
+        {
+            self.map_type(db, Type::TypeVar(variable));
+        }
+        tuple.map_structure(db, self)
+    }
+
+    fn map_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) -> Signature<'db> {
+        let previous = self.bound.get();
+        self.bound.set(GenericContext::merge_optional(
+            db,
+            previous,
+            signature.generic_context,
+        ));
+        let mapped = signature.map_structure(db, self);
+        self.bound.set(previous);
+        mapped
     }
 }
 

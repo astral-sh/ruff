@@ -239,7 +239,7 @@ impl<'db> NominalInstanceType<'db> {
     ) -> Self {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Self(NominalInstanceInner::ExactTuple(
-                tuple.map_structure(db, mapper),
+                mapper.map_tuple(db, tuple),
             )),
             NominalInstanceInner::NonTuple(class) => Self(NominalInstanceInner::NonTuple(
                 class.with_class(db, mapper.map_class(db, class.class(db))),

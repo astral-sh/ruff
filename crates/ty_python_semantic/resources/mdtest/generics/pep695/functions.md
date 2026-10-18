@@ -4374,5 +4374,72 @@ if first is not None:
 wrong: str = first  # error: [invalid-assignment]
 ```
 
+A callback stored in the recursive value can refer to the class's type parameter while retaining its
+own generic parameter. Specializing the class changes only the former.
+
+```py
+class CallbackTree[E]:
+    @staticmethod
+    def item[U](value: U) -> tuple[E, U]:
+        raise NotImplementedError
+
+    node = labelled(identity, item)
+
+callback_node = CallbackTree[int]().node
+other_callback_node = CallbackTree[str]().node
+if callback_node is not None:
+    reveal_type(callback_node[1]("x"))  # revealed: tuple[int, Literal["x"]]
+    tail = callback_node[0]
+    if tail is not None:
+        reveal_type(tail[1](1))  # revealed: tuple[int, Literal[1]]
+if other_callback_node is not None:
+    reveal_type(other_callback_node[1](1))  # revealed: tuple[str, Literal[1]]
+```
+
+`ParamSpec` and `TypeVarTuple` arguments also remain available for specialization after the
+recursive value is inferred.
+
+```py
+def callable_labelled[T, **P](callback: Callable[[T], tuple[T, Callable[P, int]] | None], action: Callable[P, int]) -> T:
+    raise NotImplementedError
+
+class CallableTree[**P]:
+    node = callable_labelled(identity, cast(Callable[P, int], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, (**P@CallableTree) -> int] | None
+
+reveal_type(CallableTree[[int, str]]().node)  # revealed: μ$0. tuple[$0, (int, str, /) -> int] | None
+
+def packed[T, *Ts](callback: Callable[[T], tuple[T, *Ts] | None], label: tuple[*Ts]) -> T:
+    raise NotImplementedError
+
+class PackedTree[*Ts]:
+    node = packed(identity, cast(tuple[*Ts], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, *Ts@PackedTree] | None
+
+reveal_type(PackedTree[int, str]().node)  # revealed: μ$0. tuple[$0, int, str] | None
+```
+
+## Collections of bound callbacks with gradual return types
+
+A collection can combine a generic callback with an unannotated return type and a lookup method
+whose return type is known. Selecting and calling a callback preserves both possible return types.
+
+```py
+class Lookup[K, V]:
+    values: dict[K, V]
+
+    def __init__(self, values: dict[K, V]) -> None: ...
+    def __getitem__(self, key: K, /) -> V:
+        raise NotImplementedError
+
+class Handler:
+    def handle[U](self, value: U):
+        raise NotImplementedError
+
+callbacks = Lookup({"handle": Handler().handle, "lookup": Lookup({"key": "value"}).__getitem__})
+callback = callbacks["lookup"]  # no diagnostic
+reveal_type(callback("key"))  # revealed: Unknown | str
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

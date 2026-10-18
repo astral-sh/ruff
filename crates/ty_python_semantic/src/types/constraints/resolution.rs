@@ -70,6 +70,14 @@ impl<'a, 'db> Resolver<'a, 'db> {
         inferable: TypeVarSet<'db>,
         solution: &'a [TypeVarSolution<'db>],
     ) -> Box<[SolutionType<'db>]> {
+        // Variadic bindings are still selected by compatibility inference after ordinary
+        // solutions. Keep them symbolic here, including in a recursive constructor's arguments.
+        let inferable = TypeVarSet::from_typevars(
+            db,
+            inferable
+                .iter(db)
+                .filter(|variable| !variable.is_paramspec(db) && !variable.is_typevartuple(db)),
+        );
         // Most solutions mention no other variable, so the index is built on the first reference.
         let indices = OnceCell::new();
         let index_of = |variable: BoundTypeVarInstance<'db>| {

@@ -1,5 +1,7 @@
 //! Transform stored type syntax without expanding definitions or comparing types.
 
+use super::signatures::Signature;
+use super::tuple::TupleType;
 use super::{
     ClassType, InternedType, IntersectionType, KnownBoundMethodType, SlotDescriptorType, Type,
     TypeFormType, UnionType,
@@ -10,6 +12,16 @@ use crate::{Db, FxOrderSet};
 /// Implementations decide whether to recurse by calling `Type::map_structure`.
 pub(super) trait StructuralTypeMapper<'db>: Sized {
     fn map_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
+
+    /// Maps a signature in its own type-parameter scope.
+    fn map_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) -> Signature<'db> {
+        signature.map_structure(db, self)
+    }
+
+    /// Maps a tuple with access to its variadic parameter.
+    fn map_tuple(&self, db: &'db dyn Db, tuple: TupleType<'db>) -> TupleType<'db> {
+        tuple.map_structure(db, self)
+    }
 
     fn map_class(&self, db: &'db dyn Db, class: ClassType<'db>) -> ClassType<'db> {
         match class {

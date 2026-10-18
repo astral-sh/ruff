@@ -3816,3 +3816,80 @@ if first is not None:
     reveal_type(first[1])  # revealed: int
 wrong: str = first  # error: [invalid-assignment]
 ```
+
+A callback stored in the recursive value can refer to the class's type parameter while retaining its
+own generic parameter. Specializing the class changes only the former.
+
+```py
+class CallbackTree(Generic[E]):
+    @staticmethod
+    def item(value: U) -> tuple[E, U]:
+        raise NotImplementedError
+
+    node = labelled(identity, item)
+
+callback_node = CallbackTree[int]().node
+other_callback_node = CallbackTree[str]().node
+if callback_node is not None:
+    reveal_type(callback_node[1]("x"))  # revealed: tuple[int, Literal["x"]]
+    tail = callback_node[0]
+    if tail is not None:
+        reveal_type(tail[1](1))  # revealed: tuple[int, Literal[1]]
+if other_callback_node is not None:
+    reveal_type(other_callback_node[1](1))  # revealed: tuple[str, Literal[1]]
+```
+
+`ParamSpec` and `TypeVarTuple` arguments also remain available for specialization after the
+recursive value is inferred.
+
+```py
+from typing import ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+def callable_labelled(callback: Callable[[T], tuple[T, Callable[P, int]] | None], action: Callable[P, int]) -> T:
+    raise NotImplementedError
+
+class CallableTree(Generic[P]):
+    node = callable_labelled(identity, cast(Callable[P, int], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, (**P@CallableTree) -> int] | None
+
+reveal_type(CallableTree[[int, str]]().node)  # revealed: μ$0. tuple[$0, (int, str, /) -> int] | None
+
+def packed(callback: Callable[[T], tuple[T, Unpack[Ts]] | None], label: tuple[Unpack[Ts]]) -> T:
+    raise NotImplementedError
+
+class PackedTree(Generic[Unpack[Ts]]):
+    node = packed(identity, cast(tuple[Unpack[Ts]], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, *Ts@PackedTree] | None
+
+reveal_type(PackedTree[int, str]().node)  # revealed: μ$0. tuple[$0, int, str] | None
+```
+
+## Collections of bound callbacks with gradual return types
+
+A collection can combine a generic callback with an unannotated return type and a lookup method
+whose return type is known. Selecting and calling a callback preserves both possible return types.
+
+```py
+from typing import Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+U = TypeVar("U")
+
+class Lookup(Generic[K, V]):
+    values: dict[K, V]
+    def __init__(self, values: dict[K, V]) -> None: ...
+    def __getitem__(self, key: K, /) -> V:
+        raise NotImplementedError
+
+class Handler:
+    def handle(self, value: U):
+        raise NotImplementedError
+
+callbacks = Lookup({"handle": Handler().handle, "lookup": Lookup({"key": "value"}).__getitem__})
+callback = callbacks["lookup"]  # no diagnostic
+reveal_type(callback("key"))  # revealed: Unknown | str
+```

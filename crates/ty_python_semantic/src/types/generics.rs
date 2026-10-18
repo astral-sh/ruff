@@ -1195,7 +1195,7 @@ impl<'db> Specialization<'db> {
             .collect();
         let tuple = self
             .tuple_inner(db)
-            .map(|tuple| tuple.map_structure(db, mapper));
+            .map(|tuple| mapper.map_tuple(db, tuple));
         if types.as_ref() == self.types(db) && tuple == self.tuple_inner(db) {
             return self;
         }
