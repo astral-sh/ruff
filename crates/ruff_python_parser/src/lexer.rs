@@ -31,6 +31,16 @@ mod interpolated_string;
 
 const BOM: char = '\u{feff}';
 
+const ASCII_IDENTIFIER_CONTINUE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut byte = 0u8;
+    while byte < 128 {
+        table[byte as usize] = matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9');
+        byte += 1;
+    }
+    table
+};
+
 /// A lexer for Python source code.
 #[derive(Debug)]
 pub struct Lexer<'src> {
@@ -639,22 +649,18 @@ impl<'src> Lexer<'src> {
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' t'' u'' r''
         let quote = if let Some(prefix) = single_char_prefix(first) {
-            match self.cursor.first() {
-                quote @ ('\'' | '"') => {
+            match self.cursor.rest().as_bytes() {
+                [quote @ (b'\'' | b'"'), ..] => {
                     self.current_flags |= prefix;
-                    self.cursor.bump();
-                    Some(quote)
+                    self.cursor.skip_bytes(1);
+                    Some(char::from(*quote))
                 }
-                second
-                    if let quote = self.cursor.second()
-                        && is_quote(quote) =>
-                {
-                    self.try_double_char_prefix([first, second]).then(|| {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        quote
-                    })
-                }
+                [second, quote @ (b'\'' | b'"'), ..] => self
+                    .try_double_char_prefix([first, char::from(*second)])
+                    .then(|| {
+                        self.cursor.skip_bytes(2);
+                        char::from(*quote)
+                    }),
                 _ => None,
             }
         } else {
@@ -680,8 +686,19 @@ impl<'src> Lexer<'src> {
         // an identifier is ASCII-only (by far the most common case), the parser
         // can skip NFKC normalization.
         let mut is_ascii = first.is_ascii();
-        self.cursor
-            .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
+        // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
+        // needs the full identifier-continuation check below.
+        let bytes = self.cursor.rest().as_bytes();
+        let ascii_len = bytes
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+            .unwrap_or(bytes.len());
+        self.cursor.skip_bytes(ascii_len);
+
+        if bytes.get(ascii_len).is_some_and(|byte| !byte.is_ascii()) {
+            self.cursor
+                .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
+        }
 
         if !is_ascii {
             self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
@@ -1572,10 +1589,6 @@ struct RadixRun {
     has_nonzero_digit: bool,
 }
 
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
-}
-
 fn single_char_prefix(c: char) -> Option<TokenFlags> {
     Some(match c {
         'f' | 'F' => TokenFlags::F_STRING,
@@ -2114,20 +2127,34 @@ if first:
 
     #[test]
     fn non_ascii_identifier_flag() {
-        let mut lexer = Lexer::new("a€\naβ = β\nascii", Mode::Module, TextSize::default());
-        let mut flags = Vec::new();
+        let source = "a€\naβ = β\nlong_ascii_prefixβ_012 = rβ_012\nascii";
+        let mut lexer = Lexer::new(source, Mode::Module, TextSize::default());
+        let mut identifiers = Vec::new();
         loop {
             let kind = lexer.next_token();
             if kind.is_eof() {
                 break;
             }
             if kind == TokenKind::Identifier {
-                flags.push(lexer.current_flags().is_non_ascii_identifier());
+                identifiers.push((
+                    &source[lexer.current_range()],
+                    lexer.current_flags().is_non_ascii_identifier(),
+                ));
             }
         }
 
         assert_eq!(lexer.finish().len(), 1);
-        assert_eq!(flags, [false, true, true, false]);
+        assert_eq!(
+            identifiers,
+            [
+                ("a", false),
+                ("aβ", true),
+                ("β", true),
+                ("long_ascii_prefixβ_012", true),
+                ("rβ_012", true),
+                ("ascii", false),
+            ]
+        );
     }
 
     fn triple_quoted_eol(eol: &str) -> LexerOutput {
