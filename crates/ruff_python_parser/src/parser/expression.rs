@@ -335,12 +335,8 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        let start = self.node_start();
 
-        let mut is_parenthesized = false;
-        let lhs = if token == TokenKind::Identifier {
-            Expr::Name(self.parse_name(context))
-        } else {
+        if token != TokenKind::Identifier {
             if let Some(unary_op) = token.as_unary_operator() {
                 let expr = self.parse_unary_expression(unary_op, context);
 
@@ -423,14 +419,9 @@ impl<'src> Parser<'src> {
                 }
                 _ => {}
             }
-
-            self.parse_atom(context, &mut is_parenthesized)
-        };
-
-        ParsedExpr {
-            expr: self.parse_postfix_expression(lhs, start, context),
-            is_parenthesized,
         }
+
+        self.parse_primary_expression(context)
     }
 
     /// Parses an expression with a minimum precedence of bitwise `or`.
@@ -585,15 +576,14 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses an atom, writing grouping-parenthesis metadata separately to keep
-    /// the return value an `Expr`.
+    /// Parses an atom and any following calls, subscripts, or attributes.
     ///
-    /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self, context: ExpressionContext, is_parenthesized: &mut bool) -> Expr {
-        *is_parenthesized = false;
+    /// See: <https://docs.python.org/3/reference/expressions.html#primaries>
+    fn parse_primary_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
+        let mut is_parenthesized = false;
         let start = self.node_start();
 
-        match self.current_token_kind() {
+        let mut lhs = match self.current_token_kind() {
             TokenKind::Float => {
                 let value = self.bump_float();
 
@@ -658,7 +648,7 @@ impl<'src> Parser<'src> {
             }
             TokenKind::Lpar => {
                 let parsed = self.parse_parenthesized_expression();
-                *is_parenthesized = parsed.is_parenthesized;
+                is_parenthesized = parsed.is_parenthesized;
                 parsed.expr
             }
             TokenKind::Lsqb => self.parse_list_like_expression(),
@@ -680,21 +670,8 @@ impl<'src> Parser<'src> {
                     })
                 }
             }
-        }
-    }
+        };
 
-    /// Parses a postfix expression in a loop until there are no postfix expressions left to parse.
-    ///
-    /// For a given left-hand side, a postfix expression can begin with either `(` for a call
-    /// expression, `[` for a subscript expression, or `.` for an attribute expression.
-    ///
-    /// This method does nothing if the current token is not a candidate for a postfix expression.
-    fn parse_postfix_expression(
-        &mut self,
-        mut lhs: Expr,
-        start: TextSize,
-        context: ExpressionContext,
-    ) -> Expr {
         loop {
             lhs = match self.current_token_kind() {
                 TokenKind::Lpar => Expr::Call(self.parse_call_expression(lhs, start)),
@@ -702,8 +679,13 @@ impl<'src> Parser<'src> {
                 TokenKind::Dot => {
                     Expr::Attribute(self.parse_attribute_expression(lhs, start, context))
                 }
-                _ => break lhs,
+                _ => break,
             };
+        }
+
+        ParsedExpr {
+            expr: lhs,
+            is_parenthesized,
         }
     }
 
