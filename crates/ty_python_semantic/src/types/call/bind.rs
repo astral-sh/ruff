@@ -6246,8 +6246,7 @@ impl<'db> CallInference<'_, 'db> {
 
     /// Refines the return using resolved alternatives that each validate every original argument.
     ///
-    /// Returns `None` when correlated inference is unavailable or incomplete. `Single` already
-    /// has the same specialization under either projection.
+    /// Returns `None` when correlated inference is unavailable or incomplete.
     fn refined_return_type(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
         let db = self.db;
         let env = self.env;
@@ -6257,6 +6256,7 @@ impl<'db> CallInference<'_, 'db> {
             return None;
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
+            // `Single` already has the same specialization under either projection.
             return None;
         };
         let resolved_type = |binding| match binding {

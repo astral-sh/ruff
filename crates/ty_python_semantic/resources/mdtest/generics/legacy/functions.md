@@ -3842,11 +3842,10 @@ make independently valid specializations incompatible: a fresh `[]` can be typed
 `list[B]`, but cannot safely expose both mutable views at once. Their intersection simplifies to
 `Never`, which would incorrectly imply that allocating the list cannot return.
 
-### Mutable returns from intersection arguments
+We handle this conservatively: if an invariant component differs across valid specializations, we do
+not intersect their return types.
 
-When a merged type-variable assignment accepts the call, inference uses that specialization instead
-of intersecting incompatible invariant returns. The covariant source permits `T = A | B`, giving
-`list[A | B]`:
+### Mutable returns from intersection arguments
 
 ```py
 from typing import Generic, TypeVar
@@ -3866,6 +3865,9 @@ def make_list(source: Source[T]) -> list[T]:
     return []
 
 def _(source: Intersection[Source[A], Source[B]]) -> None:
+    # `make_list` can accept this argument with `T = A` or `T = B`. Because `Source` is covariant,
+    # the argument also fits `Source[A | B]`. Inference uses `T = A | B`, producing `list[A | B]`
+    # instead of intersecting `list[A]` and `list[B]`.
     reveal_type(make_list(source))  # revealed: list[A | B]
 ```
 
