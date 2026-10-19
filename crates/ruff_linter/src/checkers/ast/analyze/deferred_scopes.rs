@@ -13,6 +13,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
     if !checker.any_rule_enabled(&[
         Rule::AsyncioDanglingTask,
         Rule::BadStaticmethodArgument,
+        Rule::BlockVariableShadowsLocal,
         Rule::BuiltinAttributeShadowing,
         Rule::FunctionCallInDataclassDefaultArgument,
         Rule::GlobalVariableNotAssigned,
@@ -106,6 +107,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if checker.is_rule_enabled(Rule::ImportShadowedByLoopVar) {
             pyflakes::rules::import_shadowed_by_loop_var(checker, scope_id, scope);
+        }
+
+        if checker.is_rule_enabled(Rule::BlockVariableShadowsLocal) {
+            ruff::rules::block_variable_shadows_local(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::RedefinedWhileUnused) {
