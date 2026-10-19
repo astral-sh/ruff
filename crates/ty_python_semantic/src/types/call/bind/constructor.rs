@@ -10,7 +10,7 @@ use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
+    TypeMapping, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -415,17 +415,58 @@ impl<'db> ConstructorBinding<'db> {
             .and_then(ClassLiteral::as_static);
         let class_context = class_specialization.generic_context(db);
 
-        let mut combined: Option<Specialization<'db>> = None;
-        let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
+        let mut combined: Option<Vec<Option<Type<'db>>>> = None;
+        let mut combine_binding_types = |binding: &ConstructorBinding<'db>| {
             let Some(overload) = binding
                 .first_matching_overload()
                 .or_else(|| binding.callable().unambiguous_failing_overload())
             else {
                 return;
             };
-            let return_specialization = static_class_literal
-                // Use the already-resolved overload return type when possible.
-                .and_then(|lit| overload.return_ty.specialization_of(db, env, lit));
+            // Parameter checking uses defaults for unsolved variables, but those defaults must
+            // not compete with types inferred by another constructor method. Project missing
+            // class bindings to a marker so we can distinguish them from inferred types, including
+            // an inferred `Unknown`. The overload's instance type contains call-local typevars.
+            let partial_specialization = overload.inference.and_then(|inference| {
+                let (_, class_specialization) = overload
+                    .constructor_context?
+                    .instance_type()
+                    .class_specialization(db, env)?;
+                Some(
+                    inference.merged_specialization_with(db, |typevar, inferred| {
+                        (inferred.is_none()
+                            && class_specialization
+                                .types(db)
+                                .contains(&Type::TypeVar(typevar)))
+                        .then_some(Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                    }),
+                )
+            });
+            // A marker for the entire class argument means there was no inference. Structural
+            // annotations such as `C[list[T]]` still contribute a type; use their resolved form
+            // so nested markers do not escape into the constructed instance.
+            let inferred_types = |partial: Specialization<'db>, resolved: Specialization<'db>| {
+                partial
+                    .types(db)
+                    .iter()
+                    .zip(resolved.types(db))
+                    .map(|(partial, resolved)| {
+                        (*partial != Type::Dynamic(DynamicType::UnspecializedTypeVar))
+                            .then_some(*resolved)
+                    })
+                    .collect::<Vec<_>>()
+            };
+            let project_class_arguments =
+                |ty: Type<'db>, resolved_ty: Type<'db>| -> Option<Vec<Option<Type<'db>>>> {
+                    let class = static_class_literal?;
+                    let partial = ty
+                        .apply_optional_specialization(db, partial_specialization)
+                        .specialization_of(db, env, class)?;
+                    let resolved = resolved_ty.specialization_of(db, env, class)?;
+                    Some(inferred_types(partial, resolved))
+                };
+            let return_types =
+                project_class_arguments(overload.unspecialized_return_type(db), overload.return_ty);
 
             // TODO All this handling of return-specialization vs self-specialization is a hacky
             // work-around to a situation that can occur with a case like `def __init__(self:
@@ -434,83 +475,74 @@ impl<'db> ConstructorBinding<'db> {
             // the class typevars), and we consider T1 and T2 as unknowns. This will be fixed when
             // we start building up constraint sets across the full call. We should be able to just
             // use the return specialization and eliminate all this.
-            let return_specialization_is_informative =
-                return_specialization.is_some_and(|specialization| {
-                    class_context.variables(db).any(|class_typevar| {
-                        specialization
-                            .get(db, class_typevar)
-                            .is_some_and(|mapped_ty| !mapped_ty.is_unknown())
-                    })
-                });
-            let self_parameter_specialization = static_class_literal.and_then(|lit| {
-                let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
-                let resolved_self_param_ty = overload
-                    .merged_specialization(db)
-                    .map_or(self_param_ty, |specialization| {
-                        self_param_ty.apply_specialization(db, specialization)
-                    });
-                resolved_self_param_ty.specialization_of(db, env, lit)
+            let return_types_are_informative = return_types.as_ref().is_some_and(|types| {
+                types
+                    .iter()
+                    .flatten()
+                    .any(|mapped_ty| !mapped_ty.is_unknown())
             });
-            let refined_self_parameter_specialization =
-                self_parameter_specialization.map(|specialization| {
-                    let types: Box<[_]> = specialization
-                        .types(db)
-                        .iter()
-                        .copied()
-                        .map(|mapped_ty| {
-                            let without_unknown =
-                                mapped_ty.filter_union(db, env, |element| !element.is_unknown());
-                            let mapped_ty = if without_unknown.is_never() {
-                                mapped_ty
-                            } else {
-                                without_unknown
-                            };
-                            mapped_ty.promote(db, env)
-                        })
-                        .collect();
-                    Specialization::new(
-                        db,
-                        specialization.generic_context(db),
-                        types,
-                        specialization.materialization_kind(db),
-                        None,
-                    )
-                });
-            let specialization = if return_specialization_is_informative {
-                return_specialization
+            let types = if return_types_are_informative {
+                return_types
             } else {
-                refined_self_parameter_specialization
-                    .or(return_specialization)
-                    .or_else(|| {
-                        overload
-                            .merged_specialization(db)?
-                            .restrict(db, class_context)
-                    })
+                let self_parameter_types = (|| {
+                    let self_param_ty = overload.signature.parameters().get(0)?.annotated_type();
+                    let resolved_self_param_ty = self_param_ty
+                        .apply_optional_specialization(db, overload.merged_specialization(db));
+                    let mut types = project_class_arguments(self_param_ty, resolved_self_param_ty)?;
+                    for mapped_ty in types.iter_mut().flatten() {
+                        let without_unknown =
+                            mapped_ty.filter_union(db, env, |element| !element.is_unknown());
+                        if !without_unknown.is_never() {
+                            *mapped_ty = without_unknown;
+                        }
+                        *mapped_ty = mapped_ty.promote(db, env);
+                    }
+                    Some(types)
+                })();
+                self_parameter_types.or(return_types).or_else(|| {
+                    let resolved = overload.merged_specialization(db)?;
+                    Some(inferred_types(
+                        partial_specialization
+                            .unwrap_or(resolved)
+                            .restrict(db, class_context)?,
+                        resolved.restrict(db, class_context)?,
+                    ))
+                })
             };
             // end TODO
 
-            let Some(specialization) = specialization else {
+            let Some(types) = types else {
                 return;
             };
-            combined = Some(match combined {
-                None => specialization,
-                Some(previous) => previous.combine(db, specialization),
-            });
+            if let Some(previous) = &mut combined {
+                for (previous, inferred) in previous.iter_mut().zip(types) {
+                    *previous = match (*previous, inferred) {
+                        (Some(previous), Some(inferred)) => {
+                            Some(UnionType::from_two_elements(db, env, previous, inferred))
+                        }
+                        (previous, inferred) => previous.or(inferred),
+                    };
+                }
+            } else {
+                combined = Some(types);
+            }
         };
 
-        combine_binding_specialization(self);
+        combine_binding_types(self);
 
         if let Some(downstream) = self.downstream_constructor() {
             for downstream_binding in downstream
                 .iter_callable_items()
                 .filter_map(CallableItem::as_constructor)
             {
-                combine_binding_specialization(downstream_binding);
+                combine_binding_types(downstream_binding);
             }
         }
 
-        combined.map(|specialization| {
-            specialization.apply_optional_specialization(db, Some(class_specialization))
+        combined.map(|types| {
+            class_context
+                .specialize_partial(db, types)
+                .apply_optional_specialization(db, Some(class_specialization))
         })
     }
 
