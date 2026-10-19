@@ -2008,8 +2008,8 @@ def read(value: T) -> list[str]:
 
 ## Assignment narrowing of dynamic attributes
 
-When a type variable can refer to an object with a dynamic attribute, assignment preserves the
-getter's read type. This applies to both upper bounds and constraints.
+An upper bound can provide an attribute through `__getattr__`. Assigning to that attribute does not
+change the type of later reads:
 
 ```py
 from typing import TypeVar
@@ -2020,21 +2020,25 @@ class Dynamic:
 
     def __setattr__(self, name: str, value: object) -> None: ...
 
+Bound = TypeVar("Bound", bound=Dynamic)
+
+def update_bound(obj: Bound) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
+A constrained type variable may also refer to a class that uses `__getattr__`. Assignment cannot
+narrow the attribute even if another permitted class declares it:
+
+```py
 class Declared:
     value: int | str
 
-Bound = TypeVar("Bound", bound=Dynamic | Declared)
 Constrained = TypeVar("Constrained", Dynamic, Declared)
 
-def update_bound(obj: Bound) -> Bound:
+def update_constrained(obj: Constrained) -> None:
     obj.value = 1
     reveal_type(obj.value)  # revealed: int | str
-    return obj
-
-def update_constrained(obj: Constrained) -> Constrained:
-    obj.value = 1
-    reveal_type(obj.value)  # revealed: int | str
-    return obj
 ```
 
 ## Solving TypeVars with upper bounds in unions

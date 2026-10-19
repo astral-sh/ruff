@@ -183,9 +183,26 @@ reveal_type(c.desc)  # revealed: int
 
 ### Dynamic attributes
 
-An attribute provided by `__getattr__` retains its read type after assignment. A custom
-`__setattr__` can transform or discard the assigned value, so the assignment does not determine what
-a subsequent read returns.
+An attribute provided by `__getattr__` need not return the value assigned to it. Here, `__setattr__`
+ignores assignments, and `__getattr__` always returns `"hello"`. Assigning `"goodbye"` therefore
+does not make later reads return `"goodbye"`:
+
+```py
+class AlwaysString:
+    def __getattr__(self, name: str) -> str:
+        return "hello"
+
+    def __setattr__(self, name: str, value: object) -> None:
+        pass
+
+obj = AlwaysString()
+obj.value = "goodbye"
+reveal_type(obj.value)  # revealed: str
+```
+
+### Dynamic attributes returning `Any`
+
+When `__getattr__` returns `Any`, assigning a value does not make later reads more precise:
 
 ```py
 from typing import Any
@@ -197,18 +214,21 @@ class Props:
 def update(props: Props) -> None:
     props.status = "Closed"
     reveal_type(props.status)  # revealed: Any
-    props.status.name  # no diagnostic
+```
 
-    if hasattr(props, "other"):
-        props.status = "Open"
-        reveal_type(props.status)  # revealed: Any
+A `hasattr` check tells us that an attribute exists, but not what it returns after an assignment:
 
+```py
+def update_if_present(props: Props) -> None:
     if hasattr(props, "status"):
         props.status = "Open"
         reveal_type(props.status)  # revealed: Any
 ```
 
-The same rule applies when the getter returns a static type.
+### Dynamic attributes after an `isinstance` check
+
+An `isinstance` check can narrow the type of a dynamic attribute. Assigning to that attribute
+discards the narrowing, since `__getattr__` may return a different value on the next read:
 
 ```py
 class Values:
@@ -218,69 +238,60 @@ class Values:
     def __setattr__(self, name: str, value: object) -> None: ...
 
 def update(values: Values) -> None:
-    values.value = 1
-    reveal_type(values.value)  # revealed: int | str
-
     if isinstance(values.value, int):
         reveal_type(values.value)  # revealed: int
         values.value = 2
         reveal_type(values.value)  # revealed: int | str
 ```
 
-The getter also determines the read type when there is no custom setter. The assignment is still
-invalid because the class does not provide the attribute or a setter that accepts it.
+### Dynamic attributes without a custom setter
+
+Defining `__getattr__` does not make assignments to missing attributes valid. We report the invalid
+assignment and continue to use the getter's return type for later reads:
 
 ```py
-class ReadOnlyProps:
-    def __getattr__(self, name: str) -> Any: ...
+class GetterOnly:
+    def __getattr__(self, name: str) -> str:
+        return "hello"
 
-def update(props: ReadOnlyProps) -> None:
-    props.status = "Closed"  # error: [unresolved-attribute]
-    reveal_type(props.status)  # revealed: Any
-    props.status.name  # no diagnostic
+def update(obj: GetterOnly) -> None:
+    obj.value = "goodbye"  # error: [unresolved-attribute]
+    reveal_type(obj.value)  # revealed: str
 ```
 
-### Known attributes with dynamic access
+### Declared and inferred attributes
 
-Declared and inferred attributes still narrow after assignment, even when the class has custom
-`__getattr__` and `__setattr__` methods. This preserves narrowing for ordinary fields on classes
-that also provide dynamic attributes.
+Ordinary attributes still narrow after assignment when a class defines `__getattr__` and
+`__setattr__`. This applies both to annotated attributes and to attributes inferred from assignments
+in the class body or `__init__`:
 
 ```py
 from typing import Any
 
-class Base:
-    cache: list[int] | None = None
-    inferred = None
+class Values:
+    declared: int | str
+    class_value = None
 
     def __init__(self) -> None:
-        self.instance = None
+        self.instance_value = None
 
     def __getattr__(self, name: str) -> Any: ...
     def __setattr__(self, name: str, value: object) -> None: ...
 
-class Child(Base): ...
-
-def update(obj: Child) -> None:
-    if obj.cache is None:
-        obj.cache = []
-    reveal_type(obj.cache)  # revealed: list[int]
-    obj.cache.append(1)  # no diagnostic
-
-    obj.inferred = 1
-    reveal_type(obj.inferred)  # revealed: Literal[1]
-    obj.instance = 1
-    reveal_type(obj.instance)  # revealed: Literal[1]
-
-    if hasattr(obj, "other"):
-        obj.cache = []
-        reveal_type(obj.cache)  # revealed: list[int]
+def update(obj: Values) -> None:
+    obj.declared = 1
+    reveal_type(obj.declared)  # revealed: Literal[1]
+    obj.class_value = 1
+    reveal_type(obj.class_value)  # revealed: Literal[1]
+    obj.instance_value = 1
+    reveal_type(obj.instance_value)  # revealed: Literal[1]
 ```
 
-### Dynamic attributes on union receivers
+### Dynamic attributes on unions
 
-An assignment cannot narrow an attribute when one of the possible receivers supplies it through
-`__getattr__`.
+A union may include a class that provides `value` through `__getattr__`. In that case, assigning
+`value` does not determine the type of the next read, even if another class in the union declares
+the attribute:
 
 ```py
 class Dynamic:
@@ -299,8 +310,8 @@ def update(obj: Dynamic | Declared) -> None:
 
 ### Module attributes
 
-We retain the assigned type after an invalid write to a missing module attribute. The synthetic
-`ModuleType.__getattr__` in typeshed does not provide attributes on a statically known module.
+This module defines neither `value` nor `__getattr__`, so assigning `value` produces an error. We
+still track the assigned type and report an incompatible use later:
 
 `module.py`:
 
@@ -313,23 +324,21 @@ We retain the assigned type after an invalid write to a missing module attribute
 import module
 
 module.value = 1  # error: [unresolved-attribute]
-# error: [unresolved-attribute]
-reveal_type(module.value)  # revealed: Literal[1]
 
-# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+# error: [invalid-assignment]
 # error: [unresolved-attribute]
 value: str = module.value
 ```
 
-### Module attributes with a dynamic getter
+### Modules with `__getattr__`
 
-Assigning a module attribute creates a value that shadows its module-level `__getattr__`. Subsequent
-reads retain the assigned type.
+A module's `__getattr__` is only called for missing attributes. Assigning an attribute adds it to
+the module, so later reads use the assigned value:
 
 `module.py`:
 
 ```py
-def __getattr__(name: str) -> int | str:
+def __getattr__(name: str) -> int:
     return 0
 ```
 
@@ -338,7 +347,6 @@ def __getattr__(name: str) -> int | str:
 ```py
 import module
 
-reveal_type(module.value)  # revealed: int | str
 module.value = 1
 reveal_type(module.value)  # revealed: Literal[1]
 ```

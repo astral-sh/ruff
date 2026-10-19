@@ -2460,8 +2460,8 @@ def union_bound[T: type[A] | type[B]](cls: T) -> None:
 
 ## Assignment narrowing of dynamic attributes
 
-When a type variable can refer to an object with a dynamic attribute, assignment preserves the
-getter's read type. This applies to both upper bounds and constraints.
+An upper bound can provide an attribute through `__getattr__`. Assigning to that attribute does not
+change the type of later reads:
 
 ```py
 class Dynamic:
@@ -2470,18 +2470,21 @@ class Dynamic:
 
     def __setattr__(self, name: str, value: object) -> None: ...
 
+def update_bound[T: Dynamic](obj: T) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
+A constrained type variable may also refer to a class that uses `__getattr__`. Assignment cannot
+narrow the attribute even if another permitted class declares it:
+
+```py
 class Declared:
     value: int | str
 
-def update_bound[T: Dynamic | Declared](obj: T) -> T:
+def update_constrained[T: (Dynamic, Declared)](obj: T) -> None:
     obj.value = 1
     reveal_type(obj.value)  # revealed: int | str
-    return obj
-
-def update_constrained[T: (Dynamic, Declared)](obj: T) -> T:
-    obj.value = 1
-    reveal_type(obj.value)  # revealed: int | str
-    return obj
 ```
 
 ## Solving TypeVars with upper bounds in unions
