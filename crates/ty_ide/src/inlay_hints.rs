@@ -4,7 +4,7 @@ use ty_python_semantic::ProgramEnvironment;
 use crate::{Db, FxIndexMap, HasNavigationTargets, NavigationTarget};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
-use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Parameters, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::file_to_module;
 use ty_python_core::ProgramFile;
@@ -390,6 +390,7 @@ struct InlayHintVisitor<'a, 'db> {
     model: SemanticModel<'db>,
     importer: Importer<'db>,
     hints: Vec<InlayHint>,
+    pending_return_hint: Option<(&'a Parameters, InlayHint)>,
     assignment_rhs: Option<&'a Expr>,
     range: TextRange,
     settings: &'a InlayHintSettings,
@@ -409,6 +410,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             model: SemanticModel::new(db, file),
             importer,
             hints: Vec::new(),
+            pending_return_hint: None,
             assignment_rhs: None,
             range,
             settings,
@@ -458,6 +460,16 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
 }
 
 impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+        if let AnyNodeRef::Parameters(parameters) = node
+            && let Some((_, hint)) = self
+                .pending_return_hint
+                .take_if(|(expected, _)| std::ptr::eq(*expected, parameters))
+        {
+            self.hints.push(hint);
+        }
+    }
+
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -496,36 +508,24 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
                 return;
             }
             Stmt::FunctionDef(function) => {
-                for decorator in &function.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                self.visit_identifier(&function.name);
-                if let Some(type_params) = &function.type_params {
-                    self.visit_type_params(type_params);
-                }
-                self.visit_parameters(&function.parameters);
-
                 let position = function.parameters.end();
                 if self.settings.return_types
                     && self.range.contains_inclusive(position)
                     && let Some(ty) = inlay_hint_return_type(&self.model, function)
                 {
-                    self.hints.push(InlayHint::return_type(
-                        InlayHintImportContext {
-                            db: self.db,
-                            file: self.model.program_file(),
-                            importer: &self.importer,
-                        },
-                        function,
-                        ty,
+                    self.pending_return_hint = Some((
+                        function.parameters.as_ref(),
+                        InlayHint::return_type(
+                            InlayHintImportContext {
+                                db: self.db,
+                                file: self.model.program_file(),
+                                importer: &self.importer,
+                            },
+                            function,
+                            ty,
+                        ),
                     ));
                 }
-
-                if let Some(returns) = &function.returns {
-                    self.visit_annotation(returns);
-                }
-                self.visit_body(&function.body);
-                return;
             }
             // TODO
             Stmt::For(_) => {}
