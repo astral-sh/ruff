@@ -103,6 +103,16 @@ impl InlayHint {
                             return None;
                         }
 
+                        let module =
+                            file_to_module(db, definition.program_file(db).resolver_file(db))?;
+
+                        // Types like `ty_extensions.Unknown` only exist in stubs and cannot be
+                        // imported at runtime, so we do not provide edits.
+                        if module.is_known_stub_only(db) {
+                            allow_edits = false;
+                            return None;
+                        }
+
                         // Don't try to import symbols in scope
                         let definition_file = definition.file(db);
                         if definition_file == file.file(db) {
@@ -115,9 +125,6 @@ impl InlayHint {
                         let definition_name = definition_name
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
-
-                        let file = definition.program_file(db);
-                        let module = file_to_module(db, file.resolver_file(db))?;
 
                         if should_skip_import(db, module, *ty) {
                             return None;
@@ -1017,20 +1024,6 @@ mod tests {
            |
         LL |     def method(self)[ -> str | Unknown]:
            |                                ^^^^^^^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        1 + from ty_extensions._internal import Unknown
-        2 |
-        3 | class C:
-        4 |     value: str
-        5 |
-          -     def method(self):
-        6 +     def method(self) -> str | Unknown:
-        7 |         return self.value
-          |
         ");
 
         let mut test = return_type_hint_test(
@@ -1074,19 +1067,6 @@ mod tests {
            |
         LL |     def text(self)[ -> str | Unknown]:
            |                              ^^^^^^^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        1 + from ty_extensions._internal import Unknown
-        2 |
-        --------------------------------------------------------------------------------
-        6 |     @property
-          -     def text(self):
-        7 +     def text(self) -> str | Unknown:
-        8 |         return self.value
-          |
         ");
 
         let mut test = return_type_hint_test(
@@ -2453,17 +2433,10 @@ Source with applied edits:
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
           |
-        1 + from ty_extensions._internal import Unknown
-        2 |
-        3 | class A:
-        4 |     def __init__(self, y):
-        5 |         self.x = int(1)
-          -         self.y = y
-        6 +         self.y: Unknown = y
-        7 |
+        6 |
           - a = A(2)
-        8 + a = A(y=2)
-        9 | a.y = int(3)
+        7 + a = A(y=2)
+        8 | a.y = int(3)
           |
         ");
     }
@@ -3151,13 +3124,15 @@ Source with applied edits:
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
            |
-        1  + from ty_extensions._internal import Unknown
-        2  + from string.templatelib import Template
-        3  |
+        1  + from string.templatelib import Template
+        2  |
            - a = [1, 2]
            - b = [1.0, 2.0]
            - c = [True, False]
-           - d = [None, None]
+        3  + a: list[int] = [1, 2]
+        4  + b: list[float] = [1.0, 2.0]
+        5  + c: list[bool] = [True, False]
+        6  | d = [None, None]
            - e = ["hel", "lo"]
            - f = ['the', 're']
            - g = [f"{ft}", f"{ft}"]
@@ -3165,17 +3140,13 @@ Source with applied edits:
            - i = [b'/x01', b'/x02']
            - j = [+1, +2.0]
            - k = [-1, -2.0]
-        4  + a: list[int] = [1, 2]
-        5  + b: list[float] = [1.0, 2.0]
-        6  + c: list[bool] = [True, False]
-        7  + d: list[None | Unknown] = [None, None]
-        8  + e: list[str] = ["hel", "lo"]
-        9  + f: list[str] = ['the', 're']
-        10 + g: list[str] = [f"{ft}", f"{ft}"]
-        11 + h: list[Template] = [t"wow %d", t"wow %d"]
-        12 + i: list[bytes] = [b'/x01', b'/x02']
-        13 + j: list[float] = [+1, +2.0]
-        14 + k: list[float] = [-1, -2.0]
+        7  + e: list[str] = ["hel", "lo"]
+        8  + f: list[str] = ['the', 're']
+        9  + g: list[str] = [f"{ft}", f"{ft}"]
+        10 + h: list[Template] = [t"wow %d", t"wow %d"]
+        11 + i: list[bytes] = [b'/x01', b'/x02']
+        12 + j: list[float] = [+1, +2.0]
+        13 + k: list[float] = [-1, -2.0]
            |
         "#);
     }
@@ -7048,6 +7019,139 @@ Source with applied edits:
     }
 
     #[test]
+    fn inferred_unknown_type() {
+        // We do not suggest edits/imports for ty-internal types (Unknown), even if they are nested.
+        let mut test = return_type_hint_test(
+            r#"
+        def twice(value):
+            return [value, value]
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        def twice(value)[ -> list[Unknown]]:
+            return [value, value]
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class list(MutableSequence[_T]):
+           |       ^^^^
+        info: Source
+          --> main2.py:LL:22
+           |
+        LL | def twice(value)[ -> list[Unknown]]:
+           |                      ^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:27
+           |
+        LL | def twice(value)[ -> list[Unknown]]:
+           |                           ^^^^^^^
+        ");
+
+        // We still suggest edits/imports for a user-defined class named Unknown.
+        let mut test = return_type_hint_test(
+            r#"
+        from module import make_unknown
+
+        def custom_unknown():
+            return make_unknown()
+        "#,
+        );
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Unknown: ...
+
+        def make_unknown() -> Unknown:
+            return Unknown()
+        "#,
+            ),
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from module import make_unknown
+
+        def custom_unknown()[ -> Unknown]:
+            return make_unknown()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> module.py:2:7
+          |
+        2 | class Unknown: ...
+          |       ^^^^^^^
+        info: Source
+         --> main2.py:4:26
+          |
+        4 | def custom_unknown()[ -> Unknown]:
+          |                          ^^^^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 |
+          - from module import make_unknown
+        2 + from module import make_unknown, Unknown
+        3 |
+          - def custom_unknown():
+        4 + def custom_unknown() -> Unknown:
+        5 |     return make_unknown()
+          |
+        ");
+    }
+
+    #[test]
+    fn typeshed_helper_type() {
+        // We do not suggest edits/imports for typeshed-internal types (PathEntryFinderProtocol).
+        let mut test = inlay_hint_test(
+            r#"
+        import pkgutil
+
+        finder = pkgutil.get_importer(path_item=".")
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        import pkgutil
+
+        finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/_typeshed/importlib.pyi:LL:7
+           |
+        LL | class PathEntryFinderProtocol(Protocol):
+           |       ^^^^^^^^^^^^^^^^^^^^^^^
+        info: Source
+          --> main2.py:LL:10
+           |
+        LL | finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+           |          ^^^^^^^^^^^^^^^^^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       ^^^^^^^^
+        info: Source
+          --> main2.py:LL:36
+           |
+        LL | finder[: PathEntryFinderProtocol | None] = pkgutil.get_importer(path_item=".")
+           |                                    ^^^^
+        "#);
+    }
+
+    #[test]
     fn hover_type_with_top_materialization() {
         let mut test = inlay_hint_test(
             r#"
@@ -7100,15 +7204,6 @@ Source with applied edits:
            |
         LL |     x[: Top[list[Any]]] = xyxy
            |                  ^^^
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: Inlay hint edits
-        --> main.py:1:1
-          |
-        5 | def f(xyxy: Top[list[Any]]):
-          -     x = xyxy
-        6 +     x: Top[list[Any]] = xyxy
-          |
         ");
     }
 
@@ -7502,7 +7597,17 @@ Source with applied edits:
     fn auto_import_each_hint_independently() {
         // Each hint needs its own imports, even when another hint uses the same types.
         // Repeated types within a hint should only produce one import per symbol.
-        let test = inlay_hint_test("x = (y, 1, y, 1)\nx = (y, 1, y, 1)\n");
+        let mut test =
+            inlay_hint_test("from module import y\nx = (y, 1, y, 1)\nx = (y, 1, y, 1)\n");
+        test.with_extra_file(
+            "module.py",
+            &dedent(
+                r#"
+        class Y: ...
+        y: Y
+        "#,
+            ),
+        );
         let hints = inlay_hints(
             &test.db,
             ProgramFile::new(
@@ -7533,15 +7638,15 @@ Source with applied edits:
             .join("\n");
 
         assert_snapshot!(edited_sources, @"
-        from ty_extensions._internal import Unknown
         from typing import Literal
-        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
+        from module import y, Y
+        x: tuple[Y, Literal[1], Y, Literal[1]] = (y, 1, y, 1)
         x = (y, 1, y, 1)
 
-        from ty_extensions._internal import Unknown
         from typing import Literal
+        from module import y, Y
         x = (y, 1, y, 1)
-        x: tuple[Unknown, Literal[1], Unknown, Literal[1]] = (y, 1, y, 1)
+        x: tuple[Y, Literal[1], Y, Literal[1]] = (y, 1, y, 1)
         ");
     }
 
