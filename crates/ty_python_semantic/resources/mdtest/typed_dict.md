@@ -2657,7 +2657,7 @@ config["host"] = "127.0.0.1"
 config["port"] = 80
 ```
 
-Read-only keys also can't be removed or given a default, even if they are not required:
+Read-only keys also can't be deleted, even if they are not required:
 
 ```py
 from typing_extensions import NotRequired
@@ -2666,14 +2666,66 @@ class Cache(TypedDict):
     value: NotRequired[ReadOnly[int]]
 
 def _(cache: Cache) -> None:
-    # error: [invalid-argument-type] "Cannot delete read-only key "value" from TypedDict `Cache`"
+    # snapshot: invalid-argument-type
     del cache["value"]
+```
+
+```snapshot
+error[invalid-argument-type]: Cannot delete read-only key "value" from TypedDict `Cache`
+  --> src/mdtest_snippet.py:30:15
+   |
+30 |     del cache["value"]
+   |               ^^^^^^^
+```
+
+Read-only keys cannot be removed with `pop()` either. We also reject `setdefault()`, which can
+insert a value if the key is missing:
+
+```py
+def _(cache: Cache) -> None:
     # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
     cache.pop("value")
     # error: [invalid-argument-type] "Cannot pop read-only key "value" from TypedDict `Cache`"
     cache.pop("value", 0)
     # error: [invalid-argument-type] "Cannot set default for read-only key "value" on TypedDict `Cache`"
     cache.setdefault("value", 0)
+```
+
+## Diagnostics in read-only method arguments
+
+An invalid mutation of a non-required read-only key does not suppress errors in the key or default
+argument:
+
+```py
+from typing_extensions import Literal, NotRequired, ReadOnly, TypedDict
+
+class Cache(TypedDict):
+    value: NotRequired[ReadOnly[int]]
+
+def key(value: str) -> Literal["value"]:
+    return "value"
+
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.pop("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot set default for read-only key"
+    # error: [unresolved-reference] "Name `missing_default` used when not defined"
+    cache.setdefault("value", missing_default)
+
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    cache.pop(key(1))
+```
+
+Errors in the key are also reported when the mutation is an argument to an overloaded call:
+
+```py
+def _(cache: Cache) -> None:
+    # error: [invalid-argument-type] "Cannot pop read-only key"
+    # error: [invalid-argument-type] "Argument to function `key` is incorrect"
+    sorted((cache.pop(key(1)),))
 ```
 
 ## `update()` with `ReadOnly` items

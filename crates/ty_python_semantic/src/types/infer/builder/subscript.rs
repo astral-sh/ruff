@@ -2287,21 +2287,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                                         if let Some(field) = items.get(key) {
                                             // Key exists but is read-only or required (i.e.,
-                                            // can't be deleted). Only point at the field's
-                                            // declaration for required keys, since that
-                                            // annotation suggests making the field `NotRequired`.
-                                            let (field, error_kind) = if field.is_read_only() {
-                                                (None, TypedDictDeleteErrorKind::ReadOnlyKey)
-                                            } else {
-                                                (Some(field), TypedDictDeleteErrorKind::RequiredKey)
-                                            };
+                                            // can't be deleted).
                                             report_cannot_delete_typed_dict_key(
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
                                                 key,
-                                                field,
-                                                error_kind,
+                                                Some(field),
+                                                if field.is_read_only() {
+                                                    TypedDictDeleteErrorKind::ReadOnlyKey
+                                                } else {
+                                                    TypedDictDeleteErrorKind::RequiredKey
+                                                },
                                             );
                                         } else if typed_dict
                                             .explicit_extra_items(db)
