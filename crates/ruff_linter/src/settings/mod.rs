@@ -1055,11 +1055,11 @@ mod tests {
         	incorrect-decorator-order (RUF074),
         	fallible-context-manager (RUF075),
         	method-receiver-default (RUF077),
-        	unnecessary-regular-expression-compile (RUF078),
         	invalid-rule-code (RUF102),
         	invalid-suppression-comment (RUF103),
         	unmatched-suppression-comment (RUF104),
         	rule-codes-in-suppression-comments (RUF106),
+        	unnecessary-regular-expression-compile,
         ]
 
         Removed in preview:

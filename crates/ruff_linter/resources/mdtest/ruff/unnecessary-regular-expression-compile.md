@@ -1,8 +1,8 @@
-# `unnecessary-regular-expression-compile` (`RUF078`)
+# `unnecessary-regular-expression-compile`
 
 ```toml
 lint.preview = true
-lint.select = ["RUF078"]
+lint.select = ["unnecessary-regular-expression-compile"]
 ```
 
 ## Inline form
@@ -17,7 +17,7 @@ re.compile(r"hello").match("world")  # snapshot: unnecessary-regular-expression-
 ```
 
 ```snapshot
-error[RUF078]: Compiled regular expression is used only once
+error[unnecessary-regular-expression-compile]: Compiled regular expression is used only once
  --> src/mdtest_snippet.py:3:1
   |
 3 | re.compile(r"hello").match("world")  # snapshot: unnecessary-regular-expression-compile
@@ -93,8 +93,8 @@ def double_starred(kwargs):
     re.compile(r"a").sub(**kwargs)
 ```
 
-A `re.compile()` whose arguments have side effects is not flagged, since the top-level `re`
-functions would only evaluate those arguments once:
+Arguments with side effects are still flagged. Because the compiled pattern is used inline, the
+arguments are evaluated exactly once in both the original and the replacement:
 
 ```py
 import re
@@ -105,5 +105,5 @@ def get_pattern():
 
 
 def side_effect(s):
-    return re.compile(get_pattern()).match(s)
+    return re.compile(get_pattern()).match(s)  # error: [unnecessary-regular-expression-compile]
 ```

@@ -1,5 +1,4 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::Ranged;
@@ -15,11 +14,7 @@ use crate::codes::Category;
 /// ## Why is this bad?
 /// Compiling a pattern inline and immediately calling a method on it is
 /// equivalent to calling the corresponding top-level `re` function, such as
-/// `re.match` or `re.sub`. The top-level function is shorter and avoids the
-/// intermediate pattern object.
-///
-/// If the pattern is genuinely reused, store the compiled pattern in a variable
-/// instead so the intent is clear.
+/// `re.match` or `re.sub`. The top-level function is shorter.
 ///
 /// ## Example
 /// ```python
@@ -57,7 +52,7 @@ impl Violation for UnnecessaryRegularExpressionCompile {
     }
 }
 
-/// RUF078
+/// `unnecessary-regular-expression-compile`
 pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &ExprCall) {
     let semantic = checker.semantic();
     if !semantic.seen_module(Modules::RE) {
@@ -75,9 +70,6 @@ pub(crate) fn unnecessary_regular_expression_compile(checker: &Checker, call: &E
         return;
     };
     if !is_re_compile(&compile.func, semantic) {
-        return;
-    }
-    if compile_has_side_effect(compile, semantic) {
         return;
     }
 
@@ -116,15 +108,6 @@ fn reducible_re_method(attr: &str, arguments: &Arguments) -> Option<&'static str
         "split" => "split",
         _ => return None,
     })
-}
-
-/// Returns `true` if any argument to the `re.compile()` call may have a side effect, in which case
-/// replacing the call could change when or how often that effect runs.
-fn compile_has_side_effect(compile: &ExprCall, semantic: &SemanticModel) -> bool {
-    compile
-        .arguments
-        .iter_source_order()
-        .any(|argument| contains_effect(argument.value(), |id| semantic.has_builtin_binding(id)))
 }
 
 /// Returns `true` if `func` resolves to `re.compile`.
