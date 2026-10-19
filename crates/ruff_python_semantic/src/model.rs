@@ -1212,62 +1212,31 @@ impl<'a> SemanticModel<'a> {
                     return Some(QualifiedName::builtin(head.id.as_str()));
                 }
 
-                let value_name = UnqualifiedName::from_expr(value)?;
-                return Some(
-                    std::iter::once("")
-                        .chain(value_name.segments().iter().copied())
-                        .collect(),
-                );
+                return Some(QualifiedName::from_expr(value, &["", head.id.as_str()]));
             }
             Symbol::Unbound => return None,
         };
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => {
-                let unqualified_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = unqualified_name.segments().split_first()?;
-                let resolved: QualifiedName = qualified_name
-                    .segments()
-                    .iter()
-                    .chain(tail)
-                    .copied()
-                    .collect();
-                Some(resolved)
+                Some(QualifiedName::from_expr(value, qualified_name.segments()))
             }
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = value_name.segments().split_first()?;
-
-                Some(
-                    qualified_name
-                        .segments()
-                        .iter()
-                        .take(1)
-                        .chain(tail)
-                        .copied()
-                        .collect(),
-                )
+                let (head, _) = qualified_name.segments().split_first()?;
+                Some(QualifiedName::from_expr(value, std::slice::from_ref(head)))
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
-                let value_name = UnqualifiedName::from_expr(value)?;
-                let (_, tail) = value_name.segments().split_first()?;
-
-                let resolved: QualifiedName =
-                    if qualified_name.segments().first().copied() == Some(".") {
-                        from_relative_import(
-                            self.module.qualified_name()?,
-                            qualified_name.segments(),
-                            tail,
-                        )?
-                    } else {
-                        qualified_name
-                            .segments()
-                            .iter()
-                            .chain(tail)
-                            .copied()
-                            .collect()
-                    };
-                Some(resolved)
+                if qualified_name.is_unresolved_import() {
+                    let value_name = UnqualifiedName::from_expr(value)?;
+                    let (_, tail) = value_name.segments().split_first()?;
+                    from_relative_import(
+                        self.module.qualified_name()?,
+                        qualified_name.segments(),
+                        tail,
+                    )
+                } else {
+                    Some(QualifiedName::from_expr(value, qualified_name.segments()))
+                }
             }
             BindingKind::Builtin => {
                 if value.is_name_expr() {
@@ -1275,12 +1244,7 @@ impl<'a> SemanticModel<'a> {
                     Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    let value_name = UnqualifiedName::from_expr(value)?;
-                    Some(
-                        std::iter::once("")
-                            .chain(value_name.segments().iter().copied())
-                            .collect(),
-                    )
+                    Some(QualifiedName::from_expr(value, &["", head.id.as_str()]))
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {

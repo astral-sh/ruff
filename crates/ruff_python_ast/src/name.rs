@@ -336,6 +336,24 @@ impl<'a> QualifiedName<'a> {
         Self(SegmentsVec::from_slice(&["", name]))
     }
 
+    /// Creates a qualified name from `expr`, replacing its head with `resolved_head`.
+    ///
+    /// `expr` must be a name or an attribute chain rooted at a name. For example,
+    /// resolving the head of `np.linalg.norm` to `["numpy"]` produces `numpy.linalg.norm`.
+    #[inline]
+    pub fn from_expr(mut expr: &'a Expr, resolved_head: &[&'a str]) -> Self {
+        let mut segments = SegmentsVec::from_slice(resolved_head);
+        while let Expr::Attribute(attribute) = expr {
+            segments.push(attribute.attr.as_str());
+            expr = &attribute.value;
+        }
+        debug_assert!(expr.is_name_expr());
+
+        // Attribute traversal visits the outermost member first; keep the prefix in order.
+        segments.as_mut_slice()[resolved_head.len()..].reverse();
+        Self(segments)
+    }
+
     #[inline]
     pub fn segments(&self) -> &[&'a str] {
         self.0.as_slice()
@@ -707,6 +725,14 @@ impl<'a> SegmentsVec<'a> {
         }
     }
 
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [&'a str] {
+        match self {
+            Self::Stack(stack) => stack.as_mut_slice(),
+            Self::Heap(heap) => heap.as_mut_slice(),
+        }
+    }
+
     /// Pushes `name` to the end of the segments.
     ///
     /// Spills to the heap if the segments are stored on the stack and the 9th segment is pushed.
@@ -852,9 +878,57 @@ mod tests {
     #[cfg(feature = "salsa")]
     use std::hash::{DefaultHasher, Hash, Hasher};
 
+    use ruff_text_size::TextRange;
+
     #[cfg(feature = "salsa")]
     use crate::name::Name;
-    use crate::name::SegmentsVec;
+    use crate::name::{QualifiedName, SMALL_LEN, SegmentsVec};
+    use crate::{AtomicNodeIndex, Expr, ExprAttribute, ExprContext, ExprName, Identifier};
+
+    #[test]
+    fn qualified_name_from_expr() {
+        let attributes = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
+        for prefix in [
+            &[][..],
+            &["numpy"],
+            &["package", "module"],
+            &["", "dict"],
+            &["p", "q", "r", "s", "t", "u", "v"],
+            &["p", "q", "r", "s", "t", "u", "v", "w"],
+            &["p", "q", "r", "s", "t", "u", "v", "w", "x"],
+        ] {
+            let mut expr = Expr::Name(ExprName {
+                id: "alias".into(),
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                ctx: ExprContext::Load,
+            });
+
+            for tail_len in 0..=attributes.len() {
+                let qualified = QualifiedName::from_expr(&expr, prefix);
+                assert_eq!(&qualified.segments()[..prefix.len()], prefix);
+                assert_eq!(
+                    &qualified.segments()[prefix.len()..],
+                    &attributes[..tail_len]
+                );
+                assert_eq!(
+                    qualified.0.is_spilled(),
+                    prefix.len() + tail_len > SMALL_LEN
+                );
+                drop(qualified);
+
+                if let Some(attribute) = attributes.get(tail_len) {
+                    expr = Expr::Attribute(ExprAttribute {
+                        value: Box::new(expr),
+                        attr: Identifier::new(*attribute, TextRange::default()),
+                        range: TextRange::default(),
+                        node_index: AtomicNodeIndex::NONE,
+                        ctx: ExprContext::Load,
+                    });
+                }
+            }
+        }
+    }
 
     #[cfg(feature = "salsa")]
     #[test]
