@@ -1612,6 +1612,40 @@ a.f2()
 a.f1()  # no diagnostic
 ```
 
+## Incompatible inferred method replacements
+
+After rejecting an incompatible assignment, subsequent reads retain the inferred value. In
+particular, storing non-callable data does not make a truthiness test behave like a test of the
+inherited method.
+
+```py
+class Base:
+    def color(self) -> str:
+        return "blue"
+
+class Disabled(Base):
+    def __init__(self) -> None:
+        self.color = None  # error: [invalid-assignment]
+        reveal_type(self.color)  # revealed: None
+        if self.color:  # error: [redundant-condition] "`None` is always falsy"
+            pass
+```
+
+The stored object's attributes also remain available for error recovery.
+
+```py
+class Palette:
+    def get(self) -> str:
+        return "blue"
+
+class Custom(Base):
+    def __init__(self) -> None:
+        self.color = Palette()  # error: [invalid-assignment]
+        reveal_type(self.color)  # revealed: Palette
+        if self.color:  # no diagnostic
+            reveal_type(self.color.get())  # revealed: str
+```
+
 ## Gradual method replacements and recursive wrappers
 
 An unknown replacement must not introduce the unbound method into subsequent reads. Wrapping a
@@ -1808,6 +1842,38 @@ Decoder.decode = Decoder.decode  # error: [invalid-assignment]
 Decoder.decode = staticmethod(Decoder.decode)
 ```
 
+### Structural replacements
+
+Static methods can be shadowed by other compatible callables, including callable objects. Their
+parameters are preserved without binding an extra receiver.
+
+```py
+from collections.abc import Callable
+
+class Decoder:
+    @staticmethod
+    def decode(data: bytes, /) -> str:
+        return data.decode()
+
+class Decode:
+    def __call__(self, data: bytes, /) -> str:
+        return data.decode()
+
+def replace(decoder: Decoder, callback: Callable[[bytes], str]) -> None:
+    decoder.decode = callback  # no diagnostic
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = Decode()  # no diagnostic
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = lambda data: data.decode()  # no diagnostic
+    decoder.decode = lambda data: 0  # error: [invalid-assignment]
+
+def wrong_argument(data: int, /) -> str:
+    return str(data)
+
+def invalid_replacement(decoder: Decoder) -> None:
+    decoder.decode = wrong_argument  # error: [invalid-assignment]
+```
+
 ### Implicit `self`
 
 An unannotated `self` parameter can also shadow a static method with its underlying function.
@@ -1903,6 +1969,53 @@ class C:
 def replace(c: C) -> None:
     c.f = staticmethod(f)
     c.f = f  # error: [invalid-assignment]
+```
+
+## Shadowing class methods on instances
+
+A class method accessed on an instance binds the class before deriving the replacement signature. A
+callable stored on the instance receives only the remaining arguments.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Factory:
+    @classmethod
+    def create(cls, value: int, /) -> Self:
+        return cls()
+
+    def replace(self, unknown) -> None:
+        self.create = unknown  # no diagnostic
+
+class Child(Factory): ...
+
+reveal_type(Child().create(1))  # revealed: Child
+
+class Create:
+    def __call__(self, value: int, /) -> Factory:
+        return Factory()
+
+def replace(factory: Factory, callback: Callable[[int], Factory]) -> None:
+    factory.create = callback  # no diagnostic
+    reveal_type(factory.create(1))  # revealed: Factory
+    factory.create = Create()  # no diagnostic
+    reveal_type(factory.create(1))  # revealed: Factory
+    factory.create = None  # error: [invalid-assignment]
+    factory.create = lambda value: value  # error: [invalid-assignment]
+
+def wrong_argument(value: str, /) -> Factory:
+    return Factory()
+
+def invalid_replacement(factory: Factory) -> None:
+    factory.create = wrong_argument  # error: [invalid-assignment]
+```
+
+Assignments to the class itself still require a classmethod descriptor.
+
+```py
+Factory.create = Factory.create  # error: [invalid-assignment]
+Factory.create = classmethod(Factory.create.__func__)  # no diagnostic
 ```
 
 ## Accessing attributes on class objects

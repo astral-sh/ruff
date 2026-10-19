@@ -252,7 +252,18 @@ fn member_contract<'db>(
                     .unwrap_or(read),
             )
         } else {
-            descriptor_write_domain(db, env, own_place.ty, receiver, read)
+            // Method replacements need only satisfy the bound signature, even when reads
+            // expose a function identity (as with static methods). Match assignment checking.
+            descriptor_write_domain(
+                db,
+                env,
+                own_place.ty,
+                receiver,
+                own_place
+                    .ty
+                    .instance_method_contract(db, env, receiver)
+                    .unwrap_or(read),
+            )
         };
         (read, write)
     } else {

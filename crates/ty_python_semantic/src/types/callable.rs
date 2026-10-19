@@ -101,10 +101,11 @@ impl<'db> Type<'db> {
         ))
     }
 
-    /// The callable contract for a value that shadows an ordinary method on an instance.
+    /// The callable contract for a value that shadows a method on an instance.
     ///
     /// The stored replacement is called directly, without descriptor binding. Preserve the
     /// method's bound signatures but not its function identity or nominal bound-method attributes.
+    /// Static methods keep all parameters; class methods bind the receiver's class.
     pub(super) fn instance_method_contract(
         self,
         db: &'db dyn Db,
@@ -120,7 +121,7 @@ impl<'db> Type<'db> {
                 .instance_method_contract(db, env, receiver),
             // Class objects, including instances of custom metaclasses, retain the
             // class-attribute assignment rules.
-            _ if self.function_like_kind(db) == Some(CallableTypeKind::FunctionLike)
+            _ if self.function_like_kind(db).is_some()
                 && !receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) =>
             {
                 self.function_like_dunder_get(db, env, Some(receiver), None)?

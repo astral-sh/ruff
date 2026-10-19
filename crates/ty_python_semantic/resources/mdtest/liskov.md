@@ -3122,6 +3122,57 @@ class IncompatibleAttribute(MethodBase):
     value: Callable[[], int]  # error: [invalid-attribute-override]
 ```
 
+## Static and class methods overriding callable attributes
+
+Static and class methods preserve a callable attribute's instance-write contract: an instance can
+shadow either method with a compatible callable. This also applies to a gradually typed `__call__`
+attribute, where the concrete signature is left to the implementation.
+
+```py
+from collections.abc import Callable
+
+class Method:
+    __call__: Callable[..., None]
+
+class StaticMethod(Method):
+    @staticmethod
+    def __call__() -> None:  # no diagnostic
+        pass
+
+class ClassMethod(Method):
+    @classmethod
+    def __call__(cls) -> None:  # no diagnostic
+        pass
+```
+
+A precise callable attribute also requires compatible reads and writes. An override cannot narrow
+its return type if that would reject a replacement allowed by the base declaration.
+
+```py
+class Callback:
+    callback: Callable[[], int]
+
+class StaticCallback(Callback):
+    @staticmethod
+    def callback() -> int:  # no diagnostic
+        return 0
+
+class ClassCallback(Callback):
+    @classmethod
+    def callback(cls) -> int:  # no diagnostic
+        return 0
+
+class NarrowStaticCallback(Callback):
+    @staticmethod
+    def callback() -> bool:  # error: [invalid-mutable-override]
+        return True
+
+class NarrowClassCallback(Callback):
+    @classmethod
+    def callback(cls) -> bool:  # error: [invalid-mutable-override]
+        return True
+```
+
 ## Methods replacing inferred callable defaults
 
 A class assigned to an unannotated attribute is callable without binding a receiver. An overriding
