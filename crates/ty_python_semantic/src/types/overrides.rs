@@ -1717,7 +1717,7 @@ struct LocalOverrideDefinition {
     /// Range to use as the primary diagnostic location.
     ///
     /// This is usually the function name. For an overloaded function, it points to the
-    /// implementation in a source file, or the first overload in a stub.
+    /// implementation if present, or the first overload otherwise.
     focus_range: FileRange,
     /// Whether any overload or implementation in this local function has `@override`.
     ///
@@ -1742,10 +1742,9 @@ impl LocalOverrideDefinition {
     fn from_function<'db>(
         db: &'db dyn Db,
         function: FunctionType<'db>,
-        in_stub: bool,
         module: &ParsedModuleRef,
     ) -> Self {
-        let focus_definition = overriding_definition(db, function, in_stub);
+        let focus_definition = overriding_definition(db, function);
 
         Self {
             focus_range: focus_definition.focus_range(db, module),
@@ -1859,12 +1858,7 @@ fn extract_local_override_definitions<'db>(
         .local_functions(context.db(), subclass_scope)
         .into_iter()
         .map(|function| {
-            LocalOverrideDefinition::from_function(
-                context.db(),
-                function,
-                context.in_stub(),
-                context.module(),
-            )
+            LocalOverrideDefinition::from_function(context.db(), function, context.module())
         })
         .collect()
 }
@@ -1872,10 +1866,9 @@ fn extract_local_override_definitions<'db>(
 fn overriding_definition<'db>(
     db: &'db dyn Db,
     function: FunctionType<'db>,
-    in_stub: bool,
 ) -> OverloadLiteral<'db> {
     let (_, implementation) = function.overloads_and_implementation(db);
-    if !in_stub && let Some(implementation) = implementation {
+    if let Some(implementation) = implementation {
         implementation
     } else {
         function.first_overload_or_implementation(db)
