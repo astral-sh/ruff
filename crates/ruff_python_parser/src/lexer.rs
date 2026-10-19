@@ -210,10 +210,8 @@ impl<'src> Lexer<'src> {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
-                let identifier = self.lex_identifier(c);
                 self.state = State::Other;
-
-                identifier
+                self.lex_unicode_identifier()
             } else {
                 self.push_error(LexicalError::new(
                     LexicalErrorType::UnrecognizedToken { tok: c },
@@ -637,68 +635,58 @@ impl<'src> Lexer<'src> {
         token
     }
 
-    /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
+    /// Lex an identifier starting with an ASCII character, or a prefixed string.
     fn lex_identifier(&mut self, first: char) -> TokenKind {
-        // Detect potential string like rb'' b'' f'' t'' u'' r''
-        let quote = if let Some(prefix) = single_char_prefix(first) {
-            match self.cursor.first() {
-                quote @ ('\'' | '"') => {
-                    self.current_flags |= prefix;
-                    self.cursor.bump();
-                    Some(quote)
-                }
-                second
-                    if let quote = self.cursor.second()
-                        && is_quote(quote) =>
-                {
-                    self.try_double_char_prefix([first, second]).then(|| {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        quote
-                    })
-                }
-                _ => None,
-            }
-        } else {
-            None
-        };
+        debug_assert!(first.is_ascii());
 
-        if let Some(quote) = quote {
-            if self.current_flags.is_interpolated_string()
-                && let Some(kind) = self.lex_interpolated_string_start(quote)
-            {
-                return kind;
-            }
-
-            return self.lex_string(quote);
-        }
-
-        // Keep track of whether the identifier is ASCII-only or not.
-        //
-        // This is important because Python applies NFKC normalization to
-        // identifiers: https://docs.python.org/3/reference/lexical_analysis.html#identifiers.
-        // The parser needs to do the same when cooking the name, but applying
-        // NFKC normalization unconditionally is extremely expensive. If we know
-        // an identifier is ASCII-only (by far the most common case), the parser
-        // can skip NFKC normalization.
-        let mut is_ascii = first.is_ascii();
         // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
         // needs the full identifier-continuation check below.
         let bytes = self.cursor.rest().as_bytes();
         let ascii_len = ascii_identifier_prefix_len(bytes);
         self.cursor.skip_bytes(ascii_len);
 
-        if bytes.get(ascii_len).is_some_and(|byte| !byte.is_ascii()) {
-            self.cursor
-                .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
-        }
-
-        if !is_ascii {
-            self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
-            return TokenKind::Identifier;
+        match bytes.get(ascii_len) {
+            Some(quote) if ascii_len <= 1 && matches!(quote, b'\'' | b'"') => {
+                let is_string_prefix = if ascii_len == 0 {
+                    if let Some(prefix) = single_char_prefix(first) {
+                        self.current_flags |= prefix;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    self.try_double_char_prefix([first, char::from(bytes[0])])
+                };
+                if is_string_prefix {
+                    self.cursor.skip_bytes(1);
+                    let quote = char::from(*quote);
+                    if self.current_flags.is_interpolated_string()
+                        && let Some(kind) = self.lex_interpolated_string_start(quote)
+                    {
+                        return kind;
+                    }
+                    return self.lex_string(quote);
+                }
+            }
+            Some(byte) if !byte.is_ascii() => {
+                if self.cursor.eat_if(is_xid_continue).is_some() {
+                    return self.lex_unicode_identifier();
+                }
+            }
+            _ => {}
         }
 
         KEYWORD_TABLE.lookup(first, bytes, ascii_len + 1)
+    }
+
+    /// Finishes an identifier after consuming a non-ASCII identifier character.
+    fn lex_unicode_identifier(&mut self) -> TokenKind {
+        let ascii_len = ascii_identifier_prefix_len(self.cursor.rest().as_bytes());
+        self.cursor.skip_bytes(ascii_len);
+        self.cursor.eat_while(is_identifier_continuation);
+        // The parser uses this flag to apply NFKC normalization only to non-ASCII names.
+        self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
+        TokenKind::Identifier
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -1529,10 +1517,6 @@ struct RadixRun {
     has_nonzero_digit: bool,
 }
 
-const fn is_quote(c: char) -> bool {
-    matches!(c, '\'' | '"')
-}
-
 fn single_char_prefix(c: char) -> Option<TokenFlags> {
     Some(match c {
         'f' | 'F' => TokenFlags::F_STRING,
@@ -1557,21 +1541,13 @@ fn is_unicode_identifier_start(c: char) -> bool {
 
 /// Checks if the character c is a valid continuation character as described
 /// in <https://docs.python.org/3/reference/lexical_analysis.html#identifiers>.
-///
-/// Additionally, this function also keeps track of whether or not the total
-/// identifier is ASCII-only or not by mutably altering a reference to a
-/// boolean value passed in.
-fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> bool {
+fn is_identifier_continuation(c: char) -> bool {
     // Arrange things such that ASCII codepoints never
     // result in the slower `is_xid_continue` getting called.
     if c.is_ascii() {
         matches!(c, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')
     } else {
-        let is_continuation = is_xid_continue(c);
-        if is_continuation {
-            *identifier_is_ascii_only = false;
-        }
-        is_continuation
+        is_xid_continue(c)
     }
 }
 
@@ -2244,7 +2220,7 @@ if first:
 
     #[test]
     fn non_ascii_identifier_flag() {
-        let source = "a€\naβ = β\nlong_ascii_prefixβ_012 = rβ_012\nascii";
+        let source = "a€\naβ = β\nlong_ascii_prefixβ_012 = rβ_012\nβ_long_ascii_suffix_012\nascii";
         let mut lexer = Lexer::new(source, Mode::Module, TextSize::default());
         let mut identifiers = Vec::new();
         loop {
@@ -2269,6 +2245,7 @@ if first:
                 ("β", true),
                 ("long_ascii_prefixβ_012", true),
                 ("rβ_012", true),
+                ("β_long_ascii_suffix_012", true),
                 ("ascii", false),
             ]
         );
