@@ -22,10 +22,10 @@ use super::{
     PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
     TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
-use crate::ProgramEnvironment;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
 };
+use crate::{Program, ProgramEnvironment};
 
 /// The operation required to write an attribute.
 ///
@@ -1147,6 +1147,30 @@ fn descriptor_setter<'db>(
         .place
 }
 
+/// Checks whether `__set__` can be called with this receiver without constraining the written
+/// value. The receiver's type can require the same writable protocol member that this descriptor
+/// implements. Treat a recursive check of the same descriptor and receiver as provisionally
+/// successful; the outer protocol check still validates the member's read and write types.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
+fn descriptor_setter_accepts_receiver<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    descriptor_ty: Type<'db>,
+    receiver_ty: Type<'db>,
+) -> bool {
+    !matches!(
+        descriptor_ty.try_call_dunder_with_policy(
+            db,
+            &ProgramEnvironment::from_program(program),
+            "__set__",
+            &mut CallArguments::positional([receiver_ty, Type::unknown()]),
+            TypeContext::default(),
+            MemberLookupPolicy::REQUIRE_CONCRETE,
+        ),
+        Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable)
+    )
+}
+
 /// The values accepted by a descriptor setter, when representable as a single type.
 #[derive(Copy, Clone)]
 pub(super) enum DescriptorSetterDomain<'db> {
@@ -1633,17 +1657,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_descriptor_attribute_write(db, *descriptor_ty, object_ty, value_ty)
                 });
         }
-        if matches!(
-            descriptor_ty.try_call_dunder_with_policy(
-                db,
-                env,
-                "__set__",
-                &mut CallArguments::positional([object_ty, Type::unknown()]),
-                TypeContext::default(),
-                MemberLookupPolicy::REQUIRE_CONCRETE,
-            ),
-            Err(CallDunderError::CallError(..) | CallDunderError::MethodNotAvailable)
-        ) {
+        if !descriptor_setter_accepts_receiver(db, env.program(db), descriptor_ty, object_ty) {
             return self.never();
         }
         let Place::Defined(DefinedPlace { ty: setter_ty, .. }) =
