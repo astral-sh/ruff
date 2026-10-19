@@ -12,8 +12,8 @@
 
 use std::collections::VecDeque;
 
+use ruff_index::{ImmutableSalsaIdSet, SalsaIdSet};
 use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
 
 use crate::types::{
     BoundTypeVarIdentity, ClassType, FunctionType, GenericAlias, RecursiveType, StaticClassLiteral,
@@ -230,7 +230,7 @@ impl<'db> VarianceVariable<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct VarianceComponent<'db> {
     #[returns(ref)]
-    variables: Box<[VarianceVariable<'db>]>,
+    variables: ImmutableSalsaIdSet<VarianceVariable<'db>>,
 }
 
 impl get_size2::GetSize for VarianceComponent<'_> {}
@@ -247,13 +247,14 @@ impl<'db> VarianceComponent<'db> {
         let indices: FxHashMap<_, _> = variables
             .iter()
             .enumerate()
-            .map(|(index, variable)| (*variable, index))
+            .map(|(index, variable)| (variable, index))
             .collect();
+        let variable_count = indices.len();
         let equations: Vec<_> = variables
             .iter()
             .map(|variable| variable.equation(db))
             .collect();
-        let mut dependents = vec![Vec::new(); variables.len()];
+        let mut dependents = vec![Vec::new(); variable_count];
         for (index, variable) in variables.iter().enumerate() {
             for dependency in variable.dependencies(db) {
                 if let Some(&dependency_index) = indices.get(dependency) {
@@ -262,9 +263,9 @@ impl<'db> VarianceComponent<'db> {
             }
         }
 
-        let mut values = vec![TypeVarVariance::Bivariant; variables.len()];
-        let mut pending: VecDeque<_> = (0..variables.len()).collect();
-        let mut queued = vec![true; variables.len()];
+        let mut values = vec![TypeVarVariance::Bivariant; variable_count];
+        let mut pending: VecDeque<_> = (0..variable_count).collect();
+        let mut queued = vec![true; variable_count];
         // Join and composition are monotone. Each value can move from bivariance to a polarity
         // and then to invariance, so even negative cycles need only finitely many updates.
         while let Some(index) = pending.pop_front() {
@@ -319,9 +320,8 @@ pub(crate) fn infer_protocol_variance<'db>(
         typevar,
     );
     let mut pending = vec![root];
-    let mut visited = FxHashSet::default();
+    let mut visited = SalsaIdSet::new();
     let mut incoming: FxHashMap<_, Vec<_>> = FxHashMap::default();
-    let mut variables = Vec::new();
 
     while let Some(variable) = pending.pop() {
         if !visited.insert(variable) {
@@ -331,12 +331,11 @@ pub(crate) fn infer_protocol_variance<'db>(
             incoming.entry(dependency).or_default().push(variable);
             pending.push(dependency);
         }
-        variables.push(variable);
     }
 
     // Every visited variable is reachable from the root. Those with a path back to the root
     // therefore form exactly its strongly connected component.
-    let mut component = FxHashSet::default();
+    let mut component = SalsaIdSet::new();
     pending.push(root);
     while let Some(variable) = pending.pop() {
         if component.insert(variable)
@@ -345,12 +344,9 @@ pub(crate) fn infer_protocol_variance<'db>(
             pending.extend(predecessors.iter().copied());
         }
     }
-    variables.retain(|variable| component.contains(variable));
-    variables.sort_unstable_by_key(AsId::as_id);
-    let root_index = variables.binary_search_by_key(&root.as_id(), AsId::as_id);
-    let component = VarianceComponent::new(db, variables.into_boxed_slice());
+    let root_index = component.iter().position(|variable| variable == root);
+    let component = VarianceComponent::new(db, &component);
     root_index
-        .ok()
         .and_then(|index| component.solution(db).get(index).copied())
         .unwrap_or(TypeVarVariance::Bivariant)
 }
