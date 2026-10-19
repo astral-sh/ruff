@@ -3241,6 +3241,27 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(
+                            tracked,
+                        )
+                        | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(
+                            tracked,
+                        )),
+                    ) => {
+                        let result = tracked.constraints(db).query(|_builder, set| {
+                            if matches!(
+                                method,
+                                KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                            ) {
+                                set.is_trivially_always_satisfied()
+                            } else {
+                                set.is_trivially_never_satisfied()
+                            }
+                        });
+                        overload.set_return_type(Type::bool_literal(result));
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
                         tracked,
                     )) => {

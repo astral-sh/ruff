@@ -1578,6 +1578,16 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                         return f.write_str("bound method `ConstraintSet.with_detailed_display`");
                     }
+                    KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_) => {
+                        return f.write_str(
+                            "bound method `ConstraintSet.is_trivially_always_satisfied`",
+                        );
+                    }
+                    KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_) => {
+                        return f.write_str(
+                            "bound method `ConstraintSet.is_trivially_never_satisfied`",
+                        );
+                    }
                 };
 
                 f.write_char('<')?;

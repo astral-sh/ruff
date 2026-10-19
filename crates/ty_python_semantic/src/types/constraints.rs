@@ -803,7 +803,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
         let mut storage = builder.storage.borrow_mut();
         // A quantified body is false if no assignment to its locals or free variables can
-        // satisfy it. Incomplete support or an exhausted budget cannot establish that.
+        // satisfy it.
         if let Some(support) = storage.node_support(self.node)
             && support.is_complete()
         {

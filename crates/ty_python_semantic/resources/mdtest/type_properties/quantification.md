@@ -313,19 +313,24 @@ def alternation[X: (int, str), Y: (int, str)]() -> None:
 ## Unsatisfiable bodies with free variables
 
 No type can be both a supertype of `int` and a subtype of `tuple[A, B]`, regardless of how `A` and
-`B` are specialized. Quantifying `X` therefore produces a constraint set that never holds.
+`B` are specialized. Quantifying `X` therefore reduces the constraint set to the false terminal BDD.
 
 ```py
+from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def impossible[X, A, B]() -> None:
     body = ConstraintSet.lower_bound(int, X) & ConstraintSet.upper_bound(X, tuple[A, B])
-    reveal_type(body.exists(tuple[X]))  # revealed: ConstraintSet[Literal[False]]
+    # ∃X. int ≤ X ≤ tuple[A, B]
+    impossible = body.exists(tuple[X])
+    # Note that this constraint set is not just never satisfied; it reduces specifically
+    # to the `false` terminal.
+    static_assert(impossible.is_trivially_never_satisfied())
 ```
 
 ## Satisfiability depends on free variables
 
-There is an `X` satisfying `A <= X <= int` when `A` is `int`, but not when `A` is `str`. Quantifying
+There is an `X` satisfying `A ≤ X ≤ int` when `A` is `int`, but not when `A` is `str`. Quantifying
 `X` preserves that distinction.
 
 ```py
@@ -333,11 +338,18 @@ from ty_extensions._internal import ConstraintSet
 
 def possible[X, A]() -> None:
     body = ConstraintSet.lower_bound(A, X) & ConstraintSet.upper_bound(X, int)
+    # ∃X. A ≤ X ≤ int
     quantified = body.exists(tuple[X])
+
+    # (∃X. A ≤ X ≤ int) ∧ A = int
     valid = quantified & ConstraintSet.equality(A, int)
+    # revealed: tuple[Solution[A=int]]
+    reveal_type(valid.solutions(inferable=tuple[A]))
+
+    # (∃X. A ≤ X ≤ int) ∧ A = str
     invalid = quantified & ConstraintSet.equality(A, str)
-    reveal_type(valid.solutions(inferable=tuple[A]))  # revealed: tuple[Solution[A=int]]
-    reveal_type(invalid.solutions(inferable=tuple[A]))  # revealed: None
+    # revealed: None
+    reveal_type(invalid.solutions(inferable=tuple[A]))
 ```
 
 ## Negated inner quantification with free variables
@@ -349,10 +361,18 @@ must preserve the choices for which it fails when an enclosing existential is ev
 from ty_extensions._internal import ConstraintSet
 
 def nested[X, Y, A]() -> None:
+    # ∃X. X = int ∧ X = A
     inner = (ConstraintSet.equality(X, int) & ConstraintSet.equality(X, A)).exists(tuple[X])
+    # ∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str
     outer = (~inner & ConstraintSet.equality(Y, str)).exists(tuple[Y])
+
+    # (∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str) ∧ A = str
     valid = outer & ConstraintSet.equality(A, str)
+    # revealed: tuple[Solution[A=str]]
+    reveal_type(valid.solutions(inferable=tuple[A]))
+
+    # (∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str) ∧ A = int
     invalid = outer & ConstraintSet.equality(A, int)
-    reveal_type(valid.solutions(inferable=tuple[A]))  # revealed: tuple[Solution[A=str]]
-    reveal_type(invalid.solutions(inferable=tuple[A]))  # revealed: None
+    # revealed: None
+    reveal_type(invalid.solutions(inferable=tuple[A]))
 ```
