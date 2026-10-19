@@ -70,7 +70,22 @@ impl ConstraintProvenance {
 
 pub(super) struct UnsatisfiableBound;
 
-/// One condition that can be checked by an interior node in a constraint set BDD
+/// One condition that can be checked by an interior node in a constraint set BDD.
+///
+/// When adding a new kind of constraint, choose whether to add it to `Constraint` or
+/// [`AtomicConstraint`] based on how it participates in solving:
+///
+/// - Add a variant to [`AtomicConstraint`] if it directly restricts typevar solutions. These
+///   constraints are recorded as true or false in
+///   [`PathAssignments`][super::paths::PathAssignments] and can be antecedents or consequents in a
+///   [`SequentMap`][super::sequents::SequentMap]. Both `T ≤ int` and `T ≤ U` are atomic: an atomic
+///   constraint can mention multiple typevars.
+/// - Add a variant to [`Constraint`] if it needs its own interpretation during BDD traversal
+///   instead of being recorded as an ordinary path assignment. For example, an existential
+///   constraint quantifies a body with local typevars. The atomic constraints found inside the
+///   existential body, and in its surrounding context, are merged together into a single set of
+///   path assignments. The existential itself is not recorded on the path. This custom behavior
+///   makes `Constraint` the right place for it.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum Constraint<'db> {
     Atomic(AtomicConstraint<'db>),
@@ -143,10 +158,12 @@ impl<'db> Constraint<'db> {
     }
 }
 
-/// An atomic [`Constraint`]. These are the constraints that directly constrain individual
+/// An atomic [`Constraint`]. These are the constraints that directly restrict solutions for
 /// typevars. They are allowed to appear in a [`SequentMap`][super::sequents::SequentMap], and are
 /// the elements of the BDD paths that are discovered via
 /// [`PathAssignments`][super::paths::PathAssignments].
+///
+/// See [`Constraint`] to choose whether new kinds of constraint belong here or in `Constraint`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum AtomicConstraint<'db> {
     ConcreteLower(ConcreteLowerBound<'db>),
