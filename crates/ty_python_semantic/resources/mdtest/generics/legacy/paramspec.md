@@ -1746,8 +1746,7 @@ forward(right, left, [{"name": "item"}], 1)
 
 ### Combined parameter lists in partial applications
 
-Partial application does not yet preserve intersected parameter lists inferred from callback
-consumers.
+Partial application preserves either signature of an intersected parameter list.
 
 ```py
 from functools import partial
@@ -1762,16 +1761,39 @@ def invoke(
     *args: P.args,
     **kwargs: P.kwargs,
 ) -> None: ...
-def integer(callback: Callable[[int], None]) -> None: ...
-def text(callback: Callable[[str], None]) -> None: ...
+def consume_integer(callback: Callable[[bytes, int], None]) -> None: ...
+def text(callback: Callable[[bytes, str], None]) -> None: ...
 
-callback = partial(invoke, integer, text)
-# TODO: Preserve both captured parameter lists in the partial.
-reveal_type(callback)  # revealed: partial[Unknown]
-callback(1)  # no diagnostic
-callback("text")  # no diagnostic
-# TODO: error: [invalid-argument-type]
-callback(None)
+callback = partial(invoke, consume_integer, text)
+reveal_type(callback(b"prefix", 1))  # revealed: None
+reveal_type(callback(b"prefix", "text"))  # revealed: None
+# error: [invalid-argument-type]
+callback(b"prefix", None)  # error: [invalid-argument-type]
+```
+
+Binding the shared first argument reduces both captured signatures.
+
+```py
+remaining = partial(invoke, consume_integer, text, b"prefix")
+reveal_type(remaining(1))  # revealed: None
+reveal_type(remaining("text"))  # revealed: None
+# error: [invalid-argument-type]
+remaining(None)  # error: [invalid-argument-type]
+```
+
+A gradual list also preserves the concrete list's requirements after partial application.
+
+```py
+def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args, **kwargs: P.kwargs) -> None:
+    left(*args, **kwargs)
+    right(*args, **kwargs)
+
+def integer(value: int, /) -> None: ...
+def check(gradual: Callable[..., None]) -> None:
+    callback = partial(forward, integer, gradual)
+    reveal_type(callback(1))  # revealed: None
+    callback("bad")  # error: [invalid-argument-type]
+    callback()  # error: [missing-argument]
 ```
 
 ### Repeated parameter lists from generic instances
