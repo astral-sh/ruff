@@ -167,3 +167,56 @@ with open("tmp_path/pyproject.toml", "w") as f:
 # `open` accepts a file descriptor, but `Path` does not
 with open(3, "w") as f:
     f.write("test")
+
+
+# `open` truncates the file before `write` checks the type of the value, while `write_text` and
+# `write_bytes` check it before they open the file. The fix is only safe when the value is known
+# to have the type that the mode implies.
+def known_types(data: bytes, text: str):
+    # FURB103 - safe, `text` is a string and the file is opened in text mode
+    with open("file.txt", "w") as f:
+        f.write(text)
+
+    # FURB103 - safe, `data` is bytes and the file is opened in binary mode
+    with open("file.txt", "wb") as f:
+        f.write(data)
+
+    # FURB103 - unsafe, `text` is a string but the file is opened in binary mode
+    with open("file.txt", "wb") as f:
+        f.write(text)
+
+    # FURB103 - unsafe, `data` is bytes but the file is opened in text mode
+    with open("file.txt", "w") as f:
+        f.write(data)
+
+    # FURB103 - unsafe, an f-string can raise before the file is opened
+    with open("file.txt", "w") as f:
+        f.write(f"{text}")
+
+    # FURB103 - unsafe, a call is not resolved to a type
+    with open("file.txt", "w") as f:
+        f.write(str(data))
+
+
+class Attribute:
+    text: str
+
+    def write(self):
+        # FURB103 - unsafe, `self.text` is not resolved to a type
+        with open("file.txt", "w") as f:
+            f.write(self.text)
+
+
+def unknown_types(value):
+    # FURB103 - unsafe, the type of `value` is unknown
+    with open("file.txt", "w") as f:
+        f.write(value)
+
+    # FURB103 - unsafe, the type of `value` is unknown
+    with open("file.txt", "wb") as f:
+        f.write(value)
+
+    # FURB103 - unsafe, `number` is an `int`
+    number = 1
+    with open("file.txt", "w") as f:
+        f.write(number)

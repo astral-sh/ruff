@@ -4,13 +4,14 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
+use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, OpenMode, find_file_opens};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -36,7 +37,14 @@ use crate::{FixAvailability, Locator, Violation};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the
+/// original expression.
+///
+/// The fix is also marked as unsafe if the value passed to `write` isn't known to have the type
+/// the `open` mode implies. `open` truncates the file before `write` checks the type of its
+/// argument, while `Path.write_text` and `Path.write_bytes` check the argument before they open
+/// the file. Writing a value of the wrong type therefore empties the file in the original code
+/// but leaves it untouched in the replacement.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -154,7 +162,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, content, self.with_stmt, &suggestion)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -204,6 +212,7 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
+    content: &Expr,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
@@ -232,7 +241,9 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
+        || !value_matches_mode(content, open.mode, checker.semantic())
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -243,4 +254,52 @@ fn generate_fix(
         [import_edit],
         applicability,
     ))
+}
+
+/// Returns `true` if the value passed to `write` is known to have the type that `mode` implies.
+///
+/// `open` truncates the file before `write` checks the type of its argument, so writing a value of
+/// the wrong type leaves an empty file behind. `Path.write_text` and `Path.write_bytes` check the
+/// type before they open the file, so the same mistake leaves the file untouched there. Only a
+/// value whose type is known to match the mode can be rewritten without changing that outcome.
+fn value_matches_mode(value: &Expr, mode: OpenMode, semantic: &SemanticModel) -> bool {
+    match mode {
+        OpenMode::WriteText => is_string(value, semantic),
+        OpenMode::WriteBytes => is_bytes(value, semantic),
+        OpenMode::ReadText | OpenMode::ReadBytes => false,
+    }
+}
+
+/// Returns `true` if the expression is known to be a `str`.
+fn is_string(value: &Expr, semantic: &SemanticModel) -> bool {
+    if value.is_string_literal_expr() {
+        return true;
+    }
+
+    if let Expr::Name(name) = value {
+        semantic
+            .only_binding(name)
+            .is_some_and(|binding_id| typing::is_string(semantic.binding(binding_id), semantic))
+    } else if let Some(binding_id) = semantic.lookup_attribute(value) {
+        typing::is_string(semantic.binding(binding_id), semantic)
+    } else {
+        false
+    }
+}
+
+/// Returns `true` if the expression is known to be `bytes`.
+fn is_bytes(value: &Expr, semantic: &SemanticModel) -> bool {
+    if value.is_bytes_literal_expr() {
+        return true;
+    }
+
+    if let Expr::Name(name) = value {
+        semantic
+            .only_binding(name)
+            .is_some_and(|binding_id| typing::is_bytes(semantic.binding(binding_id), semantic))
+    } else if let Some(binding_id) = semantic.lookup_attribute(value) {
+        typing::is_bytes(semantic.binding(binding_id), semantic)
+    } else {
+        false
+    }
 }
