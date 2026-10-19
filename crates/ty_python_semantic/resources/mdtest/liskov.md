@@ -2305,6 +2305,163 @@ class Unhashable:
     __hash__ = None  # no diagnostic
 ```
 
+## Restoring hashability
+
+A subclass can restore hashing after a base class disables it with `__hash__ = None`.
+
+```py
+class Unhashable:
+    __hash__ = None
+
+class Hashable(Unhashable):
+    def __hash__(self) -> int:  # no diagnostic
+        return 0
+```
+
+The restored method must return an `int`, even when the inherited `None` has no annotation:
+
+```py
+class InvalidUnannotatedHash(Unhashable):
+    def __hash__(self) -> str:  # error: [invalid-method-override]
+        return "invalid"
+```
+
+An inherited `None` annotation does not constrain a subclass assignment or its inferred type:
+
+```py
+from typing import ClassVar
+
+class DeclaredUnhashable:
+    __hash__: ClassVar[None] = None
+
+class Assigned(DeclaredUnhashable):
+    __hash__ = object.__hash__  # no diagnostic
+
+reveal_type(Assigned.__hash__)  # revealed: (self) -> int
+```
+
+The inherited `ClassVar` still prevents assignment through an instance:
+
+```py
+Assigned().__hash__ = object.__hash__  # error: [invalid-attribute-access]
+```
+
+An intervening `None` definition does not hide a more specific callable signature on an earlier
+ancestor:
+
+```py
+from typing import Callable
+
+class CallableHash:
+    __hash__: ClassVar[Callable[..., bool]]
+
+class DisabledCallable(CallableHash):
+    __hash__: ClassVar[None] = None  # error: [invalid-attribute-override]
+
+class Intermediate(DisabledCallable): ...
+
+class InvalidCallableRestoration(Intermediate):
+    def __hash__(self) -> int:  # error: [invalid-method-override]
+        return 2
+```
+
+Non-callable replacements are incompatible with `object.__hash__`:
+
+```py
+class InvalidAssignment(DeclaredUnhashable):
+    __hash__ = 42  # error: [invalid-method-override]
+```
+
+## Restoring hashability with callable objects
+
+A callable object assigned to `__hash__` keeps its own calling convention. Its `__call__` method
+receives the callable object, with no additional argument for the object being hashed:
+
+```py
+from typing import ClassVar
+
+class Unhashable:
+    __hash__: ClassVar[None] = None
+
+class HashCallable:
+    def __call__(self) -> int:
+        return 0
+
+class Restored(Unhashable):
+    __hash__ = HashCallable()  # no diagnostic
+```
+
+An incompatible return type makes the replacement invalid:
+
+```py
+class StringHashCallable:
+    def __call__(self) -> str:
+        return "invalid"
+
+class InvalidReturn(Unhashable):
+    __hash__ = StringHashCallable()  # error: [invalid-method-override]
+```
+
+## Optional hash methods
+
+A class can declare that hashing is either disabled or provided by a compatible callable. The
+callable alternative must still return an `int`:
+
+```py
+from typing import Callable, ClassVar
+
+class OptionalHash:
+    __hash__: ClassVar[Callable[..., int] | None]  # no diagnostic
+
+class InvalidOptionalHash:
+    __hash__: ClassVar[Callable[..., str] | None]  # error: [invalid-method-override]
+```
+
+The permission to disable `object.__hash__` does not extend to a more specific method on another
+base. Even a compatible callable alternative cannot permit `None` in that case:
+
+```py
+class BoolHash:
+    def __hash__(self) -> bool:
+        return False
+
+class OptionalOverride(BoolHash):
+    __hash__: ClassVar[Callable[..., bool] | None]  # error: [invalid-attribute-override]
+```
+
+## Hash overrides through gradual declarations
+
+An `Any` declaration in an intermediate class does not hide an incompatible ancestor. The callable
+override introduces its own conflict with the ancestor's `int` attribute:
+
+```py
+from typing import Any
+
+class NonCallable:
+    __hash__ = 42  # error: [invalid-method-override]
+
+class Gradual(NonCallable):
+    __hash__: Any  # no diagnostic
+
+class CallableOverride(Gradual):
+    def __hash__(self) -> int:  # error: [invalid-method-override]
+        return 0
+```
+
+## Hash overrides preserve attribute contracts
+
+Callable `__hash__` attributes retain their `ClassVar` constraint:
+
+```pyi
+from typing import Callable, ClassVar
+
+class Base:
+    __hash__: ClassVar[Callable[..., int]]
+
+class Child(Base):
+    __hash__: Callable[..., int]  # error: [invalid-attribute-override]
+```
+
 ## Class-private names do not override
 
 ```py
