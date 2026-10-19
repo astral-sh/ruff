@@ -726,7 +726,7 @@ impl<'src> Lexer<'src> {
             return TokenKind::Identifier;
         }
 
-        match self.token_text().as_bytes() {
+        match &self.source.as_bytes()[self.token_range().to_std_range()] {
             b"False" => TokenKind::False,
             b"None" => TokenKind::None,
             b"True" => TokenKind::True,
@@ -1459,11 +1459,6 @@ impl<'src> Lexer<'src> {
         let len = self.cursor.token_len();
 
         TextRange::at(end - len, len)
-    }
-
-    #[inline]
-    fn token_text(&self) -> &'src str {
-        &self.source[self.token_range()]
     }
 
     /// Retrieves the current offset of the cursor within the source code.
