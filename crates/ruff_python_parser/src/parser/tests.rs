@@ -364,7 +364,10 @@ fn cells_module_range_spans_source() {
     );
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+#[cfg(all(
+    feature = "stacker",
+    any(target_os = "linux", target_os = "macos", target_os = "windows")
+))]
 mod stack_growth {
     use std::assert_matches;
 

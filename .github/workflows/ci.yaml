@@ -443,6 +443,9 @@ jobs:
         run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
       - name: "Run doctests"
         run: cargo test --doc --all-features
+      # A workspace build enables stacker through the CLI crates' dependencies.
+      - name: "Check parser without stacker"
+        run: cargo check --locked -p ruff_python_parser --no-default-features --all-targets
       # On a PR, the annotation mdtests step above can install a Python version
       # that uv can reuse for py-fuzzer. When the annotation step is skipped (as
       # on pushes to `main`), uv may select a newer Python for the step below, for

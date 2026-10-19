@@ -93,6 +93,7 @@ pub(crate) struct Parser<'src> {
     start_offset: TextSize,
 
     /// Number of active recursive statement, expression, and pattern parsing operations.
+    #[cfg(feature = "stacker")]
     recursion_depth: usize,
 
     /// Reusable, nesting-safe scratch storage for expression lists.
@@ -139,6 +140,7 @@ impl<'src> Parser<'src> {
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
+            #[cfg(feature = "stacker")]
             recursion_depth: 0,
             current_token_id: TokenId::default(),
             expr_scratch: ScratchBuffer::with_capacity(16),
@@ -945,6 +947,7 @@ impl<'src> Parser<'src> {
     }
 }
 
+#[cfg(feature = "stacker")]
 impl Parser<'_> {
     // Stack probes access thread-local state, so avoid them while recursive parser calls remain
     // shallow. `STACK_RED_ZONE` must cover the stack used before the first deferred probe.
@@ -975,6 +978,19 @@ impl Parser<'_> {
     #[cold]
     fn grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         self.maybe_grow_stack(f)
+    }
+}
+
+#[cfg(not(feature = "stacker"))]
+impl Parser<'_> {
+    #[inline]
+    fn maybe_grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        f(self)
+    }
+
+    #[inline]
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        f(self)
     }
 }
 

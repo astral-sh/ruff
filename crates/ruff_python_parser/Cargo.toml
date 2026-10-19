@@ -26,7 +26,7 @@ hashbrown = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
-stacker = { workspace = true }
+stacker = { workspace = true, optional = true }
 thin-vec = { workspace = true }
 unicode-ident = { workspace = true }
 unicode-normalization = { workspace = true }
@@ -47,6 +47,9 @@ walkdir = { workspace = true }
 [[test]]
 name = "fixtures"
 harness = false
+
+[features]
+stacker = ["dep:stacker"]
 
 [lints]
 workspace = true
