@@ -22,7 +22,7 @@ use crate::{
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
-        TypeContext, TypeQualifiers,
+        TypeContext, TypeQualifiers, UnionType,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind, MethodDecorator},
         constraints::ConstraintSetBuilder,
@@ -244,6 +244,7 @@ fn check_inherited_method_conflicts<'db>(
             let name = &member.member.name;
             if is_mangled_private(name.as_str())
                 || is_constructor_like_method(name.as_str())
+                || name == "__hash__"
                 || !seen_names.insert(name.clone())
             {
                 continue;
@@ -261,7 +262,7 @@ fn check_inherited_method_conflicts<'db>(
                     continue;
                 };
                 let Some((selected_ty, contract_ty)) =
-                    method_override_types(db, env, selected_ty, contract_ty, contract_owner, name)
+                    method_override_types(db, env, selected_ty, contract_ty)
                 else {
                     continue;
                 };
@@ -319,14 +320,7 @@ fn check_inherited_method_conflicts<'db>(
                         continue;
                     };
                     if parent_decorator != ancestor_decorator
-                        || !is_assignable_method_override(
-                            db,
-                            env,
-                            parent_ty,
-                            ancestor_ty,
-                            parent_contract_owner,
-                            name,
-                        )
+                        || !is_assignable_method_override(db, env, parent_ty, ancestor_ty)
                     {
                         continue;
                     }
@@ -500,14 +494,47 @@ fn check_class_declaration<'db>(
         return;
     };
 
-    // Hashing uses the callable exposed through instance access, including descriptors
-    // and callable objects. `None` disables hashing and retains attribute checking.
-    let is_hash_override = member.name == "__hash__" && !type_on_subclass_instance.is_none(db);
-
     let Some((literal, _)) = class.static_class_literal(db) else {
         return;
     };
     let class_kind = CodeGeneratorKind::from_class(db, literal.into());
+
+    // Hashability may change in either direction across subclasses. Only the hash protocol's
+    // signature constrains each definition; finality and override decorators are checked below.
+    if member.name == "__hash__"
+        && configuration.check_method_liskov_violations()
+        && let Some(object_hash) = Type::object()
+            .member(db, env, "__hash__")
+            .place
+            .ignore_possibly_undefined()
+        && let Some(object_hash) = object_hash.try_upcast_to_callable(db, env)
+    {
+        let expected = UnionType::from_elements(
+            db,
+            env,
+            [
+                object_hash
+                    .map(|callable| callable.into_regular(db))
+                    .to_type(db, env),
+                Type::none(db, env),
+            ],
+        );
+        if !type_on_subclass_instance.is_assignable_to(db, env, expected)
+            && let Some(builder) = context.report_lint(
+                &INVALID_METHOD_OVERRIDE,
+                first_reachable_definition.focus_range(db, context.module()),
+            )
+        {
+            let mut diagnostic = builder.into_diagnostic("Invalid `__hash__` definition");
+            diagnostic.set_primary_annotation_message(format_args!(
+                "Expected `{}`",
+                expected.display(db, env),
+            ));
+            type_on_subclass_instance
+                .assignability_error_context(db, env, expected)
+                .attach_to(db, env, &mut diagnostic);
+        }
+    }
 
     // Check for prohibited `NamedTuple` attribute overrides.
     //
@@ -863,13 +890,7 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if !configuration.check_liskov_violations() {
-                continue;
-            }
-
-            // A subclass can restore hashing after a base disables it with `__hash__ = None`.
-            // Keep checking later bases: their non-None definitions still constrain the method.
-            if is_hash_override && superclass_type.is_none(db) {
+            if !configuration.check_liskov_violations() || member.name == "__hash__" {
                 continue;
             }
 
@@ -961,11 +982,7 @@ fn check_class_declaration<'db>(
                         continue;
                     }
                     attributes::OverrideCheck::Attribute(None)
-                    | attributes::OverrideCheck::Unavailable => {
-                        if !is_hash_override {
-                            continue;
-                        }
-                    }
+                    | attributes::OverrideCheck::Unavailable => continue,
                 }
             }
 
@@ -973,16 +990,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let subclass_function = member.ty.as_function_literal();
-            if subclass_function.is_none() && !is_hash_override {
+            let Type::FunctionLiteral(subclass_function) = member.ty else {
                 continue;
-            }
+            };
 
             // Constructor signatures may differ unless `@override` requests compatibility.
             if is_constructor_like_method(&member.name)
-                && subclass_function.is_none_or(|function| {
-                    !function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
-                })
+                && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
             {
                 continue;
             }
@@ -999,8 +1013,6 @@ fn check_class_declaration<'db>(
                 env,
                 bind_new_for_override(db, env, class, &member.name, type_on_subclass_instance),
                 bind_new_for_override(db, env, class, &member.name, superclass_type),
-                superclass,
-                &member.name,
             ) else {
                 continue;
             };
@@ -1193,22 +1205,10 @@ fn is_inherited_method_violation<'db>(
             else {
                 return false;
             };
-            // Disabling hashing does not establish a method signature that a subclass
-            // can inherit. A restored hash method must still satisfy earlier ancestors.
-            if name == "__hash__" && parent_type.is_none(db) {
-                return false;
-            }
             // An inherited violation belongs to the parent's own receiver domain.
             let parent_type = bind_new_for_override(db, env, parent, name, parent_type);
             let superclass_type = bind_new_for_override(db, env, parent, name, superclass_type);
-            if is_assignable_method_override(
-                db,
-                env,
-                parent_type,
-                superclass_type,
-                superclass,
-                name,
-            ) {
+            if is_assignable_method_override(db, env, parent_type, superclass_type) {
                 return false;
             }
 
@@ -1233,8 +1233,6 @@ fn is_inherited_method_violation<'db>(
                         env,
                         parent_type,
                         bind_new_for_override(db, env, parent, name, ancestor_type),
-                        ancestor,
-                        name,
                     )
                 })
         })
@@ -1262,10 +1260,8 @@ fn is_assignable_method_override<'db>(
     env: &ProgramEnvironment<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
-    superclass: ClassType<'db>,
-    name: &str,
 ) -> bool {
-    method_override_types(db, env, subclass_type, superclass_type, superclass, name).is_some_and(
+    method_override_types(db, env, subclass_type, superclass_type).is_some_and(
         |(subclass_type, superclass_type)| subclass_type.is_assignable_to(db, env, superclass_type),
     )
 }
@@ -1275,8 +1271,6 @@ fn method_override_types<'db>(
     env: &ProgramEnvironment<'db>,
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
-    superclass: ClassType<'db>,
-    name: &str,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
@@ -1319,27 +1313,11 @@ fn method_override_types<'db>(
         _ => (subclass_type, superclass_type),
     };
 
-    // `object.__hash__` permits disabling hashing, including a declaration that can
-    // be either a callable or `None`. Other non-None ancestors retain their contracts.
-    let subclass_type = if name == "__hash__" && superclass.is_object(db) {
-        IntersectionType::from_elements(
-            db,
-            env,
-            [subclass_type, Type::none(db, env).negate(db, env)],
-        )
-    } else {
-        subclass_type
-    };
+    let superclass_callable = superclass_type
+        .try_upcast_to_callable(db, env)?
+        .map(|callable| callable.into_regular(db));
 
-    let superclass_type = match superclass_type.try_upcast_to_callable(db, env) {
-        Some(callables) => callables
-            .map(|callable| callable.into_regular(db))
-            .to_type(db, env),
-        None if name == "__hash__" => superclass_type,
-        None => return None,
-    };
-
-    Some((subclass_type, superclass_type))
+    Some((subclass_type, superclass_callable.to_type(db, env)))
 }
 
 /// Whether an attribute declaration is a class variable or an instance variable.

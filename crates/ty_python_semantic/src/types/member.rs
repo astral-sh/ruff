@@ -157,15 +157,9 @@ pub(super) fn inherited_class_body_declaration<'db>(
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
     .class_body_declaration(name)?;
-    // Disabling hashing does not impose a type on subclass bindings. Override checks
-    // validate their values against the non-None definitions elsewhere in the MRO.
+    // Hash definitions are checked against the hash protocol, not inherited annotations.
     // Retain qualifiers such as `ClassVar`, which still constrain instance assignments.
-    if name == "__hash__"
-        && inherited
-            .place
-            .ignore_possibly_undefined()
-            .is_some_and(|ty| ty.is_none(db))
-    {
+    if name == "__hash__" {
         inherited.place = Place::Undefined;
     }
     Some(inherited)
