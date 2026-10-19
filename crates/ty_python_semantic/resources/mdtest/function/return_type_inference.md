@@ -47,12 +47,9 @@ For all the functions defined above, the inferred return type is also reflected 
 signature:
 
 ```py
-# TODO: should be `def returns_1() -> Literal[1]`
-reveal_type(returns_1)  # revealed: def returns_1() -> Unknown
-# TODO: should be `def returns_a() -> Literal["a"]`
-reveal_type(returns_a)  # revealed: def returns_a() -> Unknown
-# TODO: should be `def returns_none() -> None`
-reveal_type(returns_none)  # revealed: def returns_none() -> Unknown
+reveal_type(returns_1)  # revealed: def returns_1() -> Literal[1]
+reveal_type(returns_a)  # revealed: def returns_a() -> Literal["a"]
+reveal_type(returns_none)  # revealed: def returns_none() -> None
 reveal_type(returns_unknown)  # revealed: def returns_unknown(unknown) -> Unknown
 ```
 
@@ -429,8 +426,7 @@ def identity_2[**P, R](func: Callable[P, R]) -> Callable[P, R]:
 def returns_2():
     return 2
 
-# TODO: should be `Literal[2]`
-reveal_type(returns_2())  # revealed: Unknown
+reveal_type(returns_2())  # revealed: Literal[2]
 ```
 
 In principle, return type inference can also be used to support unannotated decorators, but this
@@ -762,11 +758,9 @@ class NarrowedReceiver:
 
 class NarrowedReceiverSub(NarrowedReceiver): ...
 
-# TODO: Should be `def method(self: object) -> object`
-reveal_type(WidenedReceiver.method)  # revealed: def method(self: object) -> Unknown
+reveal_type(WidenedReceiver.method)  # revealed: def method(self: object) -> object
 
-# TODO: Should be `def method(self: NarrowedReceiverSub) -> NarrowedReceiverSub`
-reveal_type(NarrowedReceiver.method)  # revealed: def method(self: NarrowedReceiverSub) -> Unknown
+reveal_type(NarrowedReceiver.method)  # revealed: def method(self: NarrowedReceiverSub) -> NarrowedReceiverSub | Unknown
 ```
 
 ### Methods returning `cls`
@@ -914,8 +908,7 @@ def factorial(n: int):
         return 1
     return n * factorial(n - 1)
 
-# TODO: Should ideally be `def factorial(n: int) -> int`
-reveal_type(factorial)  # revealed: def factorial(n: int) -> Unknown
+reveal_type(factorial)  # revealed: def factorial(n: int) -> int
 reveal_type(factorial(5))  # revealed: int
 
 def fibonacci(n: int):
@@ -925,8 +918,7 @@ def fibonacci(n: int):
         return 1
     return fibonacci(n - 1) + fibonacci(n - 2)
 
-# TODO: Should ideally be `def fibonacci(n: int) -> int`
-reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
+reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> int
 reveal_type(fibonacci(5))  # revealed: int
 ```
 

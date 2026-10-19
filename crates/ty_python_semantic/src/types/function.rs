@@ -1319,7 +1319,7 @@ impl<'db> FunctionType<'db> {
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
         let updated_signature = self
-            .signature(db)
+            .signature_without_inferred_return_type(db)
             .with_inherited_generic_context(db, inherited_generic_context);
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
@@ -1709,26 +1709,20 @@ impl<'db> FunctionType<'db> {
 
     /// Typed externally-visible signature for this function.
     ///
-    /// This is the signature as seen by external callers, possibly modified by decorators and/or
-    /// overloaded.
-    pub(crate) fn signature(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+    /// Includes overloads and decorator transformations, but does not infer a missing return
+    /// annotation from the body. Use this when only declaration metadata is needed, or when
+    /// constructing the function before its body can be inferred.
+    pub(crate) fn signature_without_inferred_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db CallableSignature<'db> {
         self.updated_signature(db)
             .unwrap_or_else(|| self.literal_signature(db))
     }
 
     /// The signature of this function, with the return type possibly inferred from the body.
-    ///
-    /// TODO: We should rename this function to `signature` and use it almost everywhere where
-    /// `signature` (above) is currently used. The function above should instead be renamed to
-    /// `signature_without_inferred_return_type` or `external_signature`, and only be used in
-    /// places where this is explicitly needed. This will make signatures more consistent with
-    /// the type inferred for calls to these functions (see also corresponding TODOs in
-    /// `return_type_inference.md`).
-    pub(super) fn signature_with_inferred_return_type(
-        self,
-        db: &'db dyn Db,
-    ) -> Cow<'db, CallableSignature<'db>> {
-        let signature = self.signature(db);
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Cow<'db, CallableSignature<'db>> {
+        let signature = self.signature_without_inferred_return_type(db);
         // Never infer return types for functions with multiple overloads.
         let [overload] = signature.overloads.as_slice() else {
             return Cow::Borrowed(signature);
@@ -1865,7 +1859,11 @@ impl<'db> FunctionType<'db> {
             if !base.has_explicit_return_annotation(db) {
                 continue;
             }
-            let [signature] = base.signature(db).overloads.as_slice() else {
+            let [signature] = base
+                .signature_without_inferred_return_type(db)
+                .overloads
+                .as_slice()
+            else {
                 return None;
             };
 
@@ -2006,7 +2004,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signature(db), self.callable_type_kind(db))
+        CallableType::new(db, self.signature(db).as_ref(), self.callable_type_kind(db))
     }
 
     pub(crate) fn into_bound_method_type(
@@ -2110,7 +2108,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             return self.never();
         }
-        self.check_callable_signature_pair(db, source.signature(db), target.signature(db))
+        self.check_callable_signature_pair(db, &source.signature(db), &target.signature(db))
     }
 }
 
