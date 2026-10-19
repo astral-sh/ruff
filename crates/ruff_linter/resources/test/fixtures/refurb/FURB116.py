@@ -50,3 +50,8 @@ print(
         # text
     )[2:]
 )
+
+# Inside an f-string, the fix should use the opposite quote of the enclosing
+# f-string, since reusing it is a syntax error before Python 3.12.
+print(f"{bin(1337)[2:]}")
+print(f'{bin(1337)[2:]}')

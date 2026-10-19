@@ -710,3 +710,34 @@ help: Replace with `"Infinity"`
 98 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+   --> FURB157.py:105:12
+    |
+103 | # Inside an f-string, the fix should use the opposite quote of the enclosing
+104 | # f-string, since reusing it is a syntax error before Python 3.12.
+105 | f"{Decimal(float('-nan'))}"
+    |            ^^^^^^^^^^^^^
+106 | f'{Decimal(float("-nan"))}'
+    |
+help: Replace with `'nan'`
+    |
+104 | # f-string, since reusing it is a syntax error before Python 3.12.
+    - f"{Decimal(float('-nan'))}"
+105 + f"{Decimal('nan')}"
+106 | f'{Decimal(float("-nan"))}'
+    |
+
+FURB157 [*] Verbose expression in `Decimal` constructor
+   --> FURB157.py:106:12
+    |
+104 | # f-string, since reusing it is a syntax error before Python 3.12.
+105 | f"{Decimal(float('-nan'))}"
+106 | f'{Decimal(float("-nan"))}'
+    |            ^^^^^^^^^^^^^
+help: Replace with `"nan"`
+    |
+105 | f"{Decimal(float('-nan'))}"
+    - f'{Decimal(float("-nan"))}'
+106 + f'{Decimal("nan")}'
+    |

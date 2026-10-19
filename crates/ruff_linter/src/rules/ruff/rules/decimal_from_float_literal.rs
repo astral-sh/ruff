@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_codegen::Stylist;
+use ruff_python_ast::str::Quote;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
@@ -68,7 +68,7 @@ pub(crate) fn decimal_from_float_literal_syntax(checker: &Checker, call: &ast::E
                     arg.range(),
                     float,
                     checker.locator(),
-                    checker.stylist(),
+                    checker.preferred_quote(),
                 ));
         }
     }
@@ -137,9 +137,8 @@ fn fix_float_literal(
     original_range: TextRange,
     float: Float,
     locator: &Locator,
-    stylist: &Stylist,
+    quote: Quote,
 ) -> Fix {
-    let quote = stylist.quote();
     let Float { value_range, sign } = float;
     let float_value = locator.slice(value_range);
     let content = format!("{quote}{sign}{float_value}{quote}");

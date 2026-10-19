@@ -194,7 +194,8 @@ pub(crate) fn verbose_decimal_constructor(checker: &Checker, call: &ast::ExprCal
                 // It may have been encoded (e.g. as '\N{hyphen-minus}')
                 // in the original source slice, and the added complexity
                 // does not make sense for this edge case.
-                replacement = "\"nan\"".to_string();
+                let quote = checker.preferred_quote();
+                replacement = format!("{quote}nan{quote}");
             }
             let mut diagnostic = checker.report_diagnostic(
                 VerboseDecimalConstructor {

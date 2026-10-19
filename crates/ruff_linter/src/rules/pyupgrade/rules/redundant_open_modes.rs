@@ -100,9 +100,9 @@ fn create_diagnostic(call: &ast::ExprCall, mode_arg: &Expr, mode: OpenMode, chec
             create_remove_argument_fix(call, mode_arg, checker.tokens()).map(Fix::safe_edit)
         });
     } else {
-        let stylist = checker.stylist();
+        let quote = checker.preferred_quote();
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            format!("{}{mode}{}", stylist.quote(), stylist.quote()),
+            format!("{quote}{mode}{quote}"),
             mode_arg.range(),
         )));
     }

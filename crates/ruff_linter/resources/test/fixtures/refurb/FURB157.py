@@ -99,3 +99,8 @@ Decimal(
         "Infinity"
     )
 )
+
+# Inside an f-string, the fix should use the opposite quote of the enclosing
+# f-string, since reusing it is a syntax error before Python 3.12.
+f"{Decimal(float('-nan'))}"
+f'{Decimal(float("-nan"))}'

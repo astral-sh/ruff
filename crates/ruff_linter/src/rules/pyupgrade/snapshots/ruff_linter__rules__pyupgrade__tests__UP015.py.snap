@@ -841,3 +841,34 @@ help: Remove mode argument
 77 + aiofiles.open("foo")
 78 |
    |
+
+UP015 [*] Unnecessary modes, use `w`
+  --> UP015.py:87:16
+   |
+85 | # Inside an f-string, the fix should use the opposite quote of the enclosing
+86 | # f-string, since reusing it is a syntax error before Python 3.12.
+87 | f"{open('foo', 'wt')}"
+   |                ^^^^
+88 | f'{open("foo", "wt")}'
+   |
+help: Replace with `w`
+   |
+86 | # f-string, since reusing it is a syntax error before Python 3.12.
+   - f"{open('foo', 'wt')}"
+87 + f"{open('foo', 'w')}"
+88 | f'{open("foo", "wt")}'
+   |
+
+UP015 [*] Unnecessary modes, use `w`
+  --> UP015.py:88:16
+   |
+86 | # f-string, since reusing it is a syntax error before Python 3.12.
+87 | f"{open('foo', 'wt')}"
+88 | f'{open("foo", "wt")}'
+   |                ^^^^
+help: Replace with `w`
+   |
+87 | f"{open('foo', 'wt')}"
+   - f'{open("foo", "wt")}'
+88 + f'{open("foo", "w")}'
+   |

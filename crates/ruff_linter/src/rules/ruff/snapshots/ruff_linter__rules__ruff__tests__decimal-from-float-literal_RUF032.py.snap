@@ -206,3 +206,37 @@ help: Replace with string literal
 97 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+RUF032 [*] `Decimal()` called with float literal argument
+   --> RUF032.py:107:26
+    |
+105 | # Inside an f-string, the fix should use the opposite quote of the enclosing
+106 | # f-string, since reusing it is a syntax error before Python 3.12.
+107 | val = f"{decimal.Decimal(1.5)}"  # Should error
+    |                          ^^^
+108 | val = f'{decimal.Decimal(1.5)}'  # Should error
+    |
+help: Replace with string literal
+    |
+106 | # f-string, since reusing it is a syntax error before Python 3.12.
+    - val = f"{decimal.Decimal(1.5)}"  # Should error
+107 + val = f"{decimal.Decimal('1.5')}"  # Should error
+108 | val = f'{decimal.Decimal(1.5)}'  # Should error
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF032 [*] `Decimal()` called with float literal argument
+   --> RUF032.py:108:26
+    |
+106 | # f-string, since reusing it is a syntax error before Python 3.12.
+107 | val = f"{decimal.Decimal(1.5)}"  # Should error
+108 | val = f'{decimal.Decimal(1.5)}'  # Should error
+    |                          ^^^
+help: Replace with string literal
+    |
+107 | val = f"{decimal.Decimal(1.5)}"  # Should error
+    - val = f'{decimal.Decimal(1.5)}'  # Should error
+108 + val = f'{decimal.Decimal("1.5")}'  # Should error
+109 |
+    |
+note: This is an unsafe fix and may change runtime behavior

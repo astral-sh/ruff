@@ -283,3 +283,34 @@ help: Replace with `f"{1337:b}"`
 49 | )
    |
 note: This is an unsafe fix and may change runtime behavior
+
+FURB116 [*] Replace `bin` call with `f'{1337:b}'`
+  --> FURB116.py:56:10
+   |
+54 | # Inside an f-string, the fix should use the opposite quote of the enclosing
+55 | # f-string, since reusing it is a syntax error before Python 3.12.
+56 | print(f"{bin(1337)[2:]}")
+   |          ^^^^^^^^^^^^^
+57 | print(f'{bin(1337)[2:]}')
+   |
+help: Replace with `f'{1337:b}'`
+   |
+55 | # f-string, since reusing it is a syntax error before Python 3.12.
+   - print(f"{bin(1337)[2:]}")
+56 + print(f"{f'{1337:b}'}")
+57 | print(f'{bin(1337)[2:]}')
+   |
+
+FURB116 [*] Replace `bin` call with `f"{1337:b}"`
+  --> FURB116.py:57:10
+   |
+55 | # f-string, since reusing it is a syntax error before Python 3.12.
+56 | print(f"{bin(1337)[2:]}")
+57 | print(f'{bin(1337)[2:]}')
+   |          ^^^^^^^^^^^^^
+help: Replace with `f"{1337:b}"`
+   |
+56 | print(f"{bin(1337)[2:]}")
+   - print(f'{bin(1337)[2:]}')
+57 + print(f'{f"{1337:b}"}')
+   |

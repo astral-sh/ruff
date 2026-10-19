@@ -81,3 +81,8 @@ open("foo", "rb")
 open("foo", "r+b")
 open("foo", "UU")
 open("foo", "wtt")
+
+# Inside an f-string, the fix should use the opposite quote of the enclosing
+# f-string, since reusing it is a syntax error before Python 3.12.
+f"{open('foo', 'wt')}"
+f'{open("foo", "wt")}'

@@ -102,6 +102,12 @@ a = 10.0
 val = decimal.Decimal(a)
 
 
+# Inside an f-string, the fix should use the opposite quote of the enclosing
+# f-string, since reusing it is a syntax error before Python 3.12.
+val = f"{decimal.Decimal(1.5)}"  # Should error
+val = f'{decimal.Decimal(1.5)}'  # Should error
+
+
 class decimal():
     class Decimal():
         value: float | int | str
