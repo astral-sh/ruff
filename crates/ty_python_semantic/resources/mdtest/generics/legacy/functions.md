@@ -4118,6 +4118,42 @@ def _(
     reveal_type(result())  # revealed: A & B
 ```
 
+### Stateful callable returns with `ParamSpec`
+
+A callable returned through `ParamSpec` can also retain values from earlier calls. We conservatively
+keep the first parameter list and combine the possible return types, rather than promise a separate
+return type for each input type:
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def remember_first(convert: Callable[Concatenate[int, P], R]) -> Callable[P, R]:
+    values: list[R] = []
+
+    def first(*args: P.args, **kwargs: P.kwargs) -> R:
+        values.append(convert(0, *args, **kwargs))
+        return values[0]
+
+    return first
+
+@overload
+def convert(prefix: int, value: str) -> str: ...
+@overload
+def convert(prefix: int, value: int) -> int: ...
+def convert(prefix: int, value: str | int) -> str | int:
+    return value
+
+result = remember_first(convert)
+reveal_type(result)  # revealed: (value: str) -> str | int
+result("first")  # no diagnostic
+# A cached `str` must not be returned as `int` on a later call.
+# error: [invalid-argument-type]
+reveal_type(result(1))  # revealed: str | int
+```
+
 ## Inferring type arguments through recursive aliases
 
 Generic calls infer leaf types from already-annotated recursive values. The argument can use a

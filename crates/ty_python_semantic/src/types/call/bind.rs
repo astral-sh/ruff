@@ -6264,6 +6264,14 @@ impl<'db> CallInference<'_, 'db> {
             SolutionType::Unresolved(_) => None,
         };
         let generic_context = inference.generic_context(db);
+        // TODO: Account for parameter-list and variadic-tuple bindings when refining returns.
+        // In particular, `Callable[P, R]` can capture state linking its inputs and output.
+        if generic_context
+            .variables(db)
+            .any(|variable| variable.is_paramspec(db) || variable.is_typevartuple(db))
+        {
+            return None;
+        }
         let mentions_inferable = |ty| {
             any_over_type_expanding_aliases(
                 db,
