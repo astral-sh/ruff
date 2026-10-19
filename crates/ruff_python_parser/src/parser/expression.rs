@@ -417,11 +417,12 @@ impl<'src> Parser<'src> {
             _ => {}
         }
 
-        let lhs = self.parse_atom(context);
+        let mut is_parenthesized = false;
+        let lhs = self.parse_atom(context, &mut is_parenthesized);
 
         ParsedExpr {
-            expr: self.parse_postfix_expression(lhs.expr, start, context),
-            is_parenthesized: lhs.is_parenthesized,
+            expr: self.parse_postfix_expression(lhs, start, context),
+            is_parenthesized,
         }
     }
 
@@ -577,13 +578,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses an atom.
+    /// Parses an atom, writing grouping-parenthesis metadata separately to keep
+    /// the return value an `Expr`.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atoms>
-    fn parse_atom(&mut self, context: ExpressionContext) -> ParsedExpr {
+    fn parse_atom(&mut self, context: ExpressionContext, is_parenthesized: &mut bool) -> Expr {
+        *is_parenthesized = false;
         let start = self.node_start();
 
-        let lhs = match self.current_token_kind() {
+        match self.current_token_kind() {
             TokenKind::Float => {
                 let value = self.bump_float();
 
@@ -647,7 +650,9 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+                let parsed = self.parse_parenthesized_expression();
+                *is_parenthesized = parsed.is_parenthesized;
+                parsed.expr
             }
             TokenKind::Lsqb => self.parse_list_like_expression(),
             TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
@@ -668,9 +673,7 @@ impl<'src> Parser<'src> {
                     })
                 }
             }
-        };
-
-        lhs.into()
+        }
     }
 
     /// Parses a postfix expression in a loop until there are no postfix expressions left to parse.
