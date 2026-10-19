@@ -1572,7 +1572,7 @@ pub struct AnalysisOptions {
     /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
     /// inference.
     #[option(
-        default = r#""never""#,
+        default = r#""always""#,
         value_type = r#""never" | "always""#,
         example = r#"
             return-type-inference = "always"
