@@ -2505,15 +2505,12 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::IsProtocol) => {
-                            if let [Some(ty)] = overload.parameter_types() {
+                            if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
                                 // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
                                 // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
                                 // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
                                 // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
-                                overload.set_return_type(Type::bool_literal(
-                                    ty.as_class_literal()
-                                        .is_some_and(|class| class.is_protocol(db)),
-                                ));
+                                overload.set_return_type(Type::bool_literal(class.is_protocol(db)));
                             }
                         }
 
@@ -2879,11 +2876,10 @@ impl<'db> Bindings<'db> {
                                 if !has_more {
                                     // Helper to check if return type is class-like.
                                     let returns_class = || {
-                                        matches!(
-                                            overload.return_type(),
-                                            Type::ClassLiteral(_)
-                                                | Type::GenericAlias(_)
-                                                | Type::SubclassOf(_)
+                                        overload.return_type().is_subtype_of(
+                                            db,
+                                            env,
+                                            KnownClass::Type.to_instance(db, env),
                                         )
                                     };
 

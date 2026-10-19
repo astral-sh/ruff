@@ -11,15 +11,14 @@ use crate::{
         context::InferContext,
         cyclic::ActiveRecursionDetector,
         diagnostic::{
-            ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, DISJOINT_CAST,
-            FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
+            ABSTRACT_AND_FINAL_METHOD, ASSERT_TYPE_UNSPELLABLE_SUBTYPE, ClassMatches,
+            DISJOINT_CAST, FINAL_ON_NON_METHOD, INVALID_ARGUMENT_TYPE, INVALID_PARAMETER_DEFAULT,
             INVALID_PARAMSPEC, INVALID_TYPE_FORM, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
             TYPE_ASSERTION_FAILURE, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
-            report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
+            report_bad_argument_to_protocol_function, report_bad_argument_to_protocol_interface,
             report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_runtime_checkable,
-            report_invalid_total_ordering_call,
+            report_invalid_return_type, report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
@@ -1896,26 +1895,22 @@ impl KnownFunction {
                 }
             }
 
-            KnownFunction::RuntimeCheckable => {
-                if let [Some(Type::ClassLiteral(class))] = parameter_types
-                    && !class.is_protocol(builder.db())
+            KnownFunction::GetProtocolMembers | KnownFunction::RuntimeCheckable => {
+                if let [Some(parameter_type)] = parameter_types
+                    && let Some(argument) = ClassMatches::find_matching_classes(
+                        db,
+                        builder.program_environment(),
+                        *parameter_type,
+                        |class| !class.is_protocol(db),
+                    )
                 {
-                    report_invalid_runtime_checkable(&builder.context, call_expression, *class);
+                    report_bad_argument_to_protocol_function(
+                        &builder.context,
+                        call_expression,
+                        self,
+                        &argument,
+                    );
                 }
-            }
-
-            KnownFunction::GetProtocolMembers => {
-                let [Some(Type::ClassLiteral(class))] = parameter_types else {
-                    return;
-                };
-                if class.is_protocol(builder.db()) {
-                    return;
-                }
-                report_bad_argument_to_get_protocol_members(
-                    &builder.context,
-                    call_expression,
-                    *class,
-                );
             }
 
             KnownFunction::RevealProtocolInterface => {
@@ -2135,17 +2130,15 @@ impl KnownFunction {
                 let [Some(class_type)] = parameter_types else {
                     return;
                 };
-
-                let class = match class_type {
-                    Type::ClassLiteral(class) => ClassType::NonGeneric(*class),
-                    Type::GenericAlias(generic) => ClassType::Generic(*generic),
-                    _ => return,
-                };
-
-                if !class.has_ordering_method_in_mro(db) {
+                let env = builder.program_environment();
+                if let Some(argument) =
+                    ClassMatches::find_matching_classes(db, env, *class_type, |class| {
+                        !class.has_ordering_method_in_mro(db)
+                    })
+                {
                     report_invalid_total_ordering_call(
                         &builder.context,
-                        class.class_literal(db),
+                        &argument,
                         call_expression,
                     );
                 }
@@ -2494,12 +2487,21 @@ fn report_invalid_union_type_elements<'db>(
         invalid_elements: &mut Vec<Type<'db>>,
     ) {
         match ty {
-            Type::ClassLiteral(_) => {}
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) => {}
+
+            Type::Union(union) => {
+                for element in union.elements(db) {
+                    find_invalid_elements(db, env, function, *element, invalid_elements);
+                }
+            }
+
             Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
+
             // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
             Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
+            Type::SpecialForm(SpecialFormType::Any) => invalid_elements.push(ty),
+
             Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 match instance.value_expression_types(db, env) {
                     Ok(value_expression_types) => {
@@ -2512,6 +2514,13 @@ fn report_invalid_union_type_elements<'db>(
                     }
                 }
             }
+
+            // TODO: this should be unnecessary given the branch below this;
+            // this is a short-term special-case while https://github.com/astral-sh/ty/issues/116 is open
+            Type::GenericAlias(_) => invalid_elements.push(ty),
+
+            _ if ty.is_assignable_to(db, env, KnownClass::Type.to_instance(db, env)) => {}
+
             _ => invalid_elements.push(ty),
         }
     }

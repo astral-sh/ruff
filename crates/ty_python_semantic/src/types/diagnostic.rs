@@ -55,6 +55,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, Stri
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::{SmallVec, smallvec_inline};
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, SearchPath, file_to_module,
@@ -3615,49 +3616,133 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
     }
 }
 
-pub(super) fn report_invalid_runtime_checkable(
+/// Matching classes and whether every possible value of the inspected type is known to match.
+///
+/// Each variant contains at least one matching class.
+/// Most results contain a single matching class, which fits in the `SmallVec`'s inline capacity
+/// without allocating.
+#[derive(Debug)]
+pub(super) enum ClassMatches<'db> {
+    /// Every possible value of the inspected type is known to match the predicate.
+    Always(SmallVec<[ClassType<'db>; 1]>),
+    /// The matching classes satisfy the predicate, but other possible values may not.
+    Possibly(SmallVec<[ClassType<'db>; 1]>),
+}
+
+impl<'db> ClassMatches<'db> {
+    fn into_possible(self) -> Self {
+        match self {
+            Self::Always(classes) | Self::Possibly(classes) => Self::Possibly(classes),
+        }
+    }
+
+    fn classes(&self) -> &[ClassType<'db>] {
+        match self {
+            Self::Always(classes) | Self::Possibly(classes) => classes,
+        }
+    }
+
+    /// Find class literals or known bounds in `ty` that satisfy `predicate`.
+    ///
+    /// The search does not inspect arbitrary subclasses, so returning `None` does not rule out
+    /// other values that satisfy `predicate`.
+    pub(super) fn find_matching_classes(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        predicate: impl Fn(ClassType<'db>) -> bool + Copy,
+    ) -> Option<Self> {
+        match ty {
+            Type::ClassLiteral(class) => {
+                let class = ClassType::NonGeneric(class);
+                predicate(class).then(|| Self::Always(smallvec_inline![class]))
+            }
+            Type::SubclassOf(subclass) => {
+                match subclass.subclass_of().with_transposed_type_var(db, env) {
+                    SubclassOfInner::Class(class) => {
+                        predicate(class).then(|| Self::Possibly(smallvec_inline![class]))
+                    }
+                    SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => None,
+                    SubclassOfInner::TypeVar(typevar) => {
+                        let bound = typevar
+                            .require_bound_or_constraints(db, env)
+                            .as_type(db, env);
+                        Self::find_matching_classes(db, env, bound, predicate)
+                            .map(Self::into_possible)
+                    }
+                }
+            }
+            Type::Union(union) => {
+                let mut matching_classes = SmallVec::new();
+                let mut every_element_matches = true;
+                for element in union.elements(db) {
+                    match Self::find_matching_classes(db, env, *element, predicate) {
+                        Some(Self::Always(classes)) => matching_classes.extend(classes),
+                        Some(Self::Possibly(classes)) => {
+                            every_element_matches = false;
+                            matching_classes.extend(classes);
+                        }
+                        None => {
+                            every_element_matches = false;
+                        }
+                    }
+                }
+                if matching_classes.is_empty() {
+                    None
+                } else if every_element_matches {
+                    Some(Self::Always(matching_classes))
+                } else {
+                    Some(Self::Possibly(matching_classes))
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+pub(super) fn report_bad_argument_to_protocol_function(
     context: &InferContext,
     node: impl Ranged,
-    class: ClassLiteral,
+    function: KnownFunction,
+    argument: &ClassMatches,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, node) else {
         return;
     };
     let db = context.db();
+    let function_name: &str = function.into();
     let mut diagnostic =
-        builder.into_diagnostic("`runtime_checkable` can only be applied to protocol classes");
-    diagnostic.annotate(
-        Annotation::secondary(class.header_span(db))
-            .message(format_args!("`{}` is not a protocol class", class.name(db))),
-    );
-    diagnostic.info(
-        "A class is only a protocol if it directly inherits from \
-        `typing.Protocol` or `typing_extensions.Protocol`",
-    );
-}
+        builder.into_diagnostic(format_args!("Invalid argument to `{function_name}`"));
+    diagnostic.set_primary_annotation_message(match argument {
+        ClassMatches::Always(_) => "This call will raise `TypeError` at runtime",
+        ClassMatches::Possibly(_) => "This call may raise `TypeError` at runtime",
+    });
+    if argument.classes().len() >= 2 {
+        diagnostic.set_concise_message(format_args!(
+            "Only protocol classes can be passed to `{function_name}`; {} are not protocol classes",
+            format_enumeration(argument.classes().iter().map(|class| class.name(db)))
+        ));
+    } else {
+        diagnostic.set_concise_message(format_args!(
+            "Only protocol classes can be passed to `{function_name}`"
+        ));
+    }
+    diagnostic.info(format_args!(
+        "Only protocol classes can be passed to `{function_name}`"
+    ));
 
-pub(crate) fn report_bad_argument_to_get_protocol_members(
-    context: &InferContext,
-    call: &ast::ExprCall,
-    class: ClassLiteral,
-) {
-    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
-        return;
-    };
-    let db = context.db();
-    let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
-    diagnostic.set_primary_annotation_message("This call will raise `TypeError` at runtime");
-    diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
-
-    let mut class_def_diagnostic = SubDiagnostic::new(
-        SubDiagnosticSeverity::Info,
-        format_args!(
-            "`{}` is declared here, but it is not a protocol class:",
-            class.name(db)
-        ),
-    );
-    class_def_diagnostic.annotate(Annotation::primary(class.header_span(db)));
-    diagnostic.sub(class_def_diagnostic);
+    for class in argument.classes() {
+        let class = class.class_literal(db);
+        let mut class_def_diagnostic = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{}` is declared here, but it is not a protocol class:",
+                class.name(db)
+            ),
+        );
+        class_def_diagnostic.annotate(Annotation::primary(class.header_span(db)));
+        diagnostic.sub(class_def_diagnostic);
+    }
 
     diagnostic.info(
         "A class is only a protocol class if it directly inherits \
@@ -3703,7 +3788,7 @@ pub(crate) fn report_bad_argument_to_protocol_interface(
         "A class is only a protocol class if it directly inherits \
             from `typing.Protocol` or `typing_extensions.Protocol`",
     );
-    // See TODO in `report_bad_argument_to_get_protocol_members` above
+    // See TODO in `report_bad_argument_to_protocol_function` above
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html");
 }
 
@@ -5893,11 +5978,10 @@ pub(super) fn report_invalid_total_ordering(
     diagnostic.info("The decorator will raise `ValueError` at runtime");
 }
 
-/// Reports an invalid `total_ordering(cls)` function call where the class
-/// does not define any ordering method.
+/// Report a `total_ordering` call whose argument may lack an ordering method.
 pub(super) fn report_invalid_total_ordering_call(
     context: &InferContext<'_, '_>,
-    class: ClassLiteral<'_>,
+    argument: &ClassMatches<'_>,
     call_expression: &ast::ExprCall,
 ) {
     let db = context.db();
@@ -5907,15 +5991,25 @@ pub(super) fn report_invalid_total_ordering_call(
     };
 
     let mut diagnostic = builder.into_diagnostic(
-        "`@functools.total_ordering` requires at least one ordering method \
+        "`functools.total_ordering` requires at least one ordering method \
         (`__lt__`, `__le__`, `__gt__`, or `__ge__`) \
         to be defined",
     );
-    diagnostic.set_primary_annotation_message(format_args!(
-        "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
-        class.name(db)
-    ));
-    diagnostic.info("The function will raise `ValueError` at runtime");
+    match argument.classes() {
+        [class] => diagnostic.set_primary_annotation_message(format_args!(
+            "`{}` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+            class.name(db)
+        )),
+        classes if classes.len() >= 2 => diagnostic.set_primary_annotation_message(format_args!(
+            "{} do not define `__lt__`, `__le__`, `__gt__`, or `__ge__`",
+            format_enumeration(classes.iter().map(|class| class.name(db)))
+        )),
+        _ => {}
+    }
+    diagnostic.info(match argument {
+        ClassMatches::Always(_) => "The function will raise `ValueError` at runtime",
+        ClassMatches::Possibly(_) => "The function may raise `ValueError` at runtime",
+    });
 }
 
 /// This function receives an unresolved `from foo import bar` import,
