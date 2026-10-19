@@ -431,6 +431,10 @@ jobs:
           version: "0.13.1"
           checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
           enable-cache: "true"
+      # Warm the interpreter cache before tests with per-test timeouts.
+      - name: "Prefetch Python for uv script tests"
+        continue-on-error: true
+        run: uv python install --no-bin --no-registry 3.12
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
         env:
@@ -511,6 +515,10 @@ jobs:
           version: "0.13.1"
           checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
           enable-cache: "true"
+      # Warm the interpreter cache before tests with per-test timeouts.
+      - name: "Prefetch Python for uv script tests"
+        continue-on-error: true
+        run: uv python install --no-bin --no-registry 3.12
       - name: "Run tests"
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
@@ -558,6 +566,10 @@ jobs:
           version: "0.13.1"
           checksum: "cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2"
           enable-cache: "true"
+      # Warm the interpreter cache before tests with per-test timeouts.
+      - name: "Prefetch Python for uv script tests"
+        continue-on-error: true
+        run: uv python install --no-bin --no-registry 3.12
       - name: "Run tests"
         run: |
           uv run --locked --only-dev cargo nextest run --all-features --profile ci

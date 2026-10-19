@@ -326,6 +326,10 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.1"
           checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
+      # Warm the interpreter cache before tests with per-test timeouts.
+      - name: "Prefetch Python for uv script tests"
+        continue-on-error: true
+        run: uv python install --no-bin --no-registry 3.12
       - name: Update snapshots
         # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
         # in this test, causing the step overall to fail. We want to continue to later steps
