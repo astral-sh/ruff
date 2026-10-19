@@ -1,5 +1,5 @@
 ---
-name: review-ty-pr
+name: review-ty-changes
 description: Review ty changes in astral-sh/ruff, including pull requests and local changes just written by a user or an agent. Use when asked to review, re-review, audit, or inspect ty changes for correctness, regressions, architecture, maintainability, test coverage, unnecessary complexity, or meaningful style and consistency issues.
 ---
 
