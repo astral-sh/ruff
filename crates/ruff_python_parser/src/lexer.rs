@@ -720,14 +720,13 @@ impl<'src> Lexer<'src> {
             return TokenKind::Identifier;
         }
 
-        let text = self.token_text();
-
-        // No Python keyword is longer than eight bytes.
-        if text.len() > 8 {
+        // No Python keyword is longer than eight bytes. The first ASCII character was
+        // consumed before entering this function, so only seven continuation bytes can fit.
+        if ascii_len >= 8 {
             return TokenKind::Identifier;
         }
 
-        match text.as_bytes() {
+        match self.token_text().as_bytes() {
             b"False" => TokenKind::False,
             b"None" => TokenKind::None,
             b"True" => TokenKind::True,
