@@ -8,6 +8,7 @@ use crate::types::call::bind::CheckTypesMode;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::infer::infer_definition_types;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
@@ -38,7 +39,7 @@ pub use unused_binding_support::{UnusedBinding, unused_bindings};
 static CLASS_MATCHER: LazyLock<NameMatcher<'static>> =
     LazyLock::new(|| NameMatcher::keyword("class"));
 
-/// Returns the inferred callable return type for an unannotated function definition.
+/// Returns the inferred return type of an unannotated function.
 pub fn inlay_hint_return_type<'db>(
     model: &SemanticModel<'db>,
     function: &ast::StmtFunctionDef,
@@ -49,10 +50,8 @@ pub fn inlay_hint_return_type<'db>(
         return None;
     }
     let db = model.db();
-    let function_type = function.inferred_type(model)?.as_function_literal()?;
-    if function_type.last_definition(db) != function.definition(model) {
-        return None;
-    }
+    let definition = function.definition(model);
+    let function_type = infer_definition_types(db, definition).function_type(definition)?;
     let signature = function_type.signature_with_inferred_return_type(db);
     let [overload] = signature.overloads.as_slice() else {
         return None;

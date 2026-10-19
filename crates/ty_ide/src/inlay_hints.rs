@@ -1033,6 +1033,166 @@ mod tests {
           |
         ");
 
+        let mut test = return_type_hint_test(
+            r#"
+        class C:
+            value: str
+
+            @property
+            def text(self):
+                return self.value
+        "#,
+        );
+        assert_snapshot!(test.inlay_hints(), @"
+
+        class C:
+            value: str
+
+            @property
+            def text(self)[ -> str | Unknown]:
+                return self.value
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:24
+           |
+        LL |     def text(self)[ -> str | Unknown]:
+           |                        ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:30
+           |
+        LL |     def text(self)[ -> str | Unknown]:
+           |                              ^^^^^^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+          |
+        1 + from ty_extensions._internal import Unknown
+        2 |
+        --------------------------------------------------------------------------------
+        6 |     @property
+          -     def text(self):
+        7 +     def text(self) -> str | Unknown:
+        8 |         return self.value
+          |
+        ");
+
+        let mut test = return_type_hint_test(
+            r#"
+        def stringify(function):
+            def wrapper():
+                return str(function())
+
+            return wrapper
+
+        @stringify
+        def number():
+            return 42
+        "#,
+        );
+        // TODO: Do not expose `def wrapper` in the return-type hint for `stringify`,
+        // and ideally show the return type of `str` for the returned callable.
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def stringify(function)[ -> def wrapper() -> Unknown]:
+            def wrapper()[ -> str]:
+                return str([object=]function())
+
+            return wrapper
+
+        @stringify
+        def number()[ -> Literal[42]]:
+            return 42
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions/_internal.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:46
+           |
+        LL | def stringify(function)[ -> def wrapper() -> Unknown]:
+           |                                              ^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+        info: Source
+          --> main2.py:LL:23
+           |
+        LL |     def wrapper()[ -> str]:
+           |                       ^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:22
+           |
+        LL |     def __new__(cls, object: object = "") -> Self: ...
+           |                      ^^^^^^
+        info: Source
+          --> main2.py:LL:21
+           |
+        LL |         return str([object=]function())
+           |                     ^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | ^^^^^^^
+        info: Source
+          --> main2.py:LL:18
+           |
+        LL | def number()[ -> Literal[42]]:
+           |                  ^^^^^^^
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ^^^
+        info: Source
+          --> main2.py:LL:26
+           |
+        LL | def number()[ -> Literal[42]]:
+           |                          ^^
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+           |
+        1  + from typing import Literal
+        2  |
+        3  | def stringify(function):
+           -     def wrapper():
+           -         return str(function())
+        4  +     def wrapper() -> str:
+        5  +         return str(object=function())
+        6  |
+        7  |     return wrapper
+        8  |
+        9  | @stringify
+           - def number():
+        10 + def number() -> Literal[42]:
+        11 |     return 42
+           |
+        "#);
+
         // We do not infer return types for overloaded functions.
         let mut test = return_type_hint_test(
             r#"
