@@ -46,11 +46,18 @@ struct NameInterner {
 
 impl NameInterner {
     /// Returns an inline name directly, or a shared clone of a heap-allocated name.
+    #[inline]
     fn intern(&mut self, text: &str) -> Name {
         if let Some(name) = Name::new_inline(text) {
             return name;
         }
 
+        self.intern_heap(text)
+    }
+
+    /// Shares the backing allocation of a name that does not fit inline.
+    #[inline(never)]
+    fn intern_heap(&mut self, text: &str) -> Name {
         self.names
             .get_or_insert_with(text, |text| Name::new_heap(text))
             .clone()
