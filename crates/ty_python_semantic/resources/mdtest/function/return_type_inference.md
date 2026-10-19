@@ -954,6 +954,16 @@ def expanding(x):
 reveal_type(expanding(5))  # revealed: tuple[Divergent, Divergent]
 ```
 
+### Returning a recursive lambda
+
+A returned lambda can call its enclosing function. Inferring the lambda's body creates a cycle
+through the function's return type, even when there is no call site outside the function:
+
+```py
+def recursive_lambda():
+    return lambda: recursive_lambda()  # no diagnostic
+```
+
 ### Mutual recursion
 
 Functions that mutually depend on each others' return values can also be analyzed:

@@ -2364,6 +2364,25 @@ impl<'db> StatementInferenceInner<'db> {
         }
 
         if let Some(extra) = self.extra.as_deref_mut() {
+            // Return summaries can participate in a cycle independently of their expression
+            // types. Normalize them too so a returned recursive callable cannot keep growing
+            // even after the corresponding expression type has converged.
+            for returned in &mut extra.return_types_and_ranges {
+                returned.ty = if let Some(previous_returned) =
+                    previous_inference.extra.as_deref().and_then(|extra| {
+                        extra
+                            .return_types_and_ranges
+                            .iter()
+                            .find(|previous| previous.range == returned.range)
+                    }) {
+                    returned
+                        .ty
+                        .cycle_normalized(db, env, previous_returned.ty, cycle)
+                } else {
+                    returned.ty.recursive_type_normalized(db, env, cycle)
+                };
+            }
+
             normalize_collection_use_constraints(
                 db,
                 env,
