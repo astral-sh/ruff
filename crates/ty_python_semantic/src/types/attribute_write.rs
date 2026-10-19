@@ -800,7 +800,9 @@ fn explicit_attribute_write_requirement<'db>(
                 env,
                 object_ty,
                 attribute,
-                shadowed_descriptor_write_type(db, env, attr_ty),
+                attr_ty
+                    .instance_method_contract(db, env, receiver.unwrap_or(object_ty))
+                    .unwrap_or_else(|| shadowed_descriptor_write_type(db, env, attr_ty)),
             ),
             qualifiers,
         }

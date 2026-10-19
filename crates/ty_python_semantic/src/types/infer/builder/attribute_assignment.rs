@@ -564,7 +564,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         } else {
             let tcx = match member {
                 InstanceAttributeWriteMember::Explicit { member, .. } => {
-                    self.descriptor_type_context(member)
+                    self.explicit_member_type_context(member)
                 }
                 _ => TypeContext::default(),
             };
@@ -717,7 +717,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
                     return false;
                 }
-                let tcx = self.descriptor_type_context(member);
+                let tcx = self.explicit_member_type_context(member);
                 let value_ty = self.infer_value(tcx, emit_diagnostics);
                 let member_valid =
                     self.evaluate_explicit_member(member, value_ty, emit_diagnostics);
@@ -785,10 +785,23 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         }
     }
 
-    fn descriptor_type_context(
+    fn explicit_member_type_context(
         &self,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
     ) -> TypeContext<'db> {
+        if let ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } = requirement
+            && (ty.is_callable_type()
+                || ty.as_union().is_some_and(|union| {
+                    union
+                        .elements(self.builder.db())
+                        .iter()
+                        .all(Type::is_callable_type)
+                }))
+        {
+            // Infer lambda parameters from the callable contract on the first pass;
+            // checking assignment compatibility later cannot refine an inferred body.
+            return TypeContext::declared(Some(*ty));
+        }
         if let ExplicitAttributeWriteRequirement::Descriptor {
             descriptor_ty,
             receiver_ty,

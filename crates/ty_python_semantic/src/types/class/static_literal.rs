@@ -2982,7 +2982,7 @@ impl<'db> StaticClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+            let declared_and_qualifiers = place_from_declarations(db, env, declarations.clone())
                 .with_imported_final(
                     db,
                     env,
@@ -3037,7 +3037,6 @@ impl<'db> StaticClassLiteral<'db> {
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
-
                         let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
@@ -3045,6 +3044,15 @@ impl<'db> StaticClassLiteral<'db> {
                             ..
                         }) = implicit.inner.place
                         {
+                            let qualifiers = if !declarations.any_reachable(db, |declaration| {
+                                declaration.is_defined_and(|definition| {
+                                    !definition.kind(db).is_function_def()
+                                })
+                            }) {
+                                qualifiers | TypeQualifiers::METHOD_INSTANCE_ATTRIBUTE
+                            } else {
+                                qualifiers
+                            };
                             if declaredness == Definedness::AlwaysDefined {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,

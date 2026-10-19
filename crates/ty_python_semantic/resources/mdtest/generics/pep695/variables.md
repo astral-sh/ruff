@@ -1643,4 +1643,28 @@ reveal_type(Box())  # revealed: Box[Unknown]
 reveal_type(NestedBox())  # revealed: NestedBox[Unknown]
 ```
 
+## Replacing instance methods
+
+A method replacement uses the bound signature with the receiver's class arguments substituted.
+
+```py
+class Box[T]:
+    def get(self, default: T) -> T:
+        return default
+
+    def replace(self, unknown) -> None:
+        self.get = unknown  # no diagnostic
+
+reveal_type(Box[int]().get(1))  # revealed: int
+Box[int]().get("wrong")  # error: [invalid-argument-type]
+
+class Child(Box[str]): ...
+
+reveal_type(Child().get("a"))  # revealed: str
+
+def patch(box: Box[int]) -> None:
+    box.get = lambda default: default  # no diagnostic
+    box.get = lambda default: str(default)  # error: [invalid-assignment]
+```
+
 [pep 695]: https://peps.python.org/pep-0695/

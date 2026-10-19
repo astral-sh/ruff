@@ -368,6 +368,12 @@ fn attribute_violation<'db>(
             target: target.read,
         });
     }
+    // Method overrides follow callable subtyping (including covariant returns), even
+    // though an instance can explicitly replace a method. Preserve that policy for
+    // callable attribute implementations as well as method definitions.
+    if target.is_method {
+        return None;
+    }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
     // fields can become read-only there, even though writes to the base are allowed.

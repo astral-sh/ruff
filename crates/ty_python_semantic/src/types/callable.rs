@@ -101,6 +101,40 @@ impl<'db> Type<'db> {
         ))
     }
 
+    /// The callable contract for a value that shadows an ordinary method on an instance.
+    ///
+    /// The stored replacement is called directly, without descriptor binding. Preserve the
+    /// method's bound signatures but not its function identity or nominal bound-method attributes.
+    pub(super) fn instance_method_contract(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Type::Union(union) => {
+                union.try_map(db, env, |ty| ty.instance_method_contract(db, env, receiver))
+            }
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .instance_method_contract(db, env, receiver),
+            // Class objects, including instances of custom metaclasses, retain the
+            // class-attribute assignment rules.
+            _ if self.function_like_kind(db) == Some(CallableTypeKind::FunctionLike)
+                && !receiver.is_subtype_of(db, env, KnownClass::Type.to_instance(db, env)) =>
+            {
+                self.function_like_dunder_get(db, env, Some(receiver), None)?
+                    .try_upcast_to_callable(db, env)
+                    .map(|callables| {
+                        callables
+                            .map(|callable| callable.into_regular(db))
+                            .to_type(db, env)
+                    })
+            }
+            _ => None,
+        }
+    }
+
     /// Create a callable type with a single non-overloaded signature.
     pub(crate) fn single_callable(db: &'db dyn Db, signature: Signature<'db>) -> Type<'db> {
         Type::Callable(CallableType::single(db, signature))
