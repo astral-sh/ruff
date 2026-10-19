@@ -142,14 +142,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 127 |     @lossy_decorator
 128 |     def lossy2(self): ...  # error: [invalid-explicit-override]
 129 | 
-130 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
-131 | # but not `@override` violations
+130 | # These members override an inherited name,
+131 | # but violate its Liskov contract.
 132 | class LiskovViolatingButNotOverrideViolating(Parent):
 133 |     @override
 134 |     @property
-135 |     def foo(self) -> int: ...
+135 |     def foo(self) -> int: ...  # error: [invalid-property-type-override]
 136 |     @override
-137 |     def my_property1(self) -> int: ...
+137 |     def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
 138 | 
 139 |     # Class and static methods can override each other when "bound" signatures match,
 140 |     # but here, we deliberately add a new parameter to introduce a Liskov violation
@@ -312,6 +312,34 @@ error[invalid-explicit-override]: Method `lossy2` is decorated with `@override` 
 128 |     def lossy2(self): ...  # error: [invalid-explicit-override]
     |         ^^^^^^
 info: No `lossy2` definitions were found on any superclasses of `Invalid`
+
+```
+
+```
+error[invalid-property-type-override]: Invalid override of attribute `foo`
+   --> src/mdtest_snippet.pyi:135:9
+    |
+135 |     def foo(self) -> int: ...  # error: [invalid-property-type-override]
+    |         ^^^ Read type `int` is not assignable to inherited read type `() -> Unknown`
+    |
+   ::: src/mdtest_snippet.pyi:11:9
+    |
+ 11 |     def foo(self): ...
+    |         --- `Parent.foo` declared here
+
+```
+
+```
+error[invalid-property-type-override]: Invalid override of attribute `my_property1`
+   --> src/mdtest_snippet.pyi:137:9
+    |
+137 |     def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
+    |         ^^^^^^^^^^^^ Read type `() -> int` is not assignable to inherited read type `int`
+    |
+   ::: src/mdtest_snippet.pyi:13:9
+    |
+ 13 |     def my_property1(self) -> int: ...
+    |         ------------ `Parent.my_property1` declared here
 
 ```
 

@@ -7,7 +7,7 @@ use ruff_db::files::File;
 use ruff_db::system::{CommandExecutor, System, SystemPathBuf};
 
 use super::command::unsupported_command_execution;
-use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, uv_executable_error};
+use super::{MetadataTarget, ScriptEnvironmentCacheKey, Uv, UvMetadataError, uv_executable_error};
 use crate::UvSyncProgress;
 
 /// Runs workspace and standalone-script metadata requests with uv.
@@ -71,7 +71,7 @@ impl UvMetadataService {
             Err(error) => {
                 self.publish_result(UvMetadataResult {
                     task,
-                    output: Some(Err(error)),
+                    output: Some(Err(UvMetadataError::Invocation(error))),
                     progress,
                 });
                 return;
@@ -97,7 +97,7 @@ impl UvMetadataService {
             let job = error.into_inner();
             self.publish_result(UvMetadataResult {
                 task: job.task,
-                output: Some(Err(worker_disconnected())),
+                output: Some(Err(UvMetadataError::Invocation(worker_disconnected()))),
                 progress: job.progress,
             });
         }
@@ -211,7 +211,7 @@ impl UvSyncTask {
 pub(crate) struct UvMetadataResult {
     pub(crate) task: UvSyncTask,
     /// `None` if the worker skipped this request because it was cancelled before execution.
-    pub(crate) output: Option<std::io::Result<Output>>,
+    pub(crate) output: Option<Result<Output, UvMetadataError>>,
     pub(crate) progress: Option<Box<dyn UvSyncProgress>>,
 }
 

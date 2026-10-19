@@ -11,7 +11,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
     SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
 };
-use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
+use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
@@ -72,7 +72,7 @@ pub(super) struct UnsatisfiableBound;
 
 /// One condition that can be checked by an interior node in a constraint set BDD
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum Constraint<'db> {
+pub(super) enum Constraint<'db> {
     ConcreteLower(ConcreteLowerBound<'db>),
     ConcreteUpper(ConcreteUpperBound<'db>),
     ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
@@ -439,21 +439,49 @@ impl<'db> Constraint<'db> {
         }
     }
 
-    pub(super) fn provides_lower_bound_for(
+    pub(super) fn lower_bound_for(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    ) -> Option<Type<'db>> {
         match self {
-            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
-            Constraint::ConcreteUpper(_) => false,
-            Constraint::ConcreteEquivalence(bound) => {
-                bound.typevar.is_same_typevar_as(db, bound_typevar)
-            }
-            Constraint::TypeVarRange(bound) => bound.right.is_same_typevar_as(db, bound_typevar),
+            Constraint::ConcreteLower(bound) => bound
+                .typevar
+                .is_same_typevar_as(db, bound_typevar)
+                .then_some(bound.bound),
+            Constraint::ConcreteUpper(_) => None,
+            Constraint::ConcreteEquivalence(bound) => bound
+                .typevar
+                .is_same_typevar_as(db, bound_typevar)
+                .then_some(bound.bound),
+            Constraint::TypeVarRange(bound) => bound
+                .right
+                .is_same_typevar_as(db, bound_typevar)
+                .then_some(Type::TypeVar(bound.left)),
             Constraint::TypeVarEquivalence(bound) => {
-                bound.left.is_same_typevar_as(db, bound_typevar)
-                    || bound.right.is_same_typevar_as(db, bound_typevar)
+                bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
+            }
+        }
+    }
+
+    pub(super) fn upper_bound_for(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        match self {
+            Constraint::ConcreteLower(_) => None,
+            Constraint::ConcreteUpper(bound) => bound_typevar
+                .is_same_typevar_as(db, bound.typevar)
+                .then_some(bound.bound),
+            Constraint::ConcreteEquivalence(bound) => bound_typevar
+                .is_same_typevar_as(db, bound.typevar)
+                .then_some(bound.bound),
+            Constraint::TypeVarRange(bound) => bound_typevar
+                .is_same_typevar_as(db, bound.left)
+                .then_some(Type::TypeVar(bound.right)),
+            Constraint::TypeVarEquivalence(bound) => {
+                bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
             }
         }
     }
@@ -479,24 +507,6 @@ impl<'db> Constraint<'db> {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
             Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
-        }
-    }
-
-    pub(super) fn directly_constrains_inferable_typevar(
-        self,
-        db: &'db dyn Db,
-        inferable: TypeVarSet<'db>,
-    ) -> bool {
-        match self {
-            Constraint::ConcreteLower(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ConcreteUpper(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::ConcreteEquivalence(this) => this.typevar.is_inferable(db, inferable),
-            Constraint::TypeVarRange(this) => {
-                this.left.is_inferable(db, inferable) || this.right.is_inferable(db, inferable)
-            }
-            Constraint::TypeVarEquivalence(this) => {
-                this.left.is_inferable(db, inferable) || this.right.is_inferable(db, inferable)
-            }
         }
     }
 
@@ -1070,6 +1080,20 @@ pub(super) struct TypeVarEquivalenceBound<'db> {
 }
 
 impl<'db> TypeVarEquivalenceBound<'db> {
+    fn other_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        if self.left.is_same_typevar_as(db, typevar) {
+            Some(self.right)
+        } else if self.right.is_same_typevar_as(db, typevar) {
+            Some(self.left)
+        } else {
+            None
+        }
+    }
+
     pub(super) fn new(
         db: &'db dyn Db,
         provenance: ConstraintProvenance,

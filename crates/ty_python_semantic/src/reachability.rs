@@ -202,7 +202,7 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        NarrowingConstraint, SpecialFormType, TruthinessAnalyzer, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -211,7 +211,6 @@ use crate::{
 };
 use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexSlice};
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -220,8 +219,8 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
-    definition::DefinitionState,
-    expression::Expression,
+    definition::{DefinitionKind, DefinitionState},
+    expression::{Expression, ExpressionContext},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -234,11 +233,51 @@ use ty_python_core::{
     use_def_map,
 };
 
-/// Narrow `subject_ty` by all preceding unguarded match patterns.
+/// Controls whether the inferred match subject type is expanded before narrowing it by preceding
+/// patterns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum PatternSubjectExpansion {
+    /// Use the inferred subject type directly when inferring pattern bindings.
+    Raw,
+    /// Expand the subject into a union of possible subtypes when analyzing pattern reachability.
+    /// If the subject cannot be expanded, use its inferred type directly.
+    Expanded,
+}
+
+/// Narrow the subject by preceding match patterns with no guard or an always-true guard.
 ///
-/// Caching each prefix lets the next case reuse the already-normalized subject instead of
-/// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
-/// same intersections.
+/// Caching the subject type narrowed by the patterns before each case lets the next case reuse it
+/// instead of rebuilding it from the union of all preceding patterns, which can repeatedly
+/// distribute the same intersections.
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    expansion: PatternSubjectExpansion,
+) -> Type<'db> {
+    let Some(previous) = predicate.previous_predicate(db) else {
+        let subject = predicate.subject(db);
+        let subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
+        return match expansion {
+            PatternSubjectExpansion::Raw => subject_ty,
+            PatternSubjectExpansion::Expanded => {
+                let env = ProgramEnvironment::from_scope(subject.scope(db));
+                expand_type(db, &env, subject_ty)
+                    .map(|types| UnionType::from_elements(db, &env, types))
+                    .unwrap_or(subject_ty)
+            }
+        };
+    };
+    type_narrowed_after_pattern(db, *previous, expansion)
+}
+
+/// Return the match subject's type after this case, excluding values matched by its pattern when
+/// its guard cannot reject them.
+///
+/// Reachability analysis can reuse this result for an unguarded case when checking whether the
+/// pattern covers every remaining value. Later cases use it to exclude values already matched.
+///
+/// The query key excludes the inferred subject type, which can change during a cycle through a
+/// pattern capture. Inferring it within the query lets Salsa recognize and normalize that cycle.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
@@ -248,37 +287,43 @@ use ty_python_core::{
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-pub(crate) fn type_narrowed_by_previous_patterns<'db>(
+fn type_narrowed_after_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
-    subject_ty: Type<'db>,
+    expansion: PatternSubjectExpansion,
 ) -> Type<'db> {
-    let Some(previous) = predicate.previous_predicate(db) else {
-        return subject_ty;
-    };
-    let previous = *previous;
     let narrowed_by_previous_patterns =
-        type_narrowed_by_previous_patterns(db, previous, subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, expansion);
 
-    if previous.guard(db).is_some() {
+    let narrowed_by_pattern =
+        type_narrowed_by_pattern(db, predicate, narrowed_by_previous_patterns);
+    // If the pattern does not narrow the subject, the guard's truthiness cannot affect the result.
+    // Skipping its inference also avoids cycles through the subject or a pattern capture.
+    if narrowed_by_pattern == narrowed_by_previous_patterns
+        || !pattern_guard_allows_all_matches(db, predicate)
+    {
         narrowed_by_previous_patterns
     } else {
-        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
+        narrowed_by_pattern
     }
+}
+
+/// Whether the guard cannot reject a value matched by the pattern.
+fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
+    // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
+    predicate
+        .guard(db)
+        .is_none_or(|guard| condition_truthiness(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
 ///
-/// This result is also the preceding-pattern prefix for the next unguarded case.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
-    },
-    heap_size = ruff_memory_usage::heap_size
-)]
+/// If the case has no guard, or its guard is always true, the result is the subject type remaining
+/// after the case.
+///
+/// The callers cache the narrowed subject type and pattern reachability. While tracking this
+/// function separately might seem useful for caching, it can create a new query whenever a cyclic
+/// subject type changes, introducing fresh recursive markers on every iteration.
 fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
@@ -412,9 +457,10 @@ fn enum_member_pattern_coverage<'db>(
 
 /// Determine the static truthiness of a `match` case over a union of enum literals.
 ///
-/// The analysis removes enum members already matched by earlier unguarded cases, then decides
-/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
-/// ambiguous because the guard can reject an otherwise matching enum member.
+/// The analysis removes enum members already matched by earlier cases whose guards cannot reject
+/// them, then decides whether the current case is impossible, exhaustive, or still ambiguous.
+/// If any members remain and the current case has a guard, a pattern covering all of them is
+/// conservatively treated as ambiguous.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -432,7 +478,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     while let Some(previous) = previous_predicate.previous_predicate(db) {
         previous_predicate = *previous;
 
-        if previous_predicate.guard(db).is_some() {
+        if !pattern_guard_allows_all_matches(db, previous_predicate) {
             continue;
         }
 
@@ -490,11 +536,8 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let coverage_subject_ty = expand_type(db, &env, subject_ty)
-        .map(|types| UnionType::from_elements(db, &env, types))
-        .unwrap_or(subject_ty);
     let narrowed_subject_ty =
-        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, PatternSubjectExpansion::Expanded);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -505,7 +548,13 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
+    // This check concerns the pattern itself. The cached type after the case also accounts for
+    // its guard and may therefore retain values matched by the pattern.
+    let next_narrowed_subject_ty = if predicate.guard(db).is_none() {
+        type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded)
+    } else {
+        type_narrowed_by_pattern(db, predicate, narrowed_subject_ty)
+    };
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -546,9 +595,8 @@ const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::Expression(expression)
+        PredicateNode::Expression { expression, .. }
         | PredicateNode::Condition(expression)
-        | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -560,7 +608,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-/// Infers complete preceding blocks of call predicates in source order.
+/// Infers complete blocks of call predicates at or before the given predicate, in source order.
 ///
 /// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
 /// predicates in reverse to reduce their size. Inferring a later call can depend on the
@@ -568,8 +616,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// chain. Inferring the expressions in source order turns that chain into cache lookups while
 /// preserving normal reachability and narrowing during every inference.
 ///
-/// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
-/// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
+/// Because calls are selected by predicate indices rather than graph reachability, branch-heavy
+/// code can cause earlier calls to be cached from branches that this evaluation would not otherwise
+/// visit.
 /// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
@@ -579,8 +628,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
 /// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
 /// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need prefix warming to bound the Salsa stack, so their calls are evaluated entirely on demand.
-fn analyze_non_terminal_call_prefix<'db>(
+/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
+/// demand.
+fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
@@ -644,10 +694,10 @@ fn analyze_non_terminal_calls<'db>(
 
 /// Analyzes a power-of-two range of call-predicate blocks in source order.
 ///
-/// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
-/// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
-/// requested prefix contains thousands of calls. Each leaf handles multiple calls iteratively to
-/// avoid retaining a Salsa argument and query result for every individual predicate.
+/// Calls at or before a predicate can be split into these canonical ranges, which later
+/// expression-inference queries can reuse. Splitting ranges in half keeps the Salsa query stack
+/// logarithmic even when a request covers thousands of calls. Each leaf handles multiple calls
+/// iteratively to avoid retaining a Salsa argument and query result for every individual predicate.
 ///
 /// Analyzing a call can re-enter reachability through expression inference and request this same
 /// range. Recovery is a no-op because the range only warms call queries; any call still needed for
@@ -678,7 +728,8 @@ fn analyze_non_terminal_call_range<'db>(
     analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
-/// Evaluates a reachability constraint after warming its statement-call prefix.
+/// Evaluates a reachability constraint, first caching complete blocks of statement calls up to its
+/// root predicate when the scope has many calls.
 ///
 /// Large scopes reuse canonical call ranges and sparse decision-diagram checkpoints; small scopes
 /// retain the direct evaluation path without creating either cached index.
@@ -695,7 +746,7 @@ fn evaluate_reachability_constraint<'db>(
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -764,7 +815,13 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
-/// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
+/// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
+///
+/// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
+/// cannot select either boolean branch, so only paths that bypass it remain reachable. Such paths
+/// occur in both its true and false branches: evaluate both and take the conjunction of their
+/// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
+/// Stop as soon as any required branch is unreachable.
 ///
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
@@ -783,24 +840,49 @@ fn evaluate_reachability_path<'db>(
 ) -> Truthiness {
     let env = ProgramEnvironment::from_scope(scope);
     let mut visited = 0;
+    let mut pending = SmallVec::<[ScopedReachabilityConstraintId; 2]>::new();
+    let mut seen: Option<FxHashSet<ScopedReachabilityConstraintId>> = None;
+    let mut result = Truthiness::AlwaysTrue;
 
     loop {
-        if let Some(reachability) = terminal_reachability(id) {
-            return reachability;
-        }
-
-        let node = constraints.get_interior_node(id);
-        if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
-            return evaluate_reachability_checkpoint(db, scope, id);
-        }
-
-        id = match analyze_single(db, &env, &predicates[node.atom()]) {
-            Truthiness::AlwaysTrue => node.if_true(),
-            Truthiness::Ambiguous => node.if_ambiguous(),
-            Truthiness::AlwaysFalse => node.if_false(),
+        let reachability = if seen.as_mut().is_some_and(|seen| !seen.insert(id)) {
+            // Every visited suffix already contributes to the conjunction.
+            Truthiness::AlwaysTrue
+        } else if let Some(reachability) = terminal_reachability(id) {
+            reachability
+        } else {
+            let node = constraints.get_interior_node(id);
+            if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
+                evaluate_reachability_checkpoint(db, scope, id)
+            } else {
+                id = match analyze_single(db, &env, &predicates[node.atom()]) {
+                    Truthiness::AlwaysTrue => node.if_true(),
+                    Truthiness::Ambiguous => node.if_ambiguous(),
+                    Truthiness::AlwaysFalse => node.if_false(),
+                    Truthiness::Uninhabited => {
+                        // An uninhabited condition cannot take either branch. Retain only paths
+                        // that bypass the condition, which are represented in both branches.
+                        pending.push(node.if_false());
+                        seen.get_or_insert_with(FxHashSet::default);
+                        node.if_true()
+                    }
+                };
+                use_checkpoint = true;
+                visited += 1;
+                continue;
+            }
         };
+
+        result = result.and(reachability);
+        if result.is_always_false() {
+            return result;
+        }
+        let Some(next) = pending.pop() else {
+            return result;
+        };
+        id = next;
         use_checkpoint = true;
-        visited += 1;
+        visited = 0;
     }
 }
 
@@ -862,7 +944,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         }
 
         let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
         evaluate_reachability_path(
             db,
             predicate_scope(db, &predicates[root_predicate]),
@@ -1423,6 +1505,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let branch = match analyze_single(db, self.env, &predicate) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
                         Truthiness::Ambiguous => {
                             unreachable!(
                                 "statically decidable predicates should never be Ambiguous"
@@ -1458,6 +1541,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                                 let either = self.or(if_true, if_false);
                                 self.or(either, if_uncertain)
                             }
+                            Truthiness::Uninhabited => if_uncertain,
                         }
                     } else {
                         self.add_node(ProjectedNarrowingNode {
@@ -1520,7 +1604,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         let db = self.db;
         if self.is_join(id) {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
-            // then apply the incoming prefix constraint to its narrowed type.
+            // then apply the constraints accumulated before the join to its narrowed type.
             let suffix_ty = self.narrow_join(id);
             return apply_accumulated_narrowing(db, self.env, suffix_ty, accumulated);
         }
@@ -1648,9 +1732,10 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     (Truthiness::Ambiguous, _) | (_, Truthiness::Ambiguous) => {
                         ControlFlow::Continue(Truthiness::Ambiguous)
                     }
-                    (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
-                        ControlFlow::Continue(Truthiness::AlwaysFalse)
-                    }
+                    (
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                        Truthiness::AlwaysFalse | Truthiness::Uninhabited,
+                    ) => ControlFlow::Continue(Truthiness::AlwaysFalse),
                 });
             truthiness
         }
@@ -1847,108 +1932,89 @@ fn context_manager_suppresses<'db>(
     )
 }
 
-/// Evaluate a condition without re-testing intermediate short-circuit results.
-///
-/// `None` means evaluation cannot produce a result, as for an operand narrowed to `Never`.
-/// This differs from ambiguous truthiness: in `flag and raises()`, where `raises()` returns
-/// `Never`, only the falsy short-circuit path can complete. For `flag or raises()`, only the
-/// truthy path can complete. Callers that cannot represent the absence of a result can
-/// conservatively map `None` to [`Truthiness::Ambiguous`].
-pub(crate) fn analyze_condition_expression(
-    node: &ast::Expr,
-    leaf_truthiness: &impl Fn(&ast::Expr) -> Option<Truthiness>,
-) -> Option<Truthiness> {
-    match node {
-        ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-            let short_circuit = Truthiness::from(op.is_or());
-            let mut result = short_circuit.negate();
-            for value in values {
-                let Some(truthiness) = analyze_condition_expression(value, leaf_truthiness) else {
-                    return result.is_ambiguous().then_some(short_circuit);
-                };
-                if truthiness == short_circuit {
-                    return Some(short_circuit);
-                }
-                if truthiness.is_ambiguous() {
-                    result = Truthiness::Ambiguous;
-                }
-            }
-            Some(result)
-        }
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::Not,
-            operand,
-            ..
-        }) => analyze_condition_expression(operand, leaf_truthiness).map(Truthiness::negate),
-        ast::Expr::If(ast::ExprIf {
-            test, body, orelse, ..
-        }) => match analyze_condition_expression(test, leaf_truthiness)? {
-            Truthiness::AlwaysTrue => analyze_condition_expression(body, leaf_truthiness),
-            Truthiness::AlwaysFalse => analyze_condition_expression(orelse, leaf_truthiness),
-            Truthiness::Ambiguous => {
-                let body_truthiness = analyze_condition_expression(body, leaf_truthiness);
-                let orelse_truthiness = analyze_condition_expression(orelse, leaf_truthiness);
-                match (body_truthiness, orelse_truthiness) {
-                    (None, truthiness) | (truthiness, None) => truthiness,
-                    (Some(body), Some(orelse)) => Some(if body == orelse {
-                        body
-                    } else {
-                        Truthiness::Ambiguous
-                    }),
-                }
-            }
-        },
-        _ => leaf_truthiness(node),
-    }
-}
-
+/// Test an expression's result object, accounting for operands that cannot complete.
+/// Separate value and condition queries use the expression directly as their Salsa key, avoiding
+/// an additional interner for pairs of expressions and evaluation contexts.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| Truthiness::Ambiguous,
-    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| {
-        // A condition can control whether one of its own inputs is reachable. Expression inference
-        // can lose its previous result when it ceases to be a cycle head, so its type widening alone
-        // does not ensure that the condition's truthiness converges. Delay widening here to avoid
-        // retaining imprecise results from the first few iterations.
-        if cycle.iteration() > crate::TAINTED_CYCLES && *previous != result {
-            Truthiness::Ambiguous
-        } else {
-            result
-        }
-    },
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+fn value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    expression_truthiness(db, expression, ExpressionContext::Value)
+}
+
+/// Follow short-circuit conditions without testing their result objects again.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| Truthiness::Ambiguous,
+    cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+    expression_truthiness(db, expression, ExpressionContext::Condition)
+}
+
+fn widen_truthiness(cycle: &salsa::Cycle, previous: Truthiness, result: Truthiness) -> Truthiness {
+    // A condition can control whether one of its own inputs is reachable. Expression inference
+    // can lose its previous result when it ceases to be a cycle head, so its type widening alone
+    // does not ensure that the condition's truthiness converges. Delay widening here to avoid
+    // retaining imprecise results from the first few iterations.
+    if cycle.iteration() > crate::TAINTED_CYCLES {
+        previous.union(result)
+    } else {
+        result
+    }
+}
+
+/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
+/// boolean outcome. The calling query caches that distinction and widens it during inference cycles.
+fn expression_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    context: ExpressionContext,
+) -> Truthiness {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
-    analyze_condition_expression(expression.node_ref(db).node(&module), &|node| {
-        inference
-            .comparison_truthiness(node)
-            .or_else(|| inference.expression_type(node).bool_if_inhabited(db, &env))
-    })
-    .unwrap_or(Truthiness::Ambiguous)
+    let node = expression.node_ref(db).node(&module);
+    TruthinessAnalyzer::new(
+        db,
+        &env,
+        |node| inference.expression_type(node),
+        |node| inference.comparison_truthiness(node),
+    )
+    .truthiness(node, context)
 }
 
+/// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
+///
+/// Unlike ambiguous truthiness, an uninhabited condition does not make either branch reachable.
+/// In particular, treating `Never` as ambiguous can introduce loop bindings that then exclude each
+/// other, causing inference to settle on different types depending on file-checking order.
 fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predicate) -> Truthiness {
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
-        PredicateNode::Expression(test_expr) => {
-            infer_same_file_expression_type(db, test_expr, TypeContext::default())
-                .bool(db, env)
-                .negate_if(!predicate.is_positive)
-        }
-        PredicateNode::Condition(test_expr) => {
-            analyze_condition(db, test_expr).negate_if(!predicate.is_positive)
-        }
-        PredicateNode::ChainedComparisonCondition(test_expr) => {
+        PredicateNode::Expression {
+            expression: test_expr,
+            truthiness_from_type: true,
+        } => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
-            let expression = test_expr.node_ref(db);
-            inference
-                .comparison_truthiness(expression)
-                .unwrap_or_else(|| inference.expression_type(expression).bool(db, env))
-                .negate_if(!predicate.is_positive)
+            let ty = inference.expression_type(test_expr.node_ref(db));
+            if ty.is_equivalent_to(db, env, Type::Never) {
+                Truthiness::Uninhabited
+            } else {
+                ty.bool(db, env).negate_if(!predicate.is_positive)
+            }
+        }
+        PredicateNode::Expression {
+            expression: test_expr,
+            truthiness_from_type: false,
+        } => value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
+        PredicateNode::Condition(test_expr) => {
+            condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
@@ -2036,6 +2102,14 @@ pub(crate) fn is_range_reachable<'db>(
                 entry_range.contains_range(range) && !is_reachable(db, use_def, constraint)
             })
     })
+}
+
+/// Returns whether control flow can reach the end of `scope`.
+///
+/// This can be used to check if a function can implicitly return `None`.
+pub(crate) fn is_end_of_scope_reachable<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
+    let use_def = use_def_map(db, scope);
+    is_reachable(db, use_def, use_def.end_of_scope_reachability())
 }
 
 pub(crate) fn is_reachable<'db>(
@@ -2167,6 +2241,12 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
+    /// Returns whether every reachable declaration is an annotated assignment.
+    ///
+    /// Unbound entries and unreachable definitions do not affect the result. This distinguishes
+    /// attribute annotations from other declarations, such as methods, imports, and nested classes.
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool;
+
     fn any_reachable(
         self,
         db: &'db dyn Db,
@@ -2182,6 +2262,14 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool {
+        !self.any_reachable(db, |declaration| {
+            declaration.is_defined_and(|definition| {
+                !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+            })
+        })
+    }
+
     fn any_reachable(
         mut self,
         db: &'db dyn Db,
@@ -2358,7 +2446,15 @@ class TargetB:
                 let predicate = use_def
                     .predicates()
                     .iter()
-                    .find(|predicate| matches!(predicate.node, PredicateNode::Expression(_)))
+                    .find(|predicate| {
+                        matches!(
+                            predicate.node,
+                            PredicateNode::Expression {
+                                truthiness_from_type: true,
+                                ..
+                            }
+                        )
+                    })
                     .unwrap();
                 let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
 

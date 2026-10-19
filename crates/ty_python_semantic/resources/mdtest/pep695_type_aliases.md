@@ -1621,6 +1621,34 @@ class Node:
         return {"label": self.label, "children": [child.to_dict() for child in self.children]}
 ```
 
+### Copying recursive dictionaries
+
+Copying a dictionary with a recursive value type preserves compatibility with the original type.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4598>.
+
+```py
+type Nested = dict[str, Nested | int]
+
+def consume(value: Nested): ...
+def copy(value: Nested):
+    consume(dict(value))
+    copied = dict(value)
+    consume(copied)
+```
+
+The same applies when the recursive values include both lists and dictionaries.
+
+```py
+type JSON = str | int | float | bool | None | list[JSON] | dict[str, JSON]
+
+def consume_json(value: dict[str, JSON]): ...
+def copy_json(value: dict[str, JSON]):
+    consume_json(dict(value))
+    copied = dict(value)
+    consume_json(copied)
+```
+
 ### Cyclic defaults
 
 ```py
@@ -1710,6 +1738,54 @@ type X = tuple[X, int]
 
 def _(x: X):
     reveal_type(x is x)  # revealed: bool
+```
+
+### Recursive aliases and their complements
+
+For a fully static alias `A`, every object is either an `A` or not an `A`. This also holds when the
+alias refers to itself: the list element type `Not[A] | A` is `object`.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+### Negated recursive aliases
+
+The list element is not an `A`. We can describe its type without expanding the recursive list each
+time it is inspected.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A]]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+### Equivalent complements of a gradual recursive alias
+
+The presence of `Any` must not change what an alias means. Negating this recursive alias is
+equivalent to negating its definition. Generic inference respects that equivalence in either
+direction.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Not
+
+type A = list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
+    assert_type(identity(x), Not[list[tuple[Any, A]]])
+    assert_type(identity(y), Not[A])
 ```
 
 ### Recursive invariant

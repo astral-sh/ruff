@@ -275,6 +275,162 @@ reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
+## Specializing generic class objects from context
+
+A `type[...]` annotation informs the specialization of a bare generic class, taking precedence over
+any type variable defaults:
+
+```py
+class C[T = int]: ...
+
+defaulted_factory: type[C[str]] = C
+reveal_type(defaulted_factory())  # revealed: C[str]
+```
+
+The context can also refer to a type variable of an enclosing class:
+
+```py
+class Box[T = int]:
+    value: T
+
+    def factory(self) -> "type[Box[T]]":
+        return Box  # ok
+
+class Connection[T]:
+    factory: type[Box[T]]
+
+    def __init__(self) -> None:
+        self.factory = Box  # ok
+
+reveal_type(Box[str]().factory()())  # revealed: Box[str]
+reveal_type(Connection[str]().factory())  # revealed: Box[str]
+```
+
+A declared union containing a class type is narrowed to provide useful type context:
+
+```py
+factory: type[Box[str]] | None = Box
+reveal_type(factory())  # revealed: Box[str]
+```
+
+Without a concrete type context, the default still applies:
+
+```py
+def value[T](factory: type[Box[T]]) -> T:
+    return factory().value
+
+reveal_type(value(Box))  # revealed: int
+```
+
+## Narrowing class objects of final generic classes
+
+A specialized alias is distinct from the bare class object, even when the specialization matches the
+default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
+check the return type in that branch.
+
+```py
+from typing import final
+
+@final
+class P[U = str]: ...
+
+def create[T: P[str]](cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(P[str])
+```
+
+## Narrowing class objects against a final protocol
+
+A class can implement a final protocol without being the protocol class itself. Excluding the
+protocol class leaves the implementing class reachable.
+
+```py
+from typing import Protocol, final
+
+@final
+class P(Protocol):
+    value: int
+
+class Impl:
+    value: int
+
+def create[T: Impl](cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(Impl)
+```
+
+## Class objects and specialized final protocols
+
+Implementing a specialized protocol does not make the implementing class object the protocol's
+specialized alias.
+
+```py
+from typing import Protocol, final
+from ty_extensions._internal import TypeOf
+
+@final
+class P[U](Protocol):
+    value: U
+
+class Impl:
+    value: int
+
+def as_protocol_class[T: Impl](cls: type[T]) -> TypeOf[P[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
+## Narrowing class objects against a final TypedDict
+
+Two TypedDicts can have compatible fields without being the same class object. Excluding one class
+leaves the other reachable.
+
+```py
+from typing import TypedDict, final
+
+@final
+class Shape(TypedDict):
+    value: int
+
+class Other(TypedDict):
+    value: int
+
+def create[T: Other](cls: type[T]) -> int:
+    if cls is not Shape:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
+        return "wrong"  # error: [invalid-return-type]
+    return 0
+
+create(Other)
+```
+
+## Class objects and specialized final TypedDicts
+
+Compatible TypedDict fields do not make another class object a specialized alias of the final
+TypedDict.
+
+```py
+from typing import TypedDict, final
+from ty_extensions._internal import TypeOf
+
+@final
+class Shape[U](TypedDict):
+    value: U
+
+class Other(TypedDict):
+    value: int
+
+def as_shape_class[T: Other](cls: type[T]) -> TypeOf[Shape[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
@@ -1114,6 +1270,59 @@ reveal_type(generic_context(into_regular_callable(A)))
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Inherited dataclass converters
+
+A subclass specializes an inherited converter's input type for its synthesized methods and attribute
+assignments.
+
+```py
+from typing import Any, Callable, dataclass_transform
+
+def field(*, converter: Callable[..., Any]) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Base[T]:
+    @staticmethod
+    def convert(value: T) -> T:
+        return value
+
+    value: T = field(converter=convert)
+
+@model
+class Child(Base[str]): ...
+
+reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+child = Child("a")
+reveal_type(child.value)  # revealed: str
+Child(1)  # error: [invalid-argument-type]
+
+child.value = "b"  # no diagnostic
+child.value = 1  # error: [invalid-assignment]
+
+reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+child.__replace__(value="b")  # no diagnostic
+child.__replace__(value=1)  # error: [invalid-argument-type]
+```
+
+Specialization also propagates through an intermediate generic subclass with a nested field type.
+
+```py
+@model
+class Nested[U](Base[list[U]]): ...
+
+@model
+class Indirect(Nested[str]): ...
+
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+indirect = Indirect(["a"])
+Indirect([1])  # error: [invalid-argument-type]
+indirect.value = ["b"]  # no diagnostic
+indirect.value = [1]  # error: [invalid-assignment]
+```
+
 ### Class typevar has another typevar as a default
 
 ```py
@@ -1199,6 +1408,45 @@ reveal_type(DefaultChild[str].x)  # revealed: str
 reveal_type(PartiallyFixed.fixed)  # revealed: int
 # error: [invalid-attribute-access]
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
+```
+
+## Unions of generic intersections
+
+Sharing one class constraint does not make two intersections interchangeable. Neither of these
+alternatives covers the other:
+
+```py
+from ty_extensions import Intersection
+
+class Cell[T]:
+    value: T
+
+class Other[T]: ...
+class Marker: ...
+
+def different_classes(value: Intersection[Cell[int], Marker] | Intersection[Marker, Other[int]]):
+    reveal_type(value)  # revealed: (Cell[int] & Marker) | (Marker & Other[int])
+```
+
+An alternative with an additional constraint is redundant when the other constraints match. However,
+the writable `Cell.value` makes `Cell` invariant, so `Cell[bool]` is not a subtype of `Cell[int]`:
+
+```py
+def specializations(
+    narrower: Intersection[Other[int], Marker, Cell[int]] | Intersection[Cell[int], Marker],
+    incompatible: Intersection[Cell[bool], Marker] | Intersection[Cell[int], Marker],
+):
+    reveal_type(narrower)  # revealed: Cell[int] & Marker
+    reveal_type(incompatible)  # revealed: (Cell[bool] & Marker) | (Cell[int] & Marker)
+```
+
+An inherited specialization can also make an intersection redundant:
+
+```py
+class Child(Cell[int]): ...
+
+def inherited(value: Intersection[Child, Marker] | Intersection[Cell[int], Marker]):
+    reveal_type(value)  # revealed: Cell[int] & Marker
 ```
 
 ## Fallback MROs preserve generic class identity
@@ -1608,6 +1856,53 @@ reveal_type(Aliased[str].constant)  # revealed: int
 Aliased[int].constant = 1
 ```
 
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar[U: A | B](value: U):
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
+## Self methods on narrowed union-bounded type variables
+
+Narrowing a union-bounded type variable preserves both the type variable and the narrowing when
+binding `Self` to each member of the upper bound.
+
+```py
+from typing_extensions import Self
+
+class A:
+    def f(self) -> list[Self]:
+        return [self]
+
+class B:
+    def f(self) -> set[Self]:
+        return {self}
+
+class Marker: ...
+
+def f[T: A | B](obj: T):
+    if isinstance(obj, Marker):
+        reveal_type(obj)  # revealed: T@f & Marker
+        reveal_type(obj.f())  # revealed: list[T@f & Marker & A] | set[T@f & Marker & B]
+```
+
 ## Metaclasses of specialized classes
 
 Specializing a class preserves its valid metaclass. Without an explicit metaclass, conflicting
@@ -1708,6 +2003,168 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Ambiguous overloads preserve generic return types
+
+Here, a `Series[Any]` receiver matches both `__add__` overloads, whose return types are
+`Series[int]` and `Series[str]`. We preserve the common `Series` class and replace only its
+differing type argument with `Unknown`, so the result is `Series[Unknown]` instead of `Unknown`.
+
+Regression test for [#4055](https://github.com/astral-sh/ty/issues/4055).
+
+```py
+from __future__ import annotations
+
+from typing import Any, overload
+from ty_extensions._internal import Unknown
+
+class Series[T]:
+    @overload
+    def __add__(self: Series[int], other: int) -> Series[int]: ...
+    @overload
+    def __add__(self: Series[str], other: int) -> Series[str]: ...
+    def __add__(self, other: int): ...
+    def count(self) -> int:
+        return 0
+
+def gradual(series: Series[Any]):
+    reveal_type(series + 1)  # revealed: Series[Unknown]
+    reveal_type(series.__add__(1))  # revealed: Series[Unknown]
+    reveal_type(Series.__add__(series, 1))  # revealed: Series[Unknown]
+
+def unknown(series: Series[Unknown]):
+    reveal_type(series + 1)  # revealed: Series[Unknown]
+```
+
+Concrete receivers select the matching overload:
+
+```py
+def _(integers: Series[int], strings: Series[str]):
+    reveal_type(integers + 1)  # revealed: Series[int]
+    reveal_type(strings + 1)  # revealed: Series[str]
+```
+
+The returned instance supports known methods, and ty still rejects missing attributes:
+
+```py
+def _(series: Series[Any]):
+    result = series + 1
+    reveal_type(result.count())  # revealed: int
+    result.missing()  # error: [unresolved-attribute]
+```
+
+## Ambiguous overloads returning generic protocols
+
+Specializations of a single protocol preserve the protocol while differing type arguments become
+unknown.
+
+```py
+from typing import Any, Protocol, overload
+
+class P[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+@overload
+def same_protocol(x: int) -> P[int]: ...
+@overload
+def same_protocol(x: str) -> P[str]: ...
+def same_protocol(x): ...
+def _(x: Any):
+    reveal_type(same_protocol(x))  # revealed: P[Unknown]
+```
+
+The return types `P[int]` and `Q[int]` are equivalent, but neither is equivalent to `P[str]`. The
+returns do not all specialize the same protocol, so their ambiguous result is `Unknown` regardless
+of declaration order.
+
+```py
+class Q[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+@overload
+def p_first(x: int) -> P[int]: ...
+@overload
+def p_first(x: str) -> Q[int]: ...
+@overload
+def p_first(x: bytes) -> P[str]: ...
+def p_first(x): ...
+@overload
+def q_first(x: str) -> Q[int]: ...
+@overload
+def q_first(x: int) -> P[int]: ...
+@overload
+def q_first(x: bytes) -> P[str]: ...
+def q_first(x): ...
+def _(x: Any):
+    reveal_type(p_first(x))  # revealed: Unknown
+    reveal_type(q_first(x))  # revealed: Unknown
+```
+
+## Parameter packs in ambiguous overload returns
+
+Equivalent `ParamSpec` arguments are preserved while other type arguments are merged. Differing
+parameter packs currently make the entire ambiguous return type unknown:
+
+```py
+from typing import Any, overload
+
+class WithParams[T, **P]: ...
+
+@overload
+def same_parameters(x: int) -> WithParams[int, [bytes]]: ...
+@overload
+def same_parameters(x: str) -> WithParams[str, [bytes]]: ...
+def same_parameters(x): ...
+@overload
+def parameters(x: int) -> WithParams[int, [int]]: ...
+@overload
+def parameters(x: str) -> WithParams[int, [str]]: ...
+def parameters(x): ...
+def _(x: Any):
+    reveal_type(same_parameters(x))  # revealed: WithParams[Unknown, (bytes, /)]
+    reveal_type(parameters(x))  # revealed: Unknown
+```
+
+The same applies to `TypeVarTuple` arguments:
+
+```py
+class WithItems[T, *Ts]: ...
+
+@overload
+def same_items(x: int) -> WithItems[int, bytes, float]: ...
+@overload
+def same_items(x: str) -> WithItems[str, bytes, float]: ...
+def same_items(x): ...
+@overload
+def items(x: int) -> WithItems[int, bytes]: ...
+@overload
+def items(x: str) -> WithItems[int, float]: ...
+def items(x): ...
+def _(x: Any):
+    reveal_type(same_items(x))  # revealed: WithItems[Unknown, bytes, float]
+    reveal_type(items(x))  # revealed: Unknown
+```
+
+## Instance attributes with substituted type variables
+
+Instance attributes are specialized once, even when the type arguments refer to the class's own type
+parameters.
+
+```py
+class Pair[T, U]:
+    def __init__(self, first: T, second: U):
+        self.first: T = first
+        self.second: U = second
+
+    def swapped(self, other: "Pair[U, T]"):
+        reveal_type(other.first)  # revealed: U@Pair
+        reveal_type(other.second)  # revealed: T@Pair
+
+    def nested(self, other: "Pair[list[T], U]"):
+        reveal_type(other.first)  # revealed: list[T@Pair]
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
@@ -1738,6 +2195,66 @@ An explicit `TypeIs[Any]` return type remains unmaterialized:
 def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
     reveal_type(top.unrelated(value))  # revealed: TypeIs[Any @ value]
     reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
+```
+
+## Materialized recursive generic protocols
+
+Materialization leaves recursive return types unchanged when a receiver annotation names a fixed
+specialization:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Fixed[T](Protocol):
+    def read(self: Fixed[int]) -> Fixed[tuple[T, T]]: ...
+
+static_assert(is_equivalent_to(Fixed[int], Top[Fixed[int]]))
+static_assert(is_equivalent_to(Fixed[int], Bottom[Fixed[int]]))
+```
+
+The receiver itself can name a growing specialization:
+
+```py
+class Growing[T](Protocol):
+    def child(self) -> Growing[tuple[T, T]]: ...
+    def read(self: Growing[tuple[T, T]]) -> T: ...
+
+static_assert(is_equivalent_to(Growing[int], Top[Growing[int]]))
+```
+
+Overloads can require different receiver specializations:
+
+```py
+from typing import overload
+
+class Overloaded[T](Protocol):
+    def child(self) -> Overloaded[tuple[T, T]]: ...
+    @overload
+    def read(self: Overloaded[int]) -> int: ...
+    @overload
+    def read(self: Overloaded[str]) -> str: ...
+
+static_assert(is_equivalent_to(Overloaded[int], Top[Overloaded[int]]))
+```
+
+Static bounds and constraints also leave materialization unchanged, including when the receiver's
+type argument grows:
+
+```py
+class Bounded[T: object](Protocol):
+    def read(self: Bounded[tuple[T, T]]) -> int: ...
+
+static_assert(is_equivalent_to(Bounded[int], Top[Bounded[int]]))
+static_assert(is_equivalent_to(Bounded[int], Bottom[Bounded[int]]))
+
+class Constrained[T: (int, tuple[object, ...])](Protocol):
+    def read(self: Constrained[tuple[T, T]]) -> int: ...
+
+static_assert(is_equivalent_to(Constrained[int], Top[Constrained[int]]))
 ```
 
 ## `Callable` return annotations preserve enclosing generic context
@@ -2190,6 +2707,29 @@ def probe(value: Tree[int, str]):
     reveal_type(child.value)  # revealed: str
 ```
 
+## Recursive constructor type context
+
+An invariant constructor can use a recursive type alias as context, including when its `__new__`
+method returns `Self`.
+
+```py
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+type Nested = Box[Nested | int]
+
+def copy(value: Nested) -> Nested:
+    return Box(value.value)
+
+def invalid() -> Nested:
+    return Box("wrong")  # error: [invalid-return-type]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
@@ -2204,6 +2744,298 @@ class Box[T]:
 
 def check(box: Box[int]) -> None:
     box.mutate(1)
+```
+
+## Unannotated subclass defaults inherit specialized declarations
+
+An inherited annotation is specialized using the subclass's base arguments before it provides
+context for an initializer. A further generic subclass retains its own type variables.
+
+```py
+class Base[T]:
+    items: list[T]
+
+class Integers(Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+reveal_type(Integers().items)  # revealed: list[int]
+
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+class Child[U](Base[U]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
+```
+
+## Calling differently specialized bound methods
+
+Each arm retains the relationship between its receiver and the class's type argument, whether the
+union is formed before or after accessing the method.
+
+```py
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+    def pair_with_values(self, values: list[T]) -> tuple[Self, T]:
+        return self, self.value
+
+def pairs[T](a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@pairs], T@pairs]
+    reveal_type(box.pair())
+
+def pairs_reversed[T](a: Box[str], b: Box[T], cond: bool):
+    box = b if cond else a
+    # revealed: tuple[Box[T@pairs_reversed], T@pairs_reversed] | tuple[Box[str], str]
+    reveal_type(box.pair())
+
+def bound_pairs[T](a: Box[str], b: Box[T], cond: bool):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str] | tuple[Box[T@bound_pairs], T@bound_pairs]
+    reveal_type(pair())
+
+def bound_pairs_reversed[T](a: Box[str], b: Box[T], cond: bool):
+    pair = b.pair if cond else a.pair
+    # revealed: tuple[Box[T@bound_pairs_reversed], T@bound_pairs_reversed] | tuple[Box[str], str]
+    reveal_type(pair())
+```
+
+An expected return type also provides context for the call:
+
+```py
+def contextual_argument[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    return box.pair_with_values([])  # no diagnostic
+
+def inferred_result[T](a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@inferred_result], T@inferred_result]
+    reveal_type(box.pair_with_values([]))
+
+def wrong_return[T](a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
+    box = a if cond else b
+    return box.pair()  # error: [invalid-return-type]
+```
+
+## Calling a union of generic methods
+
+A method's type parameter is inferred from the argument without changing the caller's type
+parameters or the receiver's specialization.
+
+```py
+from typing import Self
+
+class Box[T]:
+    value: T
+
+    def pair[U](self, value: U) -> tuple[Self, T, U]:
+        return self, self.value, value
+
+def call[T, U](a: Box[str], b: Box[T], cond: bool, value: U):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str, U@call] | tuple[Box[T@call], T@call, U@call]
+    reveal_type(pair(value))
+
+def wrong_return[T, U](a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
+    pair = a.pair if cond else b.pair
+    return pair(value)  # error: [invalid-return-type]
+```
+
+## Dictionary methods on unions
+
+Methods on differently specialized dictionaries accept the shared key type and retain the value
+types from both alternatives.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
+    for current in (first, second):
+        for key, data in current.items():  # no diagnostic
+            reveal_type(data)  # revealed: T@compare | int
+            reveal_type(current.get(key))  # revealed: T@compare | None | int
+```
+
+## Attribute override specialization
+
+Inherited attribute and property contracts use the superclass specialization. A mutable attribute
+cannot narrow that specialized type, while a read-only property can.
+
+```py
+class Base[T]:
+    value: T
+
+    @property
+    def readonly(self) -> T:
+        raise NotImplementedError
+
+class Same(Base[int]):
+    value: int
+
+    @property
+    def readonly(self) -> bool:
+        return True
+
+class Narrow(Base[int]):
+    value: bool  # error: [invalid-mutable-override]
+
+class Incompatible(Base[int]):
+    value: str  # error: [invalid-attribute-override]
+
+    @property
+    def readonly(self) -> str:  # error: [invalid-property-type-override]
+        return ""
+```
+
+An initialized attribute must satisfy the same specialized contract. Further subclasses do not
+repeat an incompatibility already introduced by the parent.
+
+```py
+class WithDefault(Base[int]):
+    value: str = ""  # error: [invalid-attribute-override]
+
+class Grandchild(WithDefault):
+    value: str = ""  # no diagnostic
+```
+
+A new concrete inheritance path can introduce a conflict absent from a parent's gradual
+specialization. That conflict must still be reported.
+
+```py
+from typing import Any
+
+class Gradual(Base[Any]):
+    value: str
+
+class Concrete(Base[int]): ...
+
+class NewConflict(Gradual, Concrete):
+    value: str  # error: [invalid-attribute-override]
+```
+
+## Attribute annotations in generic constructors
+
+For a subclass of `Base[int]`, the constructor annotation gives `value` the type `int`. A subclass
+can repeat that annotation.
+
+```py
+class Base[T]:
+    def __init__(self, value: T) -> None:
+        self.value: T = value
+
+class Same(Base[int]):
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+```
+
+Narrowing to `bool` would prevent writes of other integers. An unrelated type such as `str` also
+fails to preserve the inherited type.
+
+```py
+class Narrow(Base[int]):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+
+class Incompatible(Base[int]):
+    value: str  # error: [invalid-attribute-override]
+```
+
+## Specialized declarations after a dynamic base
+
+An annotation from a generic base is specialized even when the subclass has an earlier dynamic base.
+
+```py
+from typing import Any
+
+class Base[T]:
+    items: list[T]
+
+class Integers(Any, Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+```
+
+An incompatible default is rejected:
+
+```py
+class Invalid(Any, Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+```
+
+A generic subclass retains its type parameter in the inherited annotation:
+
+```py
+class Child[T](Any, Base[T]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
+```
+
+## Narrowing a bounded generic subclass
+
+An unrestricted type variable `S` cannot be used to specialize `Child`, whose type parameter is
+bounded by `str`. Specializing `Child` with `S & str` would also be incorrect: `Parent` is
+invariant, so `Parent[S]` does not imply `Parent[S & str]`. The runtime check therefore retains the
+original `Parent[S]` and narrows to `Child[Unknown]`. Member types can consequently become gradual.
+
+TODO: If we tracked `S <= str` as a flow-sensitive constraint in the branch, we could infer
+`Child[S]`.
+
+```py
+class Parent[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def put(self, value: T) -> None:
+        pass
+
+class Child[T: str](Parent[T]): ...
+
+def narrow[S](value: Parent[S]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Parent[S@narrow] & Child[Unknown]
+        reveal_type(value.get())  # revealed: S@narrow & Unknown
+        # TODO: `Parent[S]` still requires the argument to be assignable to `S`.
+        value.put(42)
+
+def narrow_bounded[S: str](value: Parent[S]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[S@narrow_bounded]
+```
+
+The same applies when narrowing an intersection of two invariant generic bases.
+
+```py
+from ty_extensions import Intersection
+
+class Other[T]:
+    value: list[T]
+
+class ChildBoth[T: str](Parent[T], Other[T]): ...
+
+def narrow_intersection[S](value: Intersection[Parent[S], Other[S]]) -> None:
+    if isinstance(value, ChildBoth):
+        reveal_type(value)  # revealed: Parent[S@narrow_intersection] & Other[S@narrow_intersection] & ChildBoth[Unknown]
+
+def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]) -> None:
+    if isinstance(value, ChildBoth):
+        reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

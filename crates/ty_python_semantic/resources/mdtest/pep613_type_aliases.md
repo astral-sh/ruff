@@ -438,6 +438,36 @@ my_isinstance(1, 1)
 my_isinstance(1, (int, (str, 1)))
 ```
 
+## Copying recursive dictionaries
+
+Copying a dictionary with a recursive value type preserves compatibility with the original type.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4598>.
+
+```py
+from typing import TypeAlias
+
+Nested: TypeAlias = dict[str, "Nested | int"]
+
+def consume(value: Nested): ...
+def copy(value: Nested):
+    consume(dict(value))
+    copied = dict(value)
+    consume(copied)
+```
+
+The same applies when the recursive values include both lists and dictionaries.
+
+```py
+JSON: TypeAlias = "str | int | float | bool | None | list[JSON] | dict[str, JSON]"
+
+def consume_json(value: dict[str, JSON]): ...
+def copy_json(value: dict[str, JSON]):
+    consume_json(dict(value))
+    copied = dict(value)
+    consume_json(copied)
+```
+
 ## Stringified recursive aliases
 
 Quoting an entire recursive alias preserves its string value at runtime and its recursive type when
@@ -451,6 +481,47 @@ reveal_type(Nested)  # revealed: str
 
 def inspect(value: Nested):
     reveal_type(value)  # revealed: Nested
+```
+
+## Recursive aliases and their complements
+
+A fully static alias and its complement cover every object, even when the alias refers to itself.
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A] | A]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+## Negated recursive aliases
+
+```py
+from typing import TypeAlias
+from ty_extensions import Not
+
+A: TypeAlias = "list[Not[A]]"
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+## Gradual recursive aliases and their complements
+
+The `Any` in each union member can have a different materialization, so the union does not simplify
+to `object`.
+
+```py
+from typing import Any, TypeAlias
+from ty_extensions import Not
+
+B: TypeAlias = "list[tuple[Any, B]]"
+
+def f(x: B | Not[B]):
+    reveal_type(x)  # revealed: B | ~B
 ```
 
 ## Specializing non-generic recursive aliases
@@ -567,6 +638,14 @@ T = TypeVar("T")
 Alias: TypeAlias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
 Growing: TypeAlias = "T | Growing[list[T]]"  # error: [cyclic-type-alias-definition]
 reveal_type(Growing)  # revealed: str
+```
+
+Adding the alias's complement does not make an unguarded cycle valid.
+
+```py
+from ty_extensions import Not
+
+Complemented: TypeAlias = "T | Complemented[T] | Not[Complemented[T]]"  # error: [cyclic-type-alias-definition]
 ```
 
 Invalid generic aliases use a divergent type for recovery with or without type arguments.

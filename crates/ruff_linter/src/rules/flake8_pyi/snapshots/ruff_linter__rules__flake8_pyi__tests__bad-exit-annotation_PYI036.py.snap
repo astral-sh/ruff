@@ -212,3 +212,55 @@ PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) s
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 169 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
     |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:196:14
+    |
+194 |     def __exit__(
+195 |         self,
+196 |         typ: "type[BaseException]",
+    |              ^^^^^^^^^^^^^^^^^^^^^
+197 |         exc: "BaseException | None",
+198 |         tb: "TracebackType | None",
+    |
+
+PYI036 The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:203:14
+    |
+201 |         self,
+202 |         typ: "type[BaseException] | None",
+203 |         exc: "BaseException",
+    |              ^^^^^^^^^^^^^^^
+204 |         tb: "TracebackType | None",
+205 |     ) -> None: ...  # PYI036
+    |
+
+PYI036 [*] Star-args in `__exit__` should be annotated with `object`
+   --> PYI036.py:225:31
+    |
+224 | class StringizedBadVariadic:
+225 |     def __exit__(self, *args: "str") -> None: ...  # PYI036
+    |                               ^^^^^
+226 |     async def __aexit__(self, *args: "int") -> None: ...  # PYI036
+    |
+help: Annotate star-args with `object`
+    |
+224 | class StringizedBadVariadic:
+    -     def __exit__(self, *args: "str") -> None: ...  # PYI036
+225 +     def __exit__(self, *args: object) -> None: ...  # PYI036
+226 |     async def __aexit__(self, *args: "int") -> None: ...  # PYI036
+    |
+
+PYI036 [*] Star-args in `__aexit__` should be annotated with `object`
+   --> PYI036.py:226:38
+    |
+224 | class StringizedBadVariadic:
+225 |     def __exit__(self, *args: "str") -> None: ...  # PYI036
+226 |     async def __aexit__(self, *args: "int") -> None: ...  # PYI036
+    |                                      ^^^^^
+help: Annotate star-args with `object`
+    |
+225 |     def __exit__(self, *args: "str") -> None: ...  # PYI036
+    -     async def __aexit__(self, *args: "int") -> None: ...  # PYI036
+226 +     async def __aexit__(self, *args: object) -> None: ...  # PYI036
+    |

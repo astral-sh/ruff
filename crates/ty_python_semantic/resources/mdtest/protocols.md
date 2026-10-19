@@ -445,6 +445,135 @@ reveal_type(typing.Protocol is typing_extensions.Protocol)  # revealed: bool
 reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 ```
 
+## Applying `runtime_checkable`
+
+The `runtime_checkable` decorator can only be applied to protocol classes. Applying it to an
+ordinary class raises `TypeError` at runtime:
+
+```py
+from typing import Protocol, runtime_checkable
+
+# snapshot: invalid-argument-type
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+```snapshot
+error[invalid-argument-type]: `runtime_checkable` can only be applied to protocol classes
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | @runtime_checkable
+  | ^^^^^^^^^^^^^^^^^^
+5 | class NotAProtocol: ...
+  |       ------------ `NotAProtocol` is not a protocol class
+info: A class is only a protocol if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+```
+
+The same restriction applies to `typing_extensions.runtime_checkable`:
+
+```py
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+# error: [invalid-argument-type]
+@runtime_checkable_extensions
+class AlsoNotAProtocol: ...
+```
+
+A subclass of a protocol is not itself a protocol unless it explicitly inherits from `Protocol`:
+
+```py
+class Base(Protocol): ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(Base): ...
+
+@runtime_checkable  # no diagnostic
+class Subprotocol(Base, Protocol): ...
+```
+
+## Calling `runtime_checkable` directly
+
+Direct calls enforce the same restriction, whether the class is passed by position or by name:
+
+```py
+from typing import Protocol, runtime_checkable
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+class NotAProtocol: ...
+class P(Protocol): ...
+
+runtime_checkable(NotAProtocol)  # error: [invalid-argument-type] "`runtime_checkable` can only be applied to protocol classes"
+runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
+runtime_checkable(P)  # no diagnostic
+```
+
+## `runtime_checkable` in stub files
+
+In a stub file, a class can inherit from `Protocol` through an alias defined later in the file:
+
+```pyi
+from typing import runtime_checkable
+
+@runtime_checkable  # no diagnostic
+class P(ProtocolAlias): ...
+
+from typing import Protocol as ProtocolAlias
+```
+
+As in Python files, a subclass must explicitly inherit from `Protocol` to be a protocol:
+
+```pyi
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(P): ...
+```
+
+## `runtime_checkable` and decorator order
+
+Decorators are applied from bottom to top. An inner decorator can replace an ordinary class with a
+protocol before `runtime_checkable` receives it:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class P(Protocol): ...
+
+@runtime_checkable  # no diagnostic
+@lambda cls: P
+class Replaced: ...
+```
+
+Reversing the order applies `runtime_checkable` to the ordinary class before it can be replaced:
+
+```py
+@lambda cls: P
+# error: [invalid-argument-type]
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+An inner decorator can also replace a protocol with an ordinary class. `runtime_checkable` rejects
+the replacement:
+
+```py
+class Ordinary: ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: Ordinary
+class ReplacedWithClass(Protocol): ...
+```
+
+If the inner decorator returns an integer, `runtime_checkable` rejects it because it is not a class:
+
+```py
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: 1
+class ReplacedWithInstance(Protocol): ...
+```
+
 ## Calls to protocol classes
 
 <!-- snapshot-diagnostics -->
@@ -1434,6 +1563,33 @@ def needs_something_hashable(x: Hashable):
     hash(x)
 
 needs_something_hashable([])  # error: [invalid-argument-type]
+```
+
+## Unannotated protocol defaults retain inherited declarations
+
+A default in a protocol subclass preserves the inherited member type. Both protocol writes and
+structural implementations use the annotation, so a narrower default does not narrow the interface.
+
+```py
+from typing import ClassVar, Protocol
+
+class Base(Protocol):
+    value: int | str
+    shared: ClassVar[int | str]
+
+class WithDefaults(Base, Protocol):
+    value = "default"
+    shared = "default"
+
+class Implementation:
+    value: int | str = 1
+    shared: ClassVar[int | str] = 1
+
+def check(protocol: WithDefaults, implementation: Implementation) -> None:
+    reveal_type(protocol.value)  # revealed: int | str
+    protocol.value = 1
+    protocol.shared = 1  # error: [invalid-attribute-access]
+    result: WithDefaults = implementation
 ```
 
 ## Diagnostics for protocols with invalid attribute members
@@ -4476,10 +4632,10 @@ static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 static_assert(not is_assignable_to(GenericReceiver, ConcreteMethod))
 static_assert(not is_subtype_of(GenericReceiver, ConcreteMethod))
 
-# Specializing the receiver constraint to `GradualReceiverImplementation` must preserve the
-# assignability relation that produced it; `list[int]` is assignable to, but not a subtype of,
-# `list[Any]`.
+# The explicit receiver permits assignability, but does not establish strict subtyping:
+# `list[int]` is assignable to, but not a subtype of, `list[Any]`.
 static_assert(is_assignable_to(GradualReceiverImplementation, GradualReceiverProtocol))
+static_assert(not is_subtype_of(GradualReceiverImplementation, GradualReceiverProtocol))
 
 # Checking the receiver constraint requires the same protocol relation that is already in
 # progress. The recursive check should terminate and establish the structural relation.
@@ -4518,6 +4674,36 @@ class BadReturnType:
 
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolImplicitSelf))
 static_assert(not is_assignable_to(BadReturnType, ShapeProtocolExplicitSelf))
+```
+
+## Gradual explicit receivers
+
+A gradual receiver is assignable to a concrete explicit `self` annotation, but is not its subtype.
+Protocol matching preserves that distinction instead of treating a possibly available method as
+unconditionally available:
+
+```py
+from typing import Any, Generic, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Source(Generic[T_co]):
+    def get(self: "Source[int]") -> int:
+        return 0
+
+class IntSource(Protocol):
+    def get(self) -> int: ...
+
+static_assert(is_assignable_to(Source[Any], IntSource))
+static_assert(is_assignable_to(Source[Unknown], IntSource))
+static_assert(not is_subtype_of(Source[Any], IntSource))
+static_assert(not is_subtype_of(Source[Unknown], IntSource))
+
+static_assert(is_subtype_of(Source[int], IntSource))
+static_assert(not is_assignable_to(Source[str], IntSource))
+static_assert(not is_subtype_of(Source[str], IntSource))
 ```
 
 ## `Self` in generic type aliases during protocol matching
@@ -5111,7 +5297,8 @@ class ClassCollection(metaclass=CollectionMeta):
 static_assert(is_assignable_to(TypeOf[ClassCollection], Membership))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Container[str]))
-static_assert(is_subtype_of(TypeOf[ClassCollection], Container[int]))
+# The class object is assignable to the gradual receiver `type[Any]`, but is not its subtype.
+static_assert(not is_subtype_of(TypeOf[ClassCollection], Container[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Iterable[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Reversible[int]))
 static_assert(is_assignable_to(TypeOf[ClassCollection], Collection[int]))
@@ -5243,7 +5430,7 @@ class NObject:
 
 class NStaticMethodShadowed(NStaticMethodGood):
     def __init__(self) -> None:
-        self.x: int = 1
+        self.x: int = 1  # error: [invalid-attribute-override]
 
 class PFactory(Protocol):
     @classmethod
@@ -6153,11 +6340,11 @@ class X(Protocol):
     x: int
 
 class YProto(X, Protocol):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 @final
 class YNominal(X):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))
@@ -6966,6 +7153,7 @@ def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
+    # TODO: Validate and refine individual specializations to reveal Consumer[int].
     reveal_type(extract(value))  # revealed: Consumer[int] | int
 ```
 
@@ -7172,6 +7360,48 @@ def valid(value: Chain[Iterable[int]]) -> None:
     reveal_type(value.flatten())  # revealed: Chain[int]
 ```
 
+### Structurally equivalent recursive protocol specializations as receivers
+
+Comparing the `child` return types of `Node[str]` and `Node[int]` leads back to the same comparison.
+No other member uses `T`, so their structures match at every depth. Thus `Node[str]` satisfies the
+`Node[int]` receiver of `read`, even though `str` is not a subtype of `int`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def child(self) -> Node[T]: ...
+    def read(self: Node[int]) -> int: ...
+
+class Readable(Protocol):
+    def read(self) -> int: ...
+
+static_assert(is_subtype_of(Node[str], Node[int]))
+
+def check(node: Node[str]) -> Readable:
+    return node  # no diagnostic
+
+T = TypeVar("T", covariant=True)
+
+class LegacyNode(Protocol[T]):
+    def child(self) -> LegacyNode[T]: ...
+    def read(self: LegacyNode[int]) -> int: ...
+
+static_assert(is_subtype_of(LegacyNode[str], LegacyNode[int]))
+
+def check_legacy(node: LegacyNode[str]) -> Readable:
+    return node  # no diagnostic
+```
+
 ### Explicit receivers on overloaded recursive protocol methods
 
 An overloaded method can constrain its receiver to a tuple specialization of the same recursive
@@ -7278,6 +7508,7 @@ bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
 def extract[U](node: Node[U]) -> U:
     raise NotImplementedError
 
+# TODO: Refine the structural and inherited specializations separately to reveal str | Literal[1].
 reveal_type(extract(Mismatched(1)))  # revealed: object
 ```
 

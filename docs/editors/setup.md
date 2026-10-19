@@ -10,13 +10,8 @@ the [migration guide](./migration.md) for more.
 !!! note
 
     The setup instructions provided below are on a best-effort basis. If you encounter any issues
-    while setting up the Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
+    while setting up Ruff in an editor, please [open an issue](https://github.com/astral-sh/ruff/issues/new)
     for assistance and help in improving this documentation.
-
-!!! tip
-
-    Regardless of the editor, it is recommended to disable the older language server
-    ([`ruff-lsp`](https://github.com/astral-sh/ruff-lsp)) to prevent any conflicts.
 
 ## VS Code
 
@@ -30,11 +25,11 @@ For more documentation on the Ruff extension, refer to the
 
 ## Neovim
 
-The Ruff language server can be setup in Neovim using the built-in LSP client either via
+The Ruff language server can be set up in Neovim using the built-in LSP client either via
 [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>) (Neovim 0.11+) or the
 [`nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig) plugin (Neovim 0.10 and earlier).
 
-To setup using [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>), you can
+To set up using [`vim.lsp.config`](<https://neovim.io/doc/user/lsp.html#vim.lsp.config()>), you can
 either use the [default configuration provided in
 `nvim-lspconfig`](https://github.com/neovim/nvim-lspconfig/blob/master/lsp/ruff.lua) or configure
 the server without any external dependencies.
@@ -438,7 +433,7 @@ IntelliJ Marketplace (maintained by [@koxudaxi](https://github.com/koxudaxi)).
 
 ## Emacs
 
-Ruff can be utilized as a language server via [`Eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
+Ruff can be used as a language server via [`Eglot`](https://github.com/joaotavora/eglot), which is in Emacs's core.
 To enable Ruff with automatic formatting on save, use the following configuration:
 
 ```elisp

@@ -376,7 +376,7 @@ reveal_type(sys.version_info[:2])
           "severity": 2,
           "code": "unsupported-python-version",
           "source": "ty",
-          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from your virtual environment metadata."
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from your virtual environment metadata."
         }
       ]
     }
@@ -403,7 +403,7 @@ reveal_type(sys.version_info[:2])
           "severity": 3,
           "code": "revealed-type",
           "source": "ty",
-          "message": "Revealed type: `tuple[Literal[3], Literal[14]]`"
+          "message": "Revealed type: `tuple[Literal[3], Literal[15]]`"
         }
       ],
       "kind": "full"
@@ -508,7 +508,7 @@ fn unsupported_inferred_python_version_setting_diagnostic_for_system_interpreter
           "severity": 2,
           "code": "unsupported-python-version",
           "source": "ty",
-          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
+          "message": "Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead.\n\ninfo: Expected one of `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`, `3.14`, `3.15`.\ninfo: Set `environment.python-version` explicitly to override the inferred version.\ninfo: The version was inferred from the `lib/python3.16/site-packages` directory layout."
         }
       ]
     }

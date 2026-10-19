@@ -970,6 +970,11 @@ def any(
     reveal_type(i2)  # revealed: P & Any
     reveal_type(i3)  # revealed: Never
 
+type AnyAlias = Any
+
+def aliased_any(value: ~AnyAlias) -> None:
+    reveal_type(value)  # revealed: Any
+
 def unknown(
     i1: ~Unknown,
     i2: P & ~Unknown,

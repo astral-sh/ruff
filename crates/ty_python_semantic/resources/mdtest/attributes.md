@@ -1305,8 +1305,8 @@ reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value
 
 #### Augmented assignments to overriding class-level defaults
 
-An unannotated class-level default supplies the initial value for an augmented assignment, even when
-another branch of a diamond declares a wider instance attribute.
+An unannotated class-level default retains the inherited declaration, including through a diamond.
+An augmented assignment must accept every value permitted by that declaration.
 
 ```py
 class Base:
@@ -1321,9 +1321,10 @@ class Child(First, Second):
     value = 1
 
     def update(self) -> None:
+        # error: [unsupported-operator] "Operator `|=` is not supported between objects of type `None` and `Literal[2]`"
         self.value |= 2
 
-reveal_type(Child().value)  # revealed: int
+reveal_type(Child().value)  # revealed: int | None
 ```
 
 #### Descriptor attributes as class variables
@@ -1387,21 +1388,17 @@ class Intermediate(Base):
     # Mypy does not report an error here, but pyright does: "… overrides symbol
     # of same name in class "Base". Variable is mutable so its type is invariant"
     #
-    # We should introduce a diagnostic for this. Whether or not that should be
-    # enabled by default can still be discussed.
+    # The opt-in mutable-override rule rejects this narrowing.
     #
-    # TODO: This should be an error
-    redeclared_with_narrower_type: str
+    redeclared_with_narrower_type: str  # error: [invalid-mutable-override]
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
-    # TODO: This should be an error
-    redeclared_with_wider_type: str | int | None
+    redeclared_with_wider_type: str | int | None  # error: [invalid-attribute-override]
 
-    # TODO: This should be an `invalid-assignment` error
-    overwritten_in_subclass_body = 1
+    overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
     # TODO: This should be an `invalid-assignment` error
     pure_overwritten_in_subclass_body = 1
@@ -1411,11 +1408,9 @@ class Intermediate(Base):
     def set_attributes(self) -> None:
         self.redeclared_in_method_with_same_type: str | None = None
 
-        # TODO: This should be an error (violates Liskov)
-        self.redeclared_in_method_with_narrower_type: str = "foo"
+        self.redeclared_in_method_with_narrower_type: str = "foo"  # error: [invalid-mutable-override]
 
-        # TODO: This should be an error (violates Liskov)
-        self.redeclared_in_method_with_wider_type: object = object()
+        self.redeclared_in_method_with_wider_type: object = object()  # error: [invalid-attribute-override]
 
         self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
 
@@ -1441,9 +1436,8 @@ reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
 reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
-# TODO: Both of these should be `str`
-reveal_type(Derived.overwritten_in_subclass_body)  # revealed: int
-reveal_type(Derived().overwritten_in_subclass_body)  # revealed: int | str
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: str
 
 reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
@@ -2224,7 +2218,7 @@ class MaybeDescriptorMeta(type):
 
 class UsesMaybeGeneratedDescriptorWithBytes(metaclass=MaybeDescriptorMeta):
     def __init__(self) -> None:
-        self.generated_descriptor = b"instance"
+        self.generated_descriptor = b"instance"  # error: [invalid-assignment]
 
 reveal_type(UsesMaybeGeneratedDescriptorWithBytes().generated_descriptor)  # revealed: Literal["descriptor"] | int | bytes
 ```
@@ -2367,7 +2361,7 @@ reveal_type(ConditionalGenerated().generated)  # revealed: int
 class ConditionalMethodAssignment(metaclass=StoringMeta):
     if flag:
         def assign(self) -> None:
-            self.generated = "instance"
+            self.generated = "instance"  # error: [invalid-assignment]
 
 reveal_type(ConditionalMethodAssignment().generated)  # revealed: int | str
 ```
@@ -3048,6 +3042,434 @@ reveal_mro(A)
 reveal_type(A.X)  # revealed: int
 
 A.X = 100
+```
+
+### Unannotated assignments retain inherited declarations
+
+Assigning a new default in a subclass does not redeclare an annotated attribute. The inherited type
+provides context for the initializer and remains the public type for class and instance access.
+Inside the class body, the assigned value can still narrow the type of a bare name.
+
+```py
+from typing import Protocol
+
+class Base:
+    items: list[int] = []
+    values: tuple[int, ...] = ()
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    values = ()
+    value = "child"
+    reveal_type(items)  # revealed: list[int]
+    reveal_type(values)  # revealed: tuple[()]
+    reveal_type(value)  # revealed: Literal["child"]
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.values)  # revealed: tuple[int, ...]
+reveal_type(Child.value)  # revealed: int | str
+
+class HasItems(Protocol):
+    items: list[int]
+    values: tuple[int, ...]
+    value: int | str
+
+def check(child: Child) -> None:
+    reveal_type(child.items)  # revealed: list[int]
+    reveal_type(child.values)  # revealed: tuple[int, ...]
+    reveal_type(child.value)  # revealed: int | str
+    child.items.append("wrong")  # error: [invalid-argument-type]
+    child.values = (1, 2)
+    child.value = 1
+    protocol: HasItems = child
+
+class Grandchild(Child):
+    value = 1
+
+reveal_type(Grandchild.value)  # revealed: int | str
+```
+
+The initializer must be assignable to the inherited declaration. An explicit subclass annotation
+instead supplies a new declared type.
+
+```py
+class Invalid(Base):
+    items = ["wrong"]  # error: [invalid-assignment]
+    values = ("wrong",)  # error: [invalid-assignment]
+
+class Redeclared(Base):
+    value: str = "child"  # error: [invalid-mutable-override]
+
+reveal_type(Redeclared.value)  # revealed: str
+```
+
+### Defaults for attributes declared in methods
+
+Annotations on instance attributes declared in methods do not yet provide context for subclass
+defaults.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.items: list[int] = [42]
+
+class Child(Base):
+    items = []
+
+# TODO: The inherited annotation should provide context for the default.
+reveal_type(Child.items)  # revealed: list[Unknown]
+reveal_type(Child().items)  # revealed: list[Unknown] | list[int]
+```
+
+### Gradual types and class-variable qualifiers are inherited
+
+An inherited `Any` annotation remains gradual. A `ClassVar` annotation still prevents instance
+writes after a subclass supplies a new default.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    dynamic: Any
+    class_only: ClassVar[int | str] = 0
+
+class Child(Base):
+    dynamic = "child"
+    class_only = "child"
+
+def check(child: Child) -> None:
+    reveal_type(child.dynamic)  # revealed: Any
+    reveal_type(child.class_only)  # revealed: int | str
+    child.dynamic = 1
+    # error: [invalid-attribute-access] "Cannot assign to ClassVar `class_only` from an instance of type `Child`"
+    child.class_only = 1
+
+# no diagnostic: attribute writes are still allowed on the class itself
+Child.class_only = 1
+```
+
+### Inherited declarations follow the MRO
+
+The first member in the MRO supplies the declaration. An unannotated member with no inherited
+declaration still uses its inferred type.
+
+```py
+class Left:
+    value: int | str = 0
+
+class Right:
+    value: bytes = b""
+
+class Child(Left, Right):
+    value = "child"  # error: [invalid-attribute-override]
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Inferred:
+    value = 0
+
+class Independent(Inferred):
+    value = "child"
+
+reveal_type(Independent.value)  # revealed: str
+```
+
+### Inherited declarations after a dynamic base
+
+An unannotated subclass default retains the annotation from a concrete base, even when an earlier
+base is `Any`. The annotation provides context for the default and determines its type on access.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+    items: list[int] = []
+
+class Child(Any, Base):
+    value = "child"
+    items = []
+
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Child.items)  # revealed: list[int]
+
+def check(child: Child) -> None:
+    reveal_type(child.value)  # revealed: int | str
+    child.value = 1
+```
+
+An incompatible default is rejected:
+
+```py
+class Invalid(Any, Base):
+    value = []  # error: [invalid-assignment]
+```
+
+The concrete base's annotation is also retained when it comes before `Any`:
+
+```py
+class DynamicLast(Base, Any):
+    value = "child"
+
+reveal_type(DynamicLast.value)  # revealed: int | str
+```
+
+### Dynamically typed base expressions
+
+A base expression with type `Any` also leaves a concrete base's annotation available.
+
+```py
+from typing import Any
+
+class Dynamic: ...
+
+DynamicBase: Any = Dynamic
+
+class Base:
+    value: int | str = 0
+
+class Child(DynamicBase, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(DynamicBase, Base):
+    value = []  # error: [invalid-assignment]
+```
+
+The same applies when the base expression has an unknown type:
+
+```py
+def unknown_base(base):
+    class Child(base, Base):
+        value = "child"
+
+    reveal_type(Child.value)  # revealed: int | str
+```
+
+### Dynamic bases without a subclass default
+
+A dynamic base can still affect ordinary attribute lookup when the subclass does not supply a
+default.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Child(Any, Base): ...
+
+reveal_type(Child.value)  # revealed: (int & Any) | (str & Any)
+reveal_type(Child().value)  # revealed: (int & Any) | (str & Any)
+```
+
+### Dynamic bases and unannotated members
+
+An earlier concrete base with an unannotated member still masks a later annotation.
+
+```py
+from typing import Any
+
+class Inferred:
+    value = 0
+
+class Annotated:
+    value: int | str = 0
+
+class Child(Any, Inferred, Annotated):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: str
+```
+
+If no concrete base declares the attribute, the subclass default uses its inferred type:
+
+```py
+class NoAnnotation(Any):
+    value = "child"
+
+reveal_type(NoAnnotation.value)  # revealed: str
+```
+
+### Dynamic bases and inherited class variables
+
+The inherited `ClassVar` qualifier still prevents writes through instances.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    value: ClassVar[int | str] = 0
+
+class Child(Any, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+Child.value = 1
+Child().value = 1  # error: [invalid-attribute-access]
+```
+
+### Dynamic bases and inherited defaults
+
+The first base that supplies a default determines its annotation. That annotation can come from an
+ancestor, even when the first base has an earlier dynamic base and another base has a different
+annotation for the same attribute. An incompatible annotation from a later base still produces an
+override error.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Intermediate(Any, Base):
+    value = "intermediate"
+
+class Other:
+    value: bytes = b""
+
+class Child(Intermediate, Other):
+    value = 1  # error: [invalid-attribute-override]
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Intermediate, Other):
+    # error: [invalid-attribute-override]
+    value = b"wrong"  # error: [invalid-assignment]
+```
+
+### Augmented assignments retain inherited declarations
+
+Updating a subclass default with augmented assignment preserves its inherited annotation, just like
+an ordinary assignment. The result must still be assignable to that annotation.
+
+```py
+class Base:
+    items: list[int] = []
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    items += [1]
+    value = "child"
+    value += "!"
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Base):
+    value = 1
+    value /= 2  # error: [invalid-assignment]
+```
+
+### Inheriting conditional declarations
+
+An annotation can have several source locations. Identical annotations on both branches still
+provide a single declared type for subclass defaults.
+
+```py
+def _(condition: bool):
+    class Base:
+        if condition:
+            value: int | str = 0
+        else:
+            value: int | str = "base"
+
+    class Child(Base):
+        value = "child"
+
+    class Grandchild(Child):
+        value = 1
+
+    reveal_type(Child.value)  # revealed: int | str
+    reveal_type(Grandchild.value)  # revealed: int | str
+```
+
+### Unreachable declarations do not hide inherited annotations
+
+A method in an unreachable branch does not replace an attribute annotation. Subclass defaults still
+use that annotation for both assignment checks and public reads.
+
+```py
+class Base:
+    value: int = 0
+
+    if 1 == 2:
+        def value(self) -> str:  # unreachable
+            return "unreachable"
+
+class Child(Base):
+    value = 1
+
+class Invalid(Base):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+reveal_type(Invalid.value)  # revealed: int
+```
+
+### Unreachable bindings do not mask inherited declarations
+
+A base with no reachable binding or declaration does not supply an attribute. Lookup continues to
+the next base in the MRO. A reachable unannotated binding, by contrast, masks the later declaration.
+
+```py
+class Left:
+    if 1 == 2:
+        value = 0  # unreachable
+
+class ReachableLeft:
+    value = 0
+
+class Right:
+    value: int = 0
+
+class Child(Left, Right):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+
+class WithReachableBinding(ReachableLeft, Right):
+    value = "child"
+
+reveal_type(WithReachableBinding.value)  # revealed: str
+```
+
+### Unannotated defaults retain their owner's declaration
+
+The first base that supplies a default determines the inherited declaration. Its own ancestors can
+provide that annotation; a later sibling in the subclass's MRO does not replace it.
+
+```py
+class Root:
+    value: int = 0
+
+class Left(Root):
+    value = 1
+
+class Right(Root):
+    value: str = "right"  # error: [invalid-attribute-override]
+
+class Child(Left, Right):
+    # error: [invalid-assignment]
+    # error: [invalid-attribute-override]
+    value = "wrong"
+
+reveal_type(Child.value)  # revealed: int
+```
+
+If the first base's default has no governing annotation, a later sibling does not supply one.
+
+```py
+class Inferred:
+    value = 0
+
+class Unannotated(Inferred, Right):
+    value = 1
+
+reveal_type(Unannotated.value)  # revealed: int
 ```
 
 ## Intersections of attributes
@@ -4747,7 +5169,7 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | Unknown | list[Unknown]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | list[Unknown] | list[list[Unknown] | int]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -4849,9 +5271,9 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
-During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
-in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
-regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+During fixpoint iteration, overloads may become ambiguous, introducing `Unknown` into their return
+types. Even in this case, `Divergent` is propagated, guaranteeing the convergence of type inference.
+Here is the regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
 from typing import Any
@@ -4866,8 +5288,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | list[Unknown]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | list[Unknown]
 ```
 
 ### Builtin types attributes

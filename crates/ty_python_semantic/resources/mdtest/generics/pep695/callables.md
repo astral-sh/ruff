@@ -790,6 +790,64 @@ def consume_child(value: Child) -> None: ...
 reveal_type(infer_child(consume_child))
 ```
 
+## Callbacks that accept final classes
+
+When a callback accepts `type[Closed]`, we infer `T` in `Callable[[type[T]], None]` as the instance
+type `Closed`. Declaring the class as final does not change this: `T` describes instances of
+`Closed`, not the class object itself.
+
+```py
+from typing import Callable, final
+
+def solve[T](callback: Callable[[type[T]], None]) -> T:
+    raise NotImplementedError
+
+@final
+class Closed: ...
+
+def takes_closed(cls: type[Closed]) -> None: ...
+
+reveal_type(solve(takes_closed))  # revealed: Closed
+```
+
+For a final generic class, the inferred instance type includes the class's type arguments:
+
+```py
+@final
+class GenericClosed[T]: ...
+
+def takes_generic_closed(cls: type[GenericClosed[int]]) -> None: ...
+
+reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
+```
+
+## Decorating classmethods of final classes
+
+This decorator accepts a method whose first argument is a class object and leaves the remaining
+parameters unchanged:
+
+```py
+from typing import Callable, Concatenate, final
+
+def decorate[T, **P](
+    f: Callable[Concatenate[type[T], P], None],
+) -> Callable[Concatenate[type[T], P], None]:
+    return f
+```
+
+For a classmethod on a final class, the inferred `cls` type is the class object itself. We accept
+the decorator by inferring `T` as the instance type `Closed`.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4664>.
+
+```py
+@final
+class Closed:
+    @decorate  # no diagnostic
+    @classmethod
+    def method(cls, value: int) -> None: ...
+```
+
 ## Gradual class parameters
 
 A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
@@ -994,9 +1052,9 @@ reveal_type(infer(callback))  # revealed: A | Any
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Both `T = str` and `T = bytes` give valid specializations for the same call. We currently merge them
+into `str | bytes`. Refining the return type per specialization should instead infer their
+intersection, `Never`.
 
 ```py
 from typing import Callable, overload
@@ -1011,6 +1069,7 @@ def f(val: bytes) -> None: ...
 def f(val: str | bytes) -> None:
     pass
 
+# TODO: Refine the return type per specialization to reveal Never.
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 

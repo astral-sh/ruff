@@ -33,6 +33,38 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Self-referential slot values
+
+Rebuilding a dictionary from its own contents preserves the dictionary type of a slotted attribute.
+
+```py
+class Slotted:
+    __slots__ = ("data",)
+
+    def __init__(self, **data):
+        self.data = data
+
+    def update(self):
+        self.data = {"a": self.data["a"]}
+
+# not a great type, but we do know that it's a dictionary with string keys!
+reveal_type(Slotted().data)  # revealed: dict[str, Unknown] | dict[str, Divergent]
+```
+
+## Slots storing their own descriptors
+
+Inference converges when a slot contains its own class descriptor, preserving the descriptor type.
+
+```py
+class Slotted:
+    __slots__ = ("value",)
+
+    def __init__(self):
+        self.value = Slotted.value
+
+reveal_type(Slotted().value)  # revealed: MemberDescriptorType
+```
+
 ## Assigning a bound method in a loop
 
 Loop narrowing preserves a bound method's receiver type when inferring an implicit attribute,
@@ -577,4 +609,56 @@ class Cached:
         return self._metadata
 
 reveal_type(Cached().metadata)  # revealed: int
+```
+
+## Lazy initialization in a classmethod
+
+We widen an attribute initialized with `None` to `None | Unknown`, since it is unlikely to always
+contain only `None`. A subclass can therefore replace this cache with an instance of its own type,
+and the initialization branch is reachable.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = None
+
+reveal_type(Context.current)  # revealed: None | Unknown
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should include `None | Unknown`, not be `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):  # no diagnostic
+            cls.current = ChildContext()  # no diagnostic
+```
+
+## Incompatible initialization in a classmethod
+
+An attribute initialized with an integer is inferred as `int`, without widening to include
+`Unknown`. Assigning an instance of the subclass to it should be rejected.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = 1
+
+reveal_type(Context.current)  # revealed: int
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        # TODO: This should be `int`, not `Never`.
+        reveal_type(cls.current)  # revealed: Never
+        if not isinstance(cls.current, ChildContext):
+            # TODO: Report an invalid-assignment error for assigning `ChildContext` to `int`.
+            cls.current = ChildContext()
 ```
