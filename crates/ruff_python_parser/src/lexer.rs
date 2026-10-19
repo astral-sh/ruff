@@ -1642,7 +1642,7 @@ static KEYWORD_TABLE: KeywordTable = {
     let mut starts = [0u64; 7];
     let mut words = [0; 64];
     let mut kinds = [TokenKind::Identifier; 64];
-    let keywords: [(&[u8], TokenKind); 39] = [
+    let mut keywords: &[(&[u8], TokenKind)] = &[
         (b"False", TokenKind::False),
         (b"None", TokenKind::None),
         (b"True", TokenKind::True),
@@ -1683,22 +1683,17 @@ static KEYWORD_TABLE: KeywordTable = {
         (b"with", TokenKind::With),
         (b"yield", TokenKind::Yield),
     ];
-    let mut index = 0;
-    while index < keywords.len() {
-        let (keyword, kind) = keywords[index];
+    while let Some((&(keyword, kind), rest)) = keywords.split_first() {
         starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
-        let mut word = 0u64;
-        let mut byte_index = 0;
-        while byte_index < keyword.len() {
-            word |= (keyword[byte_index] as u64) << (byte_index * 8);
-            byte_index += 1;
-        }
-        word <<= (8 - keyword.len()) * 8;
+        let mut bytes = [0; 8];
+        let (keyword_bytes, _) = bytes.split_at_mut(keyword.len());
+        keyword_bytes.copy_from_slice(keyword);
+        let word = u64::from_le_bytes(bytes) << ((8 - keyword.len()) * 8);
         let slot = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
         assert!(words[slot] == 0, "keyword hash collision");
         words[slot] = word;
         kinds[slot] = kind;
-        index += 1;
+        keywords = rest;
     }
     KeywordTable {
         words,
