@@ -518,6 +518,7 @@ jobs:
 
   cargo-test-other:
     strategy:
+      fail-fast: false
       matrix:
         platform:
           - ${{ github.repository == 'astral-sh/ruff' && 'namespace-profile-windows-2022-x86-64-16x32' || 'windows-latest' }}
