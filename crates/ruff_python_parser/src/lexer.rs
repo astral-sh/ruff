@@ -355,7 +355,10 @@ impl<'src> Lexer<'src> {
     }
 
     fn skip_whitespace(&mut self) -> Result<(), LexicalError> {
-        let whitespace_start = if matches!(self.cursor.first(), ' ' | '\t' | '\\' | '\x0C') {
+        let whitespace_start = if matches!(
+            self.cursor.rest().as_bytes().first(),
+            Some(b' ' | b'\t' | b'\\' | b'\x0C')
+        ) {
             self.offset()
         } else {
             return Ok(());
@@ -364,7 +367,11 @@ impl<'src> Lexer<'src> {
         loop {
             match self.cursor.first() {
                 ' ' => {
-                    self.cursor.bump();
+                    if self.cursor.rest().starts_with("    ") {
+                        self.cursor.skip_bytes(4);
+                    } else {
+                        self.cursor.bump();
+                    }
                 }
                 '\t' => {
                     self.cursor.bump();
