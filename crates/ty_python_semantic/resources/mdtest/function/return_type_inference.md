@@ -299,8 +299,7 @@ def returns_class():
 Inner1 = returns_class()
 Inner2 = returns_class()
 
-# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
-reveal_type(Inner1 is Inner2)  # revealed: Literal[True]
+reveal_type(Inner1 is Inner2)  # revealed: bool
 
 # TODO: This should ideally be an error
 i: Inner1 = Inner2()
@@ -310,15 +309,13 @@ Therefore, the return type of `returns_class` cannot be `<class 'Inner'>`. Inste
 just treat it as `Unknown`.
 
 ```py
-# TODO: Should be `Unknown` or maybe `type`
-reveal_type(Inner1)  # revealed: <class 'Inner'>
+reveal_type(Inner1)  # revealed: Unknown
 ```
 
 Unfortunately, this means that we cannot infer precise types for attributes/methods on those types:
 
 ```py
-# TODO: Should be `Unknown`
-reveal_type(Inner1().attr)  # revealed: int
+reveal_type(Inner1().attr)  # revealed: Unknown
 ```
 
 If we wanted to improve this, we could return a synthetic protocol representing the structure of the
@@ -342,11 +339,9 @@ def returns_callable():
 callable1 = returns_callable()
 callable2 = returns_callable()
 
-# TODO: This should be `bool` or `Literal[False]`, not `Literal[True]`
-reveal_type(callable1 is callable2)  # revealed: Literal[True]
+reveal_type(callable1 is callable2)  # revealed: bool
 
-# TODO: should be `Callable[[], int]`
-reveal_type(callable1)  # revealed: def inner() -> int
+reveal_type(callable1)  # revealed: () -> int
 reveal_type(callable1())  # revealed: int
 ```
 
@@ -369,12 +364,11 @@ def returns_instance[T](x: T):
 def _(x: int):
     inner = returns_instance(x)
 
-    # TODO: `Inner` would probably be wrong here. Ideally, we would return a synthetic protocol
-    # with a type of `int` for the `attr` attribute.
-    reveal_type(inner)  # revealed: Inner
+    # TODO: Ideally, we would return a synthetic protocol with an `int` attribute.
+    reveal_type(inner)  # revealed: Unknown
 
     # TODO: should ideally be `int`
-    reveal_type(inner.attr)  # revealed: T@returns_instance
+    reveal_type(inner.attr)  # revealed: Unknown
 ```
 
 ## Generators

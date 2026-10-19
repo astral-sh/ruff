@@ -9472,6 +9472,49 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::GeneralizeLocalTypes(scope) = type_mapping {
+            let is_local = |definition: Definition<'db>| {
+                definition.program_file(db) == scope.program_file(db)
+                    && semantic_index(db, scope.program_file(db))
+                        .ancestor_scopes(definition.file_scope(db))
+                        .any(|(id, _)| id == scope.file_scope_id(db))
+            };
+            let class = match self {
+                Type::ClassLiteral(class) => Some(class),
+                Type::GenericAlias(alias) => Some(alias.origin(db).into()),
+                Type::NominalInstance(instance) => Some(instance.class_literal(db, visitor.env)),
+                Type::SubclassOf(subclass) => match subclass.subclass_of() {
+                    SubclassOfInner::Class(class) => Some(class.class_literal(db)),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if class
+                .and_then(|class| class.definition(db))
+                .is_some_and(is_local)
+            {
+                // Each invocation creates a distinct nominal class. Its source definition
+                // cannot represent one shared class identity outside this function.
+                return Type::unknown();
+            }
+            if let Type::FunctionLiteral(function) = self
+                && is_local(function.definition(db))
+            {
+                // Preserve the signature, but not the identity of a function object that is
+                // recreated on each call. Its signature can itself contain local types.
+                return visitor.visit(db, self, type_mapping, || {
+                    Type::Callable(CallableType::new(
+                        db,
+                        function
+                            .signature_with_inferred_return_type(db)
+                            .into_owned(),
+                        function.callable_type_kind(db),
+                    ))
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                });
+            }
+        }
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9803,6 +9846,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -9825,6 +9869,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11192,6 +11237,25 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+
+    /// Removes identities created within a function from its inferred return type.
+    /// Local nominal classes become `Unknown`, and local functions become callables.
+    ///
+    /// For example:
+    /// ```python
+    /// def returns_callable():
+    ///     def inner() -> int:
+    ///         return 1
+    ///
+    ///     return inner
+    ///
+    /// callable1 = returns_callable()
+    /// callable2 = returns_callable()
+    /// ```
+    /// Each call creates a different `inner` function object. Generalizing its type to
+    /// `Callable[[], int]` preserves the signature without incorrectly inferring that
+    /// `callable1 is callable2` is always true.
+    GeneralizeLocalTypes(ScopeId<'db>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -11255,6 +11319,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11305,6 +11370,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
