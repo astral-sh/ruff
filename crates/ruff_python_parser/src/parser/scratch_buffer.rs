@@ -1,4 +1,4 @@
-use std::vec::Drain;
+use std::mem::MaybeUninit;
 
 use drop_bomb::DebugDropBomb;
 use thin_vec::ThinVec;
@@ -43,8 +43,13 @@ impl<T> ScratchBuffer<T> {
     }
 
     #[inline]
-    pub(super) fn take<C: FromIterator<T>>(&mut self, snapshot: ScratchSnapshot) -> C {
-        self.drain_snapshot(snapshot).collect()
+    pub(super) fn take<C: From<Vec<T>>>(&mut self, mut snapshot: ScratchSnapshot) -> C {
+        debug_assert!(
+            self.buffer.len() >= snapshot.len,
+            "Scratch buffer snapshots must be restored in reverse order of creation."
+        );
+        snapshot.bomb.defuse();
+        self.buffer.split_off(snapshot.len).into()
     }
 
     #[inline]
@@ -54,20 +59,28 @@ impl<T> ScratchBuffer<T> {
             return ThinVec::new();
         }
 
-        let drain = self.drain_snapshot(snapshot);
-        let mut result = ThinVec::with_capacity(drain.len());
-        result.extend(drain);
-        result
-    }
-
-    #[inline]
-    fn drain_snapshot(&mut self, mut snapshot: ScratchSnapshot) -> Drain<'_, T> {
-        debug_assert!(
-            self.buffer.len() >= snapshot.len,
-            "Scratch buffer snapshots must be restored in reverse order of creation."
-        );
         snapshot.bomb.defuse();
-        self.buffer.drain(snapshot.len..)
+        let source = &self.buffer[snapshot.len..];
+        let len = source.len();
+        let mut result = ThinVec::<MaybeUninit<T>>::with_capacity(len);
+
+        // SAFETY: `MaybeUninit<T>` permits uninitialized elements. Setting the length
+        // first gives the slice returned by `DerefMut` access to all `len` slots.
+        // `source` is initialized, and the allocations are disjoint (or the copy is
+        // empty for zero-sized elements). Shortening the source transfers ownership.
+        // `ThinVec` is `repr(C)` over a header pointer and `PhantomData`, and
+        // `MaybeUninit<T>` has T's size and alignment. All copied entries are now
+        // initialized, so converting the owner preserves its allocation and layout.
+        #[expect(
+            unsafe_code,
+            reason = "moves initialized AST entries without per-element iteration"
+        )]
+        unsafe {
+            result.set_len(len);
+            std::ptr::copy_nonoverlapping(source.as_ptr(), result.as_mut_ptr().cast(), len);
+            self.buffer.set_len(snapshot.len);
+            std::mem::transmute::<ThinVec<MaybeUninit<T>>, ThinVec<T>>(result)
+        }
     }
 }
 
@@ -132,5 +145,91 @@ mod tests {
 
         let _: Vec<_> = buffer.take(snapshot);
         let _: Vec<_> = buffer.take(outer_snapshot);
+    }
+
+    #[test]
+    fn nested_values_are_dropped_once() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct Value {
+            text: String,
+            boxed: Box<u8>,
+            drops: Rc<Cell<usize>>,
+        }
+
+        impl Drop for Value {
+            fn drop(&mut self) {
+                self.drops.set(self.drops.get() + 1);
+            }
+        }
+
+        let drops = Rc::new(Cell::new(0));
+        let value = |text: &str| Value {
+            text: text.to_owned(),
+            boxed: Box::new(7),
+            drops: Rc::clone(&drops),
+        };
+        let mut buffer = ScratchBuffer::new();
+        let outer = buffer.snapshot();
+        buffer.push(value("outer"));
+        let inner = buffer.snapshot();
+        buffer.push(value("first"));
+        buffer.push(value("second"));
+        let capacity = buffer.buffer.capacity();
+
+        let inner = buffer.take_thin_vec(inner);
+        assert_eq!(inner[0].text, "first");
+        assert_eq!(inner[1].text, "second");
+        assert_eq!(*inner[0].boxed, 7);
+        let outer: Vec<_> = buffer.take(outer);
+        assert_eq!(outer[0].text, "outer");
+        assert_eq!(buffer.buffer.capacity(), capacity);
+        assert_eq!(drops.get(), 0);
+        drop(inner);
+        assert_eq!(drops.get(), 2);
+        drop(outer);
+        assert_eq!(drops.get(), 3);
+    }
+
+    #[test]
+    fn zero_sized_values_and_empty_snapshots() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static DROPS: AtomicUsize = AtomicUsize::new(0);
+        struct Value;
+        impl Drop for Value {
+            fn drop(&mut self) {
+                DROPS.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        DROPS.store(0, Ordering::Relaxed);
+        let mut buffer = ScratchBuffer::new();
+        let snapshot = buffer.snapshot();
+        assert!(buffer.take_thin_vec(snapshot).is_empty());
+        let snapshot = buffer.snapshot();
+        buffer.push(Value);
+        buffer.push(Value);
+        let values = buffer.take_thin_vec(snapshot);
+        assert_eq!(values.len(), 2);
+        drop(values);
+        drop(buffer);
+        assert_eq!(DROPS.load(Ordering::Relaxed), 2);
+    }
+
+    #[test]
+    #[cfg_attr(
+        debug_assertions,
+        should_panic(
+            expected = "Scratch buffer snapshots must be restored in reverse order of creation."
+        )
+    )]
+    #[cfg_attr(not(debug_assertions), should_panic(expected = "range start index"))]
+    fn invalid_snapshot_panics_before_copying() {
+        let mut buffer = ScratchBuffer::<String>::new();
+        let mut snapshot = buffer.snapshot();
+        snapshot.len = 1;
+        let _ = buffer.take_thin_vec(snapshot);
     }
 }
