@@ -1196,8 +1196,8 @@ def _(
 
 ## Overlapping overloads in generic callbacks
 
-Overlapping overloads do not promise all of their return types simultaneously. Inference currently
-intersects their returns when a generic callback argument matches multiple overloads:
+Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
+should infer the return type of the first applicable overload, just like a direct call:
 
 ```py
 from collections.abc import Callable
@@ -1494,6 +1494,51 @@ def invoke[R](callback: Callable[[object], R], value: object) -> R:
 
 def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
     reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+An inferred tuple can still be refined when its mutable component has the same type in both
+alternatives:
+
+```py
+def _(
+    callback: Intersection[Callable[[object], tuple[A, list[int]]], Callable[[object], tuple[B, list[int]]]],
+) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+```
+
+The same applies to unions whose mutable members agree:
+
+```py
+def _(callback: Intersection[Callable[[object], list[int] | A], Callable[[object], list[int] | B]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: list[int] | (A & B)
+```
+
+The order of the callable types should not affect whether their returns can be intersected,
+including when one return alternative is a union:
+
+```py
+class C: ...
+class All(A, B, C): ...
+
+def invoke_all[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+def _(
+    first: Intersection[
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+    reordered: Intersection[
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+) -> None:
+    # TODO: revealed: tuple[A, list[int]] & tuple[B, list[int]]
+    reveal_type(invoke_all(first, All()))  # revealed: tuple[A, list[int]] | int | tuple[B, list[int]]
+    # TODO: revealed: tuple[B, list[int]] & tuple[A, list[int]]
+    reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
 ```
 
 For generic classes with both covariant and invariant parameters, refinement depends on which
