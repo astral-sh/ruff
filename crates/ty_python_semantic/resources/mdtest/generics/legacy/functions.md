@@ -3567,13 +3567,13 @@ def _(
     reveal_type(invariant_correlated(x, y))  # revealed: A | B
 ```
 
-## Ordered overloads in generic callbacks
+## Overlapping overloads in generic callbacks
 
-Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
-preserves the first applicable overload's return type, just like a direct call:
+Overlapping overloads do not promise all of their return types simultaneously. Inference currently
+intersects their returns when a generic callback argument matches multiple overloads:
 
 ```py
-from typing import Callable, Protocol, TypeVar, overload
+from typing import Callable, TypeVar, overload
 from ty_extensions import Intersection
 
 T = TypeVar("T")
@@ -3595,38 +3595,8 @@ def convert(value: A | B) -> int | str:
 
 def _(value: Both) -> None:
     reveal_type(convert(value))  # revealed: int
-    reveal_type(invoke(convert, value))  # revealed: int
-```
-
-When neither overload covers the whole argument type, the result includes both possible returns:
-
-```py
-def _(value: A | B) -> None:
-    reveal_type(invoke(convert, value))  # revealed: int | str
-```
-
-The same ordering applies when a protocol method supplies the callable constraint:
-
-```py
-InputT = TypeVar("InputT", contravariant=True)
-OutputT = TypeVar("OutputT", covariant=True)
-
-class Converter(Protocol[InputT, OutputT]):
-    def convert(self, value: InputT, /) -> OutputT: ...
-
-class OverloadedConverter:
-    @overload
-    def convert(self, value: A) -> int: ...
-    @overload
-    def convert(self, value: B) -> str: ...
-    def convert(self, value: A | B) -> int | str:
-        raise NotImplementedError
-
-def invoke_method(converter: Converter[T, R], value: T) -> R:
-    return converter.convert(value)
-
-def _(converter: OverloadedConverter, value: Both) -> None:
-    reveal_type(invoke_method(converter, value))  # revealed: int
+    # TODO: Infer `int` from the first applicable overload instead of intersecting `int` and `str`.
+    reveal_type(invoke(convert, value))  # revealed: Never
 ```
 
 In contrast, an explicit intersection of callable types does promise both results for the same
@@ -3637,75 +3607,20 @@ def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> N
     reveal_type(invoke(callback, object()))  # revealed: A & B
 ```
 
-`operator.mul` infers its return type through a protocol method. Multiplying a `Fraction` by an
-integer selects its `Fraction`-returning overload, not its later `float`-returning overload:
+Overloaded protocol methods have the same limitation. This also affects `operator.mul` with a
+`Fraction` argument ([ty#4593](https://github.com/astral-sh/ty/issues/4593)):
 
 ```py
 from fractions import Fraction
 from operator import mul
 
-def left(value: Fraction) -> Fraction:
-    reveal_type(mul(value, 2))  # revealed: Fraction
-    return mul(value, 2)  # no diagnostic
+def left(value: Fraction) -> None:
+    # TODO: Infer `Fraction` from the first applicable overload of `Fraction.__mul__`.
+    reveal_type(mul(value, 2))  # revealed: Never
 
-def right(value: Fraction) -> Fraction:
-    reveal_type(mul(2, value))  # revealed: Fraction
-    return mul(2, value)  # no diagnostic
-```
-
-## Gradual receivers in overloaded callbacks
-
-For an ambiguous-overload callback, we neither privilege the first matching overload, nor wrongly
-assume that _both_ overloads must match the gradual argument (which may be impossible).
-
-```py
-from typing import Any, Callable, Generic, TypeVar, overload
-
-SourceT = TypeVar("SourceT", covariant=True)
-R = TypeVar("R")
-
-class Source(Generic[SourceT]):
-    @overload
-    def get(self: "Source[int]") -> int: ...
-    @overload
-    def get(self: "Source[str]") -> str: ...
-    def get(self: "Source[Any]") -> int | str:
-        raise NotImplementedError
-
-def invoke(callback: Callable[[], R]) -> R:
-    return callback()
-
-def _(concrete: Source[str], gradual: Source[Any]) -> None:
-    # Concrete receiver selects the matching overload; no problem.
-    reveal_type(invoke(concrete.get))  # revealed: str
-
-    # This gradual receiver is compatible with both overloads; we should not privilege the first
-    # overload, nor can we intersect the return types: one of the overloads applies and we don't know
-    # which, but we can't say that _both_ apply. `AnyOf[int | str]` would be better here, `int |
-    # str` is conservative.
-    reveal_type(invoke(gradual.get))  # revealed: int | str
-```
-
-The same applies to a callable object whose `self` annotations contain bounded type variables. A
-gradual receiver can satisfy each annotation with different type-variable bindings, without
-guaranteeing that the first overload applies:
-
-```py
-T = TypeVar("T")
-IntT = TypeVar("IntT", bound=int)
-StrT = TypeVar("StrT", bound=str)
-
-class Callback(Generic[T]):
-    @overload
-    def __call__(self: "Callback[IntT]") -> int: ...
-    @overload
-    def __call__(self: "Callback[StrT]") -> str: ...
-    def __call__(self) -> int | str:
-        raise NotImplementedError
-
-def _(concrete: Callback[str], gradual: Callback[Any]) -> None:
-    reveal_type(invoke(concrete))  # revealed: str
-    reveal_type(invoke(gradual))  # revealed: int | str
+def right(value: Fraction) -> None:
+    # TODO: Infer `Fraction` from the first applicable overload of `Fraction.__rmul__`.
+    reveal_type(mul(2, value))  # revealed: Never
 ```
 
 ## Intersection arguments with variadic parameters

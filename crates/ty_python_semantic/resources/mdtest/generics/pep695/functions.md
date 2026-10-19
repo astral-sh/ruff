@@ -1194,14 +1194,14 @@ def _(
     reveal_type(invariant_correlated(x, y))  # revealed: A | B
 ```
 
-## Ordered overloads in generic callbacks
+## Overlapping overloads in generic callbacks
 
-Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
-preserves the first applicable overload's return type, just like a direct call:
+Overlapping overloads do not promise all of their return types simultaneously. Inference currently
+intersects their returns when a generic callback argument matches multiple overloads:
 
 ```py
 from collections.abc import Callable
-from typing import Protocol, overload
+from typing import overload
 from ty_extensions import Intersection
 
 class A: ...
@@ -1220,35 +1220,8 @@ def convert(value: A | B) -> int | str:
 
 def _(value: Both) -> None:
     reveal_type(convert(value))  # revealed: int
-    reveal_type(invoke(convert, value))  # revealed: int
-```
-
-When neither overload covers the whole argument type, the result includes both possible returns:
-
-```py
-def _(value: A | B) -> None:
-    reveal_type(invoke(convert, value))  # revealed: int | str
-```
-
-The same ordering applies when a protocol method supplies the callable constraint:
-
-```py
-class Converter[InputT, OutputT](Protocol):
-    def convert(self, value: InputT, /) -> OutputT: ...
-
-class OverloadedConverter:
-    @overload
-    def convert(self, value: A) -> int: ...
-    @overload
-    def convert(self, value: B) -> str: ...
-    def convert(self, value: A | B) -> int | str:
-        raise NotImplementedError
-
-def invoke_method[T, R](converter: Converter[T, R], value: T) -> R:
-    return converter.convert(value)
-
-def _(converter: OverloadedConverter, value: Both) -> None:
-    reveal_type(invoke_method(converter, value))  # revealed: int
+    # TODO: Infer `int` from the first applicable overload instead of intersecting `int` and `str`.
+    reveal_type(invoke(convert, value))  # revealed: Never
 ```
 
 In contrast, an explicit intersection of callable types does promise both results for the same
@@ -1257,54 +1230,6 @@ input. Its return types can still be intersected:
 ```py
 def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> None:
     reveal_type(invoke(callback, object()))  # revealed: A & B
-```
-
-## Gradual receivers in overloaded callbacks
-
-For an ambiguous-overload callback, we neither privilege the first matching overload, nor wrongly
-assume that _both_ overloads must match the gradual argument (which may be impossible).
-
-```py
-from typing import Any, Callable, overload
-
-class Source[T]:
-    @overload
-    def get(self: "Source[int]") -> int: ...
-    @overload
-    def get(self: "Source[str]") -> str: ...
-    def get(self: "Source[Any]") -> int | str:
-        raise NotImplementedError
-
-def invoke[R](callback: Callable[[], R]) -> R:
-    return callback()
-
-def _(concrete: Source[str], gradual: Source[Any]) -> None:
-    # Concrete receiver selects the matching overload; no problem.
-    reveal_type(invoke(concrete.get))  # revealed: str
-
-    # This gradual receiver is compatible with both overloads; we should not privilege the first
-    # overload, nor can we intersect the return types: one of the overloads applies and we don't know
-    # which, but we can't say that _both_ apply. `AnyOf[int | str]` would be better here, `int |
-    # str` is conservative.
-    reveal_type(invoke(gradual.get))  # revealed: int | str
-```
-
-The same applies to a callable object whose `self` annotations contain bounded type variables. A
-gradual receiver can satisfy each annotation with different type-variable bindings, without
-guaranteeing that the first overload applies:
-
-```py
-class Callback[T]:
-    @overload
-    def __call__[U: int](self: "Callback[U]") -> int: ...
-    @overload
-    def __call__[U: str](self: "Callback[U]") -> str: ...
-    def __call__(self) -> int | str:
-        raise NotImplementedError
-
-def _(concrete: Callback[str], gradual: Callback[Any]) -> None:
-    reveal_type(invoke(concrete))  # revealed: str
-    reveal_type(invoke(gradual))  # revealed: int | str
 ```
 
 ## Intersection arguments with variadic parameters

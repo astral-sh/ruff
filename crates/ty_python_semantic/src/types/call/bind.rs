@@ -6330,8 +6330,7 @@ impl<'db> CallInference<'_, 'db> {
         let mut validated = Vec::with_capacity(specializations.len());
         'specializations: for specialization in specializations {
             // Recheck the original relations, including requirements that recursive protocol
-            // inference may omit. Even complete ordinary assignability constraints would not
-            // establish the overload-order guarantees needed to intersect return types.
+            // inference may omit.
             for (relation, contributes_to_inference) in &relations {
                 let actual = relation
                     .argument_type
@@ -6343,10 +6342,9 @@ impl<'db> CallInference<'_, 'db> {
                     // Gradual assignability alone can accept different materializations in
                     // each alternative: `Any` matching both `int` and `str` does not prove
                     // that the argument has type `int & str`.
-                    // An overloaded callback can satisfy ordinary subtyping via a later
-                    // signature whose return is shadowed by an earlier overload. Refinement
-                    // needs an ordered return guarantee, including through protocol members.
-                    actual.is_subtype_for_return_refinement(db, env, formal)?
+                    // TODO: Ordinary callable subtyping can match a later, shadowed overload.
+                    // Account for overload order before intersecting the inferred returns.
+                    actual.is_subtype_of(db, env, formal)
                 } else {
                     actual.is_assignable_to(db, env, formal)
                 };
