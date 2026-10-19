@@ -720,53 +720,31 @@ impl<'src> Lexer<'src> {
             return TokenKind::Identifier;
         }
 
-        // No Python keyword is longer than eight bytes. The first ASCII character was
-        // consumed before entering this function, so only seven continuation bytes can fit.
-        if ascii_len >= 8 {
+        // Keywords contain two to eight ASCII bytes, including `first`.
+        if !(1..8).contains(&ascii_len) {
             return TokenKind::Identifier;
         }
 
-        match &self.source.as_bytes()[self.token_range().to_std_range()] {
-            b"False" => TokenKind::False,
-            b"None" => TokenKind::None,
-            b"True" => TokenKind::True,
-            b"and" => TokenKind::And,
-            b"as" => TokenKind::As,
-            b"assert" => TokenKind::Assert,
-            b"async" => TokenKind::Async,
-            b"await" => TokenKind::Await,
-            b"break" => TokenKind::Break,
-            b"case" => TokenKind::Case,
-            b"class" => TokenKind::Class,
-            b"continue" => TokenKind::Continue,
-            b"def" => TokenKind::Def,
-            b"del" => TokenKind::Del,
-            b"elif" => TokenKind::Elif,
-            b"else" => TokenKind::Else,
-            b"except" => TokenKind::Except,
-            b"finally" => TokenKind::Finally,
-            b"for" => TokenKind::For,
-            b"from" => TokenKind::From,
-            b"global" => TokenKind::Global,
-            b"if" => TokenKind::If,
-            b"import" => TokenKind::Import,
-            b"in" => TokenKind::In,
-            b"is" => TokenKind::Is,
-            b"lazy" => TokenKind::Lazy,
-            b"lambda" => TokenKind::Lambda,
-            b"match" => TokenKind::Match,
-            b"nonlocal" => TokenKind::Nonlocal,
-            b"not" => TokenKind::Not,
-            b"or" => TokenKind::Or,
-            b"pass" => TokenKind::Pass,
-            b"raise" => TokenKind::Raise,
-            b"return" => TokenKind::Return,
-            b"try" => TokenKind::Try,
-            b"type" => TokenKind::Type,
-            b"while" => TokenKind::While,
-            b"with" => TokenKind::With,
-            b"yield" => TokenKind::Yield,
-            _ => TokenKind::Identifier,
+        // Rule out lengths and initial bytes that cannot form a keyword.
+        if KEYWORD_TABLE.starts[ascii_len - 1] & (1u64 << (u32::from(first) & 63)) == 0 {
+            return TokenKind::Identifier;
+        }
+
+        let continuation = if let Some(chunk) = bytes.first_chunk::<8>() {
+            u64::from_le_bytes(*chunk)
+        } else {
+            let mut padded = [0; 8];
+            padded[..ascii_len].copy_from_slice(&bytes[..ascii_len]);
+            u64::from_le_bytes(padded)
+        };
+        // Shift out the following source bytes and align the identifier to the high end.
+        let word = ((continuation << 8) | u64::from(u32::from(first))) << ((7 - ascii_len) * 8);
+
+        let index = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
+        if word == KEYWORD_TABLE.words[index] {
+            KEYWORD_TABLE.kinds[index]
+        } else {
+            TokenKind::Identifier
         }
     }
 
@@ -1646,6 +1624,89 @@ pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 
+// The multiplier gives every Python keyword a distinct slot. The full packed word
+// still has to match, so arbitrary identifiers cannot be mistaken for keywords.
+// Adding keywords may require a new multiplier; table construction checks for collisions.
+const KEYWORD_HASH_MULTIPLIER: u64 = 0xd6b7_7ed9_811b_4777;
+
+/// Packed keyword words and token kinds indexed by a six-bit perfect hash.
+#[repr(align(64))]
+struct KeywordTable {
+    words: [u64; 64],
+    kinds: [TokenKind; 64],
+    // Possible initial bytes, grouped by keyword length (two through eight).
+    starts: [u64; 7],
+}
+
+static KEYWORD_TABLE: KeywordTable = {
+    let mut starts = [0u64; 7];
+    let mut words = [0; 64];
+    let mut kinds = [TokenKind::Identifier; 64];
+    let keywords: [(&[u8], TokenKind); 39] = [
+        (b"False", TokenKind::False),
+        (b"None", TokenKind::None),
+        (b"True", TokenKind::True),
+        (b"and", TokenKind::And),
+        (b"as", TokenKind::As),
+        (b"assert", TokenKind::Assert),
+        (b"async", TokenKind::Async),
+        (b"await", TokenKind::Await),
+        (b"break", TokenKind::Break),
+        (b"case", TokenKind::Case),
+        (b"class", TokenKind::Class),
+        (b"continue", TokenKind::Continue),
+        (b"def", TokenKind::Def),
+        (b"del", TokenKind::Del),
+        (b"elif", TokenKind::Elif),
+        (b"else", TokenKind::Else),
+        (b"except", TokenKind::Except),
+        (b"finally", TokenKind::Finally),
+        (b"for", TokenKind::For),
+        (b"from", TokenKind::From),
+        (b"global", TokenKind::Global),
+        (b"if", TokenKind::If),
+        (b"import", TokenKind::Import),
+        (b"in", TokenKind::In),
+        (b"is", TokenKind::Is),
+        (b"lazy", TokenKind::Lazy),
+        (b"lambda", TokenKind::Lambda),
+        (b"match", TokenKind::Match),
+        (b"nonlocal", TokenKind::Nonlocal),
+        (b"not", TokenKind::Not),
+        (b"or", TokenKind::Or),
+        (b"pass", TokenKind::Pass),
+        (b"raise", TokenKind::Raise),
+        (b"return", TokenKind::Return),
+        (b"try", TokenKind::Try),
+        (b"type", TokenKind::Type),
+        (b"while", TokenKind::While),
+        (b"with", TokenKind::With),
+        (b"yield", TokenKind::Yield),
+    ];
+    let mut index = 0;
+    while index < keywords.len() {
+        let (keyword, kind) = keywords[index];
+        starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
+        let mut word = 0u64;
+        let mut byte_index = 0;
+        while byte_index < keyword.len() {
+            word |= (keyword[byte_index] as u64) << (byte_index * 8);
+            byte_index += 1;
+        }
+        word <<= (8 - keyword.len()) * 8;
+        let slot = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
+        assert!(words[slot] == 0, "keyword hash collision");
+        words[slot] = word;
+        kinds[slot] = kind;
+        index += 1;
+    }
+    KeywordTable {
+        words,
+        kinds,
+        starts,
+    }
+};
+
 #[cfg(test)]
 mod tests {
     use std::fmt::Write;
@@ -1655,6 +1716,24 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use super::*;
+
+    #[test]
+    fn keyword_hash_collisions_remain_identifiers() {
+        for name in [
+            "iH", "aCd", "Fclse", "asqert", "edcept", "fknally", "glqbal", "m_tch", "noplocal",
+        ] {
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), TokenKind::Identifier, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+                if !suffix.is_empty() {
+                    assert_eq!(lexer.next_token(), TokenKind::Continue);
+                }
+            }
+        }
+    }
 
     const WINDOWS_EOL: &str = "\r\n";
     const MAC_EOL: &str = "\r";
