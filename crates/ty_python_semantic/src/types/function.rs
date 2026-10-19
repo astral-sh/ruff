@@ -72,7 +72,7 @@ use crate::types::generics::{
     GenericContext, Specialization, typing_self, walk_specialization_types,
 };
 use crate::types::infer::{
-    infer_complete_scope_types, infer_definition_types, nearest_enclosing_class,
+    infer_definition_types, infer_function_return_type, nearest_enclosing_class,
     original_class_type,
 };
 use crate::types::known_instance::DeprecatedInstance;
@@ -1794,14 +1794,12 @@ impl<'db> FunctionType<'db> {
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
             // For free functions, we simply use the type inferred from the function body.
-            return infer_complete_scope_types(db, scope)
-                .return_type()
-                .apply_type_mapping(
-                    db,
-                    &env,
-                    &TypeMapping::GeneralizeLocalTypes(scope),
-                    TypeContext::default(),
-                );
+            return infer_function_return_type(db, scope).apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::GeneralizeLocalTypes(scope),
+                TypeContext::default(),
+            );
         };
         if self
             .literal(db)
@@ -1829,7 +1827,7 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let mut return_type = infer_complete_scope_types(db, scope).return_type();
+        let mut return_type = infer_function_return_type(db, scope);
         if let Some(inherited) = self.inherited_return_annotation(db) {
             return_type = inherited;
         } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)

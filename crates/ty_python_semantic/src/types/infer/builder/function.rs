@@ -65,7 +65,11 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, find_node::covering_node};
+use ruff_python_ast::{
+    self as ast,
+    find_node::covering_node,
+    statement_visitor::{StatementVisitor, walk_stmt},
+};
 use ruff_text_size::Ranged;
 
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
@@ -213,6 +217,32 @@ impl<'db> ExpectedReturnType<'db> {
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    pub(super) fn infer_function_returns(&mut self, function: &'ast ast::StmtFunctionDef) {
+        /// Visit returns in this body without entering nested scopes or inferring unrelated
+        /// statements. Name lookup and reachability query the dependencies of each return.
+        struct Returns<'builder, 'db, 'ast>(&'builder mut TypeInferenceBuilder<'db, 'ast>);
+
+        impl<'ast> StatementVisitor<'ast> for Returns<'_, '_, 'ast> {
+            fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
+                match statement {
+                    ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
+                    ast::Stmt::Return(ret) => {
+                        let range = ret
+                            .value
+                            .as_ref()
+                            .map_or(ret.range(), |value| value.range());
+                        if self.0.context.is_range_reachable(range) {
+                            self.0.infer_maybe_standalone_statement(statement);
+                        }
+                    }
+                    _ => walk_stmt(self, statement),
+                }
+            }
+        }
+
+        Returns(self).visit_body(&function.body);
+    }
+
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         let env = self.program_environment();
         let db = self.db();
