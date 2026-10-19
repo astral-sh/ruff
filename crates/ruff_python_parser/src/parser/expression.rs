@@ -337,6 +337,11 @@ impl<'src> Parser<'src> {
         let token = self.current_token_kind();
         let start = self.node_start();
 
+        if token == TokenKind::Identifier {
+            let name = Expr::Name(self.parse_name(context));
+            return self.parse_postfix_expression(name, start, context).into();
+        }
+
         if let Some(unary_op) = token.as_unary_operator() {
             let expr = self.parse_unary_expression(unary_op, context);
 
@@ -679,6 +684,11 @@ impl<'src> Parser<'src> {
     /// expression, `[` for a subscript expression, or `.` for an attribute expression.
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
+    #[expect(
+        clippy::inline_always,
+        reason = "avoids AST copies from the two lhs paths"
+    )]
+    #[inline(always)]
     fn parse_postfix_expression(
         &mut self,
         mut lhs: Expr,
