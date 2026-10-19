@@ -1516,34 +1516,6 @@ impl<'db> Specialization<'db> {
         }
     }
 
-    /// Combines two specializations of the same generic context. If either specialization maps a
-    /// typevar to `Type::Unknown`, the other specialization's mapping is used. If both map the
-    /// typevar to a known type, those types are unioned together.
-    ///
-    /// Panics if the two specializations are not for the same generic context.
-    pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
-        let generic_context = self.generic_context(db);
-        assert_eq!(other.generic_context(db), generic_context);
-        let env = ProgramEnvironment::from_program(generic_context.program(db));
-        // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
-        // confusing/wrong results in cases where there was a mapping found for a typevar, and it
-        // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
-        // may fail to specialize, but not end up as `Unknown`. We should add a bitset or similar
-        // to Specialization that explicitly tells us which typevars are mapped.
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(other.types(db))
-            .map(|(self_type, other_type)| match (self_type, other_type) {
-                (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
-                _ => UnionType::from_two_elements(db, &env, *self_type, *other_type),
-            })
-            .collect();
-        // TODO: Combine the tuple specs too
-        // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, None)
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

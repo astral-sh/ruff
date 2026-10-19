@@ -3952,6 +3952,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 InferenceRegion::Deferred(definition),
             ) => {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
+                if !arguments.keywords.is_empty() {
+                    let mut call_arguments = self.prepare_call_arguments(arguments);
+                    // The positional arguments and `type_params` have their own validation rules;
+                    // leaving their types unset excludes them from ordinary call type checks.
+                    for (index, argument) in arguments.iter_source_order().enumerate() {
+                        if let ArgOrKeyword::Keyword(keyword) = argument
+                            && let Some(name) = keyword.arg.as_deref()
+                            && name != "type_params"
+                        {
+                            call_arguments.insert_type(
+                                index,
+                                TypeContext::default(),
+                                self.expression_type(&keyword.value),
+                            );
+                        }
+                    }
+                    if let Err(CallError(_, bindings)) = func_ty.try_call(db, env, &call_arguments)
+                    {
+                        bindings.report_diagnostics(&self.context, value.into());
+                    }
+                }
                 return;
             }
             (Some(KnownClass::Type), InferenceRegion::Deferred(definition)) => {
