@@ -445,6 +445,135 @@ reveal_type(typing.Protocol is typing_extensions.Protocol)  # revealed: bool
 reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 ```
 
+## Applying `runtime_checkable`
+
+The `runtime_checkable` decorator can only be applied to protocol classes. Applying it to an
+ordinary class raises `TypeError` at runtime:
+
+```py
+from typing import Protocol, runtime_checkable
+
+# snapshot: invalid-argument-type
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+```snapshot
+error[invalid-argument-type]: `runtime_checkable` can only be applied to protocol classes
+ --> src/mdtest_snippet.py:4:1
+  |
+4 | @runtime_checkable
+  | ^^^^^^^^^^^^^^^^^^
+5 | class NotAProtocol: ...
+  |       ------------ `NotAProtocol` is not a protocol class
+info: A class is only a protocol if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+```
+
+The same restriction applies to `typing_extensions.runtime_checkable`:
+
+```py
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+# error: [invalid-argument-type]
+@runtime_checkable_extensions
+class AlsoNotAProtocol: ...
+```
+
+A subclass of a protocol is not itself a protocol unless it explicitly inherits from `Protocol`:
+
+```py
+class Base(Protocol): ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(Base): ...
+
+@runtime_checkable  # no diagnostic
+class Subprotocol(Base, Protocol): ...
+```
+
+## Calling `runtime_checkable` directly
+
+Direct calls enforce the same restriction, whether the class is passed by position or by name:
+
+```py
+from typing import Protocol, runtime_checkable
+from typing_extensions import runtime_checkable as runtime_checkable_extensions
+
+class NotAProtocol: ...
+class P(Protocol): ...
+
+runtime_checkable(NotAProtocol)  # error: [invalid-argument-type] "`runtime_checkable` can only be applied to protocol classes"
+runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
+runtime_checkable(P)  # no diagnostic
+```
+
+## `runtime_checkable` in stub files
+
+In a stub file, a class can inherit from `Protocol` through an alias defined later in the file:
+
+```pyi
+from typing import runtime_checkable
+
+@runtime_checkable  # no diagnostic
+class P(ProtocolAlias): ...
+
+from typing import Protocol as ProtocolAlias
+```
+
+As in Python files, a subclass must explicitly inherit from `Protocol` to be a protocol:
+
+```pyi
+# error: [invalid-argument-type]
+@runtime_checkable
+class Concrete(P): ...
+```
+
+## `runtime_checkable` and decorator order
+
+Decorators are applied from bottom to top. An inner decorator can replace an ordinary class with a
+protocol before `runtime_checkable` receives it:
+
+```py
+from typing import Protocol, runtime_checkable
+
+class P(Protocol): ...
+
+@runtime_checkable  # no diagnostic
+@lambda cls: P
+class Replaced: ...
+```
+
+Reversing the order applies `runtime_checkable` to the ordinary class before it can be replaced:
+
+```py
+@lambda cls: P
+# error: [invalid-argument-type]
+@runtime_checkable
+class NotAProtocol: ...
+```
+
+An inner decorator can also replace a protocol with an ordinary class. `runtime_checkable` rejects
+the replacement:
+
+```py
+class Ordinary: ...
+
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: Ordinary
+class ReplacedWithClass(Protocol): ...
+```
+
+If the inner decorator returns an integer, `runtime_checkable` rejects it because it is not a class:
+
+```py
+# error: [invalid-argument-type]
+@runtime_checkable
+@lambda cls: 1
+class ReplacedWithInstance(Protocol): ...
+```
+
 ## Calls to protocol classes
 
 <!-- snapshot-diagnostics -->

@@ -18,7 +18,8 @@ use crate::{
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_bad_argument_to_get_protocol_members, report_bad_argument_to_protocol_interface,
             report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_invalid_total_ordering_call,
+            report_invalid_return_type, report_invalid_runtime_checkable,
+            report_invalid_total_ordering_call,
             report_issubclass_check_against_protocol_with_non_method_members,
             report_runtime_check_against_non_runtime_checkable_protocol,
             report_runtime_check_against_typed_dict, report_shadowed_type_variable,
@@ -1892,6 +1893,14 @@ impl KnownFunction {
                     source_type
                         .disjointness_error_context(db, env, casted_type)
                         .attach_to(db, env, &mut diagnostic);
+                }
+            }
+
+            KnownFunction::RuntimeCheckable => {
+                if let [Some(Type::ClassLiteral(class))] = parameter_types
+                    && !class.is_protocol(builder.db())
+                {
+                    report_invalid_runtime_checkable(&builder.context, call_expression, *class);
                 }
             }
 
