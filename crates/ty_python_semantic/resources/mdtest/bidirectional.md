@@ -3455,6 +3455,82 @@ annotated[0] /= 2
 reveal_type(annotated)  # revealed: list[int]
 ```
 
+## Augmented subscript assignments that grow tuples
+
+Appending to a tuple stored in an inferred collection widens its length while preserving its element
+type.
+
+```py
+values = [(0,)]
+values[0] += (1,)  # no diagnostic
+reveal_type(values)  # revealed: list[tuple[int, ...]]
+```
+
+Dictionary values can grow in the same way, including when the appended elements have a different
+type.
+
+```py
+mapping = {"value": (0,)}
+mapping["value"] += ("a",)  # no diagnostic
+reveal_type(mapping)  # revealed: dict[str, tuple[int | str, ...]]
+```
+
+An empty constructor combines the initial append with later tuple growth.
+
+```py
+constructed = list()
+constructed.append((0,))
+constructed[0] += (1,)  # no diagnostic
+reveal_type(constructed)  # revealed: list[tuple[int, ...]]
+```
+
+The initial tuple can come from a variable with a fixed-length type.
+
+```py
+def grow(initial: tuple[int, int]):
+    values = [initial]
+    values[0] += (1,)  # no diagnostic
+    reveal_type(values)  # revealed: list[tuple[int, ...]]
+```
+
+Recursive element types are preserved when the tuple's length widens.
+
+```py
+recursive = []
+recursive.append(recursive)
+recursive_values = [(0,)]
+recursive_values[0] += (recursive,)  # no diagnostic
+reveal_type(recursive_values)  # revealed: list[tuple[int | list[Divergent], ...]]
+```
+
+An explicit annotation still fixes the tuple's length.
+
+```py
+fixed: list[tuple[int]] = [(0,)]
+fixed[0] += (1,)  # error: [invalid-assignment]
+reveal_type(fixed)  # revealed: list[tuple[int]]
+```
+
+The annotation also applies when it is separate from the initializer.
+
+```py
+declared: list[tuple[int]]
+declared = [(0,)]
+declared[0] += (1,)  # error: [invalid-assignment]
+reveal_type(declared)  # revealed: list[tuple[int]]
+```
+
+## Finite tuple shapes in collection inference
+
+Collection uses preserve a stable union of tuple shapes.
+
+```py
+def finite(flag: bool):
+    values = [(1,) if flag else ("a", "b")]
+    values.reverse()  # no diagnostic
+    reveal_type(values)  # revealed: list[tuple[int] | tuple[str, str]]
+```
+
 ## Augmented subscript inference for nested comprehensions
 
 Collections nested inside a comprehension do not yet participate in full-scope inference through the

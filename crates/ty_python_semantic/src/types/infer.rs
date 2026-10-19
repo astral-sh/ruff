@@ -60,7 +60,7 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    TypeQualifiers, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -188,6 +188,54 @@ struct TypeAndRange<'db> {
 }
 
 type CollectionUseConstraints<'db> = FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>;
+
+/// Widens growing tuple arguments of a single inferred collection initializer.
+///
+/// An update such as `values[0] += (1,)` feeds longer tuples back into `values = [(0,)]`.
+/// Widen the element type before retaining earlier cycle results: a union of invariant lists
+/// would keep rejecting the update through its narrower alternatives.
+fn widen_collection_tuples<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    previous: Type<'db>,
+    current: Type<'db>,
+    cycle: &salsa::Cycle,
+) -> Option<Type<'db>> {
+    if previous == current {
+        return None;
+    }
+    let (class, current) = current.class_specialization(db, env)?;
+    let (previous_class, previous) = previous.class_specialization(db, env)?;
+    if class != previous_class
+        || !matches!(
+            class.known(db),
+            Some(KnownClass::List | KnownClass::Set | KnownClass::Dict)
+        )
+    {
+        return None;
+    }
+    let mut changed = false;
+    let types = current
+        .types(db)
+        .iter()
+        .zip(previous.types(db))
+        .map(|(current, previous)| {
+            if let Some(widened) = UnionType::widen_growing_tuples(db, env, *previous, *current) {
+                changed = true;
+                widened.recursive_type_normalized(db, env, cycle)
+            } else {
+                current.cycle_normalized(db, env, *previous, cycle)
+            }
+        })
+        .collect::<Vec<_>>();
+    changed.then(|| {
+        Type::instance(
+            db,
+            env,
+            class.apply_specialization(db, |generic_context| generic_context.specialize(db, types)),
+        )
+    })
+}
 
 /// Extends the current collection-use constraints with those from the previous cycle iteration.
 ///
@@ -1694,21 +1742,45 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
+        let widened_collection = match (&self.types, &previous_inference.types) {
+            (DefinitionTypes::Binding(current), DefinitionTypes::Binding(previous))
+                if definition.kind(db).is_unannotated_assignment()
+                    && semantic_index(db, definition.program_file(db))
+                        .constraining_collection_uses(definition)
+                        .next()
+                        .is_some() =>
+            {
+                widen_collection_tuples(db, &env, *previous, *current, cycle)
+                    .map(|widened| (*previous, *current, widened))
+            }
+            _ => None,
+        };
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, &env, previous_inference);
         }
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
+            *ty = if let Some((previous, current, widened)) = widened_collection
+                && *ty == current
+                && previous_ty == previous
+            {
+                widened
+            } else {
+                ty.cycle_normalized(db, &env, previous_ty, cycle)
+            };
         }
-        self.types = std::mem::take(&mut self.types).cycle_normalized(
-            db,
-            &env,
-            &previous_inference.types,
-            cycle,
-            definition,
-        );
+        self.types = if let Some((_, _, widened)) = widened_collection {
+            DefinitionTypes::Binding(widened)
+        } else {
+            std::mem::take(&mut self.types).cycle_normalized(
+                db,
+                &env,
+                &previous_inference.types,
+                cycle,
+                definition,
+            )
+        };
 
         if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
             for (expression, ty) in &mut extra.deferred_decorator_calls {
