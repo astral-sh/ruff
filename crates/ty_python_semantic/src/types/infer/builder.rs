@@ -9210,6 +9210,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
+        // A bare cycle placeholder provides no binding for a collection's type parameter.
+        // Leave it unbound so other uses and the initializer can infer it. Nested recursive
+        // types still provide a binding and must retain their concrete structure.
+        let call_specialization = if call_specialization.types(db).iter().any(Type::is_divergent) {
+            let generic_context = call_specialization.generic_context(db);
+            generic_context.specialize(
+                db,
+                generic_context
+                    .variables(db)
+                    .zip(call_specialization.types(db))
+                    .map(|(variable, ty)| {
+                        if ty.is_divergent() {
+                            Type::TypeVar(variable)
+                        } else {
+                            *ty
+                        }
+                    })
+                    .collect_vec(),
+            )
+        } else {
+            call_specialization
+        };
         let constraint = identity_instance.apply_specialization(db, call_specialization);
         let Some(receiver_generic_context) = receiver_generic_context else {
             return Some(constraint);

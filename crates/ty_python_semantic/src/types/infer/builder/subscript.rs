@@ -28,7 +28,6 @@ use crate::types::typed_dict::{
     TypedDictAssignmentKind, TypedDictExtraItems, TypedDictKeyAssignment,
 };
 use crate::types::typevar::{BindingContext, TypeVarSet};
-use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarInstance, CallArguments, CallDunderError, CallableBinding, CycleDetector,
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
@@ -1650,20 +1649,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(collection_def) = self.index.unannotated_collection_initializer(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db, env)
         {
-            // Using a divergent operator result as a constraint can keep the collection's element
-            // type divergent. Validate the write before discarding this constraint.
-            if assignment_kind == SubscriptAssignmentKind::Augmented
-                && any_over_type(
-                    db,
-                    env,
-                    infer_rhs_value(self, TypeContext::default()),
-                    false,
-                    |ty| ty.is_divergent(),
-                )
-            {
-                return is_valid_assignment;
-            }
-
             let identity_instance =
                 Type::instance(db, env, class_literal.identity_specialization(db));
             let collection_generic_context = class_literal.generic_context(db);

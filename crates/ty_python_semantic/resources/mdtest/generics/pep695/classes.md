@@ -2707,6 +2707,28 @@ def probe(value: Tree[int, str]):
     reveal_type(child.value)  # revealed: str
 ```
 
+## Augmented assignment results containing recursive types
+
+An operator's result constrains an inferred collection even when its type arguments contain a
+recursive type.
+
+```py
+class Updated[T]:
+    def __add__(self, other: int) -> "Updated[T]":
+        return self
+
+class Initial[T]:
+    def __init__(self, value: T) -> None: ...
+    def __add__(self, other: int) -> Updated[T]:
+        return Updated[T]()
+
+recursive = []
+recursive.append(recursive)
+values = [Initial(recursive)]
+values[0] += 1  # no diagnostic
+reveal_type(values)  # revealed: list[Updated[list[Divergent]] | Initial[list[Divergent]]]
+```
+
 ## Recursive constructor type context
 
 An invariant constructor can use a recursive type alias as context, including when its `__new__`
