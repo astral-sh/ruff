@@ -2561,7 +2561,7 @@ pub(crate) struct TypeVarInference<'db> {
     /// Inferred types in generic-context order. Multiple solutions are union-merged per variable,
     /// including fallback types from incomplete solution families. This projection loses
     /// correlations and completeness; `solutions` retains that information. When correlated
-    /// solutions are unavailable, this hold the compatibility or diagnostic recovery mapping.
+    /// solutions are unavailable, this holds the compatibility or diagnostic recovery mapping.
     /// For ParamSpec, we currently hold the first parameter-list.
     #[returns(deref)]
     merged_types: Box<[Option<Type<'db>>]>,
@@ -3042,6 +3042,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // TODO: Distinguish a ParamSpec binding lost to budget exhaustion from missing evidence.
         // Without that distinction, defaults can apply after budget exhaustion.
         for binding in solution {
+            // TODO: Remove this shortcut once merging ParamSpec solution alternatives is supported.
             if binding.bound_typevar.is_paramspec(db) {
                 types
                     .entry(binding.bound_typevar.identity(db))
@@ -3487,6 +3488,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) {
         let db = self.db;
         let identity = bound_typevar.identity(db);
+        // TODO: Remove this guard once repeated `ParamSpec` bounds can be combined.
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
@@ -3589,6 +3591,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     }
 
     /// Record supplied parameter lists independently from the diagnostic recovery mapping.
+    ///
+    /// TODO: Remove this wrapper once repeated `ParamSpec` bounds can be combined.
     fn record_constraint_analysis(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
         if let ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(solutions)) = analysis {
             self.record_paramspecs(
@@ -3600,6 +3604,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.project_for_legacy_fallback(analysis);
     }
 
+    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
     fn record_paramspecs<'a>(
         &mut self,
         solutions: &(impl Iterator<Item = &'a [TypeVarSolution<'db>]> + Clone),
@@ -3689,6 +3694,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.pending.intersect(self.db, self.constraints, when);
     }
 
+    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
     fn remove_seen_paramspecs(
         &self,
         when: ConstraintSet<'db, 'c>,
@@ -4014,6 +4020,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // Retain every alternative that was not proved unsatisfiable. Solving the
                 // combined TDD here would repeat their potentially expensive path traversals.
                 self.record_constraint_set(combined);
+                // TODO: Remove this bookkeeping once repeated `ParamSpec` bounds can be combined.
                 if accepted.iter().all(|(_, analysis)| {
                     matches!(
                         analysis,
