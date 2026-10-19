@@ -53,7 +53,10 @@ pub(crate) fn check_function_definition<'db>(
     let raw_signature;
     let signature = if function_type.updated_signature(db).is_none()
         && let ([], Some(_)) = function_type.overloads_and_implementation(db)
-        && let [signature] = function_type.signature(db).overloads.as_slice()
+        && let [signature] = function_type
+            .signature_without_inferred_return_type(db)
+            .overloads
+            .as_slice()
         && signature.definition == Some(definition)
     {
         signature
@@ -183,7 +186,9 @@ fn check_method_typevar_variance<'db>(
     let env = context.program_environment();
     let last_definition = function.literal(db).last_definition;
     let signatures = match member.read_ty {
-        Type::FunctionLiteral(function) => Some(function.signature(db)),
+        Type::FunctionLiteral(function) => {
+            Some(function.signature_without_inferred_return_type(db))
+        }
         Type::BoundMethod(method) => method.bound_signatures(db),
         Type::Callable(callable) => Some(callable.signatures(db)),
         _ => None,
