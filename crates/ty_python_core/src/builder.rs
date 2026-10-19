@@ -10,7 +10,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use ruff_db::parsed::ParsedModuleRef;
 
 use ruff_db::source::{SourceText, source_text};
-use ruff_index::IndexVec;
+use ruff_index::{IndexVec, SalsaIdSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{
@@ -5638,7 +5638,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
         // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
         // of an standalone inferable statement to avoid large scope-level cycles.
-        let mut collection_defs = FxHashSet::default();
+        let mut collection_defs = SalsaIdSet::default();
         for (collection_def, use_expression) in current_statement.collection_uses {
             // If the same collection is referenced multiple times in this statement,
             // we only consider the first occurrence, as collection use constraints are
