@@ -13453,6 +13453,12 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             // A read supplied by `__getattr__` need not return the assigned value. Keep
             // narrowing known attributes, including fields on classes with custom setters.
             let uses_getattr = |ty: Type<'db>| {
+                // Module literals ignore the synthetic `ModuleType.__getattr__` in typeshed.
+                // A real module-level `__getattr__` is shadowed by an assigned attribute.
+                if matches!(ty, Type::ModuleLiteral(_)) {
+                    return false;
+                }
+
                 !ty.class_member(db, env, "__getattr__").place.is_undefined()
                     && ty
                         .member_lookup_with_policy(

@@ -297,6 +297,52 @@ def update(obj: Dynamic | Declared) -> None:
     reveal_type(obj.value)  # revealed: int | str
 ```
 
+### Module attributes
+
+We retain the assigned type after an invalid write to a missing module attribute. The synthetic
+`ModuleType.__getattr__` in typeshed does not provide attributes on a statically known module.
+
+`module.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import module
+
+module.value = 1  # error: [unresolved-attribute]
+# error: [unresolved-attribute]
+reveal_type(module.value)  # revealed: Literal[1]
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `str`"
+# error: [unresolved-attribute]
+value: str = module.value
+```
+
+### Module attributes with a dynamic getter
+
+Assigning a module attribute creates a value that shadows its module-level `__getattr__`. Subsequent
+reads retain the assigned type.
+
+`module.py`:
+
+```py
+def __getattr__(name: str) -> int | str:
+    return 0
+```
+
+`main.py`:
+
+```py
+import module
+
+reveal_type(module.value)  # revealed: int | str
+module.value = 1
+reveal_type(module.value)  # revealed: Literal[1]
+```
+
 ## Subscript
 
 ### Specialization for builtin types
