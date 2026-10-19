@@ -656,6 +656,7 @@ pub(super) fn check_instance_overrides<'db>(
         // Ordinary assignments introduce no override contract. Do not infer their method
         // bodies just to discard the inferred type; a lazy cache can depend on its own reads.
         if is_mangled_private(name)
+            || name == "__hash__"
             || !attribute_declarations(db, literal.body_scope(db), name).any(
                 |(mut declarations, _)| {
                     declarations.any(|declaration| declaration.declaration.definition().is_some())
