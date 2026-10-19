@@ -79,9 +79,9 @@ use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
     DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    LiteralValueTypeKind, NominalInstanceType, ParamSpecValue, PropertyInstanceType, TypeContext,
+    TypeIdentity, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3818,7 +3818,10 @@ impl<'db> CallableBinding<'db> {
                     && let Some(value) = overload
                         .merged_specialization(db)
                         .and_then(|specialization| specialization.get(db, paramspec))
-                    && matches!(value, Type::Union(_) | Type::Intersection(_))
+                    && matches!(
+                        value.as_paramspec_value(db),
+                        Some(ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_))
+                    )
                 {
                     return None;
                 }
@@ -7595,7 +7598,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let Some(callable) = self
             .merged_specialization()
             .and_then(|specialization| specialization.get(db, paramspec))
-            .and_then(|value| value.paramspec_value_callable_type(db, self.env))
+            .and_then(|value| value.as_paramspec_value(db))
+            .and_then(|value| value.to_callable_type(db, self.env))
         else {
             return false;
         };
@@ -7990,7 +7994,7 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
     env: &'a ProgramEnvironment<'db>,
     constraints: &'a ConstraintSetBuilder<'db>,
     binding: &'a CallableBinding<'db>,
-    callable: Type<'db>,
+    paramspec_value: ParamSpecValue<'db>,
     arguments_types: &'a CallArguments<'call, 'db>,
     argument_index: usize,
     call_expression_tcx: TypeContext<'db>,
@@ -8287,11 +8291,12 @@ impl<'db> Binding<'db> {
             env,
             constraints,
             binding,
-            callable,
+            paramspec_value,
             arguments_types,
             argument_index,
             call_expression_tcx,
         } = *context;
+        let callable = paramspec_value.to_callable_type(db, env)?;
 
         let (prefix, _) = self.signature.parameters().as_paramspec_with_prefix()?;
         let paramspec_argument_indices =
@@ -8450,13 +8455,13 @@ impl<'db> Binding<'db> {
         let mut parameter_type = matched_parameter
             .expected_type
             .unwrap_or(original_parameter_type);
-        let paramspec_callable = |paramspec| {
+        let paramspec_value = |paramspec| {
             self.merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
                     specialization().and_then(|specialization| specialization.get(db, paramspec))
                 })?
-                .paramspec_value_callable_type(db, env)
+                .as_paramspec_value(db)
         };
 
         // If the parameter is a single non-ParamSpec type variable with an upper bound,
@@ -8490,14 +8495,14 @@ impl<'db> Binding<'db> {
             if let Some(paramspec) = paramspec {
                 // Specializing `P.args` or `P.kwargs` directly yields the entire parameter list,
                 // which is not a valid type context for an individual argument.
-                let callable = paramspec_callable(paramspec)?;
+                let paramspec_value = paramspec_value(paramspec)?;
                 let specialized_parameter_type =
                     self.paramspec_argument_context(&ParamSpecArgumentContext {
                         db,
                         env,
                         constraints,
                         binding,
-                        callable,
+                        paramspec_value,
                         arguments_types,
                         argument_index,
                         call_expression_tcx,
