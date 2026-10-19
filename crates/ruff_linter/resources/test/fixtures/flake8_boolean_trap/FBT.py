@@ -177,3 +177,9 @@ class BooleanArray:
     def __or__(self, other: Self | bool) -> Self: ...
     def __ror__(self, other: Self | bool) -> Self: ...
     def __ior__(self, other: Self | bool) -> Self: ...
+
+
+# https://github.com/astral-sh/ruff/issues/29484
+_set(True)
+_set_visible(True)
+__setVisible(True)
