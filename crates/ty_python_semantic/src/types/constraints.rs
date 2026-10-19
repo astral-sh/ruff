@@ -802,6 +802,29 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
         let mut storage = builder.storage.borrow_mut();
+        // A quantified body is false if no assignment to its locals or free variables can
+        // satisfy it. Incomplete support or an exhausted budget cannot establish that.
+        if let Some(support) = storage.node_support(self.node)
+            && support.is_complete()
+        {
+            let inferable =
+                TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)));
+            let budget = SolutionBudget::default();
+            let limits = BoundedSolutionLimits {
+                remaining_paths: budget.paths,
+                remaining_visits: budget.visits,
+            };
+            if let ControlFlow::Continue(true) = self.node.is_never_satisfied_with_limits(
+                db,
+                env,
+                &mut storage,
+                inferable,
+                self.source_order,
+                limits,
+            ) {
+                return Self::never(builder);
+            }
+        }
         let (node, derived_source_order) =
             self.node
                 .exists(db, env, &mut storage, to_remove, self.source_order);

@@ -309,3 +309,50 @@ def alternation[X: (int, str), Y: (int, str)]() -> None:
     missing_str = int_only.exists(tuple[X]).for_all(tuple[Y])
     static_assert(not missing_str)
 ```
+
+## Unsatisfiable bodies with free variables
+
+No type can be both a supertype of `int` and a subtype of `tuple[A, B]`, regardless of how `A` and
+`B` are specialized. Quantifying `X` therefore produces a constraint set that never holds.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def impossible[X, A, B]() -> None:
+    body = ConstraintSet.lower_bound(int, X) & ConstraintSet.upper_bound(X, tuple[A, B])
+    reveal_type(body.exists(tuple[X]))  # revealed: ConstraintSet[Literal[False]]
+```
+
+## Satisfiability depends on free variables
+
+There is an `X` satisfying `A <= X <= int` when `A` is `int`, but not when `A` is `str`. Quantifying
+`X` preserves that distinction.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def possible[X, A]() -> None:
+    body = ConstraintSet.lower_bound(A, X) & ConstraintSet.upper_bound(X, int)
+    quantified = body.exists(tuple[X])
+    valid = quantified & ConstraintSet.equality(A, int)
+    invalid = quantified & ConstraintSet.equality(A, str)
+    reveal_type(valid.solutions(inferable=tuple[A]))  # revealed: tuple[Solution[A=int]]
+    reveal_type(invalid.solutions(inferable=tuple[A]))  # revealed: None
+```
+
+## Negated inner quantification with free variables
+
+An inner existential can hold for some choices of a free variable and fail for others. Its negation
+must preserve the choices for which it fails when an enclosing existential is evaluated.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def nested[X, Y, A]() -> None:
+    inner = (ConstraintSet.equality(X, int) & ConstraintSet.equality(X, A)).exists(tuple[X])
+    outer = (~inner & ConstraintSet.equality(Y, str)).exists(tuple[Y])
+    valid = outer & ConstraintSet.equality(A, str)
+    invalid = outer & ConstraintSet.equality(A, int)
+    reveal_type(valid.solutions(inferable=tuple[A]))  # revealed: tuple[Solution[A=str]]
+    reveal_type(invalid.solutions(inferable=tuple[A]))  # revealed: None
+```
