@@ -552,9 +552,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     }
 
     /// Visits one of the outgoing edges from a BDD node.
-    ///
-    /// (This is a helper method used by [`visit_node_and_then`][Self::visit_node_and_then]. You
-    /// will probably not need to call this directly.)
     #[expect(clippy::too_many_arguments)]
     fn visit_atomic_edge<B>(
         &mut self,
