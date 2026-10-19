@@ -964,6 +964,17 @@ def recursive_lambda():
     return lambda: recursive_lambda()  # no diagnostic
 ```
 
+### Recursive lambda return type
+
+The returned callable's recursive return type is approximated with `Divergent`:
+
+```py
+def recursive_lambda():
+    return lambda: recursive_lambda()
+
+reveal_type(recursive_lambda())  # revealed: () -> Divergent
+```
+
 ### Mutual recursion
 
 Functions that mutually depend on each others' return values can also be analyzed:
