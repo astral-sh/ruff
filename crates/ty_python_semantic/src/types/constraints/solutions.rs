@@ -16,7 +16,6 @@ use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
     ConstraintFailureEvidence, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
-    UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -161,9 +160,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     .then_some((*assignment, *source_constraint))
             })
     }
-}
 
-impl<'db> SolutionWalker<'db, UnboundedSolutionLimits> {
     pub(super) fn is_never_satisfied(
         &mut self,
         db: &'db dyn Db,
@@ -172,17 +169,11 @@ impl<'db> SolutionWalker<'db, UnboundedSolutionLimits> {
         path: &mut PathAssignments,
         polarity: Polarity,
         node: NodeId,
-    ) -> bool {
-        // TODO: We might eventually need a version of this that works with bounded limits, but
-        // then we'll need a more complex return type to represent "unknown because of limit
-        // exhaustion".
-        let ControlFlow::Continue(satisfiable) =
-            self.node_is_satisfiable_on_path(db, env, storage, path, polarity, node, None);
-        !satisfiable
+    ) -> ControlFlow<L::Break, bool> {
+        self.node_is_satisfiable_on_path(db, env, storage, path, polarity, node, None)
+            .map_continue(|satisfiable| !satisfiable)
     }
-}
 
-impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
     /// any satisfiable path we discover from the node.
     #[expect(clippy::too_many_arguments)]

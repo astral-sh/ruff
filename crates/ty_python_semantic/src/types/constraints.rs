@@ -538,6 +538,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .is_never_satisfied(db, env, &mut storage, inferable, self.source_order)
     }
 
+    /// Like [`Self::is_never_satisfied`], but returns `None` if the default solution budget is
+    /// exhausted before the result is known.
+    pub(super) fn is_never_satisfied_bounded(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Option<bool> {
+        let budget = SolutionBudget::default();
+        let limits = BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        };
+        let mut storage = self.builder.storage.borrow_mut();
+        self.node
+            .is_never_satisfied_with_limits(
+                db,
+                env,
+                &mut storage,
+                inferable,
+                self.source_order,
+                limits,
+            )
+            .continue_value()
+    }
+
     /// Returns whether no specialization satisfying the type variables' upper bounds and
     /// constraints can satisfy this constraint set.
     ///
@@ -592,6 +618,32 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
             .is_always_satisfied(db, env, &mut storage, inferable, self.source_order)
+    }
+
+    /// Like [`Self::is_always_satisfied`], but returns `None` if the default solution budget is
+    /// exhausted before the result is known.
+    pub(super) fn is_always_satisfied_bounded(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Option<bool> {
+        let budget = SolutionBudget::default();
+        let limits = BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        };
+        let mut storage = self.builder.storage.borrow_mut();
+        self.node
+            .is_always_satisfied_with_limits(
+                db,
+                env,
+                &mut storage,
+                inferable,
+                self.source_order,
+                limits,
+            )
+            .continue_value()
     }
 
     /// Returns whether this constraint set is the `always` terminal.
@@ -2414,19 +2466,33 @@ impl NodeId {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
+        let ControlFlow::Continue(result) = self.is_always_satisfied_with_limits(
+            db,
+            env,
+            storage,
+            inferable,
+            source_order,
+            UnboundedSolutionLimits,
+        );
+        result
+    }
+
+    fn is_always_satisfied_with_limits<'db, L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
+        limits: L,
+    ) -> ControlFlow<L::Break, bool> {
         match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
+            Node::AlwaysTrue => ControlFlow::Continue(true),
+            Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
                 let source_orders = storage.calculate_source_orders(source_order);
-                let mut walker = SolutionWalker::new(
-                    db,
-                    storage,
-                    source_orders,
-                    inferable,
-                    UnboundedSolutionLimits,
-                    self,
-                );
+                let mut walker =
+                    SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
@@ -2442,20 +2508,43 @@ impl NodeId {
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
+        let ControlFlow::Continue(result) = self.is_never_satisfied_with_limits(
+            db,
+            env,
+            storage,
+            inferable,
+            source_order,
+            UnboundedSolutionLimits,
+        );
+        result
+    }
+
+    /// Budget exhaustion leaves satisfiability unknown and must not be cached as a result.
+    fn is_never_satisfied_with_limits<'db, L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
+        source_order: Option<SourceOrderId>,
+        mut limits: L,
+    ) -> ControlFlow<L::Break, bool> {
         /// Checks whether this BDD is a single conjunction, where either (a) every constraint is
         /// positive lower-bound-only, or (b) every constraint is a positive upper-bound-only. If
         /// so, `object` or `Never` respectively is a valid solution regardless of the contents of
         /// the constraints.
-        fn simple_conjunction_is_satisfiable(
+        fn simple_conjunction_is_satisfiable<L: SolutionLimits>(
             storage: &mut ConstraintSetStorage<'_>,
             mut node: NodeId,
-        ) -> bool {
+            limits: &mut L,
+        ) -> ControlFlow<L::Break, bool> {
             let mut found_lower = false;
             let mut found_upper = false;
             loop {
+                limits.visit_node()?;
                 match node.node() {
-                    Node::AlwaysTrue => return true,
-                    Node::AlwaysFalse => return false,
+                    Node::AlwaysTrue => return ControlFlow::Continue(true),
+                    Node::AlwaysFalse => return ControlFlow::Continue(false),
 
                     Node::Interior(_) => {
                         let interior = storage.interior_node_data(node);
@@ -2464,20 +2553,20 @@ impl NodeId {
                             || interior.if_uncertain != ALWAYS_FALSE
                         {
                             // Not a single conjunction
-                            return false;
+                            return ControlFlow::Continue(false);
                         }
 
                         let constraint = storage.constraint_data(interior.constraint);
                         #[expect(irrefutable_let_patterns)]
                         let Constraint::Atomic(constraint) = constraint else {
-                            return false;
+                            return ControlFlow::Continue(false);
                         };
                         found_lower |= constraint.provides_lower();
                         found_upper |= constraint.provides_upper();
                         if found_lower && found_upper {
                             // Might be a single conjunction, but doesn't contain _only_
                             // lower-bound-only or upper-bound-only constraints
-                            return false;
+                            return ControlFlow::Continue(false);
                         }
 
                         node = interior.if_true;
@@ -2487,31 +2576,32 @@ impl NodeId {
         }
 
         match self.node() {
-            Node::AlwaysTrue => false,
-            Node::AlwaysFalse => true,
+            Node::AlwaysTrue => ControlFlow::Continue(false),
+            Node::AlwaysFalse => ControlFlow::Continue(true),
             Node::Interior(interior) => {
                 let key = (self, inferable);
                 if let Some(result) = storage.never_satisfied_cache.get(&key) {
-                    return *result;
+                    return ControlFlow::Continue(*result);
                 }
 
-                let result = if simple_conjunction_is_satisfiable(storage, self) {
+                let result = if simple_conjunction_is_satisfiable(storage, self, &mut limits)? {
                     false
                 } else {
                     let source_orders = storage.calculate_source_orders(source_order);
-                    let mut walker = SolutionWalker::new(
-                        db,
-                        storage,
-                        source_orders,
-                        inferable,
-                        UnboundedSolutionLimits,
-                        self,
-                    );
+                    let mut walker =
+                        SolutionWalker::new(db, storage, source_orders, inferable, limits, self);
                     let mut path = interior.path_assignments(db, env, storage, source_order);
-                    walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
+                    walker.is_never_satisfied(
+                        db,
+                        env,
+                        storage,
+                        &mut path,
+                        Polarity::Positive,
+                        self,
+                    )?
                 };
                 storage.never_satisfied_cache.insert(key, result);
-                result
+                ControlFlow::Continue(result)
             }
         }
     }
