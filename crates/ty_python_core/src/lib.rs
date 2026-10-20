@@ -309,9 +309,6 @@ pub struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
-    /// Map from a lambda expression to its containing statement.
-    enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
-
     // Map from a constraining use of a collection initializer to its definition.
     collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
 
@@ -570,10 +567,6 @@ impl<'db> SemanticIndex<'db> {
             .node()
             .as_class()
             .map(|node_ref| self.expect_single_definition(node_ref))
-    }
-
-    pub fn enclosing_lambda_statement(&self, lambda: ExpressionNodeKey) -> Option<Statement<'db>> {
-        self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
     /// If this is a potentially constraining use of an unannotated collection initializer, returns

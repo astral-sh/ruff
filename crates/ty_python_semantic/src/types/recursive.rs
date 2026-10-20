@@ -436,6 +436,7 @@ impl<'db> RecursiveType<'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(_)
+            | TypeMapping::NormalizeLambdaSignatures
             | TypeMapping::ReplaceSelf { .. } => {
                 // These mappings substitute free variables, which are captured by the alias's
                 // arguments. Its formal body must remain independent of the calling context.

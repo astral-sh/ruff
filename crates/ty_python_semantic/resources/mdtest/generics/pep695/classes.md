@@ -3319,5 +3319,32 @@ class Explicit(String, Integer):
         return ""
 ```
 
+## Lambda defaults in generic base metadata
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the subclass's type parameters:
+
+```py
+from typing import Annotated, cast
+
+class Base[T]: ...
+class Derived[T](Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
+## Recursive partials that capture a lambda
+
+A recursive partial can capture a new lambda on each call. Inference converges even as the captured
+value's type gains another callable layer:
+
+```py
+from functools import partial
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback = partial(lambda: Box(lambda: value).callback)
+
+def check(box: Box[int]):
+    box.callback()()()  # no diagnostic
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
