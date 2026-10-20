@@ -587,12 +587,7 @@ impl<'db> Type<'db> {
 
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
     /// before constructing the relation checker.
-    /// These cases remain satisfied after substituting type variables on both sides.
-    pub(super) fn is_trivially_constraint_set_assignable_to(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-    ) -> bool {
+    fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.materialized_divergent_fallback().is_none() && self == target {
             return true;
         }

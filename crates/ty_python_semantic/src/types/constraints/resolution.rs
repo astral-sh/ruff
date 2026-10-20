@@ -7,10 +7,7 @@ use std::cell::{OnceCell, RefCell};
 use equations::EquationGraph;
 use rustc_hash::FxHashMap;
 
-use super::{
-    CandidateSolution, ConstraintFailureEvidence, Solution, SolutionValidity, SolutionViolation,
-    SolutionViolationKind, TypeVarSolution, is_possibly_constraint_set_assignable,
-};
+use super::{Solution, TypeVarSolution};
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
@@ -20,7 +17,7 @@ use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use crate::types::{
     BoundTypeVarInstance, CallableType, KnownInstanceType, RecursiveType, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints,
+    TypeContext, TypeMapping,
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
@@ -300,155 +297,28 @@ impl<'db> Solution<'db> {
     pub(super) fn resolve(
         &mut self,
         db: &'db dyn Db,
-        dependencies: &mut Dependencies<'_, 'db>,
+        env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
     ) {
-        let resolved = Resolver::resolve(db, dependencies, inferable, &self.solved_typevars);
+        let mut dependencies = Dependencies::new(env);
+        let resolved = Resolver::resolve(db, &mut dependencies, inferable, &self.solved_typevars);
         for (binding, resolved) in self.solved_typevars.iter_mut().zip(resolved) {
             binding.solution = resolved;
         }
-    }
-
-    /// Checks one path after substituting all of its closed bindings simultaneously. Missing
-    /// dependencies remain unresolved; a rejected declaration retains its diagnostic evidence.
-    pub(super) fn validate_resolution(
-        &mut self,
-        db: &'db dyn Db,
-        dependencies: &mut Dependencies<'_, 'db>,
-        inferable: TypeVarSet<'db>,
-        candidate: &CandidateSolution<'db>,
-        selected: &[Type<'db>],
-    ) -> bool {
-        let env = dependencies.env;
-        // Invalid candidates retain the evidence needed to explain their declaration failure.
-        if !self.is_valid() {
-            return true;
-        }
-        let substitution = OnceCell::new();
-        // Each selected type can be compared against several bounds under the same substitution.
-        let mut substituted = FxHashMap::default();
-        let mut substitute = |ty: Type<'db>| {
-            *substituted.entry(ty).or_insert_with(|| {
-                let (context, types) = substitution.get_or_init(|| {
-                    let (variables, types): (Vec<_>, Vec<_>) = self
-                        .solved_typevars
-                        .iter()
-                        .filter_map(|binding| match binding.solution {
-                            SolutionType::Resolved(ty) => Some((binding.bound_typevar, ty)),
-                            SolutionType::Unresolved(_) => None,
-                        })
-                        .unzip();
-                    (
-                        GenericContext::from_typevar_instances(db, env, variables),
-                        types,
-                    )
-                });
-                let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
-                    generic_context: *context,
-                    types,
-                    skip: None,
-                });
-                let mapped = ty.apply_type_mapping(db, env, &mapping, TypeContext::default());
-                dependencies
-                    .is_closed(db, inferable, [mapped])
-                    .then_some(mapped)
-            })
-        };
-        let mut satisfies = |source: Type<'db>, target: Type<'db>| {
-            // These relations remain satisfied under simultaneous substitution, so they need
-            // neither a substitution nor another proof after resolving the selected bindings.
-            if source.is_trivially_constraint_set_assignable_to(db, target) {
-                return true;
-            }
-            let (Some(mapped_source), Some(mapped_target)) =
-                (substitute(source), substitute(target))
-            else {
-                return true;
-            };
-            // Selection owns the original range, including policies such as literal promotion.
-            // Recheck relations affected by substitution, without selecting a different witness.
-            (mapped_source == source && mapped_target == target)
-                || is_possibly_constraint_set_assignable(
-                    db,
-                    TypePair::new(db, env.program(db), mapped_source, mapped_target),
-                )
-        };
-        let mut violations = Vec::new();
-        for bounds in &candidate.typevars {
-            let Some((index, binding)) =
-                self.solved_typevars
-                    .iter()
-                    .enumerate()
-                    .find(|(_, binding)| {
-                        binding
-                            .bound_typevar
-                            .is_same_typevar_as(db, bounds.bound_typevar)
-                    })
-            else {
-                continue;
-            };
-            let SolutionType::Resolved(ty) = binding.solution else {
-                continue;
-            };
-            let variable = binding.bound_typevar;
-            let original = selected[index];
-            let violation = match variable.require_bound_or_constraints(db, env) {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    (!satisfies(original, bound.top_materialization(db, env)))
-                        .then_some(SolutionViolationKind::UpperBound(Some(ty)))
-                }
-                TypeVarBoundOrConstraints::Constraints(choices) => {
-                    (!choices.elements(db).iter().any(|choice| {
-                        satisfies(choice.bottom_materialization(db, env), original)
-                            && satisfies(original, choice.top_materialization(db, env))
-                    }))
-                    .then_some(SolutionViolationKind::Constraints {
-                        constraints: choices,
-                        evidence: ConstraintFailureEvidence::Lower(ty),
-                    })
-                }
-            };
-            if let Some(kind) = violation {
-                violations.push(SolutionViolation {
-                    bound_typevar: variable,
-                    variance: bounds.variance(),
-                    kind,
-                });
-                continue;
-            }
-            if !bounds
-                .evidence_lower
-                .into_iter()
-                .chain(bounds.mixed_lower)
-                // `Never` marks absent validity evidence, including for parameter signatures.
-                .chain((!bounds.validity_lower.is_never()).then_some(bounds.validity_lower))
-                .all(|lower| satisfies(lower, original))
-                || !bounds
-                    .upper
-                    .iter_clauses()
-                    .all(|upper| satisfies(original, upper))
-            {
-                return false;
-            }
-        }
-        if !violations.is_empty() {
-            self.validity = SolutionValidity::Invalid(violations.into_boxed_slice());
-        }
-        true
     }
 }
 
 struct VisitDependencies;
 
 /// Shares complete type-variable dependency sets within one solution alternative.
-pub(super) struct Dependencies<'a, 'db> {
+struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     types: FxHashMap<Type<'db>, Box<[BoundTypeVarInstance<'db>]>>,
 }
 
 impl<'a, 'db> Dependencies<'a, 'db> {
     /// Starts dependency analysis for one solution alternative.
-    pub(super) fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+    fn new(env: &'a ProgramEnvironment<'db>) -> Self {
         Self {
             env,
             types: FxHashMap::default(),
