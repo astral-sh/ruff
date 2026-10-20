@@ -385,7 +385,8 @@ impl<'a> QualifiedName<'a> {
     /// Qualifies `expr`, using `self` as the qualified name of its root.
     ///
     /// For example, qualifying `la.norm` with `numpy.linalg` produces
-    /// `numpy.linalg.norm`. A plain name produces a copy of `self`.
+    /// `numpy.linalg.norm`. Qualifying a name expression such as `la` returns
+    /// `numpy.linalg`, a copy of `self`, without adding any segments.
     ///
     /// Returns `None` if this name is empty or `expr` is not a name or an
     /// attribute chain rooted at a name.
