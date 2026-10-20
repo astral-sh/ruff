@@ -1414,9 +1414,11 @@ fn resolve_stub_package_in_search_path<'db>(
 /// Orders candidates for the same module name by precedence and removes shadowed namespace packages.
 ///
 /// Regular packages and file modules shadow namespace packages, including legacy namespaces.
-/// When `for_module_name_prefix` is true, partial namespaces with higher precedence than every
-/// competing regular package or file module remain available to supply descendants. Candidates
-/// within the same precedence tier retain their search-path order.
+/// While resolving descendants, stub packages retain ordinary namespace candidates as fallbacks,
+/// and partial namespace stubs remain available alongside ordinary concrete candidates. Within
+/// each precedence tier, concrete candidates still shadow namespace packages. At the final
+/// component, any concrete candidate shadows namespaces. Candidates within the same precedence
+/// tier retain their search-path order.
 fn normalize_candidates<'db>(
     context: &ResolverContext,
     mut candidates: ResolvedNames<'db>,
@@ -1427,11 +1429,17 @@ fn normalize_candidates<'db>(
         return candidates;
     }
 
-    let best_concrete_precedence = candidates
+    let mut has_concrete_stub_package = false;
+    let mut has_concrete_search_path_candidate = false;
+    for candidate in candidates
         .iter()
         .filter(|candidate| !candidate.is_any_namespace_package(context))
-        .map(|candidate| candidate.precedence)
-        .min();
+    {
+        match candidate.precedence {
+            CandidatePrecedence::StubPackage => has_concrete_stub_package = true,
+            CandidatePrecedence::SearchPathOrder => has_concrete_search_path_candidate = true,
+        }
+    }
 
     candidates.sort_by_key(|candidate| candidate.precedence);
 
@@ -1445,15 +1453,17 @@ fn normalize_candidates<'db>(
             return true;
         }
 
-        // A higher-precedence partial namespace remains available while resolving its descendants.
-        // At the final component, a concrete package or module shadows it.
-        let preserved_for_descendants = best_concrete_precedence.is_none_or(|precedence| {
-            for_module_name_prefix
-                && candidate.py_typed == PyTyped::Partial
-                && candidate.precedence < precedence
-        });
+        let shadowed = match (for_module_name_prefix, candidate.precedence) {
+            (true, CandidatePrecedence::StubPackage) => {
+                has_concrete_stub_package
+                    || (has_concrete_search_path_candidate
+                        && candidate.py_typed != PyTyped::Partial)
+            }
+            (true, CandidatePrecedence::SearchPathOrder) => has_concrete_search_path_candidate,
+            (false, _) => has_concrete_stub_package || has_concrete_search_path_candidate,
+        };
 
-        if preserved_for_descendants {
+        if !shadowed {
             return true;
         }
 
