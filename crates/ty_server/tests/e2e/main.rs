@@ -1531,6 +1531,21 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn with_signature_documentation_format(
+        mut self,
+        formats: Option<Vec<lsp_types::MarkupKind>>,
+    ) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .signature_help
+            .get_or_insert_default()
+            .signature_information
+            .get_or_insert_default()
+            .documentation_format = formats;
+        self
+    }
+
     /// Set the hover content format preference for the client
     pub(crate) fn with_hover_content_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
         self.client_capabilities
