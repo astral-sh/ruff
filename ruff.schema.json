@@ -5532,6 +5532,7 @@
         "unnecessary-placeholder",
         "unnecessary-range-start",
         "unnecessary-regular-expression",
+        "unnecessary-regular-expression-compile",
         "unnecessary-return-none",
         "unnecessary-round",
         "unnecessary-spread",
