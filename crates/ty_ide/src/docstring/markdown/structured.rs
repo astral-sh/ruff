@@ -19,22 +19,27 @@ mod rst;
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
-pub(super) fn render_into(output: &mut String, source: &str) {
+pub(super) fn render_into(output: &mut String, source: &str, allowed_html_tags: &[String]) {
     let mut sections = rst::structured_sections(source);
     sections.extend(google::structured_sections(source));
     sections.extend(numpy::structured_sections(source));
-    render_sections_into(output, source, sections);
+    render_sections_into(output, source, sections, allowed_html_tags);
 }
 
 /// Renders a docstring from non-overlapping structured sections and general source fragments.
-fn render_sections_into(output: &mut String, source: &str, sections: Vec<Section>) {
+fn render_sections_into(
+    output: &mut String,
+    source: &str,
+    sections: Vec<Section>,
+    allowed_html_tags: &[String],
+) {
     if sections.is_empty() {
-        general::render_into(output, source);
+        general::render_into(output, source, allowed_html_tags);
         return;
     }
 
     let Some(segments) = segments(source, sections) else {
-        general::render_into(output, source);
+        general::render_into(output, source, allowed_html_tags);
         return;
     };
 
@@ -57,7 +62,7 @@ fn render_sections_into(output: &mut String, source: &str, sections: Vec<Section
                 if follows_section && !raw.is_empty() && !output.is_empty() {
                     ensure_blank_line(output);
                 }
-                general::render_into(output, raw);
+                general::render_into(output, raw, allowed_html_tags);
             }
             Segment::Structured(section) => {
                 if section.is_empty() {
@@ -66,7 +71,7 @@ fn render_sections_into(output: &mut String, source: &str, sections: Vec<Section
                 if !output.is_empty() {
                     ensure_blank_line(output);
                 }
-                section.render_markdown(output);
+                section.render_markdown(output, allowed_html_tags);
             }
         }
     }
@@ -180,7 +185,7 @@ impl Section {
     }
 
     /// Renders the section as Markdown into the given buffer.
-    fn render_markdown(&self, output: &mut String) {
+    fn render_markdown(&self, output: &mut String, allowed_html_tags: &[String]) {
         let mut rendered_section = false;
         for kind in SectionKind::iter() {
             let heading = match kind {
@@ -192,6 +197,7 @@ impl Section {
                 heading,
                 self.items.iter().filter(move |item| item.kind == kind),
                 rendered_section,
+                allowed_html_tags,
             ) {
                 rendered_section = true;
             }
@@ -249,7 +255,7 @@ impl SectionItem {
         self.display_name.is_none() && self.ty.is_none() && self.description_source.is_empty()
     }
 
-    fn render(&self, output: &mut String) {
+    fn render(&self, output: &mut String, allowed_html_tags: &[String]) {
         let mut has_label = false;
 
         if let Some(name) = self.display_name.as_deref() {
@@ -273,7 +279,11 @@ impl SectionItem {
 
         if !self.description_source.is_empty() {
             let mut description = String::new();
-            general::render_fragment_into(&mut description, &self.description_source);
+            general::render_fragment_into(
+                &mut description,
+                &self.description_source,
+                allowed_html_tags,
+            );
             let block_start = description_block_start(&description);
 
             match block_start {
@@ -312,6 +322,7 @@ fn render_markdown_section<'a>(
     heading: &str,
     fields: impl Iterator<Item = &'a SectionItem>,
     rendered_previous_section: bool,
+    allowed_html_tags: &[String],
 ) -> bool {
     let mut rendered_field = false;
 
@@ -328,7 +339,7 @@ fn render_markdown_section<'a>(
             output.push_str("\n\n");
         }
 
-        field.render(output);
+        field.render(output, allowed_html_tags);
         rendered_field = true;
     }
 
@@ -1050,7 +1061,7 @@ Rendered as code:
 
     fn render_markdown(section: &Section) -> String {
         let mut output = String::new();
-        section.render_markdown(&mut output);
+        section.render_markdown(&mut output, &[]);
         output
     }
 
@@ -1093,7 +1104,7 @@ Rendered as code:
 
     fn render_sections(raw: &str, sections: Vec<Section>) -> String {
         let mut output = String::new();
-        render_sections_into(&mut output, raw, sections);
+        render_sections_into(&mut output, raw, sections, &[]);
         output
     }
 

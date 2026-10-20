@@ -23,8 +23,13 @@ const FENCE: &str = "```````````";
 ///
 /// See [`render_fragment_into`] for fragments whose indentation should remain
 /// available to the Markdown parser.
-pub(super) fn render_into(output: &mut String, docstring: &str) {
-    render_with_indentation_mode(output, docstring, LeadingIndentation::DisplayOnly);
+pub(super) fn render_into(output: &mut String, docstring: &str, allowed_html_tags: &[String]) {
+    render_with_indentation_mode(
+        output,
+        docstring,
+        LeadingIndentation::DisplayOnly,
+        allowed_html_tags,
+    );
 }
 
 /// Renders a normalized, extracted docstring fragment as Markdown.
@@ -33,8 +38,17 @@ pub(super) fn render_into(output: &mut String, docstring: &str) {
 /// allowing Markdown to interpret fragment-relative block structure such as
 /// nested lists and indented code blocks. [`render_into`] instead preserves
 /// indentation for display only.
-pub(super) fn render_fragment_into(output: &mut String, fragment: &str) {
-    render_with_indentation_mode(output, fragment, LeadingIndentation::MarkdownSyntax);
+pub(super) fn render_fragment_into(
+    output: &mut String,
+    fragment: &str,
+    allowed_html_tags: &[String],
+) {
+    render_with_indentation_mode(
+        output,
+        fragment,
+        LeadingIndentation::MarkdownSyntax,
+        allowed_html_tags,
+    );
 }
 
 /// Renders normalized docstring source with the selected treatment of leading indentation.
@@ -76,6 +90,7 @@ fn render_with_indentation_mode(
     output: &mut String,
     source: &str,
     leading_indentation: LeadingIndentation,
+    allowed_html_tags: &[String],
 ) {
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
@@ -83,7 +98,7 @@ fn render_with_indentation_mode(
     // and (possibly in a higher up piece of logic) try to resolve the names for
     // cross-linking. (Similar to `TypeDetails` in the type formatting code.)
     let mut first_line = true;
-    let mut renderer = Renderer::new(output);
+    let mut renderer = Renderer::new(output, allowed_html_tags);
     let mut temp_owned_line;
     for line in source.lines() {
         // We can assume leading whitespace has been normalized
@@ -275,19 +290,19 @@ enum LeadingIndentation {
 }
 
 /// Renders docstring lines while preserving state across block and line boundaries.
-struct Renderer<'source, 'output> {
+struct Renderer<'source, 'render> {
     line_prefix: LinePrefix,
     block_state: BlockState<'source>,
-    inline: inline::Renderer,
-    output: &'output mut String,
+    inline: inline::Renderer<'render>,
+    output: &'render mut String,
 }
 
-impl<'source, 'output> Renderer<'source, 'output> {
-    fn new(output: &'output mut String) -> Self {
+impl<'source, 'render> Renderer<'source, 'render> {
+    fn new(output: &'render mut String, allowed_html_tags: &'render [String]) -> Self {
         Self {
             line_prefix: LinePrefix::default(),
             block_state: BlockState::default(),
-            inline: inline::Renderer::default(),
+            inline: inline::Renderer::new(allowed_html_tags),
             output,
         }
     }
