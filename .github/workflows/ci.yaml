@@ -431,6 +431,7 @@ jobs:
           version: "0.13.1"
           checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
           enable-cache: "true"
+          cache-python: true
       - name: ty mdtests (GitHub annotations)
         if: ${{ needs.determine_changes.outputs.ty == 'true' }}
         env:
@@ -514,6 +515,7 @@ jobs:
           version: "0.13.1"
           checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
           enable-cache: "true"
+          cache-python: true
       - name: "Run tests"
         run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
       - name: "Run doctests"
@@ -554,6 +556,7 @@ jobs:
           version: "0.13.1"
           checksum: "3b2661a463a5baea7f5076ea2b25ab71d77f36a6c0d809e5350651792f80a672"
           enable-cache: "true"
+          cache-python: true
       - name: "Install uv (macOS)"
         if: runner.os == 'macOS'
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -562,6 +565,7 @@ jobs:
           version: "0.13.1"
           checksum: "cfe454573412ff7380d15fc7dae5997ab53ffce72fce0a78e91ddbc84001acd2"
           enable-cache: "true"
+          cache-python: true
       - name: "Run tests"
         run: |
           uv run --locked --only-dev cargo nextest run --all-features --profile ci
