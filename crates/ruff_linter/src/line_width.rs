@@ -217,7 +217,14 @@ impl LineWidthBuilder {
     /// Adds the given text to the line width.
     #[must_use]
     pub(crate) fn add_str(self, text: &str) -> Self {
-        self.update(text.chars())
+        // Printable ASCII contributes one to both width and column. The first other byte
+        // is a UTF-8 boundary, so only the suffix needs character decoding.
+        let Some(prefix_len) = text.bytes().position(|byte| !matches!(byte, b' '..=b'~')) else {
+            return self.add_width(text.len());
+        };
+
+        self.add_width(prefix_len)
+            .update(text[prefix_len..].chars())
     }
 
     /// Adds the given character to the line width.
@@ -230,7 +237,7 @@ impl LineWidthBuilder {
     /// Also adds the given width to the column.
     /// It is generally better to use [`LineWidthBuilder::add_str`] or [`LineWidthBuilder::add_char`].
     /// The width and column should be the same for the corresponding text.
-    /// Currently, this is only used to add spaces.
+    /// This can be used for spaces or other printable ASCII text.
     #[must_use]
     pub(crate) fn add_width(mut self, width: usize) -> Self {
         self.width += width;
@@ -311,5 +318,44 @@ impl From<NonZeroU8> for IndentWidth {
 impl From<IndentWidth> for NonZeroU8 {
     fn from(value: IndentWidth) -> Self {
         value.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use test_case::test_case;
+
+    use super::LineWidthBuilder;
+
+    #[test_case("", (0, 0); "empty")]
+    #[test_case("hello ~", (7, 7); "printable_ascii")]
+    #[test_case("éab", (3, 3); "unicode_at_start")]
+    #[test_case("aéb", (3, 3); "unicode_in_middle")]
+    #[test_case("abé", (3, 3); "unicode_at_end")]
+    #[test_case("ab界", (4, 3); "wide_character")]
+    #[test_case("ab🦀", (4, 3); "emoji")]
+    #[test_case("ab\u{301}", (2, 3); "combining_character")]
+    #[test_case("\tab", (6, 6); "leading_tab")]
+    #[test_case("ab\tc", (5, 5); "interior_tab")]
+    #[test_case("ab\t", (4, 4); "trailing_tab")]
+    #[test_case("ab\nc", (1, 1); "line_feed")]
+    #[test_case("ab\rc", (1, 1); "carriage_return")]
+    #[test_case("ab\r\nc", (1, 1); "crlf")]
+    #[test_case("ab\0c", (3, 4); "nul")]
+    #[test_case("ab\x1fc", (3, 4); "control_before_printable_ascii")]
+    #[test_case("ab\x7fc", (3, 4); "delete")]
+    fn add_str(text: &str, expected: (usize, usize)) {
+        let measured = LineWidthBuilder::default().add_str(text);
+        assert_eq!((measured.width, measured.column), expected);
+    }
+
+    #[test_case("界", (5, 4); "wide_character")]
+    #[test_case("a\u{301}", (3, 4); "combining_character")]
+    fn add_str_after_unicode(prefix: &str, expected: (usize, usize)) {
+        let measured = LineWidthBuilder::default()
+            .add_str(prefix)
+            .add_str("a")
+            .add_str("\t");
+        assert_eq!((measured.width, measured.column), expected);
     }
 }
