@@ -2,7 +2,18 @@
  * Non-rendering component that loads the Monaco editor themes.
  */
 
-import { Monaco } from "@monaco-editor/react";
+import { loader, type Monaco } from "@monaco-editor/react";
+import { dependencies } from "../package.json";
+
+// The loader's default CDN URL pins its own Monaco version, so updating the
+// `monaco-editor` dependency would not update the version loaded by the
+// playgrounds. Set `paths.vs` before initialization to use the version pinned
+// in shared/package.json.
+loader.config({
+  paths: {
+    vs: `https://cdn.jsdelivr.net/npm/monaco-editor@${dependencies["monaco-editor"]}/min/vs`,
+  },
+});
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
