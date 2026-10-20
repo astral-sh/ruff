@@ -159,10 +159,20 @@ impl<'a> SectionContexts<'a> {
         // until a non-blank line dedents to the outermost indentation.
         // See: https://github.com/astral-sh/ruff/issues/23562
         let mut directive_indent = None;
+        let mut in_doctest = false;
 
         while let Some(line) = lines.next() {
             let indent = leading_space(&line);
             let indent_size = indent.text_len();
+
+            if in_doctest {
+                if line.trim().is_empty() {
+                    in_doctest = false;
+                } else {
+                    previous_line = Some(line);
+                    continue;
+                }
+            }
 
             if let Some(active_indent) = directive_indent
                 && (line.trim().is_empty() || indent_size > active_indent)
@@ -175,6 +185,12 @@ impl<'a> SectionContexts<'a> {
 
             if line.trim_start().starts_with(".. ") {
                 directive_indent = Some(indent_size);
+                previous_line = Some(line);
+                continue;
+            }
+
+            if line.trim_start().starts_with(">>> ") {
+                in_doctest = true;
                 previous_line = Some(line);
                 continue;
             }

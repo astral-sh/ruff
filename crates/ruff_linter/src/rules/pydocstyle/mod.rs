@@ -229,6 +229,58 @@ mod tests {
     }
 
     #[test]
+    fn issue_29512() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/issue_29512.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(Convention::Numpy),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::IncorrectSectionOrder,
+                    Rule::NoBlankLineBeforeSection,
+                    Rule::MissingSectionUnderlineAfterName,
+                    Rule::MissingNewLineAfterSectionName,
+                ])
+            },
+        )?;
+        assert_diagnostics!(diagnostics, @"");
+        Ok(())
+    }
+
+    #[test]
+    fn issue_29512_invalid_prompt() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/issue_29512_invalid_prompt.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(Convention::Numpy),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::MissingDashedUnderlineAfterSection)
+            },
+        )?;
+        assert_diagnostics!(diagnostics, @r#"
+        D407 [*] Missing dashed underline after section ("Returns")
+         --> issue_29512_invalid_prompt.py:8:5
+          |
+        7 |     >>>not_a_prompt.
+        8 |     Returns
+          |     ^^^^^^^
+        9 |     value
+          |
+        help: Add dashed line under "Returns"
+           |
+        8  |     Returns
+        9  +     -------
+        10 |     value
+           |
+        "#);
+        Ok(())
+    }
+
+    #[test]
     fn d209_d400() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
