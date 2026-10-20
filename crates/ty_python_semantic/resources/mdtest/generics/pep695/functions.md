@@ -1641,6 +1641,27 @@ def _(
     reveal_type(result(Both()))  # revealed: A | B
 ```
 
+The same behavior applies when a generic callback protocol describes the returned callable:
+
+```py
+from typing import Protocol
+
+class Stateful[I, O](Protocol):
+    def __call__(self, value: I, /) -> O: ...
+
+def _(
+    factory: Intersection[
+        Callable[[object], Stateful[A, A]],
+        Callable[[object], Stateful[B, B]],
+    ],
+) -> None:
+    result = invoke(factory, object())
+    reveal_type(result)  # revealed: Stateful[A, A] | Stateful[B, B]
+    result(A())  # error: [invalid-argument-type]
+    result(B())  # error: [invalid-argument-type]
+    reveal_type(result(Both()))  # revealed: A | B
+```
+
 Separate input and output type variables do not make a stateful callable safe to specialize
 independently for each call. The closure below can return a value produced by an earlier call, so
 its return type includes both `A` and `B` even when its latest argument is a `B`. The callback
