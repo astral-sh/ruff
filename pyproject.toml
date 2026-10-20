@@ -230,6 +230,9 @@ astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 certifi = "2026-10-20T02:24:17Z"
+# Allow uv 0.13.4 before the seven-day wait: it removes trust in the eMudhra
+# root that signed the compromised intermediate certificates.
+uv = "2026-10-20T15:12:07Z"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }

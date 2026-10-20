@@ -54,8 +54,8 @@ jobs:
           enable-cache: true
           save-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.1"
-          checksum: "eadd9d27c134ab5ac1ffd4473b97a741407f3ea238288f03121fc4deddf90220"
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
 
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
