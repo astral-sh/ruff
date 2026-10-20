@@ -354,7 +354,7 @@ Not a return value.
 
     fn render_numpy(source: &str) -> String {
         let mut output = String::new();
-        render_sections_into(&mut output, source, parsed_sections(source));
+        render_sections_into(&mut output, source, parsed_sections(source), &[]);
         output
     }
 

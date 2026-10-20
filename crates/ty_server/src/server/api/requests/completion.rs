@@ -122,12 +122,12 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     {
                         (
                             lsp_types::MarkupKind::Markdown,
-                            docstring.render(MarkupKind::Markdown),
+                            docstring.render(MarkupKind::Markdown, &[]),
                         )
                     } else {
                         (
                             lsp_types::MarkupKind::PlainText,
-                            docstring.render(MarkupKind::PlainText),
+                            docstring.render(MarkupKind::PlainText, &[]),
                         )
                     };
 
