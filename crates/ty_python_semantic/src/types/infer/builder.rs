@@ -9023,12 +9023,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        // A cycle's incomplete contextual type can grow on each iteration. Including it in
-        // the lambda's inputs would create a new identity each time, as in
-        // `callback = partial(lambda: callback)`. Infer without that context until it resolves.
-        let tcx = tcx.with_annotation(tcx.annotation.filter(|annotation| {
-            !any_over_type_including_alias_arguments(db, env, *annotation, |ty| ty.is_divergent())
-        }));
         let ast::ExprLambda {
             range: _,
             node_index: _,
@@ -9055,6 +9049,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             None
         };
+
+        // A lazy callable can hide an incomplete return type until its signature is resolved.
+        // In `callback = identity(lambda: callback)`, using that return type as an inference
+        // input would give the lambda a new identity on each cycle iteration.
+        let callable_tcx = callable_tcx.filter(|signature| {
+            signature
+                .parameters()
+                .into_iter()
+                .map(Parameter::annotated_type)
+                .chain([signature.return_ty])
+                .all(|ty| {
+                    !any_over_type_including_alias_arguments(db, env, ty, |ty| ty.is_divergent())
+                })
+        });
 
         // Extract the annotated parameter types.
         //
