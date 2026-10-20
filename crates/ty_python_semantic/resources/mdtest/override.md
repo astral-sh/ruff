@@ -968,6 +968,15 @@ class WrappedMethodWithOverrideBranch(BaseProperty):
         def method(self) -> int:
             return 3
 
+class ConditionalMethods(BaseProperty):
+    if coinflip():
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 2
+
+    else:
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 3
+
 class WrappedInvalidExplicitOverrideWithUndecoratedBranch:
     if coinflip():
         @wrap(BaseProperty.method)
@@ -1031,6 +1040,54 @@ class StubAbstractInterface(ABC):
 
 class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
+```
+
+## Missing `@override` decorator on property accessors
+
+We report missing decorators on all property accessors together, even though the accessors share a
+name.
+
+```toml
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    attr: int
+
+class Child(Parent):
+    @property
+    def attr(self) -> int:  # error: [missing-override-decorator]
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # error: [missing-override-decorator]
+        pass
+```
+
+Decorating or suppressing one accessor does not hide diagnostics on the others.
+
+```py
+class PartiallyDecorated(Parent):
+    @property
+    @override
+    def attr(self) -> int:  # no diagnostic
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # ty: ignore[missing-override-decorator]
+        pass
 ```
 
 ## Missing `@override` decorator on Python 3.11
