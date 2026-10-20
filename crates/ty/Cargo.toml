@@ -14,6 +14,10 @@ license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[package.metadata.cargo-shear]
+# Used only to enable parser stack growth.
+ignored = ["ruff_python_parser"]
+
 [lib]
 doctest = false
 
@@ -22,6 +26,7 @@ ruff_command_line = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_diagnostics = { workspace = true }
 ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true, features = ["stacker"] }
 ruff_ranged_value = { workspace = true }
 ty_combine = { workspace = true }
 ty_project = { workspace = true, features = ["zstd", "junit"] }
