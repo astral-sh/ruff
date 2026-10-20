@@ -2748,6 +2748,29 @@ def invoke(callback: Callback):
     callback(1)  # error: [invalid-argument-type]
 ```
 
+### Copying dictionaries with recursive callable values
+
+Copying a dictionary preserves its recursive callable value type, including callables with gradual
+parameter lists.
+
+```py
+from typing import Callable
+
+Callback = Callable[..., "Callback"]
+
+def copy_callbacks(value: dict[str, Callback]):
+    copied: dict[str, Callback] = dict(value)  # no diagnostic
+```
+
+This also applies when the callable is one alternative of a recursive union.
+
+```py
+Value = float | None | Callable[..., "Value"]
+
+def copy_values(value: dict[str, Value]):
+    copied: dict[str, Value] = dict(value)  # no diagnostic
+```
+
 ### Recursion through generic alias arguments
 
 ```toml
