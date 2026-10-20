@@ -22,7 +22,7 @@ astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-hyperfine = "2026-10-08T08:11:00Z"
 certifi = "2026-10-20T02:24:17Z"
-uv = "2026-10-20T15:12:07Z"
+uv = false
 
 [manifest]
 build-constraints = [
