@@ -210,8 +210,10 @@ impl<'src> Lexer<'src> {
             if c.is_ascii() {
                 self.consume_ascii_character(c)
             } else if is_unicode_identifier_start(c) {
+                let identifier = self.lex_unicode_identifier();
                 self.state = State::Other;
-                self.lex_unicode_identifier()
+
+                identifier
             } else {
                 self.push_error(LexicalError::new(
                     LexicalErrorType::UnrecognizedToken { tok: c },
@@ -646,7 +648,7 @@ impl<'src> Lexer<'src> {
         self.cursor.skip_bytes(ascii_len);
 
         match bytes.get(ascii_len) {
-            Some(quote) if ascii_len <= 1 && matches!(quote, b'\'' | b'"') => {
+            Some(quote @ (b'\'' | b'"')) if ascii_len <= 1 => {
                 let is_string_prefix = if ascii_len == 0 {
                     if let Some(prefix) = single_char_prefix(first) {
                         self.current_flags |= prefix;
@@ -668,10 +670,9 @@ impl<'src> Lexer<'src> {
                     return self.lex_string(quote);
                 }
             }
-            Some(byte) if !byte.is_ascii() => {
-                if self.cursor.eat_if(is_xid_continue).is_some() {
-                    return self.lex_unicode_identifier();
-                }
+            Some(byte) if !byte.is_ascii() && self.cursor.eat_if(is_xid_continue).is_some() => {
+                // The ASCII prefix is already consumed; continue after the non-ASCII character.
+                return self.lex_unicode_identifier();
             }
             _ => {}
         }
@@ -679,8 +680,10 @@ impl<'src> Lexer<'src> {
         KEYWORD_TABLE.lookup(first, bytes, ascii_len + 1)
     }
 
-    /// Finishes an identifier after consuming a non-ASCII identifier character.
+    /// Continues from the cursor after the identifier's first non-ASCII character.
     fn lex_unicode_identifier(&mut self) -> TokenKind {
+        // The remaining text can start with ASCII in both `α_suffix` and
+        // `prefix_α_suffix`. Scan that run in batches before decoding more characters.
         let ascii_len = ascii_identifier_prefix_len(self.cursor.rest().as_bytes());
         self.cursor.skip_bytes(ascii_len);
         self.cursor.eat_while(is_identifier_continuation);
