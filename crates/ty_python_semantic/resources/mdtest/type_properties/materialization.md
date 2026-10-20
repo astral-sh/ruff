@@ -349,6 +349,84 @@ def takes_objects(*args: object, **kwargs: object) -> object:
 static_assert(not is_subtype_of(TopCallable, RegularCallableTypeOf[takes_objects]))
 ```
 
+## Bottom callable assignability
+
+The bottom callable accepts every argument list and returns `Never`, so it can satisfy any callable
+signature, including one with required keyword-only parameters. Returning `Never` alone is not
+sufficient, nor is accepting every argument list with an incompatible return type.
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom
+
+class Required(Protocol):
+    def __call__(self, value: int, /, *, enabled: bool) -> str: ...
+
+def never_returns(*values: object, **options: object) -> Never:
+    raise NotImplementedError
+
+def check(
+    bottom: Bottom[Callable[..., Any]],
+    restricted: Callable[[int], Never],
+    returns_none: Bottom[Callable[..., None]],
+) -> None:
+    positional: Callable[[str, bytes], int] = bottom  # no diagnostic
+    keyword_only: Required = bottom  # no diagnostic
+    declared: Required = never_returns  # no diagnostic
+
+    wrong_parameters: Callable[[str], int] = restricted  # error: [invalid-assignment]
+    wrong_return: Callable[[int], str] = returns_none  # error: [invalid-assignment]
+```
+
+Receiver restrictions still apply when a bound method accepts every argument list and returns
+`Never`.
+
+```py
+class Restricted:
+    def method(self: "Allowed", *values: object, **options: object) -> Never:
+        raise NotImplementedError
+
+class Allowed(Restricted): ...
+
+def check_receiver(restricted: Restricted, allowed: Allowed) -> None:
+    valid: Callable[[int], str] = allowed.method  # no diagnostic
+    invalid: Callable[[int], str] = restricted.method  # error: [invalid-assignment]
+```
+
+## Top callable assignability
+
+Every callable is assignable to the top callable, which permits no calls and has return type
+`object`. A narrower return type or a parameter list that permits calls still imposes requirements.
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import Top
+
+class Required(Protocol):
+    def __call__(self, *, enabled: bool) -> bytes: ...
+
+def check(positional: Callable[[int], str], keyword_only: Required) -> None:
+    first: Top[Callable[..., object]] = positional  # no diagnostic
+    second: Top[Callable[..., object]] = keyword_only  # no diagnostic
+    wrong_return: Top[Callable[..., int]] = positional  # error: [invalid-assignment]
+    wrong_parameters: Top[Callable[[str], object]] = positional  # error: [invalid-assignment]
+```
+
+A receiver restriction does not prevent assignment to the top callable, since it permits no calls.
+The restriction still applies when assigning to a callable that permits calls.
+
+```py
+class Restricted:
+    def method(self: "Allowed") -> str:
+        return ""
+
+class Allowed(Restricted): ...
+
+def check_receiver(restricted: Restricted) -> None:
+    valid: Top[Callable[..., object]] = restricted.method  # no diagnostic
+    invalid: Callable[[], str] = restricted.method  # error: [invalid-assignment]
+```
+
 ## `ParamSpec` specializations
 
 For a class invariant in a `ParamSpec`, every fixed specialization lies between the bottom and top
