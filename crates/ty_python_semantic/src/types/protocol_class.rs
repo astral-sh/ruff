@@ -31,7 +31,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        member::class_member,
+        member::{class_member, inherited_class_body_declaration},
         signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
@@ -145,18 +145,17 @@ impl<'db> ProtocolClass<'db> {
         env: &ProgramEnvironment<'db>,
         mut visit: impl FnMut(&Name, ProtocolMemberCandidate<'db>, Option<Specialization<'db>>),
     ) {
-        for (parent_scope, specialization) in self
+        for (parent, specialization) in self
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .filter_map(|class| {
                 let (class_literal, specialization) = class.static_class_literal(db)?;
                 let protocol_class = class_literal.into_protocol_class(db)?;
-                Some((
-                    protocol_class.static_class_literal(db)?.0.body_scope(db),
-                    specialization,
-                ))
+                Some((protocol_class.static_class_literal(db)?.0, specialization))
             })
         {
+            let parent_scope = parent.body_scope(db);
+            let class_binding_context = BindingContext::Definition(parent.definition(db));
             let use_def_map = use_def_map(db, parent_scope);
             let place_table = place_table(db, parent_scope);
             let mut direct_members = FxHashMap::default();
@@ -169,12 +168,19 @@ impl<'db> ProtocolClass<'db> {
                 // Defaults retain inherited annotations, just as they do for ordinary classes.
                 let member = class_member(db, parent_scope, name).inner;
                 if let Place::Defined(place) = member.place {
+                    // Function declarations below replace the class context with their own scope.
+                    let self_binding_context = place.ty.contains_self(db, env).then(|| {
+                        let class = inherited_class_body_declaration(db, parent_scope, symbol_id)
+                            .map_or(parent, |inherited| inherited.class);
+                        BindingContext::Definition(class.definition(db))
+                    });
                     direct_members.insert(
                         symbol_id,
                         ProtocolMemberCandidate {
                             ty: place.ty,
                             qualifiers: member.qualifiers,
                             definition: place.provenance.definition(),
+                            self_binding_context,
                             bound_on_class: BoundOnClass::Yes,
                         },
                     );
@@ -191,16 +197,27 @@ impl<'db> ProtocolClass<'db> {
                 let first_declaration = place_result.first_declaration;
                 let place = place_result.ignore_conflicting_declarations();
                 if let Some(ty) = place.place.ignore_possibly_undefined() {
+                    let self_binding_context = ty.contains_self(db, env).then(|| {
+                        if let Some(definition) = first_declaration
+                            && definition.kind(db).is_function_def()
+                        {
+                            BindingContext::Definition(definition)
+                        } else {
+                            class_binding_context
+                        }
+                    });
                     direct_members
                         .entry(symbol_id)
                         .and_modify(|candidate| {
                             candidate.ty = ty;
                             candidate.qualifiers = place.qualifiers;
+                            candidate.self_binding_context = self_binding_context;
                         })
                         .or_insert(ProtocolMemberCandidate {
                             ty,
                             qualifiers: place.qualifiers,
                             definition: first_declaration,
+                            self_binding_context,
                             bound_on_class: BoundOnClass::No,
                         });
                 }
@@ -1734,18 +1751,14 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn attribute(
-        ty: Type<'db>,
-        qualifiers: TypeQualifiers,
-        definition: Option<Definition<'db>>,
-    ) -> Self {
+    fn attribute(candidate: ProtocolMemberCandidate<'db>) -> Self {
         Self {
             kind: ProtocolMemberKind::Attribute(ProtocolAnnotation {
-                ty,
-                self_binding_context: definition.map(BindingContext::Definition),
+                ty: candidate.ty,
+                self_binding_context: candidate.self_binding_context,
             }),
-            qualifiers,
-            definition,
+            qualifiers: candidate.qualifiers,
+            definition: candidate.definition,
         }
     }
 
@@ -3317,6 +3330,8 @@ struct ProtocolMemberCandidate<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
+    // A default's value provenance can differ from the declaration that scopes `Self`.
+    self_binding_context: Option<BindingContext<'db>>,
     bound_on_class: BoundOnClass,
 }
 
@@ -3481,9 +3496,9 @@ fn cached_protocol_interface<'db>(
         let candidate = candidate.apply_specialization(db, specialization);
         let ProtocolMemberCandidate {
             ty,
-            qualifiers,
             definition,
             bound_on_class,
+            ..
         } = candidate;
 
         let member = match ty {
@@ -3515,10 +3530,10 @@ fn cached_protocol_interface<'db>(
                 {
                     descriptor
                 } else {
-                    ProtocolMemberData::attribute(ty, qualifiers, definition)
+                    ProtocolMemberData::attribute(candidate)
                 }
             }
-            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+            _ => ProtocolMemberData::attribute(candidate),
         };
 
         members.insert(name.clone(), member);

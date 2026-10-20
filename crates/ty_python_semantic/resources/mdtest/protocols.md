@@ -3094,8 +3094,6 @@ class WritableSelfAttr:
 class RecursiveWritableSelfAttr(Protocol):
     x: Self
 
-# TODO: Add an equivalent property protocol and an `is_equivalent_to` assertion once `Self` types
-# are supported in protocol member comparisons.
 class HasWritableSelfAttr(Protocol):
     @property
     def x(self) -> WritableSelfAttr: ...
@@ -3164,6 +3162,82 @@ static_assert(is_subtype_of(PropertyWithSelfSetter, HasConcretePropertySetter))
 static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter))
 ```
 
+## `Self` in protocol attributes
+
+Attribute and property annotations bind `Self` to the implementation type. An inherited attribute
+keeps that meaning when a subclass supplies an unannotated default:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Attribute(Protocol):
+    value: Self | None
+
+class WithDefault(Attribute, Protocol):
+    value = None
+
+class Property(Protocol):
+    @property
+    def value(self) -> Self | None: ...
+    @value.setter
+    def value(self, value: Self | None) -> None: ...
+
+static_assert(is_equivalent_to(Attribute, Property))
+static_assert(is_equivalent_to(WithDefault, Property))
+```
+
+## `Self` in conditional protocol members
+
+`Self` still binds to the implementation type when an attribute has multiple definitions. The
+identical branches below give the inherited attribute multiple default assignments without changing
+its type:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Attribute(Protocol):
+    value: Self | None
+
+class Property(Protocol):
+    @property
+    def value(self) -> Self | None: ...
+    @value.setter
+    def value(self, value: Self | None) -> None: ...
+
+def condition() -> bool:
+    return True
+
+class WithDefault(Attribute, Protocol):
+    if condition():
+        value = None
+    else:
+        value = None
+
+static_assert(is_equivalent_to(WithDefault, Property))
+```
+
+The inherited annotation can also have multiple definitions. Both branches declare the same type, so
+`Self` binding still has the same result:
+
+```py
+class ConditionalAttribute(Protocol):
+    if condition():
+        value: Self | None
+    else:
+        value: Self | None
+
+class InheritedConditionalAttribute(ConditionalAttribute, Protocol):
+    value = None
+
+static_assert(is_equivalent_to(InheritedConditionalAttribute, Property))
+```
+
 ## Writable `__class__` members
 
 A writable `__class__: type[object]` excludes proper subclasses of `object`: their inherited setter
@@ -3220,6 +3294,36 @@ class NeverClass(Protocol):
 
 static_assert(is_equivalent_to(SelfClass, object))
 static_assert(is_equivalent_to(NeverClass, object))
+```
+
+An attribute annotation expresses the same `Self` requirement, including when inherited:
+
+```py
+class SelfClassAttribute(Protocol):
+    __class__: type[Self]
+
+class InheritedSelfClassAttribute(SelfClassAttribute, Protocol): ...
+
+static_assert(is_equivalent_to(SelfClassAttribute, object))
+static_assert(is_equivalent_to(InheritedSelfClassAttribute, object))
+```
+
+## `Self` in universal protocol methods
+
+Returning a subtype of `object` does not guarantee returning `Self` for every receiver. Although
+`object.__eq__` returns `bool`, it does not satisfy a universal requirement to return `Self`:
+
+```py
+from typing import Protocol
+from typing_extensions import Self
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class ReturnsSelf(Protocol):
+    # error: [invalid-method-override]
+    def __eq__(self, other: object) -> Self: ...
+
+static_assert(not is_equivalent_to(ReturnsSelf, object))
 ```
 
 ## Enum members and writable protocol members
