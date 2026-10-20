@@ -220,9 +220,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_returns(&mut self, function: &'ast ast::StmtFunctionDef) {
         /// Visit returns in this body without entering nested scopes or inferring unrelated
         /// statements. Name lookup and reachability query the dependencies of each return.
-        struct Returns<'builder, 'db, 'ast>(&'builder mut TypeInferenceBuilder<'db, 'ast>);
+        struct ReturnStmtVisitor<'builder, 'db, 'ast>(
+            &'builder mut TypeInferenceBuilder<'db, 'ast>,
+        );
 
-        impl<'ast> StatementVisitor<'ast> for Returns<'_, '_, 'ast> {
+        impl<'ast> StatementVisitor<'ast> for ReturnStmtVisitor<'_, '_, 'ast> {
             fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
                 match statement {
                     ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
@@ -240,7 +242,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        Returns(self).visit_body(&function.body);
+        ReturnStmtVisitor(self).visit_body(&function.body);
     }
 
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
