@@ -9479,6 +9479,7 @@ impl<'db> Type<'db> {
                         .ancestor_scopes(definition.file_scope(db))
                         .any(|(id, _)| id == scope.file_scope_id(db))
             };
+
             let class = match self {
                 Type::ClassLiteral(class) => Some(class),
                 Type::GenericAlias(alias) => Some(alias.origin(db).into()),
@@ -9493,15 +9494,16 @@ impl<'db> Type<'db> {
                 .and_then(|class| class.definition(db))
                 .is_some_and(is_local)
             {
-                // Each invocation creates a distinct nominal class. Its source definition
-                // cannot represent one shared class identity outside this function.
+                // See doc comment for `TypeMapping::GeneralizeLocalTypes`: we might want to
+                // create a synthetic protocol that represents the local class, instead of
+                // returning `Unknown`.
                 return Type::unknown();
             }
+
             if let Type::FunctionLiteral(function) = self
                 && is_local(function.definition(db))
             {
-                // Preserve the signature, but not the identity of a function object that is
-                // recreated on each call. Its signature can itself contain local types.
+                // Preserve the signature, but not the identity of a function object.
                 return visitor.visit(db, self, type_mapping, || {
                     Type::Callable(CallableType::new(
                         db,
@@ -11238,23 +11240,27 @@ pub enum TypeMapping<'a, 'db> {
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 
-    /// Removes identities created within a function from its inferred return type.
-    /// Local nominal classes become `Unknown`, and local functions become callables.
+    /// This type mapping is used in return type inference. It "promotes" certain types to supertypes
+    /// or to dynamic types in order to prevent nested definitions from leaking into the inferred
+    /// return type.
     ///
-    /// For example:
+    /// For example, consider this unannotated decorator:
     /// ```python
-    /// def returns_callable():
-    ///     def inner() -> int:
-    ///         return 1
+    ///  def register(event: str):
+    ///      def wrapper(func):
+    ///          # ...
+    ///          return func
     ///
-    ///     return inner
-    ///
-    /// callable1 = returns_callable()
-    /// callable2 = returns_callable()
+    ///      return wrapper
     /// ```
-    /// Each call creates a different `inner` function object. Generalizing its type to
-    /// `Callable[[], int]` preserves the signature without incorrectly inferring that
-    /// `callable1 is callable2` is always true.
+    ///
+    /// We do not want to infer `def wrapper(func) -> Unknown` as the return type of `register`. This would
+    /// not just expose internal details, it would also incorrectly suggest that each call to `register`
+    /// returns the same function object. Instead, we generalize to an anonymous `(func) -> Unknown` callable.
+    ///
+    /// For nested classes, we cannot easily do the same, so we return `Unknown` instead. In the future, to
+    /// improve this, we might want to synthesize a protocol that has the same attributes and methods as the
+    /// nested class.
     GeneralizeLocalTypes(ScopeId<'db>),
 }
 
