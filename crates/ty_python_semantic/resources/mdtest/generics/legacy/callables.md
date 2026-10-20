@@ -1569,6 +1569,22 @@ reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
 
+## Recursive lambdas passed to generic functions
+
+Inference terminates when a lambda returns the result of the generic call that contains it:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+callback = identity(lambda: callback)
+callback()  # no diagnostic
+```
+
 ## Recursive lambdas with an incompatible return
 
 Each recursive call described by this alias changes its type argument. A lambda that can return a
