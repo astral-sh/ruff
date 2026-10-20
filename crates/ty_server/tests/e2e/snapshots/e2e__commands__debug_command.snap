@@ -6,6 +6,7 @@ Client capabilities: ResolvedClientCapabilities {
     flags: ClientCapabilityFlags(
         WORKSPACE_CONFIGURATION,
     ),
+    allowed_html_tags: [],
 }
 Position encoding: UTF16
 Global settings: GlobalSettings {
