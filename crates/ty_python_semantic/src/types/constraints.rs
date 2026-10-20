@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use crate::types::structural::StructuralTypeMapper;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -105,6 +106,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::resolution::SolutionType;
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
@@ -290,6 +292,41 @@ impl Default for OwnedConstraintSet<'_> {
 }
 
 impl<'db> OwnedConstraintSet<'db> {
+    /// Rewrite bound syntax without testing or simplifying the represented constraints.
+    pub(super) fn map_structure(
+        &self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
+        let Some(inner) = &self.inner else {
+            return self.clone();
+        };
+        let constraints: Box<[_]> = inner
+            .constraints
+            .iter()
+            .map(|constraint| constraint.map_structure(db, mapper))
+            .collect();
+        if constraints == inner.constraints {
+            return self.clone();
+        }
+        Self {
+            node: self.node,
+            source_order: self.source_order,
+            inner: Some(Arc::new(OwnedConstraintSetInner {
+                constraints,
+                constraint_supports: inner.constraint_supports.clone(),
+                constraint_indices: inner.constraint_indices.clone(),
+                typevars: inner.typevars.clone(),
+                nodes: inner.nodes.clone(),
+                node_supports: inner.node_supports.clone(),
+                node_indices: inner.node_indices.clone(),
+                supports: inner.supports.clone(),
+                support_indices: inner.support_indices.clone(),
+                source_orders: inner.source_orders.clone(),
+            })),
+        }
+    }
+
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,
@@ -3774,8 +3811,9 @@ impl<'db> CandidateSolutions<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
+        self.solve_with(db, env, inferable, |_variance, path_bound| {
             CandidateSolutions::default_solve(db, env, builder, path_bound)
         })
     }
@@ -3786,15 +3824,22 @@ impl<'db> CandidateSolutions<'db> {
     /// the path's available bindings, but marks the resulting path family as incomplete.
     pub(crate) fn solve_with(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
-        let Ok(solutions) = self.try_solve_with(choose, |_| Ok::<(), Infallible>(()));
+        let Ok(solutions) =
+            self.try_solve_with(db, env, inferable, choose, |_| Ok::<(), Infallible>(()));
         solutions
     }
 
     /// Checks each retained solution before collecting it or solving the next path.
     fn try_solve_with<E>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
@@ -3815,7 +3860,8 @@ impl<'db> CandidateSolutions<'db> {
         let mut valid_exceeded_budget = false;
         let mut invalid_exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+            let Some((solution, path_exceeded_budget)) =
+                Self::solve_path_with(db, env, inferable, path, &mut choose)
             else {
                 continue;
             };
@@ -3844,6 +3890,9 @@ impl<'db> CandidateSolutions<'db> {
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
     /// A later unsatisfiable bound rejects the path even if an earlier bound exhausted its budget.
     fn solve_path_with(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
         candidate: &CandidateSolution<'db>,
         choose: &mut impl FnMut(
             TypeVarVariance,
@@ -3865,14 +3914,15 @@ impl<'db> CandidateSolutions<'db> {
             if let Some(ty) = ty {
                 solved_typevars.push(TypeVarSolution {
                     bound_typevar: path_bound.bound_typevar,
-                    solution: ty,
+                    solution: SolutionType::Resolved(ty),
                 });
             }
         }
-        let solution = Solution {
+        let mut solution = Solution {
             solved_typevars,
             validity: candidate.validity.clone(),
         };
+        solution.resolve(db, env, inferable);
         Some((solution, exceeded_budget))
     }
 
@@ -4507,7 +4557,7 @@ impl<'db> Solution<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct TypeVarSolution<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) solution: Type<'db>,
+    pub(crate) solution: SolutionType<'db>,
 }
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
@@ -5342,7 +5392,7 @@ mod tests {
                 typevars: Box::new([path_bound]),
                 validity: SolutionValidity::Valid,
             }]))
-            .solve(db, &env, &builder,),
+            .solve(db, &env, &builder, TypeVarSet::None),
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
         );
     }
@@ -5456,7 +5506,7 @@ class E: ...
         let str = known_instance(db, KnownClass::Str);
         let binding = |bound_typevar, solution| TypeVarSolution {
             bound_typevar,
-            solution,
+            solution: SolutionType::Resolved(solution),
         };
 
         for lower in [None, Some(Type::any())] {
@@ -5509,8 +5559,12 @@ class E: ...
                     expected_paths.reverse();
                 }
                 assert_eq!(
-                    CandidateSolutions::Constrained(paths.into_boxed_slice())
-                        .solve(db, &env, &builder,),
+                    CandidateSolutions::Constrained(paths.into_boxed_slice()).solve(
+                        db,
+                        &env,
+                        &builder,
+                        TypeVarSet::None
+                    ),
                     Solutions::Constrained(SolutionPaths::BudgetExceeded(expected_paths))
                 );
             }
@@ -5851,10 +5905,10 @@ class E: ...
                                     db,
                                     &env,
                                     *existing,
-                                    binding.solution,
+                                    binding.solution.ty(),
                                 );
                             })
-                            .or_insert(binding.solution);
+                            .or_insert(binding.solution.ty());
                     }
                 }
             }
@@ -5883,7 +5937,7 @@ class E: ...
                                 format!(
                                     "{}={}",
                                     binding.bound_typevar.identity(db).display(db),
-                                    binding.solution.display(db, &env)
+                                    binding.solution.ty().display(db, &env)
                                 )
                             })
                             .join(", ")
@@ -6712,11 +6766,11 @@ class E: ...
         let expected = Ok(Solutions::Constrained(SolutionPaths::Complete(vec![
             solution([TypeVarSolution {
                 bound_typevar: u,
-                solution: known_instance(db, KnownClass::Int),
+                solution: SolutionType::Resolved(known_instance(db, KnownClass::Int)),
             }]),
             solution([TypeVarSolution {
                 bound_typevar: u,
-                solution: known_instance(db, KnownClass::Str),
+                solution: SolutionType::Resolved(known_instance(db, KnownClass::Str)),
             }]),
         ])));
 

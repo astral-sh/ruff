@@ -47,6 +47,38 @@ impl get_size2::GetSize for UnionType<'_> {}
 
 #[salsa::tracked]
 impl<'db> UnionType<'db> {
+    /// Flattens stored unions without comparing their potentially open elements.
+    pub(super) fn from_elements_structural(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = Type<'db>>,
+        mut recursively_defined: RecursivelyDefined,
+    ) -> Type<'db> {
+        let mut pending: Vec<_> = elements.into_iter().collect();
+        pending.reverse();
+        let mut elements = FxOrderSet::default();
+        while let Some(element) = pending.pop() {
+            match element {
+                Type::Union(union) => {
+                    recursively_defined = recursively_defined.or(union.recursively_defined(db));
+                    pending.extend(union.elements(db).iter().rev().copied());
+                }
+                Type::Never => {}
+                ty => {
+                    elements.insert(ty);
+                }
+            }
+        }
+        match elements.len() {
+            0 => Type::Never,
+            1 => elements[0],
+            _ => Type::Union(Self::new(
+                db,
+                elements.into_iter().collect::<Box<[_]>>(),
+                recursively_defined,
+            )),
+        }
+    }
+
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     ///
@@ -283,20 +315,9 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            Type::Union(UnionType::new(
-                db,
-                self.elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                self.recursively_defined(db),
-            ))
-        } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            })
-        }
+        self.map_leave_aliases(db, visitor.env, |element| {
+            element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        })
     }
 
     /// Apply a transformation function to all elements of the union,
@@ -762,7 +783,7 @@ impl<'db> NegativeIntersectionElements<'db> {
     }
 
     /// Shrink the capacity of the collection as much as possible.
-    fn shrink_to_fit(&mut self) {
+    pub(super) fn shrink_to_fit(&mut self) {
         match self {
             Self::Empty | Self::Single(_) => {}
             Self::Multiple(set) => set.shrink_to_fit(),
@@ -820,7 +841,7 @@ impl<'db> NegativeIntersectionElements<'db> {
 
     /// Apply a transformation to all elements in this collection,
     /// and return a new collection of the transformed elements.
-    fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
+    pub(super) fn map(&self, map_fn: impl Fn(&Type<'db>) -> Type<'db>) -> Self {
         match self {
             NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
             NegativeIntersectionElements::Single(ty) => {
@@ -1118,50 +1139,31 @@ impl<'db> IntersectionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            let positive = self
-                .positive(db)
-                .iter()
-                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<FxOrderSet<_>>();
-            let mut negative = NegativeIntersectionElements::default();
-            for element in self.negative(db) {
-                negative.insert(element.apply_type_mapping_impl(
+        let mut builder = IntersectionBuilder::new(db, visitor.env).preserve_positive_aliases(true);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ));
+        }
+        // Regular promotion should remove negative contributions from intersections,
+        // so we don't preserve them here when regular promotion is enabled.
+        if !matches!(
+            type_mapping,
+            TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+        ) {
+            for negative in self.negative(db) {
+                builder.add_negative_in_place(negative.apply_type_mapping_impl(
                     db,
                     &type_mapping.flip(),
                     tcx,
                     visitor,
                 ));
             }
-            Type::Intersection(IntersectionType::new(db, positive, negative))
-        } else {
-            let mut builder =
-                IntersectionBuilder::new(db, visitor.env).preserve_positive_aliases(true);
-            for positive in self.positive(db) {
-                builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ));
-            }
-            // Regular promotion should remove negative contributions from intersections,
-            // so we don't preserve them here when regular promotion is enabled.
-            if !matches!(
-                type_mapping,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-            ) {
-                for negative in self.negative(db) {
-                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                        db,
-                        &type_mapping.flip(),
-                        tcx,
-                        visitor,
-                    ));
-                }
-            }
-            builder.build()
         }
+        builder.build()
     }
 
     /// Map a type transformation over all positive elements of the intersection. Leave the
@@ -1440,7 +1442,7 @@ impl RecursivelyDefined {
         matches!(self, RecursivelyDefined::Yes)
     }
 
-    const fn or(self, other: RecursivelyDefined) -> RecursivelyDefined {
+    pub(super) const fn or(self, other: RecursivelyDefined) -> RecursivelyDefined {
         match (self, other) {
             (RecursivelyDefined::Yes, _) | (_, RecursivelyDefined::Yes) => RecursivelyDefined::Yes,
             _ => RecursivelyDefined::No,

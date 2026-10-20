@@ -56,7 +56,11 @@ const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
 enum NamedItem<'db> {
     Class(ClassLiteral<'db>),
     TypeAlias(TypeAliasType<'db>),
-    Recursive(RecursiveType<'db>),
+    /// A recursive type that is displayed by the name of its alias.
+    Recursive {
+        definition: Definition<'db>,
+        name: &'db str,
+    },
 }
 
 impl<'db> NamedItem<'db> {
@@ -67,9 +71,14 @@ impl<'db> NamedItem<'db> {
                 // Specializations of the same alias share a display name.
                 left.definition(db) == right.definition(db)
             }
-            (NamedItem::Recursive(left), NamedItem::Recursive(right)) => {
-                left.definition(db) == right.definition(db)
-            }
+            (
+                NamedItem::Recursive {
+                    definition: left, ..
+                },
+                NamedItem::Recursive {
+                    definition: right, ..
+                },
+            ) => left == right,
             _ => false,
         }
     }
@@ -78,7 +87,7 @@ impl<'db> NamedItem<'db> {
         match self {
             NamedItem::Class(class) => class.name(db),
             NamedItem::TypeAlias(type_alias) => type_alias.name(db),
-            NamedItem::Recursive(recursive) => recursive.name(db),
+            NamedItem::Recursive { name, .. } => name,
         }
     }
 
@@ -88,9 +97,8 @@ impl<'db> NamedItem<'db> {
             NamedItem::TypeAlias(type_alias) => {
                 type_alias.qualified_name(db).components_excluding_self()
             }
-            NamedItem::Recursive(recursive) => {
-                QualifiedTypeAliasName::new(db, recursive.definition(db), recursive.name(db))
-                    .components_excluding_self()
+            NamedItem::Recursive { definition, name } => {
+                QualifiedTypeAliasName::new(db, definition, name).components_excluding_self()
             }
         }
     }
@@ -154,6 +162,10 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// The entries of recursive solutions whose display is in progress, in the order of their
+    /// `$` names. An occurrence of one is displayed by that name instead of its body again.
+    /// The names cannot collide with Python identifiers.
+    recursive_binders: Rc<[RecursiveType<'db>]>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -689,7 +701,9 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
-            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::Recursive(recursive) if let Some((definition, name)) = recursive.alias(db) => {
+                self.record(db, NamedItem::Recursive { definition, name });
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -711,8 +725,11 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        // Only the alias name and its arguments are displayed, not its unfolded body.
-        if let Some(arguments) = recursive.arguments(db) {
+        if recursive.definition(db).is_none() {
+            // A solution is displayed by its bodies, which can contain ambiguous names.
+            self.visit_type(db, recursive.unfold(db, self.env).into_type());
+        } else if let Some(arguments) = recursive.arguments(db) {
+            // Only the alias name and its arguments are displayed, not its unfolded body.
             walk_specialization_types(db, arguments, self);
         }
     }
@@ -1797,19 +1814,53 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     alias.materialization_kind(db),
                     f,
                 ),
-            Type::Recursive(recursive) => TypeAliasDisplay {
-                db,
-                ty: self.ty,
-                definition: recursive.definition(db),
-                name: recursive.name(db),
-                settings: self.settings.clone(),
+            Type::Recursive(recursive) if let Some((definition, name)) = recursive.alias(db) => {
+                TypeAliasDisplay {
+                    db,
+                    ty: self.ty,
+                    definition,
+                    name,
+                    settings: self.settings.clone(),
+                }
+                .fmt_specialized(
+                    self.env,
+                    recursive.arguments(db),
+                    recursive.materialization_kind(db),
+                    f,
+                )
             }
-            .fmt_specialized(
-                self.env,
-                recursive.arguments(db),
-                recursive.materialization_kind(db),
-                f,
-            ),
+            Type::Recursive(recursive) => {
+                // `μ$0. tuple[$0] | int` binds `$0` to the whole type. An entry that shares its
+                // binder with others lists them once, as in `μ{$0; $1 = list[$0]}. tuple[$1]`,
+                // instead of repeating their bodies at every reference.
+                f.set_invalid_type_annotation();
+                let binders = &self.settings.recursive_binders;
+                if let Some(index) = binders.iter().position(|binder| *binder == recursive) {
+                    return write!(f.with_type(self.ty), "${index}");
+                }
+                let members = recursive.members(db, self.env);
+                let offset = binders.len();
+                let mut settings = self.settings.clone();
+                settings.recursive_binders = binders.iter().chain(&members).copied().collect();
+                let display = |member: RecursiveType<'db>| {
+                    member.unfold(db, self.env).into_type().display_with(
+                        db,
+                        self.env,
+                        settings.clone(),
+                    )
+                };
+                if members.len() == 1 {
+                    write!(f, "μ${offset}. ")?;
+                } else {
+                    write!(f, "μ{{${offset}")?;
+                    for (index, member) in members.iter().enumerate().skip(1) {
+                        write!(f, "; ${} = ", offset + index)?;
+                        display(*member).fmt_detailed(f)?;
+                    }
+                    f.write_str("}. ")?;
+                }
+                display(recursive).fmt_detailed(f)
+            }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
     }
@@ -3733,6 +3784,13 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
             Type::Intersection(intersection) if !intersection.has_one_element(db) => {
                 write_parentheses(f)
             }
+            // The body of a `μ` binder extends as far to the right as possible.
+            Type::Recursive(recursive)
+                if recursive.definition(db).is_none()
+                    && !self.settings.recursive_binders.contains(&recursive) =>
+            {
+                write_parentheses(f)
+            }
             _ => self
                 .ty
                 .display_with(db, self.env, self.settings.clone())
@@ -3960,6 +4018,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                     write!(f, "{}=", binding.bound_typevar.name(db))?;
                     binding
                         .solution
+                        .ty()
                         .display_with(db, self.env, self.settings.clone())
                         .fmt_detailed(f)?;
                 }

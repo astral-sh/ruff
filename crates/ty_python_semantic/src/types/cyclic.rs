@@ -77,7 +77,9 @@ impl<'db> Type<'db> {
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
-            (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
+            (Type::Recursive(a), Type::Recursive(b)) => {
+                a.definition(db).is_some() && a.definition(db) == b.definition(db)
+            }
             _ => false,
         }
     }
@@ -113,7 +115,7 @@ impl<'db> Type<'db> {
                     RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
                     RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
                     RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
-                    RecursiveDefinition::Structural(_) => {
+                    RecursiveDefinition::Structural { .. } => {
                         TypeIdentity::GrowingRecursive(definition)
                     }
                 })
@@ -139,7 +141,10 @@ enum RecursiveDefinition<'db> {
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
-    Structural(RecursiveType<'db>),
+    Structural {
+        recursive: RecursiveType<'db>,
+        definition: Definition<'db>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -250,7 +255,10 @@ impl<'db> RecursiveDefinition<'db> {
             Type::Recursive(recursive) => {
                 let specialization = recursive.arguments(db)?;
                 (
-                    Self::Structural(recursive.constructor(db)),
+                    Self::Structural {
+                        recursive: recursive.constructor(db),
+                        definition: recursive.definition(db)?,
+                    },
                     Some(specialization),
                 )
             }
@@ -287,7 +295,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
             Self::TypeAlias(alias) => alias.definition(db),
-            Self::Structural(recursive) => recursive.definition(db),
+            Self::Structural { definition, .. } => definition,
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
         }
     }
@@ -295,7 +303,7 @@ impl<'db> RecursiveDefinition<'db> {
     fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         match self {
             Self::TypeAlias(alias) => alias.generic_context(db),
-            Self::Structural(recursive) => recursive.parameters(db),
+            Self::Structural { recursive, .. } => recursive.parameters(db),
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.generic_context(db),
         }
     }
@@ -306,7 +314,7 @@ impl<'db> RecursiveDefinition<'db> {
         generic_context: GenericContext<'db>,
     ) -> Specialization<'db> {
         let known_class = match self {
-            Self::TypeAlias(_) | Self::Structural(_) => None,
+            Self::TypeAlias(_) | Self::Structural { .. } => None,
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.known(db),
         };
         generic_context.default_specialization(db, known_class)
@@ -585,7 +593,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
     /// Visits the definition with each formal parameter mapped to itself.
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
-            RecursiveDefinition::Structural(recursive) => {
+            RecursiveDefinition::Structural { recursive, .. } => {
                 self.visit_type(db, recursive.unfold(db, &self.env).into_type());
             }
             RecursiveDefinition::TypeAlias(alias) => {

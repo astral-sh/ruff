@@ -1342,7 +1342,7 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    /// Retain positive aliases when rebuilding mapped intersections.
+    /// Retain positive aliases and recursive types when rebuilding mapped intersections.
     ///
     /// A positive alias can represent a type on its own, while `~A` is represented as an
     /// intersection with `A` as a negative element. Negative aliases that survive simplification
@@ -1543,13 +1543,15 @@ impl<'db> IntersectionBuilder<'db> {
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
-                // across all of those intersections.
-                let element =
-                    if self.preserve_positive_aliases && matches!(original, Type::TypeAlias(_)) {
-                        original
-                    } else {
-                        ty
-                    };
+                // across all of those intersections. Retaining a recursive binder prevents
+                // each substitution from inserting another unfolding into its own body.
+                let element = if self.preserve_positive_aliases
+                    && matches!(original, Type::TypeAlias(_) | Type::Recursive(_))
+                {
+                    original
+                } else {
+                    ty
+                };
                 for inner in &mut self.intersections {
                     inner.add_positive(db, &self.env, element);
                 }

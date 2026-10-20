@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::structural::StructuralTypeMapper;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -333,7 +334,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::ConstraintSetSolution(solution) => {
             for binding in solution.bindings(db) {
-                visitor.visit_type(db, binding.solution);
+                visitor.visit_type(db, binding.solution.ty());
             }
         }
         KnownInstanceType::Field(field) => {
@@ -400,6 +401,64 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Type<'db> {
+        let instance = match self {
+            Self::UnionType(instance) => Self::UnionType(instance.map_structure(db, mapper)),
+            Self::Annotated(ty) => {
+                Self::Annotated(InternedType::new(db, mapper.map_type(db, ty.inner(db))))
+            }
+            Self::Callable(callable) => Self::Callable(callable.map_structure(db, mapper)),
+            Self::MethodWrapper(wrapper) => Self::MethodWrapper(MethodWrapper::new(
+                db,
+                mapper.map_type(db, wrapper.wrapped(db)),
+                wrapper.kind(db),
+            )),
+            Self::Field(field) => Self::Field(FieldInstance::new(
+                db,
+                field.default_type(db).map(|ty| mapper.map_type(db, ty)),
+                field.init(db),
+                field.kw_only(db),
+                field.alias(db),
+                field.converter(db).map(|(input, output)| {
+                    (mapper.map_type(db, input), mapper.map_type(db, output))
+                }),
+                field.strict(db),
+                field.frozen(db),
+            )),
+            Self::FunctoolsPartial(partial) => {
+                Self::FunctoolsPartial(partial.map_structure(db, mapper))
+            }
+            Self::FunctoolsPartialCall(partial) => {
+                Self::FunctoolsPartialCall(partial.map_structure(db, mapper))
+            }
+            Self::TypeGenericAlias(ty) => {
+                Self::TypeGenericAlias(InternedType::new(db, mapper.map_type(db, ty.inner(db))))
+            }
+            Self::LiteralStringAlias(ty) => {
+                Self::LiteralStringAlias(InternedType::new(db, mapper.map_type(db, ty.inner(db))))
+            }
+            Self::TypeVar(_)
+            | Self::Range { .. }
+            | Self::SubscriptedProtocol(_)
+            | Self::SubscriptedGeneric(_)
+            | Self::TypeAliasType(_)
+            | Self::Deprecated(_)
+            | Self::ConstraintSet(_)
+            | Self::ConstraintSetSolution(_)
+            | Self::GenericContext(_)
+            | Self::Specialization(_)
+            | Self::Literal(_)
+            | Self::NamedTupleSpec(_)
+            | Self::NewType(_)
+            | Self::Sentinel(_) => self,
+        };
+        Type::KnownInstance(instance)
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -617,8 +676,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
+                | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
@@ -867,6 +925,16 @@ pub struct UnionTypeInstance<'db> {
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
 impl<'db> UnionTypeInstance<'db> {
+    fn map_structure(self, db: &'db dyn Db, mapper: &impl StructuralTypeMapper<'db>) -> Self {
+        let Ok(union) = self.union_type(db) else {
+            return self;
+        };
+        let values = self
+            ._value_expr_types(db)
+            .map(|types| types.map(|ty| mapper.map_type(db, ty)));
+        Self::new(db, values, Ok(mapper.map_type(db, *union)))
+    }
+
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: [Type<'db>; 2],
@@ -917,13 +985,7 @@ impl<'db> UnionTypeInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
-            let value_expr_types = match *self._value_expr_types(db) {
-                Some([first, second]) if type_mapping.is_structural() => Some([
-                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ]),
-                value_expr_types => value_expr_types,
-            };
+            let value_expr_types = *self._value_expr_types(db);
 
             UnionTypeInstance::new(
                 db,
@@ -1009,6 +1071,14 @@ impl<'db> UnionTypeInstance<'db> {
 }
 
 impl<'db> FunctoolsPartialInstance<'db> {
+    fn map_structure(self, db: &'db dyn Db, mapper: &impl StructuralTypeMapper<'db>) -> Self {
+        Self::new(
+            db,
+            InternedType::new(db, mapper.map_type(db, self.wrapped(db).inner(db))),
+            self.partial(db).map_structure(db, mapper),
+        )
+    }
+
     /// Normalizes both the wrapped callable and the exposed reduced callable recursively.
     fn recursive_type_normalized_impl(
         self,

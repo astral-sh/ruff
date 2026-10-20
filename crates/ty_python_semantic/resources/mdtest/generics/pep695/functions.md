@@ -4194,5 +4194,283 @@ class BoundedSetter(Base):
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
 
+## Inferring recursive callback solutions
+
+Passing the identity function relates the argument and return types of the callback. The inferred
+result is an integer or a tuple containing another such value. In the display, `μ$0. ...` binds `$0`
+to the whole type. Subscripting the tuple recovers that same recursive type, and the result cannot
+be assigned to `str`.
+
+```py
+from typing import Callable
+
+def fixed[T](callback: Callable[[T], tuple[T] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[$0] | int
+if isinstance(root, tuple):
+    reveal_type(root)  # revealed: tuple[μ$0. tuple[$0] | int]
+    reveal_type(root[0])  # revealed: μ$0. tuple[$0] | int
+wrong: str = root  # error: [invalid-assignment]
+```
+
+The body of `μ` extends as far to the right as possible, so the recursive type is parenthesized when
+it is an element of a union.
+
+```py
+def either(flag: bool):
+    reveal_type(root if flag else None)  # revealed: (μ$0. tuple[$0] | int) | None
+```
+
+## Alternative recursive callback solutions
+
+Each overload selects a different element type for a recursive tree. Combining their results
+preserves the element type throughout each tree.
+
+```py
+from typing import Callable, overload
+
+def alternatives[T, E](callback: Callable[[T], tuple[T, E] | None], consumer: Callable[[E], None]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+@overload
+def consume(value: int) -> None: ...
+@overload
+def consume(value: str) -> None: ...
+def consume(value: int | str) -> None: ...
+
+root = alternatives(identity, consume)
+reveal_type(root)  # revealed: (μ$0. tuple[$0, int] | None) | (μ$0. tuple[$0, str] | None)
+
+type IntTree = tuple[IntTree, int] | None
+type StrTree = tuple[StrTree, str] | None
+
+def accept_tree(value: IntTree | StrTree) -> None: ...
+
+accept_tree(root)  # no diagnostic
+```
+
+## Mutually recursive callback solutions
+
+Each callback relates its parameter to a type that mentions the other type variable, so the two are
+solved together. `μ{$0; $1 = …}. body` names the displayed type `$0` and the other type that it
+refers to.
+
+```py
+from typing import Callable
+
+def identity[V](value: V) -> V:
+    return value
+
+def fixed_pair[T, U](first: Callable[[T], tuple[U] | int], second: Callable[[U], list[T]]) -> tuple[T, U]:
+    raise NotImplementedError
+
+# revealed: tuple[μ{$0; $1 = list[$0]}. tuple[$1] | int, μ{$0; $1 = tuple[$0] | int}. list[$1]]
+reveal_type(fixed_pair(identity, identity))
+```
+
+The bound `A ≤ tuple[int, B, C]` and the bound of `B` also imply
+`A ≤ tuple[int, tuple[str, C, D], C]`, and so on for every variable and every depth. All of these
+bounds describe the same solution, which is formed from the bounds that are not unrolled.
+
+```py
+def fixed_cycle[A, B, C, D](
+    first: Callable[[A], tuple[int, B, C]],
+    second: Callable[[B], tuple[str, C, D]],
+    third: Callable[[C], tuple[bytes, D, A]],
+    fourth: Callable[[D], tuple[None, A, B]],
+) -> A:
+    raise NotImplementedError
+
+# revealed: μ{$0; $1 = tuple[str, $2, $3]; $2 = tuple[bytes, $3, $0]; $3 = tuple[None, $0, $1]}. tuple[int, $1, $2]
+reveal_type(fixed_cycle(identity, identity, identity, identity))
+```
+
+## Recursive callback solutions through finite aliases
+
+A tuple introduced by a non-recursive alias can contain the inferred result. Referring to that alias
+through another alias has the same solution.
+
+```py
+from typing import Callable
+
+type Node[V] = tuple[V] | None
+type Wrapped[V] = Node[V]
+
+def identity[T](value: T) -> T:
+    return value
+
+def node[T](callback: Callable[[T], Node[T]]) -> T:
+    raise NotImplementedError
+
+def wrapped[T](callback: Callable[[T], Wrapped[T]]) -> T:
+    raise NotImplementedError
+
+first = node(identity)
+second = wrapped(identity)
+reveal_type(first)  # revealed: μ$0. tuple[$0] | None
+reveal_type(second)  # revealed: μ$0. tuple[$0] | None
+if second is not None:
+    reveal_type(second[0])  # revealed: μ$0. tuple[$0] | None
+
+type Tree = tuple[Tree] | None
+
+def accept_tree(value: Tree) -> None: ...
+
+accept_tree(first)  # no diagnostic
+accept_tree(second)  # no diagnostic
+```
+
+## Mutually recursive callback solutions through explicit aliases
+
+An alias can name each child of a recursive tuple. The display preserves the alias and names each
+recursive type once, so repeated children refer to the same type without repeating its definition.
+
+```py
+from typing import Callable
+
+type Alias[T] = T
+
+def identity[T](value: T) -> T:
+    return value
+
+def fixed[A, B, C](
+    first: Callable[[A], tuple[int, Alias[B], Alias[B]]],
+    second: Callable[[B], tuple[str, Alias[C], Alias[C]]],
+    third: Callable[[C], tuple[bytes, Alias[A], Alias[A]]],
+) -> A:
+    raise NotImplementedError
+
+# revealed: μ{$0; $1 = tuple[str, Alias[$2], Alias[$2]]; $2 = tuple[bytes, Alias[$0], Alias[$0]]}. tuple[int, Alias[$1], Alias[$1]]
+reveal_type(fixed(identity, identity, identity))
+```
+
+## Recursive callback solutions through implicit aliases
+
+The callback's return type contains an implicit recursive alias whose argument refers to the
+inferred result. The outer tuple guards that reference, so the result is a recursive type that
+contains the alias.
+
+```py
+from typing import Callable, TypeAlias, TypeVar
+
+V = TypeVar("V")
+Repeated: TypeAlias = V | tuple["Repeated[V]"]
+
+def fixed[T](callback: Callable[[T], tuple[Repeated[T]] | int]) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+root = fixed(identity)
+reveal_type(root)  # revealed: μ$0. tuple[Repeated[$0]] | int
+if isinstance(root, tuple):
+    reveal_type(root[0])  # revealed: Repeated[μ$0. tuple[Repeated[$0]] | int]
+```
+
+## Specializing inferred recursive values
+
+The inferred recursive attribute retains the class's type parameter. Access through a specialized
+instance substitutes that parameter throughout the recursive type, including after subscripting. The
+two specializations remain independent.
+
+```py
+from typing import Callable, cast
+
+def labelled[T, E](callback: Callable[[T], tuple[T, E] | None], label: E) -> T:
+    raise NotImplementedError
+
+def identity[U](value: U) -> U:
+    return value
+
+class Tree[E]:
+    node = labelled(identity, cast(E, None))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, E@Tree] | None
+
+first = Tree[int]().node
+second = Tree[str]().node
+reveal_type(first)  # revealed: μ$0. tuple[$0, int] | None
+reveal_type(second)  # revealed: μ$0. tuple[$0, str] | None
+if first is not None:
+    reveal_type(first[0])  # revealed: μ$0. tuple[$0, int] | None
+    reveal_type(first[1])  # revealed: int
+wrong: str = first  # error: [invalid-assignment]
+```
+
+A callback stored in the recursive value can refer to the class's type parameter while retaining its
+own generic parameter. Specializing the class changes only the former.
+
+```py
+class CallbackTree[E]:
+    @staticmethod
+    def item[U](value: U) -> tuple[E, U]:
+        raise NotImplementedError
+
+    node = labelled(identity, item)
+
+callback_node = CallbackTree[int]().node
+other_callback_node = CallbackTree[str]().node
+if callback_node is not None:
+    reveal_type(callback_node[1]("x"))  # revealed: tuple[int, Literal["x"]]
+    tail = callback_node[0]
+    if tail is not None:
+        reveal_type(tail[1](1))  # revealed: tuple[int, Literal[1]]
+if other_callback_node is not None:
+    reveal_type(other_callback_node[1](1))  # revealed: tuple[str, Literal[1]]
+```
+
+`ParamSpec` and `TypeVarTuple` arguments also remain available for specialization after the
+recursive value is inferred.
+
+```py
+def callable_labelled[T, **P](callback: Callable[[T], tuple[T, Callable[P, int]] | None], action: Callable[P, int]) -> T:
+    raise NotImplementedError
+
+class CallableTree[**P]:
+    node = callable_labelled(identity, cast(Callable[P, int], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, (**P@CallableTree) -> int] | None
+
+reveal_type(CallableTree[[int, str]]().node)  # revealed: μ$0. tuple[$0, (int, str, /) -> int] | None
+
+def packed[T, *Ts](callback: Callable[[T], tuple[T, *Ts] | None], label: tuple[*Ts]) -> T:
+    raise NotImplementedError
+
+class PackedTree[*Ts]:
+    node = packed(identity, cast(tuple[*Ts], object()))
+    reveal_type(node)  # revealed: μ$0. tuple[$0, *Ts@PackedTree] | None
+
+reveal_type(PackedTree[int, str]().node)  # revealed: μ$0. tuple[$0, int, str] | None
+```
+
+## Collections of bound callbacks with gradual return types
+
+A collection can combine a generic callback with an unannotated return type and a lookup method
+whose return type is known. Selecting and calling a callback preserves both possible return types.
+
+```py
+class Lookup[K, V]:
+    values: dict[K, V]
+
+    def __init__(self, values: dict[K, V]) -> None: ...
+    def __getitem__(self, key: K, /) -> V:
+        raise NotImplementedError
+
+class Handler:
+    def handle[U](self, value: U):
+        raise NotImplementedError
+
+callbacks = Lookup({"handle": Handler().handle, "lookup": Lookup({"key": "value"}).__getitem__})
+callback = callbacks["lookup"]  # no diagnostic
+reveal_type(callback("key"))  # revealed: Unknown | str
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

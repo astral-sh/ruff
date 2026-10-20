@@ -5,6 +5,7 @@ use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::structural::StructuralTypeMapper;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
@@ -31,6 +32,21 @@ pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?
 }
 
 impl<'db> SubclassOfType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Type<'db> {
+        let subclass_of = match self.subclass_of {
+            SubclassOfInner::Class(class) => SubclassOfInner::Class(mapper.map_class(db, class)),
+            SubclassOfInner::Protocol(protocol) => {
+                SubclassOfInner::Protocol(protocol.map_structure(db, mapper))
+            }
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => self.subclass_of,
+        };
+        Type::SubclassOf(Self { subclass_of })
+    }
+
     /// Construct a new [`Type`] instance representing a given class object (or a given dynamic type)
     /// and all possible subclasses of that class object/dynamic type.
     ///

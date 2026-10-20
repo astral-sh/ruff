@@ -82,7 +82,7 @@ impl ProjectionTypeBudget {
         &mut self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        seen_aliases: &mut FxHashSet<Type<'db>>,
+        seen_definitions: &mut FxHashSet<Type<'db>>,
     ) -> Result<(), ProjectionError> {
         self.remaining = self
             .remaining
@@ -91,7 +91,7 @@ impl ProjectionTypeBudget {
         match ty {
             Type::Union(union) => {
                 for element in union.elements(db) {
-                    self.charge_type_inner(db, *element, seen_aliases)?;
+                    self.charge_type_inner(db, *element, seen_definitions)?;
                 }
             }
             Type::Intersection(intersection) => {
@@ -99,11 +99,15 @@ impl ProjectionTypeBudget {
                     .iter_positive(db)
                     .chain(intersection.iter_negative(db))
                 {
-                    self.charge_type_inner(db, element, seen_aliases)?;
+                    self.charge_type_inner(db, element, seen_definitions)?;
                 }
             }
-            Type::TypeAlias(alias) if seen_aliases.insert(ty) => {
-                self.charge_type_inner(db, alias.value_type(db), seen_aliases)?;
+            Type::TypeAlias(alias) if seen_definitions.insert(ty) => {
+                self.charge_type_inner(db, alias.value_type(db), seen_definitions)?;
+            }
+            Type::Recursive(recursive) if seen_definitions.insert(ty) => {
+                let body = recursive.unfold(db, &recursive.environment(db)).into_type();
+                self.charge_type_inner(db, body, seen_definitions)?;
             }
             _ => {}
         }
@@ -154,8 +158,8 @@ impl<'db> ConstraintSet<'db, '_> {
     /// outcome distinguishes missing evidence, invalid paths, and exhausted solution budgets.
     /// The caller is responsible for combining the resulting paths (typically via union).
     /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
-    /// The selector must preserve the typevar's declared bound: path validation does not
-    /// revalidate an arbitrary type selected afterward.
+    /// The selector owns the initial choice, including policies such as literal promotion.
+    /// Dependencies are resolved per path, and relations changed by substitution are rechecked.
     ///
     /// Per-variable budget exhaustion preserves available fallback bindings and marks the path
     /// family as [`SolutionPaths::BudgetExceeded`](super::SolutionPaths::BudgetExceeded).
@@ -171,14 +175,14 @@ impl<'db> ConstraintSet<'db, '_> {
     ) -> Result<Solutions<'db>, ProjectionError> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
+        path_bounds.try_solve_with(db, env, inferable, choose, |solution| {
             for violation in solution.violations() {
                 for evidence in violation.evidence_types() {
                     type_budget.charge_type(db, *evidence)?;
                 }
             }
             for binding in &solution.solved_typevars {
-                type_budget.charge_type(db, binding.solution)?;
+                type_budget.charge_type(db, binding.solution.ty())?;
             }
             Ok(())
         })
@@ -216,6 +220,9 @@ impl<'db> ConstraintSet<'db, '_> {
         let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
 
         path_bounds.try_fold_with(
+            db,
+            env,
+            inferable,
             choose,
             initial,
             &mut ProjectionTypeBudget::new(budget.type_terms),
@@ -225,8 +232,12 @@ impl<'db> ConstraintSet<'db, '_> {
 }
 
 impl<'db> CandidateSolutions<'db> {
+    #[expect(clippy::too_many_arguments)]
     fn try_fold_with<T>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
@@ -247,7 +258,9 @@ impl<'db> CandidateSolutions<'db> {
 
         let mut retained = false;
         for candidate in candidates {
-            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
+            let Some((solution, incomplete)) =
+                Self::solve_path_with(db, env, inferable, candidate, &mut choose)
+            else {
                 continue;
             };
             if !solution.is_valid() {

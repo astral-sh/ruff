@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::structural::StructuralTypeMapper;
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -700,6 +701,22 @@ pub(crate) type EnumComplement<'db> = EnumComplementType<'db>;
 
 #[salsa::tracked]
 impl<'db> EnumComplementType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.enum_class_literal(db),
+            self.excluded_names(db).clone(),
+            self.rest(db)
+                .iter()
+                .map(|ty| mapper.map_type(db, *ty))
+                .collect::<FxOrderSet<_>>(),
+        )
+    }
+
     /// Recognize the compact enum-complement shape inside an intersection.
     pub(crate) fn from_intersection_parts(
         db: &'db dyn Db,
@@ -902,20 +919,8 @@ impl<'db> EnumComplementType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            Type::EnumComplement(EnumComplementType::new(
-                db,
-                self.enum_class_literal(db),
-                self.excluded_names(db).clone(),
-                self.rest(db)
-                    .iter()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<FxOrderSet<_>>(),
-            ))
-        } else {
-            self.to_intersection(db, visitor.env)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-        }
+        self.to_intersection(db, visitor.env)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
     }
 
     /// Reconstruct the equivalent set-theoretic intersection.

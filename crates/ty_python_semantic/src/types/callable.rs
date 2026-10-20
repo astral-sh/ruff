@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::structural::StructuralTypeMapper;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
 
@@ -729,6 +730,14 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for CallableType<'_> {}
 
 impl<'db> CallableType<'db> {
+    pub(super) fn map_structure(
+        self,
+        db: &'db dyn Db,
+        mapper: &impl StructuralTypeMapper<'db>,
+    ) -> Self {
+        self.with_signatures(db, self.signatures(db).map_structure(db, mapper))
+    }
+
     pub(crate) fn new<S>(db: &'db dyn Db, signatures: S, kind: CallableTypeKind) -> Self
     where
         S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
