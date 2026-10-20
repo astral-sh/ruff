@@ -497,6 +497,21 @@ static_assert(not is_disjoint_from(TypeOf[f], FunctionType))
 static_assert(not is_disjoint_from(TypeOf[f], object))
 ```
 
+A function literal also overlaps a specialized `FunctionType` with a compatible signature. A
+`MethodType` describes a different kind of runtime object, even when its signature matches.
+
+```py
+from types import MethodType
+
+def stringify(value: int) -> str:
+    return str(value)
+
+static_assert(not is_disjoint_from(TypeOf[stringify], FunctionType[[int], str]))
+static_assert(not is_disjoint_from(FunctionType[[int], str], TypeOf[stringify]))
+static_assert(is_disjoint_from(TypeOf[stringify], MethodType[[int], str]))
+static_assert(is_disjoint_from(MethodType[[int], str], TypeOf[stringify]))
+```
+
 ### Specialized function literals
 
 Different specializations of an unbound method have incompatible signatures and are considered to

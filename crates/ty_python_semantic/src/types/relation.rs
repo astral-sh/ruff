@@ -4285,11 +4285,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::FunctionLiteral(function), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
                 // Function literals and their descriptor wrappers have an exact runtime class.
+                // Compare class origins because different signature specializations can describe
+                // the same runtime function object.
                 nontrivial_check(self, || {
-                    function
-                        .runtime_class(db)
-                        .when_subclass_of(db, env, instance.class(db, env), self.constraints)
-                        .negate(db, self.constraints)
+                    ConstraintSet::from_bool(
+                        self.constraints,
+                        function
+                            .runtime_class(db)
+                            .to_class_literal(db, env)
+                            .to_class_type(db)
+                            .is_some_and(|runtime_class| {
+                                !runtime_class.is_subtype_of_class_literal(
+                                    db,
+                                    instance.class_literal(db, env),
+                                )
+                            }),
+                    )
                 })
             }
 

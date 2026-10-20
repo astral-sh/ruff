@@ -56,6 +56,23 @@ reveal_type(list[int] is list[int])  # revealed: bool
 reveal_type(list[int] is not list[int])  # revealed: bool
 ```
 
+## Function identity after collection inference
+
+A function retrieved from an inferred list has a `FunctionType` that can still describe the original
+function object. Identity comparisons with that function can therefore succeed.
+
+```py
+def f() -> int:
+    return 0
+
+function = [f][0]
+reveal_type(function)  # revealed: FunctionType[(), int]
+reveal_type(function is f)  # revealed: bool
+reveal_type(f is function)  # revealed: bool
+reveal_type(function is not f)  # revealed: bool
+reveal_type(f is not function)  # revealed: bool
+```
+
 ## Function identity after passing through a generic identity function
 
 Passing a function through a generic identity function preserves the function object, so
