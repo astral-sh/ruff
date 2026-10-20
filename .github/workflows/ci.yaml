@@ -37,7 +37,7 @@ jobs:
   security-review:
     needs: determine_changes
     if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
-    uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@b504bbb0ff97d4bbf8176c145409bbc1e40a1f5e
+    uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@f11dbff15181b71f2cc5e8487b1ac7d7bb03ea7d
     with:
       runner: depot-ubuntu-22.04-16
       helper-runner: github-ubuntu-24.04-x86_64-4
