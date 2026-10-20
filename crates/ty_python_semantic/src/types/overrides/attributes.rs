@@ -507,7 +507,9 @@ impl<'db> AttributeOverrideViolation<'db> {
                     }) => {
                         if missing_slot {
                             diagnostic.info(format_args!(
-                                "Attribute `{name}` is missing from `__slots__` and the class has no instance dictionary, so this override relies on `__setattr__` accepting writes",
+                                "Attribute `{name}` is missing from `__slots__` and the class has no \
+                                 instance dictionary, so this override relies on `__setattr__` \
+                                 accepting writes",
                             ));
                         } else {
                             diagnostic.info(format_args!(
