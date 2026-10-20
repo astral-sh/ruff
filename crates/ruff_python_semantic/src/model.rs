@@ -1212,16 +1212,16 @@ impl<'a> SemanticModel<'a> {
                     return Some(QualifiedName::builtin(head.id.as_str()));
                 }
 
-                return QualifiedName::builtin(head.id.as_str()).with_attributes(value);
+                return QualifiedName::builtin(head.id.as_str()).qualify(value);
             }
             Symbol::Unbound => return None,
         };
 
         match &binding.kind {
-            BindingKind::Import(Import { qualified_name }) => qualified_name.with_attributes(value),
+            BindingKind::Import(Import { qualified_name }) => qualified_name.qualify(value),
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
                 let head = qualified_name.segments().first()?;
-                QualifiedName::user_defined_identifier(head).with_attributes(value)
+                QualifiedName::user_defined_identifier(head).qualify(value)
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
                 if qualified_name.is_unresolved_import() {
@@ -1233,7 +1233,7 @@ impl<'a> SemanticModel<'a> {
                         tail,
                     )
                 } else {
-                    qualified_name.with_attributes(value)
+                    qualified_name.qualify(value)
                 }
             }
             BindingKind::Builtin => {
@@ -1242,7 +1242,7 @@ impl<'a> SemanticModel<'a> {
                     Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    QualifiedName::builtin(head.id.as_str()).with_attributes(value)
+                    QualifiedName::builtin(head.id.as_str()).qualify(value)
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {

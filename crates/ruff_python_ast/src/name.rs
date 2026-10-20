@@ -382,15 +382,15 @@ impl<'a> QualifiedName<'a> {
         Self(inner)
     }
 
-    /// Creates a qualified name with the attributes of `expr`, skipping its first name.
+    /// Qualifies `expr`, using `self` as the qualified name of its root.
     ///
-    /// For example, appending the attributes of `np.linalg.norm` to `numpy`
-    /// produces `numpy.linalg.norm`. A plain name produces a copy of this name.
+    /// For example, qualifying `la.norm` with `numpy.linalg` produces
+    /// `numpy.linalg.norm`. A plain name produces a copy of `self`.
     ///
     /// Returns `None` if this name is empty or `expr` is not a name or an
     /// attribute chain rooted at a name.
     #[inline]
-    pub fn with_attributes(&self, mut expr: &'a Expr) -> Option<Self> {
+    pub fn qualify(&self, mut expr: &'a Expr) -> Option<Self> {
         let prefix = self.segments();
         if prefix.is_empty() {
             return None;
@@ -909,7 +909,7 @@ mod tests {
     };
 
     #[test]
-    fn with_attributes() {
+    fn qualify() {
         let name = QualifiedName::user_defined("numpy.linalg");
         let expr = Expr::Name(ExprName {
             id: "la".into(),
@@ -917,24 +917,24 @@ mod tests {
             node_index: AtomicNodeIndex::NONE,
             ctx: ExprContext::Load,
         });
-        assert_eq!(name.with_attributes(&expr), Some(name.clone()));
+        assert_eq!(name.qualify(&expr), Some(name.clone()));
 
         let expr = attribute_expr(attribute_expr(expr, "norm"), "__name__");
         assert_eq!(
-            name.with_attributes(&expr),
+            name.qualify(&expr),
             Some(QualifiedName::user_defined("numpy.linalg.norm.__name__"))
         );
     }
 
     #[test]
-    fn with_attributes_invalid_root() {
+    fn qualify_invalid_root() {
         let name = QualifiedName::user_defined_identifier("numpy");
         let expr = Expr::NoneLiteral(ExprNoneLiteral {
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
         });
         let expr = attribute_expr(expr, "member");
-        assert_eq!(name.with_attributes(&expr), None);
+        assert_eq!(name.qualify(&expr), None);
     }
 
     fn attribute_expr(value: Expr, attribute: &str) -> Expr {
