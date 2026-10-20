@@ -96,6 +96,8 @@ pub enum ExpressionKind {
         context: ExpressionContext,
         in_loop: bool,
     },
+    /// A parameter default, which may refer to later definitions in a stub file.
+    ParameterDefault,
     /// The callable part of a call, such as `list[T]` in `list[T]()`.
     ///
     /// Type variables used to specialize the callable must already be bound. A constructor call

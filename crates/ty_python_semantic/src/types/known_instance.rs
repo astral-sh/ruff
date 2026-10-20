@@ -613,6 +613,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::NormalizeLambdaSignatures
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },

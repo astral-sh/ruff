@@ -6,7 +6,9 @@ use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{
+    CallableType, KnownClass, KnownInstanceType, Parameter, Parameters, Signature, check_types,
+};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -89,6 +91,62 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
+}
+
+#[test]
+fn lambda_body_uses_its_parameter_context() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    for expression in [
+        "lambda value: value",
+        "lambda value: (lambda: value)()",
+        "lambda value: (bound := value)",
+        "lambda value: [value for _ in (0,)][0]",
+        "lambda value: [item for item in (value,)][0]",
+        "lambda value: [item for item, _ in ((value, 0),)][0]",
+        "lambda value: (lambda captured=value: captured)()",
+    ] {
+        db.write_file("/src/lambda.py", format!("first = second = {expression}"))?;
+        let file = program_file(&db, system_path_to_file(&db, "/src/lambda.py")?);
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let ast::Stmt::Assign(statement) = &module.syntax().body[0] else {
+            anyhow::bail!("Expected a lambda assignment");
+        };
+        let lambda = statement.value.as_ref();
+        let source = semantic_index(&db, file).expression(lambda);
+        let env = db.program_environment();
+
+        // The same source can be inferred under different candidate contexts. Neither body
+        // may recover its parameter types by re-inferring the unannotated source statement.
+        for class in [KnownClass::Int, KnownClass::Str, KnownClass::Int] {
+            let parameter = class.to_instance(&db, &env);
+            let context = Type::Callable(CallableType::single(
+                &db,
+                Signature::new(
+                    Parameters::from_annotation(
+                        &db,
+                        [Parameter::positional_only(None).with_annotated_type(parameter)],
+                    ),
+                    Type::unknown(),
+                ),
+            ));
+            let inference =
+                infer_expression_types(&db, source, TypeContext::declared(Some(context)));
+            let Some(callable) = inference.expression_type(lambda).as_callable() else {
+                anyhow::bail!("Expected a callable for {expression}");
+            };
+            let returned = callable.signatures(&db).overloads[0].return_ty;
+            if expression.contains("captured=") {
+                assert_eq!(
+                    returned.display(&db, &env).to_string(),
+                    format!("Unknown | {}", parameter.display(&db, &env)),
+                    "{expression}"
+                );
+            } else {
+                assert_eq!(returned, parameter, "{expression}");
+            }
+        }
+    }
+    Ok(())
 }
 
 #[test]

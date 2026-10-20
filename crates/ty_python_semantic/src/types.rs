@@ -41,8 +41,7 @@ pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_predicate_truthiness, infer_same_file_expression_type, infer_scope_types,
-    is_discarded_dict_key_assignment,
+    infer_predicate_truthiness, infer_same_file_expression_type, is_discarded_dict_key_assignment,
 };
 use self::infer::{
     infer_function_default_types, infer_legacy_type_alias, legacy_type_alias_parameters,
@@ -207,13 +206,12 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let mut legacy_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
-        // Scopes that may require type context are inferred during the inference of
-        // their outer scope.
+        // Scopes with a type context are inferred and checked with their enclosing expression.
         if scope_id.accepts_type_context(db) {
             continue;
         }
 
-        let result = infer_scope_types(db, scope_id, TypeContext::default());
+        let result = infer_complete_scope_types(db, scope_id);
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -9826,6 +9824,20 @@ impl<'db> Type<'db> {
         {
             const MAX_PARAMSPEC_EXPANSION: usize = 64;
 
+            // A lambda's parameters are available without evaluating its return query.
+            // Inspecting that query here would expand recursive signatures before the
+            // specialization can create a stable reference to the transformed lambda.
+            let callable_parameters = match self {
+                Type::Callable(callable) => callable.single_parameters(db),
+                Type::BoundMethod(method)
+                | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                    method
+                        .func(db)
+                        .as_callable()
+                        .and_then(|callable| callable.single_parameters(db))
+                }
+                _ => None,
+            };
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
@@ -9835,6 +9847,7 @@ impl<'db> Type<'db> {
             };
 
             let signatures = match self {
+                _ if callable_parameters.is_some() => None,
                 Type::FunctionLiteral(function) => function_signatures(function),
                 Type::BoundMethod(method)
                 | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
@@ -9851,11 +9864,15 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let intersection_paramspecs = signatures
+            let intersection_paramspecs = callable_parameters
                 .into_iter()
-                .flat_map(|signatures| signatures.iter())
-                .filter_map(|signature| {
-                    let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
+                .chain(
+                    signatures
+                        .into_iter()
+                        .flat_map(|signatures| signatures.iter().map(Signature::parameters)),
+                )
+                .filter_map(|parameters| {
+                    let (_, typevar) = parameters.as_paramspec_with_prefix()?;
                     let value = specialization.get(db, typevar)?.as_paramspec_value(db)?;
                     if matches!(value, ParamSpecValue::Intersection(_)) {
                         Some((typevar, value))
@@ -10140,6 +10157,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::NormalizeLambdaSignatures
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -10163,6 +10181,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::NormalizeLambdaSignatures
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11272,9 +11291,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 nominal_instance_type.variance_of(db, env, typevar)
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar),
-            Type::Callable(callable_type) => {
-                callable_type.signatures(db).variance_of(db, env, typevar)
-            }
+            Type::Callable(callable_type) => callable_type.variance_of(db, env, typevar),
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
@@ -11382,7 +11399,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
@@ -11422,7 +11439,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses the binding context and MRO-based matching against the class recorded in a `Self`
 /// typevar's origin.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,
@@ -11530,6 +11547,10 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
+    /// Resolve nested lambda signatures within signature inference, where Salsa can recover
+    /// recursive returns to a finite approximation before semantic operations inspect them.
+    NormalizeLambdaSignatures,
+
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 
@@ -11636,6 +11657,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::NormalizeLambdaSignatures
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11689,6 +11711,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::NormalizeLambdaSignatures
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
