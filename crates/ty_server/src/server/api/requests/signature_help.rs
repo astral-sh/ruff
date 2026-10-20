@@ -8,10 +8,10 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::{ActiveParameter, SignatureHelpRequest};
 use lsp_types::{
-    Documentation, ParameterInformation, ParameterInformationLabel, SignatureHelp,
-    SignatureHelpParams, SignatureInformation, Uri,
+    Documentation, MarkupContent, MarkupKind, ParameterInformation, ParameterInformationLabel,
+    SignatureHelp, SignatureHelpParams, SignatureInformation, Uri,
 };
-use ty_ide::{MarkupKind, signature_help};
+use ty_ide::{DocstringFragment, MarkupKind as IdeMarkupKind, signature_help};
 use ty_project::{ProjectDatabase, SemanticDb as _};
 
 pub(crate) struct SignatureHelpRequestHandler;
@@ -113,7 +113,19 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
 
                         ParameterInformation {
                             label,
-                            documentation: param.documentation.map(Documentation::String),
+                            documentation: param.documentation.map(|documentation| {
+                                if resolved_capabilities.prefers_markdown_in_signature_help() {
+                                    Documentation::MarkupContent(MarkupContent {
+                                        kind: MarkupKind::Markdown,
+                                        value: DocstringFragment::new(&documentation).render(
+                                            IdeMarkupKind::Markdown,
+                                            resolved_capabilities.allowed_html_tags(),
+                                        ),
+                                    })
+                                } else {
+                                    Documentation::String(documentation)
+                                }
+                            }),
                         }
                     })
                     .collect();
@@ -130,7 +142,17 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
                 SignatureInformation {
                     label: sig.label,
                     documentation: sig.documentation.map(|docstring| {
-                        Documentation::String(docstring.render(MarkupKind::PlainText, &[]))
+                        if resolved_capabilities.prefers_markdown_in_signature_help() {
+                            Documentation::MarkupContent(MarkupContent {
+                                kind: MarkupKind::Markdown,
+                                value: docstring.render(
+                                    IdeMarkupKind::Markdown,
+                                    resolved_capabilities.allowed_html_tags(),
+                                ),
+                            })
+                        } else {
+                            Documentation::String(docstring.render(IdeMarkupKind::PlainText, &[]))
+                        }
                     }),
                     parameters: Some(parameters),
                     active_parameter,
