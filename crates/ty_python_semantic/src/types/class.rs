@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member::{ClassBodyDeclaration, Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -2934,7 +2934,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations. A dynamic base
     /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
     /// Final declarations are handled by override diagnostics instead of supplying context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<ClassBodyDeclaration<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
@@ -2971,10 +2971,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             } else {
                 (!declared.qualifiers.contains(TypeQualifiers::FINAL)
                     && declarations.contains_only_annotated_assignments(db))
-                .then_some(declared)
+                .then_some(ClassBodyDeclaration {
+                    member: declared,
+                    class: base,
+                })
             };
-            return declaration.map(|declaration| {
-                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+            return declaration.map(|declaration| ClassBodyDeclaration {
+                member: declaration
+                    .member
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ..declaration
             });
         }
         None

@@ -1610,7 +1610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(inherited) =
                 inherited_class_body_declaration(db, binding.scope(db), symbol)
         {
-            place_and_quals = inherited;
+            place_and_quals = inherited.member;
         }
 
         // Fall back to implicit module globals for (possibly) unbound names
