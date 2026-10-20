@@ -6,6 +6,7 @@ use lsp_types::{
     TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions,
 };
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::PositionEncoding;
 
@@ -13,6 +14,7 @@ use crate::PositionEncoding;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ResolvedClientCapabilities {
     flags: ClientCapabilityFlags,
+    allowed_html_tags: Arc<[String]>,
 }
 
 bitflags::bitflags! {
@@ -93,6 +95,11 @@ fn preferred_markup_kind(formats: &[MarkupKind]) -> Option<&MarkupKind> {
 }
 
 impl ResolvedClientCapabilities {
+    /// Returns the HTML tags that the client allows in Markdown.
+    pub(crate) fn allowed_html_tags(&self) -> &[String] {
+        &self.allowed_html_tags
+    }
+
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(&self) -> bool {
         self.flags
@@ -458,7 +465,19 @@ impl ResolvedClientCapabilities {
             flags |= ClientCapabilityFlags::COMPLETION_ITEM_SNIPPET_SUPPORT;
         }
 
-        Self { flags }
+        let allowed_html_tags = client_capabilities
+            .general
+            .as_ref()
+            .and_then(|general| general.markdown.as_ref())
+            .and_then(|markdown| markdown.allowed_tags.as_ref())
+            .cloned()
+            .unwrap_or_default()
+            .into();
+
+        Self {
+            flags,
+            allowed_html_tags,
+        }
     }
 }
 
@@ -599,5 +618,39 @@ fn server_rename_options() -> RenameOptions {
     RenameOptions {
         prepare_provider: Some(true),
         work_done_progress_options: WorkDoneProgressOptions::default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::ClientCapabilities;
+    use serde_json::{Value, json};
+
+    use super::ResolvedClientCapabilities;
+
+    #[test]
+    fn resolves_allowed_html_tags() -> Result<(), serde_json::Error> {
+        assert!(
+            resolve_capabilities(json!({}))?
+                .allowed_html_tags()
+                .is_empty()
+        );
+
+        assert!(
+            resolve_capabilities(json!({"general": {"markdown": {"parser": "test"}}}))?
+                .allowed_html_tags()
+                .is_empty()
+        );
+
+        let resolved = resolve_capabilities(json!({
+            "general": {"markdown": {"parser": "test", "allowedTags": ["p", "code"]}}
+        }))?;
+        assert_eq!(resolved.allowed_html_tags(), ["p", "code"]);
+        Ok(())
+    }
+
+    fn resolve_capabilities(value: Value) -> Result<ResolvedClientCapabilities, serde_json::Error> {
+        let client: ClientCapabilities = serde_json::from_value(value)?;
+        Ok(ResolvedClientCapabilities::new(&client))
     }
 }
