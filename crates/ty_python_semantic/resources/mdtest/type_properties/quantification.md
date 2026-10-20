@@ -312,8 +312,10 @@ def alternation[X: (int, str), Y: (int, str)]() -> None:
 
 ## Unsatisfiable bodies with free variables
 
-No type can be both a supertype of `int` and a subtype of `tuple[A, B]`, regardless of how `A` and
-`B` are specialized. Quantifying `X` therefore reduces the constraint set to the false terminal BDD.
+No type `X` can be both a supertype of `int` and a subtype of `tuple[A, B]`, regardless of what
+types `A` and `B` are specialized to. As an optimization, when quantifying over `X` we detect that
+"eagerly", and reduce the constraint set to the "always false" terminal BDD, instead of evaluating
+the satisfiability of the body each time we solve.
 
 ```py
 from ty_extensions import static_assert
@@ -330,8 +332,8 @@ def impossible[X, A, B]() -> None:
 
 ## Satisfiability depends on free variables
 
-There is an `X` satisfying `A ≤ X ≤ int` when `A` is `int`, but not when `A` is `str`. Quantifying
-`X` preserves that distinction.
+There is an `X` satisfying `A ≤ X ≤ int` when `A` is `int`, but not when `A` is `str`. When we
+quantify over `X`, the resulting constraint set must preserve that distinction.
 
 ```py
 from ty_extensions._internal import ConstraintSet
