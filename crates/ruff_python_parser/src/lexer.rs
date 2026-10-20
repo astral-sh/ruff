@@ -23,23 +23,15 @@ use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoin
 use crate::lexer::interpolated_string::{
     InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
 };
+use crate::lexer::keywords::{KEYWORD_HASH_MULTIPLIER, KEYWORD_TABLE};
 use crate::string::InterpolatedStringKind;
 
 mod cursor;
 mod indentation;
 mod interpolated_string;
+mod keywords;
 
 const BOM: char = '\u{feff}';
-
-const ASCII_IDENTIFIER_CONTINUE: [bool; 256] = {
-    let mut table = [false; 256];
-    let mut byte = 0u8;
-    while byte < 128 {
-        table[byte as usize] = matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9');
-        byte += 1;
-    }
-    table
-};
 
 /// A lexer for Python source code.
 #[derive(Debug)]
@@ -649,18 +641,22 @@ impl<'src> Lexer<'src> {
     fn lex_identifier(&mut self, first: char) -> TokenKind {
         // Detect potential string like rb'' b'' f'' t'' u'' r''
         let quote = if let Some(prefix) = single_char_prefix(first) {
-            match self.cursor.rest().as_bytes() {
-                [quote @ (b'\'' | b'"'), ..] => {
+            match self.cursor.first() {
+                quote @ ('\'' | '"') => {
                     self.current_flags |= prefix;
-                    self.cursor.skip_bytes(1);
-                    Some(char::from(*quote))
+                    self.cursor.bump();
+                    Some(quote)
                 }
-                [second, quote @ (b'\'' | b'"'), ..] => self
-                    .try_double_char_prefix([first, char::from(*second)])
-                    .then(|| {
-                        self.cursor.skip_bytes(2);
-                        char::from(*quote)
-                    }),
+                second
+                    if let quote = self.cursor.second()
+                        && is_quote(quote) =>
+                {
+                    self.try_double_char_prefix([first, second]).then(|| {
+                        self.cursor.bump();
+                        self.cursor.bump();
+                        quote
+                    })
+                }
                 _ => None,
             }
         } else {
@@ -668,10 +664,10 @@ impl<'src> Lexer<'src> {
         };
 
         if let Some(quote) = quote {
-            if self.current_flags.is_interpolated_string() {
-                if let Some(kind) = self.lex_interpolated_string_start(quote) {
-                    return kind;
-                }
+            if self.current_flags.is_interpolated_string()
+                && let Some(kind) = self.lex_interpolated_string_start(quote)
+            {
+                return kind;
             }
 
             return self.lex_string(quote);
@@ -689,25 +685,7 @@ impl<'src> Lexer<'src> {
         // Classify the ASCII prefix without decoding each character. Any Unicode suffix still
         // needs the full identifier-continuation check below.
         let bytes = self.cursor.rest().as_bytes();
-        let ascii_len = 'ascii: {
-            // Fixed-size batches let the compiler unroll the lookups without unchecked reads.
-            let (chunks, rest) = bytes.as_chunks::<16>();
-            let mut offset = 0;
-            for chunk in chunks {
-                if let Some(end) = chunk
-                    .iter()
-                    .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
-                {
-                    break 'ascii offset + end;
-                }
-                offset += 16;
-            }
-            offset
-                + rest
-                    .iter()
-                    .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
-                    .unwrap_or(rest.len())
-        };
+        let ascii_len = ascii_identifier_prefix_len(bytes);
         self.cursor.skip_bytes(ascii_len);
 
         if bytes.get(ascii_len).is_some_and(|byte| !byte.is_ascii()) {
@@ -720,32 +698,7 @@ impl<'src> Lexer<'src> {
             return TokenKind::Identifier;
         }
 
-        // Keywords contain two to eight ASCII bytes, including `first`.
-        if !(1..8).contains(&ascii_len) {
-            return TokenKind::Identifier;
-        }
-
-        // Rule out lengths and initial bytes that cannot form a keyword.
-        if KEYWORD_TABLE.starts[ascii_len - 1] & (1u64 << (u32::from(first) & 63)) == 0 {
-            return TokenKind::Identifier;
-        }
-
-        let continuation = if let Some(chunk) = bytes.first_chunk::<8>() {
-            u64::from_le_bytes(*chunk)
-        } else {
-            let mut padded = [0; 8];
-            padded[..ascii_len].copy_from_slice(&bytes[..ascii_len]);
-            u64::from_le_bytes(padded)
-        };
-        // Shift out the following source bytes and align the identifier to the high end.
-        let word = ((continuation << 8) | u64::from(u32::from(first))) << ((7 - ascii_len) * 8);
-
-        let index = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
-        if word == KEYWORD_TABLE.words[index] {
-            KEYWORD_TABLE.kinds[index]
-        } else {
-            TokenKind::Identifier
-        }
+        KEYWORD_TABLE.lookup(first, bytes, ascii_len + 1)
     }
 
     /// Try lexing the double character string prefix, updating the token flags accordingly.
@@ -1576,6 +1529,10 @@ struct RadixRun {
     has_nonzero_digit: bool,
 }
 
+const fn is_quote(c: char) -> bool {
+    matches!(c, '\'' | '"')
+}
+
 fn single_char_prefix(c: char) -> Option<TokenFlags> {
     Some(match c {
         'f' | 'F' => TokenFlags::F_STRING,
@@ -1624,83 +1581,138 @@ pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
 
-// The multiplier gives every Python keyword a distinct slot. The full packed word
-// still has to match, so arbitrary identifiers cannot be mistaken for keywords.
-// Adding keywords may require a new multiplier; table construction checks for collisions.
-const KEYWORD_HASH_MULTIPLIER: u64 = 0xd6b7_7ed9_811b_4777;
+/// Whether each byte can continue an ASCII identifier: letters, digits, or an underscore.
+/// Non-ASCII bytes are false, so scanning stops before a UTF-8 character that needs
+/// the Unicode identifier check.
+const ASCII_IDENTIFIER_CONTINUE: [bool; 256] = {
+    let mut table = [false; 256];
+    let mut byte = 0u8;
+    while byte < 128 {
+        table[byte as usize] = matches!(byte, b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'0'..=b'9');
+        byte += 1;
+    }
+    table
+};
+
+/// Returns the number of leading ASCII identifier-continuation bytes.
+///
+/// A table lookup classifies each byte without decoding UTF-8. Fixed-size batches
+/// give the compiler an opportunity to unroll the loop; correctness does not depend
+/// on unrolling. The lexer benchmarks in `ruff_benchmark` track performance across
+/// compiler updates.
+fn ascii_identifier_prefix_len(bytes: &[u8]) -> usize {
+    let (chunks, rest) = bytes.as_chunks::<16>();
+    let mut offset = 0;
+    for chunk in chunks {
+        if let Some(end) = chunk
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+        {
+            return offset + end;
+        }
+        offset += 16;
+    }
+    offset
+        + rest
+            .iter()
+            .position(|&byte| !ASCII_IDENTIFIER_CONTINUE[usize::from(byte)])
+            .unwrap_or(rest.len())
+}
 
 /// Packed keyword words and token kinds indexed by a six-bit perfect hash.
+///
+/// Multiplying a packed keyword by `KEYWORD_HASH_MULTIPLIER` and taking the high six
+/// bits gives each keyword a distinct slot in the 64-entry table. This is a perfect
+/// hash for the keywords only; other identifiers can collide and need a full-word
+/// comparison.
+///
+/// To add, remove, or rename a keyword, update `KEYWORDS` in the generator, then run:
+///
+/// ```text
+/// uv run scripts/generate_keyword_hash.py
+/// ```
+///
+/// Keywords must contain two to eight ASCII bytes; supporting other lengths
+/// requires changing the word representation and length filter.
 #[repr(align(64))]
 struct KeywordTable {
     words: [u64; 64],
     kinds: [TokenKind; 64],
-    // Possible initial bytes, grouped by keyword length (two through eight).
+    // Each entry records the possible first bytes for keywords of a given length,
+    // from two to eight bytes. `starts[len - 2]` sets bit `first_byte & 63` for
+    // each keyword of that length. An unset bit rules out a keyword before we
+    // pack or hash the identifier.
+    //
+    // Masking with 63 fits each entry in a u64, but bytes that differ by 64 share
+    // a bit. A set bit therefore only indicates a possible match; lookup still
+    // compares the full packed word to reject other identifiers.
     starts: [u64; 7],
 }
 
-static KEYWORD_TABLE: KeywordTable = {
-    let mut starts = [0u64; 7];
-    let mut words = [0; 64];
-    let mut kinds = [TokenKind::Identifier; 64];
-    let mut keywords: &[(&[u8], TokenKind)] = &[
-        (b"False", TokenKind::False),
-        (b"None", TokenKind::None),
-        (b"True", TokenKind::True),
-        (b"and", TokenKind::And),
-        (b"as", TokenKind::As),
-        (b"assert", TokenKind::Assert),
-        (b"async", TokenKind::Async),
-        (b"await", TokenKind::Await),
-        (b"break", TokenKind::Break),
-        (b"case", TokenKind::Case),
-        (b"class", TokenKind::Class),
-        (b"continue", TokenKind::Continue),
-        (b"def", TokenKind::Def),
-        (b"del", TokenKind::Del),
-        (b"elif", TokenKind::Elif),
-        (b"else", TokenKind::Else),
-        (b"except", TokenKind::Except),
-        (b"finally", TokenKind::Finally),
-        (b"for", TokenKind::For),
-        (b"from", TokenKind::From),
-        (b"global", TokenKind::Global),
-        (b"if", TokenKind::If),
-        (b"import", TokenKind::Import),
-        (b"in", TokenKind::In),
-        (b"is", TokenKind::Is),
-        (b"lazy", TokenKind::Lazy),
-        (b"lambda", TokenKind::Lambda),
-        (b"match", TokenKind::Match),
-        (b"nonlocal", TokenKind::Nonlocal),
-        (b"not", TokenKind::Not),
-        (b"or", TokenKind::Or),
-        (b"pass", TokenKind::Pass),
-        (b"raise", TokenKind::Raise),
-        (b"return", TokenKind::Return),
-        (b"try", TokenKind::Try),
-        (b"type", TokenKind::Type),
-        (b"while", TokenKind::While),
-        (b"with", TokenKind::With),
-        (b"yield", TokenKind::Yield),
-    ];
-    while let Some((&(keyword, kind), rest)) = keywords.split_first() {
-        starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
-        let mut bytes = [0; 8];
-        let (keyword_bytes, _) = bytes.split_at_mut(keyword.len());
-        keyword_bytes.copy_from_slice(keyword);
-        let word = u64::from_le_bytes(bytes) << ((8 - keyword.len()) * 8);
-        let slot = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
-        assert!(words[slot] == 0, "keyword hash collision");
-        words[slot] = word;
-        kinds[slot] = kind;
-        keywords = rest;
+impl KeywordTable {
+    /// Builds the lookup arrays at compile time, rejecting unsupported lengths and hash collisions.
+    const fn new(mut keywords: &[(&[u8], TokenKind)]) -> Self {
+        let mut starts = [0u64; 7];
+        let mut words = [0; 64];
+        let mut kinds = [TokenKind::Identifier; 64];
+        while let Some((&(keyword, kind), rest)) = keywords.split_first() {
+            assert!(
+                keyword.len() >= 2 && keyword.len() <= 8 && keyword.is_ascii(),
+                "keywords must contain two to eight ASCII bytes"
+            );
+            starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
+            let mut bytes = [0; 8];
+            let (keyword_bytes, _) = bytes.split_at_mut(keyword.len());
+            keyword_bytes.copy_from_slice(keyword);
+            let word = u64::from_le_bytes(bytes) << ((8 - keyword.len()) * 8);
+            let slot = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
+            assert!(
+                words[slot] == 0,
+                "keyword hash collision: run `uv run scripts/generate_keyword_hash.py`"
+            );
+            words[slot] = word;
+            kinds[slot] = kind;
+            keywords = rest;
+        }
+        Self {
+            words,
+            kinds,
+            starts,
+        }
     }
-    KeywordTable {
-        words,
-        kinds,
-        starts,
+
+    /// Classifies an ASCII identifier whose first character has already been consumed.
+    /// `rest` starts after `first` and may extend past the identifier; `len` includes `first`.
+    fn lookup(&self, first: char, rest: &[u8], len: usize) -> TokenKind {
+        // The shortest keywords have two bytes, and the packed word holds at most eight.
+        if len == 1 || len > 8 {
+            return TokenKind::Identifier;
+        }
+
+        if self.starts[len - 2] & (1u64 << (u32::from(first) & 63)) == 0 {
+            return TokenKind::Identifier;
+        }
+
+        let continuation = if let Some(chunk) = rest.first_chunk::<8>() {
+            u64::from_le_bytes(*chunk)
+        } else {
+            let mut padded = [0; 8];
+            padded[..len - 1].copy_from_slice(&rest[..len - 1]);
+            u64::from_le_bytes(padded)
+        };
+        // Pack bytes in little-endian order, aligned to the high end of the word.
+        // For example, "if" becomes 0x6669_0000_0000_0000. Shifting also discards
+        // any bytes loaded from the source after the identifier.
+        let word = ((continuation << 8) | u64::from(u32::from(first))) << ((8 - len) * 8);
+
+        let index = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
+        if word == self.words[index] {
+            self.kinds[index]
+        } else {
+            TokenKind::Identifier
+        }
     }
-};
+}
 
 #[cfg(test)]
 mod tests {
@@ -1711,6 +1723,24 @@ mod tests {
     use ruff_text_size::Ranged;
 
     use super::*;
+
+    #[test]
+    fn keyword_tokens() {
+        for kind in KEYWORD_TABLE.kinds {
+            if !kind.is_keyword() {
+                continue;
+            }
+            let display = kind.to_string();
+            let name = display.trim_matches('`');
+            // Cover both the padded EOF path and the full-word load across a token boundary.
+            for suffix in ["", " continue"] {
+                let source = format!("{name}{suffix}");
+                let mut lexer = Lexer::new(&source, Mode::Module, TextSize::default());
+                assert_eq!(lexer.next_token(), kind, "{source}");
+                assert_eq!(lexer.current_range().len().to_usize(), name.len());
+            }
+        }
+    }
 
     #[test]
     fn keyword_hash_collisions_remain_identifiers() {
