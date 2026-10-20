@@ -4069,5 +4069,38 @@ def narrow_intersection_bounded(value: Intersection[Parent[BoundedS], Other[Boun
         reveal_type(value)  # revealed: ChildBoth[BoundedS@narrow_intersection_bounded]
 ```
 
+## Lambda defaults in generic base metadata
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the type variables bound by the
+subclass:
+
+```py
+from typing import Annotated, Generic, TypeVar, cast
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+class Derived(Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
+## Recursive partials that capture a lambda
+
+A recursive partial can capture a new lambda on each call. Inference converges even as the captured
+value's type gains another callable layer:
+
+```py
+from functools import partial
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.callback = partial(lambda: Box(lambda: value).callback)
+
+def check(box: Box[int]):
+    box.callback()()()  # no diagnostic
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

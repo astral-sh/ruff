@@ -1457,6 +1457,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
+            | TypeMapping::NormalizeLambdaSignatures
             | TypeMapping::RescopeReturnCallables(_)
             | TypeMapping::ApplyRecursiveSubstitution(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {

@@ -2349,6 +2349,24 @@ def _(x: bool):
     f = signatures.get("", reveal_type(lambda x: x))
 ```
 
+A callable annotation also supplies the parameter type when the lambda has a default argument:
+
+```py
+callback: Callable[[str], str] = lambda value="": reveal_type(value)  # revealed: str
+
+invalid_callback: Callable[[str], str] = lambda value="": value.bit_length()  # error: [unresolved-attribute]
+```
+
+Lambdas inside a default argument also receive the context supplied by the call that contains them:
+
+```py
+def accept(callback: Callable[[int], int]) -> Callable[[int], int]:
+    return callback
+
+nested = lambda callback=accept(lambda value: reveal_type(value)): callback  # revealed: int
+invalid_nested = lambda callback=accept(lambda value: value.upper()): callback  # error: [unresolved-attribute]
+```
+
 We do not currently account for type annotations present later in the scope:
 
 ```py
