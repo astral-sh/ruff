@@ -33,9 +33,10 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// ## Fix safety
 ///
 /// This fix is marked unsafe, because the rule cannot determine whether a parameter annotation
-/// corresponds to a type variable (e.g. for a type imported from another module), it will not add the
-/// type to the generic type parameter list. This causes the function to have a mix of old-style type
-/// variables and new-style generic type parameters, which will be rejected by type checkers.
+/// corresponds to a type variable (e.g. for a type imported from another module) and therefore it
+/// will not add the type to the generic type parameter list. This causes the function to have a mix
+/// of old-style type variables and new-style generic type parameters, which will be rejected by type
+/// checkers.
 ///
 /// ## Example
 ///
