@@ -426,8 +426,8 @@ def repeated_polarity[T](container: MixedVariance[Callable[[], T], Callable[[], 
 reveal_type(repeated_polarity(MixedVariance[Callable[[], Middle], Callable[[], Middle]](), Derived()))  # revealed: Middle
 ```
 
-An unrelated variadic type parameter currently sends the entire inference context through the legacy
-solver, so the ordinary callable loses the contravariant bound shown above.
+An unrelated ParamSpec preserves contravariance; TypeVarTuples still lose it through legacy
+inference.
 
 ```py
 def with_paramspec[T, **P](container: Contravariant[Callable[[], T]], value: T, unrelated: Callable[P, None]) -> T:
@@ -438,8 +438,7 @@ def with_typevartuple[T, *Ts](container: Contravariant[Callable[[], T]], value: 
 
 def unrelated(value: str) -> None: ...
 
-# TODO: Should reveal `Derived` when an unrelated ParamSpec no longer disables contravariance.
-reveal_type(with_paramspec(Contravariant[Callable[[], Middle]](), Derived(), unrelated))  # revealed: Middle
+reveal_type(with_paramspec(Contravariant[Callable[[], Middle]](), Derived(), unrelated))  # revealed: Derived
 # TODO: Should reveal `Derived` when an unrelated TypeVarTuple no longer disables contravariance.
 reveal_type(with_typevartuple(Contravariant[Callable[[], Middle]](), Derived(), ("value",)))  # revealed: Middle
 ```
@@ -2458,6 +2457,35 @@ def union_bound[T: type[A] | type[B]](cls: T) -> None:
     reveal_type(cls.attr)  # revealed: str | int
 ```
 
+## Assignment narrowing of dynamic attributes
+
+An upper bound can provide an attribute through `__getattr__`. Assigning to that attribute does not
+change the type of later reads:
+
+```py
+class Dynamic:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update_bound[T: Dynamic](obj: T) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
+A constrained type variable may also refer to a class that uses `__getattr__`. Assignment cannot
+narrow the attribute even if another permitted class declares it:
+
+```py
+class Declared:
+    value: int | str
+
+def update_constrained[T: (Dynamic, Declared)](obj: T) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
 ## Solving TypeVars with upper bounds in unions
 
 ```py
@@ -3222,6 +3250,9 @@ reveal_type(into_regular_callable(ClassWithNewAndInit))
 # TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
+# revealed: ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit)(1))
+# TODO: Combine both constructor parameter lists and report [missing-argument].
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 

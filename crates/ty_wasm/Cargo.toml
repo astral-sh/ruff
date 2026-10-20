@@ -13,6 +13,8 @@ description = "WebAssembly bindings for ty"
 
 [package.metadata.cargo-shear]
 ignored = [
+    # Used only to enable parser stack growth.
+    "ruff_python_parser",
     # Depended on only to enable `log` feature as of 2025-10-03.
     "tracing",
 ]
@@ -35,6 +37,7 @@ ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_diagnostics = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_formatter = { workspace = true }
+ruff_python_parser = { workspace = true, features = ["stacker"] }
 ruff_ranged_value = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }

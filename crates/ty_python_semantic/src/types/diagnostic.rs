@@ -3615,6 +3615,27 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
     }
 }
 
+pub(super) fn report_invalid_runtime_checkable(
+    context: &InferContext,
+    node: impl Ranged,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, node) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic =
+        builder.into_diagnostic("`runtime_checkable` can only be applied to protocol classes");
+    diagnostic.annotate(
+        Annotation::secondary(class.header_span(db))
+            .message(format_args!("`{}` is not a protocol class", class.name(db))),
+    );
+    diagnostic.info(
+        "A class is only a protocol if it directly inherits from \
+        `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+}
+
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
     call: &ast::ExprCall,
@@ -4642,6 +4663,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key exists but is marked `ReadOnly`.
+    ReadOnlyKey,
     /// The key refers to a read-only extra item.
     ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
@@ -4668,6 +4691,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
+        TypedDictDeleteErrorKind::ReadOnlyKey => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
         TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
             "Cannot delete read-only extra item \"{field_name}\" \
             from TypedDict `{typed_dict_name}`"
@@ -4677,8 +4703,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
         )),
     };
 
-    // Add sub-diagnostic pointing to where the field is defined (if available)
-    if let Some(field) = field
+    // Only suggest making the field `NotRequired` when that would allow deletion.
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey)
+        && let Some(field) = field
         && let Some(declaration) = field.first_declaration()
     {
         let file = declaration.file(db);

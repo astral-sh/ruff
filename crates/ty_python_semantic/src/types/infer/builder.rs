@@ -384,10 +384,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// Input types for failed decorator applications, keyed by decorator expression.
+    /// Input types for decorator applications that need validation after inference.
     ///
     /// Recheck these calls after inference so formatting diagnostics cannot pull deferred
-    /// function defaults into definition inference cycles.
+    /// function defaults into definition inference cycles, and protocol bases are fully inferred.
     deferred_decorator_calls: Vec<(ExpressionNodeKey, Type<'db>)>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
@@ -3952,6 +3952,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 InferenceRegion::Deferred(definition),
             ) => {
                 self.infer_typealiastype_assignment_deferred(definition, target, arguments);
+                if !arguments.keywords.is_empty() {
+                    let mut call_arguments = self.prepare_call_arguments(arguments);
+                    // The positional arguments and `type_params` have their own validation rules;
+                    // leaving their types unset excludes them from ordinary call type checks.
+                    for (index, argument) in arguments.iter_source_order().enumerate() {
+                        if let ArgOrKeyword::Keyword(keyword) = argument
+                            && let Some(name) = keyword.arg.as_deref()
+                            && name != "type_params"
+                        {
+                            call_arguments.insert_type(
+                                index,
+                                TypeContext::default(),
+                                self.expression_type(&keyword.value),
+                            );
+                        }
+                    }
+                    if let Err(CallError(_, bindings)) = func_ty.try_call(db, env, &call_arguments)
+                    {
+                        bindings.report_diagnostics(&self.context, value.into());
+                    }
+                }
                 return;
             }
             (Some(KnownClass::Type), InferenceRegion::Deferred(definition)) => {
@@ -5753,7 +5774,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn defer_decorator_call(&mut self, decorator: &ast::Decorator, input_ty: Type<'db>) {
-        // We replay failed decorator applications after inference only to report call errors,
+        // We validate deferred decorator applications after inference only to report call errors,
         // such as incompatible argument types or missing arguments. `@no_type_check` suppresses
         // these errors. Skip recording the calls here because the enclosing scope's post-inference
         // diagnostic context does not inherit this definition-local flag.
@@ -6945,16 +6966,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let signatures = CallableSignature::from_overloads(
                 callable.signatures(db).overloads.iter().map(|signature| {
                     let signature_generic_context = signature.generic_context.and_then(|context| {
-                        let mut variables = context
-                            .variables(db)
-                            .filter(|typevar| {
+                        GenericContext::try_from_typevar_instances(
+                            db,
+                            env,
+                            context.variables(db).filter(|typevar| {
                                 !class_generic_context.contains(db, typevar.identity(db))
-                            })
-                            .peekable();
-                        variables
-                            .peek()
-                            .is_some()
-                            .then(|| GenericContext::from_typevar_instances(db, env, variables))
+                            }),
+                        )
                     });
                     Signature::new_generic(
                         signature_generic_context,
@@ -9530,7 +9548,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         value: key_literal, ..
                     }) => Some(key_literal.to_str()),
                     _ => self
-                        .speculate_without_diagnostics()
+                        .speculate()
                         .get_or_infer_expression(first_arg, TypeContext::default())
                         .as_string_literal()
                         .map(|key_literal| key_literal.value(self.db())),
@@ -9572,7 +9590,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
 
-                    if !is_declared && field.is_read_only() {
+                    if field.is_read_only() {
                         let mutation = match method_name {
                             "pop"
                                 if arguments.keywords.is_empty()
@@ -9588,11 +9606,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             _ => None,
                         };
                         if let Some((action, preposition)) = mutation {
+                            // Report errors within the arguments even though this mutation is invalid.
+                            for argument in &arguments.args {
+                                self.get_or_infer_expression(argument, TypeContext::default());
+                            }
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_ARGUMENT_TYPE, first_arg)
                             {
+                                let kind = if is_declared { "key" } else { "extra item" };
                                 builder.into_diagnostic(format_args!(
-                                    "Cannot {action} read-only extra item \
+                                    "Cannot {action} read-only {kind} \
                                     \"{key}\" {preposition} TypedDict `{}`",
                                     Type::TypedDict(typed_dict_ty).display(db, env),
                                 ));
@@ -13454,14 +13477,49 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
+            // A read supplied by `__getattr__` need not return the assigned value. Keep
+            // narrowing known attributes, including fields on classes with custom setters.
+            let uses_getattr = |ty: Type<'db>| {
+                // Module literals ignore the synthetic `ModuleType.__getattr__` in typeshed.
+                // A real module-level `__getattr__` is shadowed by an assigned attribute.
+                if matches!(ty, Type::ModuleLiteral(_)) {
+                    return false;
+                }
+
+                !ty.class_member(db, env, "__getattr__").place.is_undefined()
+                    && ty
+                        .member_lookup_with_policy(
+                            db,
+                            env,
+                            &attr.id,
+                            MemberLookupPolicy::NO_GETATTR_LOOKUP,
+                        )
+                        .place
+                        .is_undefined()
+            };
+            let lookup_ty = value_ty.resolve_type_alias(db);
+            let lookup_ty = if let Type::TypeVar(typevar) = lookup_ty
+                && let Some(bound_or_constraints) =
+                    typevar.typevar(db).bound_or_constraints(db, env)
+            {
+                bound_or_constraints.as_type(db, env)
+            } else {
+                lookup_ty
+            };
+            let uses_getattr = match lookup_ty.expand_top_level_aliases(db, env) {
+                Type::Union(union) => union.elements(db).iter().copied().any(uses_getattr),
+                ty => uses_getattr(ty),
+            };
+
             // Arbitrary data descriptors can transform the assigned value, but slot descriptors
             // write it directly into instance storage.
-            if assignment_attribute_members(db, env, value_ty, &attr.id)
-                .and_then(AssignmentAttributeMembers::type_member)
-                .and_then(|member| member.place.ignore_possibly_undefined())
-                .is_some_and(|ty| {
-                    ty.may_be_data_descriptor(db, env) && !matches!(ty, Type::SlotDescriptor(_))
-                })
+            if uses_getattr
+                || assignment_attribute_members(db, env, value_ty, &attr.id)
+                    .and_then(AssignmentAttributeMembers::type_member)
+                    .and_then(|member| member.place.ignore_possibly_undefined())
+                    .is_some_and(|ty| {
+                        ty.may_be_data_descriptor(db, env) && !matches!(ty, Type::SlotDescriptor(_))
+                    })
             {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;

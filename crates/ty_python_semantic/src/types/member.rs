@@ -70,16 +70,17 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             if let Place::Defined(ref mut place) = place_and_quals.place
                 && place.origin == TypeOrigin::Inferred
                 && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
-                && let Place::Defined(declared) = inherited.place
             {
-                // The annotation determines the public type, but the value is still supplied
-                // by this class. Consumers such as Pydantic inspect that value's definition.
-                *place = DefinedPlace {
-                    ty: declared.ty,
-                    origin: declared.origin,
-                    public_type_policy: declared.public_type_policy,
-                    ..*place
-                };
+                if let Place::Defined(declared) = inherited.place {
+                    // The annotation determines the public type, but the value is still supplied
+                    // by this class. Consumers such as Pydantic inspect that value's definition.
+                    *place = DefinedPlace {
+                        ty: declared.ty,
+                        origin: declared.origin,
+                        public_type_policy: declared.public_type_policy,
+                        ..*place
+                    };
+                }
                 place_and_quals.qualifiers = inherited.qualifiers;
             }
 
@@ -150,10 +151,16 @@ pub(super) fn inherited_class_body_declaration<'db>(
     }
 
     let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
-    MroLookup::new(
+    let mut inherited = MroLookup::new(
         db,
         &env,
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
-    .class_body_declaration(name)
+    .class_body_declaration(name)?;
+    // Hash definitions are checked against the hash protocol, not inherited annotations.
+    // Retain qualifiers such as `ClassVar`, which still constrain instance assignments.
+    if name == "__hash__" {
+        inherited.place = Place::Undefined;
+    }
+    Some(inherited)
 }

@@ -275,11 +275,16 @@ impl<'db> Solution<'db> {
                 }
             })
             .collect();
-        let context = GenericContext::from_typevar_instances(
+        let Some(context) = GenericContext::try_from_typevar_instances(
             db,
             env,
             closed.values().map(|(variable, _)| *variable),
-        );
+        ) else {
+            // An empty substitution leaves both sides unchanged.
+            return comparisons
+                .iter()
+                .all(|(inferred, preferred)| inferred.is_assignable_to(db, env, *preferred));
+        };
         let types: Vec<_> = closed.values().map(|(_, ty)| *ty).collect();
         let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
             generic_context: context,

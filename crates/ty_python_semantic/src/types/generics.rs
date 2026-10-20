@@ -344,6 +344,9 @@ pub(crate) fn typing_self<'db>(
 ///
 /// Variables are keyed by bound occurrence identity, so freshened copies of the same source-level
 /// generic context can coexist without collapsing into each other.
+///
+/// A generic context always contains at least one type variable. Use `Option<GenericContext>`
+/// to represent a context that may be absent or empty.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
     #[returns(copy)]
@@ -373,12 +376,12 @@ impl<'db> GenericContext<'db> {
         index: &SemanticIndex<'db>,
         binding_context: Definition<'db>,
         type_params_node: &ast::TypeParams,
-    ) -> Self {
+    ) -> Option<Self> {
         let variables = type_params_node.iter().filter_map(|type_param| {
             Self::variable_from_type_param(db, index, binding_context, type_param)
         });
 
-        Self::from_typevar_instances_in_program(db, binding_context.program(db), variables)
+        Self::try_from_typevar_instances_in_program(db, binding_context.program(db), variables)
     }
 
     pub(crate) fn of_node(
@@ -429,7 +432,12 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    /// Creates a generic context from a list of `BoundTypeVarInstance`s.
+    /// Creates a generic context from a nonempty list of `BoundTypeVarInstance`s.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `type_params` is empty. Use [`Self::try_from_typevar_instances`] to return `None`
+    /// instead of panicking on empty input.
     pub(crate) fn from_typevar_instances(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -438,19 +446,41 @@ impl<'db> GenericContext<'db> {
         Self::from_typevar_instances_in_program(db, env.program(db), type_params)
     }
 
+    /// Creates a generic context, returning `None` if there are no type variables.
+    pub(crate) fn try_from_typevar_instances(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Option<Self> {
+        Self::try_from_typevar_instances_in_program(db, env.program(db), type_params)
+    }
+
+    fn try_from_typevar_instances_in_program(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
+    ) -> Option<Self> {
+        let mut type_params = type_params.into_iter().peekable();
+        type_params.peek()?;
+        Some(Self::from_typevar_instances_in_program(
+            db,
+            program,
+            type_params,
+        ))
+    }
+
     fn from_typevar_instances_in_program(
         db: &'db dyn Db,
         program: Program<'db>,
         type_params: impl IntoIterator<Item = BoundTypeVarInstance<'db>>,
     ) -> Self {
-        Self::new_internal(
-            db,
-            program,
-            type_params
-                .into_iter()
-                .map(|variable| (variable.identity(db), variable))
-                .collect::<FxOrderMap<_, _>>(),
-        )
+        let mut variables = type_params
+            .into_iter()
+            .map(|variable| (variable.identity(db), variable))
+            .collect::<FxOrderMap<_, _>>();
+        assert!(!variables.is_empty(), "a generic context must be nonempty");
+        variables.shrink_to_fit();
+        Self::new_internal(db, program, variables)
     }
 
     /// Merge this generic context with another, returning a new generic context that
@@ -484,14 +514,14 @@ impl<'db> GenericContext<'db> {
         self,
         db: &'db dyn Db,
         binding_context: Option<BindingContext<'db>>,
-    ) -> Self {
+    ) -> Option<Self> {
         #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
         fn remove_self_inner<'db>(
             db: &'db dyn Db,
             generic_context: GenericContext<'db>,
             binding_context: Option<BindingContext<'db>>,
-        ) -> GenericContext<'db> {
-            GenericContext::from_typevar_instances_in_program(
+        ) -> Option<GenericContext<'db>> {
+            GenericContext::try_from_typevar_instances_in_program(
                 db,
                 generic_context.program(db),
                 generic_context.variables(db).filter(|bound_typevar| {
@@ -858,19 +888,10 @@ impl<'db> GenericContext<'db> {
             return_type.apply_type_mapping(db, &env, &type_mapping, TypeContext::default());
 
         // And lastly remove those typevars from the function's generic context.
-        let mut kept_typevars = generic_context
+        let kept_typevars = generic_context
             .variables(db)
-            .filter(|bound_typevar| !found_only_inside_callable_return.contains(bound_typevar))
-            .peekable();
-        let generic_context = if kept_typevars.peek().is_none() {
-            None
-        } else {
-            Some(GenericContext::from_typevar_instances(
-                db,
-                &env,
-                kept_typevars,
-            ))
-        };
+            .filter(|bound_typevar| !found_only_inside_callable_return.contains(bound_typevar));
+        let generic_context = GenericContext::try_from_typevar_instances(db, &env, kept_typevars);
 
         (generic_context, return_type)
     }
@@ -1516,34 +1537,6 @@ impl<'db> Specialization<'db> {
         } else {
             self
         }
-    }
-
-    /// Combines two specializations of the same generic context. If either specialization maps a
-    /// typevar to `Type::Unknown`, the other specialization's mapping is used. If both map the
-    /// typevar to a known type, those types are unioned together.
-    ///
-    /// Panics if the two specializations are not for the same generic context.
-    pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
-        let generic_context = self.generic_context(db);
-        assert_eq!(other.generic_context(db), generic_context);
-        let env = ProgramEnvironment::from_program(generic_context.program(db));
-        // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
-        // confusing/wrong results in cases where there was a mapping found for a typevar, and it
-        // was of type Unknown. It's also wrong in case a typevar has a default, in which case it
-        // may fail to specialize, but not end up as `Unknown`. We should add a bitset or similar
-        // to Specialization that explicitly tells us which typevars are mapped.
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(other.types(db))
-            .map(|(self_type, other_type)| match (self_type, other_type) {
-                (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
-                _ => UnionType::from_two_elements(db, &env, *self_type, *other_type),
-            })
-            .collect();
-        // TODO: Combine the tuple specs too
-        // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -2536,6 +2529,11 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
+    /// Keep the first supplied parameter list. Argument checking still validates later
+    /// occurrences against the chosen list.
+    ///
+    /// TODO: Combine repeated `ParamSpec` bounds using unions and intersections of parameter lists
+    /// instead of keeping only the first occurrence's contribution.
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
@@ -2559,6 +2557,7 @@ pub(crate) struct TypeVarInference<'db> {
     /// including fallback types from incomplete solution families. This projection loses
     /// correlations and completeness; `solutions` retains that information. When correlated
     /// solutions are unavailable, this holds the compatibility or diagnostic recovery mapping.
+    /// For ParamSpec, we currently hold the first parameter-list.
     #[returns(deref)]
     merged_types: Box<[Option<Type<'db>>]>,
     #[returns(ref)]
@@ -2655,7 +2654,7 @@ pub(crate) enum TypeVarInferenceSolutions<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum TypeVarInferenceFallback {
     Unconstrained,
-    Variadic,
+    TypeVarTuple,
     Unsatisfiable,
     BudgetExceeded,
 }
@@ -2784,6 +2783,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
+        let set = self.remove_seen_paramspecs(set, &self.paramspec_seen);
         self.infer_from_constraint_set(set)
     }
 
@@ -2904,7 +2904,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
             let analysis = self.analyze_constraint_set(when);
-            self.project_for_legacy_fallback(&analysis);
+            self.record_constraint_analysis(&analysis);
         }
 
         let inference =
@@ -3047,7 +3047,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         solution: &[TypeVarSolution<'db>],
     ) {
         let db = self.db;
+        // TODO: Distinguish a ParamSpec binding lost to budget exhaustion from missing evidence.
+        // Without that distinction, defaults can apply after budget exhaustion.
         for binding in solution {
+            // TODO: Remove this shortcut once merging ParamSpec solution alternatives is supported.
+            if binding.bound_typevar.is_paramspec(db) {
+                types
+                    .entry(binding.bound_typevar.identity(db))
+                    .or_insert(binding.solution.ty());
+                continue;
+            }
             types
                 .entry(binding.bound_typevar.identity(db))
                 .and_modify(|existing| {
@@ -3081,13 +3090,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     {
         let db = self.db;
         let generic_context = self.generic_context;
-        // TODO: Move `ParamSpec` and `TypeVarTuple` handling to the new constraint solver.
+        // TODO: Move `TypeVarTuple` handling to the new constraint solver.
         if generic_context
             .variables(db)
-            .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+            .any(|typevar| typevar.is_typevartuple(db))
         {
             return Ok(
-                self.compatibility_inference_with(TypeVarInferenceFallback::Variadic, choose)
+                self.compatibility_inference_with(TypeVarInferenceFallback::TypeVarTuple, choose)
             );
         }
 
@@ -3487,6 +3496,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) {
         let db = self.db;
         let identity = bound_typevar.identity(db);
+        // TODO: Remove this guard once repeated `ParamSpec` bounds can be combined.
         if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
             return;
         }
@@ -3614,14 +3624,48 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    /// Adds available solutions, including fallback bindings, to the legacy inference mapping.
+    /// Record supplied parameter lists independently from the diagnostic recovery mapping.
     ///
-    /// This projection loses correlations between alternatives, so callers must only request it
-    /// after they have accepted the corresponding relation.
-    /// Omitting an accepted relation makes the legacy mapping unavailable for precise recovery.
-    ///
-    /// TODO: Remove this compatibility path once [`build_merged_with`][Self::build_merged_with] and all other
-    /// inference consumers can build specializations solely from the call-wide constraint set.
+    /// TODO: Remove this wrapper once repeated `ParamSpec` bounds can be combined.
+    fn record_constraint_analysis(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
+        if let ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(solutions)) = analysis {
+            self.record_paramspecs(
+                &solutions
+                    .iter()
+                    .map(|solution| solution.solved_typevars.as_slice()),
+            );
+        }
+        self.project_for_legacy_fallback(analysis);
+    }
+
+    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
+    fn record_paramspecs<'a>(
+        &mut self,
+        solutions: &(impl Iterator<Item = &'a [TypeVarSolution<'db>]> + Clone),
+    ) where
+        'db: 'a,
+    {
+        for typevar in self
+            .generic_context
+            .variables(self.db)
+            .filter(|typevar| typevar.is_paramspec(self.db))
+        {
+            // Different alternatives can supply different lists. They still belong to the
+            // first argument, so a later argument must not choose between them.
+            if solutions.clone().next().is_some()
+                && solutions.clone().all(|path| {
+                    path.iter().any(|binding| {
+                        binding.bound_typevar.identity(self.db) == typevar.identity(self.db)
+                    })
+                })
+            {
+                self.paramspec_seen.insert(typevar.identity(self.db));
+            }
+        }
+    }
+
+    /// Adds available solutions, including fallback bindings, to the legacy recovery mapping.
+    /// Only accepted relations can contribute; omitted evidence makes precise recovery unsafe.
     fn project_for_legacy_fallback(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
         if matches!(analysis, ConstraintSetAnalysis::BudgetExceeded) {
             self.types = LegacyTypeMappings::BudgetExceeded;
@@ -3680,7 +3724,25 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
     pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+        let when = self.remove_seen_paramspecs(when, &self.paramspec_seen);
         self.pending.intersect(self.db, self.constraints, when);
+    }
+
+    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
+    fn remove_seen_paramspecs(
+        &self,
+        when: ConstraintSet<'db, 'c>,
+        seen: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Callable and protocol comparisons can supply several variables at once. Ignore later
+        // occurrences of a ParamSpec without losing the other variables' requirements.
+        let seen = TypeVarSet::from_typevars(
+            self.db,
+            self.generic_context.variables(self.db).filter(|typevar| {
+                seen.contains(&typevar.identity(self.db)) && when.mentions_typevar(*typevar)
+            }),
+        );
+        when.reduce_inferable(self.db, self.env, self.constraints, seen)
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -3697,7 +3759,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if let Some(error) = analysis.specialization_error(db, self.env) {
             return Err(error);
         }
-        self.project_for_legacy_fallback(&analysis);
+        self.record_constraint_analysis(&analysis);
         Ok(())
     }
 
@@ -3992,6 +4054,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // Retain every alternative that was not proved unsatisfiable. Solving the
                 // combined TDD here would repeat their potentially expensive path traversals.
                 self.record_constraint_set(combined);
+                // TODO: Remove this bookkeeping once repeated `ParamSpec` bounds can be combined.
+                if accepted.iter().all(|(_, analysis)| {
+                    matches!(
+                        analysis,
+                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(_))
+                    )
+                }) {
+                    self.record_paramspecs(
+                        &accepted
+                            .iter()
+                            .filter_map(|(_, analysis)| match analysis {
+                                ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(
+                                    paths,
+                                )) => Some(paths),
+                                _ => None,
+                            })
+                            .flatten()
+                            .map(|solution| solution.solved_typevars.as_slice()),
+                    );
+                }
                 for (_, analysis) in accepted {
                     self.project_for_legacy_fallback(&analysis);
                 }
@@ -4087,16 +4169,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .is_always_satisfied(db, self.env, self.inferable)
         });
 
-        // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
-        // their entire inference context on the existing signature path, and use forward
-        // structural relations so nested variadics and ordinary type variables retain their
-        // mappings. Preserve the original polarity for recursive and ordinary inference.
-        // TODO: Apply full polarity once variadics are supported by the new constraint solver.
+        // Parameter-list inference extracts the actual signature's shape, including a
+        // Concatenate tail. Argument validation separately checks the enclosing variance.
         let relation_polarity = if !polarity.is_covariant()
-            && self
-                .inferable
-                .iter(db)
-                .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db))
+            && (any_over_type(db, self.env, formal, false, |ty| {
+                ty.as_typevar().is_some_and(|typevar| {
+                    typevar.is_paramspec(db)
+                        && typevar
+                            .without_paramspec_attr(db)
+                            .is_inferable(db, self.inferable)
+                })
+            })
+                // TODO: Apply full polarity once TypeVarTuple inference is migrated.
+                || self
+                    .inferable
+                    .iter(db)
+                    .any(|typevar| typevar.is_typevartuple(db)))
         {
             TypeVarVariance::Covariant
         } else {
@@ -4232,7 +4320,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let has_variadic = self
                         .inferable
                         .iter(db)
-                        .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
+                        .any(|typevar| typevar.is_typevartuple(db));
                     if has_variadic {
                         // TODO:
                         // Variadic contexts still solve from legacy mappings. Projecting the relation
@@ -4734,7 +4822,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     && !self
                         .inferable
                         .iter(db)
-                        .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db)) =>
+                        .any(|typevar| typevar.is_typevartuple(db)) =>
             {
                 let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 return self.infer_from_constraint_set(when);

@@ -7529,34 +7529,47 @@ impl<'db> Type<'db> {
                 //     name: str,
                 //     value: Any,
                 //     *,
-                //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+                //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = (),
+                //     qualname: str | None = None,  # Python 3.15+
                 // ) -> Self: ...
                 // ```
+                let parameters = [
+                    Parameter::positional_or_keyword(Name::new_static("name"))
+                        .with_annotated_type(KnownClass::Str.to_instance(db, env)),
+                    Parameter::positional_or_keyword(Name::new_static("value"))
+                        .with_annotated_type(object_type_form(db)),
+                    Parameter::keyword_only(Name::new_static("type_params"))
+                        .with_annotated_type(Type::homogeneous_tuple(
+                            db,
+                            env,
+                            UnionType::from_elements(
+                                db,
+                                env,
+                                [
+                                    KnownClass::TypeVar.to_instance(db, env),
+                                    KnownClass::ParamSpec.to_instance(db, env),
+                                    KnownClass::TypeVarTuple.to_instance(db, env),
+                                ],
+                            ),
+                        ))
+                        .with_default_type(Type::empty_tuple(db, env)),
+                ];
+                let qualname = (env.python_version(db) >= ast::PythonVersion::PY315).then(|| {
+                    let none = Type::none(db, env);
+                    Parameter::keyword_only(Name::new_static("qualname"))
+                        .with_annotated_type(UnionType::from_two_elements(
+                            db,
+                            env,
+                            KnownClass::Str.to_instance(db, env),
+                            none,
+                        ))
+                        .with_default_type(none)
+                });
                 Some(
                     Binding::single(
                         self,
                         Signature::new(
-                            Parameters::standard([
-                                Parameter::positional_or_keyword(Name::new_static("name"))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                                Parameter::positional_or_keyword(Name::new_static("value"))
-                                    .with_annotated_type(object_type_form(db)),
-                                Parameter::keyword_only(Name::new_static("type_params"))
-                                    .with_annotated_type(Type::homogeneous_tuple(
-                                        db,
-                                        env,
-                                        UnionType::from_elements(
-                                            db,
-                                            env,
-                                            [
-                                                KnownClass::TypeVar.to_instance(db, env),
-                                                KnownClass::ParamSpec.to_instance(db, env),
-                                                KnownClass::TypeVarTuple.to_instance(db, env),
-                                            ],
-                                        ),
-                                    ))
-                                    .with_default_type(Type::empty_tuple(db, env)),
-                            ]),
+                            Parameters::standard(parameters.into_iter().chain(qualname)),
                             Type::unknown(),
                         ),
                     )
@@ -10620,7 +10633,10 @@ impl<'db> Type<'db> {
     fn default_specialize(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let mut variables = FxOrderSet::default();
         self.find_legacy_typevars(db, env, None, &mut variables);
-        let generic_context = GenericContext::from_typevar_instances(db, env, variables);
+        let Some(generic_context) = GenericContext::try_from_typevar_instances(db, env, variables)
+        else {
+            return self;
+        };
         self.apply_specialization(db, generic_context.default_specialization(db, None))
     }
 
@@ -11207,24 +11223,28 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
-    /// Update the generic context of a [`Signature`] according to the current type mapping
+    /// Updates the generic context of a [`Signature`] according to the current type mapping.
+    ///
+    /// Returns `None` if the mapping removes all type variables from the context.
     fn update_signature_generic_context(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
-    ) -> GenericContext<'db> {
+    ) -> Option<GenericContext<'db>> {
         match self {
-            TypeMapping::FreshenBoundTypeVars { .. } => GenericContext::from_typevar_instances(
-                db,
-                env,
-                context.variables(db).map(|bound_typevar| {
-                    Type::TypeVar(bound_typevar)
-                        .apply_type_mapping(db, env, self, TypeContext::default())
-                        .as_typevar()
-                        .unwrap_or(bound_typevar)
-                }),
-            ),
+            TypeMapping::FreshenBoundTypeVars { .. } => {
+                Some(GenericContext::from_typevar_instances(
+                    db,
+                    env,
+                    context.variables(db).map(|bound_typevar| {
+                        Type::TypeVar(bound_typevar)
+                            .apply_type_mapping(db, env, self, TypeContext::default())
+                            .as_typevar()
+                            .unwrap_or(bound_typevar)
+                    }),
+                ))
+            }
             TypeMapping::ApplySpecialization(specialization)
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
@@ -11252,9 +11272,9 @@ impl<'db> TypeMapping<'_, 'db> {
                             )
                             .as_typevar()
                     });
-                    GenericContext::from_typevar_instances(db, env, kept)
+                    GenericContext::try_from_typevar_instances(db, env, kept)
                 } else {
-                    GenericContext::from_typevar_instances(db, env, kept)
+                    GenericContext::try_from_typevar_instances(db, env, kept)
                 }
             }
             TypeMapping::Promote(..)
@@ -11262,29 +11282,31 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
-            | TypeMapping::RescopeReturnCallables(_) => context,
+            | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
                     context.remove_self(db, binding.binding_context())
                 } else {
-                    context
+                    Some(context)
                 }
             }
-            TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
-                db,
-                env,
-                context.variables(db).map(|typevar| {
-                    if typevar.typevar(db).is_self(db) {
-                        BoundTypeVarInstance::synthetic_self(
-                            db,
-                            *new_upper_bound,
-                            typevar.binding_context(db),
-                        )
-                    } else {
-                        typevar
-                    }
-                }),
-            ),
+            TypeMapping::ReplaceSelf { new_upper_bound } => {
+                Some(GenericContext::from_typevar_instances(
+                    db,
+                    env,
+                    context.variables(db).map(|typevar| {
+                        if typevar.typevar(db).is_self(db) {
+                            BoundTypeVarInstance::synthetic_self(
+                                db,
+                                *new_upper_bound,
+                                typevar.binding_context(db),
+                            )
+                        } else {
+                            typevar
+                        }
+                    }),
+                ))
+            }
         }
     }
 

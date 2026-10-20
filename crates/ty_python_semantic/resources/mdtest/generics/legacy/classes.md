@@ -160,6 +160,11 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
+# error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
+class ExplicitInheritedGenericEmpty(MultipleTypevars[T, S], Generic[()]): ...
+
+reveal_type(generic_context(ExplicitInheritedGenericEmpty))  # revealed: None
+
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
 reveal_type(generic_context(ExplicitInheritedGeneric))
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
@@ -1602,6 +1607,95 @@ reveal_type(D(1))  # revealed: D[int]
 # TODO: The revealed type in the error message should be `D[str]`.
 # error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
+```
+
+### Type variable defaults across `__new__` and `__init__`
+
+A type variable left unsolved by `__new__` can still be inferred from `__init__`. Its default
+applies only when neither method solves it, including when `__new__` is inherited.
+
+```py
+from typing_extensions import Any, Generic, Self, TypeVar
+
+T = TypeVar("T", default=str)
+
+class Base:
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return super().__new__(cls)
+
+class C(Base, Generic[T]):
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(C(int()))  # revealed: C[int]
+reveal_type(C())  # revealed: C[str]
+reveal_type(C[float](float()))  # revealed: C[float]
+C[str](int())  # error: [invalid-argument-type]
+```
+
+Inferring a gradual type from an argument also takes precedence over the default:
+
+```py
+from ty_extensions._internal import Unknown
+
+def gradual(unknown: Unknown, dynamic: Any):
+    reveal_type(C(unknown))  # revealed: C[Unknown]
+    reveal_type(C(dynamic))  # revealed: C[Any]
+```
+
+The same applies when `__new__` is defined directly and returns the generic class instead of `Self`:
+
+```py
+class Direct(Generic[T]):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Direct[T]":
+        return super().__new__(cls)
+
+    def __init__(self, value: T | None = None) -> None: ...
+
+reveal_type(Direct(int()))  # revealed: Direct[int]
+reveal_type(Direct())  # revealed: Direct[str]
+```
+
+An explicitly annotated `self` can infer the class's type argument through a method type variable:
+
+```py
+V = TypeVar("V")
+
+class ExplicitSelf(Base, Generic[T]):
+    def __init__(self: "ExplicitSelf[V]", value: V) -> None: ...
+
+reveal_type(ExplicitSelf(int()))  # revealed: ExplicitSelf[int]
+```
+
+Each method can solve different type variables. A default that references another type variable uses
+that variable's inferred type:
+
+```py
+U = TypeVar("U", default=T)
+
+class Pair(Generic[T, U]):
+    def __new__(cls, first: T, second: object = None) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: U | None = None) -> None: ...
+
+reveal_type(Pair(int(), bytes()))  # revealed: Pair[int, bytes]
+reveal_type(Pair(int()))  # revealed: Pair[int, int]
+```
+
+When both methods infer a type, we combine their results even if one happens to equal the default:
+
+```py
+class Both(Generic[T]):
+    def __new__(cls, first: T, second: object) -> Self:
+        return super().__new__(cls)
+
+    def __init__(self, first: object, second: T) -> None: ...
+
+reveal_type(Both(str(), int()))  # revealed: Both[str | int]
+
+def inferred_unknown(unknown: Unknown):
+    reveal_type(Both(unknown, int()))  # revealed: Both[Unknown | int]
+    reveal_type(Both(int(), unknown))  # revealed: Both[int | Unknown]
 ```
 
 ### Both present, `__new__` inherited from a generic base class

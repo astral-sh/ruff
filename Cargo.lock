@@ -2577,7 +2577,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c80231409c20246a13fddb31776fb942c38553c51e871f8cbd687a4cfb5843d"
 dependencies = [
  "phf_shared 0.11.3",
- "rand 0.8.5",
+ "rand 0.8.8",
 ]
 
 [[package]]
@@ -2880,9 +2880,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "e058c7de0b26af77780c769414d6257830bb240f3c38477dbc2c16e5f54d6d4c"
 dependencies = [
  "rand_core 0.6.4",
 ]
@@ -4665,6 +4665,7 @@ dependencies = [
  "ruff_db",
  "ruff_diagnostics",
  "ruff_python_ast",
+ "ruff_python_parser",
  "ruff_python_trivia",
  "ruff_ranged_value",
  "salsa",
@@ -5061,6 +5062,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_notebook",
  "ruff_python_formatter",
+ "ruff_python_parser",
  "ruff_ranged_value",
  "ruff_source_file",
  "ruff_text_size",

@@ -812,6 +812,22 @@ class C(Generic[S]):
 x: C[A]
 ```
 
+### Qualified name
+
+Python 3.15 supports a string or `None` for the `qualname` keyword argument.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypeAliasType
+
+Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # no diagnostic
+Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-type]
+```
+
 ### Error cases
 
 #### Name is not a string literal
@@ -835,6 +851,21 @@ from typing_extensions import TypeAliasType
 # error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
 IntOrStr = TypeAliasType("WrongName", Union[int, str])
 reveal_type(IntOrStr)  # revealed: TypeAliasType
+```
+
+#### Invalid keyword arguments
+
+```py
+from typing_extensions import TypeAliasType
+
+Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
+Duplicate = TypeAliasType("Duplicate", int, name="Duplicate")  # error: [parameter-already-assigned]
+Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
+NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]
+Unsupported = TypeAliasType("Unsupported", int, qualname="Unsupported")  # error: [unknown-argument]
+
+def f(value: Invalid) -> None:
+    reveal_type(value)  # revealed: int
 ```
 
 #### Not a simple variable assignment

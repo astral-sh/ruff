@@ -2291,18 +2291,138 @@ help:
 
 ## Hash method overrides
 
-The signature of `object.__hash__` still constrains overriding methods, even though a subclass can
-disable hashing by setting `__hash__` to `None`.
+Override checking on `__hash__` methods is inherently unsound in Python, because `object` declares a
+`__hash__` method of type `(self) -> int`, making it hashable, but subclasses are explicitly allowed
+to set `__hash__ = None` to disable hashability -- which is Liskov-unsafe. Thus we have to make a
+policy decision about what exactly to enforce on `__hash__` overrides. We choose to require that a
+`__hash__` method must either have type `(self) -> int` (or a subtype), or be `None` to disable
+hashing. This same contract applies to all `__hash__` methods, regardless of the signatures declared
+by base classes.
 
 ```pyi
 class Hashable:
     def __hash__(self) -> int: ...  # no diagnostic
 
 class InvalidHash:
-    def __hash__(self) -> str: ...  # error: [invalid-method-override]
+    def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid `__hash__` definition
+ --> src/mdtest_snippet.pyi:5:9
+  |
+5 |     def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^ Expected `(() -> int) | None`
+info: type `bound method InvalidHash.__hash__() -> str` is not assignable to any element of the union `(() -> int) | None`
+info: ├── incompatible return types: `str` is not assignable to `int`
+info: └── ... omitted 1 union element without additional context
+```
+
+```pyi
+class InvalidParameters:
+    def __hash__(self, extra: int) -> int: ...  # error: [invalid-method-override]
+
+class NonCallable:
+    __hash__ = 42  # error: [invalid-method-override]
 
 class Unhashable:
     __hash__ = None  # no diagnostic
+```
+
+## Restoring hashability
+
+A subclass can replace a narrower hash signature, disable hashing, or restore it. Inherited
+annotations do not constrain the replacement or its inferred type:
+
+```pyi
+from typing import Callable, ClassVar
+
+class NarrowHash:
+    __hash__: ClassVar[Callable[..., bool]]
+
+class Assigned(NarrowHash):
+    __hash__ = object.__hash__  # no diagnostic
+
+reveal_type(Assigned.__hash__)  # revealed: def __hash__(self) -> int
+
+class Unhashable(Assigned):
+    __hash__ = None  # no diagnostic
+
+class Restored(Unhashable):
+    def __hash__(self) -> int: ...  # no diagnostic
+```
+
+The inherited `ClassVar` still prevents assignment through an instance:
+
+```pyi
+Assigned().__hash__ = object.__hash__  # error: [invalid-attribute-access]
+```
+
+## Restoring hashability with callable objects
+
+A callable object assigned to `__hash__` keeps its own calling convention. Its `__call__` method
+receives the callable object, with no additional argument for the object being hashed:
+
+```py
+from typing import ClassVar
+
+class Unhashable:
+    __hash__: ClassVar[None] = None
+
+class HashCallable:
+    def __call__(self) -> int:
+        return 0
+
+class Restored(Unhashable):
+    __hash__ = HashCallable()  # no diagnostic
+```
+
+An incompatible return type makes the replacement invalid:
+
+```py
+class StringHashCallable:
+    def __call__(self) -> str:
+        return "invalid"
+
+class InvalidReturn(Unhashable):
+    __hash__ = StringHashCallable()  # error: [invalid-method-override]
+```
+
+## Optional hash methods
+
+A class can declare that hashing is either disabled or provided by a compatible callable. The
+callable alternative must still return an `int`:
+
+```py
+from typing import Callable, ClassVar
+
+class OptionalHash:
+    __hash__: ClassVar[Callable[..., int] | None]  # no diagnostic
+
+class InvalidOptionalHash:
+    __hash__: ClassVar[Callable[..., str] | None]  # error: [invalid-method-override]
+```
+
+## Final hash definitions
+
+Finality still prevents subclasses from replacing a hash definition, including when changing whether
+hashing is enabled:
+
+```pyi
+from typing import Final, final
+
+class Unhashable:
+    __hash__: Final = None
+
+class RestoreFinalVariable(Unhashable):
+    __hash__ = object.__hash__  # error: [override-of-final-variable]
+
+class Hashable:
+    @final
+    def __hash__(self) -> int: ...
+
+class DisableFinalMethod(Hashable):
+    __hash__ = None  # error: [override-of-final-method]
 ```
 
 ## Class-private names do not override
