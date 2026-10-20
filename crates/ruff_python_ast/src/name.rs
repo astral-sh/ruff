@@ -323,25 +323,18 @@ impl<'a> QualifiedName<'a> {
         }
     }
 
-    /// Creates a qualified name from `expr`, replacing its head with `resolved_head`.
+    /// Creates a non-builtin qualified name from a single identifier.
     ///
-    /// `expr` must be a name or an attribute chain rooted at a name. For example,
-    /// resolving the head of `np.linalg.norm` to `["numpy"]` produces `numpy.linalg.norm`.
+    /// `name` must be nonempty and must not contain `.`. Use [`Self::user_defined`]
+    /// for dotted names.
     #[inline]
-    pub fn from_expr(mut expr: &'a Expr, resolved_head: &[&'a str]) -> Self {
-        let mut segments = SegmentsVec::from_slice(resolved_head);
-        while let Expr::Attribute(attribute) = expr {
-            segments.push(attribute.attr.as_str());
-            expr = &attribute.value;
-        }
-        debug_assert!(expr.is_name_expr());
-
-        // Attribute traversal visits the outermost member first; keep the prefix in order.
-        segments.as_mut_slice()[resolved_head.len()..].reverse();
-        Self(segments)
+    pub fn user_defined_identifier(name: &'a str) -> Self {
+        debug_assert!(!name.is_empty());
+        debug_assert!(!name.contains('.'));
+        Self(SegmentsVec::from_slice(&[name]))
     }
 
-    /// Creates a name that's guaranteed not be a built in
+    /// Creates a non-builtin qualified name, splitting `name` on `.`.
     #[inline]
     pub fn user_defined(name: &'a str) -> Self {
         name.split('.').collect()
@@ -387,6 +380,34 @@ impl<'a> QualifiedName<'a> {
         let mut inner = self.0;
         inner.push(member);
         Self(inner)
+    }
+
+    /// Creates a qualified name with the attributes of `expr`, skipping its first name.
+    ///
+    /// For example, appending the attributes of `np.linalg.norm` to `numpy`
+    /// produces `numpy.linalg.norm`. A plain name produces a copy of this name.
+    ///
+    /// Returns `None` if this name is empty or `expr` is not a name or an
+    /// attribute chain rooted at a name.
+    #[inline]
+    pub fn with_attributes(&self, mut expr: &'a Expr) -> Option<Self> {
+        let prefix = self.segments();
+        if prefix.is_empty() {
+            return None;
+        }
+
+        let mut segments = SegmentsVec::from_slice(prefix);
+        while let Expr::Attribute(attribute) = expr {
+            segments.push(attribute.attr.as_str());
+            expr = &attribute.value;
+        }
+        if !expr.is_name_expr() {
+            return None;
+        }
+
+        // Attribute traversal visits the outermost member first; keep the prefix in order.
+        segments.as_mut_slice()[prefix.len()..].reverse();
+        Some(Self(segments))
     }
 
     /// Extends the qualified name using the given members.
@@ -882,52 +903,48 @@ mod tests {
 
     #[cfg(feature = "salsa")]
     use crate::name::Name;
-    use crate::name::{QualifiedName, SMALL_LEN, SegmentsVec};
-    use crate::{AtomicNodeIndex, Expr, ExprAttribute, ExprContext, ExprName, Identifier};
+    use crate::name::{QualifiedName, SegmentsVec};
+    use crate::{
+        AtomicNodeIndex, Expr, ExprAttribute, ExprContext, ExprName, ExprNoneLiteral, Identifier,
+    };
 
     #[test]
-    fn qualified_name_from_expr() {
-        let attributes = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"];
-        for prefix in [
-            &[][..],
-            &["numpy"],
-            &["package", "module"],
-            &["", "dict"],
-            &["p", "q", "r", "s", "t", "u", "v"],
-            &["p", "q", "r", "s", "t", "u", "v", "w"],
-            &["p", "q", "r", "s", "t", "u", "v", "w", "x"],
-        ] {
-            let mut expr = Expr::Name(ExprName {
-                id: "alias".into(),
-                range: TextRange::default(),
-                node_index: AtomicNodeIndex::NONE,
-                ctx: ExprContext::Load,
-            });
+    fn with_attributes() {
+        let name = QualifiedName::user_defined("numpy.linalg");
+        let expr = Expr::Name(ExprName {
+            id: "la".into(),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+        });
+        assert_eq!(name.with_attributes(&expr), Some(name.clone()));
 
-            for tail_len in 0..=attributes.len() {
-                let qualified = QualifiedName::from_expr(&expr, prefix);
-                assert_eq!(&qualified.segments()[..prefix.len()], prefix);
-                assert_eq!(
-                    &qualified.segments()[prefix.len()..],
-                    &attributes[..tail_len]
-                );
-                assert_eq!(
-                    qualified.0.is_spilled(),
-                    prefix.len() + tail_len > SMALL_LEN
-                );
-                drop(qualified);
+        let expr = attribute_expr(attribute_expr(expr, "norm"), "__name__");
+        assert_eq!(
+            name.with_attributes(&expr),
+            Some(QualifiedName::user_defined("numpy.linalg.norm.__name__"))
+        );
+    }
 
-                if let Some(attribute) = attributes.get(tail_len) {
-                    expr = Expr::Attribute(ExprAttribute {
-                        value: Box::new(expr),
-                        attr: Identifier::new(*attribute, TextRange::default()),
-                        range: TextRange::default(),
-                        node_index: AtomicNodeIndex::NONE,
-                        ctx: ExprContext::Load,
-                    });
-                }
-            }
-        }
+    #[test]
+    fn with_attributes_invalid_root() {
+        let name = QualifiedName::user_defined_identifier("numpy");
+        let expr = Expr::NoneLiteral(ExprNoneLiteral {
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        });
+        let expr = attribute_expr(expr, "member");
+        assert_eq!(name.with_attributes(&expr), None);
+    }
+
+    fn attribute_expr(value: Expr, attribute: &str) -> Expr {
+        Expr::Attribute(ExprAttribute {
+            value: Box::new(value),
+            attr: Identifier::new(attribute, TextRange::default()),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+        })
     }
 
     #[cfg(feature = "salsa")]

@@ -1212,18 +1212,16 @@ impl<'a> SemanticModel<'a> {
                     return Some(QualifiedName::builtin(head.id.as_str()));
                 }
 
-                return Some(QualifiedName::from_expr(value, &["", head.id.as_str()]));
+                return QualifiedName::builtin(head.id.as_str()).with_attributes(value);
             }
             Symbol::Unbound => return None,
         };
 
         match &binding.kind {
-            BindingKind::Import(Import { qualified_name }) => {
-                Some(QualifiedName::from_expr(value, qualified_name.segments()))
-            }
+            BindingKind::Import(Import { qualified_name }) => qualified_name.with_attributes(value),
             BindingKind::SubmoduleImport(SubmoduleImport { qualified_name }) => {
-                let (head, _) = qualified_name.segments().split_first()?;
-                Some(QualifiedName::from_expr(value, std::slice::from_ref(head)))
+                let head = qualified_name.segments().first()?;
+                QualifiedName::user_defined_identifier(head).with_attributes(value)
             }
             BindingKind::FromImport(FromImport { qualified_name }) => {
                 if qualified_name.is_unresolved_import() {
@@ -1235,7 +1233,7 @@ impl<'a> SemanticModel<'a> {
                         tail,
                     )
                 } else {
-                    Some(QualifiedName::from_expr(value, qualified_name.segments()))
+                    qualified_name.with_attributes(value)
                 }
             }
             BindingKind::Builtin => {
@@ -1244,7 +1242,7 @@ impl<'a> SemanticModel<'a> {
                     Some(QualifiedName::builtin(head.id.as_str()))
                 } else {
                     // Ex) `dict.__dict__`
-                    Some(QualifiedName::from_expr(value, &["", head.id.as_str()]))
+                    QualifiedName::builtin(head.id.as_str()).with_attributes(value)
                 }
             }
             BindingKind::ClassDefinition(_) | BindingKind::FunctionDefinition(_) => {
