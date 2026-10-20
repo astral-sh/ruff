@@ -862,6 +862,15 @@ impl<'db> InferExpression<'db> {
         mut context: ExpressionInferenceContext<'db>,
     ) -> InferExpression<'db> {
         context.environment = context.environment.for_scope(db, expression.scope(db));
+        // Callee inference always enables this flag. Keeping it in the query key would
+        // infer the same callee twice depending on which caller requested it.
+        if context
+            .flags
+            .contains(InferenceFlags::CHECK_UNBOUND_TYPEVARS)
+            && expression.kind(db) == ExpressionKind::Callee
+        {
+            context.flags.remove(InferenceFlags::CHECK_UNBOUND_TYPEVARS);
+        }
         if tcx.annotation.is_some() || context != ExpressionInferenceContext::default() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx, context))
         } else {
