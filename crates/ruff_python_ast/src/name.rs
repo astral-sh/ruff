@@ -323,19 +323,6 @@ impl<'a> QualifiedName<'a> {
         }
     }
 
-    /// Creates a name that's guaranteed not be a built in
-    #[inline]
-    pub fn user_defined(name: &'a str) -> Self {
-        name.split('.').collect()
-    }
-
-    /// Creates a qualified name for a built in
-    #[inline]
-    pub fn builtin(name: &'a str) -> Self {
-        debug_assert!(!name.contains('.'));
-        Self(SegmentsVec::from_slice(&["", name]))
-    }
-
     /// Creates a qualified name from `expr`, replacing its head with `resolved_head`.
     ///
     /// `expr` must be a name or an attribute chain rooted at a name. For example,
@@ -352,6 +339,19 @@ impl<'a> QualifiedName<'a> {
         // Attribute traversal visits the outermost member first; keep the prefix in order.
         segments.as_mut_slice()[resolved_head.len()..].reverse();
         Self(segments)
+    }
+
+    /// Creates a name that's guaranteed not be a built in
+    #[inline]
+    pub fn user_defined(name: &'a str) -> Self {
+        name.split('.').collect()
+    }
+
+    /// Creates a qualified name for a built in
+    #[inline]
+    pub fn builtin(name: &'a str) -> Self {
+        debug_assert!(!name.contains('.'));
+        Self(SegmentsVec::from_slice(&["", name]))
     }
 
     #[inline]
