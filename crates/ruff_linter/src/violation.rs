@@ -34,7 +34,7 @@ pub trait ViolationMetadata {
 
     /// Returns an explanation of what this violation catches,
     /// why it's bad, and what users should do instead.
-    fn explain() -> Option<&'static str>;
+    fn explain() -> &'static str;
 
     /// Returns the rule status for this violation.
     fn status() -> RuleStatus;
