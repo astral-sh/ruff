@@ -21,8 +21,8 @@ from collections.abc import (
     ValuesView,
 )
 from importlib.machinery import ModuleSpec
-from typing import Any, ClassVar, Literal, ParamSpec, TypeVar, final, overload
-from typing_extensions import Self, TypeAliasType, TypeVarTuple, deprecated, disjoint_base
+from typing import Any, ClassVar, Concatenate, Generic, Literal, final, overload
+from typing_extensions import ParamSpec, Self, TypeAliasType, TypeVar, TypeVarTuple, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from _typeshed import AnnotateFunc
@@ -76,10 +76,13 @@ _T1 = TypeVar("_T1")
 _T2 = TypeVar("_T2")
 _KT_co = TypeVar("_KT_co", covariant=True)
 _VT_co = TypeVar("_VT_co", covariant=True)
+_P = ParamSpec("_P")
+_P_contra = ParamSpec("_P_contra", contravariant=True, default=...)
+_R_co = TypeVar("_R_co", covariant=True, default=Any)
 
 # Make sure this class definition stays roughly in line with `builtins.function`
 @final
-class FunctionType:
+class FunctionType(Generic[_P_contra, _R_co]):
     """Create a function object.
 
     code
@@ -140,14 +143,18 @@ class FunctionType:
             closure: tuple[CellType, ...] | None = None,
         ) -> Self: ...
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(
+        self: FunctionType[_P_contra, _R_co], *args: _P_contra.args, **kwargs: _P_contra.kwargs
+    ) -> _R_co:
         """Call self as a function."""
 
     @overload
-    def __get__(self, instance: None, owner: type, /) -> FunctionType:
+    def __get__(self, instance: None, owner: type, /) -> Self:
         """Return an attribute of instance, which is of type owner."""
     @overload
-    def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
+    def __get__(
+        self: FunctionType[Concatenate[_T1, _P], _R_co], instance: _T1, owner: type | None = None, /
+    ) -> MethodType[_P, _R_co]: ...
 
 LambdaType = FunctionType
 
@@ -605,7 +612,7 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
             """coroutines are generic over the types of their yield, send, and return values"""
 
 @final
-class MethodType:
+class MethodType(Generic[_P_contra, _R_co]):
     """Create a bound instance method object."""
 
     @property
@@ -615,7 +622,7 @@ class MethodType:
     @property
     def __defaults__(self) -> tuple[Any, ...] | None: ...  # inherited from the added function
     @property
-    def __func__(self) -> Callable[..., Any]:
+    def __func__(self) -> Callable[Concatenate[Any, _P_contra], _R_co]:
         """the function (or other callable) implementing a method"""
 
     @property
@@ -626,8 +633,8 @@ class MethodType:
     def __name__(self) -> str: ...  # inherited from the added function
     @property
     def __qualname__(self) -> str: ...  # inherited from the added function
-    def __new__(cls, func: Callable[..., Any], instance: object, /) -> Self: ...
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __new__(cls, func: Callable[Concatenate[_T1, _P_contra], _R_co], instance: _T1, /) -> Self: ...
+    def __call__(self, *args: _P_contra.args, **kwargs: _P_contra.kwargs) -> _R_co:
         """Call self as a function."""
 
     if sys.version_info >= (3, 13):
@@ -952,7 +959,6 @@ class DynamicClassAttribute(property):
 
 _Fn = TypeVar("_Fn", bound=Callable[..., object])
 _R = TypeVar("_R")
-_P = ParamSpec("_P")
 
 # it's not really an Awaitable, but can be used in an await expression. Real type: Generator & Awaitable
 @overload

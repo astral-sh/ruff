@@ -198,6 +198,17 @@ impl<'db> BoundMethodType<'db> {
         match self.func(db) {
             Type::FunctionLiteral(function) => Some(function.signature(db)),
             Type::Callable(callable) => Some(callable.signatures(db)),
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::FunctionType) =>
+            {
+                let env = ProgramEnvironment::from_program(self.program(db));
+                Some(
+                    self.func(db)
+                        .try_upcast_to_callable(db, &env)?
+                        .exactly_one()?
+                        .signatures(db),
+                )
+            }
             _ => None,
         }
     }

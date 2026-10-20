@@ -89,7 +89,7 @@ reveal_type(D().f)  # revealed: bound method D.f(x: int) -> str
 If we access an attribute on a bound method object itself, it will defer to `types.MethodType`:
 
 ```py
-reveal_type(bound_method.__hash__)  # revealed: bound method MethodType.__hash__() -> int
+reveal_type(bound_method.__hash__)  # revealed: bound method MethodType[(...), Any].__hash__() -> int
 ```
 
 If an attribute is not available on the bound method object, it will be looked up on the underlying
@@ -452,6 +452,26 @@ def _(union: E1 | Any, intersection: E1 & Any):
     reveal_type(intersection.f())  # revealed: list[E1 & Any] & Any
 ```
 
+## Stored unbound methods with `Self`
+
+Promoting an unbound method to `FunctionType` preserves the connection between its receiver and
+`Self`, including when the stored function is subsequently bound to an instance.
+
+```py
+from typing import Self
+
+class Base:
+    def clone(self) -> Self:
+        return self
+
+class Derived(Base): ...
+
+methods = [Base.clone]
+reveal_type(methods[0](Derived()))  # revealed: Derived
+reveal_type(methods[0](Base()))  # revealed: Base
+reveal_type(methods[0].__get__(Derived(), Derived)())  # revealed: Derived
+```
+
 ## Stored protocol-bound methods
 
 A protocol-bound method stored alongside another callable must not re-check its already-bound
@@ -483,6 +503,29 @@ class Variadic(Protocol):
 
 def check_variadic(value: Variadic) -> None:
     value.method()  # error: [invalid-argument-type]
+```
+
+## Stored bound methods with specialized variadic parameters
+
+A bound method whose variadic parameters are specialized to `Any` remains compatible with a callable
+accepting no arguments when stored in a collection.
+
+```py
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class C(Generic[T]):
+    def method(self, *args: T, **kwargs: T) -> None: ...
+
+instance = C[Any]()
+static_assert(is_subtype_of(TypeOf[instance.method], Callable[[], None]))
+methods = [instance.method]
+static_assert(is_subtype_of(TypeOf[methods[0]], Callable[[], None]))
+reveal_type(methods[0]())  # revealed: None
 ```
 
 ## Bound methods without a positional receiver
@@ -1717,7 +1760,7 @@ static_assert(is_assignable_to(TypeOf[f], Callable[..., Any]))
 reveal_type(f.__get__)
 static_assert(is_assignable_to(TypeOf[f.__get__], Callable[..., Any]))
 
-# revealed: def __call__(self, *args: Any, **kwargs: Any) -> Any
+# revealed: def __call__(self: FunctionType[(...), Any], *args: Any, **kwargs: Any) -> Any
 reveal_type(types.FunctionType.__call__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable[..., Any]))
 
@@ -1768,7 +1811,7 @@ def _(
     k: RegularCallableTypeOf[str.startswith],
     l: RegularCallableTypeOf["foo".startswith],
 ):
-    # revealed: Overload[(self: FunctionType, instance: None, owner: type, /) -> Unknown, (self: FunctionType, instance: object, owner: type | None = None, /) -> Unknown]
+    # revealed: Overload[(self: FunctionType[(...), Any], instance: None, owner: type, /) -> Unknown, (self: FunctionType[(...), Any], instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(a)
 
     # revealed: (obj: type) -> None
@@ -1778,7 +1821,7 @@ def _(
     # revealed: Overload[(instance: None, owner: type, /) -> Unknown, (instance: object, owner: type | None = None, /) -> Unknown]
     reveal_type(c)
 
-    # revealed: (self, *args: Any, **kwargs: Any) -> Any
+    # revealed: (self: FunctionType[(...), Any], *args: Any, **kwargs: Any) -> Any
     reveal_type(d)
 
     # revealed: (obj: type) -> None

@@ -6637,7 +6637,7 @@ Source with applied edits:
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/types.pyi:LL:7
            |
-        LL | class FunctionType:
+        LL | class FunctionType(Generic[_P_contra, _R_co]):
            |       ^^^^^^^^^^^^
         info: Source
           --> main2.py:LL:39
@@ -6676,7 +6676,7 @@ Source with applied edits:
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/types.pyi:LL:9
            |
-        LL |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        LL |     def __call__(
            |         ^^^^^^^^
         info: Source
           --> main2.py:LL:22
@@ -6687,7 +6687,7 @@ Source with applied edits:
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/types.pyi:LL:7
            |
-        LL | class FunctionType:
+        LL | class FunctionType(Generic[_P_contra, _R_co]):
            |       ^^^^^^^^^^^^
         info: Source
           --> main2.py:LL:35

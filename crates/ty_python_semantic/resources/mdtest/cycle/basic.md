@@ -251,7 +251,7 @@ We do, however, still check assignability of the default value to the parameter 
 ```py
 class D:
     def f(self: "D"):
-        # error: [invalid-parameter-default] "Default value of type `(a: int = ...) -> Unknown` is not assignable to annotated parameter type `int`"
+        # error: [invalid-parameter-default] "Default value of type `FunctionType[(a: int = ...), Unknown]` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
         self.a = inner_a
 ```

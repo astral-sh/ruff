@@ -4857,6 +4857,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
+            (
+                Type::NominalInstance(formal_instance),
+                Type::FunctionLiteral(_) | Type::Callable(_),
+            ) if formal_instance.has_known_class(db, KnownClass::FunctionType) => {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
+            (Type::NominalInstance(formal_instance), Type::BoundMethod(_))
+                if formal_instance.has_known_class(db, KnownClass::MethodType) =>
+            {
+                let when = self.constraint_for_relation(formal, actual, relation_polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (Type::NominalInstance(formal_nominal), Type::NominalInstance(actual_nominal)) => {
                 if let Some(formal_alias) = formal_nominal.class(db, self.env).into_generic_alias()
                 {

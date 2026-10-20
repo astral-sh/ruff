@@ -2563,6 +2563,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_callable_pair(db, source_callable, target_callable)
                 }),
 
+            // Compare complete function and bound-method signatures so generic binders can
+            // relate their parameters and return types, including across nominal type arguments.
+            // The signature alone is not enough: the runtime classes must also match.
+            (
+                Type::FunctionLiteral(_)
+                | Type::Callable(_)
+                | Type::BoundMethod(_)
+                | Type::NominalInstance(_),
+                Type::NominalInstance(instance),
+            ) if (instance.has_known_class(db, KnownClass::FunctionType)
+                && source.function_like_kind(db) == Some(CallableTypeKind::FunctionLike))
+                || (instance.has_known_class(db, KnownClass::MethodType)
+                    && (matches!(source, Type::BoundMethod(_))
+                        || matches!(source, Type::NominalInstance(source)
+                            if source.has_known_class(db, KnownClass::MethodType)))) =>
+            {
+                self.with_recursion_guard(db, source, target, || {
+                    let Some(source) = source.try_upcast_to_callable(db, env) else {
+                        return self.never();
+                    };
+                    let Some(target) = target.try_upcast_to_callable(db, env) else {
+                        return self.never();
+                    };
+                    target.iter().when_all(db, self.constraints, |target| {
+                        self.check_callables_vs_callable(db, &source, *target)
+                    })
+                })
+            }
+
             (
                 Type::Callable(source_callable),
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(target_partial)),

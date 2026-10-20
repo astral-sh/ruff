@@ -2268,6 +2268,16 @@ impl<'db> Signature<'db> {
         Self { definition, ..self }
     }
 
+    /// Copy receiver constraints without changing the signature's parameters or generic context.
+    pub(super) fn with_receiver_constraints_from(mut self, source: &Self) -> Self {
+        self.extras = SignatureExtras::new(
+            self.source_overload_index_raw(),
+            source.receiver_constraints().cloned(),
+            self.is_paramspec_value(),
+        );
+        self
+    }
+
     /// Records this signature's position in its defining function's overload list.
     pub(crate) fn with_source_overload_index(mut self, index: Option<usize>) -> Self {
         let index = index

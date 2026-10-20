@@ -2956,7 +2956,7 @@ static_assert(is_assignable_to(EquivalentFunctionLikeCallableType, DunderInitTyp
 
 static_assert(is_equivalent_to(EquivalentFunctionLikeCallableType, DunderInitType))
 
-static_assert(is_subtype_of(DunderInitType, FunctionType))
+static_assert(is_subtype_of(DunderInitType, FunctionType[[C, int], None]))
 ```
 
 It should be possible to mock out synthesized methods:

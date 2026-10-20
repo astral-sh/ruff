@@ -2430,12 +2430,18 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type supports eager `Self` binding via `bind_self_typevars`.
     ///
-    /// `FunctionLiteral`, `BoundMethod`, and function-like `Callable` types return `false`
-    /// because their `Self` binding is deferred to call time via the signature binding path.
+    /// `FunctionLiteral`, `BoundMethod`, function-like `Callable`, and nominal `FunctionType`
+    /// types return `false` because their `Self` binding is deferred to call time via the
+    /// signature binding path.
     fn supports_self_binding(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         match self {
             Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
             Type::Callable(callable) if callable.is_function_like(db) => false,
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::FunctionType) =>
+            {
+                false
+            }
             _ => self.contains_self(db, env),
         }
     }
@@ -3509,9 +3515,7 @@ impl<'db> Type<'db> {
         // report look better until we have proper bidirectional type inference.
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db, env)),
-            Type::FunctionLiteral(function) => {
-                Some(function.runtime_class(db).to_instance(db, env))
-            }
+            Type::FunctionLiteral(function) => Some(function.to_instance(db, env)),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db, env)),
             _ => None,
         }
@@ -3520,8 +3524,8 @@ impl<'db> Type<'db> {
     /// Promote (possibly nested) literals to types that these literals are instances of.
     ///
     /// Note that this function tries to promote literals to a more user-friendly form than their
-    /// fallback instance type. For example, `def _() -> int` is promoted to `Callable[[], int]`,
-    /// as opposed to `FunctionType`.
+    /// fallback instance type. Functions retain their signatures, using a specialized
+    /// `FunctionType` where possible and a callable representation for overloaded signatures.
     pub(crate) fn promote(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         self.apply_type_mapping(
             db,
@@ -3607,7 +3611,9 @@ impl<'db> Type<'db> {
             Type::LiteralValue(literal) if literal.is_promotable() => {
                 literal.fallback_instance(db, env)
             }
-            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            Type::FunctionLiteral(literal) => literal
+                .try_to_function_type_instance(db, env)
+                .unwrap_or_else(|| Type::Callable(literal.into_callable_type(db))),
             _ => self,
         }
     }
@@ -4740,10 +4746,9 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, env, name),
 
-            Type::FunctionLiteral(function) => function
-                .runtime_class(db)
-                .to_instance(db, env)
-                .instance_member(db, env, name),
+            Type::FunctionLiteral(function) => {
+                function.to_instance(db, env).instance_member(db, env, name)
+            }
 
             Type::BoundMethod(_) => KnownClass::MethodType
                 .to_instance(db, env)
@@ -9631,7 +9636,7 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
-                    // callable form.
+                    // instance or callable form.
                     TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                         Type::FunctionLiteral(function.apply_type_mapping_impl(
                             db,
