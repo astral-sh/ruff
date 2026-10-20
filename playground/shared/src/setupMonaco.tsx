@@ -3,17 +3,17 @@
  */
 
 import { loader, type Monaco } from "@monaco-editor/react";
-import { dependencies } from "../package.json";
+import * as monaco from "monaco-editor";
+import EditorWorker from "monaco-editor/editor/editor.worker?worker";
+import JsonWorker from "monaco-editor/languages/features/json/json.worker?worker";
 
-// The loader's default CDN URL pins its own Monaco version, so updating the
-// `monaco-editor` dependency would not update the version loaded by the
-// playgrounds. Set `paths.vs` before initialization to use the version pinned
-// in shared/package.json.
-loader.config({
-  paths: {
-    vs: `https://cdn.jsdelivr.net/npm/monaco-editor@${dependencies["monaco-editor"]}/min/vs`,
+self.MonacoEnvironment = {
+  getWorker(_, label) {
+    return label === "json" ? new JsonWorker() : new EditorWorker();
   },
-});
+};
+
+loader.config({ monaco });
 
 export const WHITE = "#ffffff";
 export const RADIATE = "#d7ff64";
@@ -51,7 +51,7 @@ export function setupMonaco(
   defineTomlLanguage(monaco);
   defineCommentsLanguage(monaco);
 
-  monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+  monaco.json.jsonDefaults.setDiagnosticsOptions({
     schemas: [settingsSchema],
   });
 }
