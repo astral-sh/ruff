@@ -230,8 +230,10 @@ astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 certifi = "2026-10-20T02:24:17Z"
-# Allow uv 0.13.4 before the seven-day wait: it removes trust in the eMudhra
-# root that signed the compromised intermediate certificates.
+# Allow uv 0.13.4 before the seven-day wait: its bundled trust store removes
+# the eMudhra root that anchors the compromised intermediate certificates.
+# Remove the uv cutoff once 0.13.4 is seven days old, so later uv releases
+# can be selected after the seven-day wait.
 uv = "2026-10-20T15:12:07Z"
 
 [tool.uv.dependency-groups]
