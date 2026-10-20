@@ -127,3 +127,101 @@ while True:
                 y = 0
             case 0, *x:
                 pass  # no warning
+
+
+def test_nested_if_else(a):
+    try:
+        pass
+    finally:
+        if a:
+            pass
+        else:
+            return 1  # warning
+
+
+def test_nested_elif(a, b):
+    try:
+        pass
+    finally:
+        if a:
+            pass
+        elif b:
+            return 2  # warning
+        else:
+            pass
+
+
+def test_nested_try_except():
+    try:
+        pass
+    finally:
+        try:
+            pass
+        except ValueError:
+            return 3  # warning
+
+
+def test_nested_try_else():
+    try:
+        pass
+    finally:
+        try:
+            pass
+        except ValueError:
+            pass
+        else:
+            return 4  # warning
+
+
+def test_nested_for_else(xs):
+    try:
+        pass
+    finally:
+        for x in xs:
+            pass
+        else:
+            return 5  # warning
+
+
+def test_nested_while_else():
+    try:
+        pass
+    finally:
+        while False:
+            pass
+        else:
+            return 6  # warning
+
+
+def test_nested_for_else_break(xs):
+    while True:
+        try:
+            pass
+        finally:
+            for x in xs:
+                pass
+            else:
+                break  # warning
+
+
+def test_loop_break_in_finally_else():
+    try:
+        pass
+    finally:
+        while True:
+            for x in []:
+                pass
+            else:
+                break  # no warning (breaks inner while)
+
+
+def test_loop_return_in_finally_else():
+    try:
+        pass
+    finally:
+        while True:
+            for x in []:
+                pass
+            else:
+                return 7  # warning
+

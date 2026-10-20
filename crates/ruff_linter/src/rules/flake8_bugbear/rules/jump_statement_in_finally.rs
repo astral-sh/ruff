@@ -55,34 +55,67 @@ impl Violation for JumpStatementInFinally {
     }
 }
 
-fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum Scope {
+    /// Directly inside the `finally` block or a non-loop compound statement (`if`, `try`, `with`, `match`).
+    Finally,
+    /// Inside a loop within the `finally` block, where `break` and `continue` do not jump out of `finally`.
+    Loop,
+}
+
+fn walk_stmt(checker: &Checker, body: &[Stmt], scope: Scope) {
     for stmt in body {
-        if f(stmt) {
+        let jump_name = match (stmt, scope) {
+            (Stmt::Break(_), Scope::Finally) => Some("break"),
+            (Stmt::Continue(_), Scope::Finally) => Some("continue"),
+            (Stmt::Return(_), _) => Some("return"),
+            _ => None,
+        };
+
+        if let Some(name) = jump_name {
             checker.report_diagnostic(
                 JumpStatementInFinally {
-                    name: match stmt {
-                        Stmt::Break(_) => "break",
-                        Stmt::Continue(_) => "continue",
-                        Stmt::Return(_) => "return",
-                        _ => unreachable!("Expected Stmt::Break | Stmt::Continue | Stmt::Return"),
-                    }
-                    .to_owned(),
+                    name: (*name).to_string(),
                 },
                 stmt.range(),
             );
         }
+
         match stmt {
-            Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_stmt(checker, body, Stmt::is_return_stmt);
+            Stmt::While(ast::StmtWhile { body, orelse, .. })
+            | Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+                walk_stmt(checker, body, Scope::Loop);
+                walk_stmt(checker, orelse, scope);
             }
-            Stmt::If(ast::StmtIf { body, .. })
-            | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
-                walk_stmt(checker, body, f);
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                walk_stmt(checker, body, scope);
+                for clause in elif_else_clauses {
+                    walk_stmt(checker, &clause.body, scope);
+                }
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                ..
+            }) => {
+                walk_stmt(checker, body, scope);
+                for handler in handlers {
+                    let ast::ExceptHandler::ExceptHandler(handler) = handler;
+                    walk_stmt(checker, &handler.body, scope);
+                }
+                walk_stmt(checker, orelse, scope);
+            }
+            Stmt::With(ast::StmtWith { body, .. }) => {
+                walk_stmt(checker, body, scope);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
                 for case in cases {
-                    walk_stmt(checker, &case.body, f);
+                    walk_stmt(checker, &case.body, scope);
                 }
             }
             _ => {}
@@ -92,7 +125,5 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
 
 /// B012
 pub(crate) fn jump_statement_in_finally(checker: &Checker, finalbody: &[Stmt]) {
-    walk_stmt(checker, finalbody, |stmt| {
-        matches!(stmt, Stmt::Break(_) | Stmt::Continue(_) | Stmt::Return(_))
-    });
+    walk_stmt(checker, finalbody, Scope::Finally);
 }
