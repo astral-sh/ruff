@@ -1565,10 +1565,13 @@ if f():
 else:
     Default = choose(f())
 
-# error: [invalid-type-form] "Variable of type `type[Unknown]` is not allowed in a type expression"
-T = TypeVar("T", default=Default)
+T = TypeVar("T", default=Default)  # error: [invalid-type-form]
 
-reveal_type(f())  # revealed: Unknown
+result = f()
+reveal_type(result)  # revealed: str | Unknown
+
+# TODO: We should preserve the inferred union through the generic call.
+reveal_type(f())  # revealed: str
 ```
 
 ### Use of typevar with default inside a function body that binds it

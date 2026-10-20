@@ -41,7 +41,7 @@ fn exact<'db, 'c>(
     typevar: BoundTypeVarInstance<'db>,
     ty: Type<'db>,
 ) -> ConstraintSet<'db, 'c> {
-    exact_with_provenance(db, builder, ConstraintProvenance::Evidence, typevar, ty)
+    exact_with_provenance(db, builder, ConstraintProvenance::INFERRED, typevar, ty)
 }
 
 fn exact_with_provenance<'db, 'c>(
@@ -104,7 +104,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
+        |_, bound| bound.solve(db, &env, builder, inferable),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -149,7 +149,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                CandidateSolutions::default_solve(db, &env, &builder, bound)
+                bound.solve(db, &env, &builder, inferable)
             },
             0,
             |count, _, _| {
@@ -189,7 +189,7 @@ fn invalid_paths_respect_projection_budgets() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -263,7 +263,7 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -333,7 +333,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 db,
                 &env,
                 &builder,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -365,7 +365,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
                 db,
                 &env,
                 &builder,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -393,7 +393,7 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         str,
     )
@@ -402,7 +402,7 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Validity,
+            ConstraintProvenance::VALIDITY,
             t,
             Type::TypeVar(s),
         )
@@ -449,12 +449,12 @@ fn upper_bound_checks_mixed_evidence_after_substitution() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         Type::TypeVar(u),
     )
     .and(db, &builder, || {
-        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+        exact_with_provenance(db, &builder, ConstraintProvenance::VALIDITY, u, list_s)
     });
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
@@ -485,12 +485,12 @@ fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         Type::TypeVar(u),
     )
     .and(db, &builder, || {
-        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+        exact_with_provenance(db, &builder, ConstraintProvenance::VALIDITY, u, list_s)
     });
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
@@ -527,7 +527,7 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         db,
         &env,
         &builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         t,
         callable,
     );
@@ -704,7 +704,7 @@ fn incomplete_solution_discards_the_projection() {
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
         let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-            let lower = candidate.inference_lower(db, &env);
+            let lower = candidate.inference_lower();
             if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
@@ -771,7 +771,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 },
             ] {
                 let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-                    let lower = candidate.inference_lower(db, &env);
+                    let lower = candidate.inference_lower();
                     if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
                     } else if lower == Some(str) {
@@ -886,7 +886,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, bound)
+            bound.solve(db, &env, &builder, inferable)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -898,7 +898,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+            |_, bound| bound.solve(db, &env, &builder, inferable),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -1025,7 +1025,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+                |_, bound| bound.solve(db, &env, &builder, TypeVarSet::from_typevars(db, [t])),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {
