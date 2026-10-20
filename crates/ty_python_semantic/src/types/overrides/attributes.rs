@@ -1,6 +1,7 @@
 //! Compatibility of the values read from and written to inherited attributes.
 
-use ruff_db::diagnostic::Annotation;
+use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -12,7 +13,10 @@ use crate::{
     types::{
         ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
         KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
-        attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
+        attribute_write::{
+            AttributeWriteFailure, DescriptorSetterDomain, attribute_write_requirement,
+            descriptor_setter_domain,
+        },
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
@@ -332,6 +336,7 @@ enum AttributeViolation<'db> {
     },
     Write {
         target: Type<'db>,
+        reason: Option<AttributeWriteFailure<'db>>,
     },
     ReadOnly,
 }
@@ -396,10 +401,12 @@ fn attribute_violation<'db>(
     } else {
         target_receiver
     };
+    let receiver_writable =
+        source.write.is_some() && receiver.is_attribute_writable_with(db, env, name, write);
     if !source
         .write
         .is_some_and(|source_write| write.is_assignable_to(db, env, source_write))
-        || !receiver.is_attribute_writable_with(db, env, name, write)
+        || !receiver_writable
     {
         // Do not require a write that the superclass itself cannot perform, for example
         // when a descriptor or custom `__setattr__` rejects the declared value type.
@@ -409,7 +416,15 @@ fn attribute_violation<'db>(
         return Some(if source.write.is_none() {
             AttributeViolation::ReadOnly
         } else {
-            AttributeViolation::Write { target: write }
+            AttributeViolation::Write {
+                target: write,
+                reason: if receiver_writable {
+                    None
+                } else {
+                    attribute_write_requirement(db, env, receiver, name, None)
+                        .failure_reason(db, env, name)
+                },
+            }
         });
     }
     None
@@ -475,11 +490,45 @@ impl<'db> AttributeOverrideViolation<'db> {
                     ));
                 }
             }
-            AttributeViolation::Write { target } => {
+            AttributeViolation::Write { target, reason } => {
                 diagnostic.set_primary_annotation_message(format_args!(
                     "Override does not accept writes of type `{}`",
                     target.display(db, env),
                 ));
+                match reason {
+                    Some(AttributeWriteFailure::MissingSlot) => {
+                        diagnostic.info(format_args!(
+                            "Attribute `{name}` is not included in `__slots__`, and the class has no instance dictionary",
+                        ));
+                    }
+                    Some(AttributeWriteFailure::SetAttr {
+                        definition,
+                        missing_slot,
+                    }) => {
+                        if missing_slot {
+                            diagnostic.info(format_args!(
+                                "Attribute `{name}` is missing from `__slots__` and the class has no instance dictionary, so this override relies on `__setattr__` accepting writes",
+                            ));
+                        } else {
+                            diagnostic.info(format_args!(
+                                "Writes to attribute `{name}` are handled by `__setattr__`",
+                            ));
+                        }
+                        if let Some(definition) = definition {
+                            let module = parsed_module(db, definition.python_file(db)).load(db);
+                            diagnostic.annotate(
+                                Annotation::secondary(Span::from(
+                                    definition.focus_range(db, &module),
+                                ))
+                                .message(format_args!(
+                                    "This `__setattr__` does not accept writes of type `{}`",
+                                    target.display(db, env),
+                                )),
+                            );
+                        }
+                    }
+                    None => {}
+                }
             }
             AttributeViolation::ReadOnly => diagnostic.set_primary_annotation_message(
                 "Read-only attribute overrides a writable attribute",
