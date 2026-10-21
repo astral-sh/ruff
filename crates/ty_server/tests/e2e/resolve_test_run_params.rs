@@ -260,3 +260,76 @@ def test_beta():
 
     Ok(())
 }
+
+#[test]
+fn resolve_run_params_for_a_test_in_a_nested_workspace() -> Result<()> {
+    let outer_module = SystemPath::new("repo/tests/test_module.py");
+    let outer_module_content = "\
+def test_alpha():
+    pass
+";
+    let inner_module = SystemPath::new("repo/inner/tests/test_module.py");
+    let inner_module_content = "\
+def test_beta():
+    pass
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("repo"), None)?
+        .with_file(outer_module, outer_module_content)?
+        .with_workspace(SystemPath::new("repo/inner"), None)?
+        .with_file(inner_module, inner_module_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(
+        &server,
+        "repo/inner/tests/test_module.py",
+        Some("test_beta"),
+    );
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/inner/tests/test_module.py::test_beta"
+      ],
+      "workingDirectory": "<temp_dir>/repo/inner"
+    }
+    "#);
+
+    let id = test_id(&server, "repo/tests/test_module.py", Some("test_alpha"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/tests/test_module.py::test_alpha"
+      ],
+      "workingDirectory": "<temp_dir>/repo"
+    }
+    "#);
+
+    let id = test_id(&server, "repo/inner", None);
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/repo/inner"
+      ],
+      "workingDirectory": "<temp_dir>/repo/inner"
+    }
+    "#);
+
+    Ok(())
+}

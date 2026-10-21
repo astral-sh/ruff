@@ -56,14 +56,15 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
             .map_or(params.test_id.as_str(), |(path, _)| path);
 
         let path = SystemPath::new(path);
-        let Some(db) = snapshot
-            .projects()
-            .iter()
-            .find(|&db| path_is_in_project(db, db.project().root(db), path))
-        else {
-            tracing::debug!("No open project can discover `{path}`; returning null");
+        let Some((workspace_root, db)) = snapshot.project_db_for_path(path) else {
+            tracing::debug!("`{path}` is not inside any workspace folder; returning null");
             return Ok(None);
         };
+
+        if !path_is_in_project(db, workspace_root, path) {
+            tracing::debug!("`{path}` is not discoverable in `{workspace_root}`; returning null");
+            return Ok(None);
+        }
 
         let working_directory = db.project().root(db).to_string();
 

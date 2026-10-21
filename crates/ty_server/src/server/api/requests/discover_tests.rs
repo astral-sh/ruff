@@ -8,7 +8,7 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use ty_ide::{DiscoveredPytestTestKind, discover_pytest_tests};
-use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
+use ty_project::{ProjectDatabase, SemanticDb as _};
 use ty_python_semantic::is_default_pytest_test_file_name;
 
 use crate::PositionEncoding;
@@ -110,8 +110,8 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
         let mut test_items = FxHashSet::default();
 
         let Some(uri) = params.uri else {
-            for db in snapshot.projects() {
-                collect_directory_tests(db, db.project().root(db), encoding, &mut test_items);
+            for (workspace_root, db) in snapshot.workspace_projects() {
+                collect_directory_tests(db, snapshot, workspace_root, &mut test_items);
             }
             return Ok(DiscoverTestsResult::new(test_items));
         };
@@ -125,26 +125,26 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
             return Ok(DiscoverTestsResult::new(vec![]));
         };
 
-        for db in snapshot.projects() {
-            let project_root = db.project().root(db);
-            if !path_is_in_project(db, project_root, &path) {
-                tracing::debug!("`{path}` is not discoverable in `{project_root}`.");
-                continue;
-            }
-            if db.system().is_directory(&path) {
-                tracing::debug!(
-                    "Discovering the tests under directory `{path}` of project `{project_root}`"
-                );
-                collect_directory_tests(db, &path, encoding, &mut test_items);
-            } else {
-                let Ok(file) = system_path_to_file(db, &path) else {
-                    continue;
-                };
-                tracing::debug!(
-                    "Discovering the tests in file `{path}` of project `{project_root}`"
-                );
-                collect_file_pytest_tests(db, file, encoding, &mut test_items);
-            }
+        let Some((workspace_root, db)) = snapshot.project_db_for_path(&path) else {
+            tracing::debug!("`{path}` is not inside any workspace folder.");
+            return Ok(DiscoverTestsResult::new(vec![]));
+        };
+
+        if !path_is_in_project(db, workspace_root, &path) {
+            tracing::debug!("`{path}` is not discoverable in `{workspace_root}`.");
+            return Ok(DiscoverTestsResult::new(vec![]));
+        }
+
+        if db.system().is_directory(&path) {
+            tracing::debug!(
+                "Discovering the tests under directory `{path}` of workspace `{workspace_root}`"
+            );
+            collect_directory_tests(db, snapshot, &path, &mut test_items);
+        } else if let Ok(file) = system_path_to_file(db, &path) {
+            tracing::debug!(
+                "Discovering the tests in file `{path}` of workspace `{workspace_root}`"
+            );
+            collect_file_pytest_tests(db, file, workspace_root, encoding, &mut test_items);
         }
 
         tracing::debug!("Discovered {} test items for `{path}`", test_items.len());
@@ -183,15 +183,23 @@ pub(super) fn path_is_in_project(
             })
 }
 
+/// Adds the tests of every file under `directory` that pytest collects by default.
+///
+/// Each file is reported by the project of its closest workspace folder, so the tests under a
+/// nested workspace folder appear under a separate top-level item for that folder.
 fn collect_directory_tests(
     db: &ProjectDatabase,
+    snapshot: &SessionSnapshot,
     directory: &SystemPath,
-    encoding: PositionEncoding,
     items: &mut FxHashSet<TestItem>,
 ) {
+    let encoding = snapshot.position_encoding();
     for path in walk_test_files(db, directory) {
-        if let Ok(file) = system_path_to_file(db, &path) {
-            collect_file_pytest_tests(db, file, encoding, items);
+        let Some((workspace_root, owner)) = snapshot.project_db_for_path(&path) else {
+            continue;
+        };
+        if let Ok(file) = system_path_to_file(owner, &path) {
+            collect_file_pytest_tests(owner, file, workspace_root, encoding, items);
         }
     }
 }
@@ -278,11 +286,11 @@ fn is_default_pytest_skipped_dir(system: &dyn System, path: &SystemPath) -> bool
 fn collect_file_pytest_tests(
     db: &ProjectDatabase,
     file: File,
+    stop_at: &SystemPath,
     encoding: PositionEncoding,
     items: &mut FxHashSet<TestItem>,
 ) {
     let tests = discover_pytest_tests(db, db.program_file(file));
-    let stop_at: &SystemPath = db.project().root(db);
     if tests.is_empty() {
         return;
     }
@@ -290,6 +298,16 @@ fn collect_file_pytest_tests(
     let Some(absolute_path) = file.path(db).as_system_path() else {
         return;
     };
+
+    // `stop_at` becomes the top-level item, so it must be one of the file's parent directories.
+    // Otherwise, as for a workspace folder that is a single file, the loop below would climb up
+    // to the file-system root.
+    if !absolute_path
+        .parent()
+        .is_some_and(|parent| parent.starts_with(stop_at))
+    {
+        return;
+    }
 
     let text_document = file_to_uri(db, file);
 
