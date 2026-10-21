@@ -45,8 +45,8 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassLiteral, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor,
-    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, SelfTypeVarOrigin,
+    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder,
     VarianceInferable, VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -1430,6 +1430,7 @@ impl<'db> Signature<'db> {
                 let receiver = receiver_type.unwrap_or_else(|| {
                     Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                         db,
+                        SelfTypeVarOrigin::ReceiverPlaceholder,
                         Type::object(),
                         BindingContext::Synthetic(env.program(db)),
                     ))
