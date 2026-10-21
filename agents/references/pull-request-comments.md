@@ -1,9 +1,14 @@
 # Pull request automation reports
 
-`pull-request-comment.yml` attempts to reserve one of the first three issue comments when CI is
-requested for a pull request, including a fork pull request. The workflow runs code from the trusted
-default branch and uses `GITHUB_TOKEN` to post as `github-actions[bot]`. The comment is an index of
-links to separate report comments.
+CI calls `pull-request-comment.yml` to attempt to reserve one of the first three issue comments for a pull request
+whose source branch is in this repository. The reusable workflow runs code from its pinned revision
+and uses STS to post as `astral-automations-bot[bot]`. The comment is an index of links to separate
+report comments.
+
+The `automations` environment provides `STS_API_URL`. The repository's STS policy authorizes the CI
+caller on `refs/pull/*/merge` and the exact reusable workflow revision for `pull_requests: write`.
+Fork pull requests are excluded. Changes to the reusable workflow require updating both its caller
+and the policy pin.
 
 The helper checks the bot's numeric identity, the owning pull request, and the comment marker before
 using a comment. It finds the index with one request for the first three comments:
@@ -28,10 +33,9 @@ report and updates only its index entry. It leaves publication intact when there
 human comment races the reservation into a later position, registration can still find that index.
 
 All publishers must hold the job concurrency group
-`pull-request-automation-comment-${{ needs.resolve.outputs.pull-request }}` with `queue: max` and
-`cancel-in-progress: false` while looking up, publishing, and registering a report. Resolve the pull
-request number before acquiring the group. This serializes report creation and index edits across
-different workflows without discarding pending reports.
+`pull-request-automation-comment-${{ github.event.pull_request.number }}` with `queue: max` and
+`cancel-in-progress: false` while looking up, publishing, and registering a report. This serializes
+report creation and index edits across different workflows and allows multiple jobs to wait.
 
 The available report keys are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`.
 Report bodies start with the corresponding marker in `REPORTS`, followed by a newline. Preserve the

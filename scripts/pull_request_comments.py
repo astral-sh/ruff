@@ -13,7 +13,6 @@ import re
 import sys
 from typing import Any, NamedTuple
 from urllib.error import HTTPError
-from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 REPOSITORY = "astral-sh/ruff"
@@ -21,7 +20,7 @@ REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
 COMMENT_LIMIT = 3
 INDEX_MARKER = "<!-- ruff-automation-reports -->"
-BOT_IDS = {41898282, 305554984}  # github-actions and astral-automations-bot
+BOT_ID = 305554984  # astral-automations-bot
 
 
 class Report(NamedTuple):
@@ -88,44 +87,10 @@ def pages(endpoint: str):
         page += 1
 
 
-def pull_request_for_run(run_id: int, workflow: str) -> dict | None:
-    run = api(f"actions/runs/{run_id}")
-    if (
-        run["repository"]["id"] != REPOSITORY_ID
-        or run["event"] != "pull_request"
-        or run["path"] != f".github/workflows/{workflow}"
-    ):
-        raise ValueError("The workflow run is not an eligible pull request run.")
-
-    # Fork runs can have no associated PRs, including in the commit API. Find
-    # their source branch, then verify the repository and exact head SHA below.
-    candidates = run["pull_requests"]
-    if not candidates and run["head_repository"]:
-        owner = run["head_repository"]["full_name"].split("/")[0]
-        query = urlencode({"state": "open", "head": f"{owner}:{run['head_branch']}"})
-        candidates = list(pages(f"pulls?{query}"))
-    matches = []
-    for candidate in candidates:
-        pull = api(f"pulls/{candidate['number']}")
-        if (
-            pull["state"] == "open"
-            and pull["base"]["repo"]["id"] == REPOSITORY_ID
-            and (pull["head"]["repo"] or {}).get("id")
-            == (run["head_repository"] or {}).get("id")
-            and pull["head"]["ref"] == run["head_branch"]
-            and pull["head"]["sha"] == run["head_sha"]
-        ):
-            matches.append(pull)
-    if len(matches) == 1:
-        return matches[0]
-    print("No unambiguous, current open pull request for this run.", file=sys.stderr)
-    return None
-
-
 def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
     author = comment.get("user") or {}
     return (
-        author.get("id") in BOT_IDS
+        author.get("id") == BOT_ID
         and author.get("type") == "Bot"
         and comment.get("issue_url") == f"{API_ROOT}/issues/{pull_request}"
         and (comment.get("body") or "").startswith(f"{marker}\n")
@@ -173,7 +138,11 @@ def index_body(pull_request: int, entries: dict[str, int]) -> str:
 
 def reserve_index(pull_request: int) -> dict | None:
     pull = api(f"pulls/{pull_request}")
-    if pull["state"] != "open" or pull["base"]["repo"]["id"] != REPOSITORY_ID:
+    if (
+        pull["state"] != "open"
+        or pull["base"]["repo"]["id"] != REPOSITORY_ID
+        or (pull["head"]["repo"] or {}).get("id") != REPOSITORY_ID
+    ):
         return None
     comments = first_comments(pull_request)
     if index := find_index(pull_request, comments):
@@ -234,11 +203,6 @@ def register_report(pull_request: int, report: str, comment_id: int) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    resolve = subparsers.add_parser("resolve")
-    resolve.add_argument("--run-id", required=True, type=int)
-    resolve.add_argument(
-        "--workflow", required=True, choices=[r.workflow for r in REPORTS.values()]
-    )
     for command in ("reserve", "find", "lookup", "register"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--pull-request", required=True, type=int)
@@ -249,13 +213,10 @@ def main() -> None:
     args = parser.parse_args()
     if os.environ.get("GITHUB_REPOSITORY", REPOSITORY) != REPOSITORY:
         parser.error(f"This script only supports {REPOSITORY}.")
-    for name in ("pull_request", "run_id", "comment_id"):
+    for name in ("pull_request", "comment_id"):
         if (value := getattr(args, name, None)) is not None and value <= 0:
             parser.error(f"{name} must be positive")
-    if args.command == "resolve":
-        if pull := pull_request_for_run(args.run_id, args.workflow):
-            print(pull["number"])
-    elif args.command == "register":
+    if args.command == "register":
         register_report(args.pull_request, args.report, args.comment_id)
     else:
         if args.command == "reserve":
