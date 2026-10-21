@@ -3,7 +3,7 @@ use ruff_db::system::SystemPath;
 use serde::{Deserialize, Serialize};
 use ty_project::Db as _;
 
-use super::discover_tests::project_includes_path;
+use super::discover_tests::path_is_in_project;
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -55,12 +55,13 @@ impl BackgroundRequestHandler for ResolveTestRunParamsRequestHandler {
             .split_once("::")
             .map_or(params.test_id.as_str(), |(path, _)| path);
 
+        let path = SystemPath::new(path);
         let Some(db) = snapshot
             .projects()
             .iter()
-            .find(|db| project_includes_path(db, SystemPath::new(path)))
+            .find(|&db| path_is_in_project(db, db.project().root(db), path))
         else {
-            tracing::debug!("No open project includes `{path}`; returning null");
+            tracing::debug!("No open project can discover `{path}`; returning null");
             return Ok(None);
         };
 

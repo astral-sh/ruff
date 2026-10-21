@@ -1,11 +1,15 @@
+use std::sync::Mutex;
+
 use lsp_types::{LspRequestMethod, MessageDirection, Range, Request, Uri};
 use ruff_db::Db as _;
 use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::walk_directory::WalkState;
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use ty_ide::{DiscoveredPytestTestKind, discover_pytest_tests};
 use ty_project::{Db as _, ProjectDatabase, SemanticDb as _};
+use ty_python_semantic::is_default_pytest_test_file_name;
 
 use crate::PositionEncoding;
 use crate::document::ToRangeExt;
@@ -33,6 +37,12 @@ pub(in crate::server::api) struct DiscoverTestsParams {
     /// A URI pointing at a directory discovers every test under that directory. A URI
     /// pointing at a file discovers only the tests in that file. An absent `uri`
     /// discovers every test in every project in the session.
+    ///
+    /// Test files are found the way pytest finds them by default, not by the project's `include`
+    /// and `exclude` settings, so files that are excluded from type checking are discovered too.
+    /// A URI inside a directory that pytest skips by default, below the project root, gives an
+    /// empty result. See
+    /// <https://docs.pytest.org/en/stable/explanation/goodpractices.html#test-discovery>.
     #[serde(default)]
     uri: Option<Uri>,
 }
@@ -101,9 +111,7 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
 
         let Some(uri) = params.uri else {
             for db in snapshot.projects() {
-                for file in db.project().files(db).iter() {
-                    append_file_tests(db, file, encoding, &mut test_items);
-                }
+                collect_directory_tests(db, db.project().root(db), encoding, &mut test_items);
             }
             return Ok(DiscoverTestsResult::new(test_items));
         };
@@ -119,11 +127,10 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
 
         for db in snapshot.projects() {
             let project_root = db.project().root(db);
-            if !project_includes_path(db, &path) {
-                tracing::debug!("`{path}` does not belong to the `{project_root}`.");
+            if !path_is_in_project(db, project_root, &path) {
+                tracing::debug!("`{path}` is not discoverable in `{project_root}`.");
                 continue;
             }
-
             if db.system().is_directory(&path) {
                 tracing::debug!(
                     "Discovering the tests under directory `{path}` of project `{project_root}`"
@@ -136,7 +143,7 @@ impl BackgroundRequestHandler for DiscoverTestsRequestHandler {
                 tracing::debug!(
                     "Discovering the tests in file `{path}` of project `{project_root}`"
                 );
-                append_file_tests(db, file, encoding, &mut test_items);
+                collect_file_pytest_tests(db, file, encoding, &mut test_items);
             }
         }
 
@@ -157,19 +164,23 @@ fn test_id(file_path: &str, qualified_name: &str) -> String {
     format!("{file_path}::{qualified_name}")
 }
 
-pub(super) fn project_includes_path(db: &ProjectDatabase, path: &SystemPath) -> bool {
-    let project = db.project();
-    let path = SystemPath::absolute(path, project.root(db));
-
-    let Ok(metadata) = db.system().path_metadata(&path) else {
-        return false;
-    };
-
-    if metadata.file_type().is_directory() {
-        return project.is_directory_included(db, &path);
-    }
-
-    project.is_file_included(db, &path).is_included()
+/// Returns `true` if discovering the tests under `root` reaches `path`: `path` is inside
+/// `root`, exists, and neither `path` nor one of its parent directories below `root` is a
+/// directory that pytest skips by default.
+pub(super) fn path_is_in_project(
+    db: &ProjectDatabase,
+    root: &SystemPath,
+    path: &SystemPath,
+) -> bool {
+    let system = db.system();
+    path.starts_with(root)
+        && system.path_exists(path)
+        && !path
+            .ancestors()
+            .take_while(|directory| *directory != root)
+            .any(|directory| {
+                system.is_directory(directory) && is_default_pytest_skipped_dir(system, directory)
+            })
 }
 
 fn collect_directory_tests(
@@ -178,17 +189,93 @@ fn collect_directory_tests(
     encoding: PositionEncoding,
     items: &mut FxHashSet<TestItem>,
 ) {
-    for file in db.project().files(db).iter() {
-        let Some(path) = file.path(db).as_system_path() else {
-            continue;
-        };
-        if path.starts_with(directory) {
-            append_file_tests(db, file, encoding, items);
+    for path in walk_test_files(db, directory) {
+        if let Ok(file) = system_path_to_file(db, &path) {
+            collect_file_pytest_tests(db, file, encoding, items);
         }
     }
 }
 
-fn append_file_tests(
+/// Returns the files under `directory` that follow pytest's default test file naming, without
+/// descending into the directories that pytest skips by default. Like pytest, the walk ignores
+/// the project's `include` and `exclude` settings and ignore files such as `.gitignore`. See
+/// <https://docs.pytest.org/en/stable/explanation/goodpractices.html#conventions-for-python-test-discovery>.
+fn walk_test_files(db: &ProjectDatabase, directory: &SystemPath) -> Vec<SystemPathBuf> {
+    let system = db.system();
+    let paths = Mutex::new(Vec::new());
+
+    system
+        .walk_directory(directory)
+        .standard_filters(false)
+        .run(|| {
+            let paths = &paths;
+            Box::new(move |entry| {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(error) => {
+                        tracing::debug!(
+                            "Failed to walk a directory while discovering tests: {error}"
+                        );
+                        return WalkState::Continue;
+                    }
+                };
+
+                if entry.depth() == 0 {
+                    return WalkState::Continue;
+                }
+
+                if entry.file_type().is_directory()
+                    && is_default_pytest_skipped_dir(system, entry.path())
+                {
+                    return WalkState::Skip;
+                }
+
+                if entry
+                    .path()
+                    .file_name()
+                    .is_some_and(is_default_pytest_test_file_name)
+                {
+                    paths.lock().unwrap().push(entry.into_path());
+                }
+
+                WalkState::Continue
+            })
+        });
+
+    paths.into_inner().unwrap()
+}
+
+/// Returns `true` if pytest doesn't collect tests under the directory at `path` by default.
+///
+/// These are the directories matching pytest's default `norecursedirs` patterns, plus
+/// `__pycache__` and virtual environments, which pytest always skips:
+/// <https://docs.pytest.org/en/stable/reference/reference.html#confval-norecursedirs>
+/// <https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/main.py#L416-L472>
+fn is_default_pytest_skipped_dir(system: &dyn System, path: &SystemPath) -> bool {
+    let Some(name) = path.file_name() else {
+        return false;
+    };
+
+    name.starts_with('.')
+        || path.extension() == Some("egg")
+        || matches!(
+            name,
+            "__pycache__"
+                | "_darcs"
+                | "build"
+                | "CVS"
+                | "dist"
+                | "node_modules"
+                | "venv"
+                | "{arch}"
+        )
+        || system.is_file(&path.join("pyvenv.cfg"))
+        || system.is_file(&path.join("conda-meta").join("history"))
+}
+
+/// Adds the pytest tests in `file`, and an item for each of its parent directories up to the
+/// project root, which becomes a top-level item.
+fn collect_file_pytest_tests(
     db: &ProjectDatabase,
     file: File,
     encoding: PositionEncoding,

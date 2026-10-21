@@ -392,7 +392,7 @@ impl Project {
             .is_file_included(path, GlobFilterCheckMode::Adhoc)
     }
 
-    pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
+    fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
         matches!(
             ProjectFilesFilter::from_project(db, self)
                 .is_directory_included(path, GlobFilterCheckMode::Adhoc),

@@ -133,6 +133,57 @@ fn resolve_run_params_for_a_class() -> Result<()> {
     Ok(())
 }
 
+/// Discovery reports tests in files that are excluded from type checking, so they resolve too.
+#[test]
+fn resolve_run_params_for_a_test_excluded_from_type_checking() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(
+            SystemPath::new("src/ty.toml"),
+            "[src]\nexclude = [\"tests\"]\n",
+        )?
+        .with_file(SystemPath::new(MODULE), MODULE_CONTENT)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(&server, MODULE, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @r#"
+    {
+      "arguments": [
+        "-m",
+        "pytest",
+        "-vv",
+        "<temp_dir>/src/tests/test_module.py::test_one"
+      ],
+      "workingDirectory": "<temp_dir>/src"
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Discovery doesn't report the tests inside a directory that pytest skips by default, so they
+/// don't resolve.
+#[test]
+fn resolve_run_params_for_a_test_in_a_directory_that_pytest_skips() -> Result<()> {
+    let skipped_module = "src/build/test_module.py";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(SystemPath::new(skipped_module), MODULE_CONTENT)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let id = test_id(&server, skipped_module, Some("test_one"));
+    let params = server.send_request_await::<ResolveTestRunParams>(json!({ "testId": id }));
+
+    insta::assert_json_snapshot!(params, @"null");
+
+    Ok(())
+}
+
 #[test]
 fn resolve_run_params_for_a_path_that_is_not_in_the_project() -> Result<()> {
     let mut server = server_with_one_test_module()?;

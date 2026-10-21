@@ -277,6 +277,298 @@ fn discover_tests_directory() -> Result<()> {
     Ok(())
 }
 
+/// Discovery follows pytest's rules instead of the project's settings, so it finds the tests in
+/// files that are excluded from type checking. Requests for the whole project, the directory and
+/// the file all report the same tests.
+#[test]
+fn discover_tests_that_are_excluded_from_type_checking() -> Result<()> {
+    let excluded_directory = SystemPath::new("src/tests");
+    let excluded_module = SystemPath::new("src/tests/test_module.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(
+            SystemPath::new("src/ty.toml"),
+            "[src]\nexclude = [\"tests\"]\n",
+        )?
+        .with_file(excluded_module, DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let all_tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    let uri = server.file_uri(excluded_directory);
+    let directory_tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+    assert_eq!(directory_tests, all_tests);
+
+    let uri = server.file_uri(excluded_module);
+    let module_tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+    assert_eq!(module_tests, all_tests);
+
+    insta::assert_json_snapshot!(all_tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/src",
+          "kind": "directory",
+          "label": "src",
+          "uri": "file://<temp_dir>/src/"
+        },
+        {
+          "id": "<temp_dir>/src/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/src",
+          "uri": "file://<temp_dir>/src/tests/"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/src/tests",
+          "uri": "file://<temp_dir>/src/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/src/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/src/tests/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+/// Discovery doesn't descend into the directories that pytest skips by default: those matching
+/// pytest's default `norecursedirs` patterns, `__pycache__`, and virtual environments, including
+/// conda environments. A request for one of these directories, or for a path inside one, reports
+/// nothing either.
+#[test]
+fn discover_tests_skips_directories_that_pytest_skips() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(SystemPath::new("src/env/pyvenv.cfg"), "")?
+        .with_file(SystemPath::new("src/conda_env/conda-meta/history"), "")?
+        .with_files(
+            [
+                "src/tests/test_module.py",
+                "src/env/lib/test_module.py",
+                "src/conda_env/lib/test_module.py",
+                "src/.tox/py313/test_module.py",
+                "src/node_modules/package/test_module.py",
+                "src/build/test_module.py",
+                "src/dist/test_module.py",
+                "src/venv/test_module.py",
+                "src/package.egg/test_module.py",
+                "src/__pycache__/test_module.py",
+                "src/CVS/test_module.py",
+                "src/_darcs/test_module.py",
+                "src/{arch}/test_module.py",
+            ]
+            .map(|path| (path, DUMMY_TEST)),
+        )?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    for path in ["src/.tox/py313/test_module.py", "src/.tox/py313", "src/env"] {
+        let uri = server.file_uri(SystemPath::new(path));
+        let tests = server.send_request_await::<DiscoverTests>(json!({ "uri": uri }));
+        assert_eq!(tests, json!({ "tests": [] }), "request for `{path}`");
+    }
+
+    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/src",
+          "kind": "directory",
+          "label": "src",
+          "uri": "file://<temp_dir>/src/"
+        },
+        {
+          "id": "<temp_dir>/src/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/src",
+          "uri": "file://<temp_dir>/src/tests/"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/src/tests",
+          "uri": "file://<temp_dir>/src/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/src/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/src/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/src/tests/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+/// The skip rules only apply below the directory that is searched, so a project with a name that
+/// pytest skips is still searched. Requests for the project and for a file inside it report the
+/// same tests.
+#[test]
+fn discover_tests_in_a_project_that_pytest_skips() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("build"), None)?
+        .with_file(SystemPath::new("build/tests/test_module.py"), DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/build",
+          "kind": "directory",
+          "label": "build",
+          "uri": "file://<temp_dir>/build/"
+        },
+        {
+          "id": "<temp_dir>/build/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/build",
+          "uri": "file://<temp_dir>/build/tests/"
+        },
+        {
+          "id": "<temp_dir>/build/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/build/tests",
+          "uri": "file://<temp_dir>/build/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/build/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/build/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/build/tests/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    for path in ["build", "build/tests/test_module.py"] {
+        let uri = server.file_uri(SystemPath::new(path));
+        let path_tests =
+            sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+        assert_eq!(path_tests, tests, "request for `{path}`");
+    }
+
+    Ok(())
+}
+
+/// Like pytest, discovery doesn't read ignore files, so it finds the tests in ignored paths. The
+/// test uses a `.ignore` file rather than a `.gitignore` file because the directory walker's
+/// standard filters honor `.ignore` files even outside a git repository, so this test fails if
+/// those filters are turned on.
+#[test]
+fn discover_tests_in_ignored_files() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(SystemPath::new("src/.ignore"), "generated/\n")?
+        .with_file(SystemPath::new("src/generated/test_gen.py"), DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    insta::assert_json_snapshot!(tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/src",
+          "kind": "directory",
+          "label": "src",
+          "uri": "file://<temp_dir>/src/"
+        },
+        {
+          "id": "<temp_dir>/src/generated",
+          "kind": "directory",
+          "label": "generated",
+          "parent": "<temp_dir>/src",
+          "uri": "file://<temp_dir>/src/generated/"
+        },
+        {
+          "id": "<temp_dir>/src/generated/test_gen.py",
+          "kind": "file",
+          "label": "test_gen.py",
+          "parent": "<temp_dir>/src/generated",
+          "uri": "file://<temp_dir>/src/generated/test_gen.py"
+        },
+        {
+          "id": "<temp_dir>/src/generated/test_gen.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/src/generated/test_gen.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/src/generated/test_gen.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
 const UNIT_DIRECTORY: &str = "workspace_one/tests/unit";
 const UNIT_MODULE: &str = "workspace_one/tests/unit/test_module.py";
 const INTEGRATION_MODULE: &str = "workspace_one/tests/integration/test_module.py";
