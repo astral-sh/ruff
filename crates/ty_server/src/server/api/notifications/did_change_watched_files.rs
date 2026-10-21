@@ -69,7 +69,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             return Ok(());
         }
 
-        let client_capabilities = session.client_capabilities();
+        let client_capabilities = session.client_capabilities().clone();
         let roots: Vec<_> = session
             .workspaces()
             .into_iter()
