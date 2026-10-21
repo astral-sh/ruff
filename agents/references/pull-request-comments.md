@@ -5,10 +5,10 @@ whose source branch is in this repository. The reusable workflow runs code from 
 and uses STS to post as `astral-automations-bot[bot]`. The comment is an index of links to separate
 report comments.
 
-The `automations` environment provides `STS_API_URL`. The repository's STS policy authorizes the CI
-caller on `refs/pull/*/merge` and the exact reusable workflow revision for `pull_requests: write`.
-Fork pull requests are excluded. Changes to the reusable workflow require updating both its caller
-and the policy pin.
+The caller passes `STS_API_URL` by name so the reusable job can use its value from the `automations`
+environment. The repository's STS policy authorizes the CI caller on `refs/pull/*/merge` and the exact
+reusable workflow revision for `pull_requests: write`. Fork pull requests are excluded. Changes to
+the reusable workflow or its script require updating both its caller and the policy pin.
 
 The helper checks the bot's numeric identity, the owning pull request, and the comment marker before
 using a comment. It finds the index with one request for the first three comments:
