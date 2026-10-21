@@ -46,3 +46,13 @@ F823 Local variable `sys` referenced before assignment
 63 |
 64 |     for sys in range(5):
    |
+
+F823 Local variable `x` referenced before assignment
+  --> F823.py:89:11
+   |
+88 | def multiple_assignments():
+89 |     print(x)
+   |           ^
+90 |     x = 2
+91 |     x = 3
+   |

@@ -50,14 +50,24 @@ impl Violation for UndefinedLocal {
 /// F823
 pub(crate) fn undefined_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     if scope.kind.is_function() {
-        for (name, binding_id) in scope.bindings() {
+        for (name, _) in scope.bindings() {
+            let Some(first_binding_id) = scope.get_all(name).last() else {
+                continue;
+            };
+
             // If the variable shadows a binding in a parent scope...
-            if let Some(shadowed_id) = checker.semantic().shadowed_binding(binding_id) {
+            if let Some(shadowed_id) = checker.semantic().shadowed_binding(first_binding_id) {
+                let first_binding = checker.semantic().binding(first_binding_id);
                 let shadowed = checker.semantic().binding(shadowed_id);
-                // And that binding was referenced in the current scope...
+                let max_end = first_binding
+                    .statement(checker.semantic())
+                    .map(Ranged::end)
+                    .unwrap_or_else(|| first_binding.end());
+
+                // And that binding was referenced in the current scope before or during this assignment...
                 if let Some(range) = shadowed.references().find_map(|reference_id| {
                     let reference = checker.semantic().reference(reference_id);
-                    if reference.scope_id() == scope_id {
+                    if reference.scope_id() == scope_id && reference.range().start() <= max_end {
                         Some(reference.range())
                     } else {
                         None

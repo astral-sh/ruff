@@ -80,3 +80,12 @@ def f():
     import sklearn
 
     mlflow
+
+
+x = 1
+
+
+def multiple_assignments():
+    print(x)
+    x = 2
+    x = 3
