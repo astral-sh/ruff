@@ -6023,12 +6023,18 @@ class ClassVarAttributeBad(Protocol):
 
 static_assert(not is_subtype_of(ClassVarAttributeBad, Method))
 static_assert(not is_assignable_to(ClassVarAttributeBad, Method))
+```
 
+Matching class-variable annotations remain compatible, including optional callable values:
+
+```py
 class ClassVarCallable(Protocol):
-    f: ClassVar[Callable[[int], int]]
+    f: ClassVar[Callable[[object, int], int]]
+    optional: ClassVar[Callable[[object, int], int] | None]
 
 class ImplementsClassVarCallable:
-    f: ClassVar[Callable[[int], int]]
+    f: ClassVar[Callable[[object, int], int]]
+    optional: ClassVar[Callable[[object, int], int] | None]
 
 static_assert(is_subtype_of(ImplementsClassVarCallable, ClassVarCallable))
 static_assert(is_assignable_to(ImplementsClassVarCallable, ClassVarCallable))
