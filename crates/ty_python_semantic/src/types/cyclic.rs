@@ -1,6 +1,6 @@
 //! Cycle detection for recursive types.
 //!
-//! The visitors here ([`TypeTransformer`] and [`PairVisitor`]) are used in methods that
+//! The visitors here ([`TypeTransformer`] and [`CycleDetector`]) are used in methods that
 //! recursively visit types to transform them (e.g. [`Type::apply_type_mapping`]) or to
 //! decide a relation between a pair of types (e.g. [`Type::has_relation_to`]).
 //!
@@ -32,12 +32,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
+use crate::types::callable::LambdaSignature;
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::known_instance::walk_known_instance_storage;
+use crate::types::recursive::{RecursiveOrigin, RecursivePromotions};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
-    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, KnownInstanceType,
+    ProtocolInstanceType, RecursiveType, StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -49,7 +52,7 @@ pub enum TypeIdentity<'db> {
     GrowingProtocol(Definition<'db>),
     GrowingTypeAlias(Definition<'db>),
     GrowingTypedDict(Definition<'db>),
-    GrowingRecursive(Definition<'db>),
+    GrowingRecursive(RecursiveOrigin<'db>, Option<RecursivePromotions>),
     Other(Type<'db>),
 }
 
@@ -77,7 +80,9 @@ impl<'db> Type<'db> {
             }
             (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
             (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
-            (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
+            (Type::Recursive(a), Type::Recursive(b)) => {
+                a.origin(db) == b.origin(db) && a.promotion_state(db) == b.promotion_state(db)
+            }
             _ => false,
         }
     }
@@ -105,17 +110,24 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_)
             | Type::Recursive(_) => {
                 let target = RecursiveDefinition::from_type(db, self)?.target;
-                if !target.may_have_unbounded_specialization(db) {
+                let may_grow = target.may_have_unbounded_specialization(db);
+                if !may_grow {
                     return None;
                 }
-                let definition = target.definition(db);
                 Some(match target {
-                    RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
-                    RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
-                    RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
-                    RecursiveDefinition::Structural(_) => {
-                        TypeIdentity::GrowingRecursive(definition)
+                    RecursiveDefinition::TypeAlias(alias) => {
+                        TypeIdentity::GrowingTypeAlias(alias.definition(db))
                     }
+                    RecursiveDefinition::Protocol(origin) => {
+                        TypeIdentity::GrowingProtocol(origin.definition(db))
+                    }
+                    RecursiveDefinition::TypedDict(origin) => {
+                        TypeIdentity::GrowingTypedDict(origin.definition(db))
+                    }
+                    RecursiveDefinition::Structural(recursive) => TypeIdentity::GrowingRecursive(
+                        recursive.origin(db),
+                        recursive.promotion_state(db),
+                    ),
                 })
             }
             _ => None,
@@ -128,7 +140,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         matches!(
             Type::Recursive(self).recursive_identity(db),
-            Some(TypeIdentity::GrowingRecursive(_))
+            Some(TypeIdentity::GrowingRecursive(..))
         )
     }
 }
@@ -142,6 +154,16 @@ enum RecursiveDefinition<'db> {
     Structural(RecursiveType<'db>),
 }
 
+/// A source identity shared by every specialization of one recursive constructor.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum RecursiveDefinitionIdentity<'db> {
+    Definition(Definition<'db>),
+    Lambda(LambdaSignature<'db>),
+    // Promotion changes the constructor body and its parameter slots. Its flows must be
+    // inspected separately even though it comes from the same source definition.
+    Promoted(RecursiveOrigin<'db>, RecursivePromotions),
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum FlowKind {
     /// The source parameter is passed through operations that cannot accumulate structure.
@@ -150,9 +172,15 @@ enum FlowKind {
     Nested,
 }
 
-/// Formal parameters are identified by their [`BoundTypeVarIdentity`], which is unique across
-/// definitions, so parameter identities can serve directly as the flow graph's nodes.
-/// e.g.
+/// A parameter of one recursive constructor. Different lambdas can capture the same outer type
+/// variable, but the argument passed to each lambda follows a separate path through the graph.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct FlowParameter<'db> {
+    constructor: RecursiveDefinitionIdentity<'db>,
+    typevar: BoundTypeVarIdentity<'db>,
+}
+
+/// A flow between parameters of two recursive constructors. For example,
 ///
 /// definition:
 /// ```py
@@ -174,8 +202,8 @@ enum FlowKind {
 /// ```
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 struct FlowEdge<'db> {
-    from: BoundTypeVarIdentity<'db>,
-    to: BoundTypeVarIdentity<'db>,
+    from: FlowParameter<'db>,
+    to: FlowParameter<'db>,
     kind: FlowKind,
 }
 
@@ -216,9 +244,12 @@ struct DefinitionUse<'db> {
 struct SpecializationFlowGraph<'db> {
     edges: FxHashSet<FlowEdge<'db>>,
     /// Definition references used to decide whether an unresolved flow can return to the root.
-    definition_edges: Vec<(Definition<'db>, Definition<'db>)>,
+    definition_edges: Vec<(
+        RecursiveDefinitionIdentity<'db>,
+        RecursiveDefinitionIdentity<'db>,
+    )>,
     /// Definitions whose captured outer parameters cannot be mapped to their parent specialization.
-    inconclusive_definitions: FxHashSet<Definition<'db>>,
+    inconclusive_definitions: FxHashSet<RecursiveDefinitionIdentity<'db>>,
     /// Whether a definition body or its formal parameters could not be inspected.
     inconclusive: bool,
 }
@@ -227,6 +258,7 @@ struct SpecializationFlowGraph<'db> {
 ///
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
+    source: RecursiveDefinitionIdentity<'db>,
     source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
     env: ProgramEnvironment<'db>,
     visited_types: TypeCollector<'db>,
@@ -284,11 +316,31 @@ impl<'db> RecursiveDefinition<'db> {
         })
     }
 
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        match self {
+    fn identity(self, db: &'db dyn Db) -> RecursiveDefinitionIdentity<'db> {
+        if let Self::Structural(recursive) = self
+            && let Some(promotions) = recursive.promotion_state(db)
+        {
+            return RecursiveDefinitionIdentity::Promoted(recursive.origin(db), promotions);
+        }
+        RecursiveDefinitionIdentity::Definition(match self {
             Self::TypeAlias(alias) => alias.definition(db),
-            Self::Structural(recursive) => recursive.definition(db),
+            Self::Structural(recursive) => match recursive.origin(db) {
+                RecursiveOrigin::Alias(definition) => definition,
+                RecursiveOrigin::Lambda(lambda) => {
+                    return RecursiveDefinitionIdentity::Lambda(lambda);
+                }
+            },
             Self::Protocol(origin) | Self::TypedDict(origin) => origin.definition(db),
+        })
+    }
+
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+        match self {
+            Self::TypeAlias(alias) => ProgramEnvironment::from_definition(alias.definition(db)),
+            Self::Structural(recursive) => recursive.environment(db),
+            Self::Protocol(origin) | Self::TypedDict(origin) => {
+                ProgramEnvironment::from_definition(origin.definition(db))
+            }
         }
     }
 
@@ -330,6 +382,14 @@ impl<'db> RecursiveDefinition<'db> {
             .into_iter()
             .flat_map(|context| context.variables(db))
             .map(move |parameter| Self::parameter_identity(db, parameter))
+    }
+
+    fn flow_parameters(self, db: &'db dyn Db) -> impl Iterator<Item = FlowParameter<'db>> {
+        let constructor = self.identity(db);
+        self.parameters(db).map(move |typevar| FlowParameter {
+            constructor,
+            typevar,
+        })
     }
 
     /// Returns `None` if two formal parameters share an identity, since their flows could not be
@@ -380,7 +440,7 @@ impl<'db> SpecializationFlowGraph<'db> {
         let mut visited = FxHashSet::default();
 
         while let Some(source) = pending.pop() {
-            let source_definition = source.definition(db);
+            let source_definition = source.identity(db);
             if !visited.insert(source_definition) {
                 continue;
             }
@@ -399,7 +459,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             graph.definition_edges.extend(
                 referenced_definitions
                     .iter()
-                    .map(|target| (source_definition, target.definition(db))),
+                    .map(|target| (source_definition, target.identity(db))),
             );
             pending.extend(referenced_definitions);
         }
@@ -415,7 +475,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             return true;
         }
 
-        let root_definition = root.definition(db);
+        let root_definition = root.identity(db);
         if self.inconclusive_definition_reaches(root_definition) {
             return true;
         }
@@ -424,7 +484,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             return false;
         }
 
-        let root_parameters = root.parameters(db).collect::<Vec<_>>();
+        let root_parameters = root.flow_parameters(db).collect::<Vec<_>>();
         let components =
             self.strongly_connected_parameter_components(root_parameters.iter().copied());
         let root_components = root_parameters
@@ -454,8 +514,8 @@ impl<'db> SpecializationFlowGraph<'db> {
     /// This means that typevars with the same index belong to the same SCC.
     fn strongly_connected_parameter_components(
         &self,
-        additional_parameters: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
-    ) -> FxHashMap<BoundTypeVarIdentity<'db>, usize> {
+        additional_parameters: impl IntoIterator<Item = FlowParameter<'db>>,
+    ) -> FxHashMap<FlowParameter<'db>, usize> {
         let mut parameters = additional_parameters.into_iter().collect::<FxHashSet<_>>();
         let mut outgoing = FxHashMap::<_, SmallVec<[_; 2]>>::default();
         let mut incoming = FxHashMap::<_, SmallVec<[_; 2]>>::default();
@@ -521,7 +581,7 @@ impl<'db> SpecializationFlowGraph<'db> {
         components
     }
 
-    fn inconclusive_definition_reaches(&self, target: Definition<'db>) -> bool {
+    fn inconclusive_definition_reaches(&self, target: RecursiveDefinitionIdentity<'db>) -> bool {
         if self.inconclusive_definitions.is_empty() {
             return false;
         }
@@ -532,12 +592,22 @@ impl<'db> SpecializationFlowGraph<'db> {
             .is_disjoint(&definitions_reaching_target)
     }
 
-    fn definition_reaches(&self, from: Definition<'db>, to: Definition<'db>) -> bool {
+    fn definition_reaches(
+        &self,
+        from: RecursiveDefinitionIdentity<'db>,
+        to: RecursiveDefinitionIdentity<'db>,
+    ) -> bool {
         self.definitions_reaching(to).contains(&from)
     }
 
-    fn definitions_reaching(&self, target: Definition<'db>) -> FxHashSet<Definition<'db>> {
-        let mut incoming = FxHashMap::<Definition, SmallVec<[Definition; 2]>>::default();
+    fn definitions_reaching(
+        &self,
+        target: RecursiveDefinitionIdentity<'db>,
+    ) -> FxHashSet<RecursiveDefinitionIdentity<'db>> {
+        let mut incoming = FxHashMap::<
+            RecursiveDefinitionIdentity,
+            SmallVec<[RecursiveDefinitionIdentity; 2]>,
+        >::default();
         for &(source, target) in &self.definition_edges {
             incoming.entry(target).or_default().push(source);
         }
@@ -565,8 +635,9 @@ impl<'db> SpecializationFlowGraph<'db> {
 impl<'db> SpecializationFlowVisitor<'db> {
     fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
         Some(Self {
+            source: source.identity(db),
             source_parameters: source.source_parameters(db)?,
-            env: ProgramEnvironment::from_definition(source.definition(db)),
+            env: source.environment(db),
             visited_types: TypeCollector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
@@ -631,7 +702,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             return;
         }
 
-        let target_parameters = reference.target.parameters(db).collect::<Vec<_>>();
+        let target_parameters = reference.target.flow_parameters(db).collect::<Vec<_>>();
         let arguments = specialization.types(db);
         if target_parameters.len() != arguments.len() {
             self.inconclusive.set(true);
@@ -643,7 +714,10 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 SourceParameterCollector::classify(db, &self.env, &self.source_parameters, argument)
             {
                 self.edges.borrow_mut().push(FlowEdge {
-                    from,
+                    from: FlowParameter {
+                        constructor: self.source,
+                        typevar: from,
+                    },
                     to: target,
                     kind,
                 });
@@ -659,6 +733,14 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
 
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
+    }
+
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        callable.visit_typevar_dependencies(db, self);
+    }
+
+    fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+        walk_known_instance_storage(db, known, self);
     }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -730,6 +812,14 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
         false
     }
 
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        callable.visit_typevar_dependencies(db, self);
+    }
+
+    fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
+        walk_known_instance_storage(db, known, self);
+    }
+
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
@@ -784,7 +874,7 @@ impl<'db> TypeAliasType<'db> {
     /// Returns whether this alias can refer back to its own definition.
     pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
         let root = RecursiveDefinition::TypeAlias(self.unspecialized(db));
-        let root_definition = root.definition(db);
+        let root_definition = root.identity(db);
         SpecializationFlowGraph::build(db, root)
             .definition_reaches(root_definition, root_definition)
     }
@@ -825,20 +915,6 @@ impl<'db> HasIdentity<'db> for Type<'db> {
     }
 }
 
-pub(crate) type PairVisitor<'db, Tag, C> = CycleDetector<'db, Tag, (Type<'db>, Type<'db>), C, 1>;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>) {
-    type Id = (TypeIdentity<'db>, TypeIdentity<'db>);
-
-    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        self.0.may_share_type_identity(db, other.0) && self.1.may_share_type_identity(db, other.1)
-    }
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        (self.0.to_type_identity(db), self.1.to_type_identity(db))
-    }
-}
-
 impl<'db, Context> HasIdentity<'db> for (Type<'db>, Context, Type<'db>)
 where
     Context: Copy + PartialEq,
@@ -864,8 +940,6 @@ where
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
 pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY: usize> {
-    /// The active recursion stack and the lazily-computed identity of each item.
-    /// Completed visits are removed from the end of the stack.
     seen: RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; INLINE_CAPACITY]>>,
 
     /// Memoized results from earlier visits in the current recursive operation.
@@ -907,9 +981,9 @@ where
         }
     }
 
-    /// Visits `item`, returning it in `Err` if another active item has the same identity.
+    /// Visits `item`, returning both items in `Err` if another active item has the same identity.
     ///
-    /// The caller must convert `Err(item)` into an operation-specific conservative result. An
+    /// The caller must convert the cycle into an operation-specific conservative result. An
     /// exact recursive reentry uses the detector's configured fallback and is returned as `Ok`.
     ///
     /// Completed results are reused only when `reuse_cached` accepts them. Otherwise, the visit
@@ -922,7 +996,7 @@ where
         item: T,
         reuse_cached: impl FnOnce(&R) -> bool,
         compute: impl FnOnce() -> R,
-    ) -> Result<R, T> {
+    ) -> Result<R, GrowingCycle<T>> {
         let cached_result = self.cache.borrow().get(&item).cloned();
         let was_cached = cached_result.is_some();
         if let Some(result) = cached_result
@@ -970,10 +1044,13 @@ where
             // Deriving an identity can require a structural definition walk. Defer it until a
             // cheap candidate match shows that another active item could form a cycle.
             let identity = item.to_identity(db);
-            if candidates.any(|active| {
+            if let Some(active) = candidates.find(|active| {
                 active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
             }) {
-                return CycleDetectorVisit::Cycle(item);
+                return CycleDetectorVisit::Cycle(GrowingCycle {
+                    previous: active.item.clone(),
+                    current: item,
+                });
             }
             OnceCell::from(identity)
         };
@@ -1012,12 +1089,19 @@ impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVi
     }
 }
 
+/// Two different items with the same recursive identity encountered by one operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) struct GrowingCycle<T> {
+    pub(super) previous: T,
+    pub(super) current: T,
+}
+
 /// Result of starting a cycle-detector visit.
 pub(super) enum CycleDetectorVisit<T, R> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
-    Cycle(T),
+    Cycle(GrowingCycle<T>),
     /// The caller should compute the result and finish the pending visit.
     Pending(T),
 }
@@ -1242,7 +1326,7 @@ mod tests {
     use std::assert_matches;
 
     use super::{
-        CycleDetector, CycleDetectorVisit, Db, FlowEdge, FlowKind, HasIdentity,
+        CycleDetector, CycleDetectorVisit, Db, FlowEdge, FlowKind, GrowingCycle, HasIdentity,
         RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
     };
     use crate::ProgramEnvironment;
@@ -1388,15 +1472,15 @@ type Helper[U] = U
         let helper = RecursiveDefinition::TypeAlias(
             global_type_alias(&db, &env, "Helper").unspecialized(&db),
         );
-        let mut one_parameters = one.parameters(&db);
+        let mut one_parameters = one.flow_parameters(&db);
         let Some(one_t) = one_parameters.next() else {
             panic!("expected one parameter");
         };
-        let mut two_parameters = two.parameters(&db);
+        let mut two_parameters = two.flow_parameters(&db);
         let (Some(two_x), Some(two_y)) = (two_parameters.next(), two_parameters.next()) else {
             panic!("expected two parameters");
         };
-        let mut helper_parameters = helper.parameters(&db);
+        let mut helper_parameters = helper.flow_parameters(&db);
         let Some(helper_u) = helper_parameters.next() else {
             panic!("expected one helper parameter");
         };
@@ -1712,7 +1796,10 @@ class RecursivePropertySetter[T](Protocol):
                 || {
                     assert_eq!(
                         detector.try_visit(db, ConstantIdentityItem(2), |_| true, || 20),
-                        Err(ConstantIdentityItem(2))
+                        Err(GrowingCycle {
+                            previous: ConstantIdentityItem(1),
+                            current: ConstantIdentityItem(2),
+                        })
                     );
                     10
                 }
@@ -1727,7 +1814,10 @@ class RecursivePropertySetter[T](Protocol):
                 || {
                     assert_eq!(
                         detector.try_visit(db, ConstantIdentityItem(4), |_| false, || 20),
-                        Err(ConstantIdentityItem(4))
+                        Err(GrowingCycle {
+                            previous: ConstantIdentityItem(3),
+                            current: ConstantIdentityItem(4),
+                        })
                     );
                     10
                 }
@@ -1801,7 +1891,8 @@ class RecursivePropertySetter[T](Protocol):
         else {
             panic!("a different item with the same identity should form a cycle");
         };
-        assert_eq!(item.0, 2);
+        assert_eq!(item.previous.0, 1);
+        assert_eq!(item.current.0, 2);
         detector.finish_visit(pending, 1);
 
         let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(1))

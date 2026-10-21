@@ -3700,6 +3700,32 @@ def singleton_check(value: Singleton) -> str:
         assert_never(value)
 ```
 
+## Narrowed enums in unions with recursive aliases
+
+After excluding one enum member, each remaining member can match a different alternative in a target
+union. This also works when the target union contains a recursive alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Callable, Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+type Callback = Callable[[], Callback]
+
+def check(color: Color) -> None:
+    if color is not Color.BLUE:
+        result: Literal[Color.RED, Color.GREEN] | Callback = color  # no diagnostic
+```
+
 ## `match` statements
 
 ```toml

@@ -2,8 +2,9 @@
 
 use std::cell::RefCell;
 
-use super::{LambdaSignature, infer_lambda_signature};
+use super::{LambdaSignature, SignatureSource, infer_lambda_signature};
 use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
+use crate::types::typevar::BoundTypeVarInstance;
 use crate::types::visitor::any_over_type_including_alias_arguments;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, MaterializationKind, PromotionKind, PromotionMode,
@@ -56,6 +57,77 @@ pub(super) enum LambdaMapping<'db> {
 }
 
 impl<'db> LambdaMapping<'db> {
+    /// Project a capture through this mapping without transforming its declaration.
+    /// Bounds and defaults do not determine substitution identity. Materializing them here can
+    /// re-enter signature inference while we are still collecting that signature's inputs.
+    fn map_captured_typevar(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        variable: BoundTypeVarInstance<'db>,
+        mut retain: impl FnMut(BoundTypeVarInstance<'db>),
+        mut collect: impl FnMut(Type<'db>),
+    ) {
+        let mapped = match self {
+            Self::Specialize { specialization, .. } => {
+                // A ParamSpec's attributes use the substitution of the whole parameter.
+                // The body mapping restores the attribute on the substituted occurrence.
+                let parameter = if variable.is_paramspec(db) {
+                    variable.without_paramspec_attr(db)
+                } else {
+                    variable
+                };
+                if let Some(replacement) = specialization.get(db, parameter)
+                    && replacement != Type::TypeVar(variable)
+                {
+                    collect(replacement);
+                    return;
+                }
+                variable
+            }
+            Self::FreshenBoundTypeVars(context, delta) => {
+                let identity = if variable.is_paramspec(db) {
+                    variable.identity(db).without_paramspec_attr(db)
+                } else {
+                    variable.identity(db)
+                };
+                if context.contains(db, identity) {
+                    BoundTypeVarInstance::new(
+                        db,
+                        variable.typevar(db),
+                        variable.binding_context(db),
+                        variable.paramspec_attr(db),
+                        variable.freshness(db).add(*delta),
+                    )
+                } else {
+                    variable
+                }
+            }
+            Self::BindSelf(binding) if binding.should_bind(db, env, variable) => {
+                let replacement = binding.self_type();
+                if replacement != Type::TypeVar(variable) {
+                    collect(replacement);
+                    return;
+                }
+                variable
+            }
+            Self::ReplaceSelf(upper_bound) if variable.typevar(db).is_self(db) => {
+                collect(*upper_bound);
+                BoundTypeVarInstance::synthetic_self(db, *upper_bound, variable.binding_context(db))
+            }
+            Self::Promote(..)
+            | Self::BindLegacyTypevars(_)
+            | Self::BindSelf(_)
+            | Self::ReplaceSelf(_)
+            | Self::Materialize(_)
+            | Self::ReplaceParameterDefaults
+            | Self::EagerExpansion => variable,
+        };
+        // Existing declarations already contributed their dependencies. Revisiting them
+        // would reintroduce unmapped or unfreshened variables.
+        retain(mapped);
+    }
+
     /// Own the mapping's inputs, retaining only substitutions available to this lambda.
     pub(super) fn from_type_mapping(
         db: &'db dyn Db,
@@ -163,7 +235,10 @@ impl<'db> LambdaSignature<'db> {
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    fn captured_typevars(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    pub(in crate::types) fn captured_typevars(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<GenericContext<'db>> {
         let scope = self.scope(db);
         let env = ProgramEnvironment::from_scope(scope);
         let index = semantic_index(db, scope.program_file(db));
@@ -177,6 +252,12 @@ impl<'db> LambdaSignature<'db> {
             index
                 .ancestor_scopes(scope.file_scope_id(db))
                 .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), index))
+                .chain(
+                    source
+                        .environment(db)
+                        .lambda()
+                        .and_then(|lambda| lambda.captured_typevars(db)),
+                )
                 .flat_map(|context| context.variables(db))
                 .collect::<FxOrderSet<_>>(),
         );
@@ -184,33 +265,38 @@ impl<'db> LambdaSignature<'db> {
             any_over_type_including_alias_arguments(db, &env, ty, |ty| {
                 if let Type::TypeVar(variable) = ty {
                     variables.borrow_mut().insert(variable);
+                } else if let Type::Callable(callable) = ty
+                    && let SignatureSource::Lambda(lambda) = callable.signature_source(db)
+                    && let Some(captured) = lambda.captured_typevars(db)
+                {
+                    // A lazy callable can capture variables that do not occur in its parameters.
+                    // Follow its stored captures without inferring the nested lambda's body.
+                    variables.borrow_mut().extend(captured.variables(db));
                 }
                 false
             });
         };
         for parameter in source.parameters(db) {
             collect(parameter.annotated_type());
+            if let Some(default) = parameter.eager_default_type() {
+                collect(default);
+            }
         }
         if let Some(annotation) = source.return_context(db).annotation {
             collect(annotation);
         }
         for mapping in mappings.into_iter().rev() {
             let current = variables.take();
-            let visitor = ApplyTypeMappingVisitor {
-                materialize_typevar_bounds_and_defaults: mapping
-                    .materialize_typevar_bounds_and_defaults,
-                ..ApplyTypeMappingVisitor::new(&env)
-            };
-            let context = mapping.context;
-            let mapping = mapping.mapping.as_type_mapping();
             for variable in current {
-                // Captured variables can occur in either variance position in the body.
-                for mapping in [&mapping, &mapping.flip()] {
-                    collect(
-                        Type::TypeVar(variable)
-                            .apply_type_mapping_impl(db, mapping, context, &visitor),
-                    );
-                }
+                mapping.mapping.map_captured_typevar(
+                    db,
+                    &env,
+                    variable,
+                    |variable| {
+                        variables.borrow_mut().insert(variable);
+                    },
+                    &collect,
+                );
             }
         }
         GenericContext::try_from_typevar_instances(db, &env, variables.into_inner())

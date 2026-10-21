@@ -112,6 +112,7 @@ use crate::types::member::inherited_class_body_declaration;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
+use crate::types::recursive::RecursiveOrigin;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
@@ -9053,6 +9054,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // A lazy callable can hide an incomplete return type until its signature is resolved.
         // In `callback = identity(lambda: callback)`, using that return type as an inference
         // input would give the lambda a new identity on each cycle iteration.
+        // A recursive lambda's inferred body can still change after it has been bound into a
+        // finite recursive type. Keep those approximations out of the lambda's inputs too.
         let callable_tcx = callable_tcx.filter(|signature| {
             signature
                 .parameters()
@@ -9060,7 +9063,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(Parameter::annotated_type)
                 .chain([signature.return_ty])
                 .all(|ty| {
-                    !any_over_type_including_alias_arguments(db, env, ty, |ty| ty.is_divergent())
+                    !any_over_type_including_alias_arguments(db, env, ty, |ty| {
+                        ty.is_divergent()
+                            || matches!(ty, Type::Recursive(recursive)
+                                if recursive.is_initial(db)
+                                    || matches!(recursive.origin(db), RecursiveOrigin::Lambda(_)))
+                    })
                 })
         });
 

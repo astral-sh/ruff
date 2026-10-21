@@ -428,6 +428,27 @@ class Callbacks(Generic[T_co]):
         raise NotImplementedError
 ```
 
+## Recursive lambda return types
+
+Each recursive call wraps the captured value in a list. That mutable list makes `Branch` invariant,
+even though `node` is read-only:
+
+```py
+from typing import Final, Generic
+from typing_extensions import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Branch(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: (Branch([value]).node, value)
+
+static_assert(not is_subtype_of(Branch[int], Branch[object]))
+static_assert(not is_subtype_of(Branch[object], Branch[int]))
+```
+
 ## Variance in generic methods
 
 A method's independent type variable can accept arguments outside the class's covariant value type.
@@ -2101,6 +2122,33 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for partial functions
+
+Binding an argument with `partial` does not remove that parameter from the callable exposed by
+`func`. `Bound[T]` is therefore contravariant in `T`, even though calling `callback` takes no
+arguments:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Callable, Final, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Bound(Generic[T]):
+    def __init__(self, callback: Callable[[T], None], value: T):
+        self.callback: Final = partial(callback, value)
+
+static_assert(is_subtype_of(Bound[object], Bound[int]))
+static_assert(not is_subtype_of(Bound[int], Bound[object]))
+```
+
 ## Inferred variance for recursive lambdas
 
 A read-only recursive lambda that produces `T` preserves covariance:
@@ -2111,7 +2159,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, Final, Generic, TypeVar
+from typing import Callable, Final, Generic, ParamSpec, TypeVar
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of
 
@@ -2137,6 +2185,24 @@ class Consumer(Generic[T]):
 
 static_assert(is_subtype_of(Consumer[object], Consumer[int]))
 static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
+Substituting a parameter list for a `ParamSpec` preserves this direction. The captured callback
+accepts `T`, so `Forwarder` is contravariant in `T`:
+
+```py
+P = ParamSpec("P")
+
+class Callbacks(Generic[P]):
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Forwarder(Generic[T]):
+    def __init__(self, callback: Callable[[T], None]):
+        self.node: Final = Callbacks[[T]](callback).node
+
+static_assert(is_subtype_of(Forwarder[object], Forwarder[int]))
+static_assert(not is_subtype_of(Forwarder[int], Forwarder[object]))
 ```
 
 Returning a callable that both accepts and returns `T` makes it invariant:

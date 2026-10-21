@@ -6764,8 +6764,13 @@ type RightAlias[T] = RightProtocol[T]
 
 # TODO: These structurally equivalent protocols should be recognized as subtypes.
 static_assert(not is_subtype_of(LeftProtocol[int], RightProtocol[int]))
-static_assert(not is_subtype_of(LeftAlias[int], RightAlias[int]))
-# A conservative cycle fallback must not accept structurally different recursive protocols.
+```
+
+Through the aliases, ty recognizes that the type arguments do not affect the recursive protocol.
+
+```py
+static_assert(is_subtype_of(LeftAlias[int], RightAlias[int]))
+# TODO: Different changes to unused type arguments should not prevent this subtype relation.
 static_assert(not is_subtype_of(LeftProtocol[int], DifferentProtocol[int]))
 
 class ShiftingLeftProtocol[A, B, C](Protocol):

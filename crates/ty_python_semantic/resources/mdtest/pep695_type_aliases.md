@@ -361,6 +361,15 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+An alias containing a union can match several alternatives of the target union together. Every
+source alternative still needs a matching target:
+
+```py
+def assign(value: IntOrStr):
+    accepted: int | str = value  # no diagnostic
+    rejected: int | bytes = value  # error: [invalid-assignment]
+```
+
 ## Loop-carried augmented unions
 
 PEP 604 unions created by augmented assignment should converge when the previous loop iteration
@@ -1302,6 +1311,9 @@ def _(x: C):
 
 ### Growing recursive alias relations without unions
 
+These aliases never expose their type parameters. Changing the arguments in recursive references
+does not change the types they describe.
+
 ```py
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of
@@ -1309,16 +1321,17 @@ from ty_extensions._internal import is_subtype_of
 type Left[T] = tuple[Left[list[T]]]
 type Right[T] = tuple[Right[list[T]]]
 
-# TODO: Left[int] should be equivalent to (subtype of) Right[int]
-static_assert(not is_subtype_of(Left[int], Right[int]))
+static_assert(is_subtype_of(Left[int], Right[int]))
+```
 
+A repeated non-recursive alias does not hide the recursive reference in its type arguments.
+
+```py
 type Box[T] = list[T]
 type WrappedLeft[T] = tuple[Box[Box[WrappedLeft[list[T]]]]]
 type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
 
-# A repeated non-recursive alias must not hide the recursive reference in its type arguments.
-# TODO: WrappedLeft[int] should be equivalent to (subtype of) WrappedRight[int]
-static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
+static_assert(is_subtype_of(WrappedLeft[int], WrappedRight[int]))
 ```
 
 ### Recursive alias relations with finite specialization orbits
@@ -1433,8 +1446,8 @@ type AlternatingRight[X, Y] = tuple[
     AlternatingRight[None, list[X]],
 ]
 
-# TODO: These structurally equivalent aliases should be recognized as subtypes.
-static_assert(not is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
+# Neither argument is exposed, so both aliases describe the same recursive tuple structure.
+static_assert(is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
 
 # The nested aliases grow their first argument, but the references back to the outer aliases erase
 # that argument. The outer specialization orbits are therefore finite.

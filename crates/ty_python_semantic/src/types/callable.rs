@@ -10,12 +10,13 @@ use crate::{
         FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        UnionType,
+        TypeVarVariance, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
-        cyclic::ActiveRecursionDetector,
+        cyclic::{ActiveRecursionDetector, CycleDetector},
         function::OverloadLiteral,
         infer::{InferenceEnvironment, ScopeInference},
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
+        recursive::{RecursiveOrigin, RecursiveType},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         variance::{VarianceInferable, VarianceOrigin, VarianceTerm},
@@ -73,17 +74,38 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
+        self.function_like_dunder_get_impl(db, env, instance, owner, &CycleDetector::new(None))
+    }
+
+    fn function_like_dunder_get_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+        context: &CycleDetector<'db, CallableType<'db>, Type<'db>, Option<Type<'db>>, 1>,
+    ) -> Option<Type<'db>> {
         // ParamSpec specialization can produce a union of function descriptors.
         match self {
             Type::Union(union) => {
                 return union.try_map(db, env, |alternative| {
-                    alternative.function_like_dunder_get(db, env, instance, owner)
+                    alternative.function_like_dunder_get_impl(db, env, instance, owner, context)
                 });
             }
             Type::TypeAlias(alias) => {
-                return alias
-                    .value_type(db)
-                    .function_like_dunder_get(db, env, instance, owner);
+                return context.visit(db, self, || {
+                    alias
+                        .value_type(db)
+                        .function_like_dunder_get_impl(db, env, instance, owner, context)
+                });
+            }
+            Type::Recursive(recursive) => {
+                return context.visit(db, self, || {
+                    recursive
+                        .unfold(db, env)
+                        .into_unfolded()?
+                        .function_like_dunder_get_impl(db, env, instance, owner, context)
+                });
             }
             _ => {}
         }
@@ -842,10 +864,51 @@ impl<'db> LambdaSignature<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, lambda: LambdaSignature<'db>| {
-        CallableSignature::single(Signature::new(lambda.parameters(db).clone(), Type::divergent(id)))
+        CallableSignature::single(Signature::new(
+            lambda.parameters(db).clone(),
+            Type::Recursive(RecursiveType::initial(
+                db,
+                RecursiveOrigin::Lambda(lambda),
+                id,
+                lambda.captured_typevars(db),
+            )),
+        ))
     },
-    cycle_fn=|db, cycle, previous: &CallableSignature<'db>, current: CallableSignature<'db>, lambda: LambdaSignature<'db>| {
-        current.cycle_normalized(db, &ProgramEnvironment::from_scope(lambda.scope(db)), previous, cycle)
+    cycle_fn=|db, cycle: &salsa::Cycle, _previous: &CallableSignature<'db>, current: CallableSignature<'db>, lambda: LambdaSignature<'db>| {
+        let env = ProgramEnvironment::from_scope(lambda.scope(db));
+        let is_source = lambda.mapping(db).is_none();
+        // Body inference already merges expression types during cycles. This query binds
+        // the current return graph; merging earlier closed signatures would retain snapshots
+        // of mutually recursive constructors.
+        CallableSignature::from_overloads(current.overloads.into_iter().map(|signature| {
+            // A transformation can encounter a provisional constructor from another query.
+            // Its source decides whether that recursion produces a value; discarding the
+            // reference here would remove the edge needed to bind the completed body.
+            if !is_source
+                && let Type::Recursive(recursive) = signature.return_ty
+                && recursive.is_initial(db)
+            {
+                return signature;
+            }
+            let return_ty = if is_source {
+                // A lambda that only calls itself does not return. Other alternatives, such
+                // as `lambda: 1 if condition else recur()`, retain their useful return type.
+                signature.return_ty
+                    .recursive_type_normalized(db, &env, cycle)
+                    .recover_unguarded_cycle(db, &env, Type::divergent(cycle.id()), None)
+                    .unwrap_or_else(|| Type::divergent(cycle.id()))
+            } else {
+                signature.return_ty
+            };
+            let return_ty = RecursiveType::recover(
+                db,
+                RecursiveOrigin::Lambda(lambda),
+                cycle.id(),
+                lambda.captured_typevars(db),
+                return_ty,
+            );
+            signature.with_return_type(return_ty)
+        }))
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -853,6 +916,9 @@ fn infer_lambda_signature<'db>(
     db: &'db dyn Db,
     lambda: LambdaSignature<'db>,
 ) -> CallableSignature<'db> {
+    // Cycle recovery needs these parameters. Collect their dependencies while the query
+    // can still discover cycles, rather than introducing a new cycle during recovery.
+    let _ = lambda.captured_typevars(db);
     let return_ty = match lambda.mapping(db) {
         Some(mapping) => mapping.return_type(db),
         None => lambda
@@ -895,6 +961,17 @@ impl<'db> CallableType<'db> {
         }
     }
 
+    /// Inspect stored signatures without starting inference for a deferred lambda.
+    pub(super) fn explicit_signatures(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db CallableSignature<'db>> {
+        match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => Some(signatures),
+            SignatureSource::Lambda(_) => None,
+        }
+    }
+
     /// Refer to a lambda's variance equation instead of expanding its recursive signature.
     pub(super) fn variance_of(
         self,
@@ -903,6 +980,15 @@ impl<'db> CallableType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self.signature_source(db) {
+            SignatureSource::Explicit(signatures)
+                if self.kind(db) == CallableTypeKind::ParamSpecValue =>
+            {
+                // This is a parameter list, not a callable. The callable receiving this list
+                // supplies parameter contravariance; counting it here too would reverse it twice.
+                signatures
+                    .with_polarity(TypeVarVariance::Contravariant)
+                    .variance_of(db, env, typevar)
+            }
             SignatureSource::Explicit(signatures) => signatures.variance_of(db, env, typevar),
             SignatureSource::Lambda(lambda) => {
                 VarianceTerm::variable(db, VarianceOrigin::Lambda(*lambda), typevar)
@@ -920,6 +1006,44 @@ impl<'db> CallableType<'db> {
                 Some(signature.parameters())
             }
             SignatureSource::Lambda(lambda) => Some(lambda.parameters(db)),
+        }
+    }
+
+    /// Visit free-variable dependencies without inferring a lambda's return type.
+    ///
+    /// A deferred signature captures its lexical and contextual variables in its source inputs.
+    /// Resolving those dependencies must not infer the body, which can start another call's
+    /// constraint resolution before the current resolution has finished.
+    pub(super) fn visit_typevar_dependencies<V: visitor::TypeVisitor<'db> + ?Sized>(
+        self,
+        db: &'db dyn Db,
+        visitor: &V,
+    ) {
+        let visit_defaults = |parameters: &Parameters<'db>| {
+            for parameter in parameters {
+                if let Some(default) = parameter.eager_default_type() {
+                    visitor.visit_type(db, default);
+                }
+            }
+        };
+        match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => {
+                for signature in &signatures.overloads {
+                    walk_signature(db, signature, visitor);
+                    visit_defaults(signature.parameters());
+                }
+            }
+            SignatureSource::Lambda(lambda) => {
+                for parameter in lambda.parameters(db) {
+                    visitor.visit_type(db, parameter.annotated_type());
+                }
+                visit_defaults(lambda.parameters(db));
+                if let Some(parameters) = lambda.captured_typevars(db) {
+                    for variable in parameters.variables(db) {
+                        visitor.visit_type(db, Type::TypeVar(variable));
+                    }
+                }
+            }
         }
     }
 
@@ -1188,6 +1312,18 @@ impl<'db> CallableType<'db> {
             && matches!(self.signature_source(db), SignatureSource::Lambda(_))
         {
             return self.with_signatures(db, self.signatures(db));
+        }
+        if visitor.recursive_promotion.is_some()
+            && matches!(self.signature_source(db), SignatureSource::Lambda(_))
+        {
+            // Constructor promotion substitutes private parameters according to variance.
+            // A deferred lambda mapping cannot retain that substitution, so map its closed
+            // signature while the constructor's promotion context is available.
+            return self.with_signatures(
+                db,
+                self.signatures(db)
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            );
         }
 
         let source = match self.signature_source(db) {

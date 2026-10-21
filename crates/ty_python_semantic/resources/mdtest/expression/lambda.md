@@ -206,14 +206,47 @@ reveal_type(x.__qualname__)  # revealed: str
 
 ## Recursive return types
 
-Inference preserves the finite part of a recursive lambda's return type. The recursive reference
-itself is currently approximated with `Divergent`:
+A lambda can return itself as part of another value. Calling that reference preserves its return
+type and parameter list:
 
 ```py
 node = lambda: (1, node)
 
-reveal_type(node()[0])  # revealed: Literal[1]
-reveal_type(node()[1])  # revealed: Divergent
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
+node()[1](0)  # error: [too-many-positional-arguments]
+```
+
+## Mutually recursive return types
+
+A lambda can also return another lambda that refers back to it:
+
+```py
+first = lambda: (1, second)
+second = lambda: first
+
+reveal_type(first()[1]()()[0])  # revealed: Literal[1]
+```
+
+## Recursive calls and return values
+
+The return type remains available when one branch calls the lambda and the other returns it in a
+tuple:
+
+```py
+condition: bool
+node = lambda: node() if condition else (1, node)
+
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
+```
+
+## Lambdas that only call themselves
+
+A lambda that only calls itself has no returning branch. Its inferred return remains `Divergent`:
+
+```py
+node = lambda: node()
+
+reveal_type(node())  # revealed: Divergent
 ```
 
 ## Recursive lambdas with default parameters
@@ -252,7 +285,7 @@ A lambda can return a bound method referring to itself:
 class C:
     method = lambda self: (1, C().method)
 
-reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
+reveal_type(C().method)  # revealed: () -> tuple[int, () -> ...]
 ```
 
 ## Recursive decorators with an unresolved default

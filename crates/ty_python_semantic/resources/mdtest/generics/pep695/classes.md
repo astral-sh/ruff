@@ -2248,6 +2248,165 @@ class Pair[T, U]:
         reveal_type(other.first)  # revealed: list[T@Pair]
 ```
 
+## Recursive lambdas that capture type parameters
+
+Access through a specialized instance applies the class's type argument to values captured by a
+lambda. The specialization is preserved when the lambda returns itself:
+
+```py
+class Box[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, self.node)
+
+reveal_type(Box(1).node()[1]()[0])  # revealed: int
+```
+
+## Generic constructors inside recursive lambdas
+
+Inference terminates when a recursive lambda passes its own result to a generic constructor whose
+callback may return itself:
+
+```py
+class Box[T]:
+    def __init__(self, value: T, flag: bool):
+        self.callback = lambda: value if flag else self.callback
+
+def check(flag: bool):
+    callback = lambda: Box(callback(), flag).callback()
+    callback()  # no diagnostic
+```
+
+## Recursive lambdas wrapped in `partial`
+
+Inference terminates when a lambda's default and an argument bound by `partial` both refer to the
+final attribute being initialized. The lambda's body constructs another specialization of the class,
+whose type parameter has a bound:
+
+```py
+from functools import partial
+from typing import Final
+
+class Box[T: object]:
+    def __init__(self, value: T):
+        # no diagnostic
+        self.callback: Final = partial(
+            lambda *, captured=self.callback: Box(lambda: captured).callback,
+            captured=self.callback,
+        )
+```
+
+## Recursive partials with changing captured values
+
+Each recursive call wraps the captured value in a lambda and constructs another specialization of
+`Box`. Inference terminates when the resulting partial is stored in a final attribute:
+
+```py
+from functools import partial
+from typing import Final
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.callback: Final = partial(lambda: (value, Box(lambda: value).callback))
+
+Box(1).callback()[1]()[0]()  # no diagnostic
+```
+
+## Recursive lambdas that capture callables
+
+Both callbacks return a captured callable and themselves. The second callback is stored in a list
+while `T` is still a type parameter:
+
+```py
+from typing import Any, Callable, Literal
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+class Node[T]:
+    def __init__(self, callback: Callable[[T], T]):
+        self.node = lambda: (callback, self.node)
+        self.promoted = [lambda: (callback, self.promoted)][0]
+```
+
+`Top` and `Bottom` materialize the captured callable's parameter and return in opposite directions,
+including after following the recursive return:
+
+```py
+def check(top: Top[Node[Any]], bottom: Bottom[Node[Any]]):
+    reveal_type(top.node()[1]()[0])  # revealed: (Never, /) -> object
+    reveal_type(bottom.node()[1]()[0])  # revealed: (object, /) -> Never
+```
+
+Putting a specialized callback in a list promotes its inferred literal return to `int` without
+widening its parameter. If the callback entered the list before specialization, the later literal
+argument stays literal:
+
+```py
+def echo(value: Literal[1]) -> Literal[1]:
+    return value
+
+node = Node[TypeOf[1]](echo)
+after_specialization = [node.node][0]
+reveal_type(after_specialization()[1]()[0])  # revealed: (Literal[1], /) -> int
+reveal_type(node.promoted()[1]()[0])  # revealed: (Literal[1], /) -> Literal[1]
+```
+
+## Recursive lambdas in callable containers
+
+A generic container can inherit its call method from a base class:
+
+```py
+from ty_extensions import Intersection
+
+def intersect[A, B](a: A, b: B) -> Intersection[A, B]:
+    raise NotImplementedError
+
+class CallableBase[T]:
+    def __init__(self, first: T, second: T):
+        self.first = first
+
+    def __call__(self) -> T:
+        return self.first
+
+class Container[T](CallableBase[T]):
+    pass
+```
+
+One callback returns the captured value; the other returns an intersection of two recursive lambdas.
+Both can be passed to the container constructor:
+
+```py
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node = lambda unused: Container(
+            lambda: intersect(Branch(lambda: value).node, self.node),
+            lambda: value,
+        )
+
+Branch(0).node(None)  # no diagnostic
+```
+
+## Recursive aliases in captured values
+
+A recursive lambda can capture a value whose type is a recursive alias. Storing the lambda in a list
+preserves the alias's type argument, including through later recursive references:
+
+```py
+type Link[T] = tuple[T, Link[T]] | None
+
+class Box[T]:
+    def __init__(self, link: Link[T]):
+        self.node = lambda: (link, self.node)
+
+callback = [Box[int]((1, None)).node][0]
+first = callback()[0]
+if first is not None:
+    second = first[1]
+    if second is not None:
+        third = second[1]
+        if third is not None:
+            reveal_type(third[0])  # revealed: int
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:

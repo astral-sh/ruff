@@ -58,6 +58,7 @@ use crate::types::callable::LambdaSignature;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
+use crate::types::recursive::RecursiveOrigin;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
@@ -110,13 +111,13 @@ pub(super) struct CyclicTypeAliasError<'db> {
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
-            ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
+            ty: Ok(Type::Recursive(RecursiveType::initial(db, RecursiveOrigin::Alias(definition), id, parameters))),
             diagnostics: TypeCheckDiagnostics::default(),
             implicit_aliases: Box::default(),
         }
     },
     cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
+        let recover = |ty| RecursiveType::recover(db, RecursiveOrigin::Alias(definition), cycle.id(), parameters, ty);
         result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
             fallback_type: recover(error.fallback_type),
         });
@@ -935,6 +936,11 @@ impl<'db> InferenceEnvironment<'db> {
         Self {
             lambda: Some(lambda),
         }
+    }
+
+    /// The lambda whose parameter bindings are available in this environment.
+    pub(super) fn lambda(self) -> Option<LambdaSignature<'db>> {
+        self.lambda
     }
 
     fn is_empty(self) -> bool {

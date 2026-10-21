@@ -5,10 +5,10 @@ use std::cell::{Cell, RefCell};
 use rustc_hash::FxHashMap;
 
 use super::TypeVarSolution;
-use crate::types::cyclic::CycleDetector;
+use crate::types::cyclic::{CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
-use crate::types::known_instance::walk_known_instance_type;
+use crate::types::known_instance::walk_known_instance_storage;
 use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
@@ -125,13 +125,33 @@ impl<'db> Resolver<'_, 'db> {
 
 struct VisitDependencies;
 
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+struct DependencyType<'db> {
+    ty: Type<'db>,
+    inferable: TypeVarSet<'db>,
+}
+
+impl<'db> HasIdentity<'db> for DependencyType<'db> {
+    type Id = (TypeIdentity<'db>, TypeVarSet<'db>);
+
+    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
+        self.inferable == other.inferable && self.ty.may_share_type_identity(db, other.ty)
+    }
+
+    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
+        (self.ty.to_type_identity(db), self.inferable)
+    }
+}
+
+type DependencyVisits<'db> = CycleDetector<'db, VisitDependencies, DependencyType<'db>, (), 3>;
+
 /// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
-    satisfied: Cell<bool>,
-    visited: CycleDetector<'db, VisitDependencies, Type<'db>, (), 3>,
+    satisfied: &'a Cell<bool>,
+    visited: &'a DependencyVisits<'db>,
 }
 
 impl<'db> Dependencies<'_, 'db> {
@@ -142,12 +162,14 @@ impl<'db> Dependencies<'_, 'db> {
         ty: Type<'db>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
+        let satisfied = Cell::new(true);
+        let visited = DependencyVisits::new(());
         let visitor = Dependencies {
             env,
             inferable,
             query: &query,
-            satisfied: Cell::new(true),
-            visited: CycleDetector::new(()),
+            satisfied: &satisfied,
+            visited: &visited,
         };
         visitor.visit_type(db, ty);
         visitor.satisfied.get()
@@ -195,8 +217,14 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.
-            self.visited
-                .visit(db, ty, || walk_non_atomic_type(db, non_atomic, self));
+            self.visited.visit(
+                db,
+                DependencyType {
+                    ty,
+                    inferable: self.inferable,
+                },
+                || walk_non_atomic_type(db, non_atomic, self),
+            );
         }
     }
 
@@ -209,7 +237,34 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-        self.visit_type(db, recursive.unfold(db, self.env).into_type());
+        // Actual arguments were visited before entering the binder. Inspect the formal body
+        // separately to find its free variables without constructing every specialization.
+        let inferable = match recursive.parameters(db) {
+            Some(parameters)
+                if self
+                    .inferable
+                    .iter(db)
+                    .any(|variable| parameters.contains(db, variable.identity(db))) =>
+            {
+                TypeVarSet::from_typevars(
+                    db,
+                    self.inferable
+                        .iter(db)
+                        .filter(|variable| !parameters.contains(db, variable.identity(db))),
+                )
+            }
+            _ => self.inferable,
+        };
+        if inferable == TypeVarSet::None {
+            return;
+        }
+        // The inferable set is part of the cache key: a visit under this binder must not
+        // suppress a later free occurrence of one of its parameters.
+        let body_visitor = Self { inferable, ..*self };
+        body_visitor.visit_type(
+            db,
+            recursive.constructor(db).unfold(db, self.env).into_type(),
+        );
     }
 
     fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -224,9 +279,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-        for signature in &callable.signatures(db).overloads {
-            self.signature(db, signature);
-        }
+        callable.visit_typevar_dependencies(db, self);
     }
 
     fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
@@ -234,12 +287,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             KnownInstanceType::TypeAliasType(alias) => {
                 self.visit_type(db, Type::TypeAlias(alias));
             }
-            KnownInstanceType::FunctoolsPartial(partial)
-            | KnownInstanceType::FunctoolsPartialCall(partial) => {
-                self.visit_type(db, partial.wrapped(db).inner(db));
-                self.visit_callable_type(db, partial.partial(db));
-            }
-            _ => walk_known_instance_type(db, known, self),
+            _ => walk_known_instance_storage(db, known, self),
         }
     }
 }

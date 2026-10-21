@@ -488,6 +488,22 @@ C.f2(1)
 C().f2(1)
 ```
 
+## Returning a recursive lambda before binding it
+
+A lambda that returns itself is still a function descriptor. Assigning the returned function to a
+class binds its first parameter on instance access. Calling that method returns the original,
+unbound function.
+
+```py
+node = lambda self: node
+
+class C:
+    method = node(None)
+
+reveal_type(C().method())  # revealed: (self) -> ...
+C().method(0)  # error: [too-many-positional-arguments]
+```
+
 ## Decorators returning unions of callables
 
 A decorator can return a union of callables with different signatures. `staticmethod` accepts the

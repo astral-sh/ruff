@@ -1,6 +1,6 @@
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
-use std::cell::{Cell, LazyCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
@@ -1164,8 +1164,9 @@ pub struct Specialization<'db> {
     /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
     /// with `Some(MaterializationKind::Bottom)`.
-    /// The `materialization_kind` field may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions or positions with constrained type variables.
+    /// A marker is retained for invariant and constrained arguments whenever materialization
+    /// changes their representation. It can be redundant when the materialized argument has a
+    /// different representation but is equivalent to the original argument.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
@@ -1203,6 +1204,35 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Omit identity substitutions so they preserve metadata on each variable occurrence.
+    /// Equality includes bounds and defaults: a variable can retain its identity while those
+    /// attributes have changed. Tuple specializations also carry a shape outside their arguments.
+    pub(super) fn without_identity_mappings(self, db: &'db dyn Db) -> Option<Self> {
+        if self.tuple_inner(db).is_some() {
+            return Some(self);
+        }
+        let context = self.generic_context(db);
+        let retained = || {
+            context
+                .variables(db)
+                .zip(self.types(db).iter().copied())
+                .filter(|(variable, ty)| *ty != Type::TypeVar(*variable))
+        };
+        if retained().count() == context.len(db) {
+            return Some(self);
+        }
+        let env = ProgramEnvironment::from_program(context.program(db));
+        let context =
+            GenericContext::try_from_typevar_instances(db, &env, retained().map(|(var, _)| var))?;
+        Some(Self::new(
+            db,
+            context,
+            retained().map(|(_, ty)| ty).collect::<Box<[_]>>(),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+        ))
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -1439,12 +1469,15 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        let flipped_mapping = type_mapping
+            .is_variance_sensitive()
+            .then(|| type_mapping.flip());
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
+            let Some(flipped_mapping) = flipped_mapping.as_ref() else {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-            }
+            };
             match (typevar.variance(db), type_mapping) {
                 (
                     TypeVarVariance::Invariant,
@@ -1477,7 +1510,7 @@ impl<'db> Specialization<'db> {
                 (variance, _) if variance.is_covariant() => {
                     ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }
-                _ => ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                _ => ty.apply_type_mapping_impl(db, flipped_mapping, tcx, visitor),
             }
         });
 
@@ -1562,15 +1595,14 @@ impl<'db> Specialization<'db> {
         if self.materialization_kind(db).is_some() {
             return self;
         }
-        let mut has_unsimplified_dynamic_typevar = false;
+        let mut has_unsimplified_materialization = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {
             let variance = specialization_variance(db, bound_typevar);
             let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
-            // Equivalence can recursively inspect a protocol's requirements. Only check it when
-            // the result affects this materialization.
-            let has_dynamic_type = LazyCell::new(|| {
-                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
-            });
+            // Mapping must not compare signatures to decide whether an argument is static.
+            // Keep a materialization marker when equality cannot establish that it is unchanged;
+            // relations interpret that marker even when the argument is already fully static.
+            let materialization_changes_argument = vartype != top_materialization;
 
             match variance {
                 TypeVarVariance::Bivariant => {
@@ -1579,9 +1611,10 @@ impl<'db> Specialization<'db> {
                     top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-                    if bound_typevar.typevar(db).is_constrained(db) && *has_dynamic_type =>
+                    if bound_typevar.typevar(db).is_constrained(db)
+                        && materialization_changes_argument =>
                 {
-                    has_unsimplified_dynamic_typevar = true;
+                    has_unsimplified_materialization = true;
                     vartype
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
@@ -1595,20 +1628,15 @@ impl<'db> Specialization<'db> {
 
                     if effective_materialization_kind == MaterializationKind::Top
                         && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(db)
-                        && *has_dynamic_type
+                        && materialization_changes_argument
                     {
-                        IntersectionType::from_two_elements(
-                            db,
-                            visitor.env,
-                            materialized,
-                            upper_bound,
-                        )
+                        visitor.intersect(db, materialized, upper_bound)
                     } else {
                         materialized
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= *has_dynamic_type;
+                    has_unsimplified_materialization |= materialization_changes_argument;
                     vartype
                 }
             }
@@ -1624,7 +1652,7 @@ impl<'db> Specialization<'db> {
             )
         });
         let new_materialization_kind =
-            has_unsimplified_dynamic_typevar.then_some(materialization_kind);
+            has_unsimplified_materialization.then_some(materialization_kind);
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
@@ -1848,15 +1876,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return ty;
         }
 
+        let env = self.env;
+        // Generic signature comparisons introduce their own inferable parameters. Keep their
+        // active declaration assumptions separate from the enclosing call's inference.
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let checker = self.for_materialized_argument(&signature_relation_visitor);
         let argument_top =
             ty.materialize(db, MaterializationKind::Top, self.materialization_visitor);
-        if self
-            .materialization_visitor
-            .is_equivalent_to_materialization(db, ty, argument_top)
+        if checker
+            .as_equivalence_checker()
+            .check_type_pair(db, ty, argument_top)
+            .is_always_satisfied(db, env, TypeVarSet::None)
         {
             return ty;
         }
-        let env = self.env;
         let Some(constraints) = typevar.constraints(db, env) else {
             return ty;
         };
@@ -1873,8 +1906,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A viable constraint must overlap the argument's upper materialization and contain
             // its lower materialization. The upper check matters for `Intersection[int, Any]`,
             // and the lower check matters for `Any | int`.
-            if argument_top.is_disjoint_from(db, env, constraint_top)
-                || !argument_bottom.is_subtype_of(db, env, constraint_top)
+            if checker
+                .as_disjointness_checker()
+                .check_type_pair(db, argument_top, constraint_top)
+                .is_always_satisfied(db, env, TypeVarSet::None)
+                || !checker
+                    .check_type_pair(db, argument_bottom, constraint_top)
+                    .is_always_satisfied(db, env, TypeVarSet::None)
             {
                 return None;
             }

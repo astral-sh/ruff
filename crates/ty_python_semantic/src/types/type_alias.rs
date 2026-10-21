@@ -5,12 +5,14 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        PromotionMode, Type, TypeContext, TypeMapping, TypeRecursionContext, TypingModule,
+        UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
+        recursive::RecursivePromotion,
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -30,79 +32,188 @@ impl<'db> Type<'db> {
     /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
-        AliasCycleSummary::from_type(db, self).cycle.is_some()
+        AliasCycleSummary::from_type(db, self).cycle().is_some()
+    }
+
+    /// Remove unguarded recursive edges from a closed type, preserving other union alternatives.
+    /// Returns `None` when no alternatives remain, so the caller can choose its cycle fallback.
+    /// An open recursive body must be bound before calling this semantic operation.
+    pub(super) fn recover_unguarded_cycle(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cycle: Type<'db>,
+        context: Option<&TypeRecursionContext<'db>>,
+    ) -> Option<Self> {
+        AliasCycleRecovery {
+            env,
+            context,
+            cycle,
+            visitor: CycleDetector::new(None),
+        }
+        .recover(db, self)
     }
 }
 
-/// An alias's cycles and the type variables exposed outside containers and other enclosing types.
+/// Cycles and type variables exposed outside containers and other enclosing types.
 /// Only arguments substituted for these variables can introduce an unguarded cycle.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct AliasCycleSummary<'db> {
-    /// The divergent marker or unbound reference that closes an unguarded cycle.
-    pub(super) cycle: Option<Type<'db>>,
-    typevars: Box<[BoundTypeVarInstance<'db>]>,
+    cycles: [Option<Type<'db>>; 4],
+    typevars: Box<[(BoundTypeVarInstance<'db>, NegativeIntersectionPath)]>,
+}
+
+/// Count negative intersection edges only as far as promotion can distinguish them. Promotion
+/// drops a negative branch in positive position; in negative position it keeps the first negative
+/// edge and drops the second. Without that reduction, only the parity affects type variables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue, get_size2::GetSize)]
+enum NegativeIntersectionPath {
+    None,
+    One,
+    /// An even number of edges, at least two.
+    Even,
+    /// An odd number of edges, at least three.
+    Odd,
+}
+
+impl NegativeIntersectionPath {
+    const ALL: [Self; 4] = [Self::None, Self::One, Self::Even, Self::Odd];
+
+    fn compose(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::None, other) | (other, Self::None) => other,
+            _ if self.is_negative() == other.is_negative() => Self::Even,
+            _ => Self::Odd,
+        }
+    }
+
+    fn is_negative(self) -> bool {
+        matches!(self, Self::One | Self::Odd)
+    }
+
+    fn survives(self, mode: Option<PromotionMode>) -> bool {
+        match mode {
+            Some(PromotionMode::On) => matches!(self, Self::None),
+            Some(PromotionMode::Off) => matches!(self, Self::None | Self::One),
+            None => true,
+        }
+    }
 }
 
 impl<'db> AliasCycleSummary<'db> {
     pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let mut typevars = FxOrderSet::default();
-        let cycle = Self::collect(db, ty, &mut typevars);
+        let mut cycles = [None; 4];
+        Self::collect(
+            db,
+            ty,
+            NegativeIntersectionPath::None,
+            &mut cycles,
+            &mut typevars,
+        );
         Self {
-            cycle,
+            cycles,
             typevars: typevars.into_iter().collect(),
+        }
+    }
+
+    /// The divergent marker or unbound reference that closes an unguarded cycle.
+    pub(super) fn cycle(&self) -> Option<Type<'db>> {
+        self.cycles.iter().flatten().copied().next()
+    }
+
+    /// Update the summary without promoting its open body. Cycle recovery cannot perform semantic
+    /// mappings, which could introduce new query dependencies before its recursive variables close.
+    pub(super) fn promoted(self, db: &'db dyn Db, promotion: RecursivePromotion<'db>) -> Self {
+        let mode = promotion.regular_mode();
+        let cycles = std::array::from_fn(|index| {
+            if NegativeIntersectionPath::ALL[index].survives(mode) {
+                self.cycles[index]
+            } else {
+                None
+            }
+        });
+        Self {
+            cycles,
+            typevars: self
+                .typevars
+                .into_iter()
+                .filter(|(_, path)| path.survives(mode))
+                .map(|(variable, path)| {
+                    (
+                        promotion.exposed_typevar(db, variable, path.is_negative()),
+                        path,
+                    )
+                })
+                .collect(),
+        }
+    }
+
+    /// Transform cycle markers without visiting the summarized body.
+    pub(super) fn map_cycles(&mut self, mut map: impl FnMut(Type<'db>) -> Type<'db>) {
+        for cycle in self.cycles.iter_mut().flatten() {
+            *cycle = map(*cycle);
         }
     }
 
     fn collect(
         db: &'db dyn Db,
         ty: Type<'db>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
+        path: NegativeIntersectionPath,
+        cycles: &mut [Option<Type<'db>>; 4],
+        typevars: &mut FxOrderSet<(BoundTypeVarInstance<'db>, NegativeIntersectionPath)>,
+    ) {
         match ty {
             // A bare reference is unguarded: recursive binders do not introduce a container.
-            Type::RecursiveVar(_) => Some(ty),
+            Type::RecursiveVar(_) => {
+                cycles[path as usize].get_or_insert(ty);
+            }
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
                 // recursive references beneath a container.
                 let summary = alias.cycle_summary(db);
-                if summary.cycle.is_some() {
-                    return summary.cycle;
-                }
                 let specialization = alias.specialization(db).or_else(|| {
                     alias
                         .generic_context(db)
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                summary.collect_exposed_arguments(db, specialization, typevars)
+                summary.collect_exposed_arguments(db, specialization, path, cycles, typevars);
             }
             Type::Recursive(recursive) => {
                 let summary = recursive.cycle_summary(db);
-                if summary.cycle.is_some() {
-                    return summary.cycle;
-                }
-                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars)
+                summary.collect_exposed_arguments(
+                    db,
+                    recursive.arguments(db),
+                    path,
+                    cycles,
+                    typevars,
+                );
             }
             Type::TypeVar(typevar) => {
-                typevars.insert(typevar);
-                None
+                typevars.insert((typevar, path));
             }
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .find_map(|&element| Self::collect(db, element, typevars)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .chain(intersection.negative(db))
-                .find_map(|&element| Self::collect(db, element, typevars)),
+            Type::Union(union) => {
+                for &element in union.elements(db) {
+                    Self::collect(db, element, path, cycles, typevars);
+                }
+            }
+            Type::Intersection(intersection) => {
+                for &element in intersection.positive(db) {
+                    Self::collect(db, element, path, cycles, typevars);
+                }
+                let negative = path.compose(NegativeIntersectionPath::One);
+                for &element in intersection.negative(db) {
+                    Self::collect(db, element, negative, cycles, typevars);
+                }
+            }
             Type::Divergent(divergent)
                 if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
             {
-                Some(ty)
+                cycles[path as usize].get_or_insert(ty);
             }
-            _ => None,
+            _ => {}
         }
     }
 
@@ -111,19 +222,26 @@ impl<'db> AliasCycleSummary<'db> {
         &self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
-        self.typevars.iter().find_map(|&typevar| {
+        path: NegativeIntersectionPath,
+        cycles: &mut [Option<Type<'db>>; 4],
+        typevars: &mut FxOrderSet<(BoundTypeVarInstance<'db>, NegativeIntersectionPath)>,
+    ) {
+        for (inner, cycle) in NegativeIntersectionPath::ALL.into_iter().zip(self.cycles) {
+            if let Some(cycle) = cycle {
+                cycles[path.compose(inner) as usize].get_or_insert(cycle);
+            }
+        }
+        for &(typevar, inner) in &self.typevars {
+            let path = path.compose(inner);
             if let Some(argument) =
                 specialization.and_then(|specialization| specialization.get(db, typevar))
                 && argument != Type::TypeVar(typevar)
             {
-                Self::collect(db, argument, typevars)
+                Self::collect(db, argument, path, cycles, typevars);
             } else {
-                typevars.insert(typevar);
-                None
+                typevars.insert((typevar, path));
             }
-        })
+        }
     }
 }
 
@@ -471,7 +589,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(id)),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -525,24 +643,25 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         context: Option<&TypeRecursionContext<'db>>,
     ) -> Type<'db> {
-        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle {
+        if let Some(cycle) = AliasCycleSummary::from_type(db, Type::TypeAlias(self)).cycle() {
             let env = ProgramEnvironment::from_definition(self.definition(db));
-            return AliasCycleRecovery {
-                env: &env,
-                context,
-                cycle,
-                visitor: CycleDetector::new(None),
-            }
-            .recover(db, Type::TypeAlias(self))
-            .unwrap_or(cycle);
+            return Type::TypeAlias(self)
+                .recover_unguarded_cycle(db, &env, cycle, context)
+                .unwrap_or(cycle);
         }
-        apply_type_alias_specialization(
+        let specialized = apply_type_alias_specialization(
             db,
             self.raw_value_type(db),
             self.generic_context(db),
             self.specialization(db),
             context,
-        )
+        );
+        if let Type::Intersection(intersection) = specialized {
+            let env = ProgramEnvironment::from_definition(self.definition(db));
+            intersection.normalize_aliases(db, &env, context)
+        } else {
+            specialized
+        }
     }
 
     /// Resolve this alias while preserving active recursion guards.
@@ -752,7 +871,12 @@ impl<'db> TypeAliasType<'db> {
                 if mapped == ty
                     || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
                 {
-                    ty
+                    // A recursive backedge retains the unpromoted alias. Capture its stored
+                    // arguments too, so an enclosing constructor can specialize them later.
+                    match visitor.recursive_promotion {
+                        Some(context) => context.unchanged(db, ty),
+                        None => ty,
+                    }
                 } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
                     && self.is_recursive(db)
                 {

@@ -5,9 +5,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
-use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -500,11 +499,6 @@ impl MetaTypeRecursion<'_> {
 }
 
 struct ApplyTypeMappingTag;
-struct ApplyMaterializationEquivalence;
-
-type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
-
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
@@ -515,6 +509,12 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
+    /// Rebuild sets without semantic comparisons while transforming a recursive constructor.
+    /// Specialization, promotion, and materialization belong to that same structural operation.
+    structural_reconstruction: Cell<bool>,
+    recursive_promotion: Option<&'env recursive::RecursivePromotionContext<'db>>,
+    /// Independent constructor comparisons completed by this operation.
+    recursive_constructor_equivalence: OnceCell<Box<recursive::RecursiveConstructorProof<'db>>>,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -522,7 +522,6 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -531,6 +530,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             env,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
+            structural_reconstruction: Cell::new(false),
+            recursive_promotion: None,
+            recursive_constructor_equivalence: OnceCell::default(),
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -538,7 +540,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             bottom_specialization_materialization: OnceCell::default(),
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
-            materialization_equivalence: OnceCell::default(),
         }
     }
 
@@ -554,9 +555,16 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
-    fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
-        self.materialization_equivalence
-            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    /// Intersect a mapped value with its bound under this operation's reconstruction policy.
+    fn intersect(&self, db: &'db dyn Db, value: Type<'db>, bound: Type<'db>) -> Type<'db> {
+        if self.structural_reconstruction.get() {
+            IntersectionBuilder::new(db, self.env)
+                .structural()
+                .positive_elements([value, bound])
+                .build()
+        } else {
+            IntersectionType::from_two_elements(db, self.env, value, bound)
+        }
     }
 
     fn visit(
@@ -586,30 +594,47 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             .visit_type(db, ty, func)
     }
 
-    fn is_equivalent_to_materialization(
-        &self,
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> bool {
-        self.materialization_equivalence()
-            .visit(db, (left, right), || {
-                left.is_equivalent_to_with_materialization_visitor(db, right, self)
-            })
-    }
-
-    fn for_new_materialization_root(&self) -> Self {
-        let materialization_equivalence = OnceCell::new();
-        let was_empty =
-            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
-        debug_assert!(was_empty.is_ok());
-
+    /// Keep the operation's context while separating results from a different mapping.
+    fn with_fresh_mapping_caches(&self) -> Self {
         Self {
-            materialization_equivalence,
             recursion_context: self.recursion_context,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            structural_reconstruction: Cell::new(self.structural_reconstruction.get()),
+            recursive_promotion: self.recursive_promotion,
             ..Self::new(self.env)
         }
+    }
+
+    /// Transform a closed recursive body without re-entering its consuming operation.
+    fn for_recursive_unfolding(&self) -> Self {
+        Self {
+            structural_reconstruction: Cell::new(true),
+            ..self.with_fresh_mapping_caches()
+        }
+    }
+
+    /// Transform a recursive constructor without resetting the active mapping guards.
+    fn with_structural_reconstruction<T>(&self, work: impl FnOnce() -> T) -> T {
+        // Reconstruction changes normalization, not the mapped type's meaning, so previously
+        // mapped values remain reusable. Keeping the same caches also retains the guards for
+        // recursive references reached while transforming its arguments and body.
+        let _guard = StructuralReconstructionGuard {
+            policy: &self.structural_reconstruction,
+            previous: self.structural_reconstruction.replace(true),
+        };
+        work()
+    }
+}
+
+/// Restore the caller's reconstruction policy, including when mapping is cancelled.
+struct StructuralReconstructionGuard<'a> {
+    policy: &'a Cell<bool>,
+    previous: bool,
+}
+
+impl Drop for StructuralReconstructionGuard<'_> {
+    fn drop(&mut self) {
+        self.policy.set(self.previous);
     }
 }
 
@@ -3336,10 +3361,8 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
-            // Revisit this and `is_hintable` when general recursive type inference can produce
-            // types without a declared alias.
-            Type::TypeAlias(_) | Type::Recursive(_) => true,
+            Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.alias(db).is_some(),
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
@@ -3376,8 +3399,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(_)
             | Type::NewTypeInstance(_)
             | Type::LiteralValue(_)
-            | Type::TypeAlias(_)
-            | Type::Recursive(_) => true,
+            | Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.alias(db).is_some(),
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
@@ -3818,14 +3841,18 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::GenericAlias),
-            Type::Recursive(_) => Some(self),
+            Type::Recursive(recursive) => recursive
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::Recursive),
             Type::ClassLiteral(class) => class
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::SubclassOf),
-            Type::TypeVar(_) => Some(self),
+            Type::TypeVar(variable) => variable
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::TypeVar),
             Type::KnownInstance(known_instance) => known_instance
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::KnownInstance),
@@ -9580,6 +9607,9 @@ impl<'db> Type<'db> {
                 const MAX_PARAMSPEC_EXPANSION: usize = 64;
 
                 let mut expanded_callables = UnionBuilder::new(db, visitor.env);
+                if visitor.structural_reconstruction.get() {
+                    expanded_callables = expanded_callables.structural();
+                }
                 let mut expansion_size = 1usize;
                 for (_, union) in &union_paramspecs {
                     expansion_size = expansion_size.saturating_mul(union.elements(db).len());
@@ -9622,7 +9652,12 @@ impl<'db> Type<'db> {
 
                         // Use a fresh visitor, as the visitor cache does not distinguish
                         // between these specialization bindings.
-                        let callable = self.apply_type_mapping(db, visitor.env, &mapping, tcx);
+                        let callable = self.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            tcx,
+                            &visitor.with_fresh_mapping_caches(),
+                        );
                         expanded_callables.add_in_place(callable);
                     }
 
@@ -11221,8 +11256,8 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
-    /// Resolve nested lambda signatures within signature inference, where Salsa can recover
-    /// recursive returns to a finite approximation before semantic operations inspect them.
+    /// Resolve nested lambda signatures within signature inference, where Salsa can
+    /// bind recursive return types before semantic operations inspect them.
     NormalizeLambdaSignatures,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
@@ -11352,6 +11387,25 @@ impl<'db> TypeMapping<'_, 'db> {
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
         matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
+    }
+
+    /// Whether entering a negative position changes this operation.
+    const fn is_variance_sensitive(&self) -> bool {
+        match self {
+            Self::Promote(..)
+            | Self::Materialize(_)
+            | Self::ApplySpecializationWithMaterialization { .. } => true,
+            Self::ApplySpecialization(_)
+            | Self::ApplyRecursiveSubstitution(_)
+            | Self::BindLegacyTypevars(_)
+            | Self::FreshenBoundTypeVars { .. }
+            | Self::BindSelf(_)
+            | Self::ReplaceSelf { .. }
+            | Self::ReplaceParameterDefaults
+            | Self::EagerExpansion
+            | Self::NormalizeLambdaSignatures
+            | Self::RescopeReturnCallables(_) => false,
+        }
     }
 }
 
@@ -12402,9 +12456,10 @@ impl<'db> TypeIsType<'db> {
                     return Type::TypeIs(self);
                 }
 
-                // `TypeIs` with a static argument is equivalent to its top and bottom materializations.
+                // An unchanged argument needs no marker. Otherwise preserve the invariant
+                // materialization without comparing signatures during mapping.
                 let top = argument.materialize(db, MaterializationKind::Top, visitor);
-                if visitor.is_equivalent_to_materialization(db, argument, top) {
+                if argument == top {
                     return Type::TypeIs(self);
                 }
 
