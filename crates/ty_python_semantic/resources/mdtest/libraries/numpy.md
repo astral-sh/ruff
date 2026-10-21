@@ -76,9 +76,8 @@ reveal_type(from_dtype_like(np.bool))  # revealed: dtype[mini_numpy.bool[builtin
 
 ## Scalar classes represented by aliases
 
-Older NumPy stubs represent scalar classes as aliases for specialized generic bases. These names
-remain usable as annotations, constructors, and class arguments, including through renamed imports
-and local aliases. The runtime scalar class can be a subclass of the base described by the alias.
+Older NumPy stubs represent scalar classes as aliases for specialized generic bases. We retain these
+alias types, including their type arguments, when they are imported or assigned to another name.
 
 `numpy/__init__.pyi`:
 
@@ -110,12 +109,6 @@ value: Alias = Integer(1)
 reveal_type(value)  # revealed: signedinteger[_64Bit]
 
 class Int64(Alias): ...  # no diagnostic
-class ImportedInt64(Integer): ...  # no diagnostic
-class QualifiedInt64(np.int64): ...  # no diagnostic
-class GenericInt64[T](Integer): ...  # no diagnostic
-
-def nested_class():
-    class NestedInt64(Integer): ...  # no diagnostic
 
 Scalar = np.int32 | np.int64
 scalar: Scalar = Integer(1)  # no diagnostic
@@ -126,19 +119,12 @@ def narrow(value: np.int32 | np.int64) -> None:
         reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
     else:
         reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
-
-def runtime_class(cls: type[np.int64]) -> None:
-    Variable = cls
-    value: Variable  # error: [invalid-type-form]
-    class Invalid(Variable): ...  # error: [unsupported-base]
-    RuntimeScalar = cls | str
-    scalar: RuntimeScalar  # error: [invalid-type-form]
 ```
 
 ## Scalar classes represented by class definitions
 
-NumPy's newer stubs define scalar classes directly. These retain their concrete class identities;
-the compatibility handling for older aliases does not apply.
+NumPy's newer stubs define scalar classes directly. These retain their concrete class identities and
+allow precise narrowing.
 
 `numpy/__init__.pyi`:
 

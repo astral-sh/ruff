@@ -6175,7 +6175,9 @@ impl<'db> CallInference<'_, 'db> {
         }
         visitor.visit(db, (left, right), || {
             let class_specialization = |ty| match ty {
-                Type::GenericAlias(alias) => Some((alias.origin(db), alias.specialization(db))),
+                Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                    Some((alias.origin(db), alias.specialization(db)))
+                }
                 Type::NominalInstance(_) => ty.class_specialization(db, env),
                 // A pending protocol materialization affects its members, not just its arguments.
                 Type::ProtocolInstance(protocol) if protocol.materialization_kind(db).is_none() => {
@@ -6249,6 +6251,7 @@ impl<'db> CallInference<'_, 'db> {
             if matches!(
                 (left, right),
                 (Type::NominalInstance(_), Type::NominalInstance(_))
+                    | (Type::SpecializedClass(_), Type::SpecializedClass(_))
                     | (Type::GenericAlias(_), Type::GenericAlias(_))
                     | (Type::ProtocolInstance(_), Type::ProtocolInstance(_))
             ) && let (Some((left_class, left)), Some((right_class, right))) =

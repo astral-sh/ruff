@@ -3404,14 +3404,7 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                 let ty = if matches!(base_node, ast::Expr::Starred(_)) {
                     Type::unknown()
                 } else {
-                    let ty = definition_expression_type(db, class_definition, base_node);
-                    crate::types::dedicated::numpy::scalar_class_base(
-                        db,
-                        class_definition,
-                        base_node,
-                        ty,
-                    )
-                    .unwrap_or(ty)
+                    definition_expression_type(db, class_definition, base_node)
                 };
                 expanded_bases.push(ExpandedClassBaseEntry {
                     source_node: base_node,

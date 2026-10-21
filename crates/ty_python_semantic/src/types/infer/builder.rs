@@ -63,7 +63,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::{InferContext, InferContextResult};
-use crate::types::dedicated::{numpy, pydantic};
+use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
@@ -3719,11 +3719,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             SpecialFormType::try_from_file_and_name(db, importing_file, &name.id)
         }) {
             target_ty = Type::SpecialForm(special_form);
-        } else if let Type::GenericAlias(alias) = target_ty
-            && let Some(name) = target.as_name_expr()
-            && let Some(class) = numpy::scalar_class(self.db(), definition, &name.id, alias)
-        {
-            target_ty = class;
         }
 
         target_ty
@@ -4911,7 +4906,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 value,
                 TypeContext::declared(Some(declared.inner_type())),
             );
-            let inferred_ty = if is_pep_613_type_alias && let Some(name) = target.as_name_expr() {
+            let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.
                 match inferred_ty {
@@ -4925,9 +4920,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::KnownInstance(KnownInstanceType::LiteralStringAlias(
                             InternedType::new(self.db(), Type::unknown()),
                         ))
-                    }
-                    Type::GenericAlias(alias) => {
-                        numpy::scalar_class(db, definition, &name.id, alias).unwrap_or(inferred_ty)
                     }
                     _ => inferred_ty,
                 }
