@@ -3230,12 +3230,15 @@ impl<'db> Bindings<'db> {
                                 method,
                                 KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                             ) {
-                                set.is_always_satisfied(db, env, inferable)
+                                set.is_always_satisfied_bounded(db, env, inferable)
                             } else {
-                                set.is_never_satisfied(db, env, inferable)
+                                set.is_never_satisfied_bounded(db, env, inferable)
                             }
                         });
-                        overload.set_return_type(Type::bool_literal(result));
+                        overload.set_return_type(result.map_or_else(
+                            || KnownClass::Bool.to_instance(db, env),
+                            Type::bool_literal,
+                        ));
                     }
 
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
