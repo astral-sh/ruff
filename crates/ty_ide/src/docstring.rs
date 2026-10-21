@@ -29,14 +29,9 @@ impl Docstring {
     /// Render the docstring to the given markup format
     pub fn render(&self, kind: MarkupKind) -> String {
         match kind {
-            MarkupKind::PlainText => self.render_plaintext(),
+            MarkupKind::PlainText => documentation_trim(&self.0),
             MarkupKind::Markdown => markdown::render(&documentation_trim(&self.0)),
         }
-    }
-
-    /// Render the docstring for plaintext display
-    pub fn render_plaintext(&self) -> String {
-        documentation_trim(&self.0)
     }
 
     /// Extract parameter documentation from popular docstring formats.
@@ -1079,7 +1074,7 @@ Summary.
         );
         assert_eq!(&param_docs["param3"], "A parameter without type annotation");
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         Args:
@@ -1150,7 +1145,7 @@ Summary.
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         Parameters
@@ -1211,7 +1206,7 @@ Summary.
         let param_docs = docstring.parameter_documentation();
         assert!(param_docs.is_empty());
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @r"
         Insert an entry into the list of warnings filters (at the front).
 
         'param1' -- The first parameter description
@@ -1257,7 +1252,7 @@ Summary.
         let param_docs = docstring.parameter_documentation();
         assert!(param_docs.is_empty());
 
-        assert_snapshot!(docstring.render_plaintext(), @"This is a simple function description without parameter documentation.");
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"This is a simple function description without parameter documentation.");
 
         assert_snapshot!(docstring.render(MarkupKind::Markdown), @"This is a simple function description without parameter documentation.");
     }
@@ -1295,7 +1290,7 @@ Summary.
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         Args:
@@ -1373,7 +1368,7 @@ Summary.
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         :param str param1: The first parameter description
@@ -1446,7 +1441,7 @@ Summary.
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         Args:
@@ -1525,7 +1520,7 @@ Summary.
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render(MarkupKind::PlainText), @"
         This is a function description.
 
         Parameters
@@ -1583,7 +1578,7 @@ Summary.
             Some(&"The first parameter".to_string())
         );
 
-        let plaintext = docstring_windows.render_plaintext();
+        let plaintext = docstring_windows.render(MarkupKind::PlainText);
         assert_snapshot!(plaintext.as_str(), @"
         This is a function description.
 
@@ -1591,8 +1586,8 @@ Summary.
             param1 (str): The first parameter
             param2 (int): The second parameter
         ");
-        assert_eq!(docstring_mac.render_plaintext(), plaintext);
-        assert_eq!(docstring_unix.render_plaintext(), plaintext);
+        assert_eq!(docstring_mac.render(MarkupKind::PlainText), plaintext);
+        assert_eq!(docstring_unix.render(MarkupKind::PlainText), plaintext);
 
         let markdown = docstring_windows.render(MarkupKind::Markdown);
         assert_snapshot!(markdown.as_str(), @"

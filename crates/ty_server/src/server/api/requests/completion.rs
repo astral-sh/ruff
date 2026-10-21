@@ -127,7 +127,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     } else {
                         (
                             lsp_types::MarkupKind::PlainText,
-                            docstring.render_plaintext(),
+                            docstring.render(MarkupKind::PlainText),
                         )
                     };
 
