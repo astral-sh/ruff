@@ -13,3 +13,9 @@ def _():
 def _():
     from builtin import exec
     exec('')  # No error
+
+
+# https://github.com/astral-sh/ruff/issues/28011
+list(map(exec, ["hi"]))
+foo = exec
+

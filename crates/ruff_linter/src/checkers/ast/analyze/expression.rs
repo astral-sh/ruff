@@ -280,6 +280,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         );
                     }
                     if checker.any_rule_enabled(&[
+                        Rule::ExecBuiltin,
                         Rule::SuspiciousPickleUsage,
                         Rule::SuspiciousMarshalUsage,
                         Rule::SuspiciousInsecureHashUsage,
@@ -401,6 +402,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
         Expr::Attribute(attribute) => {
             if attribute.ctx == ExprContext::Load {
                 if checker.any_rule_enabled(&[
+                    Rule::ExecBuiltin,
                     Rule::SuspiciousPickleUsage,
                     Rule::SuspiciousMarshalUsage,
                     Rule::SuspiciousInsecureHashUsage,

@@ -1162,6 +1162,15 @@ fn suspicious_function(
             checker.report_diagnostic_if_enabled(SuspiciousEvalUsage, range)
         }
 
+        // Exec
+        ["" | "builtins", "exec"] => {
+            if arguments.is_none() {
+                checker.report_diagnostic_if_enabled(super::ExecBuiltin, range)
+            } else {
+                None
+            }
+        }
+
         // MarkSafe
         ["django", "utils", "safestring" | "html", "mark_safe"] => {
             if let Some(arguments) = arguments {

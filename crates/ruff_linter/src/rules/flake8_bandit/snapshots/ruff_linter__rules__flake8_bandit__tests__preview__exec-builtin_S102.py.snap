@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
+S102 Use of `exec` detected
+  --> S102.py:19:10
+   |
+18 | # https://github.com/astral-sh/ruff/issues/28011
+19 | list(map(exec, ["hi"]))
+   |          ^^^^
+20 | foo = exec
+   |
+
+
+S102 Use of `exec` detected
+  --> S102.py:20:7
+   |
+18 | # https://github.com/astral-sh/ruff/issues/28011
+19 | list(map(exec, ["hi"]))
+20 | foo = exec
+   |       ^^^^

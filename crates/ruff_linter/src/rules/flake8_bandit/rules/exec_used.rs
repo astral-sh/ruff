@@ -14,6 +14,8 @@ use crate::codes::Category;
 /// The `exec()` function is insecure as it allows for arbitrary code
 /// execution.
 ///
+/// In [preview], this rule will also flag references to `exec`.
+///
 /// ## Example
 /// ```python
 /// exec("print('Hello World')")
@@ -22,6 +24,8 @@ use crate::codes::Category;
 /// ## References
 /// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct ExecBuiltin;
