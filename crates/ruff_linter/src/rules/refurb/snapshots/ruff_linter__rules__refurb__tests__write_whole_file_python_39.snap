@@ -208,3 +208,25 @@ help: Replace with `Path("tmp_path/pyproject.toml")....`
 159 + pathlib.Path("tmp_path/pyproject.toml").write_text(dedent(
 160 |         """
     |
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("hello")`
+   --> FURB103_0.py:174:6
+    |
+172 | # See: https://github.com/astral-sh/ruff/issues/29452
+173 | flag = False
+174 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+175 |     flag and f.write("hello")
+    |
+help: Replace with `Path("file.txt").write_text("hello")`
+
+FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text("abc")`
+   --> FURB103_0.py:177:6
+    |
+175 |     flag and f.write("hello")
+176 |
+177 | with open("file.txt", "w") as f:
+    |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+178 |     print(f.write("abc"))
+    |
+help: Replace with `Path("file.txt").write_text("abc")`

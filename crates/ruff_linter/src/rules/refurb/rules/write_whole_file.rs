@@ -207,7 +207,19 @@ fn generate_fix(
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
-    if !(with_stmt.items.len() == 1 && matches!(with_stmt.body.as_slice(), [Stmt::Expr(_)])) {
+    if with_stmt.items.len() != 1 {
+        return None;
+    }
+
+    let [Stmt::Expr(ast::StmtExpr { value, .. })] = with_stmt.body.as_slice() else {
+        return None;
+    };
+
+    let Some((write_to, _)) = match_write_call(value) else {
+        return None;
+    };
+
+    if !open.is_ref(write_to) {
         return None;
     }
 
