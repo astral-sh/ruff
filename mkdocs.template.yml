@@ -1,7 +1,8 @@
 site_name: Ruff
 theme:
   name: material
-  logo: assets/bolt.svg
+  font: false
+  logo: assets/logo-brand.svg
   favicon: assets/favicon.ico
   features:
     - navigation.instant
@@ -104,6 +105,7 @@ plugins:
           - faq.md
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/brand.css
   - stylesheets/rule-filters.css
 extra_javascript:
   - js/extra.js
