@@ -2009,6 +2009,18 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+The `member` wrapper's `value` attribute preserves a wrapped function's arguments. Accessing the
+function through the wrapper does not bind the wrapper as a receiver:
+
+```py
+def format_bytes(value: bytes) -> str:
+    return value.hex()
+
+wrapped = member(format_bytes)
+reveal_type(wrapped.value(b""))  # revealed: str
+reveal_type(wrapped.value.__name__)  # revealed: str
+```
+
 ### Dunder and class-private names
 
 An attribute with a name beginning with a double underscore is treated as a non-member. This

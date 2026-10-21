@@ -1640,9 +1640,35 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
             ty: self.access.materialize_type(db, env, annotation.ty),
             ..annotation
         };
-        Some(self_type.map_or(annotation.ty, |self_type| {
+        let ty = self_type.map_or(annotation.ty, |self_type| {
             annotation.bind_self(db, env, self_type)
-        }))
+        });
+        if self.access.mode == ProtocolMemberAccessMode::Instance
+            && self
+                .access
+                .declaration
+                .qualifiers
+                .contains(TypeQualifiers::CLASS_VAR)
+            && matches!(
+                self.access.declaration.kind,
+                ProtocolMemberKind::Attribute(_)
+            )
+        {
+            // Class-variable callable annotations describe the unbound signature. Resolve their
+            // instance reads with the same descriptor heuristic as the implementation's reads.
+            let receiver = self_type.unwrap_or(Type::unknown());
+            Type::try_call_dunder_get_on_attribute(
+                db,
+                env,
+                Place::declared(ty).with_qualifiers(self.access.declaration.qualifiers),
+                Some(receiver),
+                receiver.to_meta_type(db, env),
+            )
+            .0
+            .ignore_possibly_undefined()
+        } else {
+            Some(ty)
+        }
     }
 }
 
@@ -2594,16 +2620,6 @@ fn protocol_member_read_type<'db>(
         .unwrap_or_else(|error| error.fallback_member(db))
         .member(db)
         .place
-    } else if access == ProtocolMemberAccessMode::Instance
-        && member.qualifiers().contains(TypeQualifiers::CLASS_VAR)
-    {
-        receiver_ty
-            .class_member_with_policy(
-                db,
-                member.name.into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
-            .place
     } else {
         receiver_ty.member(db, env, member.name).place
     };

@@ -114,41 +114,56 @@ impl<'db> Type<'db> {
         Type::Callable(CallableType::function_like(db, signature))
     }
 
-    /// Promote regular callables with a positional receiver to function-like callables.
-    pub(crate) fn into_function_like_callable(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    /// Promote regular callable signatures with a receiver to function descriptors.
+    pub(super) fn into_function_like_callable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        is_dunder: bool,
+    ) -> Type<'db> {
         struct IntoFunctionLikeCallable;
 
-        fn transform<'db>(
+        fn into_function_like_callable<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
+            is_dunder: bool,
             visitor: &TypeTransformer<'db, IntoFunctionLikeCallable>,
         ) -> Type<'db> {
             match ty {
                 Type::Callable(callable)
                     if callable.is_regular(db)
-                        && callable.signatures(db).has_bindable_receiver() =>
+                        && callable.signatures(db).iter().any(|signature| {
+                            signature
+                                .parameters()
+                                .get(0)
+                                .is_some_and(Parameter::is_positional)
+                                || is_dunder && signature.parameters().is_gradual()
+                        }) =>
                 {
                     Type::Callable(callable.into_function_like(db))
                 }
                 Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
-                    let value_type = alias.value_type(db);
-                    let transformed = transform(db, env, value_type, visitor);
-                    if transformed == value_type {
+                    let value = alias.value_type(db);
+                    let transformed =
+                        into_function_like_callable(db, env, value, is_dunder, visitor);
+                    if transformed == value {
                         ty
                     } else {
                         transformed
                     }
                 }),
-                Type::Union(union) => union.map(db, env, |element| transform(db, env, *element, visitor)),
-                Type::Intersection(intersection) => {
-                    intersection.map_positive(db, env, |element| transform(db, env, *element, visitor))
-                }
+                Type::Union(union) => union.map(db, env, |element| {
+                    into_function_like_callable(db, env, *element, is_dunder, visitor)
+                }),
+                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
+                    into_function_like_callable(db, env, *element, is_dunder, visitor)
+                }),
                 _ => ty,
             }
         }
 
-        transform(db, env, self, &TypeTransformer::default())
+        into_function_like_callable(db, env, self, is_dunder, &TypeTransformer::default())
     }
 
     /// Create a non-overloaded callable type which represents the value bound to a `ParamSpec`
@@ -557,6 +572,22 @@ pub enum CallableTypeKind {
     /// Class-member lookup can treat inferred class-body callables, `ClassVar` callables,
     /// and explicitly annotated callable dunders as function-like descriptors. Generic callable
     /// declarations retain their complete signatures after specialization.
+    ///
+    /// For example, `len(Sized())` implicitly calls `__len__` on the `Sized` instance. We
+    /// treat the `Callable`-typed `__len__` as a function, so accessing `Sized().__len__`
+    /// binds the `instance` parameter and gives it the signature `() -> int`:
+    ///
+    /// ```python
+    /// from collections.abc import Callable
+    ///
+    /// def length(instance: "Sized") -> int:
+    ///     return 1
+    ///
+    /// class Sized:
+    ///     __len__: Callable[["Sized"], int] = length
+    ///
+    /// len(Sized())  # Returns 1.
+    /// ```
     Regular,
 
     /// Callable objects modeled as instances of Python's `types.FunctionType`.

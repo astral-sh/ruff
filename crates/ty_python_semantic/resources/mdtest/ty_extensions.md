@@ -758,7 +758,7 @@ class Owner:
     callback = into_callable(instance)
 
 Owner().callback(1)  # error: [too-many-positional-arguments]
-Owner().callback()
+Owner().callback()  # no diagnostic
 
 class DescriptorCallableInstance:
     def __call__(self, value: int, /) -> str:
