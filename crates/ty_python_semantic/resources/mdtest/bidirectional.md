@@ -2374,6 +2374,15 @@ _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
 ```
 
+## Recursive lambdas in generic calls
+
+The callable in the list returns itself after `next` selects it. We do not use its unfinished return
+type as the expected type of another argument.
+
+```py
+callback = next(map(lambda x: x, [lambda: callback]))  # no diagnostic
+```
+
 ## Lambda contextual inference through type aliases
 
 A lambda parameter is inferred from a callable behind a type alias, including aliases that resolve
