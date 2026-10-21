@@ -3766,10 +3766,9 @@ reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
 
 ## Gradual specializations in callable union returns
 
-A callback returning `Box[Unknown]` or `Box[Any]` satisfies the `Box[T]` member of the union. It
-does not also need to satisfy the `T` member, which would require the box itself to be a `str` or
-`bytes`. Both declared constraints remain possible, so inference preserves the gradual type
-argument.
+A callable's return type only needs to match one member of an expected union, even when the match
+relies on a gradual type argument. If several declared constraints remain possible, inference
+preserves the gradual type argument.
 
 ```py
 from typing import Any, Callable
@@ -3789,12 +3788,14 @@ any_result = infer(lambda: any_)  # no diagnostic
 reveal_type(any_result)  # revealed: Any
 ```
 
-A separate argument of type `T` must still satisfy the declared constraints. Gradual evidence from
-the callback does not make an incompatible argument valid:
+Other arguments must still satisfy the type variable's declared constraints. Gradual evidence from a
+callback does not make an incompatible argument valid:
 
 ```py
 def consume[T: (str, bytes)](callback: Callable[[], Box[T]], other: T) -> None: ...
 
+# The callback returns a box, as required by `Box[T]`. The second argument must instead
+# be `str` or `bytes`, but is also a box: only its type argument is gradual.
 consume(lambda: unknown, unknown)  # error: [invalid-argument-type] "does not satisfy constraints"
 consume(lambda: any_, any_)  # error: [invalid-argument-type] "does not satisfy constraints"
 ```
