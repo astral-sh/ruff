@@ -29,7 +29,8 @@ use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
+    TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -3378,6 +3379,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         choose(*variable, Some(&candidate)).unwrap_or(mapped_ty)
                     }
                     None => choose(*variable, None)?,
+                };
+                // Unsupported parameter-list unions can survive in the legacy recovery map.
+                // Keep one list so argument validation reports the incompatible callbacks.
+                let chosen = if variable.domain(db) == TypeVarDomain::ParameterSignature
+                    && let Type::Union(union) = chosen
+                {
+                    *union.elements(db).first()?
+                } else {
+                    chosen
                 };
                 Some((*identity, chosen))
             })

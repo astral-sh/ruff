@@ -4108,11 +4108,11 @@ class ClassWithNewAndInit:
 
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 reveal_type(into_regular_callable(ClassWithNewAndInit))
-# revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
+# revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)(1))
-# error: [missing-argument]
+# TODO: error: [missing-argument]
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 

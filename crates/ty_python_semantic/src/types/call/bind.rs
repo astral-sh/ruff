@@ -3812,7 +3812,7 @@ impl<'db> CallableBinding<'db> {
             .into_iter()
             .filter_map(|index| self.overloads().get(index))
             .map(|overload| {
-                // TODO: Preserve combined parameter lists when synthesizing partial signatures.
+                // TODO: Preserve intersected parameter lists when synthesizing partial signatures.
                 if let Some((_, paramspec)) =
                     overload.signature.parameters().as_paramspec_with_prefix()
                     && let Some(value) = overload
@@ -3820,7 +3820,7 @@ impl<'db> CallableBinding<'db> {
                         .and_then(|specialization| specialization.get(db, paramspec))
                     && matches!(
                         value.as_paramspec_value(db),
-                        Some(ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_))
+                        Some(ParamSpecValue::Intersection(_))
                     )
                 {
                     return None;
