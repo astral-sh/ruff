@@ -1,15 +1,57 @@
 use crate::{
-    Db, ProgramEnvironment,
+    Db, Program, ProgramEnvironment,
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         callable::CallableTypeKind,
+        set_theoretic::{IntersectionBuilder, UnionBuilder},
     },
 };
 
 mod equations;
 
 pub(super) use equations::{VarianceOrigin, VarianceTerm, infer_protocol_variance};
+
+/// Remove redundant set elements before measuring their type-variable occurrences.
+///
+/// Recursive substitution preserves sets structurally. For example, substituting a bounded `T`
+/// can leave `T | Parent` even when `T` is a subtype of `Parent`. Counting that occurrence in
+/// `list[T | Parent]` would incorrectly make an otherwise unused parameter invariant.
+/// Redundancy checks can themselves request variance, so a circular proof keeps the original
+/// closed set. Recursive constructors remain closed throughout this operation.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, ty| ty,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(super) fn normalize_set<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    ty: Type<'db>,
+) -> Type<'db> {
+    let env = ProgramEnvironment::from_program(program);
+    match ty {
+        Type::Union(union) => {
+            let mut builder = UnionBuilder::new(db, &env)
+                .unpack_aliases(false)
+                .or_recursively_defined(union.recursively_defined(db));
+            for element in union.elements(db) {
+                builder.add_in_place(*element);
+            }
+            builder.build()
+        }
+        Type::Intersection(intersection) => {
+            let mut builder = IntersectionBuilder::new(db, &env)
+                .preserve_positive_aliases(true)
+                .positive_elements(intersection.positive(db).iter().copied());
+            for negative in intersection.negative(db) {
+                builder.add_negative_in_place(*negative);
+            }
+            builder.build()
+        }
+        _ => ty,
+    }
+}
 
 impl<'db> BoundTypeVarInstance<'db> {
     /// Measure a type argument before composing it with this parameter's variance.
@@ -29,13 +71,32 @@ impl<'db> BoundTypeVarInstance<'db> {
             return argument.variance_of(db, env, typevar);
         }
         match argument {
-            Type::Union(union) => VarianceTerm::join(
-                db,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|argument| self.argument_variance(db, env, *argument, typevar)),
-            ),
+            Type::Union(union) => {
+                let variance_of_elements = |elements: &[Type<'db>]| {
+                    VarianceTerm::join(
+                        db,
+                        elements
+                            .iter()
+                            .map(|argument| self.argument_variance(db, env, *argument, typevar)),
+                    )
+                };
+                let variance = variance_of_elements(union.elements(db));
+                if let VarianceTerm::Constant(value) = variance
+                    && value != TypeVarVariance::Bivariant
+                {
+                    let normalized = normalize_set(db, env.program(db), argument);
+                    if normalized == argument {
+                        variance
+                    } else {
+                        match normalized {
+                            Type::Union(union) => variance_of_elements(union.elements(db)),
+                            argument => self.argument_variance(db, env, argument, typevar),
+                        }
+                    }
+                } else {
+                    variance
+                }
+            }
             Type::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
                 argument
                     .with_polarity(TypeVarVariance::Contravariant)

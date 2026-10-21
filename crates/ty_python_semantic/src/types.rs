@@ -11009,13 +11009,32 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
-            Type::Union(union_type) => VarianceTerm::join(
-                db,
-                union_type
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar)),
-            ),
+            Type::Union(union_type) => {
+                let variance_of_elements = |elements: &[Type<'db>]| {
+                    VarianceTerm::join(
+                        db,
+                        elements.iter().map(|ty| ty.variance_of(db, env, typevar)),
+                    )
+                };
+                let variance = variance_of_elements(union_type.elements(db));
+                // Keep references to other equations symbolic. Comparing their types here
+                // could evaluate a recursive signature while its equation is still being built.
+                if let VarianceTerm::Constant(value) = variance
+                    && value != TypeVarVariance::Bivariant
+                {
+                    let normalized = variance::normalize_set(db, env.program(db), self);
+                    if normalized == self {
+                        variance
+                    } else {
+                        match normalized {
+                            Type::Union(union) => variance_of_elements(union.elements(db)),
+                            ty => ty.variance_of(db, env, typevar),
+                        }
+                    }
+                } else {
+                    variance
+                }
+            }
 
             // Products are covariant in their conjuncts. For negative
             // conjuncts, they're contravariant. To see this, suppose we have
@@ -11023,17 +11042,20 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             // `A`, and so is not assignable to `~A`. On the other hand, a value
             // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
             // assignable to `~B`.
-            Type::Intersection(intersection_type) => VarianceTerm::join(
-                db,
-                intersection_type
-                    .positive(db)
-                    .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar))
-                    .chain(intersection_type.negative(db).iter().map(|ty| {
-                        ty.with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar)
-                    })),
-            ),
+            Type::Intersection(_) => match variance::normalize_set(db, env.program(db), self) {
+                Type::Intersection(intersection_type) => VarianceTerm::join(
+                    db,
+                    intersection_type
+                        .positive(db)
+                        .iter()
+                        .map(|ty| ty.variance_of(db, env, typevar))
+                        .chain(intersection_type.negative(db).iter().map(|ty| {
+                            ty.with_polarity(TypeVarVariance::Contravariant)
+                                .variance_of(db, env, typevar)
+                        })),
+                ),
+                ty => ty.variance_of(db, env, typevar),
+            },
             Type::EnumComplement(complement) => complement
                 .to_intersection(db, env)
                 .variance_of(db, env, typevar),

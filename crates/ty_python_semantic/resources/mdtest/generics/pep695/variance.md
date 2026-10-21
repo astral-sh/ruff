@@ -524,6 +524,33 @@ static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
 static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
 ```
 
+## Redundant union elements in recursive lambda returns
+
+A recursive lambda can capture a callback whose return type contains a union:
+
+```py
+from typing import Callable, Final
+
+class Parent: ...
+class Child(Parent): ...
+
+class Box[Q]:
+    def __init__(self, callback: Callable[[], list[Q | Parent]]):
+        self.node = lambda: (callback, self.node)
+```
+
+When `Q` is replaced with a type variable bounded by `Parent`, the union simplifies to `Parent`. The
+callback below therefore returns `list[Parent]`, so it does not make `View` invariant in `T`:
+
+```py
+class View[T: Parent]:
+    def __init__(self, box: Box[T]):
+        self.callback: Final = box.node()[0]
+
+def upcast(value: View[Child]) -> View[Parent]:
+    return value  # no diagnostic
+```
+
 ## Writable recursive lambda attributes
 
 A writable lambda attribute makes the class invariant, even when the lambda only produces `T`.
