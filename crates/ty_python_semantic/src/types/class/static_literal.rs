@@ -26,8 +26,8 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
-        StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeTransformer,
-        TypeVarVariance, TypingModule, UnionBuilder, UnionType,
+        StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
+        TypingModule, UnionBuilder, UnionType,
         attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -1473,59 +1473,6 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        #[derive(Clone, Copy)]
-        enum CallableTransform {
-            Regular,
-            GradualDunder,
-        }
-
-        struct TransformCallable;
-
-        fn transform_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-            transform: CallableTransform,
-            visitor: &TypeTransformer<'d, TransformCallable>,
-        ) -> Type<'d> {
-            match (ty, transform) {
-                (Type::Callable(callable_ty), CallableTransform::Regular) => {
-                    Type::Callable(callable_ty.into_regular(db))
-                }
-                (Type::Callable(callable_ty), CallableTransform::GradualDunder)
-                    if callable_ty.is_regular(db)
-                        && callable_ty
-                            .signatures(db)
-                            .iter()
-                            .any(|signature| signature.parameters().is_gradual()) =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                // A TypeVar annotation can specialize to a function literal. Erase that runtime
-                // provenance so the explicit annotation still behaves as a regular callable.
-                (Type::FunctionLiteral(function), CallableTransform::Regular) => {
-                    Type::Callable(function.into_callable_type(db, env).into_regular(db))
-                }
-                (Type::TypeAlias(alias), transform) => visitor.visit_type(db, ty, || {
-                    let value_type = alias.value_type(db);
-                    let transformed = transform_callable(db, env, value_type, transform, visitor);
-                    if transformed == value_type {
-                        ty
-                    } else {
-                        transformed
-                    }
-                }),
-                (Type::Union(union), transform) => union.map(db, env, |element| {
-                    transform_callable(db, env, *element, transform, visitor)
-                }),
-                (Type::Intersection(intersection), transform) => intersection
-                    .map_positive(db, env, |element| {
-                        transform_callable(db, env, *element, transform, visitor)
-                    }),
-                _ => ty,
-            }
-        }
-
         let inherited_generic_context = if policy.no_inherited_generic_context() {
             None
         } else {
@@ -1538,7 +1485,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        let member = match result {
+        match result {
             ClassMemberResult::Done(result) => result.finalize(db, env),
             ClassMemberResult::TypedDict(module) => typed_dict_class_member(
                 db,
@@ -1548,40 +1495,6 @@ impl<'db> StaticClassLiteral<'db> {
                 policy,
                 name,
             ),
-        };
-
-        // A wholly gradual callable dunder generally describes a method. Keep it function-like so
-        // class-level inspection (for example, `Method.__call__.__code__`) remains available.
-        // Concrete callable dunders are promoted during implicit lookup, while other explicitly
-        // annotated callables remain regular after specialization.
-        if !member.is_class_var()
-            && let Place::Defined(place) = member.place
-            && let Some(definition) = place.provenance.definition()
-            && matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-        {
-            let is_gradual_callable_dunder = name.starts_with("__")
-                && name.ends_with("__")
-                && inferred_declaration(db, definition)
-                    .declared()
-                    .is_some_and(|declared| {
-                        let ty = declared.inner_type();
-                        transform_callable(
-                            db,
-                            env,
-                            ty,
-                            CallableTransform::GradualDunder,
-                            &TypeTransformer::default(),
-                        ) != ty
-                    });
-
-            let transform = if is_gradual_callable_dunder {
-                CallableTransform::GradualDunder
-            } else {
-                CallableTransform::Regular
-            };
-            member.map_type(|ty| transform_callable(db, env, ty, transform, &TypeTransformer::default()))
-        } else {
-            member
         }
     }
 
@@ -1640,7 +1553,46 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let mut member = class_member(db, body_scope, name);
+        let is_dunder = name.starts_with("__") && name.ends_with("__");
+        let is_class_var = member.inner.is_class_var();
+        let is_inferred = matches!(
+            member.inner.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Inferred,
+                ..
+            })
+        );
+
+        // Decide before applying this class's specialization: `Callable[P, R]` and a bare `F`
+        // describe the stored callable's full signature. A concrete receiver in a dunder or
+        // inferred class-body callable instead indicates a method. Ordinary `ClassVar` callables
+        // are promoted on instance access to preserve their declared types for assignment checks.
+        // TODO: An inherited annotation can already be specialized when a subclass supplies a
+        // default. Preserve its original binding behavior in that case too.
+        if !is_class_var
+            && !is_inferred
+            && let Some(ty) = member.ignore_possibly_undefined()
+            && match ty.resolve_type_alias(db) {
+                Type::TypeVar(_) => true,
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    let element = element.resolve_type_alias(db);
+                    element.is_type_var() || element.is_none(db)
+                }),
+                _ => false,
+            }
+        {
+            member
+                .inner
+                .qualifiers
+                .insert(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
+        }
+        let member = member.map_type(|ty| {
+            let ty = if is_dunder || is_inferred {
+                ty.into_function_like_callable(db, env, is_dunder)
+            } else {
+                ty
+            };
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of

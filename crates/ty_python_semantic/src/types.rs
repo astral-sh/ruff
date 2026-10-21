@@ -1336,7 +1336,6 @@ bitflags! {
         /// All other attributes use the `WithInstanceFallback` policy.
         ///
         /// If this flag is set - look up the attribute on the meta-type only.
-        /// This also selects method-like binding for concrete callable dunder declarations.
         const NO_INSTANCE_FALLBACK = 1 << 0;
 
         /// When looking up an attribute on a class, we sometimes need to avoid
@@ -4512,38 +4511,18 @@ impl<'db> Type<'db> {
             key
         };
 
-        let member = if let Type::TypeVar(_) = ty
-            && let Some(class) = ty.nominal_class(db, env)
-        {
-            ty.to_meta_type(db, env)
-                .class_namespace_member(db, env, class, key.name(db), key.policy(db))
-        } else {
-            Self::class_member_with_policy_inner(db, key)
-        };
-        let name = key.name(db);
-        let is_dunder_lookup = key.policy(db).no_instance_fallback()
-            && name.starts_with("__") && name.ends_with("__");
-        let is_callable_dunder = is_dunder_lookup
-            && matches!(member.place, Place::Defined(place) if place
-                .provenance.definition().is_some_and(|definition| {
-                    matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
-                        && inferred_declaration(db, definition).declared().is_some_and(|declared| {
-                            let ty = declared.inner_type();
-                            ty.into_function_like_callable(db, env) != ty
-                        })
-                }));
+        if let Type::TypeVar(_) = ty {
+            if let Some(class) = ty.nominal_class(db, env) {
+                let name = key.name(db);
+                let policy = key.policy(db);
 
-        // Inferred class-body callables, `ClassVar` callables, and concrete callable
-        // dunders behave as descriptors when read through an instance. Dunder lookup uses
-        // the unspecialized declaration so callable-bounded TypeVars and ParamSpecs keep
-        // their full signatures after specialization.
-        if member.is_class_var() || is_callable_dunder
-            || matches!(member.place, Place::Defined(DefinedPlace { origin: TypeOrigin::Inferred, .. }))
-        {
-            member.map_type(|ty| ty.into_function_like_callable(db, env))
-        } else {
-            member
+                return ty
+                    .to_meta_type(db, env)
+                    .class_namespace_member(db, env, class, name, policy);
+            }
         }
+
+        Self::class_member_with_policy_inner(db, key)
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -5244,6 +5223,23 @@ impl<'db> Type<'db> {
         AttributeKind,
         Option<DescriptorGetCallContext<'db>>,
     ) {
+        // A bare type-variable annotation describes a stored value. Specialization can supply
+        // a function or another descriptor, but does not turn that value into a class descriptor.
+        if attribute
+            .qualifiers
+            .contains(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE)
+        {
+            return (attribute, AttributeKind::NormalOrNonDataDescriptor, None);
+        }
+
+        // A `ClassVar[Callable[...]]` is assumed to describe a method on instance access.
+        // Preserve the declared callable type elsewhere, including class-attribute writes.
+        let attribute = if instance.is_some() && attribute.is_class_var() {
+            attribute.map_type(|ty| ty.into_function_like_callable(db, env, false))
+        } else {
+            attribute
+        };
+
         if let PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
@@ -11672,7 +11668,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -11693,6 +11689,11 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// A class-body attribute declared with a bare type variable, such as `value: T`,
+        /// optionally unioned with `None`. Treat its specialized value as instance storage rather
+        /// than invoking its descriptor protocol. This is a heuristic: the annotation does
+        /// not record whether the value is installed on the class or on each instance.
+        const GENERIC_INSTANCE_ATTRIBUTE = 1 << 8;
     }
 }
 
@@ -11723,10 +11724,11 @@ impl TypeQualifiers {
     /// Returns `true` if this is a non-standard qualifier.
     ///
     /// Non-standard qualifiers are internal implementation details like
-    /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
+    /// `IMPLICIT_INSTANCE_ATTRIBUTE`, `FROM_MODULE_GETATTR`, and `GENERIC_INSTANCE_ATTRIBUTE`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
         self.intersects(NON_STANDARD)
     }
 }

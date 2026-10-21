@@ -101,18 +101,21 @@ If we were to treat `Callable`s as bound-method descriptors, then the signatures
 This would be equally unsound, because now we would allow a call to `C3().callable_n(1)` which would
 also fail at runtime.
 
-There is no perfect solution here, but for compatibility with other type checkers we treat inferred
-class-body callables and `ClassVar`-annotated callables with a positional receiver as bound-method
-descriptors. Wholly gradual signatures have no known receiver to bind during ordinary attribute
-access, and explicit non-`ClassVar` callable annotations remain regular. Concrete callable dunders
-are treated as methods when invoked implicitly; callable-bounded TypeVars and ParamSpecs remain
-regular. Gradual callable dunders retain function-like behavior for class-level inspection.
+There is no perfect solution here. We treat inferred class-body callables, `ClassVar` callables, and
+callable dunders with a positional receiver as function descriptors. Other explicit callable
+annotations remain regular. Gradual callable dunders also retain function behavior for uses such as
+`Method.__call__.__code__`.
+
+For members declared in a generic class, `Callable[P, R]` retains its full parameter list, and an
+attribute declared with a bare type variable describes a stored value whose descriptor protocol is
+not invoked. Descriptor classification is shared by direct attribute access, implicit calls, and
+`super()`. Direct access can also find a value stored on the instance instead of a class descriptor.
 
 ## Callable descriptor lookup modes
 
-For inferred and `ClassVar` callables, promotion to a bound-method descriptor only affects instance
-reads. Class reads and writes retain the declared callable signature. This also applies when the
-callable is hidden behind a PEP 695 type alias or has a gradual `Concatenate` tail:
+Inferred and `ClassVar` callables bind the receiver on instance reads. Class reads retain the full
+signature. This also applies when the callable is hidden behind a PEP 695 type alias or has a
+gradual `Concatenate` tail:
 
 ```py
 from collections.abc import Callable
@@ -140,13 +143,37 @@ reveal_type(C.classvar)  # revealed: (object, str, /) -> int
 reveal_type(C().classvar)  # revealed: (str, /) -> int
 reveal_type(C().explicit)  # revealed: (object, str, /) -> int
 
-C.inferred = method
-C.classvar = method
+C.inferred = method  # no diagnostic
+C.classvar = method  # no diagnostic
 
 reveal_type(C().inferred("value"))  # revealed: int
 reveal_type(C().classvar("value"))  # revealed: int
 reveal_type(C().inferred_gradual())  # revealed: int
 reveal_type(C().classvar_gradual())  # revealed: int
+```
+
+## Callable descriptors accessed through `super()`
+
+`super()` binds inferred and `ClassVar` callables just as ordinary instance access does, including
+when the attribute is a dunder:
+
+```py
+from collections.abc import Callable
+from typing import ClassVar, cast
+
+def impl(receiver: object, value: int) -> int:
+    return value
+
+class Base:
+    method = cast(Callable[[object, int], int], impl)
+    classvar: ClassVar[Callable[[object, int], int]] = impl
+    __call__ = cast(Callable[[object, int], int], impl)
+
+class Child(Base):
+    def check(self) -> None:
+        reveal_type(super().method(1))  # revealed: int
+        reveal_type(super().classvar(1))  # revealed: int
+        reveal_type(super().__call__(1))  # revealed: int
 ```
 
 ## Use case: Decorating a method with a `Callable`-typed decorator
@@ -436,7 +463,8 @@ class Thunk:
 reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
 ```
 
-In particular, ordinary attribute access retains the full signature of a concrete callable dunder:
+As with inferred callable attributes, the heuristic does not check whether the receiver's type is
+compatible with the first parameter:
 
 ```py
 def descriptor_candidate(value: str) -> int:
@@ -445,7 +473,7 @@ def descriptor_candidate(value: str) -> int:
 class DescriptorCandidate:
     __value__: Callable[[str], int] = descriptor_candidate
 
-reveal_type(DescriptorCandidate().__value__)  # revealed: (str, /) -> int
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
 ```
 
 A gradual callable annotation on a dunder also describes a method, so function attributes are
@@ -983,10 +1011,10 @@ C.with_new(1)
 C().with_new(1)
 C.with_init(1)
 C().with_init(1)
-C.extracted_new(1)
+C.extracted_new(1)  # no diagnostic
 # error: [too-many-positional-arguments]
 C().extracted_new(1)
-C.extracted_init(1)
+C.extracted_init(1)  # no diagnostic
 # error: [too-many-positional-arguments]
 C().extracted_init(1)
 ```
@@ -1173,5 +1201,3 @@ that same method, so receiver checking is recursive.
 class C:
     __pow__ = pow
 ```
-
-[`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092
