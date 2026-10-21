@@ -12,7 +12,7 @@ use crate::types::attribute_write::{
     property_setter_value_type,
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -1451,6 +1451,19 @@ struct ProtocolMemberAccess<'a, 'db> {
 }
 
 impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
+    fn unbound_instance_method(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+        // Raw declaration signatures do not include a pending materialization.
+        if self.mode != ProtocolMemberAccessMode::Instance || self.materialization.is_some() {
+            return None;
+        }
+        let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+            self.declaration.kind
+        else {
+            return None;
+        };
+        Some(callable.signatures(db))
+    }
+
     fn read(self) -> Option<ProtocolMemberReadAccess<'a, 'db>> {
         let supported = match self.declaration.kind {
             ProtocolMemberKind::Method(..) => true,
@@ -2596,6 +2609,46 @@ fn protocol_member_read_type<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Prove receiver compatibility without unfolding two instances of the same protocol.
+    ///
+    /// A target receiver restriction `P[B]` implies a source restriction `P[A]` if `P[B]`
+    /// is assignable to `P[A]`. Comparing their type arguments using the protocol's variance
+    /// is sufficient; checking the implementing instance against both annotations would
+    /// recursively check this same method with fresh type variables. Retaining the receiver
+    /// parameter keeps its constraints in the same scope as the other parameters and return type.
+    fn try_check_protocol_receiver_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableSignature<'db>,
+        target: &CallableSignature<'db>,
+        source_self_type: Type<'db>,
+        target_self_type: Type<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        let target_receiver = target.overloads.first()?.parameters().get_positional(0)?;
+        let receiver_protocol = target_receiver
+            .annotated_type()
+            .resolve_type_alias(db)
+            .as_protocol_instance()?;
+        let origin = receiver_protocol.class_origin(db)?.class_literal(db);
+        let prepare = |signatures: &CallableSignature<'db>, self_type| {
+            signatures
+                .iter()
+                .map(|signature| {
+                    signature.with_nominal_protocol_receiver(db, self.env, origin, self_type)
+                })
+                .collect::<Option<Vec<_>>>()
+                .map(CallableSignature::from_overloads)
+        };
+        let source = prepare(source, source_self_type)?;
+        let target = prepare(target, target_self_type)?;
+        let mut checker = self.clone();
+        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        let result = checker.check_callable_signature_pair(db, &source, &target);
+        // This is a sufficient proof. A failed nominal comparison does not rule out a
+        // structural match, even between specializations of the same protocol.
+        (!result.is_never_satisfied(db, self.env, self.inferable)).then_some(result)
+    }
+
     fn check_protocol_member_read(
         &self,
         db: &'db dyn Db,
@@ -2666,6 +2719,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             } else {
                 (implementation_self_binding_ty, protocol_self_binding_ty)
             };
+
+        if let Some(target) = required.unbound_instance_method(db)
+            && let Type::BoundMethod(method) = attribute_type
+            && method.signature_receiver(db) == protocol_receiver_binding_ty
+            && let Some(source) = method.unbound_signatures(db)
+        {
+            // A stored bound method keeps its captured receiver; only descriptor binding to
+            // this object lets us use the target's receiver restriction as a premise.
+            let source_descriptor = ty
+                .class_member_with_policy(
+                    db,
+                    env,
+                    member.name,
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .ignore_possibly_undefined();
+            if source_descriptor
+                .is_some_and(|descriptor| descriptor.function_like_kind(db).is_some())
+                && let Some(result) = self.try_check_protocol_receiver_pair(
+                    db,
+                    source,
+                    target,
+                    method.typing_self_type(db),
+                    protocol_self_binding_ty,
+                )
+            {
+                return result;
+            }
+        }
 
         let Some(Type::Callable(required_callable)) = required
             .read()
@@ -3006,6 +3089,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.always()
         } else if source.read().is_none() {
             self.never()
+        } else if let Some(source) = source.unbound_instance_method(db)
+            && let Some(target) = target.unbound_instance_method(db)
+            && let Some(result) =
+                self.try_check_protocol_receiver_pair(db, source, target, source_type, source_type)
+        {
+            result
         } else {
             let bind_read = |access: ProtocolMemberAccess<'_, 'db>,
                              member: &ProtocolMember<'_, 'db>| {

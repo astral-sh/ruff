@@ -3727,6 +3727,122 @@ exact_class: type[Just[object]] = object  # no diagnostic
 subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
 ```
 
+## Recursive protocol receiver restrictions
+
+An implementation can use the same receiver restriction as a generic protocol. Its other parameters
+and return types must still match.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable, Iterable
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise RuntimeError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise RuntimeError
+
+class Inherited(Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+class Structural(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None:
+        raise NotImplementedError
+
+class Invalid(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def step(self: Chain[tuple[S]], callback: Callable[[S], str]) -> None:
+        raise NotImplementedError
+
+def accepts(value: Chain[int]) -> None: ...
+def check(inherited: Inherited[int], structural: Structural[int], wrong: Structural[str], invalid: Invalid[int]):
+    accepts(inherited)  # no diagnostic
+    accepts(structural)  # no diagnostic
+    accepts(wrong)  # error: [invalid-argument-type]
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+A subprotocol must pass the same assignability check.
+
+```py
+class StructuralProtocol(Protocol[T]):
+    def value(self) -> T: ...
+    def step(self: Chain[tuple[S]], callback: Callable[[S], T]) -> None: ...
+
+def check_protocol(valid: StructuralProtocol[int], invalid: StructuralProtocol[str]):
+    accepts(valid)  # no diagnostic
+    accepts(invalid)  # error: [invalid-argument-type]
+```
+
+The expected protocol also supplies the inherited constructor's type argument.
+
+```py
+contextual: Chain[int] = Inherited(())  # no diagnostic
+reveal_type(contextual)  # revealed: Inherited[int]
+```
+
+## Variance of protocol receiver restrictions
+
+An implementation can accept a broader receiver than a protocol requires.
+
+```py
+from __future__ import annotations
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Reader(Protocol[T_co]):
+    def read(self) -> T_co: ...
+
+class Required(Protocol):
+    def method(self: Reader[bool]) -> None: ...
+
+class Broad:
+    def method(self: Reader[int]) -> None: ...
+
+class Incompatible:
+    def method(self: Reader[str]) -> None: ...
+
+def accepts(value: Required) -> None: ...
+def check(broad: Broad, incompatible: Incompatible):
+    accepts(broad)  # no diagnostic
+    accepts(incompatible)  # error: [invalid-argument-type]
+```
+
+## Structurally equivalent protocol receiver restrictions
+
+Receiver annotations can match structurally even when their type arguments do not satisfy the
+protocol's declared variance.
+
+```py
+from __future__ import annotations
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Recursive(Protocol[T_co]):
+    def child(self) -> Recursive[T_co]: ...
+
+class Required(Protocol):
+    def method(self: Recursive[int]) -> None: ...
+
+class Implementation:
+    def child(self) -> Implementation:
+        return self
+    def method(self: Recursive[str]) -> None: ...
+
+def accepts(value: Required) -> None: ...
+def check(value: Implementation):
+    accepts(value)  # no diagnostic
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
