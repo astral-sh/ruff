@@ -199,4 +199,54 @@ help: Use the loop variable directly
 84 |     for index, column_name in enumerate(column_names):
    -         _ = data[column_names[index]]  # PLR1736
 85 +         _ = data[column_name]  # PLR1736
+86 |
+   |
+
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:89:44
+   |
+88 | def comprehension_if_and_multi_generators(xs, ys):
+89 |     return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   |                                            ^^^^^
+90 |     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+91 |     return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   |
+help: Use the loop variable directly
+   |
+88 | def comprehension_if_and_multi_generators(xs, ys):
+   -     return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+89 +     return [1 for i, x in enumerate(xs) if x]  # PLR1736
+90 |     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+   |
+
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:90:13
+   |
+88 | def comprehension_if_and_multi_generators(xs, ys):
+89 |     return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+90 |     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+   |             ^^^^^
+91 |     return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   |
+help: Use the loop variable directly
+   |
+89 |     return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   -     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+90 +     return [x for _ in ys for i, x in enumerate(xs)]  # PLR1736
+91 |     return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   |
+
+PLR1736 [*] List index lookup in `enumerate()` loop
+  --> unnecessary_list_index_lookup.py:91:56
+   |
+89 |     return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+90 |     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+91 |     return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+   |                                                        ^^^^^
+help: Use the loop variable directly
+   |
+90 |     return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+   -     return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+91 +     return [1 for _ in ys for i, x in enumerate(xs) if x]  # PLR1736
+92 |
    |

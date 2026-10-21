@@ -93,13 +93,16 @@ pub(crate) fn unnecessary_list_index_lookup_comprehension(checker: &Checker, exp
         let Some((sequence, index_name, value_name)) =
             enumerate_items(&comp.iter, &comp.target, checker.semantic())
         else {
-            return;
+            continue;
         };
 
         let ranges = {
             let mut visitor =
                 SequenceIndexVisitor::new(&sequence.id, &index_name.id, &value_name.id);
             visitor.visit_expr(elt);
+            for expr in &comp.ifs {
+                visitor.visit_expr(expr);
+            }
             visitor.into_accesses()
         };
 

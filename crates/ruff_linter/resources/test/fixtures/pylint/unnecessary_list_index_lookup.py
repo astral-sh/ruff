@@ -83,3 +83,10 @@ def nested_index_lookup():
     column_names = ["a", "b"]
     for index, column_name in enumerate(column_names):
         _ = data[column_names[index]]  # PLR1736
+
+
+def comprehension_if_and_multi_generators(xs, ys):
+    return [1 for i, x in enumerate(xs) if xs[i]]  # PLR1736
+    return [xs[i] for _ in ys for i, x in enumerate(xs)]  # PLR1736
+    return [1 for _ in ys for i, x in enumerate(xs) if xs[i]]  # PLR1736
+
