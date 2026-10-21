@@ -73,3 +73,111 @@ def from_dtype_like(value: np._DTypeLike[_ScalarT]) -> np.dtype[_ScalarT]:
 
 reveal_type(from_dtype_like(np.bool))  # revealed: dtype[mini_numpy.bool[builtins.bool]]
 ```
+
+## Scalar classes represented by aliases
+
+Older NumPy stubs represent scalar classes as aliases for specialized generic bases. These names
+remain usable as annotations, constructors, and class arguments, including through renamed imports
+and local aliases. The runtime scalar class can be a subclass of the base described by the alias.
+
+`numpy/__init__.pyi`:
+
+```pyi
+from typing import Self, TypeAlias
+
+class _32Bit: ...
+class _64Bit: ...
+
+class signedinteger[Precision]:
+    def __new__(cls, value: int = ...) -> Self: ...
+
+int32: TypeAlias = signedinteger[_32Bit]
+int64 = signedinteger[_64Bit]
+```
+
+```py
+import numpy as np
+from numpy import int64 as Integer
+
+Alias = Integer
+
+def accepts_int64(cls: type[np.int64]) -> None: ...
+
+accepts_int64(Alias)  # no diagnostic
+accepts_int64(np.int32)  # error: [invalid-argument-type]
+
+value: Alias = Integer(1)
+reveal_type(value)  # revealed: signedinteger[_64Bit]
+
+class Int64(Alias): ...  # no diagnostic
+class ImportedInt64(Integer): ...  # no diagnostic
+class QualifiedInt64(np.int64): ...  # no diagnostic
+class GenericInt64[T](Integer): ...  # no diagnostic
+
+def nested_class():
+    class NestedInt64(Integer): ...  # no diagnostic
+
+Scalar = np.int32 | np.int64
+scalar: Scalar = Integer(1)  # no diagnostic
+reveal_type(scalar)  # revealed: signedinteger[_64Bit]
+
+def narrow(value: np.int32 | np.int64) -> None:
+    if isinstance(value, Integer):
+        reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
+    else:
+        reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
+
+def runtime_class(cls: type[np.int64]) -> None:
+    Variable = cls
+    value: Variable  # error: [invalid-type-form]
+    class Invalid(Variable): ...  # error: [unsupported-base]
+    RuntimeScalar = cls | str
+    scalar: RuntimeScalar  # error: [invalid-type-form]
+```
+
+## Scalar classes represented by class definitions
+
+NumPy's newer stubs define scalar classes directly. These retain their concrete class identities;
+the compatibility handling for older aliases does not apply.
+
+`numpy/__init__.pyi`:
+
+```pyi
+from typing import Self, final
+
+class _32Bit: ...
+class _64Bit: ...
+
+class signedinteger[Precision]:
+    def __new__(cls, value: int = ...) -> Self: ...
+
+@final
+class int32(signedinteger[_32Bit]): ...
+
+@final
+class int64(signedinteger[_64Bit]): ...
+
+longlong = int64
+```
+
+```py
+import numpy as np
+from numpy import int64 as Integer
+
+Alias = Integer
+
+def accepts_int64(cls: type[np.int64]) -> None: ...
+
+accepts_int64(Alias)  # no diagnostic
+accepts_int64(np.longlong)  # no diagnostic
+accepts_int64(np.int32)  # error: [invalid-argument-type]
+
+value: Alias = Integer(1)
+reveal_type(value)  # revealed: int64
+
+def narrow(value: np.int32 | np.int64) -> None:
+    if isinstance(value, Integer):
+        reveal_type(value)  # revealed: int64
+    else:
+        reveal_type(value)  # revealed: int32
+```
