@@ -726,10 +726,11 @@ def f[T: A](x: P[T, T], value: T) -> None:
 f(Bad(), B())
 ```
 
-## Correlated alternatives from intersection arguments
+## Intersection alternatives with contravariant constraints
 
-An intersection of contravariant sinks offers alternative specializations. Evidence from the value
-argument selects the compatible alternative, regardless of argument order:
+Because `Sink` is contravariant, passing a `Sink[A]` to a `Sink[T]` parameter requires `T` to be
+assignable to `A`. The intersection offers two alternative constraints: `T` is assignable to `A` or
+to `B`. The value argument selects the compatible alternative, regardless of argument order:
 
 ```py
 from ty_extensions import Intersection
@@ -762,22 +763,20 @@ def _(sink: Intersection[Sink[A], Sink[B]], value: C) -> None:
     choose_reversed(value, sink)
 ```
 
-With no second argument, inference retains both alternatives and merges their assignments to
-`A | B`. Argument checking currently rejects that merged specialization even though either
-individual specialization would accept the sink:
+With no second argument, both alternatives accept the sink. Inference validates each specialization
+separately and intersects their return types:
 
 ```py
 def element[T](sink: Sink[T]) -> T:
     raise NotImplementedError
 
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
-    # TODO: Validate and refine each specialization separately to accept this call and reveal A & B.
-    # error: [invalid-argument-type] "Expected `Sink[A | B]`"
-    reveal_type(element(sink))  # revealed: A | B
+    reveal_type(element(sink))  # revealed: A & B
 ```
 
-Assignments to different type variables remain correlated within an alternative. Selecting the
-source whose first element is `A` also selects its second element, `B`:
+Assignments to different type variables remain correlated within an alternative: the choices here
+are `(T = A, U = B)` and `(T = B, U = C)`. The contravariant `Sink[A]` selects the first pair, so
+the result is `B`:
 
 ```py
 class Pair[T, U]:
@@ -821,9 +820,10 @@ def _(both: C, only_a: A, sink: Sink[Intersection[Source[A], Source[B]]]) -> Non
 
 ## Bounds and constraints on intersection alternatives
 
-Only alternatives satisfying a declared bound or constraint contribute to inference. The return type
-currently uses the union of all accepted assignments; refining it per specialization would preserve
-the intersection of the accepted result types:
+An intersection in actual-argument positions can result in multiple valid specializations of a
+generic call. In this case, we intersect the specialized return types.
+
+Only alternatives satisfying a declared bound or constraint contribute to inference:
 
 ```py
 from ty_extensions import Intersection
@@ -845,12 +845,17 @@ def constrained[T: (A, B)](source: Source[T]) -> T:
     return source.get()
 
 def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
-    # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(bounded(both))  # revealed: A | B
-    # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(constrained(both))  # revealed: A | B
+    reveal_type(bounded(both))  # revealed: A & B
+    reveal_type(constrained(both))  # revealed: A & B
     reveal_type(bounded(mixed))  # revealed: A
     reveal_type(constrained(mixed))  # revealed: A
+```
+
+An incompatible third element does not discard either valid specialization:
+
+```py
+def _(source: Intersection[Source[A], Source[B], Source[C]]) -> None:
+    reveal_type(bounded(source))  # revealed: A & B
 ```
 
 If no covariant source alternative satisfies an upper bound, the diagnostic intersects their
@@ -864,9 +869,8 @@ def _(source: Intersection[Source[C], Source[D]]) -> None:
     reveal_type(constrained(source))  # revealed: Unknown
 ```
 
-For a contravariant sink, the declared constraint must be a subtype of the sink's element type. A
-sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
-any declared constraint:
+For a contravariant sink, the declared constraint must be a subtype of the sink's element type. Each
+valid specialization contributes its return type:
 
 ```py
 class Sink[T]:
@@ -878,6 +882,15 @@ class Marker: ...
 def constrained_sink[T: (A, B)](sink: Sink[T]) -> T:
     raise NotImplementedError
 
+def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
+    reveal_type(constrained_sink(sink))  # revealed: A & B
+```
+
+A sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
+any declared constraint. When both alternatives fail, the diagnostic reports the upper bound from
+the first rejected alternative:
+
+```py
 def _(narrow: Intersection[Sink[SubA], Marker], unrelated: Intersection[Sink[C], Sink[D]]) -> None:
     # error: [invalid-argument-type] "No allowed specialization of `T` satisfies the inferred upper bound `SubA`"
     reveal_type(constrained_sink(narrow))  # revealed: Unknown
@@ -927,6 +940,17 @@ def compatible_constraints[S: (int, str)](source: Intersection[Source[S], Marker
 
 def independent[S](source: Intersection[Source[S], Source[str]]) -> None:
     reveal_type(bounded(source))  # revealed: str
+```
+
+An unrestricted parameter accepts both the caller's type variable and a separate string element.
+Both specializations contribute to the intersection of return types:
+
+```py
+def unbounded[T](value: Source[T]) -> T:
+    return value.get()
+
+def intersected_outer[S](value: Intersection[Source[S], Source[str]]) -> None:
+    reveal_type(unbounded(value))  # revealed: S@intersected_outer & str
 ```
 
 ## Gradual evidence in intersection inference
@@ -981,6 +1005,731 @@ def _(any_: Intersection[AnySource, StrSource], unknown: Intersection[UnknownSou
     reveal_type(constrained(any_))  # revealed: Any
     reveal_type(bounded(unknown))  # revealed: Unknown
     reveal_type(constrained(unknown))  # revealed: Unknown
+```
+
+## Inherited specializations in intersection arguments
+
+Inference finds and combines generic specializations through the MRO of intersected concrete
+subclasses:
+
+```py
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class ASource(Source[A]): ...
+class BSource(Source[B]): ...
+
+def element[T](x: Source[T]) -> T:
+    return x.get()
+
+def f(x: ASource) -> None:
+    if isinstance(x, BSource):
+        reveal_type(x)  # revealed: ASource & BSource
+        reveal_type(element(x))  # revealed: A & B
+```
+
+## Uninferred return type variables with intersection arguments
+
+A type variable used only in the return annotation can remain uninferred without preventing
+refinement of an independent type variable, even through a type alias.
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+type Pair[T, U] = tuple[T, U]
+
+def aliased_pair[T, U](value: Source[T]) -> Pair[T, U]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    # `U` becomes `Unknown` in both specializations; `T` is inferred separately as `A` and `B`
+    reveal_type(aliased_pair(value))  # revealed: tuple[A, Unknown] & tuple[B, Unknown]
+```
+
+## Constructor inference from intersection arguments
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class ConcreteElement: ...
+
+class FixedReceiverConstructor[T]:
+    item: T
+
+    def __new__(
+        cls: "type[FixedReceiverConstructor[ConcreteElement]]",
+        value: Source[T],
+    ) -> "FixedReceiverConstructor[T]":
+        raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[ConcreteElement]]) -> None:
+    # Either intersection element type satisfies the parameter type, but the explicit annotation
+    # of `cls` on `__new__` above restricts the constructor to
+    # `FixedReceiverConstructor[ConcreteElement]`
+    reveal_type(FixedReceiverConstructor(value))  # revealed: FixedReceiverConstructor[ConcreteElement]
+```
+
+## Covariant return types need not preserve intersections
+
+Intersecting covariant return types does not generally allow intersecting their type arguments. A
+meet-preserving generic would satisfy `F[A & B] == F[A] & F[B]`; covariance only guarantees
+`F[A & B] <: F[A] & F[B]`, not the reverse.
+
+Generic inference does not distinguish meet-preserving from non-meet-preserving covariant types. It
+conservatively treats all covariant types as potentially non-meet-preserving, intersecting their
+specialized return types rather than their type arguments.
+
+Here, an object usable as both `F[A]` and `F[B]` can call its callback with an `A` or a `B`,
+respectively. It cannot safely accept a callback that only handles values that are both `A` and `B`,
+as `F[A & B]` would allow. Thus `F` is not meet-preserving, and inferring `F[A & B]` from
+`F[A] & F[B]` would be unsound:
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+class F[T]:
+    def use(self, callback: Callable[[T], int]) -> int:
+        raise NotImplementedError
+
+def return_f[T](x: F[T]) -> F[T]:
+    return x
+
+def takes_f_intersection(x: F[Intersection[A, B]]) -> None: ...
+def _(x: Intersection[F[A], F[B]]) -> None:
+    # `F[A] & F[B]` is not assignable to `F[A & B]`.
+    # error: [invalid-argument-type]
+    takes_f_intersection(x)
+    # This cannot safely be `F[A & B]`.
+    reveal_type(return_f(x))  # revealed: F[A] & F[B]
+```
+
+## Correlated inference from multiple intersection arguments
+
+Constraints from every argument are solved together. Both sources in this function must supply
+values compatible with the same `T`:
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class D: ...
+
+def correlated[T](x: Source[T], y: Source[T]) -> T:
+    raise NotImplementedError
+```
+
+Since `Source` is covariant, `T` can be a union containing the element types selected from both
+arguments. Selecting `A` or `B` from `x` and `B` or `D` from `y` gives four valid specializations:
+`A | B`, `A | D`, `B`, and `B | D`. Intersecting these return types gives `(B & A) | (B & D)`.
+
+This also describes a result obtained from either source: a value from `x` satisfies `A & B`, while
+a value from `y` satisfies `B & D`. Either result satisfies `B`, but need not satisfy both `A` and
+`D`:
+
+```py
+def _(
+    x: Intersection[Source[A], Source[B]],
+    y: Intersection[Source[B], Source[D]],
+) -> None:
+    reveal_type(correlated(x, y))  # revealed: (B & A) | (B & D)
+```
+
+An invariant `Box` requires the same element type from both arguments. When both intersections
+contain `Box[A]`, inference selects `T = A`:
+
+```py
+class Box[T]:
+    value: T
+
+class Marker: ...
+
+def invariant_correlated[T](x: Box[T], y: Box[T]) -> T:
+    raise NotImplementedError
+
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[A], D],
+) -> None:
+    reveal_type(invariant_correlated(x, y))  # revealed: A
+```
+
+The first argument below requires `T = A`, while the second requires `T = B`. The unrelated `Marker`
+and `D` intersection elements do not resolve that conflict, so no specialization accepts both
+arguments. For error recovery, inference merges `A` and `B`; neither argument matches the resulting
+`Box[A | B]` parameter type:
+
+```py
+def _(
+    x: Intersection[Box[A], Marker],
+    y: Intersection[Box[B], D],
+) -> None:
+    # The revealed `A | B` is for error recovery, not the return type of a valid call.
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[A] & Marker`"
+    # error: [invalid-argument-type] "Argument to function `invariant_correlated` is incorrect: Expected `Box[A | B]`, found `Box[B] & D`"
+    reveal_type(invariant_correlated(x, y))  # revealed: A | B
+```
+
+## Overlapping overloads in generic callbacks
+
+Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
+should infer the return type of the first applicable overload, just like a direct call:
+
+```py
+from collections.abc import Callable
+from typing import overload
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+@overload
+def convert(value: A) -> int: ...
+@overload
+def convert(value: B) -> str: ...
+def convert(value: A | B) -> int | str:
+    raise NotImplementedError
+
+def _(value: Both) -> None:
+    reveal_type(convert(value))  # revealed: int
+    # TODO: Infer `int` from the first applicable overload instead of intersecting `int` and `str`.
+    reveal_type(invoke(convert, value))  # revealed: Never
+```
+
+In contrast, an explicit intersection of callable types does promise both results for the same
+input. Its return types can still be intersected:
+
+```py
+def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: A & B
+```
+
+## Intersection arguments with variadic parameters
+
+Homogeneous unpacked tuple annotations on starred parameters can be validated for each
+specialization, just like `*args: T`. Both direct and unpacked arguments contribute to the inferred
+return type:
+
+```py
+from typing import Unpack
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class D: ...
+
+def with_starred[T](x: Source[T], *args: Unpack[tuple[T, ...]]) -> T:
+    raise NotImplementedError
+
+def _(x: Intersection[Source[A], Source[B]], value: D, values: tuple[D, ...]) -> None:
+    reveal_type(with_starred(x, value))  # revealed: (A & B) | D
+    reveal_type(with_starred(x, *values))  # revealed: (A & B) | D
+```
+
+## Gradual intersection arguments
+
+A gradually narrowed source contributes its known element types to inference:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class ASource(Source[A]): ...
+class BSource(Source[B]): ...
+
+def element[T](x: Source[T]) -> T:
+    return x.get()
+
+def _(x: Any) -> None:
+    assert isinstance(x, ASource)
+    assert isinstance(x, BSource)
+    # TODO: revealed: Any & A & B
+    reveal_type(element(x))  # revealed: A | B
+```
+
+Its known element type also contributes when another argument supplies static alternatives:
+
+```py
+class D: ...
+class DSource(Source[D]): ...
+
+def correlated[T](x: Source[T], y: Source[T]) -> T:
+    raise NotImplementedError
+
+def _(x: Intersection[Source[A], Source[B]], other: Any) -> None:
+    assert isinstance(other, DSource)
+    # TODO: revealed: (A & B) | (Any & D)
+    reveal_type(correlated(x, other))  # revealed: (A & B) | D
+```
+
+A gradual component in the return annotation is preserved in both specialized return types:
+
+```py
+def element_with_other[T](x: Source[T], other: object) -> tuple[T, Any]:
+    return x.get(), other
+
+def _(x: Intersection[Source[A], Source[B]], other) -> None:
+    reveal_type(element_with_other(x, other))  # revealed: tuple[A, Any] & tuple[B, Any]
+```
+
+## Intersection arguments do not hide argument errors
+
+Every specialization of a generic call must accept all of its arguments, including parameters
+without type variables. The intersection below provides two choices for `T`, but neither choice
+makes a string a valid `int` argument.
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def with_fixed[T](source: Source[T], other: int) -> T:
+    return source.get()
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    # The revealed return type comes from error recovery, not from a valid call specialization.
+    # error: [invalid-argument-type]
+    reveal_type(with_fixed(source, "bad"))  # revealed: A | B
+```
+
+An invalid union member still makes an argument incompatible, even when its other member provides a
+type-variable assignment. Neither choice for `T` makes `None` a valid `list[U]` argument:
+
+```py
+def with_list[T, U](source: Source[T], values: list[U]) -> tuple[T, U]:
+    return source.get(), values[0]
+
+def _(source: Intersection[Source[A], Source[B]], values: list[int] | None) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(with_list(source, values))  # revealed: tuple[A | B, int]
+```
+
+## Invariant components in return intersections
+
+Return intersections describe properties that hold simultaneously for one value. Mutable state can
+make independently valid specializations incompatible: a fresh `[]` can be typed as `list[A]` or
+`list[B]`, but cannot safely expose both mutable views at once. Their intersection simplifies to
+`Never`, which would incorrectly imply that allocating the list cannot return.
+
+We handle this conservatively: if an invariant component differs across valid specializations, we do
+not intersect their return types.
+
+### Mutable returns from intersection arguments
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def make_list[T](source: Source[T]) -> list[T]:
+    return []
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    # `make_list` can accept this argument with `T = A` or `T = B`. Because `Source` is covariant,
+    # the argument also fits `Source[A | B]`. Inference uses `T = A | B`, producing `list[A | B]`
+    # instead of intersecting `list[A]` and `list[B]`.
+    reveal_type(make_list(source))  # revealed: list[A | B]
+```
+
+The same applies when an alias hides the mutable result:
+
+```py
+type Mutable[T] = list[T]
+
+def aliased_list[T](source: Source[T]) -> Mutable[T]:
+    return []
+
+def _(source: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(aliased_list(source))  # revealed: list[A | B]
+```
+
+An invariant parameter that has the same inferred type in every specialization does not prevent the
+independent, covariant part of the return type from being intersected:
+
+```py
+def with_fixed_list[T, U](source: Source[T], value: U) -> tuple[T, list[U]]:
+    return source.get(), [value]
+
+def _(source: Intersection[Source[A], Source[B]], value: str) -> None:
+    reveal_type(with_fixed_list(source, value))  # revealed: tuple[A, list[str]] & tuple[B, list[str]]
+```
+
+### Defaulted return type variables
+
+A fixed default gives the same type in every specialization. Even an invariant `list[int]` default
+therefore allows the independently inferred `T` to be refined:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import Intersection
+
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+def fixed_default[T, U = list[int]](value: Source[T]) -> tuple[T, U]:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(fixed_default(value))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+```
+
+A default that depends on an inferred variable can produce varying invariant types. Applying
+`U = list[T]` separately produces incompatible `list[A]` and `list[B]` specializations, so inference
+retains the merged `list[A | B]` result instead of intersecting them to `Never`:
+
+```py
+def defaulted[T, U = list[T]](value: Source[T]) -> U:
+    raise NotImplementedError
+
+def _(value: Intersection[Source[A], Source[B]]) -> None:
+    reveal_type(defaulted(value))  # revealed: list[A | B]
+```
+
+### Mutable returns from alternative specializations
+
+Each sink accepts one of the two possible element types. Both complete specializations can return a
+mutable list, but merging their element types does not produce a specialization accepted by either
+sink. The call retains the union of the separately specialized list types:
+
+```py
+from ty_extensions import Intersection
+
+class Sink[T]:
+    def put(self, value: T) -> None: ...
+
+class A: ...
+class B: ...
+class ASink(Sink[A]): ...
+class BSink(Sink[B]): ...
+
+def make_list[T](sink: Sink[T]) -> list[T]:
+    return []
+
+def _(sink: Intersection[ASink, BSink]) -> None:
+    reveal_type(make_list(sink))  # revealed: list[A] | list[B]
+```
+
+Evidence from another argument can leave only one valid specialization. A supplied value of type `A`
+selects the `A` specialization:
+
+```py
+def with_value[T](sink: Sink[T], value: T) -> list[T]:
+    return [value]
+
+def _(sink: Intersection[ASink, BSink], value: A) -> None:
+    reveal_type(with_value(sink, value))  # revealed: list[A]
+```
+
+### Mutable components in inferred return types
+
+Invariant components also matter when the return annotation is just a type variable. Inferring
+`R = list[A]` and `R = list[B]` from callback signatures does not make those returns safe to
+intersect. Inference retains `list[A] | list[B]`:
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def invoke[R](callback: Callable[[object], R], value: object) -> R:
+    return callback(value)
+
+def _(callback: Intersection[Callable[[object], list[A]], Callable[[object], list[B]]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: list[A] | list[B]
+```
+
+An inferred tuple can still be refined when its mutable component has the same type in both
+alternatives:
+
+```py
+def _(
+    callback: Intersection[Callable[[object], tuple[A, list[int]]], Callable[[object], tuple[B, list[int]]]],
+) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: tuple[A, list[int]] & tuple[B, list[int]]
+```
+
+The same applies to unions whose mutable members agree:
+
+```py
+def _(callback: Intersection[Callable[[object], list[int] | A], Callable[[object], list[int] | B]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: list[int] | (A & B)
+```
+
+The order of the callable types should not affect whether their returns can be intersected,
+including when one return alternative is a union:
+
+```py
+class C: ...
+class All(A, B, C): ...
+
+def invoke_all[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+def _(
+    first: Intersection[
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+    reordered: Intersection[
+        Callable[[B], tuple[B, list[int]]],
+        Callable[[A], tuple[A, list[int]]],
+        Callable[[C], tuple[A, list[int]] | int],
+    ],
+) -> None:
+    # TODO: revealed: tuple[A, list[int]] & tuple[B, list[int]]
+    reveal_type(invoke_all(first, All()))  # revealed: tuple[A, list[int]] | int | tuple[B, list[int]]
+    # TODO: revealed: tuple[B, list[int]] & tuple[A, list[int]]
+    reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
+```
+
+For generic classes with both covariant and invariant parameters, refinement depends on which
+parameters vary. `Wrapper` only produces `T`, while its writable `value` attribute makes `U`
+invariant:
+
+```py
+class Wrapper[T, U]:
+    value: U
+
+    def get(self) -> T:
+        raise NotImplementedError
+```
+
+When the signatures agree on `U = int`, their return types can be intersected. If `U` varies between
+`int` and `str`, inference retains the union:
+
+```py
+def _(
+    fixed: Intersection[Callable[[object], Wrapper[A, int]], Callable[[object], Wrapper[B, int]]],
+    varying: Intersection[Callable[[object], Wrapper[A, int]], Callable[[object], Wrapper[B, str]]],
+) -> None:
+    reveal_type(invoke(fixed, object()))  # revealed: Wrapper[A, int] & Wrapper[B, int]
+    reveal_type(invoke(varying, object()))  # revealed: Wrapper[A, int] | Wrapper[B, str]
+```
+
+### Inferred TypedDict return alternatives
+
+Writable `TypedDict` fields are invariant even when the dictionaries have no type parameters. A
+fresh `{}` can be typed as either dictionary below because their fields are optional. Inference
+retains the union of these return types rather than their disjoint intersection, `Never`:
+
+```py
+from typing import Callable, TypedDict
+from ty_extensions import Intersection
+
+class IntDict(TypedDict, total=False):
+    value: int
+
+class StrDict(TypedDict, total=False):
+    value: str
+
+def invoke[R](callback: Callable[[], R]) -> R:
+    return callback()
+
+def _(callback: Intersection[Callable[[], IntDict], Callable[[], StrDict]]) -> None:
+    reveal_type(invoke(callback))  # revealed: IntDict | StrDict
+```
+
+### Inferred protocol return alternatives
+
+Even without type parameters, protocol returns can contain incompatible invariant members. Inference
+retains the union when the callback signatures expose different mutable list types:
+
+```py
+from typing import Callable, Protocol
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+class IntList(Protocol):
+    value: list[int]
+
+class StrList(Protocol):
+    value: list[str]
+
+def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+def _(callback: Intersection[Callable[[A], IntList], Callable[[B], StrList]]) -> None:
+    reveal_type(invoke(callback, Both()))  # revealed: IntList | StrList
+```
+
+### Inferred stateful callable return alternatives
+
+A returned callable can capture mutable state. Giving the same callable both signatures could allow
+an `A` to be stored and later returned as a `B`. Inference retains separate callable return
+alternatives instead of exposing both signatures through the same potentially stateful result:
+
+```py
+from typing import Callable
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+def invoke[R](callback: Callable[[object], R], value: object) -> R:
+    return callback(value)
+
+def _(
+    factory: Intersection[Callable[[object], Callable[[A], A]], Callable[[object], Callable[[B], B]]],
+) -> None:
+    result = invoke(factory, object())
+    reveal_type(result)  # revealed: ((A, /) -> A) | ((B, /) -> B)
+    # error: [invalid-argument-type]
+    result(A())
+    reveal_type(result(Both()))  # revealed: A | B
+```
+
+The same behavior applies when a generic callback protocol describes the returned callable:
+
+```py
+from typing import Protocol
+
+class Stateful[I, O](Protocol):
+    def __call__(self, value: I, /) -> O: ...
+
+def _(
+    factory: Intersection[
+        Callable[[object], Stateful[A, A]],
+        Callable[[object], Stateful[B, B]],
+    ],
+) -> None:
+    result = invoke(factory, object())
+    reveal_type(result)  # revealed: Stateful[A, A] | Stateful[B, B]
+    result(A())  # error: [invalid-argument-type]
+    result(B())  # error: [invalid-argument-type]
+    reveal_type(result(Both()))  # revealed: A | B
+```
+
+Separate input and output type variables do not make a stateful callable safe to specialize
+independently for each call. The closure below can return a value produced by an earlier call, so
+its return type includes both `A` and `B` even when its latest argument is a `B`. The callback
+explicitly accepts `A | B` as well as each narrower input, so the merged specialization is valid:
+
+```py
+def remember_first[T, U](convert: Callable[[T], U]) -> Callable[[T], U]:
+    values: list[U] = []
+
+    def first(value: T) -> U:
+        values.append(convert(value))
+        return values[0]
+
+    return first
+
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
+    result = remember_first(identity)
+    reveal_type(result)  # revealed: (A | B, /) -> A | B
+    result(A())  # no diagnostic
+    reveal_type(result(B()))  # revealed: A | B
+```
+
+In contrast, a deferred call exposes only its output type. Capturing an argument accepted by both
+narrower callable contracts lets the returned callable produce a value satisfying both return types:
+
+```py
+def defer[T, U](convert: Callable[[T], U], value: T) -> Callable[[], U]:
+    return lambda: convert(value)
+
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
+    result = defer(identity, Both())
+    reveal_type(result())  # revealed: A & B
+```
+
+### Stateful callable returns with `ParamSpec`
+
+A callable returned through `ParamSpec` can also retain values from earlier calls. We conservatively
+keep the first parameter list and combine the possible return types, rather than promise a separate
+return type for each input type:
+
+```py
+from typing import Callable, Concatenate, overload
+
+def remember_first[**P, R](convert: Callable[Concatenate[int, P], R]) -> Callable[P, R]:
+    values: list[R] = []
+
+    def first(*args: P.args, **kwargs: P.kwargs) -> R:
+        values.append(convert(0, *args, **kwargs))
+        return values[0]
+
+    return first
+
+@overload
+def convert(prefix: int, value: str) -> str: ...
+@overload
+def convert(prefix: int, value: int) -> int: ...
+def convert(prefix: int, value: str | int) -> str | int:
+    return value
+
+result = remember_first(convert)
+reveal_type(result)  # revealed: (value: str) -> str | int
+result("first")  # no diagnostic
+# A cached `str` must not be returned as `int` on a later call.
+# error: [invalid-argument-type]
+reveal_type(result(1))  # revealed: str | int
 ```
 
 ## Inferring tuple parameter types

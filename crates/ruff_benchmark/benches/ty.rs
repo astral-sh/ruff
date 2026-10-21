@@ -1175,6 +1175,45 @@ fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterio
     }
 }
 
+/// Materializing nested callables reuses shared parameter and return types. A recursive leaf
+/// permits reuse after its cycle closes; a cycle through the whole graph also needs reuse while
+/// the cycle is still active. Both cases should avoid exponential work as the nesting grows.
+fn benchmark_recursive_callable_materialization(criterion: &mut Criterion) {
+    for depth in [8, 12] {
+        // Implicit aliases in the leaf case expose shared callables directly, without an
+        // intervening cache for each named type alias.
+        for (name, recursive_target, alias_prefix) in [
+            ("leaf", "Recursive".to_string(), ""),
+            ("cycle", format!("A{depth}"), "type "),
+        ] {
+            let mut code = format!(
+                "
+            from collections.abc import Callable
+            from ty_extensions import Top
+
+            type Recursive = Callable[..., {recursive_target}]
+            {alias_prefix}A0 = Recursive"
+            );
+
+            for index in 1..=depth {
+                let previous = index - 1;
+                write!(
+                    &mut code,
+                    "\n            {alias_prefix}A{index} = Callable[[A{previous}, A{previous}], A{previous}]"
+                )
+                .ok();
+            }
+            write!(&mut code, "\n            def f(value: Top[A{depth}]): ...").ok();
+
+            benchmark_micro_case(
+                criterion,
+                &format!("ty_micro[recursive_callable_materialization_{name}_{depth}]"),
+                &code,
+            );
+        }
+    }
+}
+
 /// Comparing a recursive protocol whose specializations grow should not repeatedly expand its
 /// members.
 fn benchmark_recursive_protocol_growing_specialization(criterion: &mut Criterion) {
@@ -2528,6 +2567,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_recursive_callable_materialization,
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
