@@ -1353,8 +1353,8 @@ make independently valid specializations incompatible: a fresh `[]` can be typed
 `list[B]`, but cannot safely expose both mutable views at once. Their intersection simplifies to
 `Never`, which would incorrectly imply that allocating the list cannot return.
 
-We handle this conservatively: if an invariant component differs across valid specializations, we do
-not intersect their return types.
+When no complete return type is a subtype of all alternatives, we handle this conservatively: if an
+invariant component differs across valid specializations, we do not intersect their return types.
 
 ### Mutable returns from intersection arguments
 
@@ -1540,6 +1540,26 @@ def _(
     reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
 ```
 
+A return alternative can be selected when it is a subtype of every other return. Here `list[B]`
+satisfies both union alternatives, even though neither union is a subtype of the other:
+
+```py
+def _(
+    callback: Intersection[Callable[[A], list[A] | list[B]], Callable[[B], list[B] | list[C]], Callable[[C], list[B]]],
+) -> None:
+    reveal_type(invoke_all(callback, All()))  # revealed: list[B]
+```
+
+In contrast, being a subtype of one alternative is insufficient. Neither `list[A]` nor `list[B]` is
+a subtype of all three returns, so inference retains their union:
+
+```py
+def _(
+    callback: Intersection[Callable[[A], list[A] | list[B]], Callable[[B], list[A]], Callable[[C], list[B]]],
+) -> None:
+    reveal_type(invoke_all(callback, All()))  # revealed: list[A] | list[B]
+```
+
 For generic classes with both covariant and invariant parameters, refinement depends on which
 parameters vary. `Wrapper` only produces `T`, while its writable `value` attribute makes `U`
 invariant:
@@ -1562,6 +1582,48 @@ def _(
 ) -> None:
     reveal_type(invoke(fixed, object()))  # revealed: Wrapper[A, int] & Wrapper[B, int]
     reveal_type(invoke(varying, object()))  # revealed: Wrapper[A, int] | Wrapper[B, str]
+```
+
+### Returning values from mixed-variance unions
+
+A callback producing a value or a batch of values can infer the element type even when mutable and
+read-only batches have different variances. One valid return alternative is `V`; another includes
+`Batch[V]`. Because `V` is already a subtype of the other return, inference can select it without
+combining incompatible mutable views:
+
+```py
+from typing import Callable
+
+class ReadOnlyBatch[V]:
+    def get(self) -> V:
+        raise NotImplementedError
+
+class Batch[V]:
+    value: V
+
+def first_value[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> V:
+    raise NotImplementedError
+
+def forward[V](mapping: V | Batch[V] | ReadOnlyBatch[V]) -> V:
+    value = first_value(lambda: mapping)
+    reveal_type(value)  # revealed: V@forward
+    return value  # no diagnostic
+```
+
+The complete return type determines which alternative is a subtype. Wrapping `V` in an invariant
+list prevents refinement, while a contravariant callable parameter selects the wider binding:
+
+```py
+def make_list[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> list[V]:
+    return []
+
+def make_sink[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> Callable[[V], None]:
+    return lambda value: None
+
+def wrapped_returns[V](mapping: V | Batch[V] | ReadOnlyBatch[V]) -> None:
+    # revealed: list[V@wrapped_returns | ReadOnlyBatch[V@wrapped_returns] | Batch[V@wrapped_returns]]
+    reveal_type(make_list(lambda: mapping))
+    reveal_type(make_sink(lambda: mapping))  # revealed: (Batch[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
 
 ### Inferred TypedDict return alternatives
