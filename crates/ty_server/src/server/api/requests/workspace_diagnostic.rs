@@ -122,7 +122,6 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
 
         if snapshot
             .projects()
-            .iter()
             .any(|db| db.uv_environments().has_pending_initializations())
         {
             tracing::debug!(

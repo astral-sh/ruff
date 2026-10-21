@@ -889,6 +889,246 @@ fn discover_tests_two_workspaces_one_dir() -> Result<()> {
     Ok(())
 }
 
+const OUTER_WORKSPACE: &str = "repo";
+const INNER_DIRECTORY: &str = "repo/inner/tests";
+const INNER_MODULE: &str = "repo/inner/tests/test_module.py";
+
+fn server_with_nested_workspaces() -> Result<TestServer> {
+    let server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new(OUTER_WORKSPACE), None)?
+        .with_file(SystemPath::new("repo/tests/test_module.py"), DUMMY_TEST)?
+        .with_workspace(SystemPath::new("repo/inner"), None)?
+        .with_file(SystemPath::new(INNER_MODULE), DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    Ok(server)
+}
+
+#[test]
+fn discover_tests_nested_workspaces_all() -> Result<()> {
+    let mut server = server_with_nested_workspaces()?;
+
+    let all_tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    let uri = server.file_uri(SystemPath::new(OUTER_WORKSPACE));
+    let outer_tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+    assert_eq!(outer_tests, all_tests);
+
+    insta::assert_json_snapshot!(all_tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/repo",
+          "kind": "directory",
+          "label": "repo",
+          "uri": "file://<temp_dir>/repo/"
+        },
+        {
+          "id": "<temp_dir>/repo/inner",
+          "kind": "directory",
+          "label": "inner",
+          "uri": "file://<temp_dir>/repo/inner/"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/repo/inner",
+          "uri": "file://<temp_dir>/repo/inner/tests/"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/repo/inner/tests",
+          "uri": "file://<temp_dir>/repo/inner/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/repo/inner/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/repo/inner/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/repo/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/repo",
+          "uri": "file://<temp_dir>/repo/tests/"
+        },
+        {
+          "id": "<temp_dir>/repo/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/repo/tests",
+          "uri": "file://<temp_dir>/repo/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/repo/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/repo/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/repo/tests/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn discover_tests_nested_workspaces_inner() -> Result<()> {
+    let mut server = server_with_nested_workspaces()?;
+
+    let uri = server.file_uri(SystemPath::new(INNER_MODULE));
+    let module_tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+
+    let uri = server.file_uri(SystemPath::new(INNER_DIRECTORY));
+    let directory_tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+    assert_eq!(directory_tests, module_tests);
+
+    insta::assert_json_snapshot!(module_tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/repo/inner",
+          "kind": "directory",
+          "label": "inner",
+          "uri": "file://<temp_dir>/repo/inner/"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/repo/inner",
+          "uri": "file://<temp_dir>/repo/inner/tests/"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests/test_module.py",
+          "kind": "file",
+          "label": "test_module.py",
+          "parent": "<temp_dir>/repo/inner/tests",
+          "uri": "file://<temp_dir>/repo/inner/tests/test_module.py"
+        },
+        {
+          "id": "<temp_dir>/repo/inner/tests/test_module.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/repo/inner/tests/test_module.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/repo/inner/tests/test_module.py"
+        }
+      ]
+    }
+    "#);
+
+    Ok(())
+}
+
+#[test]
+fn discover_tests_with_the_project_root_above_the_workspace_folder() -> Result<()> {
+    let workspace_root = SystemPath::new("b/src");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(SystemPath::new("b/ty.toml"), "")?
+        .with_file(SystemPath::new("b/src/tests/test_a.py"), DUMMY_TEST)?
+        .with_file(SystemPath::new("b/tests/test_b.py"), DUMMY_TEST)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let all_tests = sort_by_id(server.send_request_await::<DiscoverTests>(json!({})));
+
+    let uri = server.file_uri(workspace_root);
+    let workspace_tests =
+        sort_by_id(server.send_request_await::<DiscoverTests>(json!({ "uri": uri })));
+    assert_eq!(workspace_tests, all_tests);
+
+    insta::assert_json_snapshot!(all_tests, @r#"
+    {
+      "tests": [
+        {
+          "id": "<temp_dir>/b/src",
+          "kind": "directory",
+          "label": "src",
+          "uri": "file://<temp_dir>/b/src/"
+        },
+        {
+          "id": "<temp_dir>/b/src/tests",
+          "kind": "directory",
+          "label": "tests",
+          "parent": "<temp_dir>/b/src",
+          "uri": "file://<temp_dir>/b/src/tests/"
+        },
+        {
+          "id": "<temp_dir>/b/src/tests/test_a.py",
+          "kind": "file",
+          "label": "test_a.py",
+          "parent": "<temp_dir>/b/src/tests",
+          "uri": "file://<temp_dir>/b/src/tests/test_a.py"
+        },
+        {
+          "id": "<temp_dir>/b/src/tests/test_a.py::test_dummy",
+          "kind": "function",
+          "label": "test_dummy",
+          "parent": "<temp_dir>/b/src/tests/test_a.py",
+          "range": {
+            "end": {
+              "character": 14,
+              "line": 0
+            },
+            "start": {
+              "character": 4,
+              "line": 0
+            }
+          },
+          "uri": "file://<temp_dir>/b/src/tests/test_a.py"
+        }
+      ]
+    }
+    "#);
+
+    let uri = server.file_uri(SystemPath::new("b/tests/test_b.py"));
+    let outside_tests = server.send_request_await::<DiscoverTests>(json!({ "uri": uri }));
+    assert_eq!(outside_tests, json!({ "tests": [] }));
+
+    Ok(())
+}
+
 #[test]
 fn discover_tests_for_a_uri_outside_any_workspace() -> Result<()> {
     let workspace_root = SystemPath::new("src");
