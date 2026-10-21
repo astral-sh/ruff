@@ -118,7 +118,7 @@ impl<'db> AliasCycleSummary<'db> {
     }
 
     /// The divergent marker or unbound reference that closes an unguarded cycle.
-    pub(super) fn cycle(&self) -> Option<Type<'db>> {
+    fn cycle(&self) -> Option<Type<'db>> {
         self.cycles.iter().flatten().copied().next()
     }
 

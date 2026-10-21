@@ -206,7 +206,7 @@ pub enum RecursiveOrigin<'db> {
 }
 
 impl<'db> RecursiveOrigin<'db> {
-    pub(super) fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
+    fn environment(self, db: &'db dyn Db) -> ProgramEnvironment<'db> {
         match self {
             Self::Alias(definition) => ProgramEnvironment::from_definition(definition),
             Self::Lambda(lambda) => ProgramEnvironment::from_scope(lambda.scope(db)),
