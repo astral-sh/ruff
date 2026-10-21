@@ -195,7 +195,7 @@ def find_report(pull_request: int, report: str) -> dict | None:
         comment = api(f"issues/comments/{comment_id}", missing_ok=True)
         if comment and matches_comment(comment, pull_request, REPORTS[report].marker):
             return comment
-    # Older PRs may have no early index. Discovery also recovers deleted reports
+    # Older PRs may have no early index. Discovery also handles deleted reports
     # and a successful comment creation followed by a failed index update.
     return next(
         (

@@ -1,6 +1,6 @@
 name: Reserve automation report index
 
-# Only GitHub PR metadata is consumed; both jobs run default-branch code.
+# Only GitHub workflow-run and PR metadata is consumed; both jobs run default-branch code.
 on: # zizmor: ignore[dangerous-triggers]
   workflow_run:
     workflows: [CI]
