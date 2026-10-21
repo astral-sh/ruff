@@ -12,16 +12,13 @@ use ruff_text_size::Ranged;
 
 use crate::Db;
 use crate::types::dict::dict_literal_key_value_types;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::{ExpressionInference, FrozenMap, InferenceEnvironment};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
     VariableLengthTuple,
 };
-use crate::types::{
-    KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType,
-    infer_expression_types,
-};
+use crate::types::{KnownClass, Type, TypeCheckDiagnostics, TypeContext, UnionBuilder, UnionType};
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;
@@ -78,7 +75,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
     }
 
     /// Unpack the value to the target expression.
-    pub(crate) fn unpack(&mut self, target: &ast::Expr, value: UnpackValue<'db>) {
+    pub(crate) fn unpack(
+        &mut self,
+        target: &ast::Expr,
+        value: UnpackValue<'db>,
+        environment: InferenceEnvironment<'db>,
+    ) {
         let db = self.db();
         debug_assert_matches!(
             target,
@@ -86,7 +88,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = infer_expression_types(
+        let value_inference = environment.infer_expression(
             self.context.db(),
             value.expression(),
             TypeContext::default(),

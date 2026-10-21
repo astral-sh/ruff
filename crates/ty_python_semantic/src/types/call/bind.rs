@@ -74,7 +74,8 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGener
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    any_over_type_including_callable_signatures, walk_non_atomic_type,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -8570,7 +8571,15 @@ impl<'db> Binding<'db> {
                 let call_expression_constraints = return_type_solutions.get(&identity).copied();
                 let argument_constraints = argument_specialization
                     .and_then(|specialization| specialization.get(db, typevar))
-                    .filter(|ty| !ty.has_provisional_marker(db, env))
+                    .filter(|ty| {
+                        // A lambda can hide a provisional return type until its signature is
+                        // inferred. Reusing that result as context for another argument can give
+                        // a recursive lambda a new identity on every inference pass.
+                        !any_over_type_including_callable_signatures(db, env, *ty, |ty| {
+                            ty.as_dynamic()
+                                .is_some_and(DynamicType::is_provisional_marker)
+                        })
+                    })
                     .map(|ty| {
                         let promoted = ty.promote(db, env);
                         // Context for other arguments must still satisfy the type variable's

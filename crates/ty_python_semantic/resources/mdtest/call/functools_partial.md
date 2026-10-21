@@ -2106,3 +2106,20 @@ p = partial(f)
 # error: [unresolved-attribute]
 p.__name__ = "renamed"
 ```
+
+## Recursive lambda returns
+
+A partial can wrap a lambda that returns the partial itself:
+
+```py
+from functools import partial
+
+callback = partial(lambda: callback)
+callback()  # no diagnostic
+```
+
+The lambda can also return the partial inside a tuple while leaving a required parameter unbound:
+
+```py
+pair = partial(lambda value: (pair, value))  # no diagnostic
+```
