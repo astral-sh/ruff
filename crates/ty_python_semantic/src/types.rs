@@ -2170,20 +2170,19 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
-/// A captured parameter list, another `ParamSpec`, or a combination of those values.
+/// A captured parameter list, another `ParamSpec`, or an intersection of those values.
 ///
 /// Use [`Type::as_paramspec_value`] to validate callable kinds, whole `ParamSpec` references,
-/// and the members of unions and positive-only intersections.
+/// and the members of positive-only intersections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum ParamSpecValue<'db> {
     Callable(CallableType<'db>),
     ParamSpec(BoundTypeVarInstance<'db>),
-    Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
 }
 
 impl<'db> ParamSpecValue<'db> {
-    /// Maps captured lists and `ParamSpec` references, retaining their union or intersection.
+    /// Maps captured lists and `ParamSpec` references, retaining their intersection.
     fn try_map(
         self,
         db: &'db dyn Db,
@@ -2191,9 +2190,6 @@ impl<'db> ParamSpecValue<'db> {
         map: &mut impl FnMut(Self) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
         match self {
-            Self::Union(union) => union.try_map(db, env, |element| {
-                element.as_paramspec_value(db)?.try_map(db, env, map)
-            }),
             Self::Intersection(intersection) if intersection.negative(db).is_empty() => {
                 let elements = intersection
                     .positive(db)
@@ -2215,7 +2211,7 @@ impl<'db> ParamSpecValue<'db> {
                 db,
                 Signature::new(Parameters::paramspec(db, paramspec), Type::unknown()),
             ))),
-            Self::Union(_) | Self::Intersection(_) => {
+            Self::Intersection(_) => {
                 self.try_map(db, env, &mut |value| value.to_callable_type(db, env))
             }
         }
@@ -2227,7 +2223,6 @@ impl<'db> From<ParamSpecValue<'db>> for Type<'db> {
         match value {
             ParamSpecValue::Callable(callable) => Self::Callable(callable),
             ParamSpecValue::ParamSpec(paramspec) => Self::TypeVar(paramspec),
-            ParamSpecValue::Union(union) => Self::Union(union),
             ParamSpecValue::Intersection(intersection) => Self::Intersection(intersection),
         }
     }
@@ -3128,14 +3123,6 @@ impl<'db> Type<'db> {
             }
             Self::TypeVar(typevar) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
                 Some(ParamSpecValue::ParamSpec(typevar))
-            }
-            Self::Union(union)
-                if union
-                    .elements(db)
-                    .iter()
-                    .all(|element| element.as_paramspec_value(db).is_some()) =>
-            {
-                Some(ParamSpecValue::Union(union))
             }
             Self::Intersection(intersection)
                 if intersection.negative(db).is_empty()
@@ -9741,7 +9728,7 @@ impl<'db> Type<'db> {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
         }
 
-        // Expand combined `ParamSpec`s before specializing a given callable.
+        // Expand intersection-valued `ParamSpec`s before specializing a given callable.
         if let TypeMapping::ApplySpecialization(specialization)
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
@@ -9771,16 +9758,13 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let combined_paramspecs = signatures
+            let intersection_paramspecs = signatures
                 .into_iter()
                 .flat_map(|signatures| signatures.iter())
                 .filter_map(|signature| {
                     let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
                     let value = specialization.get(db, typevar)?.as_paramspec_value(db)?;
-                    if matches!(
-                        value,
-                        ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_)
-                    ) {
+                    if matches!(value, ParamSpecValue::Intersection(_)) {
                         Some((typevar, value))
                     } else {
                         None
@@ -9789,12 +9773,12 @@ impl<'db> Type<'db> {
                 .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
                 .collect::<Vec<_>>();
 
-            if let Some((typevar, value)) = combined_paramspecs.first() {
-                // Independent combinations can produce a Cartesian product. Count all leaves
+            if let Some((typevar, value)) = intersection_paramspecs.first() {
+                // Independent intersections can produce a Cartesian product. Count all leaves
                 // before expanding the first variable so recursive expansion shares this bound.
                 const MAX_PARAMSPEC_EXPANSION: usize = 64;
                 let mut expansion_size = 1usize;
-                for (_, value) in &combined_paramspecs {
+                for (_, value) in &intersection_paramspecs {
                     let mut count = 0usize;
                     let counted = value.try_map(db, visitor.env, &mut |value| {
                         count += 1;
@@ -9825,8 +9809,8 @@ impl<'db> Type<'db> {
                                 _ => TypeMapping::ApplySpecialization(specialization),
                             };
 
-                            // A fresh visitor distinguishes the overridden binding. Other combined
-                            // ParamSpecs are expanded recursively before mapping the signatures.
+                            // A fresh visitor distinguishes the overridden binding. Other
+                            // intersection-valued ParamSpecs are expanded recursively.
                             Some(self.apply_type_mapping(db, visitor.env, &mapping, tcx))
                         })
                         .unwrap_or_else(Type::unknown)

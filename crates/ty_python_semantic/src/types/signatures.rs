@@ -426,9 +426,9 @@ impl<'db> CallableSignature<'db> {
                         }),
                     ))
                 }
-                // Preserving unions and intersections requires a `Type` result rather than a
+                // Preserving intersections requires a `Type` result rather than a
                 // `CallableSignature`. `Type::apply_type_mapping_impl` performs that expansion.
-                ParamSpecValue::Union(_) | ParamSpecValue::Intersection(_) => None,
+                ParamSpecValue::Intersection(_) => None,
             }
         }
 
