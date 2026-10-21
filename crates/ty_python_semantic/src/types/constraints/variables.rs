@@ -209,6 +209,10 @@ impl<'db> Constraint<'db> {
     ) -> impl Iterator<Item = Result<Self, UnsatisfiableBound>> {
         let choose_upper_bound = move |bound: Type<'db>| {
             let bound = Self::normalize_bound(db, typevar, bound);
+            // Preserve explicit argument evidence, but do not infer from a vacuous restriction.
+            if provenance != ConstraintProvenance::Evidence && bound == typevar.domain(db).top(db) {
+                return None;
+            }
             match bound {
                 // Two identical typevars must always solve to the same type, so it is not useful to
                 // have an upper bound that is the typevar being constrained.

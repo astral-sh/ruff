@@ -424,7 +424,7 @@ impl PathAssignments {
     /// the BDD. You should make this call from inside of your callback, so that as you get further
     /// down into the BDD structure, we remember all of the information that we have learned from
     /// the path we're on.
-    pub(super) fn walk_edge<'db, R>(
+    fn walk_edge<'db, R>(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -504,23 +504,6 @@ impl PathAssignments {
             .truncate(substituted_constraints_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
-    }
-
-    pub(super) fn positive_constraints(
-        &self,
-    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
-        self.assignments.iter().filter_map(
-            |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
-            },
-        )
-    }
-
-    pub(super) fn constraint_is_substituted(&self, constraint: ConstraintId) -> bool {
-        self.substituted_constraints.contains(&constraint)
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
@@ -1186,6 +1169,7 @@ struct PathAssignmentConflict;
 
 #[cfg(test)]
 mod tests {
+    use super::super::propagation::SolutionPath;
     use super::super::solutions::{Polarity, SolutionWalker};
     use super::super::*;
 
@@ -1324,9 +1308,7 @@ mod tests {
             (1, usize::MAX, ProjectionError::PathBudgetExceeded),
         ] {
             let mut storage = builder.storage.borrow_mut();
-            let mut path = set
-                .node
-                .path_assignments(db, &env, &mut storage, set.source_order);
+            let mut path = SolutionPath::default();
             let mut limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,

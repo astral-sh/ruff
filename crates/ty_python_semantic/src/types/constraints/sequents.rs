@@ -2001,7 +2001,11 @@ impl<'db> Type<'db> {
     /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
     /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
     /// make their eligibility depend on a specialization that the sequent is meant to constrain.
-    fn is_static_sequent_eligible(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+    pub(super) fn is_static_sequent_eligible(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
         struct EligibilityVisitor<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
             seen: TypeCollector<'db>,

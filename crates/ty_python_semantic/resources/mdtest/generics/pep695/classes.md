@@ -675,6 +675,22 @@ class NameAttribute[T: (object, str)]:
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+Gradual type arguments are preserved when they are compatible with more than one declared
+constraint. An invariant container does not force `Any` to one of its possible specializations.
+
+```py
+from typing import Any
+
+class File[T: (str, bytes)]:
+    content: T
+
+class AsyncFile[T: (str, bytes)]:
+    def __init__(self, file: File[T]) -> None: ...
+
+def wrap(file: File[Any]):
+    reveal_type(AsyncFile(file))  # revealed: AsyncFile[Any]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
@@ -991,6 +1007,24 @@ reveal_type(generic_context(into_regular_callable(D)))
 
 # Because `C[T, U]` is not an instance of `D`, we never hit `D.__init__` at all.
 reveal_type(D(1))  # revealed: C[Unknown, int]
+```
+
+The initializer's receiver annotation still determines the specialization when the inherited
+`__new__` comes from a base whose type argument contains `Any`.
+
+```py
+from typing import Any, Self
+
+class Values[T]:
+    value: T
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return object.__new__(cls)
+
+class FloatValues[T](Values[T | Any]):
+    def __init__(self: "FloatValues[float]") -> None: ...
+
+reveal_type(FloatValues())  # revealed: FloatValues[float]
 ```
 
 ### Explicit access to constructors of bare generic classes

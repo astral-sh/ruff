@@ -121,6 +121,8 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
 pub(crate) mod paths;
 pub(crate) mod projection;
+mod propagation;
+mod relations;
 pub(crate) mod resolution;
 mod sequents;
 mod solutions;
@@ -128,6 +130,7 @@ mod support;
 mod variables;
 
 use paths::PathAssignments;
+use propagation::SolutionPath;
 use solutions::{Polarity, SolutionWalker};
 use variables::Constraint;
 pub(crate) use variables::ConstraintProvenance;
@@ -2443,10 +2446,10 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
-            Node::Interior(interior) => {
+            Node::Interior(_) => {
                 let source_orders = storage.calculate_source_orders(source_order);
                 let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, self);
-                let mut path = interior.path_assignments(db, env, storage, source_order);
+                let mut path = SolutionPath::default();
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
         }
@@ -2504,7 +2507,7 @@ impl NodeId {
         match self.node() {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
-            Node::Interior(interior) => {
+            Node::Interior(_) => {
                 let key = (self, inferable);
                 if let Some(result) = storage.never_satisfied_cache.get(&key) {
                     return *result;
@@ -2516,7 +2519,7 @@ impl NodeId {
                     let source_orders = storage.calculate_source_orders(source_order);
                     let mut walker =
                         SolutionWalker::new(db, storage, source_orders, inferable, self);
-                    let mut path = interior.path_assignments(db, env, storage, source_order);
+                    let mut path = SolutionPath::default();
                     walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
                 };
                 storage.never_satisfied_cache.insert(key, result);
@@ -2828,6 +2831,7 @@ impl NodeId {
         searcher.clauses
     }
 
+    #[cfg(test)]
     fn path_assignments<'db>(
         self,
         db: &'db dyn Db,
@@ -3568,10 +3572,7 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, node);
-        // Sequent discovery must also happen in source order. Sorting the collected paths is
-        // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
-        // discard gradual evidence before solution extraction.
-        let mut path = node.path_assignments(db, env, storage, source_order);
+        let mut path = SolutionPath::default();
         let node_support = storage.node_support(node).cloned();
         walker.visit_node(
             db,
@@ -5046,17 +5047,10 @@ mod tests {
         });
         let inferable = TypeVarSet::from_typevars(db, [t]);
 
-        assert_eq!(
-            CandidateSolutions::compute(
-                db,
-                &env,
-                &mut builder.storage.borrow_mut(),
-                set.node,
-                inferable,
-                set.source_order,
-            ),
-            CandidateSolutions::Unsatisfiable
-        );
+        assert!(matches!(
+            set.solutions(db, &env, inferable),
+            Ok(Solutions::Unsatisfiable(_))
+        ));
     }
 
     #[test]
@@ -6058,7 +6052,7 @@ class E: ...
             },
             // The unrelated `V = bytes` alternative must not pick up bindings for `T` or `U`.
             [
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
             ],
         );
     }

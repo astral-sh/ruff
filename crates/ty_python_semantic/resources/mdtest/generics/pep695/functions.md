@@ -120,6 +120,34 @@ reveal_type(result)
 result.nonexistent()
 ```
 
+## Inferring lambda parameters from other arguments
+
+An argument's type provides context for a lambda even when the lambda also contributes to the same
+type variable.
+
+```py
+from typing import Callable
+
+def update[T](value: T, transform: Callable[[T], T]) -> T:
+    return transform(value)
+
+def check[T](value: T) -> None:
+    result = update(value, lambda item: reveal_type(item))  # revealed: T@check
+    reveal_type(result)  # revealed: T@check
+```
+
+The same context is available when forwarding generic callbacks and preserving an enclosing
+function's return type.
+
+```py
+def transform[T, U](value: T, observe: Callable[[T], None], convert: Callable[[T], U]) -> list[U]:
+    observe(value)
+    return [convert(value)]
+
+def forward[T](value: T, observe: Callable[[T], None]) -> list[T]:
+    return transform(value, observe, lambda item: reveal_type(item))  # revealed: T@forward
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive
@@ -222,6 +250,38 @@ def _(a: A, b: B, x: A | B):
     reveal_type(takes_in_supports_foo(a))  # revealed: A
     reveal_type(takes_in_supports_foo(b))  # revealed: B
     reveal_type(takes_in_supports_foo(x))  # revealed: A | B
+```
+
+## Inferring from matching protocol overloads
+
+An overload that cannot accept the protocol's parameter type does not contribute to the inferred
+return type. Here, string indexing returns `list[Any]`, but integer indexing does not.
+
+```py
+from typing import Any, Protocol, overload
+
+class Indexed[T](Protocol):
+    def __getitem__(self, key: int, /) -> T: ...
+
+class Records:
+    def __len__(self) -> int:
+        return 0
+
+    @overload
+    def __getitem__(self, key: int, /) -> Any: ...
+    @overload
+    def __getitem__(self, key: int | slice, /) -> list[str]: ...
+    @overload
+    def __getitem__(self, key: str, /) -> list[Any]: ...
+    def __getitem__(self, key):
+        raise NotImplementedError
+
+def first[T](values: Indexed[T]) -> T:
+    return values[0]
+
+def check(values: Records):
+    reveal_type(first(values))  # revealed: Any | list[str]
+    reveal_type(reversed(values))  # revealed: reversed[Any | list[str]]
 ```
 
 ## Inferring through nested nominal generic classes
@@ -1926,6 +1986,21 @@ info: Type variable defined here
   |
 3 | def f[T: (int, None)](x: T) -> T:
   |       ^^^^^^^^^^^^^^
+```
+
+## Inferring a constrained typevar from an empty invariant container
+
+An empty list does not discard the more specific type inferred from another argument.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+def bounds[T: (Base, Derived)](default: T, values: list[T]) -> tuple[T, T]:
+    raise NotImplementedError
+
+def check(value: Derived):
+    reveal_type(bounds(value, []))  # revealed: tuple[Derived, Derived]
 ```
 
 ## Inferring a constrained typevar from a covariant container
@@ -4120,6 +4195,32 @@ def get_int() -> int | None: ...
 reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
+### Mapping an overloaded callback with an `Any` fallback
+
+The fallback overload accepts strings and returns `Result`, so mapping the callback over strings is
+valid. We currently infer a wider result for `map` than for the equivalent comprehension.
+
+```py
+from typing import Any, overload
+
+class Result: ...
+
+@overload
+def convert(value: int) -> Result: ...
+@overload
+def convert[T: Result](value: T) -> T: ...
+@overload
+def convert(value: Any) -> Result: ...
+def convert(value: Any) -> Result:
+    return value if isinstance(value, Result) else Result()
+
+def check(values: list[str]) -> None:
+    reveal_type(convert(values[0]))  # revealed: Result
+    # TODO: revealed: map[Result]
+    reveal_type(map(convert, values))  # revealed: map[Result | str]
+    reveal_type([convert(value) for value in values])  # revealed: list[Result]
+```
+
 ### Callable return union order does not affect inference
 
 ```py
@@ -4267,9 +4368,7 @@ regression test.
 from functools import reduce
 
 def _(keys: list[str]):
-    # TODO: revealed: int
-    # revealed: Unknown | Literal[0]
-    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+    reveal_type(reduce(lambda total, k: total + len(k), keys, 0))  # revealed: int
 ```
 
 ### Transitive constraints preserve typevar domains
@@ -4941,6 +5040,35 @@ class BoundedSetter(Base):
 
     @value.setter
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
+```
+
+## Repeated nesting with a finite bound
+
+A callback that returns its input permits arbitrarily deep nesting. It cannot satisfy a type
+variable whose bound allows only finitely many tuple layers. A callback returning `int` can satisfy
+the same bound, regardless of how often it is called.
+
+```py
+from collections.abc import Callable
+
+type Layer[T] = int | tuple[T]
+type Limit = Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[Layer[int]]]]]]]]]]
+
+def identity[T](value: T) -> T:
+    return value
+
+def nest[T: Limit](callback: Callable[[int | tuple[T]], T], depth: int) -> T:
+    value = callback(0)
+    for _ in range(depth):
+        value = callback((value,))
+    return value
+
+nest(identity, 11)  # error: [invalid-argument-type]
+
+def constant(value: Limit) -> int:
+    return 0
+
+reveal_type(nest(constant, 11))  # revealed: int
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

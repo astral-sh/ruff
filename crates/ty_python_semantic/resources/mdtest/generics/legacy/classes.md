@@ -1334,6 +1334,24 @@ class NameAttribute(Generic[T]):
 attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
+Gradual type arguments are preserved when they are compatible with more than one declared
+constraint. An invariant container does not force `Any` to one of its possible specializations.
+
+```py
+from typing import Any, Generic, TypeVar
+
+AnyStr = TypeVar("AnyStr", str, bytes)
+
+class File(Generic[AnyStr]):
+    content: AnyStr
+
+class AsyncFile(Generic[AnyStr]):
+    def __init__(self, file: File[AnyStr]) -> None: ...
+
+def wrap(file: File[Any]):
+    reveal_type(AsyncFile(file))  # revealed: AsyncFile[Any]
+```
+
 ### Constructing the class from its own type variable
 
 A constructor call inside a generic class can use a value whose type is one of the class's type
@@ -1479,9 +1497,6 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        # TODO: Only report the return error. The explicitly specialized constructor accepts
-        # `value: T` and `self: Self`; the incompatible return context should not reject them.
-        # error: [invalid-argument-type]
         # error: [invalid-return-type]
         return Box[T, Self](value, self)
 ```
@@ -1727,6 +1742,24 @@ reveal_type(generic_context(D))
 reveal_type(generic_context(into_regular_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
+```
+
+The initializer's receiver annotation still determines the specialization when the inherited
+`__new__` comes from a base whose type argument contains `Any`.
+
+```py
+from typing import Any
+
+class Values(Generic[T]):
+    value: T
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        return object.__new__(cls)
+
+class FloatValues(Values[T | Any], Generic[T]):
+    def __init__(self: "FloatValues[float]") -> None: ...
+
+reveal_type(FloatValues())  # revealed: FloatValues[float]
 ```
 
 ### Generic class inherits `__init__` from generic base class

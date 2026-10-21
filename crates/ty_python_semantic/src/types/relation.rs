@@ -857,6 +857,7 @@ impl<'db> Type<'db> {
             &ConstraintSetBuilder::new(),
             materialization_visitor,
             TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
         )
         .is_always_satisfied(db, materialization_visitor.env, TypeVarSet::None)
     }
@@ -875,6 +876,27 @@ impl<'db> Type<'db> {
             constraints,
             &materialization_visitor,
             TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
+        )
+    }
+
+    /// Compare exact constraint bounds while retaining the origin of derived constraints.
+    pub(super) fn when_constraint_set_equivalent_to_with_provenance<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
+    ) -> ConstraintSet<'db, 'c> {
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        self.when_equivalent_to_with_materialization_visitor(
+            db,
+            other,
+            constraints,
+            &materialization_visitor,
+            TypeVarEvaluation::Lazy,
+            provenance,
         )
     }
 
@@ -905,6 +927,7 @@ impl<'db> Type<'db> {
                         constraints,
                         &materialization_visitor,
                         TypeVarEvaluation::Lazy,
+                        ConstraintProvenance::Evidence,
                     )
             })
         }
@@ -940,6 +963,7 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         materialization_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         typevar_evaluation: TypeVarEvaluation,
+        provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -947,7 +971,7 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
-            provenance: ConstraintProvenance::Evidence,
+            provenance,
             perform_expensive_checks: true,
             typevar_evaluation,
             relation_visitor: &relation_visitor,

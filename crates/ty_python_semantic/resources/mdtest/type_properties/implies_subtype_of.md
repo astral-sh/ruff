@@ -998,11 +998,9 @@ def contravariant_lower_bound_into_upper[C, B, S]():
     static_assert(constraints.implies_subtype_of(C, Contravariant[B]))
 ```
 
-### Concrete bound substitution into nested generic types (future extension)
+### Concrete bound substitution into nested generic types
 
 When B's bound _contains_ a typevar (but is not a bare typevar), the same logic as above applies.
-
-TODO: This is not implemented yet, since it requires different detection machinery.
 
 ```py
 from ty_extensions import static_assert
@@ -1015,16 +1013,23 @@ class Covariant[T]:
 def upper_bound_into_lower[B, C]():
     # (Covariant[int] ≤ C) ∧ (B ≤ int) → (Covariant[B] ≤ C)
     constraints = ConstraintSet.lower_bound(Covariant[int], C) & ConstraintSet.upper_bound(B, int)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(Covariant[B], C))
 
 def lower_bound_into_upper[B, C]():
     # (C ≤ Covariant[int]) ∧ (int ≤ B) → (C ≤ Covariant[B])
     constraints = ConstraintSet.upper_bound(C, Covariant[int]) & ConstraintSet.lower_bound(int, B)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(C, Covariant[B]))
+```
+
+The same relationships hold when a type variable has a gradual declared bound. Its explicit
+constraints still restrict the possible specializations.
+
+```py
+from typing import Any
+
+def gradual_declared_bound[T: Any, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, Covariant[T]) & ConstraintSet.upper_bound(T, int)
+    static_assert(constraints.implies_subtype_of(U, Covariant[int]))
 ```
 
 ### Nested typevar propagation also works when the replacement is a bare typevar
