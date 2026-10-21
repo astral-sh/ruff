@@ -18,7 +18,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
-use crate::types::infer::builder::annotation_expression::PEP613Policy;
+use crate::types::infer::builder::annotation_expression::{
+    AnnotationExpressionInference, PEP613Policy,
+};
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
@@ -318,6 +320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             subscript,
                             AnnotatedExprContext::TypeExpression,
                         )
+                        .annotation_ty
                         .inner_type());
                 }
                 SpecialFormType::Optional => {
@@ -2408,7 +2411,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         subscript_context: AnnotatedExprContext,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         let slice = &*subscript.slice;
         let ast::Expr::Tuple(ast::ExprTuple {
             elts: arguments, ..
@@ -2424,7 +2427,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(first_argument) = arguments.first() else {
             self.infer_expression(slice, TypeContext::default());
-            return TypeAndQualifiers::declared(Type::unknown());
+            return AnnotationExpressionInference::new(
+                TypeAndQualifiers::declared(Type::unknown()),
+            );
         };
 
         let previous_in_type_alias = self
@@ -2591,25 +2596,23 @@ impl AnnotatedExprContext {
         self,
         builder: &mut TypeInferenceBuilder<'db, '_>,
         argument: &ast::Expr,
-    ) -> TypeAndQualifiers<'db> {
-        match self {
-            AnnotatedExprContext::TypeExpression => {
-                let inner = builder.infer_type_expression(argument);
-                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                    builder.db(),
-                    inner,
-                )));
-                TypeAndQualifiers::declared(outer)
-            }
+    ) -> AnnotationExpressionInference<'db> {
+        let inner = match self {
+            AnnotatedExprContext::TypeExpression => AnnotationExpressionInference::new(
+                TypeAndQualifiers::declared(builder.infer_type_expression(argument)),
+            ),
             AnnotatedExprContext::AnnotationExpression => {
-                let inner =
-                    builder.infer_annotation_expression_impl(argument, PEP613Policy::Disallowed);
-                let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                    builder.db(),
-                    inner.inner_type(),
-                )));
-                TypeAndQualifiers::declared(outer).with_qualifier(inner.qualifiers())
+                builder.infer_annotation_expression_impl(argument, PEP613Policy::Disallowed)
             }
-        }
+        };
+        let outer = Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+            builder.db(),
+            inner.annotation_ty.inner_type(),
+        )));
+        let mut inferred = AnnotationExpressionInference::new(
+            TypeAndQualifiers::declared(outer).with_qualifier(inner.annotation_ty.qualifiers()),
+        );
+        inferred.bare_final_annotation = inner.bare_final_annotation;
+        inferred
     }
 }

@@ -46,7 +46,7 @@ use crate::{
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{DataclassTransformerParams, KnownFunction},
         generics::Specialization,
-        inferred_declaration,
+        infer_definition_types, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
@@ -1607,7 +1607,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
+        let mut member = class_member(db, body_scope, name).map_type(|ty| {
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
@@ -1637,6 +1637,16 @@ impl<'db> StaticClassLiteral<'db> {
                 _ => ty,
             }
         });
+
+        // A bare `Final` binding can be a field specifier. Attribute lookup must use the
+        // field's inferred value type, just as the constructor and instance storage do.
+        if member.qualifiers().contains(TypeQualifiers::FINAL)
+            && let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                CodeGeneratorKind::from_static_class(db, self)
+            && let Some(field) = self.own_fields(db, None, field_policy).get(name)
+        {
+            member = member.map_type(|_| field.declared_ty);
+        }
 
         if self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
@@ -2772,6 +2782,23 @@ impl<'db> StaticClassLiteral<'db> {
                     converter = field.converter(db);
                 }
 
+                // Bare `Final` fields infer their type from the value stored on the instance.
+                // Resolve field specifiers first: their defaults describe the value, whereas
+                // the binding itself has type `dataclasses.Field`.
+                let declared_ty = if field_policy.is_dataclass_like()
+                    && first_declaration.is_some_and(|definition| {
+                        infer_definition_types(db, definition)
+                            .bare_final_annotation()
+                            .is_some()
+                    }) {
+                    converter
+                        .map(|(_, output_ty)| output_ty)
+                        .or(default_ty)
+                        .unwrap_or(attr_ty)
+                } else {
+                    attr_ty.apply_optional_specialization(db, specialization)
+                };
+
                 let kind = match field_policy {
                     CodeGeneratorKind::NamedTuple => FieldKind::NamedTuple { default_ty },
                     CodeGeneratorKind::DataclassLike(_) => FieldKind::Dataclass {
@@ -2810,7 +2837,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 let mut field = Field {
-                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    declared_ty,
                     kind,
                     first_declaration,
                 };
@@ -2982,13 +3009,21 @@ impl<'db> StaticClassLiteral<'db> {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            let declared_and_qualifiers = place_from_declarations(db, env, declarations)
+            let mut declared_and_qualifiers = place_from_declarations(db, env, declarations)
                 .with_imported_final(
                     db,
                     env,
                     use_def.end_of_scope_imported_final_candidates(symbol_id.into()),
                 )
                 .ignore_conflicting_declarations();
+
+            if declared_and_qualifiers.is_bare_final().is_some()
+                && let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                    CodeGeneratorKind::from_static_class(db, self)
+                && let Some(field) = self.own_fields(db, None, field_policy).get(name)
+            {
+                declared_and_qualifiers = declared_and_qualifiers.map_type(|_| field.declared_ty);
+            }
 
             match declared_and_qualifiers {
                 PlaceAndQualifiers {

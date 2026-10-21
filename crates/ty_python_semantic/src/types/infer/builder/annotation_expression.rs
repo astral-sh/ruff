@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_dotted_name;
+use ruff_text_size::{Ranged, TextRange};
 use ty_python_core::definition::Definition;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
@@ -20,28 +21,21 @@ pub(super) enum PEP613Policy {
 }
 
 /// The semantic result of inferring an annotation and the type stored for its expression node.
-struct AnnotationExpressionInference<'db> {
+pub(super) struct AnnotationExpressionInference<'db> {
     /// The type and qualifiers that the annotation contributes to the declaration.
-    annotation_ty: TypeAndQualifiers<'db>,
+    pub(super) annotation_ty: TypeAndQualifiers<'db>,
     /// The type exposed for the annotation expression itself, including to IDE features.
     expression_ty: Type<'db>,
+    /// The range of a bare `Final`, including through nested and string annotations.
+    pub(super) bare_final_annotation: Option<TextRange>,
 }
 
 impl<'db> AnnotationExpressionInference<'db> {
-    fn new(annotation_ty: TypeAndQualifiers<'db>) -> Self {
+    pub(super) fn new(annotation_ty: TypeAndQualifiers<'db>) -> Self {
         Self {
             expression_ty: annotation_ty.inner_type(),
             annotation_ty,
-        }
-    }
-
-    fn with_expression_type(
-        annotation_ty: TypeAndQualifiers<'db>,
-        expression_ty: Type<'db>,
-    ) -> Self {
-        Self {
-            annotation_ty,
-            expression_ty,
+            bare_final_annotation: None,
         }
     }
 }
@@ -55,6 +49,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         deferred_state: DeferredExpressionState,
     ) -> TypeAndQualifiers<'db> {
         self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Disallowed)
+            .annotation_ty
     }
 
     /// Infer the type of an annotation expression with the given [`DeferredExpressionState`],
@@ -63,7 +58,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         self.infer_annotation_expression_inner(annotation, deferred_state, PEP613Policy::Allowed)
     }
 
@@ -72,7 +67,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
         deferred_state: DeferredExpressionState,
         pep_613_policy: PEP613Policy,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         // `DeferredExpressionState::InStringAnnotation` takes precedence over other deferred states.
         // However, if it's not a stringified annotation, we must still ensure that annotation expressions
         // are always deferred in stub files.
@@ -89,13 +84,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .context
             .inference_flags
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
-        let annotation_ty = self.infer_annotation_expression_impl(annotation, pep_613_policy);
+        let inferred = self.infer_annotation_expression_impl(annotation, pep_613_policy);
         self.context.inference_flags.set(
             InferenceFlags::CHECK_UNBOUND_TYPEVARS,
             previous_check_unbound_typevars,
         );
         self.deferred_state = previous_deferred_state;
-        annotation_ty
+        inferred
     }
 
     /// Implementation of [`infer_annotation_expression`].
@@ -105,7 +100,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         annotation: &ast::Expr,
         pep_613_policy: PEP613Policy,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         fn infer_name_or_attribute<'db>(
             reference: (Type<'db>, Option<Definition<'db>>),
             annotation: &ast::Expr,
@@ -172,7 +167,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty,
                 Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::Final))
             ) {
-                AnnotationExpressionInference::with_expression_type(annotation_ty, ty)
+                AnnotationExpressionInference {
+                    annotation_ty,
+                    expression_ty: ty,
+                    bare_final_annotation: Some(annotation.range()),
+                }
             } else {
                 AnnotationExpressionInference::new(annotation_ty)
             }
@@ -184,12 +183,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let inferred = match annotation {
             // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(string) => {
-                AnnotationExpressionInference::new(self.infer_string_annotation_expression(string))
+                let inferred = self.infer_string_annotation_expression(string);
+                AnnotationExpressionInference {
+                    expression_ty: inferred.annotation_ty.inner_type(),
+                    ..inferred
+                }
             }
 
             ast::Expr::Attribute(attribute) => {
                 if !is_dotted_name(annotation) {
-                    return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
+                    return AnnotationExpressionInference::new(TypeAndQualifiers::declared(
+                        self.infer_type_expression(annotation),
+                    ));
                 }
                 match attribute.ctx {
                     ast::ExprContext::Load => infer_name_or_attribute(
@@ -228,13 +233,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
                 if !is_dotted_name(value) {
-                    return TypeAndQualifiers::declared(self.infer_type_expression(annotation));
+                    return AnnotationExpressionInference::new(TypeAndQualifiers::declared(
+                        self.infer_type_expression(annotation),
+                    ));
                 }
 
                 let slice = &**slice;
                 let (value_ty, definition) = self.infer_type_expression_reference(value);
                 let value_ty = self.finish_expression_type(value, value_ty, TypeContext::default());
 
+                let mut bare_final_annotation = None;
                 let annotation_ty = match value_ty {
                     Type::SpecialForm(special_form) => match special_form {
                         SpecialFormType::Annotated => {
@@ -242,7 +250,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 subscript,
                                 AnnotatedExprContext::AnnotationExpression,
                             );
+                            bare_final_annotation = inferred.bare_final_annotation;
                             let in_type_expression = inferred
+                                .annotation_ty
                                 .inner_type()
                                 .in_type_expression(db, self.scope(), None, self.inference_flags())
                                 .unwrap_or_else(|err| {
@@ -253,7 +263,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     )
                                 });
                             TypeAndQualifiers::declared(in_type_expression)
-                                .with_qualifier(inferred.qualifiers())
+                                .with_qualifier(inferred.annotation_ty.qualifiers())
                         }
                         SpecialFormType::TypeQualifier(qualifier) => {
                             let arguments = if let ast::Expr::Tuple(tuple) = slice {
@@ -262,10 +272,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 std::slice::from_ref(slice)
                             };
                             let type_and_qualifiers = if let [argument] = arguments {
-                                let type_and_qualifiers = self.infer_annotation_expression_impl(
+                                let inferred = self.infer_annotation_expression_impl(
                                     argument,
                                     PEP613Policy::Disallowed,
                                 );
+                                bare_final_annotation = inferred.bare_final_annotation;
+                                let type_and_qualifiers = inferred.annotation_ty;
 
                                 // Emit a diagnostic if ClassVar and Final are combined in a class where
                                 // Final already implies the semantics of ClassVar. Dataclasses and
@@ -360,7 +372,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 };
 
-                AnnotationExpressionInference::new(annotation_ty)
+                AnnotationExpressionInference {
+                    bare_final_annotation,
+                    ..AnnotationExpressionInference::new(annotation_ty)
+                }
             }
 
             // Fallback to `infer_type_expression_no_store` for everything else
@@ -369,34 +384,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             )),
         };
 
-        let AnnotationExpressionInference {
-            annotation_ty,
-            expression_ty,
-        } = inferred;
-        self.store_expression_type(annotation, expression_ty);
-        self.store_qualifiers(annotation, annotation_ty.qualifiers());
+        self.store_expression_type(annotation, inferred.expression_ty);
+        self.store_qualifiers(annotation, inferred.annotation_ty.qualifiers());
 
-        annotation_ty
+        inferred
     }
 
     /// Infer the type of a string annotation expression.
     fn infer_string_annotation_expression(
         &mut self,
         string: &ast::ExprStringLiteral,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         match parse_string_annotation(&self.context, self.inference_flags(), string) {
             Some(parsed) => {
                 self.string_annotations
                     .insert(ruff_python_ast::ExprRef::StringLiteral(string).into());
                 // String annotations are always evaluated in the deferred context.
-                self.infer_annotation_expression(
+                self.infer_annotation_expression_inner(
                     parsed.expr(),
                     DeferredExpressionState::InStringAnnotation(
                         self.enclosing_node_key(string.into()),
                     ),
+                    PEP613Policy::Disallowed,
                 )
             }
-            None => TypeAndQualifiers::declared(Type::unknown()),
+            None => {
+                AnnotationExpressionInference::new(TypeAndQualifiers::declared(Type::unknown()))
+            }
         }
     }
 }
