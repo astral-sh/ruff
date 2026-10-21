@@ -9573,11 +9573,7 @@ impl<'db> Type<'db> {
     /// Recursive substitution preserves sets structurally until a semantic operation consumes
     /// the closed result. A circular simplification retains that result rather than using a
     /// provisional relation to discard one of its components.
-    pub(super) fn normalize_closed_sets(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Type<'db> {
+    fn normalize_closed_sets(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_result=|_, _, _, ty| ty,
