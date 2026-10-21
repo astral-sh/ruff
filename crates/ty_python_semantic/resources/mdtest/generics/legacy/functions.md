@@ -3792,8 +3792,9 @@ make independently valid specializations incompatible: a fresh `[]` can be typed
 `list[B]`, but cannot safely expose both mutable views at once. Their intersection simplifies to
 `Never`, which would incorrectly imply that allocating the list cannot return.
 
-When no complete return type is a subtype of all alternatives, we handle this conservatively: if an
-invariant component differs across valid specializations, we do not intersect their return types.
+We handle this conservatively: if an invariant component differs across valid specializations, we do
+not intersect their return types. (But if one valid specialization results in a return type that is
+a subtype of all others, we select that one.)
 
 ### Mutable returns from intersection arguments
 
@@ -4000,22 +4001,32 @@ def _(
     reveal_type(invoke_all(reordered, All()))  # revealed: tuple[B, list[int]] | tuple[A, list[int]] | int
 ```
 
-A return alternative can be selected when it is a subtype of every other return. Here `list[B]`
-satisfies both union alternatives, even though neither union is a subtype of the other:
+The call to `invoke_all` below can infer three different types for `R`, one from each callback
+signature. Each choice gives a possible return type for the call. Inference selects `list[B]`
+because it is a subtype of both other return types, `list[A] | list[B]` and `list[B] | list[C]`:
 
 ```py
 def _(
-    callback: Intersection[Callable[[A], list[A] | list[B]], Callable[[B], list[B] | list[C]], Callable[[C], list[B]]],
+    callback: Intersection[
+        Callable[[A], list[A] | list[B]],
+        Callable[[B], list[B] | list[C]],
+        Callable[[C], list[B]],
+    ],
 ) -> None:
     reveal_type(invoke_all(callback, All()))  # revealed: list[B]
 ```
 
-In contrast, being a subtype of one alternative is insufficient. Neither `list[A]` nor `list[B]` is
-a subtype of all three returns, so inference retains their union:
+Being a subtype of just one other return type is insufficient. Here `list[A]` and `list[B]` are both
+subtypes of `list[A] | list[B]`, but neither is a subtype of the other. Inference retains
+`list[A] | list[B]`:
 
 ```py
 def _(
-    callback: Intersection[Callable[[A], list[A] | list[B]], Callable[[B], list[A]], Callable[[C], list[B]]],
+    callback: Intersection[
+        Callable[[A], list[A] | list[B]],
+        Callable[[B], list[A]],
+        Callable[[C], list[B]],
+    ],
 ) -> None:
     reveal_type(invoke_all(callback, All()))  # revealed: list[A] | list[B]
 ```
@@ -4051,10 +4062,11 @@ def _(
 
 ### Returning values from mixed-variance unions
 
-A callback producing a value or a batch of values can infer the element type even when mutable and
-read-only batches have different variances. One valid return alternative is `V`; another includes
-`Batch[V]`. Because `V` is already a subtype of the other return, inference can select it without
-combining incompatible mutable views:
+`Batch` is invariant in its type parameter because its `value` attribute is writable;
+`ReadOnlyBatch` is covariant because it only returns values of that type. Inference finds two valid
+specializations for the call to `first_value` below, returning `V@forward` and
+`V@forward | Batch[V@forward]`. The first return type is a subtype of the second, so inference
+selects `V@forward`:
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -4075,11 +4087,16 @@ def first_value(mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> V:
 def forward(mapping: V | Batch[V] | ReadOnlyBatch[V]) -> V:
     value = first_value(lambda: mapping)
     reveal_type(value)  # revealed: V@forward
-    return value  # no diagnostic
+    return value
 ```
 
-The complete return type determines which alternative is a subtype. Wrapping `V` in an invariant
-list prevents refinement, while a contravariant callable parameter selects the wider binding:
+The comparison uses the complete return types after substituting the inferred type arguments. For
+`make_list`, the two choices produce `list[V]` and `list[V | Batch[V]]`. Neither is a subtype of the
+other, because lists are invariant, so inference keeps the merged result below.
+
+For `make_sink`, a callable accepting `V | Batch[V]` is a subtype of one accepting only `V`: it
+accepts every input the latter accepts. The wider parameter type therefore produces the narrower
+callable type, which inference selects:
 
 ```py
 def make_list(mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> list[V]:

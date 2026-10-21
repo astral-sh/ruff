@@ -6393,12 +6393,14 @@ impl<'db> CallInference<'_, 'db> {
             });
         }
 
-        // A whole return that is a subtype of every alternative can be selected without
-        // combining mutable views: `T` can win over `T | list[T]`, even though only the
-        // latter has an invariant component. Compare returns, not individual bindings,
-        // to preserve correlations and account for the return annotation's variance.
-        // Find a candidate in one pass, then check it against every alternative; two
-        // incomparable returns may still have a later alternative that subtypes both.
+        // If one valid specialization's return type is a subtype of all the others, use it
+        // directly. For example, `int` can be selected over `int | list[int]`, even though the
+        // invariant-type check below would otherwise prevent intersecting them. Compare complete
+        // return types: substituting a narrower type argument can produce an incomparable
+        // (`list[T]`) or wider (`Callable[[T], None]`) return type.
+        //
+        // Find a candidate in one pass, then check it against every return type; two
+        // incomparable returns may still have a later return that is a subtype of both.
         let mut candidate = *returns.first()?;
         for &return_ty in returns.iter().skip(1) {
             if return_ty != candidate && return_ty.is_subtype_of(db, env, candidate) {
