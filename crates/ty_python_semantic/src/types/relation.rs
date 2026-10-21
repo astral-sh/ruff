@@ -11,6 +11,7 @@ use crate::types::constraints::{
     OptionConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::dedicated::numpy;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
@@ -1858,6 +1859,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
+            // TODO: Remove this NumPy assignability exception together with `numpy::is_scalar_alias`.
+            (Type::GenericAlias(alias), _)
+                if self.relation.is_assignability()
+                    && (matches!(target, Type::SubclassOf(_))
+                        || matches!(target, Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type)))
+                    && numpy::is_scalar_alias(db, alias) =>
+            {
+                self.check_type_pair(
+                    db,
+                    SubclassOfType::from(db, env, ClassType::Generic(alias)),
+                    target,
+                )
+            }
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

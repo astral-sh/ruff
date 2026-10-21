@@ -70,14 +70,17 @@ def runtime_checks(value: object) -> None:
     issubclass(type(value), np.float32)  # no diagnostic
 ```
 
-Explicitly subscribing a NumPy generic class still produces an alias.
+The compatibility exception also accepts explicit subscriptions of NumPy's scalar bases, which have
+the same types as the scalar aliases in these stubs. Other NumPy generic aliases remain invalid
+class arguments.
 
 ```py
 from typing import Any
 
 def accepts_class(cls: type) -> None: ...
 
-accepts_class(np.signedinteger[Any])  # error: [invalid-argument-type] "Expected `type`"
+accepts_class(np.signedinteger[Any])  # no diagnostic
+accepts_class(np.ndarray[Any, Any])  # error: [invalid-argument-type] "Expected `type`"
 ```
 
 ## Iterating over an array union

@@ -77,7 +77,8 @@ reveal_type(from_dtype_like(np.bool))  # revealed: dtype[mini_numpy.bool[builtin
 ## Scalar classes represented by aliases
 
 Older NumPy stubs represent scalar classes as aliases for specialized generic bases. We retain these
-alias types, including their type arguments, when they are imported or assigned to another name.
+alias types and their type arguments when they are imported or assigned to another name. We also
+accept them as class arguments because the scalar names refer to classes at runtime.
 
 `numpy/__init__.pyi`:
 
@@ -91,13 +92,17 @@ class _128Bit: ...
 class signedinteger[Precision]:
     def __new__(cls, value: int = ...) -> Self: ...
 
+class unsignedinteger[Precision]: ...
 class floating[Precision]: ...
+class complexfloating[RealPrecision, ImagPrecision]: ...
 
 int32: TypeAlias = signedinteger[_32Bit]
 int64 = signedinteger[_64Bit]
 int_ = int64
+uint64: TypeAlias = unsignedinteger[_64Bit]
 float32: TypeAlias = floating[_32Bit]
 single: TypeAlias = float32
+complex64: TypeAlias = complexfloating[_32Bit, _32Bit]
 
 class float64(floating[_64Bit]): ...
 
@@ -143,14 +148,33 @@ accepts_int64(np.int32)  # error: [invalid-argument-type]
 accepts_class(np.int64)  # no diagnostic
 accepts_class(Integer)  # no diagnostic
 accepts_class(np.int_)  # no diagnostic
+accepts_class(np.uint64)  # no diagnostic
 accepts_class(np.float64)  # no diagnostic
 accepts_class(np.single)  # no diagnostic
 accepts_class(np.float128)  # no diagnostic
+accepts_class(np.complex64)  # no diagnostic
 
 reveal_type(construct(np.int32))  # revealed: signedinteger[_32Bit]
 reveal_type(construct(Integer))  # revealed: signedinteger[_64Bit]
 reveal_type(construct(np.float32))  # revealed: floating[_32Bit]
 reveal_type(construct(np.float128))  # revealed: floating[_128Bit]
+
+def construct_optional[T](cls: type[T] | None) -> T | None:
+    return cls() if cls is not None else None
+
+reveal_type(construct_optional(Integer))  # revealed: signedinteger[_64Bit] | None
+
+def optional_class(flag: bool) -> None:
+    candidate = Integer if flag else None
+    reveal_type(construct_optional(candidate))  # revealed: signedinteger[_64Bit] | None
+
+from types import GenericAlias
+
+def identity[T](value: T) -> T:
+    return value
+
+retained_alias: GenericAlias = identity(Integer)  # no diagnostic
+reveal_type(identity(Integer))  # revealed: <class 'signedinteger[_64Bit]'>
 
 value: Alias = Integer(1)
 reveal_type(value)  # revealed: signedinteger[_64Bit]
@@ -158,6 +182,7 @@ reveal_type(value)  # revealed: signedinteger[_64Bit]
 scalar_class: type[np.int64] = Integer  # no diagnostic
 wrong_scalar: type[np.int64] = np.int32  # error: [invalid-assignment]
 isinstance(value, Integer)  # no diagnostic
+isinstance(value, Integer | str)  # no diagnostic
 issubclass(Integer, np.signedinteger)  # no diagnostic
 
 class Int64(Alias): ...  # no diagnostic
@@ -173,18 +198,36 @@ def narrow(value: np.int32 | np.int64) -> None:
         reveal_type(value)  # revealed: signedinteger[_32Bit] | signedinteger[_64Bit]
 ```
 
-The exception applies only to known scalar definitions. Explicit subscriptions and other aliases
-remain generic aliases, including aliases declared in unrelated stubs.
+Scalar aliases can also register class-specific handlers:
+
+`dispatch.py`:
+
+```py
+from functools import singledispatch
+from numpy import int64 as Integer
+
+@singledispatch
+def process(value: object) -> None: ...
+@process.register(Integer)  # no diagnostic
+def process_integer(value: Integer) -> None: ...
+```
+
+The exception applies to aliases whose origins are NumPy's `signedinteger`, `unsignedinteger`,
+`floating`, or `complexfloating` definitions. It also accepts explicit subscriptions and equivalent
+aliases declared in other modules, even though explicit subscriptions produce aliases at runtime.
+Other generic aliases and unrelated classes with the same names remain invalid class arguments.
 
 `other.pyi`:
 
 ```pyi
-from numpy import signedinteger, _64Bit
+from numpy import signedinteger as numpy_signedinteger, _64Bit
 
-int64 = signedinteger[_64Bit]
+int64 = numpy_signedinteger[_64Bit]
+
+class signedinteger[Precision]: ...
 ```
 
-`rejected.py`:
+`compatibility.py`:
 
 ```py
 import numpy as np
@@ -192,11 +235,14 @@ import other
 
 def accepts_class(cls: type) -> None: ...
 
-accepts_class(np.signedinteger[np._64Bit])  # error: [invalid-argument-type]
-accepts_class(np.ScalarAlias)  # error: [invalid-argument-type]
+accepts_class(np.signedinteger[np._64Bit])  # no diagnostic
+accepts_class(np.ScalarAlias)  # no diagnostic
+accepts_class(np.Namespace.int64)  # no diagnostic
+accepts_class(other.int64)  # no diagnostic
+
+accepts_class(list[int])  # error: [invalid-argument-type]
 accepts_class(np.int8)  # error: [invalid-argument-type]
-accepts_class(np.Namespace.int64)  # error: [invalid-argument-type]
-accepts_class(other.int64)  # error: [invalid-argument-type]
+accepts_class(other.signedinteger[np._64Bit])  # error: [invalid-argument-type]
 ```
 
 ## Scalar classes represented by class definitions
