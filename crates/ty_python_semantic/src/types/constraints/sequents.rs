@@ -1547,9 +1547,12 @@ impl<'db> ConcreteLowerBound<'db> {
         }
 
         // (α ≤ β) ⇒ ((T = β) ⇒ (α ≤ T))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
+        // This requires a static equivalence bound: `T = Any` permits `T = str`, so
+        // assignability of `int` to `Any` does not imply `int ≤ T`.
+        if other.bound.is_static_sequent_eligible(db, env)
+            && self
+                .bound
+                .is_constraint_set_assignable_to(db, env, other.bound)
         {
             map.add_single_implication(other.into(), self.into());
         }
@@ -1728,14 +1731,16 @@ impl<'db> ConcreteUpperBound<'db> {
         }
 
         // (β ≤ α) ⇒ ((T = β) ⇒ (T ≤ α))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
+        // Likewise, `T = Any` does not imply `T ≤ int`, even though `Any` is assignable to `int`.
+        if other.bound.is_static_sequent_eligible(db, env)
+            && other
+                .bound
+                .is_constraint_set_assignable_to(db, env, self.bound)
         {
             map.add_single_implication(other.into(), self.into());
         }
 
-        // Given constraints `T ≤ α` and `T = β`, `α ≤ β` must also hold. If those bounds contain
+        // Given constraints `T ≤ α` and `T = β`, `β ≤ α` must also hold. If those bounds contain
         // other typevars, we can infer additional constraints.
         AtomicConstraint::add_sequents_for_range(db, env, map, other, self);
     }

@@ -3764,6 +3764,41 @@ reveal_type(infer_any_bound(list[str]()))  # revealed: str
 reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
 ```
 
+## Gradual specializations in callable union returns
+
+A callback returning `Box[Unknown]` or `Box[Any]` satisfies the `Box[T]` member of the union. It
+does not also need to satisfy the `T` member, which would require the box itself to be a `str` or
+`bytes`. Both declared constraints remain possible, so inference preserves the gradual type
+argument.
+
+```py
+from typing import Any, Callable
+
+class Box[T: (str, bytes)]:
+    value: T
+
+def infer[T: (str, bytes)](callback: Callable[[], T | Box[T]]) -> T:
+    raise NotImplementedError
+
+unknown = Box()
+any_ = Box[Any]()
+
+unknown_result = infer(lambda: unknown)  # no diagnostic
+reveal_type(unknown_result)  # revealed: Unknown
+any_result = infer(lambda: any_)  # no diagnostic
+reveal_type(any_result)  # revealed: Any
+```
+
+A separate argument of type `T` must still satisfy the declared constraints. Gradual evidence from
+the callback does not make an incompatible argument valid:
+
+```py
+def consume[T: (str, bytes)](callback: Callable[[], Box[T]], other: T) -> None: ...
+
+consume(lambda: unknown, unknown)  # error: [invalid-argument-type] "does not satisfy constraints"
+consume(lambda: any_, any_)  # error: [invalid-argument-type] "does not satisfy constraints"
+```
+
 ## Invalid bounds in generic union members
 
 An argument that violates a type variable's bound is rejected even when another union member is not
