@@ -2,6 +2,9 @@ name: Reserve automation report index
 
 on:
   workflow_call:
+    secrets:
+      STS_API_URL:
+        required: true
 
 permissions: {}
 
