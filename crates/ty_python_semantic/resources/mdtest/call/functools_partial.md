@@ -2117,3 +2117,9 @@ from functools import partial
 callback = partial(lambda: callback)
 callback()  # no diagnostic
 ```
+
+The lambda can also return the partial inside a tuple while leaving a required parameter unbound:
+
+```py
+pair = partial(lambda value: (pair, value))  # no diagnostic
+```
