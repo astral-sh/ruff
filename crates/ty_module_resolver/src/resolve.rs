@@ -1251,13 +1251,9 @@ enum ComponentFileFilter {
     StubOnly,
 }
 
-/// Where a candidate sits in the typing specification's module-resolution order.
-///
-/// Variants are declared from highest to lowest precedence so that derived ordering can be used
-/// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
-/// sorts used by the resolver preserve search-path order between candidates in the same tier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
-enum CandidatePrecedence {
+/// Where a module resolution candidate originated.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+enum CandidateOrigin {
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
     /// Stub packages take precedence over candidates for `<package>` regardless of where those
@@ -1268,7 +1264,19 @@ enum CandidatePrecedence {
     ///
     /// This includes `.pyi` and `.py` packages and modules from extra paths, first-party code,
     /// editable installs, site-packages, and the standard library.
-    SearchPathOrder,
+    SearchPath,
+}
+
+impl CandidateOrigin {
+    /// Returns the candidate's precedence tier in the typing specification's module-resolution order.
+    ///
+    /// The resolver's stable sort preserves search-path order between candidates in the same tier.
+    fn sort_key(self) -> impl Ord {
+        match self {
+            Self::StubPackage => 0,
+            Self::SearchPath => 1,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1280,28 +1288,28 @@ struct ModuleResolutionCandidate<'db> {
     directory: ModuleDirectory<'db>,
     module: ResolvedModule,
     py_typed: PyTyped,
-    precedence: CandidatePrecedence,
+    origin: CandidateOrigin,
 }
 
 impl<'db> ModuleResolutionCandidate<'db> {
     fn root(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
-        Self::with_precedence(context, search_path, CandidatePrecedence::SearchPathOrder)
+        Self::with_origin(context, search_path, CandidateOrigin::SearchPath)
     }
 
     fn stub(context: &ResolverContext<'db>, search_path: &SearchPath) -> Self {
-        Self::with_precedence(context, search_path, CandidatePrecedence::StubPackage)
+        Self::with_origin(context, search_path, CandidateOrigin::StubPackage)
     }
 
-    fn with_precedence(
+    fn with_origin(
         context: &ResolverContext<'db>,
         search_path: &SearchPath,
-        precedence: CandidatePrecedence,
+        origin: CandidateOrigin,
     ) -> Self {
         Self {
             directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
-            precedence,
+            origin,
         }
     }
 
@@ -1435,13 +1443,13 @@ fn normalize_candidates<'db>(
         .iter()
         .filter(|candidate| !candidate.is_any_namespace_package(context))
     {
-        match candidate.precedence {
-            CandidatePrecedence::StubPackage => has_concrete_stub_package = true,
-            CandidatePrecedence::SearchPathOrder => has_concrete_search_path_candidate = true,
+        match candidate.origin {
+            CandidateOrigin::StubPackage => has_concrete_stub_package = true,
+            CandidateOrigin::SearchPath => has_concrete_search_path_candidate = true,
         }
     }
 
-    candidates.sort_by_key(|candidate| candidate.precedence);
+    candidates.sort_by_key(|candidate| candidate.origin.sort_key());
 
     // Note that we intentionally do *not* filter out ordinary search-path candidates when a stub
     // package is found. Even when a non-namespace, non-partial stub package exists, we keep the
@@ -1453,14 +1461,17 @@ fn normalize_candidates<'db>(
             return true;
         }
 
-        let shadowed = match (for_module_name_prefix, candidate.precedence) {
-            (true, CandidatePrecedence::StubPackage) => {
-                has_concrete_stub_package
-                    || (has_concrete_search_path_candidate
-                        && candidate.py_typed != PyTyped::Partial)
+        let shadowed = if for_module_name_prefix {
+            match candidate.origin {
+                CandidateOrigin::StubPackage => {
+                    has_concrete_stub_package
+                        || (has_concrete_search_path_candidate
+                            && candidate.py_typed != PyTyped::Partial)
+                }
+                CandidateOrigin::SearchPath => has_concrete_search_path_candidate,
             }
-            (true, CandidatePrecedence::SearchPathOrder) => has_concrete_search_path_candidate,
-            (false, _) => has_concrete_stub_package || has_concrete_search_path_candidate,
+        } else {
+            has_concrete_stub_package || has_concrete_search_path_candidate
         };
 
         if !shadowed {
