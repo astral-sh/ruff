@@ -1,0 +1,70 @@
+name: Reserve automation report index
+
+# Only GitHub PR metadata is consumed; both jobs run default-branch code.
+on: # zizmor: ignore[dangerous-triggers]
+  workflow_run:
+    workflows: [CI]
+    types: [requested]
+
+permissions: {}
+
+jobs:
+  resolve:
+    if: github.repository == 'astral-sh/ruff' && github.event.workflow_run.event == 'pull_request'
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    outputs:
+      pull-request: ${{ steps.resolve.outputs.pull-request }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          enable-cache: false
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          pull_request="$(uv run --script scripts/pull_request_comments.py resolve --run-id "$RUN_ID" --workflow ci.yaml)"
+          echo "pull-request=$pull_request" >> "$GITHUB_OUTPUT"
+
+  reserve:
+    needs: resolve
+    if: needs.resolve.outputs.pull-request != ''
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: pull-request-automation-comment-${{ needs.resolve.outputs.pull-request }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          enable-cache: false
+      - name: Reserve an early report index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ needs.resolve.outputs.pull-request }}
+        run: uv run --script scripts/pull_request_comments.py reserve --pull-request "$PULL_REQUEST"
