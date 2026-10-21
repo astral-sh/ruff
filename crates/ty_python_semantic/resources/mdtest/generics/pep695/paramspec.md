@@ -684,7 +684,7 @@ reveal_type(with_empty())  # revealed: bytes
 reveal_type(with_empty(1))  # revealed: bytes
 ```
 
-A `ParamSpec` wrapper should preserve the combined callable's supported signatures.
+A `ParamSpec` wrapper preserves the combined callable's supported signatures.
 
 ```py
 def preserve[**P](callback: Callable[P, bytes]) -> Callable[P, bytes]:
@@ -692,11 +692,9 @@ def preserve[**P](callback: Callable[P, bytes]) -> Callable[P, bytes]:
 
 reveal_type(callback)  # revealed: ((int, /) -> bytes) & ((str, /) -> bytes)
 preserved = preserve(callback)
-# TODO: ((int, /) -> bytes) & ((str, /) -> bytes)
-reveal_type(preserved)  # revealed: (int, /) -> bytes
+reveal_type(preserved)  # revealed: ((int, /) -> bytes) & ((str, /) -> bytes)
 preserved(1)
-# TODO: no error
-preserved("text")  # error: [invalid-argument-type]
+preserved("text")
 ```
 
 A `Concatenate` prefix is required for every signature in the result.
@@ -746,6 +744,22 @@ def nested[**P](
 inner = nested(consume, text)(1)
 reveal_type(inner)  # revealed: ((int, /) -> None) & ((str, /) -> None)
 inner("text")  # no diagnostic
+```
+
+### Nested callable parameter lists
+
+Nested callable returns keep one specialization because their calls can share state.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection
+
+def nested[**P](factory: Callable[P, Callable[P, bytes]]) -> Callable[P, Callable[P, bytes]]:
+    raise NotImplementedError
+
+def _(factory: Intersection[Callable[[int], Callable[[int], bytes]], Callable[[str], Callable[[str], bytes]]]):
+    reveal_type(nested(factory)(1)(1))  # revealed: bytes
+    nested(factory)("text")  # error: [invalid-argument-type]
 ```
 
 ### Type variable variance alongside a parameter list
