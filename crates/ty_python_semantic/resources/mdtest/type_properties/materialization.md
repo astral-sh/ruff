@@ -1547,6 +1547,129 @@ def generic_recursive_materialization(value: Top[Covariant[GenericRecursive[int]
     reveal_type(value)  # revealed: Covariant[Top[GenericRecursive[int]]]
 ```
 
+## Recursive callables
+
+Materializing a recursive callable also materializes its return type. Calling its bottom
+materialization repeatedly preserves that materialization at every recursive reference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Any
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+type Callback = Callable[..., Callback]
+
+static_assert(is_subtype_of(Bottom[Callback], Top[Callback]))
+static_assert(not is_subtype_of(Top[Callback], Bottom[Callback]))
+
+def call(bottom: Bottom[Callback]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+    static_assert(is_equivalent_to(TypeOf[bottom()()], Bottom[Callback]))
+
+def call_expanded(bottom: Bottom[Callable[..., Callback]]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+
+def call_after_alias(bottom: Bottom[tuple[Callback, Callable[..., Callback]]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Callback]))
+```
+
+Recursive references in parameter types use the opposite materialization, since callable parameters
+are contravariant.
+
+```py
+type Consumer = Callable[[Consumer], Any]
+
+static_assert(is_equivalent_to(Top[Consumer], Callable[[Bottom[Consumer]], object]))
+static_assert(is_equivalent_to(Bottom[Consumer], Callable[[Top[Consumer]], Bottom[Any]]))
+```
+
+Mutually recursive aliases also retain their materialization when a callable is reached through
+different paths in the same type.
+
+```py
+type Node = tuple[Factory, Any]
+type Factory = Callable[[], Node]
+
+def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
+```
+
+## Legacy recursive callables
+
+The same materialization rules apply to recursive aliases declared with `TypeAlias`.
+
+```py
+from collections.abc import Callable
+from typing import Any, TypeAlias
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+Callback: TypeAlias = Callable[..., "Callback"]
+
+static_assert(is_subtype_of(Bottom[Callback], Top[Callback]))
+static_assert(not is_subtype_of(Top[Callback], Bottom[Callback]))
+
+def call(bottom: Bottom[Callback]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+    static_assert(is_equivalent_to(TypeOf[bottom()()], Bottom[Callback]))
+
+def call_expanded(bottom: Bottom[Callable[..., Callback]]):
+    static_assert(is_equivalent_to(TypeOf[bottom()], Bottom[Callback]))
+
+def call_after_alias(bottom: Bottom[tuple[Callback, Callable[..., Callback]]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Callback]))
+```
+
+Recursive parameter types reverse the materialization in legacy aliases as well.
+
+```py
+Consumer: TypeAlias = Callable[["Consumer"], Any]
+
+static_assert(is_equivalent_to(Top[Consumer], Callable[[Bottom[Consumer]], object]))
+static_assert(is_equivalent_to(Bottom[Consumer], Callable[[Top[Consumer]], Bottom[Any]]))
+```
+
+The same applies to mutually recursive legacy aliases.
+
+```py
+Node: TypeAlias = tuple["Factory", Any]
+Factory: TypeAlias = Callable[[], Node]
+
+def call_mutual(bottom: Bottom[tuple[Node, Factory]]):
+    static_assert(is_equivalent_to(TypeOf[bottom[1]()], Bottom[Node]))
+```
+
+## Recursive function defaults
+
+A function's type parameter default can refer to its own `__call__` method. Materializing the
+function preserves the recursion guard when following that method back to the function's signature.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+from ty_extensions import Bottom
+from ty_extensions._internal import CallableTypeOf, TypeOf
+
+def factory[T = TypeOf[factory.__call__]]() -> Callable[..., T]:
+    raise NotImplementedError
+
+def check(value: Bottom[CallableTypeOf[factory]]):
+    reveal_type(value)  # revealed: () -> ([T'return](*args: object, **kwargs: object) -> T'return)
+
+def check_method(value: Bottom[TypeOf[factory.__call__]]):
+    reveal_type(value)  # revealed: <method-wrapper '__call__' of function 'factory'>
+```
+
 ## Subtyping
 
 ```toml

@@ -264,6 +264,15 @@ reveal_type(recursive())  # revealed: int
 recursive("no")  # error: [invalid-argument-type]
 ```
 
+## Recursive defaults in a list of lambdas
+
+A lambda stored in a list can return another lambda whose default refers to the selected callback.
+The default is evaluated only when the outer lambda is called, after `callback` has been assigned.
+
+```py
+callback = [lambda: lambda x=callback: x, lambda: callback][0]  # no diagnostic
+```
+
 ## Bound recursive lambdas
 
 Access through an instance binds the receiver of a recursive lambda:

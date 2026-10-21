@@ -30,7 +30,7 @@ use crate::types::{
     type_form::walk_typeform_type,
     typed_dict::walk_typed_dict_type,
     typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-    walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
+    walk_property_instance_type, walk_signature, walk_typeguard_type, walk_typeis_type,
 };
 
 /// A visitor trait that recurses into nested types.
@@ -779,6 +779,8 @@ enum TypeSearchMode {
     IncludeLazyAttributes,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
     IncludeAliasArguments,
+    /// Also inspect inferred callable signatures, leaving other lazy attributes unevaluated.
+    IncludeCallableSignatures,
 }
 
 impl TypeSearchMode {
@@ -787,7 +789,10 @@ impl TypeSearchMode {
     }
 
     const fn should_visit_alias_arguments(self) -> bool {
-        matches!(self, Self::IncludeAliasArguments)
+        matches!(
+            self,
+            Self::IncludeAliasArguments | Self::IncludeCallableSignatures
+        )
     }
 }
 
@@ -821,6 +826,16 @@ where
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
             self.mode.should_visit_lazy_type_attributes()
+        }
+
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            if matches!(self.mode, TypeSearchMode::IncludeCallableSignatures) {
+                for signature in &callable.signatures(db).overloads {
+                    walk_signature(db, signature, self);
+                }
+            } else {
+                walk_callable_type(db, callable, self);
+            }
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -898,6 +913,23 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
+}
+
+/// Searches through alias arguments and inferred callable signatures without evaluating other
+/// lazy attributes. This exposes incomplete return types hidden behind nested lambda references.
+pub(super) fn any_over_type_including_callable_signatures<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(
+        db,
+        env,
+        ty,
+        TypeSearchMode::IncludeCallableSignatures,
+        query,
+    )
 }
 
 /// Searches through type aliases without forcing other lazily inferred type attributes.

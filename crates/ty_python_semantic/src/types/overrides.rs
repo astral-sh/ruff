@@ -1835,44 +1835,46 @@ fn check_missing_overrides<'db>(
 ) {
     let db = context.db();
 
-    let Some(definition) = missing_override_definition(context, member, subclass_scope) else {
-        return;
-    };
-
-    let Some(builder) = context.report_lint(&MISSING_OVERRIDE_DECORATOR, definition.focus_range)
-    else {
-        return;
-    };
-
     let MissingOverrideTarget {
         superclass,
         definition: superclass_definition,
     } = target;
     let superclass_name = superclass.name(db);
     let superclass_member = format!("{superclass_name}.{}", member.name);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
-        member.name
-    ));
     let override_module =
         if context.program_environment().python_version(db) >= PythonVersion::PY312 {
             "typing"
         } else {
             "typing_extensions"
         };
-    diagnostic.info(format_args!(
-        "Decorate the method with `@{override_module}.override` to make the override explicit"
-    ));
-
-    if let Some(superclass_definition) = superclass_definition
-        && superclass_definition.file(db) == context.file()
+    for definition in extract_local_override_definitions(context, member, subclass_scope)
+        .into_iter()
+        .filter(|definition| !definition.focus_definition_has_override_decorator)
     {
-        diagnostic.annotate(
-            Annotation::secondary(
-                context.span(superclass_definition.focus_range(db, context.module())),
-            )
-            .message(format_args!("`{superclass_member}` defined here")),
-        );
+        let Some(builder) =
+            context.report_lint(&MISSING_OVERRIDE_DECORATOR, definition.focus_range)
+        else {
+            continue;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Method `{}` overrides `{superclass_member}` but is not decorated with `@override`",
+            member.name
+        ));
+        diagnostic.info(format_args!(
+            "Decorate the method with `@{override_module}.override` to make the override explicit"
+        ));
+
+        if let Some(superclass_definition) = superclass_definition
+            && superclass_definition.file(db) == context.file()
+        {
+            diagnostic.annotate(
+                Annotation::secondary(
+                    context.span(superclass_definition.focus_range(db, context.module())),
+                )
+                .message(format_args!("`{superclass_member}` defined here")),
+            );
+        }
     }
 }
 
@@ -1884,16 +1886,6 @@ fn invalid_explicit_override_definition<'db>(
     extract_local_override_definitions(context, member, subclass_scope)
         .into_iter()
         .find(|definition| definition.any_definition_has_override_decorator)
-}
-
-fn missing_override_definition<'db>(
-    context: &InferContext<'db, '_>,
-    member: &Member<'db>,
-    subclass_scope: ScopeId<'db>,
-) -> Option<LocalOverrideDefinition> {
-    extract_local_override_definitions(context, member, subclass_scope)
-        .into_iter()
-        .find(|definition| !definition.focus_definition_has_override_decorator)
 }
 
 fn extract_local_override_definitions<'db>(

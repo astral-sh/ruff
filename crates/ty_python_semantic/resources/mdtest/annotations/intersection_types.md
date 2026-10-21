@@ -207,6 +207,41 @@ def _(a: A, b: B, c: C, d: D):
     reveal_type(d)  # revealed: ~list[D]
 ```
 
+## Negated recursive aliases in gradual unions
+
+A recursive alias can combine a negated list with a list whose element type is unknown.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4768>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+type A = ~list[A] | list  # error: [missing-type-argument]
+type B = ~list[B] | list[Any]
+
+def _(a: A, b: B):
+    reveal_type(a)  # revealed: ~list[A] | list[Unknown]
+    reveal_type(b)  # revealed: ~list[B] | list[Any]
+```
+
+The same applies to stringified aliases declared with `TypeAlias`:
+
+```py
+from typing import TypeAlias
+
+C: TypeAlias = "~list[C] | list"  # error: [missing-type-argument]
+D: TypeAlias = "~list[D] | list[Any]"
+
+def _(c: C, d: D):
+    reveal_type(c)  # revealed: C
+    reveal_type(d)  # revealed: D
+```
+
 ## Intersections inside `type[...]`
 
 ```toml

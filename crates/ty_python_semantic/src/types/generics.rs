@@ -2232,11 +2232,13 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // These variables stand for specializations we have yet to choose. Keep
                     // their declared domains intact: materializing `T: Any` to `T: Never`
                     // would incorrectly rule out the valid choice `T = str`.
+                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
+                    // Bound-preserving materialization needs separate transformation caches,
+                    // while retaining the caller's recursion and reconstruction context.
                     let materialization_visitor = ApplyTypeMappingVisitor {
                         materialize_typevar_bounds_and_defaults: false,
-                        ..ApplyTypeMappingVisitor::new(self.env)
+                        ..checker.materialization_visitor.with_fresh_mapping_caches()
                     };
-                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self

@@ -864,30 +864,37 @@ impl<'db> TypeAliasType<'db> {
                 }))
             }
             _ => {
-                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                // will detect the cycle and return the fallback value.
+                // Keep body expansion and materialization inside a single visitor.visit() call.
+                // If the alias refers to itself (as in `type R = int | tuple[R, ...]`), the
+                // visitor detects the cycle and returns the fallback value.
                 let mapped = visitor.visit(db, ty, type_mapping, || {
-                    self.value_type_with_recursion(db, visitor.recursion_context)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                });
+                    let mapped = self
+                        .value_type_with_recursion(db, visitor.recursion_context)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-                // If the type mapping does not result in any change to this type alias, keep the
-                // alias node instead of eagerly expanding it. A recursive backedge also returns
-                // the alias itself, and fully static aliases must retain their original identity.
-                if mapped == ty
-                    || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
-                {
-                    // A recursive backedge retains the unpromoted alias. Capture its stored
-                    // arguments too, so an enclosing constructor can specialize them later.
-                    match visitor.recursive_promotion {
-                        Some(context) => context.unchanged(db, ty),
-                        None => ty,
+                    // If the type mapping does not result in any change to this type alias, keep the
+                    // alias node instead of eagerly expanding it. A recursive backedge also returns
+                    // the alias itself, and fully static aliases must retain their original identity.
+                    if mapped == ty
+                        || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
+                    {
+                        ty
+                    } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
+                        && self.is_recursive(db)
+                    {
+                        Type::TypeAlias(
+                            self.with_materialization_kind(db, Some(*materialization_kind)),
+                        )
+                    } else {
+                        mapped
                     }
-                } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                    && self.is_recursive(db)
+                });
+                // Capture retained alias arguments after visiting so cycle fallbacks take this
+                // path too. An enclosing recursive constructor must be able to specialize them.
+                if mapped == ty
+                    && let Some(context) = visitor.recursive_promotion
                 {
-                    Type::TypeAlias(self.with_materialization_kind(db, Some(*materialization_kind)))
+                    context.unchanged(db, ty)
                 } else {
                     mapped
                 }

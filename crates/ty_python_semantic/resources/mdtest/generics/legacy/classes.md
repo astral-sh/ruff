@@ -3355,8 +3355,8 @@ reveal_type(Box(1).node()[1]()[0])  # revealed: int
 
 ## Disjoint types in recursive lambda returns
 
-The lambda captures a value narrowed to both `T` and `str`. For `Box[int]`, no value can be both `int`
-and `str`, so the first tuple element is assignable to `Never`:
+The lambda captures a value narrowed to both `T` and `str`. For `Box[int]`, no value can be both
+`int` and `str`, so the first tuple element is assignable to `Never`:
 
 ```py
 from typing import Callable, Generic, Never, TypeVar
@@ -3403,8 +3403,8 @@ def excluded_callback(value: Box[int], callback: Callable[[], tuple[Never, objec
 ## Excluding a callable from a recursive return
 
 The recursive lambda returns another callback with a growing type argument. Excluding a callback
-that returns the captured value or `None` still leaves a callable, so the result is not assignable to
-`Never`:
+that returns the captured value or `None` still leaves a callable, so the result is not assignable
+to `Never`:
 
 ```py
 from typing import Final, Generic, Never, TypeVar
