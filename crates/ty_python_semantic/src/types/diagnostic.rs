@@ -5082,7 +5082,7 @@ pub(super) fn report_invalid_method_override<'db>(
     member: &str,
     subclass: ClassType<'db>,
     subclass_definition: Definition<'db>,
-    subclass_function: Option<FunctionType<'db>>,
+    subclass_function: FunctionType<'db>,
     superclass: ClassType<'db>,
     superclass_type: Type<'db>,
     superclass_method_kind: MethodKind,
@@ -5094,23 +5094,18 @@ pub(super) fn report_invalid_method_override<'db>(
         |function: FunctionType<'db>| function.literal(db).last_definition.spans(db).signature;
 
     let subclass_definition_kind = subclass_definition.kind(db);
+    let subclass_definition_signature_span = signature_span(subclass_function);
 
     // If the function was originally defined elsewhere and simply assigned
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
-    let diagnostic_range = if subclass_definition_kind.is_function_def()
-        && let Some(subclass_function) = subclass_function
-    {
-        signature_span(subclass_function)
+    let diagnostic_range = if subclass_definition_kind.is_function_def() {
+        subclass_definition_signature_span
             .range()
             .unwrap_or_else(|| {
                 subclass_function
                     .node(db, context.file(), context.module())
                     .range
             })
-    } else if subclass_definition_kind.is_function_def() {
-        subclass_definition
-            .focus_range(db, context.module())
-            .range()
     } else {
         subclass_definition.full_range(db, context.module()).range()
     };
@@ -5168,11 +5163,9 @@ pub(super) fn report_invalid_method_override<'db>(
 
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    if !subclass_definition_kind.is_function_def()
-        && let Some(subclass_function) = subclass_function
-    {
+    if !subclass_definition_kind.is_function_def() {
         diagnostic.annotate(
-            Annotation::secondary(signature_span(subclass_function))
+            Annotation::secondary(subclass_definition_signature_span)
                 .message(format_args!("Signature of `{class_name}.{member}`")),
         );
     }
