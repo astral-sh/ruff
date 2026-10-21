@@ -22,7 +22,7 @@ impl ScriptProgress {
     pub(crate) fn for_script(
         &self,
         client: &Client,
-        capabilities: ResolvedClientCapabilities,
+        capabilities: &ResolvedClientCapabilities,
         display_path: String,
     ) -> Option<Box<dyn UvSyncProgress>> {
         if !capabilities.supports_work_done_progress() {
@@ -126,11 +126,18 @@ mod tests {
         let (main_loop, actions) = unbounded();
         let (sender, messages) = unbounded();
         let client = Client::new(main_loop, sender);
+        let capabilities = ResolvedClientCapabilities::new(&lsp_types::ClientCapabilities {
+            window: Some(lsp_types::WindowClientCapabilities {
+                work_done_progress: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
         let work_done = LazyWorkDoneProgress::new(
             &client,
             Some(ProgressToken::String("scripts".into())),
             "Synchronizing scripts",
-            ResolvedClientCapabilities::WORK_DONE_PROGRESS,
+            &capabilities,
         );
         let mut state = State {
             total: 2,

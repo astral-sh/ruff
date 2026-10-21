@@ -2,9 +2,11 @@
 source: crates/ty_server/tests/e2e/commands.rs
 expression: response
 ---
-Client capabilities: ResolvedClientCapabilities(
-    WORKSPACE_CONFIGURATION,
-)
+Client capabilities: ResolvedClientCapabilities {
+    flags: ClientCapabilityFlags(
+        WORKSPACE_CONFIGURATION,
+    ),
+}
 Position encoding: UTF16
 Global settings: GlobalSettings {
     diagnostic_mode: OpenFilesOnly,

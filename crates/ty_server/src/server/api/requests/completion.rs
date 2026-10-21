@@ -185,7 +185,7 @@ impl RetriableRequestHandler for CompletionRequestHandler {
 /// so that clients without a handler never receive one.
 fn to_lsp_command(
     command: CompletionCommand,
-    client_capabilities: ResolvedClientCapabilities,
+    client_capabilities: &ResolvedClientCapabilities,
 ) -> Option<Command> {
     match command {
         CompletionCommand::TriggerSignatureHelp => client_capabilities
