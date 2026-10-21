@@ -3006,6 +3006,105 @@ class C:
     }
 
     #[test]
+    fn references_pytest_fixture_from_registered_plugin() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["plugin"]
+                "#,
+            )
+            .site_packages(
+                "plugin.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                def test_use(resource<CURSOR>):
+                    print(resource)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> site-packages/plugin.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+          |
+         ::: src/test_example.py:2:14
+          |
+        2 | def test_use(resource):
+          |              --------
+        3 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
+    fn references_pytest_fixture_reexported_by_registered_plugin() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["plugin"]
+                "#,
+            )
+            .source(
+                "plugin.py",
+                r#"
+                from fixtures import resource
+                "#,
+            )
+            .source(
+                "fixtures.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                def test_use(resource<CURSOR>):
+                    print(resource)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 4 references
+         --> src/fixtures.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+          |
+         ::: src/plugin.py:2:22
+          |
+        2 | from fixtures import resource
+          |                      --------
+          |
+         ::: src/test_example.py:2:14
+          |
+        2 | def test_use(resource):
+          |              --------
+        3 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
     fn references_pytest_fixture_declaration_through_external_stub() {
         let definition_test = external_stub_fixture_definition_cursor_test();
         let import_test = external_stub_fixture_cursor_test(
