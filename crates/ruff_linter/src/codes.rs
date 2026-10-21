@@ -785,6 +785,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pydocstyle, "419") => rules::pydocstyle::rules::EmptyDocstring,
         (Pydocstyle, "420") => rules::pydocstyle::rules::IncorrectSectionOrder,
         (Pydocstyle, "421") => rules::pydocstyle::rules::PropertyDocstringStartsWithVerb,
+        (Pydocstyle, "422") => rules::pydocstyle::rules::DuplicateDocstringSection,
 
         // pep8-naming
         (PEP8Naming, "801") => rules::pep8_naming::rules::InvalidClassName,
