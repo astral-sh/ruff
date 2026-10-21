@@ -590,23 +590,25 @@ impl<'db> GenericAlias<'db> {
             .map(|(generic_typevar, ty)| {
                 // Composition is commutative. Keep the argument on the left so evaluation can
                 // skip the class's potentially expensive equation when the argument is bivariant.
-                ty.variance_of(db, &env, typevar).compose_thunk(db, || {
-                    match generic_typevar.typevar(db).explicit_variance(db) {
-                        Some(explicit_variance)
-                            if generic_typevar.is_paramspec(db)
-                                || generic_typevar.is_typevartuple(db)
-                                || origin.into_protocol_class(db).is_none() =>
-                        {
-                            explicit_variance.into()
+                generic_typevar
+                    .argument_variance(db, &env, *ty, typevar)
+                    .compose_thunk(db, || {
+                        match generic_typevar.typevar(db).explicit_variance(db) {
+                            Some(explicit_variance)
+                                if generic_typevar.is_paramspec(db)
+                                    || generic_typevar.is_typevartuple(db)
+                                    || origin.into_protocol_class(db).is_none() =>
+                            {
+                                explicit_variance.into()
+                            }
+                            Some(explicit_variance) => VarianceTerm::variable(
+                                db,
+                                VarianceOrigin::ProtocolParameter(origin, explicit_variance),
+                                generic_typevar.identity(db),
+                            ),
+                            None => origin.variance_of(db, &env, generic_typevar.identity(db)),
                         }
-                        Some(explicit_variance) => VarianceTerm::variable(
-                            db,
-                            VarianceOrigin::ProtocolParameter(origin, explicit_variance),
-                            generic_typevar.identity(db),
-                        ),
-                        None => origin.variance_of(db, &env, generic_typevar.identity(db)),
-                    }
-                })
+                    })
             });
         VarianceTerm::join(db, variances)
     }

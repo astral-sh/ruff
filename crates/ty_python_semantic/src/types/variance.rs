@@ -3,12 +3,48 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
+        callable::CallableTypeKind,
     },
 };
 
 mod equations;
 
 pub(super) use equations::{VarianceOrigin, VarianceTerm, infer_protocol_variance};
+
+impl<'db> BoundTypeVarInstance<'db> {
+    /// Measure a type argument before composing it with this parameter's variance.
+    ///
+    /// A concrete `ParamSpec` argument stores its parameter list in a callable. Substitution
+    /// extracts that list, so the callable wrapper's contravariance must not contribute again.
+    /// A forwarded `ParamSpec` has no wrapper. Ordinary variance inference retains callable
+    /// contravariance because relations between stored parameter lists compare their signatures.
+    pub(super) fn argument_variance(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument: Type<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        if !self.is_paramspec(db) {
+            return argument.variance_of(db, env, typevar);
+        }
+        match argument {
+            Type::Union(union) => VarianceTerm::join(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|argument| self.argument_variance(db, env, *argument, typevar)),
+            ),
+            Type::Callable(callable) if callable.kind(db) == CallableTypeKind::ParamSpecValue => {
+                argument
+                    .with_polarity(TypeVarVariance::Contravariant)
+                    .variance_of(db, env, typevar)
+            }
+            _ => argument.variance_of(db, env, typevar),
+        }
+    }
+}
 
 impl<'db> StaticClassLiteral<'db> {
     /// Keeps `Self` symbolic while inspecting a class's interface. Substituting `C[T]` would

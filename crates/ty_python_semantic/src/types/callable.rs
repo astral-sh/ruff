@@ -10,7 +10,7 @@ use crate::{
         FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-        TypeVarVariance, UnionType,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::{ActiveRecursionDetector, CycleDetector},
         function::OverloadLiteral,
@@ -980,15 +980,6 @@ impl<'db> CallableType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         match self.signature_source(db) {
-            SignatureSource::Explicit(signatures)
-                if self.kind(db) == CallableTypeKind::ParamSpecValue =>
-            {
-                // This is a parameter list, not a callable. The callable receiving this list
-                // supplies parameter contravariance; counting it here too would reverse it twice.
-                signatures
-                    .with_polarity(TypeVarVariance::Contravariant)
-                    .variance_of(db, env, typevar)
-            }
             SignatureSource::Explicit(signatures) => signatures.variance_of(db, env, typevar),
             SignatureSource::Lambda(lambda) => {
                 VarianceTerm::variable(db, VarianceOrigin::Lambda(*lambda), typevar)

@@ -1585,7 +1585,9 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
                         VarianceOrigin::Recursive(constructor),
                         parameter.identity(db),
                     )
-                    .compose_thunk(db, || argument.variance_of(db, env, typevar))
+                    .compose_thunk(db, || {
+                        parameter.argument_variance(db, env, *argument, typevar)
+                    })
                 }),
         )
     }

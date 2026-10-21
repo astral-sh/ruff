@@ -994,7 +994,9 @@ impl<'db> TypeAliasType<'db> {
             .map(|(alias_typevar, argument_ty)| {
                 raw_value_type
                     .variance_of(db, &env, alias_typevar.identity(db))
-                    .compose_thunk(db, || argument_ty.variance_of(db, &env, typevar))
+                    .compose_thunk(db, || {
+                        alias_typevar.argument_variance(db, &env, *argument_ty, typevar)
+                    })
             });
         VarianceTerm::join(db, variances)
     }

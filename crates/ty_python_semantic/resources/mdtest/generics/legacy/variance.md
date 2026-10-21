@@ -2149,6 +2149,39 @@ static_assert(is_subtype_of(Bound[object], Bound[int]))
 static_assert(not is_subtype_of(Bound[int], Bound[object]))
 ```
 
+## Variance of inferred parameter lists
+
+Inferring a `ParamSpec` from a union of callbacks can produce a union of parameter lists. Every
+alternative below consumes `T`, so the read-only callback attribute makes `Holder` contravariant in
+`T`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Generic, ParamSpec, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P", contravariant=True)
+T = TypeVar("T", infer_variance=True)
+
+class Callback(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def identity(callback: Callback[P]) -> Callback[P]:
+    return callback
+
+class Holder(Generic[T]):
+    def __init__(self, callback: Callback[[T, int]] | Callback[[str, T]]):
+        self.callback: Final = identity(callback)
+
+static_assert(is_subtype_of(Holder[object], Holder[int]))
+static_assert(not is_subtype_of(Holder[int], Holder[object]))
+```
+
 ## Inferred variance for recursive lambdas
 
 A read-only recursive lambda that produces `T` preserves covariance:
