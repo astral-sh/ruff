@@ -73,6 +73,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParameter,
         Rule::IncorrectDocstringSectionOrder,
+        Rule::DuplicateDocstringSection,
         Rule::PropertyDocstringStartsWithVerb,
         Rule::UndocumentedPublicClass,
         Rule::UndocumentedPublicFunction,
@@ -306,6 +307,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::OverIndentedDocstringSectionUnderline,
                 Rule::UndocumentedParameter,
                 Rule::IncorrectDocstringSectionOrder,
+                Rule::DuplicateDocstringSection,
             ]);
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(
