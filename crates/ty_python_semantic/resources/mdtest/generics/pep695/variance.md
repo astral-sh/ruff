@@ -2000,6 +2000,36 @@ static_assert(is_assignable_to(Intersection[C, Not[A]], Intersection[C, Not[B]])
 static_assert(not is_assignable_to(Intersection[C, Not[B]], Intersection[C, Not[A]]))
 ```
 
+## Narrowed enum attributes
+
+Excluding an enum member from an attribute's type does not introduce a dependency on a type
+variable:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+The enum attribute below does not mention `T`. The other attribute is read-only, so `Box` remains
+covariant in `T`:
+
+```py
+class Box[T]:
+    def __init__(self, color: Color, value: T):
+        self.value: Final = value
+        if color is Color.RED:
+            return
+        self.color: Final = color
+
+def upcast(value: Box[int]) -> Box[object]:
+    return value  # no diagnostic
+```
+
 ## Subclass Types (type[T])
 
 The `type[T]` construct represents the type of classes that are subclasses of `T`. It is covariant

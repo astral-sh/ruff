@@ -11056,9 +11056,16 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 ),
                 ty => ty.variance_of(db, env, typevar),
             },
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db, env)
-                .variance_of(db, env, typevar),
+            Type::EnumComplement(complement) => {
+                // Excluded enum literals contain no type variables. Visit the positive
+                // components directly: normalizing their intersection recreates this complement.
+                VarianceTerm::join(
+                    db,
+                    iter::once(complement.enum_class(db).to_non_generic_instance(db, env))
+                        .chain(complement.rest(db).iter().copied())
+                        .map(|ty| ty.variance_of(db, env, typevar)),
+                )
+            }
             Type::PropertyInstance(property_instance_type) => VarianceTerm::join(
                 db,
                 [

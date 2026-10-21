@@ -2122,6 +2122,43 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for narrowed enum attributes
+
+Excluding an enum member from an attribute's type does not introduce a dependency on a type
+variable:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Final, Generic, TypeVar
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+The enum attribute below does not mention `T`. The other attribute is read-only, so `Box` remains
+covariant in `T`:
+
+```py
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    def __init__(self, color: Color, value: T):
+        self.value: Final = value
+        if color is Color.RED:
+            return
+        self.color: Final = color
+
+def upcast(value: Box[int]) -> Box[object]:
+    return value  # no diagnostic
+```
+
 ## Inferred variance for partial functions
 
 Binding an argument with `partial` does not remove that parameter from the callable exposed by
