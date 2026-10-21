@@ -858,7 +858,7 @@ impl<'db> CallableType<'db> {
         }
     }
 
-    pub(crate) fn is_regular(self, db: &'db dyn Db) -> bool {
+    fn is_regular(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::Regular)
     }
 
@@ -943,7 +943,7 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    pub(crate) fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
+    fn into_function_like(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::FunctionLike)
     }
 
