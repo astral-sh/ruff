@@ -106,3 +106,71 @@ B012 `break` inside `finally` blocks cause exceptions to be silenced
 117 |             case 0, *x:
 118 |                 break  # warning
     |                 ^^^^^
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:140:13
+    |
+138 |             pass
+139 |         elif a == 2:
+140 |             return  # warning
+    |             ^^^^^^
+141 |         else:
+142 |             return  # warning
+    |
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:142:13
+    |
+140 |             return  # warning
+141 |         else:
+142 |             return  # warning
+    |             ^^^^^^
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:152:13
+    |
+150 |             pass
+151 |         except ValueError:
+152 |             return  # warning
+    |             ^^^^^^
+153 |         except Exception:
+154 |             pass
+    |
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:156:13
+    |
+154 |             pass
+155 |         else:
+156 |             return  # warning
+    |             ^^^^^^
+157 |         finally:
+158 |             return  # warning
+    |
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:158:13
+    |
+156 |             return  # warning
+157 |         finally:
+158 |             return  # warning
+    |             ^^^^^^
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:168:13
+    |
+166 |             pass
+167 |         else:
+168 |             return  # warning
+    |             ^^^^^^
+169 |
+170 |         for _ in range(1):
+    |
+
+B012 `return` inside `finally` blocks cause exceptions to be silenced
+   --> B012.py:173:13
+    |
+171 |             pass
+172 |         else:
+173 |             return  # warning
+    |             ^^^^^^

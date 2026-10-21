@@ -127,3 +127,48 @@ while True:
                 y = 0
             case 0, *x:
                 pass  # no warning
+
+
+# https://github.com/astral-sh/ruff/issues/29422
+def elif_else_finally(a):
+    try:
+        pass
+    finally:
+        if a == 1:
+            pass
+        elif a == 2:
+            return  # warning
+        else:
+            return  # warning
+
+
+def try_except_finally():
+    try:
+        pass
+    finally:
+        try:
+            pass
+        except ValueError:
+            return  # warning
+        except Exception:
+            pass
+        else:
+            return  # warning
+        finally:
+            return  # warning
+
+
+def loop_else_finally():
+    try:
+        pass
+    finally:
+        while True:
+            pass
+        else:
+            return  # warning
+
+        for _ in range(1):
+            pass
+        else:
+            return  # warning
+

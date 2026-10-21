@@ -72,12 +72,35 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             );
         }
         match stmt {
-            Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
+            Stmt::While(ast::StmtWhile { body, orelse, .. })
+            | Stmt::For(ast::StmtFor { body, orelse, .. }) => {
                 walk_stmt(checker, body, Stmt::is_return_stmt);
+                walk_stmt(checker, orelse, Stmt::is_return_stmt);
             }
-            Stmt::If(ast::StmtIf { body, .. })
-            | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
+            Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => {
+                walk_stmt(checker, body, f);
+                for clause in elif_else_clauses {
+                    walk_stmt(checker, &clause.body, f);
+                }
+            }
+            Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                ..
+            }) => {
+                walk_stmt(checker, body, f);
+                for handler in handlers {
+                    let ast::ExceptHandler::ExceptHandler(handler) = handler;
+                    walk_stmt(checker, &handler.body, f);
+                }
+                walk_stmt(checker, orelse, f);
+            }
+            Stmt::With(ast::StmtWith { body, .. }) => {
                 walk_stmt(checker, body, f);
             }
             Stmt::Match(ast::StmtMatch { cases, .. }) => {
