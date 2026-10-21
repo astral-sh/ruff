@@ -310,6 +310,11 @@ impl<'db> OwnedConstraintSet<'db> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Returns `true` if this constraint set's root is not a terminal.
+    pub(super) fn is_nontrivial(&self) -> bool {
+        !self.node.is_terminal()
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///

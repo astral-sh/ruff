@@ -2749,10 +2749,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let may_contain_typevars = |signature: &Signature<'db>| {
+            signature.generic_context.is_some()
+                || signature
+                    .receiver_constraints()
+                    .is_some_and(|constraints| constraints.assignability.is_nontrivial())
+                || std::iter::once(signature.return_ty)
+                    .chain(signature.parameters.iter().map(Parameter::annotated_type))
+                    .any(|ty| {
+                        // Aliases and recursive types can hide typevars. Avoid expanding them just
+                        // to decide whether to take a fast path.
+                        any_over_type(db, self.env, ty, false, |ty| {
+                            matches!(
+                                ty,
+                                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+                            )
+                        })
+                    })
+        };
+
         // Fast path: If the source is the bottom signature or the target is the top signature,
         // assignability holds no matter what, and we can return without spending the time matching
-        // parameter lists.
-        if source.is_bottom() || target.is_top() {
+        // parameter lists. However, the opposite signature's typevars still need inference
+        // bounds: even `Never ≤ T` or `T ≤ object` can determine an inferred type.
+        if (source.is_bottom() && !may_contain_typevars(target))
+            || (target.is_top() && !may_contain_typevars(source))
+        {
             return self.always();
         }
 

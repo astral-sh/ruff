@@ -298,6 +298,54 @@ reveal_type(generic_context(outside_callable(int_identity)))
 outside_callable(int_identity)("string")
 ```
 
+## Inference from bottom callable signatures
+
+A callable that accepts every argument list and returns `Never` can satisfy any callable signature.
+Its return and parameter types still provide inference evidence: `Never ≤ T` infers `Never`, while
+`T ≤ object` infers `object`.
+
+```py
+from typing import Callable, Never, TypeVar
+
+T = TypeVar("T")
+
+def abort(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+def wrap(callback: Callable[[], T]) -> list[T]:
+    return []
+
+def wrap_param(callback: Callable[[T], object]) -> list[T]:
+    return []
+
+# revealed: list[Never]
+reveal_type(wrap(abort))
+# revealed: list[object]
+reveal_type(wrap_param(abort))
+value: str = wrap_param(abort)[0]  # error: [invalid-assignment]
+```
+
+## Inference from top callable signatures
+
+A callback accepting the top callable accepts any callable. Comparing its parameter with a callable
+returning `T` still contributes `T ≤ object` to inference.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+
+def wrap(callback: Callable[[Callable[[], T]], None]) -> list[T]:
+    return []
+
+def accepts_top(callback: Top[Callable[..., object]]) -> None: ...
+
+# revealed: list[object]
+reveal_type(wrap(accepts_top))
+value: str = wrap(accepts_top)[0]  # error: [invalid-assignment]
+```
+
 ## Union without intersection does not consider budget
 
 A single union upper bound remains precise even when it has more alternatives than the solution
