@@ -191,7 +191,18 @@ pub fn fixture_bindings_for_parameter<'db>(
         }
     }
 
-    // Fourth, search plugins registered through `pytest_plugins` in reverse registration order.
+    // Fourth, search the legacy temporary-directory plugin. Pytest registers it while
+    // configuring, after the core plugins and the plugins named by initial conftests, so it
+    // takes precedence over both. Plugins named by test modules are registered later, but we
+    // don't distinguish them here.
+    if let Some(plugin) = pytest_legacy_tmpdir_plugin(db, request_file.program(db)) {
+        let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(plugin));
+        if !bindings.is_empty() {
+            return bindings;
+        }
+    }
+
+    // Fifth, search plugins registered through `pytest_plugins` in reverse registration order.
     // Their fixtures are visible to the whole session, so conftest fixtures take precedence.
     // https://github.com/pytest-dev/pytest/blob/9.1.1/src/_pytest/fixtures.py#L1776-L1792
     for plugin in pytest_registered_plugin_files(db, request_file)
@@ -208,14 +219,7 @@ pub fn fixture_bindings_for_parameter<'db>(
         }
     }
 
-    // Finally, search installed core plugins in reverse registration order. The legacy
-    // temporary-directory plugin is registered after the static core plugins, so it comes first.
-    if let Some(plugin) = pytest_legacy_tmpdir_plugin(db, request_file.program(db)) {
-        let bindings = bindings_in_search_scope(db, &request, FixtureSearchScope::Class(plugin));
-        if !bindings.is_empty() {
-            return bindings;
-        }
-    }
+    // Finally, search installed core plugins in reverse registration order.
     for plugin in pytest_global_plugin_files(db, request_file.program(db))
         .iter()
         .rev()
@@ -343,8 +347,8 @@ fn pytest_registered_plugin_files<'db>(
         plugins: Vec::new(),
     };
 
-    // Fixtures are only requested from modules that pytest imports, so `request_file`'s own
-    // registrations always apply.
+    // Pytest reads `request_file`'s own registrations when it loads the file as a conftest, test
+    // module, or plugin. As an approximation, we always read them.
     let mut modules = conftest_files(db, request_file);
     modules.reverse();
     modules.push(request_file);
@@ -414,8 +418,9 @@ impl<'db> PytestPluginRegistry<'db> {
 /// Returns the plugin names in `file`'s `pytest_plugins` variable, which pytest accepts as a
 /// sequence of module names or a comma-separated string.
 ///
-/// A conditionally bound variable contributes the names from each binding that may exist at
-/// runtime.
+/// A conditionally bound variable contributes the names from each reachable binding that may exist
+/// at runtime. Bindings in branches that ty treats as unreachable, such as the `else` branch of
+/// `if TYPE_CHECKING:`, are ignored.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn pytest_plugin_names<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Box<[String]> {
     let scope = global_scope(db, file);
@@ -3416,18 +3421,46 @@ def implementation(): ...
     #[test_case("pytest_plugins = []"; "empty list")]
     #[test_case(r#"pytest_plugins = """#; "empty string")]
     #[test_case(r#"pytest_plugins = ["invalid-name", "missing"]"#; "invalid and unresolved names")]
-    #[test_case("def plugins() -> list[str]: ...\npytest_plugins = plugins()"; "dynamic list")]
-    #[test_case("from registry import pytest_plugins"; "imported variable length tuple")]
     #[test_case("if False:\n    pytest_plugins = ['custom_fixtures']"; "unreachable registration")]
     #[test_case("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pytest_plugins = ['custom_fixtures']"; "typing only registration")]
-    #[test_case("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']\nelse:\n    pytest_plugins = ['custom_fixtures']"; "runtime branch hidden by typing guard")]
-    #[test_case("from typing import TYPE_CHECKING\npytest_plugins = ['custom_fixtures']\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']"; "runtime binding hidden by typing reassignment")]
-    #[test_case("plugins = ['custom_fixtures']\npytest_plugins = plugins"; "aliased list")]
-    fn ignores_unavailable_pytest_plugin_registrations(registration: &'static str) {
+    fn ignores_pytest_plugin_registrations_absent_at_runtime(registration: &'static str) {
         let test = PytestTestCase::with_files(
             "/src/test_example.py",
             &[
                 ("/src/conftest.py", registration),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef resource(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(resource): ..."),
+            ],
+        );
+
+        let test_use = test.function("test_use");
+        assert!(
+            fixture_bindings_for_parameter(&test.db, test_use.parameter_definition("resource"))
+                .is_empty()
+        );
+    }
+
+    #[test_case("def plugins() -> list[str]: ...\npytest_plugins = plugins()"; "dynamic list")]
+    #[test_case("plugins = ['custom_fixtures']\npytest_plugins = plugins"; "aliased list")]
+    #[test_case("from shared import pytest_plugins"; "imported list")]
+    #[test_case("from registry import pytest_plugins"; "imported variable length tuple")]
+    #[test_case("pytest_plugins = ['missing']\npytest_plugins += ['custom_fixtures']"; "augmented list")]
+    #[test_case("from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']\nelse:\n    pytest_plugins = ['custom_fixtures']"; "runtime branch hidden by typing guard")]
+    #[test_case("from typing import TYPE_CHECKING\npytest_plugins = ['custom_fixtures']\nif TYPE_CHECKING:\n    pytest_plugins = ['missing']"; "runtime binding hidden by typing reassignment")]
+    fn ignores_pytest_plugin_registrations_that_are_not_statically_known(
+        registration: &'static str,
+    ) {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                // Pytest can register `custom_fixtures` at runtime in each case, but the value is
+                // computed, follows a list defined elsewhere, or is bound in a branch that ty
+                // treats as unreachable.
+                ("/src/conftest.py", registration),
+                ("/src/shared.py", "pytest_plugins = ['custom_fixtures']"),
                 (
                     "/src/registry.py",
                     "def plugins() -> tuple[str, ...]: ...\npytest_plugins = plugins()",
@@ -3565,6 +3598,30 @@ def test_use(resource, nested_only, conftest_override, module_override, core_val
             "module_override",
         );
         test_use.assert_fixture("core_value", "/src/second.py", "core_value");
+    }
+
+    #[test]
+    fn legacy_tmpdir_plugin_takes_precedence_over_conftest_pytest_plugins() {
+        let test = PytestTestCase::with_files(
+            "/src/test_example.py",
+            &[
+                (
+                    "/src/conftest.py",
+                    r#"pytest_plugins = ["custom_fixtures"]"#,
+                ),
+                (
+                    "/src/custom_fixtures.py",
+                    "import pytest\n@pytest.fixture\ndef tmpdir(): ...",
+                ),
+                ("/src/test_example.py", "def test_use(tmpdir): ..."),
+            ],
+        );
+
+        test.function("test_use").assert_fixture(
+            "tmpdir",
+            "/.venv/lib/python3.13/site-packages/_pytest/legacypath.py",
+            "LegacyTmpdirPlugin.tmpdir",
+        );
     }
 
     #[test]

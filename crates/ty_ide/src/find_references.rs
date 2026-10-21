@@ -3050,6 +3050,65 @@ class C:
     }
 
     #[test]
+    fn references_pytest_fixture_declared_in_registered_plugin() {
+        let mut builder = pytest_cursor_test_builder();
+        let test = builder
+            .source(
+                "conftest.py",
+                r#"
+                pytest_plugins = ["plugin"]
+                "#,
+            )
+            .source(
+                "plugin.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource<CURSOR>(): ...
+                "#,
+            )
+            .source(
+                "test_example.py",
+                r#"
+                def test_use(resource):
+                    print(resource)
+                "#,
+            )
+            .source(
+                "nested/conftest.py",
+                r#"
+                import pytest
+
+                @pytest.fixture
+                def resource(): ...
+                "#,
+            )
+            .source(
+                "nested/test_nested.py",
+                r#"
+                def test_nested(resource): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 3 references
+         --> src/plugin.py:5:5
+          |
+        5 | def resource(): ...
+          |     --------
+          |
+         ::: src/test_example.py:2:14
+          |
+        2 | def test_use(resource):
+          |              --------
+        3 |     print(resource)
+          |           --------
+        ");
+    }
+
+    #[test]
     fn references_pytest_fixture_reexported_by_registered_plugin() {
         let mut builder = pytest_cursor_test_builder();
         let test = builder
