@@ -34,6 +34,15 @@ env:
   MDTEST_EXTERNAL: "1"
 
 jobs:
+  reserve-report-index:
+    if: >-
+      github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    uses: astral-sh/ruff/.github/workflows/pull-request-comment.yml@0af2225c3f856febae48eb0ba538b13f5ceef422
+    permissions:
+      contents: read
+      id-token: write
+
   security-review:
     needs: determine_changes
     if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
