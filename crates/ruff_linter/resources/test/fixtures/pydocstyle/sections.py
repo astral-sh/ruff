@@ -630,3 +630,39 @@ def another_valid_google_style_docstring(a: str) -> str:
 
     """
     return a
+
+
+# https://github.com/astral-sh/ruff/issues/29512
+def doctest_section_like_output():
+    """Summary.
+
+    Examples
+    --------
+    >>> xr.Variable("x", [1, 2], attrs={"a": 1})
+    <xarray.Variable (x: 2)> Size: 16B
+    array([1, 2])
+    Attributes:
+        a:        1
+
+    Returns
+    -------
+    None
+
+    """
+
+
+def doctest_section_like_output_google():
+    """Summary.
+
+    Examples:
+        >>> xr.Variable("x", [1, 2], attrs={"a": 1})
+        <xarray.Variable (x: 2)> Size: 16B
+        array([1, 2])
+        Attributes:
+            a:        1
+
+    Returns:
+        None
+
+    """
+

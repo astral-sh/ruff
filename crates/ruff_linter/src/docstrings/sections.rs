@@ -160,6 +160,11 @@ impl<'a> SectionContexts<'a> {
         // See: https://github.com/astral-sh/ruff/issues/23562
         let mut directive_indent = None;
 
+        // Track doctest blocks (e.g. `>>> foo()`). Doctest prompts and their expected output
+        // continue until the next blank line or dedentation.
+        // See: https://github.com/astral-sh/ruff/issues/29512
+        let mut doctest_indent = None;
+
         while let Some(line) = lines.next() {
             let indent = leading_space(&line);
             let indent_size = indent.text_len();
@@ -177,6 +182,21 @@ impl<'a> SectionContexts<'a> {
                 directive_indent = Some(indent_size);
                 previous_line = Some(line);
                 continue;
+            }
+
+            if line.trim_start().starts_with(">>>") {
+                doctest_indent = Some(indent_size);
+                previous_line = Some(line);
+                continue;
+            }
+
+            if let Some(active_indent) = doctest_indent {
+                if line.trim().is_empty() || indent_size < active_indent {
+                    doctest_indent = None;
+                } else {
+                    previous_line = Some(line);
+                    continue;
+                }
             }
 
             if let Some(section_kind) = suspected_as_section(&line, style) {
