@@ -1119,13 +1119,13 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Type::FunctionLiteral(subclass_function) = member.ty else {
-                continue;
-            };
+            let subclass_function = member.ty.as_function_literal();
 
             // Constructor signatures may differ unless `@override` requests compatibility.
             if is_constructor_like_method(&member.name)
-                && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+                && subclass_function.is_none_or(|function| {
+                    !function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
+                })
             {
                 continue;
             }
@@ -1253,8 +1253,8 @@ fn check_class_declaration<'db>(
 }
 
 /// Look up `__new__` on the class so generated and decorated callables retain `cls`
-/// until they are bound for the override comparison. Hashing ignores instance storage
-/// and binds descriptors on the class, as for implicit calls to `__hash__`.
+/// until they are bound for the override comparison. Dunder methods ignore instance
+/// storage and bind descriptors on the class, as for implicit operator calls.
 fn lookup_override_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1263,7 +1263,15 @@ fn lookup_override_member<'db>(
 ) -> PlaceAndQualifiers<'db> {
     if name == "__new__" {
         class.class_member(db, env, name, MemberLookupPolicy::default())
-    } else if name == "__hash__" {
+    } else if name == "__hash__"
+        || name.starts_with("__")
+            && name.ends_with("__")
+            && class
+                .class_member(db, env, name, MemberLookupPolicy::default())
+                .place
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| attributes::is_method_type(db, ty))
+    {
         Type::instance(db, env, class).member_lookup_with_policy(
             db,
             env,
