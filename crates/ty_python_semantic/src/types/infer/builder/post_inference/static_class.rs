@@ -29,13 +29,13 @@ use crate::{
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
-            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
-            report_duplicate_bases, report_inconsistent_generic_bases,
-            report_instance_layout_conflict, report_invalid_attribute_assignment,
-            report_invalid_named_tuple_field_qualifier, report_invalid_or_unsupported_base,
-            report_invalid_total_ordering, report_invalid_type_param_order,
-            report_invalid_typevar_default_reference, report_missing_type_arguments,
-            report_named_tuple_field_with_leading_underscore,
+            UNTYPED_FINAL_FIELD, report_bad_frozen_dataclass_inheritance,
+            report_conflicting_metaclass_from_bases, report_duplicate_bases,
+            report_inconsistent_generic_bases, report_instance_layout_conflict,
+            report_invalid_attribute_assignment, report_invalid_named_tuple_field_qualifier,
+            report_invalid_or_unsupported_base, report_invalid_total_ordering,
+            report_invalid_type_param_order, report_invalid_typevar_default_reference,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -1017,8 +1017,8 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    // Check that a dataclass does not have more than one `KW_ONLY`
-    // and that required fields are defined before default fields.
+    // Validate dataclass fields after the whole class body has been inferred, so defaults
+    // assigned separately from their declarations are available.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
         CodeGeneratorKind::from_class(db, class.into())
     {
@@ -1026,6 +1026,27 @@ pub(crate) fn check_static_class_definitions<'db>(
         let class_init = class.has_dataclass_param(db, field_policy, DataclassFlags::INIT);
         let own_fields = class.own_fields(db, specialization, field_policy);
 
+        for (name, field) in own_fields {
+            if matches!(
+                field.kind,
+                FieldKind::Dataclass {
+                    default_ty: None,
+                    converter: None,
+                    ..
+                }
+            ) && let Some(definition) = field.first_declaration
+                && let Some(range) = infer_definition_types(db, definition).bare_final_annotation()
+                && let Some(builder) = context.report_lint(&UNTYPED_FINAL_FIELD, range)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Cannot infer the type of final field `{name}`"
+                ));
+                diagnostic.help("Add a type argument to `Final` or provide a default value");
+            }
+        }
+
+        // Check that a dataclass does not have more than one `KW_ONLY`
+        // and that required fields are defined before default fields.
         let kw_only_sentinel_fields: Vec<_> = own_fields
             .iter()
             .filter_map(|(name, field)| field.is_kw_only_sentinel(db).then_some(name))

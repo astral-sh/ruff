@@ -20,7 +20,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
-use crate::types::infer::builder::annotation_expression::PEP613Policy;
+use crate::types::infer::builder::annotation_expression::{
+    AnnotationExpressionInference, PEP613Policy,
+};
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
 use crate::types::special_form::AliasSpec;
@@ -326,7 +328,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map_or(Type::unknown(), |inferred| {
                             Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
                                 db,
-                                inferred.inner_type(),
+                                inferred.annotation_ty.inner_type(),
                             )))
                         }));
                 }
@@ -2523,7 +2525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         subscript_context: AnnotatedExprContext,
-    ) -> Option<TypeAndQualifiers<'db>> {
+    ) -> Option<AnnotationExpressionInference<'db>> {
         let slice = &*subscript.slice;
         let arguments = match slice {
             ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
@@ -2703,11 +2705,11 @@ impl AnnotatedExprContext {
         self,
         builder: &mut TypeInferenceBuilder<'db, '_>,
         argument: &ast::Expr,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         match self {
-            AnnotatedExprContext::TypeExpression => {
-                TypeAndQualifiers::declared(builder.infer_type_expression(argument))
-            }
+            AnnotatedExprContext::TypeExpression => AnnotationExpressionInference::new(
+                TypeAndQualifiers::declared(builder.infer_type_expression(argument)),
+            ),
             AnnotatedExprContext::AnnotationExpression => {
                 builder.infer_annotation_expression_impl(argument, PEP613Policy::Disallowed)
             }
