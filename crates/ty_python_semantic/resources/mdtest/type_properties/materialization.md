@@ -187,6 +187,23 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
     reveal_type(bottom)
 ```
 
+## Recursive lambdas
+
+A top materialization replaces a returned `Any` with `object`, including when we reach the value
+through a recursive lambda reference:
+
+```py
+from typing import Any
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+value: Any = None
+node = lambda: (value, node)
+
+def _(top: Top[TypeOf[node]]):
+    reveal_type(top()[1]()[0])  # revealed: object
+```
+
 ## `TypeIs`
 
 `TypeIs` is invariant in its type argument, and so the top and bottom materializations of

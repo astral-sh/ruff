@@ -273,13 +273,9 @@ class Base(Generic[B]):
 
 ## Parameter default values
 
-This is a regression test for <https://github.com/astral-sh/ty/issues/1402>. When a parameter has a
-default value that references the callable itself, we currently prevent infinite recursion by simply
-falling back to `Unknown` for the type of the default value, which does not have any practical
-impact except for the displayed type. We could also consider inferring `Divergent` when we encounter
-too many layers of nesting (instead of just one), but that would require a type traversal which
-could have performance implications. So for now, we mainly make sure not to panic or stack overflow
-for these seemingly rare cases.
+A parameter's default value can refer back to the callable through an instance attribute. We can
+infer and display these callables without expanding their defaults indefinitely. This is a
+regression test for <https://github.com/astral-sh/ty/issues/1402>.
 
 ### Functions
 
@@ -323,25 +319,24 @@ class D:
 
 ### Lambdas
 
+A lambda can return its default value. Calling the returned lambda preserves its parameter list:
+
 ```py
 class C:
     def f(self: "C"):
         self.a = lambda positional=self.a: positional
         self.b = lambda *, kw_only=self.b: kw_only
         self.c = lambda positional_only=self.c, /: positional_only
-        self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=...) -> Unknown | ((positional=...) -> Unknown | ((positional=...) -> Divergent))
+        # revealed: (positional=...) -> Unknown | ((positional=...) -> Unknown | ((positional=...) -> ...))
         reveal_type(self.a)
+        self.a()()()(1, 2)  # error: [too-many-positional-arguments]
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent))
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | ((*, kw_only=...) -> ...))
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Divergent))
+        # revealed: (positional_only=..., /) -> Unknown | ((positional_only=..., /) -> Unknown | ((positional_only=..., /) -> ...))
         reveal_type(self.c)
-
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent))
-        reveal_type(self.d)
 ```
 
 ### Self-referential decorated functions

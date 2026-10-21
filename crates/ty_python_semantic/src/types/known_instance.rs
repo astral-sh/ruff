@@ -380,6 +380,23 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     }
 }
 
+/// Visits stored inputs that a type mapping can rewrite, in addition to the callable interface.
+///
+/// A partial's callable interface is its reduced signature. Its `func` attribute also retains
+/// the original callable, which dependency and specialization analyses must inspect.
+pub(super) fn walk_known_instance_storage<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    known_instance: KnownInstanceType<'db>,
+    visitor: &V,
+) {
+    if let KnownInstanceType::FunctoolsPartial(partial)
+    | KnownInstanceType::FunctoolsPartialCall(partial) = known_instance
+    {
+        visitor.visit_type(db, partial.wrapped(db).inner(db));
+    }
+    walk_known_instance_type(db, known_instance, visitor);
+}
+
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
     fn variance_of(
         self,
@@ -394,6 +411,16 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
             KnownInstanceType::MethodWrapper(wrapper) => {
                 wrapper.wrapped(db).variance_of(db, env, typevar)
             }
+            KnownInstanceType::FunctoolsPartial(partial)
+            | KnownInstanceType::FunctoolsPartialCall(partial) => VarianceTerm::join(
+                db,
+                [
+                    // `func` exposes the original callable in addition to the reduced
+                    // signature used when calling the partial.
+                    partial.wrapped(db).inner(db).variance_of(db, env, typevar),
+                    partial.partial(db).variance_of(db, env, typevar),
+                ],
+            ),
             _ => VarianceTerm::BIVARIANT,
         }
     }
@@ -618,6 +645,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
@@ -919,10 +947,15 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
             let value_expr_types = match *self._value_expr_types(db) {
-                Some([first, second]) if type_mapping.is_structural() => Some([
-                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ]),
+                Some([first, second])
+                    if type_mapping.is_structural()
+                        || matches!(type_mapping, TypeMapping::NormalizeSets) =>
+                {
+                    Some([
+                        first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ])
+                }
                 value_expr_types => value_expr_types,
             };
 

@@ -20,7 +20,7 @@ use crate::types::{
     function::{FunctionType, walk_function_type},
     generics::walk_specialization_types,
     instance::{walk_nominal_instance_type, walk_protocol_instance_type},
-    known_instance::walk_known_instance_type,
+    known_instance::{walk_known_instance_storage, walk_known_instance_type},
     method::{walk_bound_method_type, walk_method_wrapper_type},
     newtype::{NewType, walk_newtype_instance_type},
     protocol_class::walk_protocol_instance_interface,
@@ -151,7 +151,9 @@ pub(crate) trait TypeVisitor<'db> {
         if self.should_visit_lazy_type_attributes() {
             self.visit_type(
                 db,
-                recursive.unfold(db, self.program_environment()).into_type(),
+                recursive
+                    .unfold_structurally(db, self.program_environment())
+                    .into_type(),
             );
         } else {
             self.notify_skipped_lazy_type_attributes();
@@ -557,14 +559,12 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
-            if matches!(self.mode, DynamicContentMode::Materialization)
-                && let KnownInstanceType::FunctoolsPartial(partial)
-                | KnownInstanceType::FunctoolsPartialCall(partial) = known
-            {
-                // Materialization maps both the reduced signature and the wrapped callable.
-                self.visit_type(db, partial.wrapped(db).inner(db));
+            if !self.content.get().is_absent() {
+                return;
             }
-            if self.content.get().is_absent() {
+            if matches!(self.mode, DynamicContentMode::Materialization) {
+                walk_known_instance_storage(db, known, self);
+            } else {
                 walk_known_instance_type(db, known, self);
             }
         }
@@ -595,7 +595,7 @@ pub(super) fn dynamic_content_impl<'db>(
             self.active_recursive_types.visit(
                 &recursive.constructor(db),
                 || self.record(DynamicContent::Indeterminate),
-                || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                || self.visit_type(db, recursive.unfold_structurally(db, self.env).into_type()),
             );
         }
 
@@ -716,7 +716,7 @@ pub(super) fn contains_growing_type<'db>(
                 && matches!(
                     ty.to_type_identity(db),
                     TypeIdentity::GrowingTypeAlias(_)
-                        | TypeIdentity::GrowingRecursive(_)
+                        | TypeIdentity::GrowingRecursive(..)
                         | TypeIdentity::GrowingProtocol(_)
                         | TypeIdentity::GrowingTypedDict(_)
                 )
@@ -965,7 +965,7 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                             search(
                                 db,
                                 env,
-                                recursive.unfold(db, env).into_type(),
+                                recursive.unfold_structurally(db, env).into_type(),
                                 query,
                                 active_aliases,
                             )

@@ -35,7 +35,7 @@ use crate::types::visitor::{
     dynamic_content_impl, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
+    ApplyTypeMappingVisitor, BindingContext, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
     VarianceTerm,
 };
@@ -1527,6 +1527,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
+        if let (NominalInstanceInner::ExactTuple(left), NominalInstanceInner::ExactTuple(right)) =
+            (left.0, right.0)
+        {
+            // Both instances have the builtin tuple class, so only their lengths and elements
+            // can prove disjointness. Converting them to classes would also construct element
+            // unions, starting fresh comparisons of potentially recursive elements.
+            return self.check_tuple_type_pair(db, left, right);
+        }
         let env = self.env;
         if let Some(left_spec) = left.tuple_spec(db, env)
             && let Some(right_spec) = right.tuple_spec(db, env)
@@ -1654,7 +1662,15 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
-        self.class(db, env).variance_of(db, env, typevar)
+        let class = self.class(db, env);
+        // Without specialization arguments, a nominal instance cannot contain a variable
+        // bound by another definition. Its absence does not need a variance equation.
+        if let ClassType::NonGeneric(ClassLiteral::Static(origin)) = class
+            && typevar.binding_context != BindingContext::Definition(origin.definition(db))
+        {
+            return VarianceTerm::BIVARIANT;
+        }
+        class.variance_of(db, env, typevar)
     }
 }
 

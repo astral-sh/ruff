@@ -441,6 +441,31 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Variance of inferred parameter lists
+
+Inferring a `ParamSpec` from a union of callbacks can produce a union of parameter lists. Every
+alternative below consumes `T`, so the read-only callback attribute makes `Holder` contravariant in
+`T`:
+
+```py
+from typing import Final, Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callback[**P](Protocol):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def identity[**P](callback: Callback[P]) -> Callback[P]:
+    return callback
+
+class Holder[T]:
+    def __init__(self, callback: Callback[[T, int]] | Callback[[str, T]]):
+        self.callback: Final = identity(callback)
+
+static_assert(is_subtype_of(Holder[object], Holder[int]))
+static_assert(not is_subtype_of(Holder[int], Holder[object]))
+```
+
 ## Recursive lambda variance
 
 A read-only recursive lambda that produces `T` preserves covariance:
@@ -472,6 +497,22 @@ static_assert(is_subtype_of(Consumer[object], Consumer[int]))
 static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
 ```
 
+Substituting a parameter list for a `ParamSpec` preserves this direction. The captured callback
+accepts `T`, so `Forwarder` is contravariant in `T`:
+
+```py
+class Callbacks[**P]:
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Forwarder[T]:
+    def __init__(self, callback: Callable[[T], None]):
+        self.node: Final = Callbacks[[T]](callback).node
+
+static_assert(is_subtype_of(Forwarder[object], Forwarder[int]))
+static_assert(not is_subtype_of(Forwarder[int], Forwarder[object]))
+```
+
 Returning a callable that both accepts and returns `T` makes it invariant:
 
 ```py
@@ -481,6 +522,33 @@ class Transformer[T]:
 
 static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
 static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Redundant union elements in recursive lambda returns
+
+A recursive lambda can capture a callback whose return type contains a union:
+
+```py
+from typing import Callable, Final
+
+class Parent: ...
+class Child(Parent): ...
+
+class Box[Q]:
+    def __init__(self, callback: Callable[[], list[Q | Parent]]):
+        self.node = lambda: (callback, self.node)
+```
+
+When `Q` is replaced with a type variable bounded by `Parent`, the union simplifies to `Parent`. The
+callback below therefore returns `list[Parent]`, so it does not make `View` invariant in `T`:
+
+```py
+class View[T: Parent]:
+    def __init__(self, box: Box[T]):
+        self.callback: Final = box.node()[0]
+
+def upcast(value: View[Child]) -> View[Parent]:
+    return value  # no diagnostic
 ```
 
 ## Writable recursive lambda attributes
@@ -1391,6 +1459,44 @@ static_assert(is_subtype_of(Callbacks[object], Callbacks[int]))
 static_assert(not is_subtype_of(Callbacks[int], Callbacks[object]))
 ```
 
+## Partial functions
+
+Binding an argument with `partial` does not remove that parameter from the callable exposed by
+`func`. `Bound[T]` is therefore contravariant in `T`, even though calling `callback` takes no
+arguments:
+
+```py
+from functools import partial
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Bound[T]:
+    def __init__(self, callback: Callable[[T], None], value: T):
+        self.callback: Final = partial(callback, value)
+
+static_assert(is_subtype_of(Bound[object], Bound[int]))
+static_assert(not is_subtype_of(Bound[int], Bound[object]))
+```
+
+## Recursive lambda return types
+
+Each recursive call wraps the captured value in a list. That mutable list makes `Branch` invariant,
+even though `node` is read-only:
+
+```py
+from typing import Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Branch[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (Branch([value]).node, value)
+
+static_assert(not is_subtype_of(Branch[int], Branch[object]))
+static_assert(not is_subtype_of(Branch[object], Branch[int]))
+```
+
 ## Tuple elements
 
 Tuples are covariant in each element type. A class that accepts `tuple[T, object]` is therefore
@@ -1892,6 +1998,36 @@ static_assert(not is_subtype_of(Intersection[C, Not[B]], Intersection[C, Not[A]]
 
 static_assert(is_assignable_to(Intersection[C, Not[A]], Intersection[C, Not[B]]))
 static_assert(not is_assignable_to(Intersection[C, Not[B]], Intersection[C, Not[A]]))
+```
+
+## Narrowed enum attributes
+
+Excluding an enum member from an attribute's type does not introduce a dependency on a type
+variable:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+The enum attribute below does not mention `T`. The other attribute is read-only, so `Box` remains
+covariant in `T`:
+
+```py
+class Box[T]:
+    def __init__(self, color: Color, value: T):
+        self.value: Final = value
+        if color is Color.RED:
+            return
+        self.color: Final = color
+
+def upcast(value: Box[int]) -> Box[object]:
+    return value  # no diagnostic
 ```
 
 ## Subclass Types (type[T])

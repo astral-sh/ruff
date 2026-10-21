@@ -4478,3 +4478,21 @@ class BoundedSetter(Base):
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
+
+## Recursive lambdas with constrained type variables
+
+Putting a recursive lambda in a list preserves the constraints on its captured type variables. For
+`T` constrained to `int` or `Any`, `Bottom[T]` allows only `int`.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+T = TypeVar("T", int, Any)
+
+def check(value: Bottom[T]) -> None:
+    callback = lambda: (value, callback)
+    promoted = [callback][0]
+    static_assert(is_subtype_of(TypeOf[promoted()[0]], int))
+```

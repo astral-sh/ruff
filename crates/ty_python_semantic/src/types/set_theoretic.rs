@@ -8,10 +8,11 @@ use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy, TypeOrigin,
 };
 use crate::types::class::KnownClass;
+use crate::types::cyclic::TypeTransformer;
 use crate::types::enums::EnumComplement;
 use crate::types::{
     ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    TypeMapping, TypePair, TypeQualifiers, TypeRecursionContext,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -137,18 +138,33 @@ impl<'db> UnionType<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         // Relation checks expand the same target union for many different source types.
-        self.cached_expand_aliases(db, env.program(db))
+        self.cached_expand_aliases(db, env.program(db), false)
+    }
+
+    /// Normalize aliases that expose union alternatives while retaining recursive constructors.
+    /// Comparing a recursive alternative must install its own guard before opening its body.
+    pub(super) fn normalize_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.cached_expand_aliases(db, env.program(db), true)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program| {
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, program, _| {
             result.cycle_normalized(db, &ProgramEnvironment::from_program(program), *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn cached_expand_aliases(self, db: &'db dyn Db, program: Program<'db>) -> Type<'db> {
+    fn cached_expand_aliases(
+        self,
+        db: &'db dyn Db,
+        program: Program<'db>,
+        preserve_recursive_aliases: bool,
+    ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(program);
         // Expose both alias forms without expanding aliases inside containers during reduction.
         let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
@@ -160,6 +176,15 @@ impl<'db> UnionType<'db> {
             }
             match element.resolve_type_alias(db) {
                 Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+                _ if preserve_recursive_aliases
+                    && match element {
+                        Type::Recursive(_) => true,
+                        Type::TypeAlias(alias) => alias.is_recursive(db),
+                        _ => false,
+                    } =>
+                {
+                    builder.add_in_place(element);
+                }
                 resolved => builder.add_in_place(resolved),
             }
         }
@@ -275,6 +300,51 @@ impl<'db> UnionType<'db> {
         Some(builder.build())
     }
 
+    /// Rebuild a union in an open recursive body without inspecting its types.
+    /// Substitution can make distinct alternatives identical, so flattening and exact
+    /// deduplication keep the constructor representation stable across inference cycles.
+    fn from_open_elements(
+        db: &'db dyn Db,
+        elements: impl IntoIterator<Item = Type<'db>>,
+        mut recursively_defined: RecursivelyDefined,
+    ) -> Type<'db> {
+        let mut pending = elements.into_iter().collect::<Vec<_>>();
+        pending.reverse();
+        let mut elements = FxOrderSet::default();
+        while let Some(element) = pending.pop() {
+            match element {
+                Type::Union(union) => {
+                    recursively_defined = recursively_defined.or(union.recursively_defined(db));
+                    pending.extend(union.elements(db).iter().rev().copied());
+                }
+                Type::Never => {}
+                Type::LiteralValue(literal) => {
+                    recursively_defined = recursively_defined.or(literal.recursively_defined());
+                    elements.insert(element);
+                }
+                _ => {
+                    elements.insert(element);
+                }
+            }
+        }
+        let elements = elements
+            .into_iter()
+            .map(|element| match element {
+                Type::LiteralValue(literal) => {
+                    literal.with_recursively_defined(recursively_defined).into()
+                }
+                _ => element,
+            })
+            .collect::<FxOrderSet<_>>()
+            .into_iter()
+            .collect::<Box<[_]>>();
+        match elements.as_ref() {
+            [] => Type::Never,
+            [element] => *element,
+            _ => Type::Union(Self::new(db, elements, recursively_defined)),
+        }
+    }
+
     /// Map the union's elements, preserving open bodies during structural substitutions.
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
@@ -283,17 +353,35 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            Type::Union(UnionType::new(
-                db,
-                self.elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                self.recursively_defined(db),
-            ))
+        if matches!(type_mapping, TypeMapping::NormalizeSets) {
+            let mut builder = UnionBuilder::new(db, visitor.env)
+                .unpack_aliases(false)
+                .or_recursively_defined(self.recursively_defined(db));
+            for element in self.elements(db) {
+                builder.add_in_place(element.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+            }
+            builder.build()
+        } else if type_mapping.is_structural() {
+            let elements = self.elements(db);
+            let mapped = elements
+                .iter()
+                .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect::<Vec<_>>();
+            if mapped.as_slice() == elements {
+                return Type::Union(self);
+            }
+            Self::from_open_elements(db, mapped, self.recursively_defined(db))
         } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
+            let mut builder = UnionBuilder::new(db, visitor.env).unpack_aliases(false);
+            if visitor.structural_reconstruction.get() {
+                builder = builder.structural();
+            }
+            self.map_with_builder(db, builder, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             })
         }
@@ -318,6 +406,19 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_with_builder(
+            db,
+            UnionBuilder::new(db, env).unpack_aliases(false),
+            transform_fn,
+        )
+    }
+
+    fn map_with_builder(
+        self,
+        db: &'db dyn Db,
+        mut builder: UnionBuilder<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let elements = self.elements(db);
@@ -325,7 +426,6 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
@@ -914,6 +1014,58 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
     }
 }
 
+struct NormalizeIntersectionAliases;
+
+fn normalize_intersection_aliases<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    context: Option<&TypeRecursionContext<'db>>,
+    visitor: &TypeTransformer<'db, NormalizeIntersectionAliases>,
+) -> Type<'db> {
+    match ty {
+        Type::TypeAlias(alias) => visitor.visit_type(db, ty, || {
+            // Keep recursive heads closed. The transformer also returns the original alias
+            // if normalization revisits an active type, including growing specializations.
+            if alias.is_recursive(db) {
+                ty
+            } else {
+                normalize_intersection_aliases(
+                    db,
+                    env,
+                    alias.value_type_with_recursion(db, context),
+                    context,
+                    visitor,
+                )
+            }
+        }),
+        Type::Union(union) => {
+            let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+            for element in union.elements(db) {
+                builder.add_in_place(normalize_intersection_aliases(
+                    db, env, *element, context, visitor,
+                ));
+            }
+            builder.build()
+        }
+        Type::Intersection(intersection) => {
+            let mut builder = IntersectionBuilder::new(db, env).preserve_positive_aliases(true);
+            for positive in intersection.positive(db) {
+                builder.add_positive_in_place(normalize_intersection_aliases(
+                    db, env, *positive, context, visitor,
+                ));
+            }
+            for negative in intersection.negative(db) {
+                builder.add_negative_in_place(normalize_intersection_aliases(
+                    db, env, *negative, context, visitor,
+                ));
+            }
+            builder.build()
+        }
+        _ => ty,
+    }
+}
+
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
     /// Returns whether a direct positive or negative element is a type alias.
@@ -923,6 +1075,22 @@ impl<'db> IntersectionType<'db> {
             .chain(self.negative(db))
             .copied()
             .any(Type::is_alias_like)
+    }
+
+    /// Simplify a completed specialization without opening recursive constructors.
+    pub(super) fn normalize_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: Option<&TypeRecursionContext<'db>>,
+    ) -> Type<'db> {
+        normalize_intersection_aliases(
+            db,
+            env,
+            Type::Intersection(self),
+            context,
+            &TypeTransformer::default(),
+        )
     }
 
     /// Normalize direct aliases without expanding aliases nested inside containers.
@@ -1137,6 +1305,9 @@ impl<'db> IntersectionType<'db> {
         } else {
             let mut builder =
                 IntersectionBuilder::new(db, visitor.env).preserve_positive_aliases(true);
+            if visitor.structural_reconstruction.get() {
+                builder = builder.structural();
+            }
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,

@@ -1542,6 +1542,50 @@ callback = identity(lambda: callback)
 callback()  # no diagnostic
 ```
 
+## Recursive aliases with unused type arguments
+
+`T` appears only in the next reference to `Callback`, so it does not change the callable's
+signature. A lambda that returns itself satisfies the alias even as that unused argument grows:
+
+```py
+from typing import Callable
+
+type Callback[T] = Callable[[], Callback[list[T]]]
+
+callback = lambda: callback
+expected: Callback[int] = callback  # no diagnostic
+```
+
+## Recursive aliases with changing return values
+
+Here `U` remains unused, but `T` occurs in the returned tuple, so its changing argument affects
+later calls. After the first call, the alias requires a list; a lambda whose first tuple element is
+always `1` is incompatible:
+
+```py
+from typing import Callable
+
+type Callback[T, U] = Callable[[], tuple[T, Callback[list[T], list[U]]]]
+
+callback = lambda: (1, callback)
+expected: Callback[int, int] = callback  # error: [invalid-assignment]
+```
+
+## Recursive lambdas with different later returns
+
+Matching the first returned value does not make two recursive callables compatible. The later call
+returns a string where the other callable still returns `T`:
+
+```py
+from ty_extensions._internal import TypeOf
+
+def check[T](value: T):
+    keep = lambda: (value, keep)
+    wrong = lambda: ("wrong", wrong)
+    delayed = lambda: (value, wrong)
+    target: TypeOf[keep] = delayed  # error: [invalid-assignment]
+```
+
 ## Recursive lambdas with an incompatible return
 
 Each recursive call described by this alias changes its type argument. A lambda that can return a
@@ -1555,4 +1599,26 @@ type Callback[T] = Callable[[], Callback[list[T]] | T]
 def check(flag: bool):
     callback = lambda: callback if flag else "wrong"
     invalid: Callback[int] = callback  # error: [invalid-assignment]
+```
+
+## Recursive callable bounds with defaults
+
+A type parameter's default does not permit an incompatible return type. This lambda can return a
+string, so it does not satisfy the recursive callable bound:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+
+type Callback[T] = Callable[[T], Callback[list[T]] | T]
+
+def identity[T: Callback[int] = Callback[int]](value: T) -> T:
+    return value
+
+def check(flag: bool):
+    callback = lambda value: identity(callback) if flag else "wrong"  # error: [invalid-argument-type]
 ```

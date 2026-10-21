@@ -2731,6 +2731,48 @@ def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int
 call_factory(my_factory)
 ```
 
+## Passing an overloaded constructor through `Concatenate`
+
+A vector can accept either an iterable of elements or individual elements. Its mutable element type
+is invariant:
+
+```py
+from collections.abc import Callable, Iterable, Iterator
+from typing import Concatenate, Self, overload
+
+class Vec[T]:
+    @overload
+    def __new__(cls, data: Iterable[T], /) -> Self: ...
+    @overload
+    def __new__(cls, data: T, /, *more: T) -> Self: ...
+    def __new__(cls, data: Iterable[T] | T, /, *more: T) -> Self:
+        raise NotImplementedError
+
+    def insert(self, index: int, value: T) -> None: ...
+    def retain(self, predicate: Callable[[T], bool]) -> None: ...
+```
+
+The range supplies integer elements. Its `pipe` method passes itself to a callable and forwards any
+remaining arguments:
+
+```py
+class Range:
+    def __iter__(self) -> Iterator[int]:
+        raise NotImplementedError
+
+    def pipe[**P, R](self, func: Callable[Concatenate[Self, P], R], *args: P.args, **kwargs: P.kwargs) -> R:
+        raise NotImplementedError
+```
+
+`Vec` can consume the range as an iterable. We accept a callback for its integer elements, although
+we do not yet infer `Vec[int]` for `values`:
+
+```py
+def check(data: Range) -> None:
+    values = data.pipe(Vec)
+    values.retain(lambda value: value < 5)  # no diagnostic
+```
+
 ## Calling methods on a union of `ParamSpec` specializations
 
 A caller's parameter list can be shared by the receivers while the return type preserves the

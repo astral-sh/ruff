@@ -487,6 +487,52 @@ struct BindingsElement<'db> {
 }
 
 impl<'db> BindingsElement<'db> {
+    /// Compare plain call interfaces without discarding distinct receivers or source signatures.
+    /// Already checked bindings retain their argument-matching state and are not deduplicated.
+    fn has_same_call_interface(&self, other: &Self) -> bool {
+        let ([CallableItem::Regular(left)], [CallableItem::Regular(right)]) =
+            (self.items.as_slice(), other.items.as_slice())
+        else {
+            return false;
+        };
+        self.callable_type == other.callable_type
+            && left.callable_type == right.callable_type
+            && left.signature_type == right.signature_type
+            && left.bound_type == right.bound_type
+            && left.is_implicitly_invoked == right.is_implicitly_invoked
+            && left.dunder_call_is_possibly_unbound == right.dunder_call_is_possibly_unbound
+            && left.overload_call_result.is_none()
+            && right.overload_call_result.is_none()
+            && left.matching_overload_before_type_checking.is_none()
+            && right.matching_overload_before_type_checking.is_none()
+            && left.overloads.len() == right.overloads.len()
+            && left
+                .overloads
+                .iter()
+                .zip(&right.overloads)
+                .all(|(left, right)| {
+                    left.signature == right.signature
+                        && left.source_overload_index == right.source_overload_index
+                        && left.source_parameter_index_offset == right.source_parameter_index_offset
+                        && left.callable_type == right.callable_type
+                        && left.signature_type == right.signature_type
+                        && left.return_ty == right.return_ty
+                        && left.inferable_typevars == right.inferable_typevars
+                        && left.inference == right.inference
+                        && left.is_partial_application == right.is_partial_application
+                        && left.variadic_argument_matched_to_variadic_parameter
+                            == right.variadic_argument_matched_to_variadic_parameter
+                        && left.argument_matches.is_empty()
+                        && right.argument_matches.is_empty()
+                        && left.parameter_tys.is_empty()
+                        && right.parameter_tys.is_empty()
+                        && left.errors.is_empty()
+                        && right.errors.is_empty()
+                        && left.constructor_context.is_none()
+                        && right.constructor_context.is_none()
+                })
+    }
+
     fn items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
         self.items.iter()
     }
@@ -792,7 +838,16 @@ impl<'db> Bindings<'db> {
                 bindings.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
                 bindings.implicit_dunder_init_is_possibly_unbound;
-            elements.extend(bindings.elements);
+            for element in bindings.elements {
+                // Distinct objects, such as nested partials, can project to the same callable.
+                // Keep the original union type, but check each identical call interface once.
+                if !elements
+                    .iter()
+                    .any(|existing| existing.has_same_call_interface(&element))
+                {
+                    elements.push(element);
+                }
+            }
         }
 
         assert!(!elements.is_empty());
@@ -10853,7 +10908,7 @@ impl<'db> ClassInfoValidator<'_, 'db> {
                 |_| true,
                 || self.validate_impl(db, ty, |ty| self.validate(db, ty)),
             )
-            .unwrap_or_else(|ty| self.validate_constructor(db, ty))
+            .unwrap_or_else(|cycle| self.validate_constructor(db, cycle.current))
     }
 
     fn validate_constructor(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {

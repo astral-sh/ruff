@@ -428,6 +428,27 @@ class Callbacks(Generic[T_co]):
         raise NotImplementedError
 ```
 
+## Recursive lambda return types
+
+Each recursive call wraps the captured value in a list. That mutable list makes `Branch` invariant,
+even though `node` is read-only:
+
+```py
+from typing import Final, Generic
+from typing_extensions import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Branch(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: (Branch([value]).node, value)
+
+static_assert(not is_subtype_of(Branch[int], Branch[object]))
+static_assert(not is_subtype_of(Branch[object], Branch[int]))
+```
+
 ## Variance in generic methods
 
 A method's independent type variable can accept arguments outside the class's covariant value type.
@@ -2101,6 +2122,103 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for narrowed enum attributes
+
+Excluding an enum member from an attribute's type does not introduce a dependency on a type
+variable:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Final, Generic, TypeVar
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+The enum attribute below does not mention `T`. The other attribute is read-only, so `Box` remains
+covariant in `T`:
+
+```py
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    def __init__(self, color: Color, value: T):
+        self.value: Final = value
+        if color is Color.RED:
+            return
+        self.color: Final = color
+
+def upcast(value: Box[int]) -> Box[object]:
+    return value  # no diagnostic
+```
+
+## Inferred variance for partial functions
+
+Binding an argument with `partial` does not remove that parameter from the callable exposed by
+`func`. `Bound[T]` is therefore contravariant in `T`, even though calling `callback` takes no
+arguments:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from functools import partial
+from typing import Callable, Final, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Bound(Generic[T]):
+    def __init__(self, callback: Callable[[T], None], value: T):
+        self.callback: Final = partial(callback, value)
+
+static_assert(is_subtype_of(Bound[object], Bound[int]))
+static_assert(not is_subtype_of(Bound[int], Bound[object]))
+```
+
+## Variance of inferred parameter lists
+
+Inferring a `ParamSpec` from a union of callbacks can produce a union of parameter lists. Every
+alternative below consumes `T`, so the read-only callback attribute makes `Holder` contravariant in
+`T`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Final, Generic, ParamSpec, Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+P = ParamSpec("P", contravariant=True)
+T = TypeVar("T", infer_variance=True)
+
+class Callback(Protocol[P]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+def identity(callback: Callback[P]) -> Callback[P]:
+    return callback
+
+class Holder(Generic[T]):
+    def __init__(self, callback: Callback[[T, int]] | Callback[[str, T]]):
+        self.callback: Final = identity(callback)
+
+static_assert(is_subtype_of(Holder[object], Holder[int]))
+static_assert(not is_subtype_of(Holder[int], Holder[object]))
+```
+
 ## Inferred variance for recursive lambdas
 
 A read-only recursive lambda that produces `T` preserves covariance:
@@ -2111,7 +2229,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Callable, Final, Generic, TypeVar
+from typing import Callable, Final, Generic, ParamSpec, TypeVar
 from ty_extensions import static_assert
 from ty_extensions._internal import is_subtype_of
 
@@ -2139,6 +2257,24 @@ static_assert(is_subtype_of(Consumer[object], Consumer[int]))
 static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
 ```
 
+Substituting a parameter list for a `ParamSpec` preserves this direction. The captured callback
+accepts `T`, so `Forwarder` is contravariant in `T`:
+
+```py
+P = ParamSpec("P")
+
+class Callbacks(Generic[P]):
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Forwarder(Generic[T]):
+    def __init__(self, callback: Callable[[T], None]):
+        self.node: Final = Callbacks[[T]](callback).node
+
+static_assert(is_subtype_of(Forwarder[object], Forwarder[int]))
+static_assert(not is_subtype_of(Forwarder[int], Forwarder[object]))
+```
+
 Returning a callable that both accepts and returns `T` makes it invariant:
 
 ```py
@@ -2148,6 +2284,42 @@ class Transformer(Generic[T]):
 
 static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
 static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Redundant union elements in recursive lambda returns
+
+A recursive lambda can capture a callback whose return type contains a union:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Final, Generic, TypeVar
+
+class Parent: ...
+class Child(Parent): ...
+
+Q = TypeVar("Q")
+
+class Box(Generic[Q]):
+    def __init__(self, callback: Callable[[], list[Q | Parent]]):
+        self.node = lambda: (callback, self.node)
+```
+
+When `Q` is replaced with a type variable bounded by `Parent`, the union simplifies to `Parent`. The
+callback below therefore returns `list[Parent]`, so it does not make `View` invariant in `T`:
+
+```py
+T = TypeVar("T", bound=Parent, infer_variance=True)
+
+class View(Generic[T]):
+    def __init__(self, box: Box[T]):
+        self.callback: Final = box.node()[0]
+
+def upcast(value: View[Child]) -> View[Parent]:
+    return value  # no diagnostic
 ```
 
 ## Inferred variance for writable recursive lambda attributes

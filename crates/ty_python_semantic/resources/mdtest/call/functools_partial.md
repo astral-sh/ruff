@@ -707,6 +707,26 @@ def choose(flag: bool) -> None:
     reveal_type(selected is bool_partial)  # revealed: bool
 ```
 
+### Repeated call signatures in a union
+
+Different partials can expose the same call signature. We report an invalid argument once while
+preserving their different wrapped callables.
+
+```py
+from functools import partial
+
+def callback(value: int) -> int:
+    return value
+
+first = partial(callback)
+second = partial(first)
+
+def check(flag: bool) -> None:
+    selected = first if flag else second
+    reveal_type(selected.func)  # revealed: (def callback(value: int) -> int) | partial[(value: int) -> int]
+    selected(1, unexpected=1)  # error: [unknown-argument]
+```
+
 ### Keyword-bound overload filtering
 
 ```py
@@ -2115,7 +2135,27 @@ A partial can wrap a lambda that returns the partial itself:
 from functools import partial
 
 callback = partial(lambda: callback)
-callback()  # no diagnostic
+reveal_type(callback())  # revealed: partial[() -> ...]
+```
+
+Binding an argument keeps the original function's parameter on `func`. Its recursive return still
+refers to the partial, which takes no arguments:
+
+```py
+bound = partial(lambda value: [bound], 1)
+bound.func(1)[0](2)  # error: [too-many-positional-arguments]
+```
+
+## Recursive lambda defaults
+
+A lambda returned by a partial can refer to that partial in a default argument. Inference terminates
+when the returned lambda is called with that default:
+
+```py
+from functools import partial
+
+callback = partial(lambda: lambda value=callback: value)
+callback()()()  # no diagnostic
 ```
 
 The lambda can also return the partial inside a tuple while leaving a required parameter unbound:

@@ -16,10 +16,10 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        InstanceProjection, KnownClass, KnownInstanceType, MaterializationKind, Parameter,
+        Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         tuple::Tuple,
@@ -388,40 +388,35 @@ impl<'db> TypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        // Keep lazy metadata when its resolved value is unchanged. Evaluating the declaration
+        // must not make an otherwise unchanged type variable compare unequal.
+        let bound_or_constraints = self._bound_or_constraints(db).and_then(|evaluation| {
+            let bounds = self.bound_or_constraints(db, visitor.env)?;
+            let materialized = bounds.materialize_impl(db, materialization_kind, visitor);
+            Some(if materialized == bounds {
+                evaluation
+            } else {
+                materialized.into()
+            })
+        });
+        let default = self._default(db).and_then(|evaluation| {
+            let ty = match evaluation {
+                TypeVarDefaultEvaluation::Eager(ty) => ty,
+                TypeVarDefaultEvaluation::Lazy => self.lazy_default(db, visitor.env)?,
+            };
+            let materialized = ty.materialize(db, materialization_kind, visitor);
+            Some(if materialized == ty {
+                evaluation
+            } else {
+                materialized.into()
+            })
+        });
         Self::new(
             db,
             self.identity(db),
-            self._bound_or_constraints(db)
-                .and_then(|bound_or_constraints| match bound_or_constraints {
-                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
-                        bound_or_constraints
-                            .materialize_impl(db, materialization_kind, visitor)
-                            .into(),
-                    ),
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
-                        self.lazy_bound(db, visitor.env).map(|bound| {
-                            TypeVarBoundOrConstraints::UpperBound(bound)
-                                .materialize_impl(db, materialization_kind, visitor)
-                                .into()
-                        })
-                    }
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db, visitor.env).map(|constraints| {
-                            TypeVarBoundOrConstraints::Constraints(constraints)
-                                .materialize_impl(db, materialization_kind, visitor)
-                                .into()
-                        })
-                    }
-                }),
+            bound_or_constraints,
             self.explicit_variance(db),
-            self._default(db).and_then(|default| match default {
-                TypeVarDefaultEvaluation::Eager(ty) => {
-                    Some(ty.materialize(db, materialization_kind, visitor).into())
-                }
-                TypeVarDefaultEvaluation::Lazy => self
-                    .lazy_default(db, visitor.env)
-                    .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
-            }),
+            default,
         )
     }
 
@@ -574,7 +569,7 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     type_is_self_referential_impl(
                         state,
-                        recursive.unfold(db, state.env).into_type(),
+                        recursive.unfold_structurally(db, state.env).into_type(),
                         self_identity,
                     )
                 }
@@ -865,7 +860,7 @@ impl TypeVarNonce {
         )
     }
 
-    fn add(self, delta: u32) -> Self {
+    pub(super) fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -1064,6 +1059,86 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(
             db,
             self.typevar(db).with_name_suffix(db, suffix),
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            self.freshness(db),
+        )
+    }
+
+    /// A constructor-local parameter with the source parameter's substitution domain.
+    /// Occurrence metadata remains separate from the slot's identity so an unchanged captured
+    /// argument can retain a materialized bound or default when the constructor is unfolded.
+    pub(super) fn recursive_promotion_slot(
+        self,
+        db: &'db dyn Db,
+        constructor: super::callable::LambdaSignature<'db>,
+        position: super::recursive::RecursivePromotionPosition,
+    ) -> Self {
+        let source = if self.is_paramspec(db) {
+            self.without_paramspec_attr(db)
+        } else {
+            self
+        };
+        let occurrence = self.typevar(db);
+        // Lazy bounds and defaults still belong to the source declaration. The private
+        // binding context distinguishes slots; only `Self` needs an ordinary typevar kind
+        // so later mappings cannot treat a captured constructor argument as a new `Self`.
+        let identity = if occurrence.is_self(db) {
+            TypeVarIdentity::new(db, self.name(db).clone(), None, TypeVarKind::Pep695TypeVar)
+        } else {
+            occurrence.identity(db)
+        };
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            occurrence._bound_or_constraints(db),
+            Some(TypeVarVariance::Invariant),
+            occurrence._default(db),
+        );
+        Self::new(
+            db,
+            typevar,
+            BindingContext::RecursivePromotion(super::recursive::RecursivePromotionBinding::new(
+                db,
+                constructor,
+                source.identity(db),
+                position,
+            )),
+            self.paramspec_attr(db),
+            self.freshness(db),
+        )
+    }
+
+    /// Restore a captured identity application without replacing this occurrence's metadata.
+    fn restore_recursive_promotion_argument(
+        self,
+        db: &'db dyn Db,
+        argument: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let BindingContext::RecursivePromotion(binding) = self.binding_context(db) else {
+            return None;
+        };
+        let source = binding.source_variable(db)?;
+        if argument != Type::TypeVar(source) {
+            return None;
+        }
+        Some(Type::TypeVar(source.with_occurrence_metadata(db, self)))
+    }
+
+    /// Change the bounds and default while preserving this variable's substitution identity.
+    fn with_occurrence_metadata(self, db: &'db dyn Db, occurrence: Self) -> Self {
+        let occurrence = occurrence.typevar(db);
+        let source_typevar = self.typevar(db);
+        let typevar = TypeVarInstance::new(
+            db,
+            source_typevar.identity(db),
+            occurrence._bound_or_constraints(db),
+            source_typevar.explicit_variance(db),
+            occurrence._default(db),
+        );
+        Self::new(
+            db,
+            typevar,
             self.binding_context(db),
             self.paramspec_attr(db),
             self.freshness(db),
@@ -1304,6 +1379,69 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    /// Maps stored bounds and defaults without evaluating their declarations.
+    ///
+    /// Specialized `Self` bounds can contain recursive references. Binding or normalizing those
+    /// references must inspect the stored bounds, but must not start declaration queries during
+    /// cycle recovery.
+    fn map_eager_types(self, db: &'db dyn Db, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        let typevar = self.typevar(db);
+        let bound_or_constraints =
+            typevar
+                ._bound_or_constraints(db)
+                .map(|evaluation| match evaluation {
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bounds) => {
+                        TypeVarBoundOrConstraintsEvaluation::Eager(match bounds {
+                            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                                TypeVarBoundOrConstraints::UpperBound(f(bound))
+                            }
+                            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                                TypeVarBoundOrConstraints::Constraints(
+                                    constraints.map(db, |ty| f(*ty)),
+                                )
+                            }
+                        })
+                    }
+                    evaluation => evaluation,
+                });
+        let default = typevar._default(db).map(|evaluation| match evaluation {
+            TypeVarDefaultEvaluation::Eager(default) => TypeVarDefaultEvaluation::Eager(f(default)),
+            TypeVarDefaultEvaluation::Lazy => TypeVarDefaultEvaluation::Lazy,
+        });
+        let typevar = TypeVarInstance::new(
+            db,
+            typevar.identity(db),
+            bound_or_constraints,
+            typevar.explicit_variance(db),
+            default,
+        );
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+            self.freshness(db),
+        )
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let mut contains_cycle = false;
+        let normalized = self.map_eager_types(db, |ty| {
+            ty.recursive_type_normalized_impl(db, env, div, true)
+                .unwrap_or_else(|| {
+                    contains_cycle = true;
+                    div
+                })
+        });
+        (!nested || !contains_cycle).then_some(normalized)
+    }
+
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,
@@ -1325,7 +1463,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                         variance => variance,
                     }
                 }),
-                BindingContext::Synthetic(_) => TypeVarVariance::Invariant,
+                BindingContext::Synthetic(_) | BindingContext::RecursivePromotion(..) => {
+                    TypeVarVariance::Invariant
+                }
             },
         }
     }
@@ -1341,20 +1481,32 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let mapped_specialization_type =
-            |specialization: &ApplySpecialization<'a, 'db>| -> Option<Type<'db>> {
+            |specialization: &ApplySpecialization<'a, 'db>| -> Option<(Type<'db>, bool)> {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
                     self
                 };
                 specialization.get(db, typevar).map(|ty| {
+                    let restored = self.restore_recursive_promotion_argument(db, ty);
+                    let mut ty = restored.unwrap_or(ty);
+                    if let Type::TypeVar(slot) = ty
+                        && let BindingContext::RecursivePromotion(binding) =
+                            slot.binding_context(db)
+                        && binding.is_source_variable(db, self)
+                    {
+                        // Lifting an unchanged/default occurrence into a private slot must
+                        // preserve its metadata just like promotion's positive/negative slots.
+                        ty = Type::TypeVar(slot.with_occurrence_metadata(db, self));
+                    }
                     if let Some(attr) = self.paramspec_attr(db)
                         && let Type::TypeVar(typevar) = ty
                         && typevar.is_paramspec(db)
                     {
-                        return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
+                        ty = Type::TypeVar(typevar.with_paramspec_attr(db, attr));
                     }
-                    ty
+                    let substituted = restored.is_none() && ty != Type::TypeVar(self);
+                    (ty, substituted)
                 })
             };
 
@@ -1376,35 +1528,31 @@ impl<'db> BoundTypeVarInstance<'db> {
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
                 mapped_specialization_type(specialization)
+                    .map(|(mapped, _)| mapped)
                     .unwrap_or_else(|| possibly_apply_to_self(specialization))
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
             } => mapped_specialization_type(specialization)
-                .map(|mapped| {
+                .map(|(mapped, substituted)| {
                     // Only materialize if the specialization actually substituted this
                     // typevar with a different type. A typevar that maps back to itself
                     // hasn't been substituted and should not be materialized.
-                    if mapped == Type::TypeVar(self) {
+                    if !substituted {
                         mapped
                     } else {
-                        let env = visitor.env;
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_materialization_root();
+                        let materialization_visitor = visitor.with_fresh_mapping_caches();
                         let materialized =
                             mapped.materialize(db, *materialization_kind, &materialization_visitor);
 
                         if *materialization_kind == MaterializationKind::Top
-                            && !materialization_visitor.is_equivalent_to_materialization(
-                                db,
-                                mapped,
-                                materialized,
-                            )
                             && let Some(upper_bound) = self.top_materialized_upper_bound(db)
+                            && mapped != materialized
                         {
-                            IntersectionType::from_two_elements(db, env, materialized, upper_bound)
+                            visitor.intersect(db, materialized, upper_bound)
                         } else {
                             materialized
                         }
@@ -1453,13 +1601,23 @@ impl<'db> BoundTypeVarInstance<'db> {
                     ))
                 }
             }
-            TypeMapping::Promote(..)
-            | TypeMapping::ReplaceParameterDefaults
+            TypeMapping::Promote(mode, _) => Type::TypeVar(
+                visitor
+                    .recursive_promotion
+                    .and_then(|context| context.variable(db, self, *mode))
+                    .unwrap_or(self),
+            ),
+            TypeMapping::ApplyRecursiveSubstitution(_) => {
+                Type::TypeVar(self.map_eager_types(db, |ty| {
+                    ty.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
+                }))
+            }
+            TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
-            | TypeMapping::RescopeReturnCallables(_)
-            | TypeMapping::ApplyRecursiveSubstitution(_) => Type::TypeVar(self),
+            | TypeMapping::NormalizeSets
+            | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 if visitor.materialize_typevar_bounds_and_defaults {
                     Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))
@@ -1797,6 +1955,8 @@ pub enum BindingContext<'db> {
     /// in the source, but is still bound and eligible for specialization inference. Its program
     /// identifies the environment that cannot otherwise be recovered from a source definition.
     Synthetic(Program<'db>),
+    /// A private input of a promoted recursive constructor.
+    RecursivePromotion(super::recursive::RecursivePromotionBinding<'db>),
 }
 
 impl<'db> From<Definition<'db>> for BindingContext<'db> {
@@ -1809,7 +1969,7 @@ impl<'db> BindingContext<'db> {
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
         match self {
             BindingContext::Definition(definition) => Some(definition),
-            BindingContext::Synthetic(_) => None,
+            BindingContext::Synthetic(_) | BindingContext::RecursivePromotion(..) => None,
         }
     }
 
@@ -1817,6 +1977,9 @@ impl<'db> BindingContext<'db> {
         match self {
             Self::Definition(definition) => definition.program(db),
             Self::Synthetic(program) => program,
+            Self::RecursivePromotion(binding) => {
+                ProgramEnvironment::from_scope(binding.lambda(db).scope(db)).program(db)
+            }
         }
     }
 

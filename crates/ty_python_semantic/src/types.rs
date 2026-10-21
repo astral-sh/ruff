@@ -5,9 +5,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::iter;
-use std::rc::Rc;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -500,10 +499,6 @@ impl MetaTypeRecursion<'_> {
 }
 
 struct ApplyTypeMappingTag;
-struct ApplyMaterializationEquivalence;
-
-type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
 type MaterializationDependency<'db> = (Type<'db>, MaterializationKind);
 
@@ -522,6 +517,12 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
+    /// Rebuild sets without semantic comparisons while transforming a recursive constructor.
+    /// Specialization, promotion, and materialization belong to that same structural operation.
+    structural_reconstruction: Cell<bool>,
+    recursive_promotion: Option<&'env recursive::RecursivePromotionContext<'db>>,
+    /// Independent constructor comparisons completed by this operation.
+    recursive_constructor_equivalence: OnceCell<Box<recursive::RecursiveConstructorProof<'db>>>,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -529,7 +530,6 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
     materialization_dependencies: RefCell<Vec<MaterializationDependency<'db>>>,
     dependent_materializations:
         RefCell<FxHashMap<MaterializationDependency<'db>, DependentMaterialization<'db>>>,
@@ -541,6 +541,9 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             env,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
+            structural_reconstruction: Cell::new(false),
+            recursive_promotion: None,
+            recursive_constructor_equivalence: OnceCell::default(),
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
             bottom_materialization: OnceCell::default(),
@@ -548,7 +551,6 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             bottom_specialization_materialization: OnceCell::default(),
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
-            materialization_equivalence: OnceCell::default(),
             materialization_dependencies: RefCell::default(),
             dependent_materializations: RefCell::default(),
         }
@@ -566,9 +568,16 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
-    fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
-        self.materialization_equivalence
-            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    /// Intersect a mapped value with its bound under this operation's reconstruction policy.
+    fn intersect(&self, db: &'db dyn Db, value: Type<'db>, bound: Type<'db>) -> Type<'db> {
+        if self.structural_reconstruction.get() {
+            IntersectionBuilder::new(db, self.env)
+                .structural()
+                .positive_elements([value, bound])
+                .build()
+        } else {
+            IntersectionType::from_two_elements(db, self.env, value, bound)
+        }
     }
 
     fn visit(
@@ -659,30 +668,47 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         )
     }
 
-    fn is_equivalent_to_materialization(
-        &self,
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> bool {
-        self.materialization_equivalence()
-            .visit(db, (left, right), || {
-                left.is_equivalent_to_with_materialization_visitor(db, right, self)
-            })
-    }
-
-    fn for_new_materialization_root(&self) -> Self {
-        let materialization_equivalence = OnceCell::new();
-        let was_empty =
-            materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
-        debug_assert!(was_empty.is_ok());
-
+    /// Keep the operation's context while separating results from a different mapping.
+    fn with_fresh_mapping_caches(&self) -> Self {
         Self {
-            materialization_equivalence,
             recursion_context: self.recursion_context,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            structural_reconstruction: Cell::new(self.structural_reconstruction.get()),
+            recursive_promotion: self.recursive_promotion,
             ..Self::new(self.env)
         }
+    }
+
+    /// Transform a closed recursive body without re-entering its consuming operation.
+    fn for_recursive_unfolding(&self) -> Self {
+        Self {
+            structural_reconstruction: Cell::new(true),
+            ..self.with_fresh_mapping_caches()
+        }
+    }
+
+    /// Transform a recursive constructor without resetting the active mapping guards.
+    fn with_structural_reconstruction<T>(&self, work: impl FnOnce() -> T) -> T {
+        // Reconstruction changes normalization, not the mapped type's meaning, so previously
+        // mapped values remain reusable. Keeping the same caches also retains the guards for
+        // recursive references reached while transforming its arguments and body.
+        let _guard = StructuralReconstructionGuard {
+            policy: &self.structural_reconstruction,
+            previous: self.structural_reconstruction.replace(true),
+        };
+        work()
+    }
+}
+
+/// Restore the caller's reconstruction policy, including when mapping is cancelled.
+struct StructuralReconstructionGuard<'a> {
+    policy: &'a Cell<bool>,
+    previous: bool,
+}
+
+impl Drop for StructuralReconstructionGuard<'_> {
+    fn drop(&mut self) {
+        self.policy.set(self.previous);
     }
 }
 
@@ -3409,10 +3435,8 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
-            // Revisit this and `is_hintable` when general recursive type inference can produce
-            // types without a declared alias.
-            Type::TypeAlias(_) | Type::Recursive(_) => true,
+            Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.alias(db).is_some(),
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
@@ -3449,8 +3473,8 @@ impl<'db> Type<'db> {
             Type::NominalInstance(_)
             | Type::NewTypeInstance(_)
             | Type::LiteralValue(_)
-            | Type::TypeAlias(_)
-            | Type::Recursive(_) => true,
+            | Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.alias(db).is_some(),
 
             Type::Intersection(_)
             | Type::EnumComplement(_)
@@ -3891,14 +3915,18 @@ impl<'db> Type<'db> {
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::GenericAlias),
-            Type::Recursive(_) => Some(self),
+            Type::Recursive(recursive) => recursive
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::Recursive),
             Type::ClassLiteral(class) => class
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::SubclassOf),
-            Type::TypeVar(_) => Some(self),
+            Type::TypeVar(variable) => variable
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::TypeVar),
             Type::KnownInstance(known_instance) => known_instance
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::KnownInstance),
@@ -9540,6 +9568,33 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
+    /// Normalize sets in an exposed type without opening recursive or lazy definitions.
+    ///
+    /// Recursive substitution preserves sets structurally until a semantic operation consumes
+    /// the closed result. A circular simplification retains that result rather than using a
+    /// provisional relation to discard one of its components.
+    fn normalize_closed_sets(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, ty| ty,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn normalize_closed_sets_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> Type<'db> {
+            ty.apply_type_mapping(
+                db,
+                &ProgramEnvironment::from_program(program),
+                &TypeMapping::NormalizeSets,
+                TypeContext::default(),
+            )
+        }
+
+        normalize_closed_sets_impl(db, env.program(db), self)
+    }
+
     fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -9653,6 +9708,9 @@ impl<'db> Type<'db> {
                 const MAX_PARAMSPEC_EXPANSION: usize = 64;
 
                 let mut expanded_callables = UnionBuilder::new(db, visitor.env);
+                if visitor.structural_reconstruction.get() {
+                    expanded_callables = expanded_callables.structural();
+                }
                 let mut expansion_size = 1usize;
                 for (_, union) in &union_paramspecs {
                     expansion_size = expansion_size.saturating_mul(union.elements(db).len());
@@ -9695,7 +9753,12 @@ impl<'db> Type<'db> {
 
                         // Use a fresh visitor, as the visitor cache does not distinguish
                         // between these specialization bindings.
-                        let callable = self.apply_type_mapping(db, visitor.env, &mapping, tcx);
+                        let callable = self.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            tcx,
+                            &visitor.with_fresh_mapping_caches(),
+                        );
                         expanded_callables.add_in_place(callable);
                     }
 
@@ -9775,6 +9838,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
+            Type::NewTypeInstance(_) if matches!(type_mapping, TypeMapping::NormalizeSets) => self,
             Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -9917,6 +9981,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -9940,6 +10005,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -10073,7 +10139,7 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold_structurally(db, env) {
                     unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
                 }
             }),
@@ -10536,7 +10602,7 @@ impl<'db> Type<'db> {
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
             Self::Recursive(recursive) => recursive
-                .unfold(db, env)
+                .unfold_structurally(db, env)
                 .into_unfolded()?
                 .definition(db, env),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
@@ -11056,13 +11122,32 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             }
             Type::TypedDict(typed_dict) => typed_dict.variance_of(db, env, typevar),
             // unions are covariant in their disjuncts
-            Type::Union(union_type) => VarianceTerm::join(
-                db,
-                union_type
-                    .elements(db)
-                    .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar)),
-            ),
+            Type::Union(union_type) => {
+                let variance_of_elements = |elements: &[Type<'db>]| {
+                    VarianceTerm::join(
+                        db,
+                        elements.iter().map(|ty| ty.variance_of(db, env, typevar)),
+                    )
+                };
+                let variance = variance_of_elements(union_type.elements(db));
+                // Keep references to other equations symbolic. Comparing their types here
+                // could evaluate a recursive signature while its equation is still being built.
+                if let VarianceTerm::Constant(value) = variance
+                    && value != TypeVarVariance::Bivariant
+                {
+                    let normalized = variance::normalize_set(db, env.program(db), self);
+                    if normalized == self {
+                        variance
+                    } else {
+                        match normalized {
+                            Type::Union(union) => variance_of_elements(union.elements(db)),
+                            ty => ty.variance_of(db, env, typevar),
+                        }
+                    }
+                } else {
+                    variance
+                }
+            }
 
             // Products are covariant in their conjuncts. For negative
             // conjuncts, they're contravariant. To see this, suppose we have
@@ -11070,20 +11155,30 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             // `A`, and so is not assignable to `~A`. On the other hand, a value
             // of type `~A` excludes all `A`s, and thus all `B`s, and so _is_
             // assignable to `~B`.
-            Type::Intersection(intersection_type) => VarianceTerm::join(
-                db,
-                intersection_type
-                    .positive(db)
-                    .iter()
-                    .map(|ty| ty.variance_of(db, env, typevar))
-                    .chain(intersection_type.negative(db).iter().map(|ty| {
-                        ty.with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, env, typevar)
-                    })),
-            ),
-            Type::EnumComplement(complement) => complement
-                .to_intersection(db, env)
-                .variance_of(db, env, typevar),
+            Type::Intersection(_) => match variance::normalize_set(db, env.program(db), self) {
+                Type::Intersection(intersection_type) => VarianceTerm::join(
+                    db,
+                    intersection_type
+                        .positive(db)
+                        .iter()
+                        .map(|ty| ty.variance_of(db, env, typevar))
+                        .chain(intersection_type.negative(db).iter().map(|ty| {
+                            ty.with_polarity(TypeVarVariance::Contravariant)
+                                .variance_of(db, env, typevar)
+                        })),
+                ),
+                ty => ty.variance_of(db, env, typevar),
+            },
+            Type::EnumComplement(complement) => {
+                // Excluded enum literals contain no type variables. Visit the positive
+                // components directly: normalizing their intersection recreates this complement.
+                VarianceTerm::join(
+                    db,
+                    iter::once(complement.enum_class(db).to_non_generic_instance(db, env))
+                        .chain(complement.rest(db).iter().copied())
+                        .map(|ty| ty.variance_of(db, env, typevar)),
+                )
+            }
             Type::PropertyInstance(property_instance_type) => VarianceTerm::join(
                 db,
                 [
@@ -11303,9 +11398,13 @@ pub enum TypeMapping<'a, 'db> {
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
 
-    /// Resolve nested lambda signatures within signature inference, where Salsa can recover
-    /// recursive returns to a finite approximation before semantic operations inspect them.
+    /// Resolve nested lambda signatures within signature inference, where Salsa can
+    /// bind recursive return types before semantic operations inspect them.
     NormalizeLambdaSignatures,
+
+    /// Normalize unions and intersections in stored type components without evaluating lazy
+    /// definitions or opening recursive constructors.
+    NormalizeSets,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -11373,6 +11472,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11424,6 +11524,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
@@ -11434,6 +11535,26 @@ impl<'db> TypeMapping<'_, 'db> {
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
         matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
+    }
+
+    /// Whether entering a negative position changes this operation.
+    const fn is_variance_sensitive(&self) -> bool {
+        match self {
+            Self::Promote(..)
+            | Self::Materialize(_)
+            | Self::ApplySpecializationWithMaterialization { .. } => true,
+            Self::ApplySpecialization(_)
+            | Self::ApplyRecursiveSubstitution(_)
+            | Self::BindLegacyTypevars(_)
+            | Self::FreshenBoundTypeVars { .. }
+            | Self::BindSelf(_)
+            | Self::ReplaceSelf { .. }
+            | Self::ReplaceParameterDefaults
+            | Self::EagerExpansion
+            | Self::NormalizeLambdaSignatures
+            | Self::NormalizeSets
+            | Self::RescopeReturnCallables(_) => false,
+        }
     }
 }
 
@@ -12484,9 +12605,10 @@ impl<'db> TypeIsType<'db> {
                     return Type::TypeIs(self);
                 }
 
-                // `TypeIs` with a static argument is equivalent to its top and bottom materializations.
+                // An unchanged argument needs no marker. Otherwise preserve the invariant
+                // materialization without comparing signatures during mapping.
                 let top = argument.materialize(db, MaterializationKind::Top, visitor);
-                if visitor.is_equivalent_to_materialization(db, argument, top) {
+                if argument == top {
                     return Type::TypeIs(self);
                 }
 

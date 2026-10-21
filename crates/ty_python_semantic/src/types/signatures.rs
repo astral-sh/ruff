@@ -2322,6 +2322,44 @@ impl<'db> Signature<'db> {
     pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
         Self { return_ty, ..self }
     }
+
+    /// Compare stored signature structure, leaving its type components to the caller.
+    /// Deferred defaults and receiver constraints remain opaque; this never infers their types.
+    pub(super) fn structurally_matches(
+        &self,
+        other: &Self,
+        mut compare: impl FnMut(Type<'db>, Type<'db>),
+    ) -> bool {
+        if self.generic_context != other.generic_context
+            || self.definition != other.definition
+            || self.extras != other.extras
+            || self.parameters.kind() != other.parameters.kind()
+            || self.parameters.len() != other.parameters.len()
+        {
+            return false;
+        }
+        for (source, target) in self.parameters.iter().zip(other.parameters.iter()) {
+            let mut source_metadata = source.clone();
+            let mut target_metadata = target.clone();
+            source_metadata.annotated_type = Type::unknown();
+            target_metadata.annotated_type = Type::unknown();
+            match (source.eager_default_type(), target.eager_default_type()) {
+                (Some(source_default), Some(target_default)) => {
+                    compare(source_default, target_default);
+                    source_metadata = source_metadata.with_default_type(Type::unknown());
+                    target_metadata = target_metadata.with_default_type(Type::unknown());
+                }
+                (None, None) => {}
+                _ => return false,
+            }
+            if source_metadata != target_metadata {
+                return false;
+            }
+            compare(source.annotated_type(), target.annotated_type());
+        }
+        compare(self.return_ty, other.return_ty);
+        true
+    }
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
@@ -5421,7 +5459,9 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. }) {
+        let kind = if matches!(type_mapping, TypeMapping::FreshenBoundTypeVars { .. })
+            || visitor.recursive_promotion.is_some()
+        {
             let freshen = |paramspec| {
                 Type::TypeVar(paramspec)
                     .apply_type_mapping_impl(db, &type_mapping, tcx, visitor)
@@ -6476,7 +6516,10 @@ impl<'db> ParameterKind<'db> {
                 }
                 // Defaults describe values, not the set of accepted arguments. Promoting the
                 // enclosing callable must not widen those values.
-                TypeMapping::Promote(..) => default,
+                TypeMapping::Promote(..) => match visitor.recursive_promotion {
+                    Some(context) => default.map_type(|ty| context.unchanged(db, ty)),
+                    None => default,
+                },
                 _ => default
                     .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             })
