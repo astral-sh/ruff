@@ -41,7 +41,10 @@ impl AlwaysFixableViolation for ExtraneousParentheses {
 }
 
 // See: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_main.py#L148
-fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRange, TextRange)> {
+fn match_extraneous_parentheses(
+    tokens: &mut Iter<'_, Token>,
+    is_class_def: bool,
+) -> Option<(TextRange, TextRange)> {
     // Store the location of the extraneous opening parenthesis.
     let start_range = loop {
         let token = tokens.next()?;
@@ -64,6 +67,7 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
 
     // Verify that we're not in a tuple or coroutine.
     let mut depth = 1u32;
+    let mut has_for_at_depth_1 = false;
 
     // Store the location of the extraneous closing parenthesis.
     let end_range = loop {
@@ -72,6 +76,9 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
         match token.kind() {
             // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
             TokenKind::Comma | TokenKind::Yield if depth == 1 => return None,
+            TokenKind::For if depth == 1 => {
+                has_for_at_depth_1 = true;
+            }
             TokenKind::Lpar | TokenKind::Lbrace | TokenKind::Lsqb => {
                 depth = depth.saturating_add(1);
             }
@@ -97,6 +104,13 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
         return None;
     }
 
+    // In a class definition (`class Foo((base for base in bases)):`), the outer parentheses
+    // enclose base classes, which cannot be a bare generator expression without parentheses.
+    // See: https://github.com/astral-sh/ruff/issues/29422
+    if is_class_def && has_for_at_depth_1 {
+        return None;
+    }
+
     // Find the next non-coding token.
     let token = loop {
         let token = tokens.next()?;
@@ -116,6 +130,84 @@ fn match_extraneous_parentheses(tokens: &mut Iter<'_, Token>) -> Option<(TextRan
     }
 }
 
+/// Returns true if the opening parenthesis at `lpar_index` is the argument list of a class definition.
+fn is_class_def_lpar(tokens: &[Token], lpar_index: usize) -> bool {
+    let mut iter = tokens[..lpar_index].iter().rev();
+
+    // Skip non-coding tokens between the class name (or type params) and the opening parenthesis.
+    let mut prev = loop {
+        match iter.next() {
+            Some(token)
+                if matches!(
+                    token.kind(),
+                    TokenKind::Comment | TokenKind::NonLogicalNewline
+                ) =>
+            {
+                continue;
+            }
+            Some(token) => break token,
+            None => return false,
+        }
+    };
+
+    // If type parameters are present (e.g. `class Foo[T](...)`), skip backwards over `[...]`.
+    if matches!(prev.kind(), TokenKind::Rsqb) {
+        let mut depth = 1u32;
+        prev = loop {
+            match iter.next() {
+                Some(token) => match token.kind() {
+                    TokenKind::Comment | TokenKind::NonLogicalNewline => continue,
+                    TokenKind::Rsqb => depth = depth.saturating_add(1),
+                    TokenKind::Lsqb => {
+                        depth = depth.saturating_sub(1);
+                        if depth == 0 {
+                            break loop {
+                                match iter.next() {
+                                    Some(tok)
+                                        if matches!(
+                                            tok.kind(),
+                                            TokenKind::Comment | TokenKind::NonLogicalNewline
+                                        ) =>
+                                    {
+                                        continue;
+                                    }
+                                    Some(tok) => break tok,
+                                    None => return false,
+                                }
+                            };
+                        }
+                    }
+                    _ => {}
+                },
+                None => return false,
+            }
+        };
+    }
+
+    // The token preceding the parentheses (or `[...]`) must be the class name.
+    if !matches!(prev.kind(), TokenKind::Identifier) {
+        return false;
+    }
+
+    // The token preceding the class name must be `class`.
+    let class_token = loop {
+        match iter.next() {
+            Some(token)
+                if matches!(
+                    token.kind(),
+                    TokenKind::Comment | TokenKind::NonLogicalNewline
+                ) =>
+            {
+                continue;
+            }
+            Some(token) => break token,
+            None => return false,
+        }
+    };
+
+    matches!(class_token.kind(), TokenKind::Class)
+}
+
 /// UP034
 pub(crate) fn extraneous_parentheses(context: &LintContext, tokens: &Tokens, locator: &Locator) {
     let mut token_iter = tokens.iter();
@@ -124,7 +216,12 @@ pub(crate) fn extraneous_parentheses(context: &LintContext, tokens: &Tokens, loc
             continue;
         }
 
-        let Some((start_range, end_range)) = match_extraneous_parentheses(&mut token_iter) else {
+        let current_index = tokens.len() - token_iter.len() - 1;
+        let is_class_def = is_class_def_lpar(tokens, current_index);
+
+        let Some((start_range, end_range)) =
+            match_extraneous_parentheses(&mut token_iter, is_class_def)
+        else {
             continue;
         };
 

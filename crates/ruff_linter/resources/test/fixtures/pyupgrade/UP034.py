@@ -59,3 +59,21 @@ def f():
 
 # OK
 sum((i for i in range(3)), [])
+
+# OK (class base cannot be a bare generator expression)
+# https://github.com/astral-sh/ruff/issues/29422
+class Foo((base for base in bases)):
+    pass
+
+# OK (class with type parameters)
+class Bar[T]((base for base in bases)):
+    pass
+
+# UP034 (extra parentheses around generator expression in class base)
+class Baz(((base for base in bases))):
+    pass
+
+# UP034 (non-generator expression in class base)
+class Qux((object)):
+    pass
+

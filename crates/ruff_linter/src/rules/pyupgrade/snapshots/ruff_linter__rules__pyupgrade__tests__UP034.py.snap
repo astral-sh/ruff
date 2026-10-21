@@ -176,3 +176,35 @@ help: Remove extraneous parentheses
 39 + print(x for x in range(3))
 40 |
    |
+
+UP034 [*] Avoid extraneous parentheses
+  --> UP034.py:73:11
+   |
+72 | # UP034 (extra parentheses around generator expression in class base)
+73 | class Baz(((base for base in bases))):
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |     pass
+   |
+help: Remove extraneous parentheses
+   |
+72 | # UP034 (extra parentheses around generator expression in class base)
+   - class Baz(((base for base in bases))):
+73 + class Baz((base for base in bases)):
+74 |     pass
+   |
+
+UP034 [*] Avoid extraneous parentheses
+  --> UP034.py:77:11
+   |
+76 | # UP034 (non-generator expression in class base)
+77 | class Qux((object)):
+   |           ^^^^^^^^
+78 |     pass
+   |
+help: Remove extraneous parentheses
+   |
+76 | # UP034 (non-generator expression in class base)
+   - class Qux((object)):
+77 + class Qux(object):
+78 |     pass
+   |
