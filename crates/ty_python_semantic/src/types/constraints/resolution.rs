@@ -263,7 +263,10 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
         let body_visitor = Self { inferable, ..*self };
         body_visitor.visit_type(
             db,
-            recursive.constructor(db).unfold(db, self.env).into_type(),
+            recursive
+                .constructor(db)
+                .unfold_structurally(db, self.env)
+                .into_type(),
         );
     }
 

@@ -569,7 +569,7 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     type_is_self_referential_impl(
                         state,
-                        recursive.unfold(db, state.env).into_type(),
+                        recursive.unfold_structurally(db, state.env).into_type(),
                         self_identity,
                     )
                 }
@@ -1616,6 +1616,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 if visitor.materialize_typevar_bounds_and_defaults {

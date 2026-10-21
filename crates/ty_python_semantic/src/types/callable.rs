@@ -1299,6 +1299,11 @@ impl<'db> CallableType<'db> {
         if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
             return replacements.get(&self).copied().unwrap_or(self);
         }
+        if matches!(type_mapping, TypeMapping::NormalizeSets)
+            && matches!(self.signature_source(db), SignatureSource::Lambda(_))
+        {
+            return self;
+        }
         if matches!(type_mapping, TypeMapping::NormalizeLambdaSignatures)
             && matches!(self.signature_source(db), SignatureSource::Lambda(_))
         {

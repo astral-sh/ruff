@@ -1000,7 +1000,7 @@ impl<'db> Type<'db> {
                     definition,
                     name,
                     constructor.parameters(db),
-                    constructor.unfold(db, env).into_type(),
+                    constructor.unfold_structurally(db, env).into_type(),
                 )
             }
             _ => return None,

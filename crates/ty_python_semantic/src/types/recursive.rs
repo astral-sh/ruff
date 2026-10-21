@@ -722,16 +722,42 @@ impl<'db> RecursiveType<'db> {
         self.origin(db).environment(db)
     }
 
-    /// Substitute closed types for references before exposing the body.
+    /// Substitute closed types for references and normalize the completed body.
     ///
     /// Report whether unfolding returns exactly `Type::Recursive(self)`. An unfolded
     /// type can still contain recursive references, so callers must retain their recursion guards.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
-        self.unfold_with_materialization_visitor(db, &ApplyTypeMappingVisitor::new(env))
+        let UnfoldResult::Unfolded(unfolded) = self.unfold_structurally(db, env) else {
+            return UnfoldResult::Unchanged(self);
+        };
+        let normalized = unfolded.normalize_closed_sets(db, env);
+        if normalized == Type::Recursive(self) {
+            UnfoldResult::Unchanged(self)
+        } else {
+            UnfoldResult::Unfolded(normalized)
+        }
     }
 
-    /// Retain the consuming operation's context while materializing an unfolded body.
-    pub(super) fn unfold_with_materialization_visitor(
+    /// Expose the closed body without comparing its substituted elements.
+    ///
+    /// Mappings and constructor analyses use this form because semantic normalization can
+    /// request the same analysis again. Relations also consume the structural form directly,
+    /// keeping comparisons within their existing recursion guards. Other consumers use
+    /// `unfold`, which simplifies sets inside the completed body, such as a tuple element
+    /// specialized from `T & str` to `int & str`.
+    pub(super) fn unfold_structurally(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> UnfoldResult<'db> {
+        self.unfold_structurally_with_materialization_visitor(
+            db,
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
+    /// Retain the consuming operation's context while materializing a structural unfolding.
+    pub(super) fn unfold_structurally_with_materialization_visitor(
         self,
         db: &'db dyn Db,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
@@ -820,6 +846,9 @@ impl<'db> RecursiveType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if matches!(mapping, TypeMapping::NormalizeSets) {
+            return Type::Recursive(self);
+        }
         visitor.with_structural_reconstruction(|| {
             if let TypeMapping::Promote(mode, kind) = mapping
                 && let RecursiveOrigin::Lambda(_) = self.origin(db)
@@ -881,7 +910,7 @@ impl<'db> RecursiveType<'db> {
                 }
                 TypeMapping::Materialize(kind) => {
                     visitor.visit(db, Type::Recursive(self), mapping, || {
-                        self.unfold_with_materialization_visitor(db, visitor)
+                        self.unfold_structurally_with_materialization_visitor(db, visitor)
                             .map(|unfolded| {
                                 let mapped =
                                     unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -900,7 +929,7 @@ impl<'db> RecursiveType<'db> {
                     visitor.visit(db, Type::Recursive(self), mapping, || {
                         // Expand arguments only where the body exposes them. Expanding stored arguments
                         // first can feed a recursive alias's previous approximation into its own arguments.
-                        self.unfold_with_materialization_visitor(db, visitor)
+                        self.unfold_structurally_with_materialization_visitor(db, visitor)
                             .map(|unfolded| {
                                 let mapped =
                                     unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -921,7 +950,7 @@ impl<'db> RecursiveType<'db> {
                     });
                     let recursive = self.with_arguments(db, arguments);
                     recursive
-                        .unfold_with_materialization_visitor(db, visitor)
+                        .unfold_structurally_with_materialization_visitor(db, visitor)
                         .map(|unfolded| {
                             let mapped =
                                 unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
@@ -946,7 +975,7 @@ impl<'db> RecursiveType<'db> {
         // Equations describe formal parameters. Applied arguments contribute separate terms,
         // so a reference such as `R[list[T]]` does not unfold a larger body on every visit.
         self.constructor(db)
-            .unfold(db, &env)
+            .unfold_structurally(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)
     }
@@ -1265,7 +1294,8 @@ impl<'db> ConstructorComparison<'db> {
             {
                 return None;
             }
-            let UnfoldResult::Unfolded(body) = recursive.unfold(db, &recursive.environment(db))
+            let UnfoldResult::Unfolded(body) =
+                recursive.unfold_structurally(db, &recursive.environment(db))
             else {
                 return None;
             };
@@ -1291,12 +1321,12 @@ impl<'db> ConstructorComparison<'db> {
                         return false;
                     }
                     let UnfoldResult::Unfolded(source_body) =
-                        source.unfold(db, &source.environment(db))
+                        source.unfold_structurally(db, &source.environment(db))
                     else {
                         return false;
                     };
                     let UnfoldResult::Unfolded(target_body) =
-                        target.unfold(db, &target.environment(db))
+                        target.unfold_structurally(db, &target.environment(db))
                     else {
                         return false;
                     };
@@ -1552,7 +1582,7 @@ fn materialized_unfold<'db>(db: &'db dyn Db, recursive: RecursiveType<'db>) -> T
     let env = recursive.environment(db);
     let unfolded = recursive
         .with_materialization(db, None)
-        .unfold(db, &env)
+        .unfold_structurally(db, &env)
         .into_type();
     unfolded.apply_type_mapping_impl(
         db,

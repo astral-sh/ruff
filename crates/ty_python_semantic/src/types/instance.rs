@@ -1527,6 +1527,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         if left.is_object() || right.is_object() {
             return result;
         }
+        if let (NominalInstanceInner::ExactTuple(left), NominalInstanceInner::ExactTuple(right)) =
+            (left.0, right.0)
+        {
+            // Both instances have the builtin tuple class, so only their lengths and elements
+            // can prove disjointness. Converting them to classes would also construct element
+            // unions, starting fresh comparisons of potentially recursive elements.
+            return self.check_tuple_type_pair(db, left, right);
+        }
         let env = self.env;
         if let Some(left_spec) = left.tuple_spec(db, env)
             && let Some(right_spec) = right.tuple_spec(db, env)

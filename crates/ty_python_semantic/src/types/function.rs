@@ -1358,6 +1358,7 @@ impl<'db> FunctionType<'db> {
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_callables) = if type_mapping.is_structural()
+            || matches!(type_mapping, TypeMapping::NormalizeSets)
             || matches!(
                 type_mapping,
                 TypeMapping::ApplySpecialization(specialization)

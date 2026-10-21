@@ -182,6 +182,7 @@ impl<'db> LambdaMapping<'db> {
             TypeMapping::EagerExpansion => Self::EagerExpansion,
             TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => {
                 return None;
             }

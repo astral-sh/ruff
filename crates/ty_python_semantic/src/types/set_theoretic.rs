@@ -353,7 +353,20 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
+        if matches!(type_mapping, TypeMapping::NormalizeSets) {
+            let mut builder = UnionBuilder::new(db, visitor.env)
+                .unpack_aliases(false)
+                .or_recursively_defined(self.recursively_defined(db));
+            for element in self.elements(db) {
+                builder.add_in_place(element.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ));
+            }
+            builder.build()
+        } else if type_mapping.is_structural() {
             let elements = self.elements(db);
             let mapped = elements
                 .iter()

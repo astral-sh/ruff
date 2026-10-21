@@ -3353,6 +3353,78 @@ class Box(Generic[T]):
 reveal_type(Box(1).node()[1]()[0])  # revealed: int
 ```
 
+## Disjoint types in recursive lambda returns
+
+The lambda captures a value narrowed to both `T` and `str`. For `Box[int]`, no value can be both `int`
+and `str`, so the first tuple element is assignable to `Never`:
+
+```py
+from typing import Callable, Generic, Never, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        if not isinstance(value, str):
+            raise TypeError
+        self.node = lambda: (value, self.node)
+
+def result(value: Box[int]) -> Never:
+    return value.node()[0]  # no diagnostic
+```
+
+The same rule applies when the lambda is passed around without being called. A callback whose first
+tuple element is `str` is still rejected:
+
+```py
+def empty_callback(value: Box[int]) -> Callable[[], tuple[Never, object]]:
+    return value.node  # no diagnostic
+
+def nonempty_callback(value: Box[str]) -> Callable[[], tuple[Never, object]]:
+    return value.node  # error: [invalid-return-type]
+```
+
+Excluding a compatible callable leaves an empty type. This comparison still recognizes the empty
+intersection inside the recursive callback's return:
+
+```py
+from ty_extensions import Intersection, Not
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+def exclude(value: A, excluded: B) -> Intersection[A, Not[B]]:
+    raise NotImplementedError
+
+def excluded_callback(value: Box[int], callback: Callable[[], tuple[Never, object]]) -> Never:
+    return exclude(value.node, callback)  # no diagnostic
+```
+
+## Excluding a callable from a recursive return
+
+The recursive lambda returns another callback with a growing type argument. Excluding a callback
+that returns the captured value or `None` still leaves a callable, so the result is not assignable to
+`Never`:
+
+```py
+from typing import Final, Generic, Never, TypeVar
+from ty_extensions import Intersection, Not
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+
+def exclude(value: A, excluded: B) -> Intersection[A, Not[B]]:
+    raise NotImplementedError
+
+class Branch(Generic[T]):
+    def __init__(self, value: T, flag: bool = False):
+        self.node: Final = lambda: exclude(Branch([value]).node, lambda: value if flag else None)
+
+def check() -> Never:
+    return Branch(0).node()  # error: [invalid-return-type]
+```
+
 ## Generic constructors inside recursive lambdas
 
 Inference terminates when a recursive lambda passes its own result to a generic constructor whose
@@ -3409,6 +3481,25 @@ class Box(Generic[T]):
         self.callback: Final = partial(lambda: (value, Box(lambda: value).callback))
 
 Box(1).callback()[1]()[0]()  # no diagnostic
+```
+
+## Variadic parameters in recursive partials
+
+A partial that accepts variadic arguments can return another specialization of itself. The returned
+partial still accepts positional arguments:
+
+```py
+from functools import partial
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.callback = partial(lambda *args: (args, Box(lambda: value).callback))
+
+def check(box: Box[int]):
+    box.callback(1)[1](2)  # no diagnostic
 ```
 
 ## Recursive lambdas that capture callables

@@ -645,6 +645,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
@@ -946,10 +947,15 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
             let value_expr_types = match *self._value_expr_types(db) {
-                Some([first, second]) if type_mapping.is_structural() => Some([
-                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ]),
+                Some([first, second])
+                    if type_mapping.is_structural()
+                        || matches!(type_mapping, TypeMapping::NormalizeSets) =>
+                {
+                    Some([
+                        first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ])
+                }
                 value_expr_types => value_expr_types,
             };
 

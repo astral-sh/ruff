@@ -1116,14 +1116,20 @@ impl<'db> Type<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
-/// Derived checks can change the inferable variables or enable expensive checks while borrowing
-/// the same visitors, so both settings belong in the cache key.
+/// Derived checks can change the inferable variables, enable expensive checks, or omit an
+/// emptiness proof already performed for the source. Those settings belong in the cache key.
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     'db,
     TypeRelation,
     (
         Type<'db>,
-        (TypeRelation, TypeVarEvaluation, TypeVarSet<'db>, bool),
+        (
+            TypeRelation,
+            TypeVarEvaluation,
+            TypeVarSet<'db>,
+            bool,
+            SourceEmptiness,
+        ),
         Type<'db>,
     ),
     ConstraintSet<'db, 'c>,
@@ -1152,6 +1158,15 @@ impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
     pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
     }
+}
+
+/// Whether the current source has already contributed its emptiness constraints.
+/// Opening the same source or changing only the target preserves this state. Comparing a source
+/// component starts a new check.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub(crate) enum SourceEmptiness {
+    Unchecked,
+    Checked,
 }
 
 #[derive(Clone)]
@@ -1407,6 +1422,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         union: UnionType<'db>,
+        source_emptiness: SourceEmptiness,
     ) -> ConstraintSet<'db, 'c> {
         let target = Type::Union(union);
         if let Type::Intersection(intersection) = source
@@ -1424,7 +1440,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::Recursive(_)
                 | Type::TypeVar(_)
                 | Type::Intersection(_)
-                | Type::NewTypeInstance(_) => self.check_type_pair(db, source, target),
+                | Type::NewTypeInstance(_) => {
+                    self.check_type_pair_impl(db, source, target, source_emptiness)
+                }
                 // Every target alternative has already been checked against the closed source.
                 // Repeating those comparisons after opening a callable or another non-union
                 // would lose the source identity without adding a possible union partition.
@@ -1465,7 +1483,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 Type::TypeAlias(alias) => check_union_head(alias.value_type(db)),
                 Type::Recursive(recursive) => recursive
-                    .unfold_with_materialization_visitor(db, self.materialization_visitor)
+                    .unfold_structurally_with_materialization_visitor(
+                        db,
+                        self.materialization_visitor,
+                    )
                     .map(check_union_head)
                     .unwrap_or(ConstraintSet::from_bool(
                         self.constraints,
@@ -1482,7 +1503,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let result = elements
             .iter()
             .when_any(db, self.constraints, |&element| {
-                let result = self.check_type_pair(db, source, element);
+                let result = self.check_type_pair_impl(db, source, element, source_emptiness);
                 if let Some(context_tree) = context_tree {
                     let context = context_tree.take();
                     if !context.is_empty() {
@@ -1523,12 +1544,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         intersection: IntersectionType<'db>,
+        source_emptiness: SourceEmptiness,
     ) -> ConstraintSet<'db, 'c> {
         intersection
             .positive(db)
             .iter()
             .when_all(db, self.constraints, |&positive| {
-                let constraint_set = self.check_type_pair(db, source, positive);
+                let constraint_set =
+                    self.check_type_pair_impl(db, source, positive, source_emptiness);
                 if let Some(context) = self.report_context()
                     && constraint_set.is_never_satisfied(db, self.env, self.inferable)
                 {
@@ -1712,6 +1735,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        self.with_comparison_guard(db, source, target, SourceEmptiness::Unchecked, work)
+    }
+
+    fn with_comparison_guard(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        source_emptiness: SourceEmptiness,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let collect_context = self.is_context_collection_enabled();
         let pair = (
             source,
@@ -1720,6 +1754,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.typevar_evaluation,
                 self.inferable,
                 self.perform_expensive_checks,
+                source_emptiness,
             ),
             target,
         );
@@ -1870,15 +1905,25 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.check_type_pair_impl(db, source, target, SourceEmptiness::Unchecked)
+    }
+
+    fn check_type_pair_impl(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        source_emptiness: SourceEmptiness,
+    ) -> ConstraintSet<'db, 'c> {
         // Reflexivity and lazy constraints can bypass the RecursiveVar match arm below.
         source.assert_not_recursive_var();
         target.assert_not_recursive_var();
         if let Some(source) = source.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
+            return self.check_type_pair_impl(db, source, target, source_emptiness);
         }
 
         if let Some(target) = target.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
+            return self.check_type_pair_impl(db, source, target, source_emptiness);
         }
 
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
@@ -1959,27 +2004,42 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::Union(union)) if source.is_alias_like() => {
-                self.with_recursion_guard(db, source, target, || {
-                    // Keep the source reference while comparing individual alternatives. Opening
-                    // it first can hide a recursive alias pair behind two changing signatures.
-                    // If no alternative covers the source, check_target_union opens it afterward
-                    // so a source union can be covered by several target alternatives together.
-                    let normalized = if union.has_aliases(db) {
-                        union.normalize_aliases(db, env)
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
+                    let when_empty = if matches!(source, Type::Recursive(_))
+                        && source_emptiness == SourceEmptiness::Unchecked
+                    {
+                        self.as_disjointness_checker()
+                            .check_type_pair(db, source, source)
                     } else {
-                        target
+                        self.never()
                     };
-                    if normalized != target {
-                        self.check_type_pair(db, source, normalized)
+                    let source_emptiness = if matches!(source, Type::Recursive(_)) {
+                        SourceEmptiness::Checked
                     } else {
-                        self.check_target_union(db, source, union)
-                    }
+                        source_emptiness
+                    };
+                    when_empty.or(db, self.constraints, || {
+                        // Keep the source reference while comparing individual alternatives. Opening
+                        // it first can hide a recursive alias pair behind two changing signatures.
+                        // If no alternative covers the source, check_target_union opens it afterward
+                        // so a source union can be covered by several target alternatives together.
+                        let normalized = if union.has_aliases(db) {
+                            union.normalize_aliases(db, env)
+                        } else {
+                            target
+                        };
+                        if normalized != target {
+                            self.check_type_pair_impl(db, source, normalized, source_emptiness)
+                        } else {
+                            self.check_target_union(db, source, union, source_emptiness)
+                        }
+                    })
                 })
             }
 
             (Type::Recursive(source_recursive), _) => {
                 // Both comparing arguments and unfolding can revisit this pair.
-                self.with_recursion_guard(db, source, target, || {
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
                     let by_arguments = if let Type::Recursive(target_recursive) = target {
                         self.when_recursive_types_relate_by_arguments(
                             db,
@@ -1990,24 +2050,48 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         self.never()
                     };
                     by_arguments.or(db, self.constraints, || {
-                        source_recursive
-                            .unfold_with_materialization_visitor(db, self.materialization_visitor)
-                            .map(|source_unfolded| {
-                                self.check_type_pair(db, source_unfolded, target)
-                            })
-                            .unwrap_or(ConstraintSet::from_bool(
-                                self.constraints,
-                                self.relation.is_assignability(),
-                            ))
+                        // Keep the constructor as the identity of the emptiness proof. Its
+                        // unfolded intersection can change on every specialization, as in
+                        // R[T] = (() -> R[list[T]]) & ~(() -> T).
+                        let when_empty = if source_emptiness == SourceEmptiness::Unchecked {
+                            self.as_disjointness_checker()
+                                .check_type_pair(db, source, source)
+                        } else {
+                            self.never()
+                        };
+                        when_empty.or(db, self.constraints, || {
+                            source_recursive
+                                .unfold_structurally_with_materialization_visitor(
+                                    db,
+                                    self.materialization_visitor,
+                                )
+                                .map(|source_unfolded| {
+                                    self.check_type_pair_impl(
+                                        db,
+                                        source_unfolded,
+                                        target,
+                                        SourceEmptiness::Checked,
+                                    )
+                                })
+                                .unwrap_or(ConstraintSet::from_bool(
+                                    self.constraints,
+                                    self.relation.is_assignability(),
+                                ))
+                        })
                     })
                 })
             }
 
             (_, Type::Recursive(target_recursive)) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
                     target_recursive
-                        .unfold_with_materialization_visitor(db, self.materialization_visitor)
-                        .map(|target_unfolded| self.check_type_pair(db, source, target_unfolded))
+                        .unfold_structurally_with_materialization_visitor(
+                            db,
+                            self.materialization_visitor,
+                        )
+                        .map(|target_unfolded| {
+                            self.check_type_pair_impl(db, source, target_unfolded, source_emptiness)
+                        })
                         .unwrap_or(ConstraintSet::from_bool(
                             self.constraints,
                             self.relation.is_assignability(),
@@ -2024,14 +2108,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::TypeAlias(source_alias), _) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source_alias.value_type(db), target)
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
+                    self.check_type_pair_impl(
+                        db,
+                        source_alias.value_type(db),
+                        target,
+                        source_emptiness,
+                    )
                 })
             }
 
             (_, Type::TypeAlias(target_alias)) => {
-                self.with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, target_alias.value_type(db))
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
+                    self.check_type_pair_impl(
+                        db,
+                        source,
+                        target_alias.value_type(db),
+                        source_emptiness,
+                    )
                 })
             }
 
@@ -2039,30 +2133,65 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // types. Expand direct aliases for comparison so `~A` and `~list[Any]` compare
             // identically when `type A = list[Any]`.
             (Type::Intersection(intersection), _) if intersection.has_aliases(db) => self
-                .with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, intersection.expand_aliases(db, env), target)
+                .with_comparison_guard(db, source, target, source_emptiness, || {
+                    self.check_type_pair_impl(
+                        db,
+                        intersection.expand_aliases(db, env),
+                        target,
+                        source_emptiness,
+                    )
                 }),
 
             (_, Type::Intersection(intersection)) if intersection.has_aliases(db) => self
-                .with_recursion_guard(db, source, target, || {
-                    self.check_type_pair(db, source, intersection.expand_aliases(db, env))
+                .with_comparison_guard(db, source, target, source_emptiness, || {
+                    self.check_type_pair_impl(
+                        db,
+                        source,
+                        intersection.expand_aliases(db, env),
+                        source_emptiness,
+                    )
                 }),
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
             (_, Type::Union(union)) if union.has_aliases(db) => {
-                self.with_recursion_guard(db, source, target, || {
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
                     let normalized = union.normalize_aliases(db, env);
                     if normalized != target {
-                        self.check_type_pair(db, source, normalized)
+                        self.check_type_pair_impl(db, source, normalized, source_emptiness)
                     } else {
-                        self.check_type_pair_after_alias_normalization(db, source, target)
+                        self.check_type_pair_after_alias_normalization(
+                            db,
+                            source,
+                            target,
+                            source_emptiness,
+                        )
                     }
                 })
             }
 
-            _ => self.check_type_pair_after_alias_normalization(db, source, target),
+            (Type::Intersection(_), _) if source_emptiness == SourceEmptiness::Unchecked => {
+                self.with_comparison_guard(db, source, target, source_emptiness, || {
+                    // Structural substitution can leave an empty intersection such as `int & str`.
+                    // Prove emptiness with this operation's checker instead of rebuilding the set,
+                    // which would start fresh comparisons while this pair is still active.
+                    self.as_disjointness_checker()
+                        .check_type_pair(db, source, source)
+                        .or(db, self.constraints, || {
+                            self.check_type_pair_after_alias_normalization(
+                                db,
+                                source,
+                                target,
+                                SourceEmptiness::Checked,
+                            )
+                        })
+                })
+            }
+
+            _ => {
+                self.check_type_pair_after_alias_normalization(db, source, target, source_emptiness)
+            }
         }
     }
 
@@ -2073,6 +2202,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         db: &'db dyn Db,
         source: Type<'db>,
         target: Type<'db>,
+        source_emptiness: SourceEmptiness,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         match (source, target) {
@@ -2091,7 +2221,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::Divergent(_)
                 | Type::Recursive(_)
                 | Type::TypeAlias(_),
-            ) => self.check_type_pair(db, source, target),
+            ) => self.check_type_pair_impl(db, source, target, source_emptiness),
 
             (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
                 .with_recursion_guard(db, source, target, || {
@@ -2155,9 +2285,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, complement.to_intersection(db, env), target)
             }
 
-            (_, Type::EnumComplement(complement)) => {
-                self.check_type_pair(db, source, complement.to_intersection(db, env))
-            }
+            (_, Type::EnumComplement(complement)) => self.check_type_pair_impl(
+                db,
+                source,
+                complement.to_intersection(db, env),
+                source_emptiness,
+            ),
 
             // Field definitions in dataclasses and dataclass-transformers can involve calls to
             // `dataclasses.field` or custom field-specifier functions. The annotated return type
@@ -2441,10 +2574,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .exact_tuple_instance_spec(db)
                         .is_some_and(|spec| spec.is_variadic()) =>
             {
-                self.check_type_pair(
+                self.check_type_pair_impl(
                     db,
                     source,
                     Type::tuple(TupleType::unpacked_typevartuple(db, env, bound_typevar)),
+                    source_emptiness,
                 )
             }
 
@@ -2490,7 +2624,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .constraints(db, env)
                         .when_some_and(db, self.constraints, |constraints| {
                             constraints.iter().when_all(db, self.constraints, |c| {
-                                self.check_type_pair(db, source, *c)
+                                self.check_type_pair_impl(db, source, *c, source_emptiness)
                             })
                         })
                     && !constraints.is_never_satisfied(db, env, self.inferable) =>
@@ -2535,13 +2669,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::Union(union), _) => self.check_source_union(db, union, target),
-            (_, Type::Union(union)) => self.check_target_union(db, source, union),
+            (_, Type::Union(union)) => self.check_target_union(db, source, union, source_emptiness),
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
             (_, Type::Intersection(intersection)) => {
-                self.check_target_intersection(db, source, intersection)
+                self.check_target_intersection(db, source, intersection, source_emptiness)
             }
 
             // Check an inferable target's bound before splitting a source intersection.
@@ -2553,7 +2687,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 typevar.typevar(db).upper_bound(db, env).when_none_or(
                     db,
                     self.constraints,
-                    |bound| self.check_type_pair(db, source, bound),
+                    |bound| self.check_type_pair_impl(db, source, bound, source_emptiness),
                 )
             }
 
@@ -3141,7 +3275,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::SubclassOf(subclass_of_ty))
                 if subclass_of_ty.is_dynamic() && self.relation.is_assignability() =>
             {
-                self.check_type_pair(db, source, KnownClass::Type.to_instance(db, env))
+                self.check_type_pair_impl(
+                    db,
+                    source,
+                    KnownClass::Type.to_instance(db, env),
+                    source_emptiness,
+                )
             }
 
             // `type[str]` (== `SubclassOf("str")` in ty) describes all possible runtime subclasses
@@ -3194,18 +3333,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::PropertyInstance(property), _) => {
                 self.check_type_pair(db, property.instance_fallback(db, env), target)
             }
-            (_, Type::PropertyInstance(property)) => {
-                self.check_type_pair(db, source, property.instance_fallback(db, env))
-            }
+            (_, Type::PropertyInstance(property)) => self.check_type_pair_impl(
+                db,
+                source,
+                property.instance_fallback(db, env),
+                source_emptiness,
+            ),
             (Type::SlotDescriptor(_), _) => self.check_type_pair(
                 db,
                 KnownClass::MemberDescriptorType.to_instance(db, env),
                 target,
             ),
-            (_, Type::SlotDescriptor(_)) => self.check_type_pair(
+            (_, Type::SlotDescriptor(_)) => self.check_type_pair_impl(
                 db,
                 source,
                 KnownClass::MemberDescriptorType.to_instance(db, env),
+                source_emptiness,
             ),
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
@@ -3626,7 +3769,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         if let Some(context) = self.report_context() {
             context.take();
         }
-        let result = self.check_type_pair_impl(db, left, right);
+        let empty_intersection = if self.perform_expensive_checks && left != right {
+            [left, right]
+                .into_iter()
+                .filter(|ty| matches!(ty, Type::Intersection(_)))
+                .when_any(db, self.constraints, |ty| self.check_type_pair(db, ty, ty))
+        } else {
+            self.never()
+        };
+        let result = empty_intersection.or(db, self.constraints, || {
+            self.check_type_pair_impl(db, left, right)
+        });
         if let Some(context) = self.report_context()
             && !result.is_always_satisfied(db, self.env, self.inferable)
         {
@@ -3676,10 +3829,50 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
+            // Split unions before unfolding recursive types. Otherwise, comparing a recursive
+            // constructor to a union containing it can keep growing the union's type arguments
+            // without comparing the two constructors while both recursion guards are active.
+            (Type::Union(union), other) | (other, Type::Union(union)) => {
+                nontrivial_check(self, || {
+                    let mut children = Vec::new();
+                    let result = union
+                        .elements(db)
+                        .iter()
+                        .when_all(db, self.constraints, |e| {
+                            let result = self.check_type_pair(db, *e, other);
+                            if let Some(context) = self.report_context() {
+                                if context.is_empty() {
+                                    context.push(ErrorContext::DisjointTypes {
+                                        left: *e,
+                                        right: other,
+                                    });
+                                }
+                                children.push(context.take());
+                            }
+                            result
+                        });
+                    if let Some(context) = self.report_context()
+                        && result.is_always_satisfied(db, env, self.inferable)
+                    {
+                        context.set(
+                            ErrorContext::DisjointUnion {
+                                union: Type::Union(union),
+                                other,
+                            },
+                            children,
+                        );
+                    }
+                    result
+                })
+            }
+
             (Type::Recursive(left_recursive), _) => {
                 self.with_recursion_guard(db, left, right, || {
                     left_recursive
-                        .unfold_with_materialization_visitor(db, self.materialization_visitor)
+                        .unfold_structurally_with_materialization_visitor(
+                            db,
+                            self.materialization_visitor,
+                        )
                         .map(|left_unfolded| self.check_type_pair(db, left_unfolded, right))
                         .unwrap_or(self.never())
                 })
@@ -3688,7 +3881,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (_, Type::Recursive(right_recursive)) => {
                 self.with_recursion_guard(db, left, right, || {
                     right_recursive
-                        .unfold_with_materialization_visitor(db, self.materialization_visitor)
+                        .unfold_structurally_with_materialization_visitor(
+                            db,
+                            self.materialization_visitor,
+                        )
                         .map(|right_unfolded| self.check_type_pair(db, left, right_unfolded))
                         .unwrap_or(self.never())
                 })
@@ -3784,69 +3980,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // TODO: Infer specializations here
             (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => self.never(),
 
-            (Type::Union(union), other) | (other, Type::Union(union)) => {
-                nontrivial_check(self, || {
-                    let mut children = Vec::new();
-                    let result = union
-                        .elements(db)
-                        .iter()
-                        .when_all(db, self.constraints, |e| {
-                            let result = self.check_type_pair(db, *e, other);
-                            if let Some(context) = self.report_context() {
-                                if context.is_empty() {
-                                    context.push(ErrorContext::DisjointTypes {
-                                        left: *e,
-                                        right: other,
-                                    });
-                                }
-                                children.push(context.take());
-                            }
-                            result
-                        });
-                    if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, env, self.inferable)
-                    {
-                        context.set(
-                            ErrorContext::DisjointUnion {
-                                union: Type::Union(union),
-                                other,
-                            },
-                            children,
-                        );
-                    }
-                    result
-                })
-            }
-
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
             (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => {
                 nontrivial_check(self, || {
-                    if let Some(alternatives) = left_intersection.finite_alternative_union(db, env)
-                    {
-                        self.check_type_pair(db, alternatives, right)
-                    } else if let Some(alternatives) =
-                        right_intersection.finite_alternative_union(db, env)
-                    {
-                        self.check_type_pair(db, left, alternatives)
-                    } else {
-                        self.with_recursion_guard(db, left, right, || {
+                    self.with_recursion_guard(db, left, right, || {
+                        if let Some(alternatives) =
+                            left_intersection.finite_alternative_union(db, env)
+                        {
+                            self.check_type_pair(db, alternatives, right)
+                        } else if let Some(alternatives) =
+                            right_intersection.finite_alternative_union(db, env)
+                        {
+                            self.check_type_pair(db, left, alternatives)
+                        } else {
                             left_intersection
-                                .positive(db)
-                                .iter()
-                                .when_any(db, self.constraints, |&pos_ty| {
+                                .positive_elements_or_object(db)
+                                .when_any(db, self.constraints, |pos_ty| {
                                     self.check_type_pair(db, pos_ty, right)
                                 })
                                 .or(db, self.constraints, || {
-                                    right_intersection.positive(db).iter().when_any(
+                                    right_intersection.positive_elements_or_object(db).when_any(
                                         db,
                                         self.constraints,
-                                        |&pos_ty| self.check_type_pair(db, pos_ty, left),
+                                        |pos_ty| self.check_type_pair(db, pos_ty, left),
                                     )
                                 })
-                        })
-                    }
+                        }
+                    })
                 })
             }
 

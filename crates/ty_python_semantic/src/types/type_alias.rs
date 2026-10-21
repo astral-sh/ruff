@@ -270,7 +270,12 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
                 self.recover(db, value)
             }),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
-                self.recover(db, recursive.unfold(db, self.env).into_unfolded()?)
+                self.recover(
+                    db,
+                    recursive
+                        .unfold_structurally(db, self.env)
+                        .into_unfolded()?,
+                )
             }),
             Type::Union(union) => {
                 let elements: Vec<_> = union
@@ -820,7 +825,9 @@ impl<'db> TypeAliasType<'db> {
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
         match type_mapping {
-            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::NormalizeLambdaSignatures => {
+            TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,

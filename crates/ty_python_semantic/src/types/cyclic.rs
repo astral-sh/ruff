@@ -657,7 +657,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
     fn visit_definition_body(&self, db: &'db dyn Db, source: RecursiveDefinition<'db>) -> bool {
         match source {
             RecursiveDefinition::Structural(recursive) => {
-                self.visit_type(db, recursive.unfold(db, &self.env).into_type());
+                self.visit_type(db, recursive.unfold_structurally(db, &self.env).into_type());
             }
             RecursiveDefinition::TypeAlias(alias) => {
                 self.visit_type(db, alias.raw_value_type(db));

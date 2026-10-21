@@ -80,7 +80,7 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'d
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
             self.visit_guarded(db, Type::Recursive(recursive), || {
-                self.visit_type(db, recursive.unfold(db, self.env).into_type());
+                self.visit_type(db, recursive.unfold_structurally(db, self.env).into_type());
             });
         }
 

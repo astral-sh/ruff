@@ -9494,6 +9494,37 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
+    /// Normalize sets in an exposed type without opening recursive or lazy definitions.
+    ///
+    /// Recursive substitution preserves sets structurally until a semantic operation consumes
+    /// the closed result. A circular simplification retains that result rather than using a
+    /// provisional relation to discard one of its components.
+    pub(super) fn normalize_closed_sets(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_result=|_, _, _, ty| ty,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn normalize_closed_sets_impl<'db>(
+            db: &'db dyn Db,
+            program: Program<'db>,
+            ty: Type<'db>,
+        ) -> Type<'db> {
+            ty.apply_type_mapping(
+                db,
+                &ProgramEnvironment::from_program(program),
+                &TypeMapping::NormalizeSets,
+                TypeContext::default(),
+            )
+        }
+
+        normalize_closed_sets_impl(db, env.program(db), self)
+    }
+
     fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -9737,6 +9768,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
+            Type::NewTypeInstance(_) if matches!(type_mapping, TypeMapping::NormalizeSets) => self,
             Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -9870,6 +9902,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -9893,6 +9926,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::NormalizeLambdaSignatures
+                | TypeMapping::NormalizeSets
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -10026,7 +10060,7 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold_structurally(db, env) {
                     unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
                 }
             }),
@@ -10489,7 +10523,7 @@ impl<'db> Type<'db> {
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db, env),
             Self::Recursive(recursive) => recursive
-                .unfold(db, env)
+                .unfold_structurally(db, env)
                 .into_unfolded()?
                 .definition(db, env),
             Self::NewTypeInstance(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
@@ -11289,6 +11323,10 @@ pub enum TypeMapping<'a, 'db> {
     /// bind recursive return types before semantic operations inspect them.
     NormalizeLambdaSignatures,
 
+    /// Normalize unions and intersections in stored type components without evaluating lazy
+    /// definitions or opening recursive constructors.
+    NormalizeSets,
+
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
 }
@@ -11355,6 +11393,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11406,6 +11445,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::NormalizeLambdaSignatures
+            | TypeMapping::NormalizeSets
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
@@ -11433,6 +11473,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | Self::ReplaceParameterDefaults
             | Self::EagerExpansion
             | Self::NormalizeLambdaSignatures
+            | Self::NormalizeSets
             | Self::RescopeReturnCallables(_) => false,
         }
     }

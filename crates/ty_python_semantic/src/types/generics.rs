@@ -845,7 +845,7 @@ impl<'db> GenericContext<'db> {
                 self.active_aliases.visit(
                     &Type::Recursive(recursive).to_type_identity(db),
                     || (),
-                    || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+                    || self.visit_type(db, recursive.unfold_structurally(db, self.env).into_type()),
                 );
             }
 
