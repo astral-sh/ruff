@@ -766,6 +766,13 @@ impl Project {
     ///
     /// This is a no-op if the project files haven't been indexed yet.
     fn replace_index_diagnostics(self, db: &mut dyn Db, diagnostics: Vec<Diagnostic>) {
+        // Check before acquiring a mutable index, which cancels pending queries.
+        match self.file_set(db).get() {
+            Index::Lazy(_) => return,
+            Index::Indexed(index) if index.diagnostics() == diagnostics => return,
+            Index::Indexed(_) => {}
+        }
+
         let Some(mut index) = IndexedFiles::indexed_mut(db, self) else {
             return;
         };
