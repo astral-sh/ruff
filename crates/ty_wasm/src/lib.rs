@@ -565,7 +565,7 @@ impl Workspace {
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                 }
             })
             .collect())
@@ -757,7 +757,7 @@ impl Workspace {
                     label: sig.label,
                     documentation: sig
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }

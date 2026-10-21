@@ -289,7 +289,6 @@ mod tests {
     use insta::assert_snapshot;
 
     use crate::MarkupKind;
-    use crate::docstring::Docstring;
     use crate::signature_help::SignatureHelpInfo;
     use crate::tests::{CursorTest, cursor_test};
 
@@ -335,7 +334,7 @@ mod tests {
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some(expected_docstring.to_string())
         );
 
@@ -416,7 +415,9 @@ mod tests {
             .and_then(|result| result.signatures.into_iter().next())
             .and_then(|signature| signature.documentation);
         assert_eq!(
-            documentation.as_ref().map(Docstring::render_plaintext),
+            documentation
+                .as_ref()
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some("Factory method documentation.\n".to_string())
         );
     }
@@ -1076,7 +1077,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some(expected_docstring.to_string())
         );
     }
@@ -1262,7 +1263,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             None
         );
     }
@@ -1559,7 +1560,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some(expected_docstring.to_string())
         );
     }
@@ -1590,7 +1591,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some(expected_docstring.to_string())
         );
     }
@@ -1629,7 +1630,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some("The int overload\n".to_string())
         );
     }
@@ -1668,7 +1669,7 @@ def ab(a: int, *, c: int):
             signature
                 .documentation
                 .as_ref()
-                .map(Docstring::render_plaintext),
+                .map(|docstring| docstring.render(MarkupKind::PlainText)),
             Some("The real implementation\n".to_string())
         );
     }
@@ -1707,7 +1708,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(Docstring::render_plaintext)
+                        .map(|docstring| docstring.render(MarkupKind::PlainText))
                         .unwrap_or_default(),
                 )
                 .unwrap();
@@ -1745,7 +1746,7 @@ def ab(a: int, *, c: int):
                     docs = signature
                         .documentation
                         .as_ref()
-                        .map(Docstring::render_plaintext)
+                        .map(|docstring| docstring.render(MarkupKind::PlainText))
                         .unwrap_or_default(),
                 )
                 .unwrap();
