@@ -1858,6 +1858,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         match (source, target) {
+            // Runtime generic aliases retain their existing inheritance-based relations until
+            // they are checked as alias objects.
+            (Type::ClassLiteral(source_class), Type::GenericAlias(target_alias)) => self
+                .check_class_pair(
+                    db,
+                    source_class.default_specialization(db),
+                    ClassType::Generic(target_alias),
+                ),
+            (
+                Type::GenericAlias(source_alias) | Type::SpecializedClass(source_alias),
+                Type::GenericAlias(target_alias),
+            )
+            | (Type::GenericAlias(source_alias), Type::SpecializedClass(target_alias)) => self
+                .check_class_pair(
+                    db,
+                    ClassType::Generic(source_alias),
+                    ClassType::Generic(target_alias),
+                ),
+            (Type::GenericAlias(alias), Type::ClassLiteral(_)) => self.check_type_pair(
+                db,
+                ClassType::Generic(alias).metaclass_instance_type(db, env),
+                target,
+            ),
             (Type::GenericAlias(alias), _) => {
                 self.check_type_pair(db, Type::SpecializedClass(alias), target)
             }
@@ -2946,10 +2969,22 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
             }
 
-            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a specialized class type)
-            // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
-            // with final generic types, where `type[C[...]]` is simplified to the specialized-class
-            // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
+            // Both variants identify an exact class object. Specialization information may differ,
+            // but a subclass represents a different object even when its instances are subtypes.
+            (Type::ClassLiteral(class), Type::SpecializedClass(alias))
+            | (Type::SpecializedClass(alias), Type::ClassLiteral(class))
+                if class.as_static() != Some(alias.origin(db)) =>
+            {
+                self.never()
+            }
+            (Type::SpecializedClass(source), Type::SpecializedClass(target))
+                if source.origin(db) != target.origin(db) =>
+            {
+                self.never()
+            }
+
+            // A bare generic class uses its default specialization when compared with a specialized
+            // class object, including `type[C[...]]` when `C` is final.
             (Type::ClassLiteral(source_cls), Type::SpecializedClass(target_alias)) => self
                 .check_class_pair(
                     db,
@@ -2957,7 +2992,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     ClassType::Generic(target_alias),
                 ),
 
-            // For specialized class objects, we delegate to the underlying class type.
+            (Type::SpecializedClass(source_alias), Type::ClassLiteral(target_cls)) => self
+                .check_class_pair(
+                    db,
+                    ClassType::Generic(source_alias),
+                    target_cls.default_specialization(db),
+                ),
+
             (Type::SpecializedClass(source_alias), Type::SpecializedClass(target_alias)) => self
                 .check_class_pair(
                     db,

@@ -120,6 +120,50 @@ fn generic_alias_and_specialized_class() -> anyhow::Result<()> {
 }
 
 #[test]
+fn specialized_class_relations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        class Base[T]: ...
+        class Child[T](Base[T]): ...
+
+        base_alias = Base[int]
+        child_alias = Child[int]
+        "#,
+    )?;
+
+    let env = db.program_environment();
+    let symbol = |name| get_symbol(&db, "/src/main.py", &[], name).expect_type();
+    let Type::GenericAlias(base_alias) = symbol("base_alias") else {
+        anyhow::bail!("expected a generic alias for Base[int]");
+    };
+    let Type::GenericAlias(child_alias) = symbol("child_alias") else {
+        anyhow::bail!("expected a generic alias for Child[int]");
+    };
+    let base = Type::SpecializedClass(base_alias);
+    let child = Type::SpecializedClass(child_alias);
+    let base_literal = symbol("Base");
+    let child_literal = symbol("Child");
+
+    assert!(base.is_singleton(&db, &env));
+    assert!(base.is_assignable_to(&db, &env, base_literal));
+    assert!(base_literal.is_assignable_to(&db, &env, base));
+    assert!(!base.is_disjoint_from(&db, &env, base_literal));
+
+    assert!(!child.is_subtype_of(&db, &env, base));
+    assert!(!child.is_assignable_to(&db, &env, base));
+    assert!(!child_literal.is_assignable_to(&db, &env, base));
+    assert!(!child.is_assignable_to(&db, &env, base_literal));
+    assert!(child.is_disjoint_from(&db, &env, base));
+    assert!(child.is_disjoint_from(&db, &env, base_literal));
+    assert!(child_literal.is_disjoint_from(&db, &env, base));
+
+    assert!(symbol("child_alias").is_subtype_of(&db, &env, symbol("base_alias")));
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)

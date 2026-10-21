@@ -2114,11 +2114,10 @@ pub enum Type<'db> {
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object (either from a `class` statement or `type()` call)
     ClassLiteral(ClassLiteral<'db>),
-    /// A class object carrying specialization information. The class may be a subclass of the
-    /// specialization's origin, so the origin does not necessarily identify the runtime class.
+    /// The exact class object identified by the specialization's origin, carrying static type
+    /// arguments. Subclasses are represented by `SubclassOf`, not by this variant.
     SpecializedClass(ClassSpecialization<'db>),
-    /// A runtime generic alias such as `list[int]`, distinct from a class object. Operations
-    /// currently retain the same behavior as specialized class objects.
+    /// A runtime generic alias such as `list[int]`, distinct from a class object.
     GenericAlias(ClassSpecialization<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
@@ -4113,10 +4112,11 @@ impl<'db> Type<'db> {
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
-            Type::SpecializedClass(..) | Type::GenericAlias(..) => false,
+            Type::GenericAlias(..) => false,
             Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
+            | Type::SpecializedClass(..)
             | Type::ModuleLiteral(..) => true,
             Type::SpecialForm(special_form) => special_form.is_guaranteed_singleton(),
             Type::KnownInstance(KnownInstanceType::Sentinel(_)) => true,

@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::types::dedicated::numpy;
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
@@ -282,6 +283,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
+        if let Some(alias) =
+            definition.and_then(|definition| numpy::scalar_class_alias(db, ty, definition))
+        {
+            return Type::instance(db, env, alias.into());
+        }
         match self.legacy_type_alias_reference(ty, definition, annotation) {
             LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =

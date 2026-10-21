@@ -607,8 +607,9 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                     SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
                         Some(constraint_from_class_literal(class_literal))
                     }
-                    // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
-                    // e.g. `isinstance(x, list[int])` fails at runtime.
+                    // TODO: Narrow positively against the unspecialized origin, as for other
+                    // class objects. The specialization does not constrain which instances
+                    // pass a runtime check, and the class may be a subclass of the origin.
                     SubclassOfInner::Class(ClassType::Generic(_)) => None,
                     SubclassOfInner::Dynamic(dynamic) => Some(Type::Dynamic(dynamic)),
                     // TODO: This narrowing is not fully sound:
@@ -671,7 +672,8 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
                 }
             }
 
-            // We do not currently narrow against specialized class objects.
+            // TODO: Narrow against the unspecialized origin. A specialized class object
+            // identifies that exact class, but runtime checks do not inspect its type arguments.
             Type::SpecializedClass(_) => None,
 
             Type::NominalInstance(nominal) if let Some(tuple) = nominal.tuple_spec(db, env) => {

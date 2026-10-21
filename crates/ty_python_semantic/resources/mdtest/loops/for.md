@@ -233,6 +233,16 @@ for x in (1, "a", b"foo"):
 reveal_type(x)  # revealed: Literal[1, "a", b"foo"]
 ```
 
+## Tuple class objects
+
+The `tuple` class does not support iteration:
+
+```py
+def iterate_tuple_class(values: tuple[int, ...]):
+    for _ in values.__class__:  # error: [not-iterable]
+        pass
+```
+
 ## With statically non-empty literals
 
 ```py
