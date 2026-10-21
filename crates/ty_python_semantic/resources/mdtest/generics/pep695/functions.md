@@ -1597,50 +1597,48 @@ def _(
 
 ### Returning values from mixed-variance unions
 
-`Batch` is invariant in its type parameter because its `value` attribute is writable;
-`ReadOnlyBatch` is covariant because it only returns values of that type. Inference finds two valid
-specializations for the call to `first_value` below, returning `V@forward` and
-`V@forward | Batch[V@forward]`. The first return type is a subtype of the second, so inference
-selects `V@forward`:
+Inference finds two valid specializations for the call to `first_value` below, returning `V@forward`
+and `V@forward | Invariant[V@forward]`. The first return type is a subtype of the second, so
+inference selects `V@forward`:
 
 ```py
 from typing import Callable
 
-class ReadOnlyBatch[V]:
+class Covariant[V]:
     def get(self) -> V:
         raise NotImplementedError
 
-class Batch[V]:
+class Invariant[V]:
     value: V
 
-def first_value[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> V:
+def first_value[V](mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> V:
     raise NotImplementedError
 
-def forward[V](mapping: V | Batch[V] | ReadOnlyBatch[V]) -> V:
+def forward[V](mapping: V | Invariant[V] | Covariant[V]) -> V:
     value = first_value(lambda: mapping)
     reveal_type(value)  # revealed: V@forward
     return value
 ```
 
 The comparison uses the complete return types after substituting the inferred type arguments. For
-`make_list`, the two choices produce `list[V]` and `list[V | Batch[V]]`. Neither is a subtype of the
-other, because lists are invariant, so inference keeps the merged result below.
+`make_list`, the two choices produce `list[V]` and `list[V | Invariant[V]]`. Neither is a subtype of
+the other, because lists are invariant, so inference keeps the merged result below.
 
-For `make_sink`, a callable accepting `V | Batch[V]` is a subtype of one accepting only `V`: it
+For `make_sink`, a callable accepting `V | Invariant[V]` is a subtype of one accepting only `V`: it
 accepts every input the latter accepts. The wider parameter type therefore produces the narrower
 callable type, which inference selects:
 
 ```py
-def make_list[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> list[V]:
+def make_list[V](mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> list[V]:
     return []
 
-def make_sink[V](mapping: Callable[[], V | Batch[V] | ReadOnlyBatch[V]]) -> Callable[[V], None]:
+def make_sink[V](mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callable[[V], None]:
     return lambda value: None
 
-def wrapped_returns[V](mapping: V | Batch[V] | ReadOnlyBatch[V]) -> None:
-    # revealed: list[V@wrapped_returns | ReadOnlyBatch[V@wrapped_returns] | Batch[V@wrapped_returns]]
+def wrapped_returns[V](mapping: V | Invariant[V] | Covariant[V]) -> None:
+    # revealed: list[V@wrapped_returns | Covariant[V@wrapped_returns] | Invariant[V@wrapped_returns]]
     reveal_type(make_list(lambda: mapping))
-    reveal_type(make_sink(lambda: mapping))  # revealed: (Batch[V@wrapped_returns] | V@wrapped_returns, /) -> None
+    reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
 
 ### Inferred TypedDict return alternatives
