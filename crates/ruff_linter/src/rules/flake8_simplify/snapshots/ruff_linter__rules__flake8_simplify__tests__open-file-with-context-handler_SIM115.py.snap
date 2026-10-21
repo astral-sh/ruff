@@ -366,3 +366,43 @@ SIM115 Use a context manager for opening files
     |     ^^^^^^^^^^^^^^^^
 259 | f.close()
     |
+
+SIM115 Use a context manager for opening files
+   --> SIM115.py:292:24
+    |
+290 | # SIM115
+291 | def f():
+292 |     return [x for x in open("a")]
+    |                        ^^^^
+
+SIM115 Use a context manager for opening files
+   --> SIM115.py:297:24
+    |
+295 | # SIM115
+296 | def f():
+297 |     return (x for x in open("a"))
+    |                        ^^^^
+
+SIM115 Use a context manager for opening files
+   --> SIM115.py:302:24
+    |
+300 | # SIM115
+301 | def f():
+302 |     return {x for x in open("a")}
+    |                        ^^^^
+
+SIM115 Use a context manager for opening files
+   --> SIM115.py:307:27
+    |
+305 | # SIM115
+306 | def f():
+307 |     return {x: 1 for x in open("a")}
+    |                           ^^^^
+
+SIM115 Use a context manager for opening files
+   --> SIM115.py:312:21
+    |
+310 | # SIM115
+311 | def f():
+312 |     x = [x for x in open("a")]
+    |                     ^^^^

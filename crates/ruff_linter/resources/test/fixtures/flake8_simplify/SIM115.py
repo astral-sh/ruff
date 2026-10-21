@@ -285,3 +285,34 @@ async def foo():
 class ExampleTests(TestCase):
     def setUp(self):
         self.enterContext(open("filename"))
+
+
+# SIM115
+def f():
+    return [x for x in open("a")]
+
+
+# SIM115
+def f():
+    return (x for x in open("a"))
+
+
+# SIM115
+def f():
+    return {x for x in open("a")}
+
+
+# SIM115
+def f():
+    return {x: 1 for x in open("a")}
+
+
+# SIM115
+def f():
+    x = [x for x in open("a")]
+
+
+# OK
+def f(filenames):
+    with contextlib.ExitStack() as stack:
+        return [stack.enter_context(open(fname)) for fname in filenames]

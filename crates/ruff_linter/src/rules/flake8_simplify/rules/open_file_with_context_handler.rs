@@ -244,7 +244,14 @@ pub(crate) fn open_file_with_context_handler(checker: &Checker, call: &ast::Expr
     }
 
     // Ex) `return open("foo.txt")`
-    if semantic.current_statement().is_return_stmt() {
+    if semantic.current_statement().is_return_stmt()
+        && !semantic.current_expressions().any(|expr| {
+            matches!(
+                expr,
+                Expr::ListComp(_) | Expr::SetComp(_) | Expr::DictComp(_) | Expr::Generator(_)
+            )
+        })
+    {
         return;
     }
 
