@@ -76,7 +76,7 @@ enum AttributeContractKind {
 }
 
 /// Whether every alternative has method binding behavior rather than only a call signature.
-pub(super) fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     ty.as_union()
         .map_or(std::slice::from_ref(&ty), |union| union.elements(db))
         .iter()
