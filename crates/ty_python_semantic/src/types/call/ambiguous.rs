@@ -121,7 +121,12 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
         if !residuals.is_empty() {
             // Keep each overload's remaining union intact. Differing concrete returns still
             // require ordinary ambiguity handling, even when a cycle marker is also present.
-            builder.add_in_place(self.equivalent_representative(&residuals)?);
+            let equivalent = self.equivalent_representative(&residuals)?;
+            // A marker-only return has no concrete evidence to agree with the other overloads.
+            // Keep its marker until the cycle resolves instead of retaining a speculative return.
+            if residuals.len() == types.len() {
+                builder.add_in_place(equivalent);
+            }
         }
         Some(builder.build())
     }
