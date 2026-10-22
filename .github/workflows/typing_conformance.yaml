@@ -131,7 +131,7 @@ jobs:
       github.repository == 'astral-sh/ruff' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (needs.typing_conformance.result == 'success' || needs.typing_conformance.result == 'failure')
-    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782
+    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@main # zizmor: ignore[unpinned-uses]
     secrets:
       KV_API_URL: ${{ secrets.KV_API_URL }}
       STS_API_URL: ${{ secrets.STS_API_URL }}
