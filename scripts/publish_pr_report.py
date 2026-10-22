@@ -115,8 +115,8 @@ def find_artifact(run_id: int, name: str) -> dict | None:
     return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
-def download_artifact(artifact: dict) -> bytes:
-    if artifact["size_in_bytes"] > MAX_ARCHIVE_BYTES:
+def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:
+    if artifact["size_in_bytes"] > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     result = subprocess.run(
         [
@@ -128,23 +128,25 @@ def download_artifact(artifact: dict) -> bytes:
         stdout=subprocess.PIPE,
         timeout=120,
     )
-    if len(result.stdout) > MAX_ARCHIVE_BYTES:
+    if len(result.stdout) > max_bytes:
         raise ValueError("The report archive exceeds the download limit.")
     return result.stdout
 
 
-def read_report(archive_bytes: bytes, filename: str) -> str:
+def read_report(
+    archive_bytes: bytes, filename: str, *, max_bytes: int = MAX_REPORT_BYTES
+) -> str:
     # Read one fixed member in memory. Archive paths are never extracted, and
     # artifacts cannot replace the publisher or supply executable configuration.
     with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
         members = [info for info in archive.infolist() if info.filename == filename]
         if len(members) != 1 or members[0].is_dir():
             raise ValueError(f"Expected exactly one {filename} report in the archive.")
-        if members[0].file_size > MAX_REPORT_BYTES:
+        if members[0].file_size > max_bytes:
             raise ValueError("The uncompressed report exceeds the size limit.")
         with archive.open(members[0]) as member:
-            data = member.read(MAX_REPORT_BYTES + 1)
-        if len(data) > MAX_REPORT_BYTES:
+            data = member.read(max_bytes + 1)
+        if len(data) > max_bytes:
             raise ValueError("The uncompressed report exceeds the size limit.")
         return data.decode("utf-8")
 
@@ -157,6 +159,7 @@ def render_report(
     *,
     title: str = "",
     full_report: dict | None = None,
+    full_report_url: str = "",
 ) -> str:
     if len(contents) > MAX_REPORT_CHARACTERS:
         artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
@@ -166,6 +169,12 @@ def render_report(
         )
     if title:
         contents = f"## {title}\n\n{contents}"
+    if full_report_url:
+        contents = (
+            f"{contents.rstrip()}\n\n"
+            f"**[Full report with detailed diff]({full_report_url}/diff.html)** "
+            f"([timing results]({full_report_url}/timing.html))"
+        )
     if full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
@@ -232,6 +241,7 @@ def publish(
     filename: str,
     title: str = "",
     full_report_artifact: str = "",
+    full_report_url: str = "",
     stored_comment_id: int | None = None,
     dry_run: bool = False,
 ) -> int | None:
@@ -248,7 +258,13 @@ def publish(
         find_artifact(run_id, full_report_artifact) if full_report_artifact else None
     )
     body = render_report(
-        report, contents, run, artifact, title=title, full_report=full_report
+        report,
+        contents,
+        run,
+        artifact,
+        title=title,
+        full_report=full_report,
+        full_report_url=full_report_url,
     )
     if dry_run:
         print(body, end="")
@@ -284,6 +300,7 @@ def main() -> None:
     parser.add_argument("--filename", required=True)
     parser.add_argument("--title", default="")
     parser.add_argument("--full-report-artifact", default="")
+    parser.add_argument("--full-report-url", default="")
     parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -301,6 +318,7 @@ def main() -> None:
         filename=args.filename,
         title=args.title,
         full_report_artifact=args.full_report_artifact,
+        full_report_url=args.full_report_url,
         stored_comment_id=args.comment_id,
         dry_run=args.dry_run,
     )
