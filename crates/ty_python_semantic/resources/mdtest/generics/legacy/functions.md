@@ -2664,6 +2664,7 @@ The caller's variable also supplies inference evidence without a separate union 
 OnlyOuter = TypeVar("OnlyOuter", bound=str)
 
 def only_outer(value: Callable[[], OnlyOuter]) -> None:
+    # Since str and int are disjoint, OnlyOuter & ~int simplifies to OnlyOuter.
     reveal_type(helper(value))  # revealed: OnlyOuter@only_outer
 ```
 
