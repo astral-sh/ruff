@@ -860,8 +860,7 @@ jobs:
           cat ecosystem-result-format-preview >> ecosystem-result
           echo "" >> ecosystem-result
 
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
-      # Make sure to update the bot if you rename the artifact.
+      # publish-pull-request-report.yml consumes this artifact for PR comments.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         name: Upload Results
         with:
@@ -874,6 +873,23 @@ jobs:
           if grep -q "project error" ecosystem-result; then
             exit 1
           fi
+
+  publish-ecosystem-report:
+    needs: ecosystem
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' &&
+      github.repository == 'astral-sh/ruff' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (needs.ecosystem.result == 'success' || needs.ecosystem.result == 'failure')
+    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@a2f3ca0cde3f89a8a1e5365e23ecfced130eae30
+    secrets:
+      KV_API_URL: ${{ secrets.KV_API_URL }}
+      STS_API_URL: ${{ secrets.STS_API_URL }}
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      report: ruff-ecosystem
 
   fuzz-ty:
     name: "Fuzz for new ty panics/timeouts"
