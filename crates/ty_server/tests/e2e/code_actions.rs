@@ -1,6 +1,6 @@
 use crate::{TestServer, TestServerBuilder};
-use anyhow::Result;
-use lsp_types::{CodeActionRequest, DocumentDiagnosticReport, Position, Range};
+use anyhow::{Context, Result, bail};
+use lsp_types::{CodeActionRequest, CodeActionResponse, DocumentDiagnosticReport, Position, Range};
 use ruff_db::system::SystemPath;
 
 fn code_actions_at(
@@ -400,6 +400,33 @@ html.parser
 
     insta::assert_json_snapshot!(code_actions);
 
+    Ok(())
+}
+
+// The Literal fix must use its edit description as the title even when an earlier help message
+// suggests a concrete Literal type.
+#[test]
+fn code_action_literal_fix_title() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let file = SystemPath::new("src/main.py");
+    let source = r#"value: "invalid syntax""#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(file, source)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+    server.open_text_document(file, source, 1);
+
+    let diagnostics = server.document_diagnostic_request(file, None);
+    let params = code_actions_at(&server, diagnostics, file, full_range(source));
+    let request_id = server.send_request::<CodeActionRequest>(params);
+    let actions = server
+        .await_response::<CodeActionRequest>(&request_id)
+        .context("Expected code actions")?;
+    let [CodeActionResponse::CodeAction(fix), ..] = actions.as_slice() else {
+        bail!("Expected a fix action, got {actions:?}");
+    };
+    assert_eq!(fix.title, "Wrap in `Literal[...]`");
     Ok(())
 }
 

@@ -376,7 +376,7 @@ fn to_lsp_diagnostic(
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
     let fix = diagnostic.fix();
-    let suggestion = diagnostic.first_help_text();
+    let suggestion = diagnostic.fix_title();
 
     let (severity, code) = if let Some(code) = diagnostic.secondary_code() {
         let severity = severity(code);
