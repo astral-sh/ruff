@@ -4309,6 +4309,7 @@ The caller's variable also supplies inference evidence without a separate union 
 
 ```py
 def only_outer[U: str](value: Callable[[], U]) -> None:
+    # Since str and int are disjoint, U & ~int simplifies to U.
     reveal_type(helper(value))  # revealed: U@only_outer
 ```
 
