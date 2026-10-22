@@ -1499,7 +1499,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Returns an [`Iterator`] over the current expression hierarchy represented as [`NodeId`],
     /// from the current [`NodeId`] through to any parents.
-    pub(crate) fn current_expression_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
+    fn current_expression_ids(&self) -> impl Iterator<Item = NodeId> + '_ {
         self.node_id
             .iter()
             .flat_map(|id| self.nodes.ancestor_ids(*id))
