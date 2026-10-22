@@ -6,6 +6,7 @@
       "caller_workflow": "pull-request-reviewers.yml",
       "caller_ref": "refs/heads/main",
       "environment": "automations",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/pull-request-reviewers.yml@refs/heads/main",
       "permissions": { "workflow": ["read", "write"] }
     },
     {
