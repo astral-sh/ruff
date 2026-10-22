@@ -12637,6 +12637,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
         builder.context.inference_flags = self.inference_flags();
+        if self.context.is_type_expression_explanation() {
+            builder.context.collect_type_expression_diagnostics();
+        }
         builder.expression_cache.clone_from(expression_cache);
         builder.reachability_cache.clone_from(reachability_cache);
         builder

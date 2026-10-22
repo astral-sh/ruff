@@ -170,7 +170,8 @@ pub(super) fn implicit_alias_definition<'db>(
 /// Find the original assignment for a computed value that cannot be used as a type.
 ///
 /// Callers use this to reject references that value-to-type conversion would otherwise accept,
-/// recovering with `Unknown` even when `invalid-type-form` is disabled.
+/// recovering with `Unknown` even when `invalid-type-form` is disabled. The returned definition
+/// also lets diagnostics explain the invalid right-hand side at its original source location.
 ///
 /// A class-valued assignment is not necessarily a type declaration: `(lambda: int)()`
 /// produces the existing `int` class, whereas a recognized `NamedTuple` or `type` call
