@@ -130,7 +130,7 @@ jobs:
           git commit -am "Sync Linux docstrings" --allow-empty
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -189,7 +189,7 @@ jobs:
         run: ./scripts/codemod_docstrings.sh
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -272,7 +272,7 @@ jobs:
           git commit -am "Remove pyproject.toml file"
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -387,7 +387,7 @@ jobs:
           path: ${{ runner.temp }}/snapshot-updates
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
