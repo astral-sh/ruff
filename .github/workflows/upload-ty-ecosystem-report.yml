@@ -1,0 +1,74 @@
+name: Upload a ty ecosystem report
+
+on:
+  workflow_call:
+    secrets:
+      STS_API_URL:
+        required: true
+    outputs:
+      report-url:
+        value: ${{ jobs.upload.outputs.report-url }}
+
+permissions: {}
+
+jobs:
+  upload:
+    if: >-
+      github.repository == 'astral-sh/ruff' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.workflow_ref == format('astral-sh/ruff/.github/workflows/ty-ecosystem-analyzer.yaml@refs/pull/{0}/merge', github.event.pull_request.number)
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 10
+    environment: automations
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      report-url: ${{ steps.upload.outputs.report-url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          enable-cache: false
+      - name: Get an artifact download token
+        id: token
+        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            actions: read
+            pull_requests: read
+      - name: Get report upload credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.TY_REPORTS_REGION }}
+          role-to-assume: ${{ vars.TY_REPORTS_ROLE_ARN }}
+          role-duration-seconds: 900
+          role-session-name: ty-report-${{ github.run_id }}-${{ github.run_attempt }}
+          unset-current-credentials: true
+      - name: Upload the report
+        id: upload
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          REPORTS_BUCKET: ${{ vars.TY_REPORTS_BUCKET }}
+          REPORTS_URL: ${{ vars.TY_REPORTS_URL }}
+        run: >-
+          uv run --script scripts/upload_ty_ecosystem_report.py
+          --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
+          --pull-request "$PULL_REQUEST" --workflow-ref "$WORKFLOW_REF"
+          --bucket "$REPORTS_BUCKET" --base-url "$REPORTS_URL"
