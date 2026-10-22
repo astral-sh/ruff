@@ -890,6 +890,30 @@ c.name = None
 c.name = 42
 ```
 
+### Writing to a property's documentation
+
+A property stores its documentation in a writable descriptor even though property instances do not
+have an instance dictionary.
+
+```py
+class Example:
+    @property
+    def value(self) -> int:
+        return 1
+
+    value.__doc__ = "Updated documentation"
+```
+
+A property created directly has the same writable `__doc__` attribute. Assignments must still
+respect its `str | None` annotation, and arbitrary instance attributes remain unsupported.
+
+```py
+descriptor = property(lambda instance: 1)
+descriptor.__doc__ = None
+descriptor.__doc__ = 1  # error: [invalid-assignment]
+descriptor.extra = 1  # error: [unresolved-attribute]
+```
+
 ### Overriding properties in subclasses
 
 When a subclass overrides a property, accessing other inherited properties from within the
@@ -1195,7 +1219,7 @@ python-version = "3.12"
 ```
 
 ```py
-type Recursive = int | Recursive
+type Recursive = int | Recursive  # error: [cyclic-type-alias-definition]
 
 class C:
     value: Recursive = 1
@@ -1203,10 +1227,130 @@ class C:
 C().value
 ```
 
-### Property getters reject invalid receiver specializations
+### A descriptor requires a protocol containing its own attribute
 
-A property getter checks the same specialized receiver as an ordinary method. A generic alias with
-alternatives that impose different type-variable bounds can produce an invalid property access.
+The descriptor's instance parameter can require the same attribute that the descriptor implements.
+Checking the enclosing class terminates, and an instance of that class satisfies the protocol.
+
+```py
+from typing import Protocol
+
+class HasItem(Protocol):
+    item: int
+
+class ItemDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: int) -> None: ...
+
+class Holder:
+    item = ItemDescriptor()
+
+compatible: HasItem = Holder()  # no diagnostic
+```
+
+Checking a class that only annotates its attribute with the descriptor type also terminates:
+
+```py
+class AnnotationOnlyHolder:
+    item: ItemDescriptor  # no diagnostic
+```
+
+The recursive check does not make an incompatible setter acceptable:
+
+```py
+class WrongValueDescriptor:
+    def __get__(self, instance: HasItem, owner: type[object]) -> int:
+        return 0
+
+    def __set__(self, instance: HasItem, value: str) -> None: ...
+
+class WrongValueHolder:
+    item = WrongValueDescriptor()
+
+incompatible: HasItem = WrongValueHolder()  # error: [invalid-assignment]
+```
+
+### Recursive metaclass declarations containing dynamic types
+
+A recursive declaration containing `Any` can describe a data descriptor. Assignments to a class
+attribute must still satisfy the setter stored on its metaclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+Implicit = Any | list["Implicit"]
+type Explicit = Any | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+ExplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+```
+
+### Recursive metaclass declarations containing non-descriptors
+
+A recursive union can contain both descriptors and ordinary values. A valid assignment is checked
+against the descriptor actually stored on the metaclass, even when the class has an attribute with
+the same name.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+Implicit = Descriptor | list["Implicit"]
+type Explicit = Descriptor | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "accepted"
+ExplicitOwner.value = "accepted"
+```
+
+### Property getters do not infer fixed owner type variables
+
+A property getter treats type variables fixed by the owner specialization as evidence, not as
+inference targets.
 
 ```py
 from collections.abc import Callable
@@ -1229,9 +1373,11 @@ AnyCallback = TypeVar("AnyCallback", bound=Callable[..., str])
 Command = A[AnyCallback] | B[AnyCallback]
 Callback = TypeVar("Callback", bound=Callable[[int], str])
 
+# TODO: `Command[Callback]` produces `B[Callback]`, but `Callback` does not satisfy `BItem`'s
+# upper bound. Report this at `Command[Callback]` once specialization validation can prove that
+# every possible specialization of a symbolic assignment satisfies the destination domain.
 def access(value: Callback | Command[Callback]) -> None:
     if isinstance(value, A | B):
-        # error: [invalid-attribute-access]
         value.callback
 ```
 
@@ -1916,6 +2062,31 @@ class Decorated:
 bound = Decorated().method
 reveal_type(bound)  # revealed: Decorator[(value: str)]
 bound(1)  # error: [invalid-argument-type]
+```
+
+### Static getters, setters and deleters
+
+```py
+class Descriptor:
+    @staticmethod
+    def __get__(descriptor: object, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+    @staticmethod
+    def __delete__(instance: object) -> None: ...
+
+class Owner:
+    value = Descriptor()
+
+owner = Owner()
+reveal_type(owner.value)  # revealed: int
+reveal_type(Owner.value)  # revealed: int
+owner.value = 1
+del owner.value
+
+owner.value = "wrong"  # error: [invalid-assignment] "Expected `int`, found `Literal["wrong"]`"
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

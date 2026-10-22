@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 
@@ -34,7 +35,7 @@ use crate::rules::flake8_executable::helpers::{is_executable, is_wsl};
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 /// - [Git documentation: `git update-index --chmod`](https://git-scm.com/docs/git-update-index#Documentation/git-update-index.txt---chmod-x)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.233")]
+#[violation_metadata(stable_since = "v0.0.233", category = Category::Correctness)]
 pub(crate) struct ShebangMissingExecutableFile;
 
 impl Violation for ShebangMissingExecutableFile {

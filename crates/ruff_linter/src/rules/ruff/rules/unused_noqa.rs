@@ -3,6 +3,7 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub(crate) struct UnusedCodes<'a> {
@@ -87,7 +88,7 @@ impl UnusedNOQAKind {
 ///
 /// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Suspicious)]
 pub(crate) struct UnusedNOQA<'a> {
     pub codes: Option<UnusedCodes<'a>>,
     pub kind: UnusedNOQAKind,

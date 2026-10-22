@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of except handling via `try`-`except` within `for` and
@@ -77,7 +78,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.276")]
+#[violation_metadata(stable_since = "v0.0.276", category = Category::Pedantic)]
 pub(crate) struct TryExceptInLoop;
 
 impl Violation for TryExceptInLoop {

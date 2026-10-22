@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `continue` statements outside of loops.
@@ -18,7 +19,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: `continue`](https://docs.python.org/3/reference/simple_stmts.html#the-continue-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.36")]
+#[violation_metadata(stable_since = "v0.0.36", category = Category::Correctness)]
 pub(crate) struct ContinueOutsideLoop;
 
 impl Violation for ContinueOutsideLoop {

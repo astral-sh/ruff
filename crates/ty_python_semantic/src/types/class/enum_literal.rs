@@ -5,7 +5,6 @@ use ruff_text_size::TextRange;
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
-use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{
     ClassLiteral, ClassType, DynamicClassHeaderAnchor, DynamicClassScopeOffset, MemberLookupPolicy,
@@ -14,6 +13,7 @@ use crate::types::class::{
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
+use crate::types::{Type, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -242,7 +242,10 @@ impl<'db> DynamicEnumLiteral<'db> {
         {
             let enum_lit =
                 crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name);
-            return Member::definitely_declared(Type::enum_literal(enum_lit));
+            return Member {
+                inner: Place::declared(Type::enum_literal(enum_lit))
+                    .with_qualifiers(TypeQualifiers::READ_ONLY),
+            };
         }
         Member::unbound()
     }
@@ -251,18 +254,28 @@ impl<'db> DynamicEnumLiteral<'db> {
     ///
     /// If members are unknown and nothing was found in the MRO, returns `Unknown`
     /// as a last resort to avoid false `unresolved-attribute` errors.
+    ///
+    /// `policy` is forwarded to the mixin and enum-base lookups so that those lookups resolve the
+    /// same way they would on an equivalent class-syntax enum. For example, a caller asking for
+    /// `__eq__` with `MRO_NO_OBJECT_FALLBACK` must not be given `object.__eq__`: that would
+    /// describe the enum as defining its own equality and hide its real comparison semantics.
+    ///
+    /// The unknown-member fallback at the end does not consult `policy`. It exists to avoid false
+    /// `unresolved-attribute` errors when the member names are not statically known, which is a
+    /// property of the enum rather than of the lookup being performed.
     pub(crate) fn class_member(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         let own = self.own_class_member(db, name);
         if !own.is_undefined() {
             return own.inner;
         }
         if let Some(mixin_class) = self.mixin_class(db, env) {
-            let result = mixin_class.class_member(db, env, name, MemberLookupPolicy::default());
+            let result = mixin_class.class_member(db, env, name, policy);
             if !result.place.is_undefined() {
                 return result;
             }
@@ -271,7 +284,7 @@ impl<'db> DynamicEnumLiteral<'db> {
             .base_class(db)
             .to_class_literal(db, env)
             .as_class_literal()
-            .map(|cls| cls.class_member(db, env, name, MemberLookupPolicy::default()))
+            .map(|cls| cls.class_member(db, env, name, policy))
             .unwrap_or_else(|| Place::Undefined.into());
 
         // When members are unknown (e.g. `Enum("E", some_var)`), any name could

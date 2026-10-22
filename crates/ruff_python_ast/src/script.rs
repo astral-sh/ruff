@@ -32,11 +32,6 @@ impl ScriptTag {
         &self.source_map
     }
 
-    /// Consumes this tag and returns its TOML together with its original-source mapping.
-    pub fn into_metadata_and_source_map(self) -> (String, ScriptSourceMap) {
-        (self.metadata, self.source_map)
-    }
-
     /// Given the contents of a Python file, extract the `script` metadata block with leading
     /// comment hashes removed and map its offsets to the original Python script.
     ///
@@ -168,7 +163,7 @@ pub struct ScriptSourceMap {
 
 impl ScriptSourceMap {
     /// Maps a metadata offset to the corresponding offset in the Python source.
-    pub fn map_offset(&self, offset: TextSize) -> TextSize {
+    fn map_offset(&self, offset: TextSize) -> TextSize {
         let Some(index) = self
             .markers
             .partition_point(|marker| marker.metadata_offset <= offset)

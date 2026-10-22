@@ -44,22 +44,22 @@ fn logging_f_string(
         .value
         .iter()
         .map(|part| match part {
-            ast::FStringPart::Literal(literal) => literal.flags.quote_str(),
-            ast::FStringPart::FString(f) => f.flags.quote_str(),
+            ast::FStringPartRef::Literal(literal) => literal.flags.quote_str(),
+            ast::FStringPartRef::FString(f) => f.flags.quote_str(),
         })
         .next()
         .unwrap_or("\"");
 
     for part in &f_string.value {
         match part {
-            ast::FStringPart::Literal(literal) => {
+            ast::FStringPartRef::Literal(literal) => {
                 let literal_text = literal.as_str();
                 if literal_text.contains('%') {
                     return;
                 }
                 format_string.push_str(literal_text);
             }
-            ast::FStringPart::FString(f) => {
+            ast::FStringPartRef::FString(f) => {
                 for element in &f.elements {
                     match element {
                         InterpolatedStringElement::Literal(lit) => {

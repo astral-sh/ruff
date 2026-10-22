@@ -7,6 +7,7 @@ use ruff_python_trivia::indentation_at_offset;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -33,7 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     def bar(cls): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
 pub(crate) struct NoClassmethodDecorator;
 
 impl AlwaysFixableViolation for NoClassmethodDecorator {
@@ -70,7 +71,7 @@ impl AlwaysFixableViolation for NoClassmethodDecorator {
 ///     def bar(arg1, arg2): ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.7")]
+#[violation_metadata(preview_since = "v0.1.7", category = Category::Style)]
 pub(crate) struct NoStaticmethodDecorator;
 
 impl AlwaysFixableViolation for NoStaticmethodDecorator {

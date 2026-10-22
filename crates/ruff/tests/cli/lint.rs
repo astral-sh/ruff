@@ -48,7 +48,7 @@ inline-quotes = "single"
     test.py:1:19: Q000 [*] Double quotes found but single quotes preferred
     test.py:1:19: PLE1310 String `strip` call contains duplicate characters
     Found 4 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -86,7 +86,7 @@ inline-quotes = "single"
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     -:1:19: PLE1310 String `strip` call contains duplicate characters
     Found 4 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -121,7 +121,7 @@ inline-quotes = "single"
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     -:1:19: PLE1310 String `strip` call contains duplicate characters
     Found 4 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -162,7 +162,7 @@ inline-quotes = "single"
     -:1:19: Q000 [*] Double quotes found but single quotes preferred
     -:1:19: PLE1310 String `strip` call contains duplicate characters
     Found 4 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -232,7 +232,7 @@ OTHER = "OTHER"
     main.py:4:12: Q000 [*] Double quotes found but single quotes preferred
     test.py:2:15: Q000 [*] Double quotes found but single quotes preferred
     Found 3 errors.
-    [*] 3 fixable with the `--fix` option.
+    [*] 3 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -269,7 +269,7 @@ exclude = ["main.py"]
     ----- stdout -----
     main.py:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     "
@@ -310,7 +310,7 @@ if __name__ == "__main__":
     generated.py:4:16: Q000 [*] Double quotes found but single quotes preferred
     generated.py:5:12: Q000 [*] Double quotes found but single quotes preferred
     Found 2 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     ----- stdout -----
     generated.py:2:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -432,7 +432,7 @@ if __name__ == "__main__":
     ----- stdout -----
     generated.py:2:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in `ruff.toml`:
@@ -607,6 +607,141 @@ extend = "ruff3.toml"
 }
 
 #[test]
+fn extend_banned_api() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "cgi".msg = "Use a supported library instead."
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "test.py",
+        "
+        import cgi
+        from typing import TypedDict
+        import typing
+        x: typing.Any
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    test.py:3:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    test.py:5:4: TID251 `typing.Any` is banned: Use a precise type instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn extend_banned_api_inherited() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+        [lint]
+        select = ["TID251"]
+
+        [lint.flake8-tidy-imports.banned-api]
+        "cgi".msg = "The cgi module is deprecated."
+        "pipes".msg = "Use shlex instead."
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "typing.Any".msg = "Use a precise type instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+
+        [lint.flake8-tidy-imports.extend-banned-api]
+        "cgi".msg = "Use a supported library instead."
+        "typing.TypedDict".msg = "Use typing_extensions.TypedDict instead."
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        "#,
+    )?;
+    fixture.write_file(
+        "child/grandchild/test.py",
+        "
+        import cgi
+        import pipes
+        from typing import Any, TypedDict
+        ",
+    )?;
+
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 3 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited extensions while preserving the inherited base bans.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        extend-banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+    child/grandchild/test.py:3:8: TID251 `pipes` is banned: Use shlex instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+
+    // Clear inherited base bans while preserving the inherited extensions.
+    fixture.write_file(
+        "child/grandchild/ruff.toml",
+        r#"
+        extend = "../ruff.toml"
+        [lint.flake8-tidy-imports]
+        banned-api = {}
+        "#,
+    )?;
+    assert_cmd_snapshot!(fixture.check_command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    child/grandchild/test.py:2:8: TID251 `cgi` is banned: Use a supported library instead.
+    child/grandchild/test.py:4:25: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+    Found 2 errors.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn circular_extend() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -752,7 +887,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
     -:2:1: I001 [*] Import block is un-sorted or un-formatted
     -:15:91: E501 Line too long (97 > 90)
     Found 2 errors.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -992,7 +1127,7 @@ fn unknown_rule_selectors_extend_select_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `extend-select` from the CLI
@@ -1009,7 +1144,7 @@ fn unknown_rule_selectors_ignore_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `ignore` from the CLI
@@ -1042,7 +1177,7 @@ fn unknown_rule_selectors_extend_fixable_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `extend-fixable` from the CLI
@@ -1059,7 +1194,7 @@ fn unknown_rule_selectors_unfixable_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `unfixable` from the CLI
@@ -1076,7 +1211,7 @@ fn unknown_rule_selectors_config_ignore_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `ignore` from the CLI
@@ -1097,7 +1232,7 @@ fn unknown_rule_selectors_ruff_toml_extend_safe_fixes_f481_preview() -> Result<(
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `extend-safe-fixes` from `[TMP]/ruff.toml`
@@ -1118,7 +1253,7 @@ fn unknown_rule_selectors_ruff_toml_extend_unsafe_fixes_f481_preview() -> Result
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `extend-unsafe-fixes` from `[TMP]/ruff.toml`
@@ -1135,7 +1270,7 @@ fn unknown_rule_selectors_per_file_ignores_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
@@ -1152,7 +1287,7 @@ fn unknown_rule_selectors_extend_per_file_ignores_f481_preview() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `per-file-ignores` from the CLI
@@ -1173,7 +1308,7 @@ fn unknown_rule_selectors_ruff_toml_per_file_ignores_f481_preview() -> Result<()
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
@@ -1194,7 +1329,7 @@ fn unknown_rule_selectors_ruff_toml_extend_per_file_ignores_f481_preview() -> Re
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     warning: Unknown rule selector `F481` in `per-file-ignores` from `[TMP]/ruff.toml`
@@ -1229,7 +1364,41 @@ fn rule_name_selector_cli_preview_enabled() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_category_selector_cli_preview_disabled() -> Result<()> {
+    let fixture = unknown_rule_selector_test()?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction"]), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Invalid selector `restriction` in `select` from the CLI. Selecting rules by category requires preview mode
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn rule_category_selector_cli_preview_enabled() -> Result<()> {
+    let fixture = CliTest::with_file("test.py", "assert True")?;
+
+    assert_cmd_snapshot!(fixture.check_command().args(["--select", "restriction", "--preview"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:1: assert: Use of `assert` detected
+    Found 1 error.
 
     ----- stderr -----
     ");
@@ -1269,7 +1438,7 @@ fn rule_name_selector_config_preview_enabled() -> Result<()> {
     ----- stdout -----
     test.py:1:8: unused-import: [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1509,9 +1678,10 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
 }
 
 #[test]
-fn deprecated_config_option_overridden_via_cli() {
-    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(STDIN_BASE_OPTIONS)
+fn deprecated_config_option_overridden_via_cli() -> Result<()> {
+    let test = CliTest::new()?;
+
+    assert_cmd_snapshot!(test.check_command()
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
         @"
@@ -1525,6 +1695,8 @@ fn deprecated_config_option_overridden_via_cli() {
     warning: The top-level linter settings are deprecated in favour of their counterparts in the `lint` section. Please update the following options in your `--config` CLI arguments:
       - 'select' -> 'lint.select'
     ");
+
+    Ok(())
 }
 
 #[test]
@@ -1588,7 +1760,7 @@ include = ["*.ipy"]
     ----- stdout -----
     main.ipy:cell 1:1:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1690,7 +1862,7 @@ import os
     ----- stdout -----
     -:2:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1800,7 +1972,7 @@ import os
     ----- stdout -----
     -:2:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1837,7 +2009,7 @@ def func():
     ----- stdout -----
     -:2:8: F401 [*] `os` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1871,7 +2043,7 @@ fn negated_per_file_ignores() -> Result<()> {
     ----- stdout -----
     selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -1903,7 +2075,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
     ----- stdout -----
     src/selected.py:1:1: RUF901 [*] Hey this is a stable test rule with a safe fix.
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2030,7 +2202,7 @@ import sys
     noqa.py:2:8: F401 [*] `os` imported but unused
     noqa.py:5:8: F401 [*] `sys` imported but unused
     Found 2 errors.
-    [*] 2 fixable with the `--fix` option.
+    [*] 2 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2704,7 +2876,7 @@ select = ["UP006"]
     ----- stdout -----
     test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2762,7 +2934,7 @@ select = ["UP006"]
     ----- stdout -----
     test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2795,7 +2967,7 @@ select = ["UP006"]
     ----- stdout -----
     test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2828,7 +3000,7 @@ select = ["UP006"]
     ----- stdout -----
     test.py:1:31: UP006 [*] Use `list` instead of `List` for type annotation
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -2964,7 +3136,7 @@ requires-python = ">= 3.11"
     ----- stdout -----
     test.py:1:31: UP007 [*] Use `X | Y` for type annotations
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -3049,7 +3221,7 @@ from typing import Union;foo: Union[int, str] = 1"#,
     ----- stdout -----
     test.py:2:31: UP007 [*] Use `X | Y` for type annotations
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -3292,7 +3464,7 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
     ----- stdout -----
     main.ipynb:cell 1:1:8: F401 [*] `random` imported but unused
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -3519,30 +3691,36 @@ fn required_import_set_conflicts_with_pyi025() {
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_aliased_as_abstract_set_no_conflict() {
+fn required_import_set_aliased_as_abstract_set_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set as AbstractSet"]"#)
             .args(["--select", "I002,PYI025"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/20891
 #[test]
-fn required_import_set_without_pyi025_no_conflict() {
+fn required_import_set_without_pyi025_no_conflict() -> Result<()> {
+    let test = CliTest::new()?;
+
     assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
+        test.check_command()
             .arg("--config")
             .arg(r#"lint.isort.required-imports = ["from collections.abc import Set"]"#)
             .args(["--select", "I002"])
             .arg("-")
             .pass_stdin("1")
     );
+
+    Ok(())
 }
 
 // https://github.com/astral-sh/ruff/issues/19842
@@ -3913,7 +4091,7 @@ class A(Generic[T]):
     ----- stdout -----
     test.py:6:9: non-pep695-generic-class: Generic class `A` uses `Generic` subclass instead of type parameters
     Found 1 error.
-    No fixes available (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    1 unsafe fix available with `--fix --unsafe-fixes`.
 
     ----- stderr -----
     "
@@ -4148,7 +4326,7 @@ fn cookiecutter_globbing() -> Result<()> {
     ----- stdout -----
     {{cookiecutter.repo_name}}/tests/maintest.py:3:8: F811 [*] Redefinition of unused `foo` from line 1: `foo` redefined here
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -4461,7 +4639,7 @@ fn statistics_hyperlinks() -> Result<()> {
     1	<link https://docs.astral.sh/ruff/rules/unused-import>F401</link>   	[*] unused-import
     1	<link https://docs.astral.sh/ruff/rules/useless-import-alias>PLC0414</link>	[ ] useless-import-alias
     Found 2 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
     ----- stderr -----
     ",
@@ -4554,7 +4732,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
       |
 
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     ",
@@ -4583,7 +4761,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
     normal.py:1:1: redirected-to-test-rule: Hey this is a test rule that was redirected from another.
     panic.py: panic: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
     Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
     ----- stderr -----
     error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
@@ -4622,9 +4800,19 @@ fn rule_panic_mixed_results_full() -> Result<()> {
 
     stable-test-rule-unsafe-fix: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-unsafe-fix
+    2 | import os
+      |
+    note: This is an unsafe fix and may change runtime behavior
 
     stable-test-rule-display-only-fix: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
+      |
+    1 + # fix from stable-test-rule-display-only-fix
+    2 | import os
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
     preview-test-rule: Hey this is a preview test rule.
     --> normal.py:1:1
@@ -4639,7 +4827,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     info: run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information
 
     Found 7 errors.
-    [*] 1 fixable with the `--fix` option (1 hidden fix can be enabled with the `--unsafe-fixes` option).
+    [*] 1 fixable with `--fix` (1 unsafe fix available with `--fix --unsafe-fixes`).
 
     ----- stderr -----
     error: Panic during linting indicates a bug in Ruff. If you could open an issue at:
@@ -4725,7 +4913,7 @@ fn supported_file_extensions() -> Result<()> {
     src/thing.py:1:8: F401 [*] `os` imported but unused
     src/thing.pyi:1:8: F401 [*] `os` imported but unused
     Found 3 errors.
-    [*] 3 fixable with the `--fix` option.
+    [*] 3 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -4806,7 +4994,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     src/thing.pyi:1:8: unused-import: [*] `os` imported but unused
     src/thing.pyw:1:8: unused-import: [*] `os` imported but unused
     Found 4 errors.
-    [*] 4 fixable with the `--fix` option.
+    [*] 4 fixable with `--fix`.
 
     ----- stderr -----
     ");
@@ -4896,16 +5084,9 @@ fn default_rules() -> Result<()> {
     	unnecessary-map (C417),
     	unnecessary-literal-within-dict-call (C418),
     	unnecessary-comprehension-in-call (C419),
-    	call-datetime-without-tzinfo (DTZ001),
     	call-datetime-today (DTZ002),
     	call-datetime-utcnow (DTZ003),
     	call-datetime-utcfromtimestamp (DTZ004),
-    	call-datetime-now-without-tzinfo (DTZ005),
-    	call-datetime-fromtimestamp (DTZ006),
-    	call-datetime-strptime-without-zone (DTZ007),
-    	call-date-today (DTZ011),
-    	call-date-fromtimestamp (DTZ012),
-    	datetime-min-max (DTZ901),
     	debugger (T100),
     	shebang-not-executable (EXE001),
     	shebang-missing-executable-file (EXE002),
@@ -5028,6 +5209,7 @@ fn default_rules() -> Result<()> {
     	unused-import (F401),
     	import-shadowed-by-loop-var (F402),
     	late-future-import (F404),
+    	undefined-local-with-nested-import-star-usage (F406),
     	future-feature-not-defined (F407),
     	percent-format-invalid-format (F501),
     	percent-format-expected-mapping (F502),
@@ -5274,7 +5456,7 @@ fn ruff_toml_is_linted() -> Result<()> {
       |
 
     Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    [*] 1 fixable with `--fix`.
 
     ----- stderr -----
     "#,

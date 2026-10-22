@@ -181,6 +181,176 @@ c.desc = -1
 reveal_type(c.desc)  # revealed: int
 ```
 
+### Dynamic attributes
+
+An attribute provided by `__getattr__` need not return the value assigned to it. Here, `__setattr__`
+ignores assignments, and `__getattr__` always returns `"hello"`. Assigning `"goodbye"` therefore
+does not make later reads return `"goodbye"`:
+
+```py
+class AlwaysString:
+    def __getattr__(self, name: str) -> str:
+        return "hello"
+
+    def __setattr__(self, name: str, value: object) -> None:
+        pass
+
+obj = AlwaysString()
+obj.value = "goodbye"
+reveal_type(obj.value)  # revealed: str
+```
+
+### Dynamic attributes returning `Any`
+
+When `__getattr__` returns `Any`, assigning a value does not make later reads more precise:
+
+```py
+from typing import Any
+
+class Props:
+    def __getattr__(self, name: str) -> Any: ...
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update(props: Props) -> None:
+    props.status = "Closed"
+    reveal_type(props.status)  # revealed: Any
+```
+
+A `hasattr` check tells us that an attribute exists, but not what it returns after an assignment:
+
+```py
+def update_if_present(props: Props) -> None:
+    if hasattr(props, "status"):
+        props.status = "Open"
+        reveal_type(props.status)  # revealed: Any
+```
+
+### Dynamic attributes after an `isinstance` check
+
+An `isinstance` check can narrow the type of a dynamic attribute. Assigning to that attribute
+discards the narrowing, since `__getattr__` may return a different value on the next read:
+
+```py
+class Values:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update(values: Values) -> None:
+    if isinstance(values.value, int):
+        reveal_type(values.value)  # revealed: int
+        values.value = 2
+        reveal_type(values.value)  # revealed: int | str
+```
+
+### Dynamic attributes without a custom setter
+
+Defining `__getattr__` does not make assignments to missing attributes valid. We report the invalid
+assignment and continue to use the getter's return type for later reads:
+
+```py
+class GetterOnly:
+    def __getattr__(self, name: str) -> str:
+        return "hello"
+
+def update(obj: GetterOnly) -> None:
+    obj.value = "goodbye"  # error: [unresolved-attribute]
+    reveal_type(obj.value)  # revealed: str
+```
+
+### Declared and inferred attributes
+
+Ordinary attributes still narrow after assignment when a class defines `__getattr__` and
+`__setattr__`. This applies both to annotated attributes and to attributes inferred from assignments
+in the class body or `__init__`:
+
+```py
+from typing import Any
+
+class Values:
+    declared: int | str
+    class_value = None
+
+    def __init__(self) -> None:
+        self.instance_value = None
+
+    def __getattr__(self, name: str) -> Any: ...
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+def update(obj: Values) -> None:
+    obj.declared = 1
+    reveal_type(obj.declared)  # revealed: Literal[1]
+    obj.class_value = 1
+    reveal_type(obj.class_value)  # revealed: Literal[1]
+    obj.instance_value = 1
+    reveal_type(obj.instance_value)  # revealed: Literal[1]
+```
+
+### Dynamic attributes on unions
+
+A union may include a class that provides `value` through `__getattr__`. In that case, assigning
+`value` does not determine the type of the next read, even if another class in the union declares
+the attribute:
+
+```py
+class Dynamic:
+    def __getattr__(self, name: str) -> int | str:
+        return 0
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+class Declared:
+    value: int | str
+
+def update(obj: Dynamic | Declared) -> None:
+    obj.value = 1
+    reveal_type(obj.value)  # revealed: int | str
+```
+
+### Module attributes
+
+This module defines neither `value` nor `__getattr__`, so assigning `value` produces an error. We
+still track the assigned type and report an incompatible use later:
+
+`module.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import module
+
+module.value = 1  # error: [unresolved-attribute]
+
+# error: [invalid-assignment]
+# error: [unresolved-attribute]
+value: str = module.value
+```
+
+### Modules with `__getattr__`
+
+A module's `__getattr__` is only called for missing attributes. Assigning an attribute adds it to
+the module, so later reads use the assigned value:
+
+`module.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    return 0
+```
+
+`main.py`:
+
+```py
+import module
+
+module.value = 1
+reveal_type(module.value)  # revealed: Literal[1]
+```
+
 ## Subscript
 
 ### Specialization for builtin types

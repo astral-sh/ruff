@@ -5,6 +5,7 @@ use ruff_python_ast::{Expr, ExprCall, token::parenthesized_range};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -41,7 +42,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// This rule will emit a diagnostic but not suggest a fix if `map` has been shadowed from its
 /// builtin binding.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Complexity)]
 pub(crate) struct StarmapZip;
 
 impl Violation for StarmapZip {

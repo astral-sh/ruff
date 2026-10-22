@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for argument names that do not follow the `snake_case` convention.
@@ -46,7 +47,7 @@ use crate::checkers::ast::Checker;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.77")]
+#[violation_metadata(stable_since = "v0.0.77", category = Category::Pedantic)]
 pub(crate) struct InvalidArgumentName {
     name: String,
 }

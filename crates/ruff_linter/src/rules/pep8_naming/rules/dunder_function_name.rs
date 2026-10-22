@@ -7,6 +7,7 @@ use ruff_python_semantic::{Scope, ScopeKind};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
 /// ## What it does
@@ -38,7 +39,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.82")]
+#[violation_metadata(stable_since = "v0.0.82", category = Category::Pedantic)]
 pub(crate) struct DunderFunctionName;
 
 impl Violation for DunderFunctionName {

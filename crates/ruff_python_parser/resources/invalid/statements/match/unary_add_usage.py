@@ -1,4 +1,4 @@
-# Unary addition isn't allowed but we parse it for better error recovery.
+# Unary addition isn't allowed before Python 3.15.
 match subject:
     case +1:
         pass

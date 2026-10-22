@@ -10,7 +10,7 @@ use ty_module_resolver::KnownModule;
 
 use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range,
 };
@@ -23,9 +23,9 @@ use crate::types::typed_dict::{
     deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
-    TypingModule, UnionType, determine_upper_bound,
+    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
+    KnownClass, MemberLookupPolicy, SelfTypeVarOrigin, Type, TypeContext, TypeMapping,
+    TypeVarVariance, TypedDictType, TypingModule, UnionType, determine_self_class,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -220,7 +220,6 @@ fn synthesize_typed_dict_init<'db>(
         db,
         CallableSignature::from_overloads([map_overload, keyword_overload]),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -262,7 +261,6 @@ fn synthesize_typed_dict_getitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -322,7 +320,6 @@ fn synthesize_typed_dict_setitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -376,7 +373,6 @@ fn synthesize_typed_dict_delitem<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -393,6 +389,17 @@ fn synthesize_typed_dict_get<'db>(
     } else {
         typed_dict.value_type(db, env)
     };
+    let str_ty = KnownClass::Str.to_instance(db, env);
+    let missing_keys = typed_dict.openness(db).is_closed().then(|| {
+        let key_ty = IntersectionBuilder::new(db, env)
+            .add_positive(str_ty)
+            .add_negative(typed_dict.key_type(db, env))
+            .build();
+        (key_ty, Type::Never)
+    });
+    let fallback_types = missing_keys
+        .into_iter()
+        .chain(std::iter::once((str_ty, fallback_value_ty)));
     let overloads = fields
         .iter()
         .flat_map(|(field_name, field)| {
@@ -466,45 +473,44 @@ fn synthesize_typed_dict_get<'db>(
                 )
             }
         })
-        // Fallback overloads for unknown keys
-        .chain(std::iter::once(Signature::new(
-            Parameters::standard([
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-            ]),
-            UnionType::from_two_elements(db, env, fallback_value_ty, Type::none(db, env)),
-        )))
-        .chain(std::iter::once({
+        // For keys absent from a closed TypedDict, `get` returns only `None` or
+        // the supplied default. Put these overloads before the general string
+        // fallback so it doesn't add declared field types to the result.
+        .chain(fallback_types.flat_map(|(key_type, value_type)| {
+            let get_sig = Signature::new(
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                ]),
+                UnionType::from_two_elements(db, env, value_type, Type::none(db, env)),
+            );
             let t_default = BoundTypeVarInstance::synthetic(
                 db,
                 env,
                 Name::new_static("T"),
                 TypeVarVariance::Covariant,
             );
-
-            let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db, env)),
-                Parameter::positional_only(Some(Name::new_static("default")))
-                    .with_annotated_type(Type::TypeVar(t_default)),
-            ];
-
-            Signature::new_generic(
+            let get_with_default_sig = Signature::new_generic(
                 Some(GenericContext::from_typevar_instances(db, env, [t_default])),
-                Parameters::standard(parameters),
-                UnionType::from_two_elements(db, env, fallback_value_ty, Type::TypeVar(t_default)),
-            )
+                Parameters::standard([
+                    Parameter::positional_only(Some(Name::new_static("self")))
+                        .with_annotated_type(instance_ty),
+                    Parameter::positional_only(Some(Name::new_static("key")))
+                        .with_annotated_type(key_type),
+                    Parameter::positional_only(Some(Name::new_static("default")))
+                        .with_annotated_type(Type::TypeVar(t_default)),
+                ]),
+                UnionType::from_two_elements(db, env, value_type, Type::TypeVar(t_default)),
+            );
+            [get_sig, get_with_default_sig]
         }));
 
     Type::Callable(CallableType::new(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -654,7 +660,6 @@ fn synthesize_typed_dict_pop<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -705,7 +710,6 @@ fn synthesize_typed_dict_setdefault<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -826,7 +830,6 @@ fn synthesize_typed_dict_merge<'db>(
         db,
         CallableSignature::from_overloads(overloads),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     ))
 }
 
@@ -1064,7 +1067,12 @@ pub(in crate::types) fn synthesized_typed_dict_class_member<'db>(
         TypingModule::Typing,
         lookup_policy,
         name,
-        || Type::TypedDict(typed_dict),
+        || {
+            (
+                SelfTypeVarOrigin::SynthesizedTypedDict,
+                Type::TypedDict(typed_dict),
+            )
+        },
     )
 }
 
@@ -1094,8 +1102,6 @@ pub(super) fn typed_dict_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let self_class = class.class_literal(db);
-
     typed_dict_inherited_class_member(
         db,
         env,
@@ -1103,7 +1109,13 @@ pub(super) fn typed_dict_class_member<'db>(
         module,
         lookup_policy,
         name,
-        || determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict),
+        || {
+            let self_class = determine_self_class(db, class, ClassBase::is_typed_dict);
+            (
+                SelfTypeVarOrigin::Class(self_class.class_literal(db)),
+                Type::instance(db, env, self_class),
+            )
+        },
     )
 }
 
@@ -1114,12 +1126,14 @@ fn typed_dict_inherited_class_member<'db>(
     module: TypingModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
-    new_upper_bound: impl FnOnce() -> Type<'db>,
+    replacement_self: impl FnOnce() -> (SelfTypeVarOrigin<'db>, Type<'db>),
 ) -> PlaceAndQualifiers<'db> {
     let fallback_member = typed_dict_fallback_class_member(db, env, module, lookup_policy, name)
         .map_type(|ty| {
+            let (new_origin, new_upper_bound) = replacement_self();
             let mapping = TypeMapping::ReplaceSelf {
-                new_upper_bound: new_upper_bound(),
+                new_origin,
+                new_upper_bound,
             };
             ty.apply_type_mapping(db, env, &mapping, TypeContext::default())
         });

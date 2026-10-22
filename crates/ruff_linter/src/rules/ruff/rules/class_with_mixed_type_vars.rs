@@ -8,6 +8,7 @@ use ruff_python_ast::{
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::pyupgrade::rules::pep695::{
     DisplayTypeVars, TypeParamKind, TypeVar, expr_name_to_type_var, find_generic,
@@ -62,7 +63,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [type parameter lists]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Correctness)]
 pub(crate) struct ClassWithMixedTypeVars;
 
 impl Violation for ClassWithMixedTypeVars {

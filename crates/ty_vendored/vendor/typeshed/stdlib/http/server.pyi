@@ -422,7 +422,7 @@ def executable(path: StrPath) -> bool:  # undocumented
     """Test for executable file."""
 
 if sys.version_info < (3, 15):
-    @deprecated("Deprecated and unsafe; will be removed in Python 3.15.")
+    @deprecated("Deprecated and unsafe; removed in Python 3.15.")
     class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
         """Complete HTTP server with GET, HEAD and POST commands.
 

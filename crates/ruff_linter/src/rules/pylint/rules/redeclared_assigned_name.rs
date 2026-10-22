@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for declared assignments to the same variable multiple times
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
 }

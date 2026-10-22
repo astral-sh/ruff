@@ -1,12 +1,11 @@
 ## What it does
 
-Checks for expressions that are used as [type expressions]
-but cannot validly be interpreted as such.
+Checks for expressions that are used as [type expressions] but cannot validly be interpreted as
+such.
 
 ## Why is this bad?
 
-Such expressions cannot be understood by ty.
-In some cases, they might raise errors at runtime.
+Such expressions cannot be understood by ty. In some cases, they might raise errors at runtime.
 
 ## Examples
 

@@ -13,9 +13,10 @@ use crate::{
     },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
-        Type, UnionType, binding_type,
+        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, DynamicType, EnumLiteralType,
+        IntersectionType, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
+        NegativeIntersectionElements, StaticClassLiteral, Type, TypeContext, TypeMapping,
+        UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
@@ -527,6 +528,11 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Return whether `name` is an enum member, including aliases.
+    pub(super) fn contains_member(&self, name: &str) -> bool {
+        self.members.contains_key(name) || self.aliases.contains_key(name)
+    }
+
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
@@ -704,7 +710,7 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            let Type::NominalInstance(instance) = positive else {
+            let Type::NominalInstance(instance) = positive.resolve_type_alias(db) else {
                 rest.push(*positive);
                 continue;
             };
@@ -726,7 +732,7 @@ impl<'db> EnumComplementType<'db> {
         }
         let mut excluded_names = FxHashSet::default();
         for negative in negative {
-            let enum_literal = negative.as_enum_literal()?;
+            let enum_literal = negative.resolve_type_alias(db).as_enum_literal()?;
             if enum_literal.enum_class_literal(db) != enum_class_literal {
                 return None;
             }
@@ -888,6 +894,30 @@ impl<'db> EnumComplementType<'db> {
         self.rest(db).is_empty()
     }
 
+    /// Map the complement's remaining components without expanding open recursive bodies.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            Type::EnumComplement(EnumComplementType::new(
+                db,
+                self.enum_class_literal(db),
+                self.excluded_names(db).clone(),
+                self.rest(db)
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<FxOrderSet<_>>(),
+            ))
+        } else {
+            self.to_intersection(db, visitor.env)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        }
+    }
+
     /// Reconstruct the equivalent set-theoretic intersection.
     pub(crate) fn to_intersection(
         self,
@@ -1040,14 +1070,17 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
+    let scope_id = class.body_scope(db);
+    let use_def_map = use_def_map(db, scope_id);
+    // As a fast path, avoid looking up base classes if the class body is empty
+    use_def_map.all_end_of_scope_symbol_bindings().next()?;
+
     let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;
     }
 
-    let scope_id = class.body_scope(db);
-    let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
@@ -1531,9 +1564,27 @@ fn inherited_user_defined_mixin_new<'db>(
         .iter_mro(db, None)
         .skip(1)
         .filter_map(ClassBase::into_class)
-        .filter_map(|class| class.class_literal(db).as_static())
-        .filter(|base| base.known(db).is_none())
-        .find_map(|base| custom_enum_method(db, base.body_scope(db), "__new__"))
+        .find_map(|class_type| {
+            let (base, specialization) = class_type.static_class_literal(db)?;
+            if base.known(db).is_some() {
+                return None;
+            }
+            let binding = custom_enum_method(db, base.body_scope(db), "__new__")?;
+            // The mixin may be inherited as a specialized generic alias (`Mixin[str]`). Apply that
+            // specialization, so that members are checked against the specialized `__new__`
+            // signature instead of one with free typevars.
+            let EnumMethodBinding::Function(function) = binding else {
+                return Some(EnumMethodBinding::Opaque);
+            };
+            Some(
+                match Type::FunctionLiteral(function)
+                    .apply_optional_owner_specialization_to_member(db, specialization)
+                {
+                    Type::FunctionLiteral(function) => EnumMethodBinding::Function(function),
+                    _ => EnumMethodBinding::Opaque,
+                },
+            )
+        })
 }
 
 /// Looks up a resolvable method inherited from a known enum class.

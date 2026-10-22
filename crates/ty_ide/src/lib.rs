@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod annotation_expression;
 mod call_hierarchy;
 mod code_action;
 mod completion;
@@ -18,9 +19,12 @@ mod goto_implementation;
 mod goto_type_definition;
 mod hints;
 mod hover;
+#[cfg(test)]
 mod importer;
 mod inlay_hints;
 mod markup;
+#[cfg(test)]
+mod pytest_test_discovery;
 mod references;
 mod rename;
 mod selection_range;
@@ -411,15 +415,12 @@ mod tests {
     use ruff_db::source::{SourceText, source_text};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
-    use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
     use ty_project::{Db as _, ProjectMetadata, SemanticDb as _};
     use ty_python_core::ProgramFile;
-    use ty_python_core::platform::PythonPlatform;
-    use ty_python_core::program::{FallibleStrategy, ProgramSettings};
-    use ty_python_semantic::PythonVersionWithSource;
+    use ty_python_core::program::FallibleStrategy;
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -507,7 +508,6 @@ mod tests {
         pub(super) offset: TextSize,
         pub(super) parsed: ParsedModuleRef,
         pub(super) source: SourceText,
-        pub(super) stylist: Stylist<'static>,
     }
 
     #[derive(Default)]
@@ -569,14 +569,11 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }
@@ -676,14 +673,10 @@ mod tests {
             .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
             .expect("valid search paths");
 
-            db.project().update_program(
-                &mut db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            let project = db.project();
+            let mut settings = project.program_settings(&db).clone();
+            settings.search_paths = search_paths;
+            project.update_program(&mut db, settings);
 
             db.files()
                 .try_add_root(&db, &project_root, FileRootKind::Project);
@@ -717,14 +710,11 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed =
                         parsed_module(&db, db.program_file(file).python_file(&db)).load(&db);
-                    let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,
                         parsed,
                         source,
-                        stylist,
                     });
                 }
             }

@@ -187,6 +187,14 @@ impl System for LSPSystem {
         self.native_system.is_same_file(first, second)
     }
 
+    fn is_file_open(&self, path: &FilePath) -> bool {
+        match path {
+            FilePath::System(path) => self.system_path_to_document(path).is_some(),
+            FilePath::SystemVirtual(path) => self.system_virtual_path_to_document(path).is_some(),
+            FilePath::Vendored(_) => false,
+        }
+    }
+
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
         let document = self.system_path_to_document(path)?;
         Self::source_type_from_document(document, path.extension())

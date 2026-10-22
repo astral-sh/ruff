@@ -10,6 +10,7 @@ use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, Reso
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for mismatched argument types in "old-style" format strings.
@@ -28,7 +29,7 @@ use crate::checkers::ast::Checker;
 /// print("%d" % 1)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Correctness)]
 pub(crate) struct BadStringFormatType;
 
 impl Violation for BadStringFormatType {

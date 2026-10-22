@@ -42,9 +42,6 @@ pub enum PythonVersionSource {
     /// (e.g., the Python environment)
     Editor,
 
-    /// The value was provided by `uv workspace metadata`.
-    UvWorkspace,
-
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
     Default,

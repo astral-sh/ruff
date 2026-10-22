@@ -962,6 +962,7 @@ impl BlackOptions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::path::Path;
 
     use indoc::indoc;
@@ -982,10 +983,7 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Respect
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Respect);
     }
 
     #[test]
@@ -1001,9 +999,6 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Ignore
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Ignore);
     }
 }

@@ -2,6 +2,7 @@ use ruff_python_ast::StmtImportFrom;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::codes::Category;
 use crate::{Fix, FixAvailability, Violation};
 use crate::{checkers::ast::Checker, fix};
 
@@ -18,7 +19,7 @@ use crate::{checkers::ast::Checker, fix};
 /// ## References
 /// - [Typing Style Guide](https://typing.python.org/en/latest/guides/writing_stubs.html#language-features)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Correctness)]
 pub(crate) struct FutureAnnotationsInStub;
 
 impl Violation for FutureAnnotationsInStub {

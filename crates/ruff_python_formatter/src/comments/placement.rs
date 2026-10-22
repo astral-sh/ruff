@@ -10,6 +10,7 @@ use ruff_python_trivia::{
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
+use std::debug_assert_matches;
 
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
@@ -1161,11 +1162,7 @@ fn handle_slice_comments<'a>(
         //     1:
         // ]
         // ```
-        debug_assert!(
-            matches!(comment.enclosing_node(), AnyNodeRef::ExprSubscript(_)),
-            "{:?}",
-            comment.enclosing_node()
-        );
+        debug_assert_matches!(comment.enclosing_node(), AnyNodeRef::ExprSubscript(_));
         return CommentPlacement::dangling(comment.enclosing_node(), comment);
     }
 
@@ -1322,10 +1319,10 @@ fn handle_dict_unpacking_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
+    debug_assert_matches!(
         comment.enclosing_node(),
         AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
-    ));
+    );
 
     // no node after our comment so we can't be between `**` and the name (node)
     let Some(following) = comment.following_node() else {
@@ -1365,10 +1362,10 @@ fn handle_key_value_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,
 ) -> CommentPlacement<'a> {
-    debug_assert!(matches!(
+    debug_assert_matches!(
         comment.enclosing_node(),
         AnyNodeRef::ExprDict(_) | AnyNodeRef::ExprDictComp(_)
-    ));
+    );
 
     let (Some(following), Some(preceding)) = (comment.following_node(), comment.preceding_node())
     else {
@@ -2004,10 +2001,10 @@ fn handle_bracketed_end_of_line_comment<'a>(
         let Some(paren) = lexer.next() else {
             return CommentPlacement::Default(comment);
         };
-        debug_assert!(matches!(
+        debug_assert_matches!(
             paren.kind(),
             SimpleTokenKind::LParen | SimpleTokenKind::LBrace | SimpleTokenKind::LBracket
-        ));
+        );
 
         // If there are no additional tokens between the open parenthesis and the comment, then
         // it should be attached as a dangling comment on the brackets, rather than a leading

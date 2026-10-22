@@ -15,6 +15,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -75,7 +76,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `printf`-style String Formatting](https://docs.python.org/3/library/stdtypes.html#old-string-formatting)
 /// - [Python documentation: `str.format`](https://docs.python.org/3/library/stdtypes.html#str.format)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.229")]
+#[violation_metadata(stable_since = "v0.0.229", category = Category::Style)]
 pub(crate) struct PrintfStringFormatting;
 
 impl Violation for PrintfStringFormatting {

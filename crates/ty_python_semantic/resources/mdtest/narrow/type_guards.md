@@ -324,6 +324,87 @@ def _(d: Any, guarded: object, narrowed: object, other: object, mode: bool):
         reveal_type(narrowed)  # revealed: int
 ```
 
+## Intersections
+
+Guards for overlapping types can share a common subtype. A function returning `TypeGuard[int]`
+satisfies both callable types below and can return `True` for an integer. Calling their intersection
+preserves both guard wrappers.
+
+```py
+from typing import Callable
+from typing_extensions import Never, TypeGuard, TypeIs
+from ty_extensions import Intersection, Not
+
+def is_int(value: object) -> TypeGuard[int]:
+    return isinstance(value, int)
+
+def check_overlapping_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int | str]], Callable[[object], TypeGuard[int | bytes]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int | str] & TypeGuard[int | bytes]
+
+check_overlapping_guards(is_int, 1)
+```
+
+Even guards for disjoint types share `TypeGuard[Never]` as a common subtype. An always-false
+function satisfies both callable types below, so their intersection also remains inhabited.
+
+```py
+def never_true(value: object) -> TypeGuard[Never]:
+    return False
+
+def check_disjoint_guards(
+    guard: Intersection[Callable[[object], TypeGuard[int]], Callable[[object], TypeGuard[str]]],
+    value: object,
+):
+    reveal_type(guard(value))  # revealed: TypeGuard[int] & TypeGuard[str]
+
+check_disjoint_guards(never_true, object())
+```
+
+Distinct wrappers are also preserved in intersections of guard return types, including `TypeIs` and
+mixed guard kinds.
+
+```py
+def _(
+    guard: Intersection[TypeGuard[int], TypeGuard[str]],
+    type_is: Intersection[TypeIs[int], TypeIs[str]],
+    mixed: Intersection[TypeGuard[int], TypeIs[str]],
+):
+    reveal_type(guard)  # revealed: TypeGuard[int] & TypeGuard[str]
+    reveal_type(type_is)  # revealed: TypeIs[int] & TypeIs[str]
+    reveal_type(mixed)  # revealed: TypeGuard[int] & TypeIs[str]
+```
+
+Redundant components still simplify away. `TypeGuard` is covariant, whereas `TypeIs` is invariant.
+
+```py
+def _(
+    covariant: Intersection[TypeGuard[int], TypeGuard[bool]],
+    reversed: Intersection[TypeGuard[bool], TypeGuard[int]],
+    invariant: Intersection[TypeIs[int], TypeIs[bool]],
+    repeated: Intersection[TypeIs[int], TypeIs[int]],
+    boolean: Intersection[TypeGuard[int], bool],
+):
+    reveal_type(covariant)  # revealed: TypeGuard[bool]
+    reveal_type(reversed)  # revealed: TypeGuard[bool]
+    reveal_type(invariant)  # revealed: TypeIs[int] & TypeIs[bool]
+    reveal_type(repeated)  # revealed: TypeIs[int]
+    reveal_type(boolean)  # revealed: TypeGuard[int]
+```
+
+Excluding a different guard retains the exclusion. Excluding a supertype still yields `Never`.
+
+```py
+def _(
+    different: Intersection[TypeGuard[int], Not[TypeGuard[str]]],
+    supertype: Intersection[TypeGuard[bool], Not[TypeGuard[int]]],
+):
+    reveal_type(different)  # revealed: TypeGuard[int] & ~TypeGuard[str]
+    reveal_type(supertype)  # revealed: Never
+```
+
 ## Narrowing
 
 ```toml
@@ -474,24 +555,76 @@ def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
         reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
-A `TypeIs` function that returns a gradual specialization of a generic class narrows to that generic
-type without replacing its gradual type argument:
+A `TypeIs` function can also be used to narrow to a specific callable type:
 
 ```py
-class Covariant[T]:
+def is_callable_that_returns_int(arg: object) -> TypeIs[Callable[[object], int]]:
+    return callable(arg)
+
+def is_callable_that_takes_str(arg: object) -> TypeIs[Callable[[str], object]]:
+    return callable(arg)
+
+def _(arg: Callable[[object], str] | Callable[[object], int]):
+    if is_callable_that_returns_int(arg):
+        reveal_type(arg)  # revealed: (object, /) -> int
+
+def _(arg: Callable[[str], object] | Callable[[int], object]):
+    if is_callable_that_takes_str(arg):
+        reveal_type(arg)  # revealed: (str, /) -> object
+```
+
+## `TypeIs` narrowing with generic classes and gradual types
+
+### Non-strict mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = false
+
+[rules]
+# This rule is ignored in ty's default settings. Disable it here as well to
+# allow usage of `Getter` without a type argument below. 
+missing-type-argument = "ignore"
+```
+
+In non-strict narrowing mode, a `TypeIs` function that returns a gradual specialization of a generic
+class narrows from `object` to that gradual specialization:
+
+```py
+from typing import Any
+from typing_extensions import TypeIs
+
+class Getter[T]:
     def get(self) -> T:
         raise NotImplementedError
 
-def is_instance_of_covariant(arg: object) -> TypeIs[Covariant[Any]]:
-    return isinstance(arg, Covariant)
+def is_getter(arg: object) -> TypeIs[Getter[Any]]:
+    return isinstance(arg, Getter)
 
-def _(x: object):
-    if is_instance_of_covariant(x):
-        reveal_type(x)  # revealed: Covariant[Any]
+def is_getter_unspecialized(arg: object) -> TypeIs[Getter]:
+    return isinstance(arg, Getter)
+
+def _(obj: object):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: Getter[Any]
+        reveal_type(obj.get())  # revealed: Any
+
+    if is_getter_unspecialized(obj):
+        reveal_type(obj)  # revealed: Getter[Unknown]
+        reveal_type(obj.get())  # revealed: Unknown
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[Unknown]
+        reveal_type(obj.get())  # revealed: Unknown
 ```
 
-However, intersecting with the declared gradual type does not necessarily exclude every other
-specialization in the negative branch:
+When narrowing from a union of a specific `Getter` specialization and another type, the positive
+branch retains the specific `Getter` specialization and the negative branch excludes `Getter`
+entirely:
 
 ```py
 from typing import final
@@ -499,38 +632,423 @@ from typing import final
 @final
 class Unrelated: ...
 
-def needs_instance_of_unrelated(arg: Unrelated):
-    pass
+def _(obj: Unrelated | Getter[int]):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
 
-def _(x: Unrelated | Covariant[int]):
-    if is_instance_of_covariant(x):
-        raise RuntimeError("oh no")
-
-    reveal_type(x)  # revealed: Unrelated | (Covariant[int] & ~Covariant[Any])
-
-    needs_instance_of_unrelated(x)  # error: [invalid-argument-type]
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
 ```
 
-If a user wants to select *all* instances of `Covariant`, they must use `Covariant[object]`, or more
-generally, `Top[C[Any]]`, which also works for invariant generic types:
+If the other type is not final, the positive branch retains the possibility of multiple inheritance
+between `Overlapping` and `Getter`:
 
 ```py
-from typing import TYPE_CHECKING
+class Overlapping: ...
 
-if TYPE_CHECKING:
-    from ty_extensions import Top
-
-class Invariant[T]:
-    value: T  # make it invariant in `T`
-
-def is_instance_of_invariant(arg: object) -> "TypeIs[Top[Invariant[Any]]]":
-    return isinstance(arg, Invariant)
-
-def _(x: Unrelated | Invariant[int]):
-    if is_instance_of_invariant(x):
-        reveal_type(x)  # revealed: Invariant[int]
+def _(obj: Overlapping | Getter[int]):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[Any]) | Getter[int]
+        reveal_type(obj.get())  # revealed: Any | int
     else:
-        reveal_type(x)  # revealed: Unrelated
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+
+    # For comparison, `isinstance` narrowing behaves in the same way (except for Any -> Unknown)
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[Unknown]) | Getter[int]
+        reveal_type(obj.get())  # revealed: Unknown | int
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+```
+
+The same also works for invariant generics:
+
+```py
+def is_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def _(obj: object):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[Unknown]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[Unknown]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+def _(obj: Unrelated | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+def _(obj: Overlapping | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: (Overlapping & list[Unknown]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: (Overlapping & list[Unknown]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+# Regression test from https://github.com/astral-sh/ty/issues/4394
+def _(value: int | list) -> int:
+    if is_list(value):
+        value = 0
+    return value
+```
+
+Similarly, for gradual protocols, `TypeIs` narrowing retains the gradualness of protocol members in
+non-strict mode, when narrowing from object:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+def is_reader(arg: object) -> TypeIs[Reader]:
+    return isinstance(arg, Reader)
+
+def _(obj: object):
+    if is_reader(obj):
+        reveal_type(obj)  # revealed: Reader
+        reveal_type(obj.read())  # revealed: Any
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        reveal_type(obj)  # revealed: Reader
+        reveal_type(obj.read())  # revealed: Any
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
+```
+
+When narrowing from a union of a specific `Reader` implementation and another type, the positive
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+
+```py
+class SpecificReader:
+    def read(self) -> str:
+        raise NotImplementedError
+
+def _(obj: SpecificReader | Unrelated):
+    if is_reader(obj):
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+```
+
+Conversely, narrowing a gradual implementation with a fully static protocol retains the
+intersection. `GradualReader.read` can return any type, but `IntReader.read` restricts the return
+type to `int`, so the narrowed return type is `Any & int`:
+
+```py
+@runtime_checkable
+class IntReader(Protocol):
+    def read(self) -> int: ...
+
+class GradualReader:
+    def read(self) -> Any:
+        raise NotImplementedError
+
+def is_int_reader(x: object) -> TypeIs[IntReader]:
+    raise NotImplementedError
+
+def _(obj: GradualReader):
+    if is_int_reader(obj):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, IntReader):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+```
+
+### Strict mode
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+
+[rules]
+# see above
+missing-type-argument = "ignore"
+```
+
+In strict narrowing mode, we narrow to the top-materialization of the generic class:
+
+```py
+from typing import Any
+from typing_extensions import TypeIs
+
+class Getter[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def is_getter(arg: object) -> TypeIs[Getter[Any]]:
+    return isinstance(arg, Getter)
+
+def is_getter_unspecialized(arg: object) -> TypeIs[Getter]:
+    return isinstance(arg, Getter)
+
+def _(obj: object):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: Getter[object]
+        reveal_type(obj.get())  # revealed: object
+
+    if is_getter_unspecialized(obj):
+        reveal_type(obj)  # revealed: Getter[object]
+        reveal_type(obj.get())  # revealed: object
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[object]
+        reveal_type(obj.get())  # revealed: object
+```
+
+Like in non-strict mode, when narrowing from a union of a specific `Getter` specialization and
+another type, the positive branch retains the specific `Getter` specialization and the negative
+branch excludes `Getter` entirely:
+
+```py
+from typing import final
+
+@final
+class Unrelated: ...
+
+def _(obj: Unrelated | Getter[int]):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: Getter[int]
+        reveal_type(obj.get())  # revealed: int
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+```
+
+Like in non-strict mode, if the other type is not final, the positive branch retains the possibility
+of multiple inheritance between `Overlapping` and `Getter`:
+
+```py
+class Overlapping: ...
+
+def _(obj: Overlapping | Getter[int]):
+    if is_getter(obj):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[object]) | Getter[int]
+        reveal_type(obj.get())  # revealed: object
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Getter):
+        reveal_type(obj)  # revealed: (Overlapping & Getter[object]) | Getter[int]
+        reveal_type(obj.get())  # revealed: object
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Getter[object]
+```
+
+The same also works for invariant generics:
+
+```py
+def is_list(value: object) -> TypeIs[list]:
+    return isinstance(value, list)
+
+def _(obj: object):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: Top[list[Unknown]]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: Top[list[Unknown]]
+    else:
+        reveal_type(obj)  # revealed: ~Top[list[Unknown]]
+
+def _(obj: Unrelated | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: list[int]
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+def _(obj: Overlapping | list[int]):
+    if is_list(obj):
+        reveal_type(obj)  # revealed: (Overlapping & Top[list[Unknown]]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, list):
+        reveal_type(obj)  # revealed: (Overlapping & Top[list[Unknown]]) | list[int]
+    else:
+        reveal_type(obj)  # revealed: Overlapping & ~Top[list[Unknown]]
+
+# Regression test from https://github.com/astral-sh/ty/issues/4394
+def _(value: int | list) -> int:
+    if is_list(value):
+        value = 0
+    return value
+```
+
+Similarly, for gradual protocols, `TypeIs` narrowing in strict mode also narrows to the
+top-materialization of the protocol:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Reader(Protocol):
+    def read(self) -> Any: ...
+
+def is_reader(arg: object) -> TypeIs[Reader]:
+    return isinstance(arg, Reader)
+
+def _(obj: object):
+    if is_reader(obj):
+        reveal_type(obj)  # revealed: Top[Reader]
+        reveal_type(obj.read())  # revealed: object
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        reveal_type(obj)  # revealed: Top[Reader]
+        reveal_type(obj.read())  # revealed: object
+    else:
+        reveal_type(obj)  # revealed: ~Top[Reader]
+```
+
+When narrowing from a union of a specific `Reader` implementation and another type, the positive
+branch retains the specific `Reader` implementation, and the negative branch excludes it entirely:
+
+```py
+class SpecificReader:
+    def read(self) -> str:
+        raise NotImplementedError
+
+def _(obj: SpecificReader | Unrelated):
+    if is_reader(obj):
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, Reader):
+        reveal_type(obj)  # revealed: SpecificReader
+        reveal_type(obj.read())  # revealed: str
+    else:
+        reveal_type(obj)  # revealed: Unrelated
+```
+
+Narrowing a gradual implementation with a fully static protocol retains the same intersection as in
+non-strict mode, since materialization does not change the protocol:
+
+```py
+@runtime_checkable
+class IntReader(Protocol):
+    def read(self) -> int: ...
+
+class GradualReader:
+    def read(self) -> Any:
+        raise NotImplementedError
+
+def is_int_reader(x: object) -> TypeIs[IntReader]:
+    raise NotImplementedError
+
+def _(obj: GradualReader):
+    if is_int_reader(obj):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+
+    # For comparison, `isinstance` narrowing behaves in the same way:
+    if isinstance(obj, IntReader):
+        reveal_type(obj)  # revealed: GradualReader & IntReader
+        reveal_type(obj.read())  # revealed: Any & int
+```
+
+## Materialized `TypeIs` narrowing
+
+A `TypeIs[Any]` guard may materialize to any type, and so it narrows its argument to `Never` in the
+negative branch:
+
+```py
+from typing import Any, Callable
+from typing_extensions import TypeIs
+from ty_extensions import Top
+
+def _(predicate: Callable[[object], TypeIs[Any]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int & Any
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
+The top materialization of the guard, however, does not narrow its argument, as it describes the
+union of guards for all static types:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[Any]]], value: int) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: int
+```
+
+The static component of a top-materialized gradual `TypeIs` guard constrains the possible
+materializations of its argument:
+
+```py
+def _(predicate: Top[Callable[[object], TypeIs[int | Any]]], value: int | str) -> None:
+    if predicate(value):
+        reveal_type(value)  # revealed: int | str
+    else:
+        reveal_type(value)  # revealed: str
 ```
 
 ## `TypeIs` narrowing of `NewType` instances
@@ -616,6 +1134,86 @@ def _(x: object):
         reveal_type(x)  # revealed: B & C
 ```
 
+## TypeGuard narrowing across multiple bindings
+
+A conditional assignment can leave two bindings with the same original type. If a type guard
+replaces the type of only one binding, both the replacement and the original type remain possible.
+
+```py
+from typing_extensions import TypeGuard
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+        if not is_str(value):
+            return
+
+    reveal_type(value)  # revealed: int | str
+```
+
+Once both branches of a type guard rejoin, the replacement no longer applies. A call on the negative
+branch must not preserve the positive branch's replacement.
+
+```py
+def _(flag: bool):
+    value = make_int()
+    if flag:
+        value = make_int()
+
+    if is_str(value):
+        pass
+    else:
+        make_int()
+
+    reveal_type(value)  # revealed: int
+```
+
+## TypeGuard joins after repeated suppressed assignments
+
+Conditional assignments inside suppressing context managers preserve several possible bindings.
+After a type guard's branches rejoin, its replacement no longer applies to any of those bindings,
+even when a nested `TypeIs` check rules out the replacement type.
+
+```py
+from contextlib import suppress
+from typing_extensions import TypeGuard, TypeIs
+
+def make_int() -> int:
+    return 1
+
+def is_str(value: object) -> TypeGuard[str]:
+    return True
+
+def is_int(value: object) -> TypeIs[int]:
+    return True
+
+def _(flag: bool, value: int | None) -> None:
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+    with suppress(Exception):
+        if flag:
+            value = make_int()
+
+    if is_str(value):
+        if is_int(value):
+            reveal_type(value)  # revealed: Never
+    reveal_type(value)  # revealed: int | None
+```
+
 ## Boolean logic with TypeGuard and TypeIs
 
 TypeGuard constraints need to properly distribute through boolean operations.
@@ -698,4 +1296,57 @@ def overwritten_target(value: object):
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysFalsy
     else:
         reveal_type(value)  # revealed: TypeGuard[list[int] @ value] & ~AlwaysTruthy
+```
+
+## Recursive TypeIs targets
+
+An unresolved recursive `TypeIs` target does not make the negative branch unreachable. We retain the
+recursive input while inferring assignments in both branches.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+
+class Container(Generic[T]): ...
+
+def is_container(value: object, other: T) -> TypeIs[Container[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container(value, type(value)):
+        value = value.__str__  # error: [possibly-unresolved-reference]
+        bad: str = 42  # error: [invalid-assignment]
+    else:
+        value = {value}  # error: [possibly-unresolved-reference]
+        bad: str = 42  # error: [invalid-assignment]
+    reveal_type(value)  # revealed: Divergent | set[Divergent]
+```
+
+## Recursive TypeIs targets with PEP 695 generics
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeIs
+
+class Container[T]: ...
+
+def is_container[T](value: object, other: T) -> TypeIs[Container[T]]:
+    return True
+
+while True:
+    # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    if is_container(value, type(value)):
+        value = value.__str__  # error: [possibly-unresolved-reference]
+    else:
+        value = {value}  # error: [possibly-unresolved-reference]
+    reveal_type(value)  # revealed: Divergent | set[Divergent]
 ```

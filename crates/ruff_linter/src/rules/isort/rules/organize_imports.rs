@@ -12,6 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
 use crate::rules::isort::block::Block;
@@ -39,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.110")]
+#[violation_metadata(stable_since = "v0.0.110", category = Category::Style)]
 pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {

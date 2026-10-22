@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pytest_style::helpers::is_likely_pytest_test;
 use crate::{Edit, Fix, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -31,7 +32,7 @@ use ruff_text_size::Ranged;
 /// ## References
 /// - [Original Pytest issue](https://github.com/pytest-dev/pytest/issues/12693)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct PytestParameterWithDefaultArgument {
     parameter_name: String,
 }
