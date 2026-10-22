@@ -10,7 +10,8 @@ import argparse
 import json
 import os
 import re
-from typing import Any, NamedTuple
+from dataclasses import dataclass
+from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -20,25 +21,39 @@ API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
 BOT_ID = 305554984  # astral-automations-bot
 
 
-class Report(NamedTuple):
-    marker: str
+@dataclass(frozen=True)
+class Report:
     workflow: str
+    artifact: str
+    filename: str
 
 
 REPORTS = {
-    "ruff-ecosystem": Report("<!-- generated-comment ecosystem -->", "ci.yaml"),
+    "ruff-ecosystem": Report(
+        workflow="ci.yaml",
+        artifact="ecosystem-result",
+        filename="ecosystem-result",
+    ),
     "memory": Report(
-        "<!-- generated-comment memory_report_diff -->", "memory_report.yaml"
+        workflow="memory_report.yaml",
+        artifact="memory_report_diff",
+        filename="memory_report_diff.diff",
     ),
     "typing-conformance": Report(
-        "<!-- generated-comment typing_conformance_diagnostics_diff -->",
-        "typing_conformance.yaml",
+        workflow="typing_conformance.yaml",
+        artifact="typing_conformance_diagnostics_diff",
+        filename="typing_conformance_diagnostics.diff",
     ),
     "ty-ecosystem": Report(
-        "<!-- generated-comment ty ecosystem-analyzer -->",
-        "ty-ecosystem-analyzer.yaml",
+        workflow="ty-ecosystem-analyzer.yaml",
+        artifact="comment.md",
+        filename="comment.md",
     ),
 }
+
+
+def report_marker(report: str) -> str:
+    return f"<!-- generated-comment {report} -->"
 
 
 def api(
@@ -92,7 +107,7 @@ def find_report(
         return None
     comment = api(f"issues/comments/{comment_id}", missing_ok=True)
     if comment is not None and not matches_comment(
-        comment, pull_request, REPORTS[report].marker
+        comment, pull_request, report_marker(report)
     ):
         raise ValueError(
             "The stored ID does not identify this bot's report on this PR."

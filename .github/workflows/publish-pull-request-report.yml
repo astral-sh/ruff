@@ -7,6 +7,8 @@ on:
         type: string
         required: true
     secrets:
+      KV_API_URL:
+        required: true
       STS_API_URL:
         required: true
 
@@ -48,7 +50,7 @@ jobs:
         id: comment-state
         uses: astral-sh/github-actions/key-value-store/get@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          service-url: ${{ secrets.KV_API_URL }}
           key: report-comment-${{ inputs.report }}
           mask-value: "false"
       - name: Get a report publishing token
@@ -85,6 +87,6 @@ jobs:
         if: steps.publish.outputs.comment-id != ''
         uses: astral-sh/github-actions/key-value-store/put@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          service-url: ${{ secrets.KV_API_URL }}
           key: report-comment-${{ inputs.report }}
           value: ${{ steps.publish.outputs.comment-id }}

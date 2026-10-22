@@ -20,15 +20,6 @@ from pathlib import Path
 
 import pull_request_comments as comments
 
-ARTIFACTS = {
-    "ruff-ecosystem": ("ecosystem-result", "ecosystem-result"),
-    "memory": ("memory_report_diff", "memory_report_diff.diff"),
-    "typing-conformance": (
-        "typing_conformance_diagnostics_diff",
-        "typing_conformance_diagnostics.diff",
-    ),
-    "ty-ecosystem": ("comment.md", "comment.md"),
-}
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
@@ -110,7 +101,7 @@ def render_report(
         )
     run_url = f"https://github.com/{comments.REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
     return (
-        f"{comments.REPORTS[report].marker}\n"
+        f"{comments.report_marker(report)}\n"
         f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
         f"{contents.rstrip()}\n\n"
         f"[Workflow run]({run_url}) · `{run['head_sha'][:7]}`\n"
@@ -167,12 +158,12 @@ def publish(
     run, pull = source
     if pull["number"] != pull_request:
         raise ValueError("The run does not belong to the requested pull request.")
-    artifact_name, filename = ARTIFACTS[report]
-    artifact = find_artifact(run_id, artifact_name)
+    metadata = comments.REPORTS[report]
+    artifact = find_artifact(run_id, metadata.artifact)
     if artifact is None:
-        print(f"No {artifact_name} artifact is available.", file=sys.stderr)
+        print(f"No {metadata.artifact} artifact is available.", file=sys.stderr)
         return
-    contents = read_report(download_artifact(artifact), filename)
+    contents = read_report(download_artifact(artifact), metadata.filename)
     if not contents.strip():
         return
     full_report = (
@@ -207,7 +198,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True, type=int)
     parser.add_argument("--run-attempt", required=True, type=int)
-    parser.add_argument("--report", required=True, choices=ARTIFACTS)
+    parser.add_argument("--report", required=True, choices=comments.REPORTS)
     parser.add_argument("--pull-request", required=True, type=int)
     parser.add_argument("--comment-id", type=comments.parse_comment_id)
     parser.add_argument("--dry-run", action="store_true")

@@ -1,21 +1,22 @@
 # Pull request report comments
 
 `publish-pull-request-report.yml` provides a shared publisher for same-repository pull requests.
-Callers pass a `report` input and the `STS_API_URL` secret, and pin the reusable workflow to the same
-revision authorized by the STS policy. The publisher runs code from that revision in the
+Callers pass a `report` input and the `KV_API_URL` and `STS_API_URL` secrets, and pin the reusable
+workflow to the same revision authorized by the STS policy. The publisher runs code from that revision in the
 `automations` environment. STS supplies the `actions: read` and `pull_requests: write` token used to
 publish as `astral-automations-bot[bot]`.
 
 ## Comment IDs
 
 The publisher uses `key-value-store/get` and `key-value-store/put` from `astral-sh/github-actions`.
-Set the repository variable `KEY_VALUE_SERVICE_URL` to the service's HTTPS origin. The actions
+Set the `KV_API_URL` secret in the `automations` environment to the service's HTTPS URL. The actions
 exchange the job's OIDC token for access to the service independently of STS.
 
 The key-value store is the only source of existing comment IDs. The publisher fetches a stored ID
-directly and verifies the bot's numeric identity, the owning PR, and the report marker. It never
-lists or scans PR comments. A missing or expired key, or a deleted comment, causes a new comment to
-be created and its ID stored. Malformed IDs and mismatched comments fail publication.
+directly and verifies the bot's numeric identity, the owning PR, and the marker derived from the
+`report` input. It never lists or scans PR comments. A missing or expired key, or a deleted comment,
+causes a new comment to be created and its ID stored. Malformed IDs and mismatched comments fail
+publication.
 
 Each report uses a separate key named `report-comment-<report>`, containing a positive decimal ID.
 The report names are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`. GitHub's
