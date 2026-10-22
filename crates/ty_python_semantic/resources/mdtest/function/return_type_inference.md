@@ -956,21 +956,32 @@ reveal_type(expanding(5))  # revealed: tuple[Divergent, Divergent]
 
 ### Returning a recursive lambda
 
-A returned lambda can call its enclosing function. Inferring the lambda's body creates a cycle
-through the function's return type, even when there is no call site outside the function:
+A regression test for a cycle panic:
 
 ```py
 def recursive_lambda():
-    return lambda: recursive_lambda()  # no diagnostic
+    return lambda: recursive_lambda()
+
+reveal_type(recursive_lambda())  # revealed: () -> Divergent
 ```
 
-The returned callable's recursive return type is approximated with `Divergent`:
+### Recursive instance attributes
+
+Inferring an attribute assigned from a method's return type must converge even when neither method
+is called outside the class. Adding an external call changes the inference cycle and hides this
+regression.
 
 ```py
-def called_recursive_lambda():
-    return lambda: called_recursive_lambda()
+class Tree:
+    def build(self):
+        root = None
+        # error: [truthiness-test-of-none-union]
+        if self.root:
+            root = [self.root]
+        return (root,)  # no diagnostic
 
-reveal_type(called_recursive_lambda())  # revealed: () -> Divergent
+    def update(self):
+        (self.root,) = self.build()  # no diagnostic
 ```
 
 ### Mutual recursion

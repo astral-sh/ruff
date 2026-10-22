@@ -218,8 +218,6 @@ impl<'db> ExpectedReturnType<'db> {
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_returns(&mut self, function: &'ast ast::StmtFunctionDef) {
-        /// Visit returns in this body without entering nested scopes or inferring unrelated
-        /// statements. Name lookup and reachability query the dependencies of each return.
         struct ReturnStmtVisitor<'builder, 'db, 'ast>(
             &'builder mut TypeInferenceBuilder<'db, 'ast>,
         );
@@ -228,13 +226,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
                 match statement {
                     ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
-                    ast::Stmt::Return(ret) => {
-                        let range = ret
-                            .value
-                            .as_ref()
-                            .map_or(ret.range(), |value| value.range());
-                        if self.0.context.is_range_reachable(range) {
-                            self.0.infer_maybe_standalone_statement(statement);
+                    ast::Stmt::Return(return_statement) => {
+                        if self.0.context.is_range_reachable(return_statement.range()) {
+                            // Keep return inference in this query's cycle. A standalone
+                            // statement can normalize `tuple[None | list[Divergent]]` to
+                            // `tuple[Divergent]` before unpacking establishes the recursive
+                            // attribute type, losing the structure needed for convergence.
+                            self.0.infer_return_statement(return_statement);
                         }
                     }
                     _ => walk_stmt(self, statement),
