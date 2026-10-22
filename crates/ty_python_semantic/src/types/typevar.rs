@@ -1072,6 +1072,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             binding_context,
             paramspec_attr,
             freshness,
+            scope: None,
         };
         Self::new_internal(db, typevar, identity)
     }
@@ -1089,12 +1090,14 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        Self::new(
+        let typevar = self.typevar(db).with_name_suffix(db, suffix);
+        Self::new_internal(
             db,
-            self.typevar(db).with_name_suffix(db, suffix),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
+            typevar,
+            BoundTypeVarIdentity {
+                identity: typevar.identity(db),
+                ..self.identity(db)
+            },
         )
     }
 
@@ -1184,12 +1187,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
-        Self::new(
+        Self::new_internal(
             db,
             typevar,
-            self.binding_context(db),
-            Some(kind),
-            self.freshness(db),
+            BoundTypeVarIdentity {
+                paramspec_attr: Some(kind),
+                ..self.identity(db)
+            },
         )
     }
 
@@ -1208,7 +1212,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         );
 
         let typevar = self.typevar(db);
-        Self::new(
+        Self::new_internal(
             db,
             TypeVarInstance::new(
                 db,
@@ -1217,9 +1221,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 typevar.explicit_variance(db),
                 None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
-            self.binding_context(db),
-            None,
-            self.freshness(db),
+            self.identity(db).without_paramspec_attr(db),
         )
     }
 
@@ -1257,6 +1259,19 @@ impl<'db> BoundTypeVarInstance<'db> {
             None,
             TypeVarNonce::NONE,
         )
+    }
+
+    /// Resolves an unresolved typevar, preserving bindings already captured from another scope.
+    pub(crate) fn resolve(self, db: &'db dyn Db, scope: TypeVarScope<'db>) -> Self {
+        if self.is_resolved(db) {
+            return self;
+        }
+        let identity = self.identity(db).resolve(db, scope);
+        Self::new_internal(db, self.typevar(db), identity)
+    }
+
+    pub(crate) fn is_resolved(self, db: &'db dyn Db) -> bool {
+        self.identity(db).scope.is_some()
     }
 
     /// Create a synthetic `Self` type variable with the given origin and upper bound.
@@ -1331,13 +1346,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar._default(db),
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        )
+        Self::new_internal(db, typevar, self.identity(db))
     }
 
     pub(crate) fn variance_with_polarity(
@@ -1493,6 +1502,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     ))
                 }
             }
+            TypeMapping::ResolveTypeVars(scope) => Type::TypeVar(self.resolve(db, *scope)),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1584,13 +1594,11 @@ impl<'db> BoundTypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        Self::new(
+        Self::new_internal(
             db,
             self.typevar(db)
                 .materialize_impl(db, materialization_kind, visitor),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
+            self.identity(db),
         )
     }
 
@@ -1604,15 +1612,13 @@ impl<'db> BoundTypeVarInstance<'db> {
         let typevar = self.typevar(db);
         let bound_or_constraints = typevar.bound_or_constraints(db, visitor.env);
         let default = self.default_type(db);
+        let identity = BoundTypeVarIdentity {
+            freshness: nonce,
+            ..self.identity(db)
+        };
 
         if bound_or_constraints.is_none() && default.is_none() {
-            return Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                nonce,
-            );
+            return Self::new_internal(db, typevar, identity);
         }
 
         let typevar = TypeVarInstance::new(
@@ -1630,13 +1636,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             }),
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            nonce,
-        )
+        Self::new_internal(db, typevar, identity)
     }
 
     pub(super) fn to_instance(
@@ -1645,12 +1645,13 @@ impl<'db> BoundTypeVarInstance<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Self>> {
         Some(self.typevar(db).to_instance(db, env)?.map(|typevar| {
-            Self::new(
+            Self::new_internal(
                 db,
                 typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                self.freshness(db),
+                BoundTypeVarIdentity {
+                    identity: typevar.identity(db),
+                    ..self.identity(db)
+                },
             )
         }))
     }
@@ -1902,6 +1903,26 @@ impl std::fmt::Display for ParamSpecAttrKind {
     }
 }
 
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct TypeVarScope<'db> {
+    #[returns(copy)]
+    kind: TypeVarScopeKind,
+    #[returns(copy)]
+    generic_context: GenericContext<'db>,
+    #[returns(copy)]
+    parent: Option<TypeVarScope<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypeVarScope<'_> {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum TypeVarScopeKind {
+    NonInferable,
+    Inferable(u16),
+    Quantified(u16),
+}
+
 /// The identity of a bound type variable occurrence.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
@@ -1918,6 +1939,7 @@ pub struct BoundTypeVarIdentity<'db> {
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
     /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     freshness: TypeVarNonce,
+    scope: Option<TypeVarScope<'db>>,
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
@@ -1938,6 +1960,21 @@ impl<'db> BoundTypeVarIdentity<'db> {
 
         self.paramspec_attr = None;
         self
+    }
+
+    fn resolve(self, db: &'db dyn Db, mut scope: TypeVarScope<'db>) -> Self {
+        loop {
+            if scope.generic_context(db).contains(db, self) {
+                return Self {
+                    scope: Some(scope),
+                    ..self
+                };
+            }
+            let Some(parent) = scope.parent(db) else {
+                panic!("should find containing scope for {}", self.display(db));
+            };
+            scope = parent;
+        }
     }
 }
 

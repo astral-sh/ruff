@@ -110,7 +110,7 @@ pub(crate) use crate::types::typevar::{
     TypeVarBoundOrConstraints, TypeVarNonce,
 };
 pub use crate::types::typevar::{BoundTypeVarInstance, TypeVarKind};
-use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{TypeVarDomain, TypeVarInstance, TypeVarScope, TypeVarSet};
 use crate::types::union_type_instance::UnionTypeInstance;
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::{VarianceInferable, VarianceTerm};
@@ -10133,6 +10133,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::ResolveTypeVars(_)
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -10156,6 +10157,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::ResolveTypeVars(_)
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11522,6 +11524,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
+    /// Resolves typevars against a particular scope
+    ResolveTypeVars(TypeVarScope<'db>),
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -11629,6 +11633,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::ResolveTypeVars(_)
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11682,6 +11687,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::ResolveTypeVars(_)
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
