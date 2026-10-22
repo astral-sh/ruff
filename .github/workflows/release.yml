@@ -237,13 +237,16 @@ jobs:
           path: target/distrib/local-dist-manifest.json
 
   # Build and package all the platform-agnostic(ish) things
+  #
+  # The global artifacts use binary archives and the local dist manifest with
+  # checksums, but not Docker or WASM build outputs. Omitting `custom-build-docker`
+  # and `custom-build-wasm` from `needs` lets this job run before those builds finish.
+  # The `host` job still requires both to succeed or be skipped.
   build-global-artifacts:
     needs:
       - sign-release-binaries
       - plan
       - custom-build-binaries
-      - custom-build-docker
-      - custom-build-wasm
       - generate-checksum-manifest
     permissions:
       "contents": "read"
