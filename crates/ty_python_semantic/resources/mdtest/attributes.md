@@ -3538,16 +3538,24 @@ class B: ...
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: int
 
+    # `B` has no `x` of its own, and no `__setattr__` to object to the write either, so it
+    # doesn't veto a value that `A`'s declared type accepts.
     a_and_b.x = 2
+
+    a_and_b.x = "wrong"  # error: [invalid-assignment]
 
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: int
 
     a_and_b.x = 2
+    a_and_b.x = "wrong"  # error: [invalid-assignment]
 ```
 
 ### Attribute available on both elements
+
+Reading `a_and_b.x` combines `A`'s and `B`'s declared types into an intersection, so a write must
+satisfy both declared types too, not just one of them.
 
 ```py
 from ty_extensions import Intersection
@@ -3566,10 +3574,44 @@ def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.x)  # revealed: P & Q
     a_and_b.x = R()
 
+    # `P()` satisfies `A`'s declared type but not `B`'s.
+    a_and_b.x = P()  # error: [invalid-assignment]
+
 # Same for class objects
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: P & Q
     a_and_b.x = R()
+    a_and_b.x = P()  # error: [invalid-assignment]
+```
+
+### Writing a callable through two elements
+
+The same both-elements requirement applies when the declared types are callable signatures. A value
+that already has a concrete type must be assignable to each element's declared type on its own:
+
+```py
+from collections.abc import Callable
+from ty_extensions import Intersection
+
+class A:
+    callback: Callable[[int], object]
+
+class B:
+    callback: Callable[[str], object]
+
+def takes_int(value: int) -> object: ...
+def _(a_and_b: Intersection[A, B]):
+    # `takes_int` accepts `int`, so it isn't assignable to `B`'s `Callable[[str], object]`.
+    a_and_b.callback = takes_int  # error: [invalid-assignment]
+```
+
+An unannotated lambda has no type of its own until it's checked against an expected type, so each
+element independently infers it under its own declared type; the type shown here comes from
+whichever element is checked first.
+
+```py
+def _(a_and_b: Intersection[A, B]):
+    a_and_b.callback = lambda value: reveal_type(value)  # revealed: int
 ```
 
 ### Descriptor binding uses the full intersection type
@@ -3672,6 +3714,10 @@ def _(flag: bool):
         # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
+        # `A3.x` and `B3.x` are each independently possibly-unbound, so a write that checks
+        # every positive element gets one warning for each, even though both happen to be
+        # conditioned on the same `flag` here.
+        # error: [possibly-missing-attribute]
         # error: [possibly-missing-attribute]
         a_and_b.x = R()
     # Same for class objects
@@ -3679,6 +3725,7 @@ def _(flag: bool):
         # error: [possibly-missing-attribute]
         reveal_type(a_and_b.x)  # revealed: P & Q
 
+        # error: [possibly-missing-attribute]
         # error: [possibly-missing-attribute]
         a_and_b.x = R()
 
