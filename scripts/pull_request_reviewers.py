@@ -76,19 +76,18 @@ def parse_pools(contents: str) -> list[Pool]:
         reviewers = raw.get("reviewers")
         if not isinstance(paths, list) or not isinstance(reviewers, list):
             continue
-        patterns = tuple(
-            dict.fromkeys(
-                pattern
-                for value in paths
-                if isinstance(value, str) and (pattern := value.strip().lstrip("/"))
-            )
-        )
-        logins = {}
+        patterns: dict[str, None] = {}
+        for value in paths:
+            if isinstance(value, str):
+                pattern = value.strip().lstrip("/")
+                if pattern:
+                    patterns[pattern] = None
+        logins: dict[str, str] = {}
         for value in reviewers:
             if isinstance(value, str) and (login := value.strip().removeprefix("@")):
                 logins.setdefault(login.lower(), login)
         if patterns and logins:
-            pools.append(Pool(name, patterns, tuple(logins.values())))
+            pools.append(Pool(name, tuple(patterns), tuple(logins.values())))
     return pools
 
 

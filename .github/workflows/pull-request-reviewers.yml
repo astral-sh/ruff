@@ -22,7 +22,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       !github.event.pull_request.draft && vars.KEY_VALUE_SERVICE_URL != ''
-    uses: astral-sh/ruff/.github/workflows/dispatch-pull-request-reviewer.yml@0000000000000000000000000000000000000000
+    uses: astral-sh/ruff/.github/workflows/dispatch-pull-request-reviewer.yml@fb3919b95857263335174dbea27c26cfb22d5d3d
     secrets:
       STS_API_URL: ${{ secrets.STS_API_URL }}
     permissions:

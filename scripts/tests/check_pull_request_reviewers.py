@@ -1,6 +1,9 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = []
+#
+# [tool.ty.environment]
+# root = [".."]
 # ///
 """Exercise reviewer rotation, state migration, and GitHub request boundaries."""
 
@@ -13,6 +16,7 @@ import random
 import sys
 import tempfile
 import unittest
+from email.message import Message
 from pathlib import Path
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
@@ -29,8 +33,8 @@ class FixedRandom(random.Random):
     def random(self):
         return self.value
 
-    def choice(self, sequence):
-        return sequence[0]
+    def choice(self, seq):
+        return seq[0]
 
 
 def pull(*, author="author", number=42, **overrides):
@@ -219,7 +223,7 @@ reviewers = ["docs"]
         )
 
     def rejected_candidate_tries_another_reviewer(self):
-        error = HTTPError("https://api.github.com/", 422, "Rejected", {}, None)
+        error = HTTPError("https://api.github.com/", 422, "Rejected", Message(), None)
         result, state, github = exercise(
             responses=[
                 pull(),
@@ -252,7 +256,7 @@ reviewers = ["docs"]
                 pull(),
                 [{"filename": "src/a.py"}],
                 pull(),
-                HTTPError("https://api.github.com/", 422, "Rejected", {}, None),
+                HTTPError("https://api.github.com/", 422, "Rejected", Message(), None),
                 pull(),
                 {},
             ],
@@ -278,7 +282,9 @@ reviewers = ["docs"]
                     pull(),
                     [{"filename": "src/a.py"}],
                     pull(),
-                    HTTPError("https://api.github.com/", 500, "Unavailable", {}, None),
+                    HTTPError(
+                        "https://api.github.com/", 500, "Unavailable", Message(), None
+                    ),
                 ],
             )
         self.assertEqual(state, {})
