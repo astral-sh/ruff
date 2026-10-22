@@ -221,7 +221,7 @@ jobs:
         run: rustup show
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
+        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
         with:
           prefix-key: ruff-iterate-20261022-v3-mtimes
           key: ruff-linux-debug
@@ -300,7 +300,7 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
+        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
         with:
           prefix-key: ruff-iterate-20261022-v3-narrow
           key: ruff-linux-debug
@@ -444,7 +444,7 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
+        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
         with:
           prefix-key: ruff-iterate-20261022-v3-mtimes
           key: ruff-linux-debug
@@ -497,7 +497,7 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
+        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
         with:
           prefix-key: ruff-iterate-20261022-v3-narrow
           key: ruff-linux-debug
