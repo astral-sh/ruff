@@ -146,3 +146,5 @@ jobs:
       id-token: write
     with:
       report: memory
+      artifact: memory_report_diff
+      filename: memory_report_diff.diff
