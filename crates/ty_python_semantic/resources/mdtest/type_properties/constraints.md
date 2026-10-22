@@ -1368,6 +1368,40 @@ def declared_bound[T: str]() -> None:
     static_assert(constraint.solutions(inferable=tuple[T]) is None)
 ```
 
+## Trivial satisfiability checks
+
+The trivial satisfiability checks only recognize the true and false terminal BDDs.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+static_assert(ConstraintSet.always().is_trivially_always_satisfied())
+static_assert(not ConstraintSet.always().is_trivially_never_satisfied())
+static_assert(ConstraintSet.never().is_trivially_never_satisfied())
+static_assert(not ConstraintSet.never().is_trivially_always_satisfied())
+
+def bounded[T]() -> None:
+    constraint = ConstraintSet.equality(T, int)
+    static_assert(not constraint.is_trivially_always_satisfied())
+    static_assert(not constraint.is_trivially_never_satisfied())
+```
+
+Semantic contradictions and tautologies need not be represented as terminal BDDs.
+
+```py
+def nonterminal[T]() -> None:
+    # T = int ∧ T = str
+    impossible = ConstraintSet.equality(T, int) & ConstraintSet.equality(T, str)
+    static_assert(impossible.is_never_satisfied(inferable=tuple[T]))
+    static_assert(not impossible.is_trivially_never_satisfied())
+
+    # ¬(T = int ∧ T = str)
+    tautology = ~impossible
+    static_assert(tautology.is_always_satisfied(inferable=tuple[T]))
+    static_assert(not tautology.is_trivially_always_satisfied())
+```
+
 ## Satisfiability checks exceeding the traversal budget
 
 Independent alternatives can produce too many paths to check within the computation budget. An

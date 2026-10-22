@@ -102,6 +102,44 @@ def combine[T](first: T, second: T, third: T) -> T:
     });
 }
 
+/// Quantify both satisfiable and contradictory bodies containing free variables. The satisfiable
+/// case measures the cost of checking for contradictions when projection still has work to do.
+fn benchmark_constraint_quantification(criterion: &mut Criterion) {
+    const NUM_FUNCTIONS: usize = 128;
+
+    setup_rayon();
+
+    for (name, lower, upper, negation) in [
+        ("satisfiable", "A", "A", ""),
+        ("unsatisfiable", "int", "tuple[A, B]", "not "),
+    ] {
+        let mut code = "from ty_extensions import static_assert\n\
+                        from ty_extensions._internal import ConstraintSet\n\n"
+            .to_string();
+        for i in 0..NUM_FUNCTIONS {
+            writeln!(
+                &mut code,
+                "def check{i}[X, A, B]() -> None:
+    body = ConstraintSet.lower_bound({lower}, X) & ConstraintSet.upper_bound(X, {upper})
+    static_assert({negation}body.exists(tuple[X]))
+"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(
+            &format!("ty_micro[constraint_quantification/{name}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -680,6 +718,7 @@ criterion_group!(
     constraint_set,
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
+    benchmark_constraint_quantification,
     benchmark_factored_upper_bounds,
     benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,
