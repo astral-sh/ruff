@@ -245,4 +245,26 @@ reveal_type(article.get_access_display())  # revealed: str
 article.get_visibility_display()  # error: [unresolved-attribute]
 ```
 
+## Date navigation
+
+Django adds `get_next_by_<field>()` and `get_previous_by_<field>()` methods for date fields that do
+not have `null=True`. These methods return the next/previous instance of the corresponding model
+when ordered by that specific date field:
+
+```py
+from django.db import models
+
+class Article(models.Model):
+    published = models.DateField()
+    reviewed = models.DateField(null=True)
+
+def _(article: Article):
+    reveal_type(article.get_next_by_published())  # revealed: Article
+    reveal_type(article.get_previous_by_published())  # revealed: Article
+
+    # Nullable date fields do not generate these methods.
+    article.get_next_by_reviewed()  # error: [unresolved-attribute]
+    article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+```
+
 [django-types]: https://github.com/sbdchd/django-types

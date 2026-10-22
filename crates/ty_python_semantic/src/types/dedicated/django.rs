@@ -9,8 +9,9 @@ use ty_python_core::{
 use crate::place::known_module_symbol;
 use crate::types::member::class_member;
 use crate::types::{
-    ClassBase, KnownClass, Parameter, Parameters, Signature, Specialization, StaticClassLiteral,
-    Type, binding_type, definition_expression_type,
+    BindingContext, BoundTypeVarInstance, ClassBase, KnownClass, Parameter, Parameters,
+    SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, binding_type,
+    definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -87,6 +88,9 @@ impl<'db> Field<'db> {
                 .is_some_and(|choices| {
                     !definition_expression_type(db, definition, &choices.value).is_none(db)
                 });
+        field.metadata.null = call.arguments.find_keyword("null").is_some_and(|null| {
+            definition_expression_type(db, definition, &null.value) == Type::bool_literal(true)
+        });
         field
     }
 }
@@ -96,6 +100,7 @@ impl<'db> Field<'db> {
 struct FieldMetadata {
     primary_key: bool,
     has_choices: bool,
+    null: bool,
 }
 
 /// All fields defined on this Django model (not including base class fields).
@@ -144,7 +149,11 @@ pub(in crate::types) fn synthesized_member<'db>(
     name: &str,
 ) -> Option<Type<'db>> {
     // A quick filter on the name, so that we can return quickly for almost all attribute names.
-    if !(matches!(name, "id" | "pk") || name.starts_with("get_") && name.ends_with("_display")) {
+    if !(matches!(name, "id" | "pk")
+        || name.starts_with("get_") && name.ends_with("_display")
+        || name.starts_with("get_next_by_")
+        || name.starts_with("get_previous_by_"))
+    {
         return None;
     }
     if !is_model(db, class) {
@@ -152,7 +161,8 @@ pub(in crate::types) fn synthesized_member<'db>(
     }
     match name {
         "id" | "pk" => primary_key_member(db, env, class, specialization, name),
-        _ => display_method(db, env, class, specialization, name),
+        _ => display_method(db, env, class, specialization, name)
+            .or_else(|| date_navigation_method(db, env, class, specialization, name)),
     }
 }
 
@@ -246,6 +256,52 @@ fn display_method<'db>(
             Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty)
         ]),
         KnownClass::Str.to_instance(db, env),
+    );
+    Some(Type::function_like_callable(db, signature))
+}
+
+/// Synthesize `get_next_by_<field>()` and `get_previous_by_<field>()` for non-nullable date fields.
+fn date_navigation_method<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let field_name = name
+        .strip_prefix("get_next_by_")
+        .or_else(|| name.strip_prefix("get_previous_by_"))?;
+    let field = own_model_fields(db, class)
+        .iter()
+        .find(|field| field.name == field_name)?;
+    if field.metadata.null {
+        return None;
+    }
+    // We add these methods for all field types that inherit from `DateField`, like `DateTimeField`.
+    let date_field = KnownClass::DjangoDateField.try_to_class_literal(db, env)?;
+    let field_class = field.ty.nominal_class(db, env)?;
+    if !field_class.is_subtype_of_class_literal(db, date_field.into()) {
+        return None;
+    }
+
+    // Construct `def get_{next,previous}_by_<field>(self: Self, **kwargs: Any) -> Self`.
+    let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+        db,
+        SelfTypeVarOrigin::Class(class.into()),
+        Type::instance(
+            db,
+            env,
+            class.apply_optional_specialization(db, specialization),
+        ),
+        BindingContext::Synthetic(env.program(db)),
+    ));
+    let signature = Signature::new(
+        Parameters::standard([
+            Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::any()),
+        ]),
+        self_ty,
     );
     Some(Type::function_like_callable(db, signature))
 }
