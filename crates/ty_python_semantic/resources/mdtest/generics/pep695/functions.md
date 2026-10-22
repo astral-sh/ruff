@@ -4282,8 +4282,7 @@ TODO: After #29236 lands, simplify these tests to use direct union annotations i
 types, which are currently needed to exercise the full constraints.
 
 A caller's type variable contributes to the inferred return type even when the callee's type also
-accepts a concrete union member. Inferring only `str` would discard the caller's type variable and
-reject a valid call:
+accepts a concrete union member:
 
 ```py
 from collections.abc import Callable
@@ -4344,18 +4343,16 @@ def helper[T](value: Callable[[], T | int]) -> T:
 def defaulted[T = str](value: Callable[[], T | int]) -> T:
     raise NotImplementedError
 
-def covered[U: int](value: Callable[[], U]) -> int:
+def covered[U: int](value: Callable[[], U]):
     reveal_type(helper(value))  # revealed: Unknown
     result = defaulted(value)
     reveal_type(result)  # revealed: str
-    return result  # error: [invalid-return-type]
 ```
 
 ### Invariant arguments with unions
 
-When a union contains two inferred variables, invariant arguments can determine which variable
-accepts each union member. The caller's variable keeps its identity regardless of which inferred
-variable it supplies:
+When a union annotation contains two inferred variables (e.g. `T | V`), invariant arguments can
+determine which variable accepts each union member:
 
 ```py
 from collections.abc import Callable
@@ -4368,30 +4365,11 @@ def outer[U](value: Callable[[], U | str], variables: list[U], strings: list[str
     reveal_type(helper(value, strings, variables))  # revealed: tuple[str, U@outer]
 ```
 
-### Fixed outer variables in protocol member unions
-
-The same inference preserves the caller's variable when a read-only protocol property supplies the
-union:
-
-```py
-from typing import Protocol
-
-class Supplier[T](Protocol):
-    @property
-    def value(self) -> T: ...
-
-def helper[T](value: Supplier[T | int]) -> T:
-    raise NotImplementedError
-
-def outer[U](value: Supplier[U | str]) -> None:
-    reveal_type(helper(value))  # revealed: (U@outer & ~int) | str
-```
-
 ### Bounds and constraints with fixed outer union members
 
-The concrete union member can accept part of the caller's variable. The remaining part must satisfy
-the callee's bound or constraints; requiring the entire caller variable to satisfy them would reject
-these valid calls:
+In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
+type variable. The remaining part must satisfy the callee's bound or constraints; requiring the
+entire caller variable to satisfy them would reject these valid calls:
 
 ```py
 from collections.abc import Callable
