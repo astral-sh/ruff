@@ -44,8 +44,8 @@ def find_artifact(run_id: int, name: str) -> dict | None:
     return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
-def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:
-    if artifact["size_in_bytes"] > max_bytes:
+def download_artifact(artifact: dict) -> bytes:
+    if artifact["size_in_bytes"] > MAX_ARCHIVE_BYTES:
         raise ValueError("The report archive exceeds the download limit.")
     result = subprocess.run(
         [
@@ -57,7 +57,7 @@ def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> 
         stdout=subprocess.PIPE,
         timeout=120,
     )
-    if len(result.stdout) > max_bytes:
+    if len(result.stdout) > MAX_ARCHIVE_BYTES:
         raise ValueError("The report archive exceeds the download limit.")
     return result.stdout
 
@@ -111,15 +111,17 @@ def render_report(
 def report_run(comment: dict) -> tuple[int, int]:
     lines = comment["body"].splitlines()
     if len(lines) > 1 and (
-        match := re.fullmatch(r"<!-- report-run:([0-9]+):([0-9]+) -->", lines[1])
+        match := re.fullmatch(
+            r"<!-- report-run:([1-9][0-9]*):([1-9][0-9]*) -->", lines[1]
+        )
     ):
         return int(match[1]), int(match[2])
-    return 0, 0
+    raise ValueError("The stored report comment has no valid workflow run metadata.")
 
 
 def current_run(
     run_id: int, run_attempt: int, report: str, pull_request: int
-) -> tuple[dict, dict] | None:
+) -> dict | None:
     run = comments.api(f"actions/runs/{run_id}")
     if run["run_attempt"] != run_attempt:
         print("The workflow run has been rerun.", file=sys.stderr)
@@ -132,6 +134,8 @@ def current_run(
     ):
         raise ValueError("The workflow run is not an eligible same-repository PR run.")
     pull = comments.api(f"pulls/{pull_request}")
+    if pull["number"] != pull_request:
+        raise ValueError("The run does not belong to the requested pull request.")
     if (
         pull["state"] != "open"
         or pull["base"]["repo"]["id"] != comments.REPOSITORY_ID
@@ -141,7 +145,7 @@ def current_run(
     ):
         print("The run is not for the current head of this PR.", file=sys.stderr)
         return None
-    return run, pull
+    return run
 
 
 def publish(
@@ -153,11 +157,8 @@ def publish(
     stored_comment_id: int | None = None,
     dry_run: bool = False,
 ) -> int | None:
-    if not (source := current_run(run_id, run_attempt, report, pull_request)):
+    if not (run := current_run(run_id, run_attempt, report, pull_request)):
         return
-    run, pull = source
-    if pull["number"] != pull_request:
-        raise ValueError("The run does not belong to the requested pull request.")
     metadata = comments.REPORTS[report]
     artifact = find_artifact(run_id, metadata.artifact)
     if artifact is None:
@@ -175,8 +176,7 @@ def publish(
         return
 
     # Recheck after downloading: the PR may have advanced or the run may have been retried.
-    current = current_run(run_id, run_attempt, report, pull_request)
-    if not current or current[1]["number"] != pull_request:
+    if not current_run(run_id, run_attempt, report, pull_request):
         return
     existing = comments.find_report(pull_request, report, stored_comment_id)
     if existing and report_run(existing) > (run_id, run_attempt):

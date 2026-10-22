@@ -1,12 +1,7 @@
-# /// script
-# requires-python = ">=3.10"
-# dependencies = []
-# ///
 """Look up automation report comments using IDs from the key-value store."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import re
@@ -113,21 +108,3 @@ def find_report(
             "The stored ID does not identify this bot's report on this PR."
         )
     return comment
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pull-request", required=True, type=int)
-    parser.add_argument("--report", required=True, choices=REPORTS)
-    parser.add_argument("--comment-id", type=parse_comment_id)
-    args = parser.parse_args()
-    if os.environ.get("GITHUB_REPOSITORY", REPOSITORY) != REPOSITORY:
-        parser.error(f"This script only supports {REPOSITORY}.")
-    if args.pull_request <= 0:
-        parser.error("The pull request number must be positive.")
-    if comment := find_report(args.pull_request, args.report, args.comment_id):
-        print(comment["id"])
-
-
-if __name__ == "__main__":
-    main()
