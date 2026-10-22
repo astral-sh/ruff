@@ -4151,6 +4151,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 );
             }
 
+            (formal, actual @ Type::Divergent(_))
+                if actual.is_dynamic() && !formal.is_type_var() =>
+            {
+                let when = self.constraint_for_relation(formal, actual, polarity);
+                return self.infer_from_constraint_set(when);
+            }
+
             (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 return self.infer_map_impl(
@@ -4488,6 +4495,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),
                 }
+            }
+
+            // TODO: Remove this special case once actual unions use constraint-set inference
+            // regardless of the formal type.
+            (formal, Type::Union(actual_union))
+                if polarity.is_covariant()
+                    && actual_union
+                        .elements(db)
+                        .iter()
+                        .any(|ty| ty.is_divergent() && ty.is_dynamic()) =>
+            {
+                let when = self.constraint_for_relation(formal, actual, polarity);
+                return self.infer_from_constraint_set(when);
             }
 
             (Type::NominalInstance(_), Type::TypeVar(actual_typevar))

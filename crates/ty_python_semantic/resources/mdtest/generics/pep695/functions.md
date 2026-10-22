@@ -4882,6 +4882,21 @@ def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
+## Recursive class objects passed to generic functions
+
+Inference converges when a loop repeatedly wraps a class's instance type in `list`.
+
+```py
+def nest[T](cls: type[T]) -> type[list[T]]:
+    raise NotImplementedError
+
+def wrap(paths: list[int]):
+    cls = int
+    for _ in paths:
+        cls = nest(cls)
+    reveal_type(cls)  # revealed: <class 'int'> | type[list[Divergent]]
+```
+
 ## Generic property setters implementing protocols
 
 These deliberately contrived setters could use `object` and `int` directly instead of method-scoped
