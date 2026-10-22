@@ -235,7 +235,7 @@ if sys.version_info >= (3, 15):
     def issubnormal(x: _SupportsFloatOrIndex, /) -> bool:
         """Return True if x is subnormal, and False otherwise."""
 
-def isqrt(n: SupportsIndex, /) -> int:
+def isqrt(n: SupportsIndex, /) -> str:
     """Return the integer part of the square root of the input."""
 
 def lcm(*integers: SupportsIndex) -> int:
