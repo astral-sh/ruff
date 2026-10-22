@@ -5,7 +5,7 @@ use regex::{CaptureMatches, Regex};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::{Arguments, Expr, ExprCall, ExprSubscript, Parameter, ParameterWithDefault};
+use ruff_python_ast::{Arguments, Expr, ExprCall, Parameter, ParameterWithDefault, Stmt};
 use ruff_python_semantic::{BindingKind, Modules, ScopeKind, SemanticModel};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextSize};
@@ -269,13 +269,9 @@ impl<'a> Dependency<'a> {
             return Some(dependency);
         }
 
-        let ExprSubscript { value, slice, .. } = parameter.annotation()?.as_subscript_expr()?;
+        let subscript = resolve_annotated_subscript(parameter.annotation()?, semantic)?;
 
-        if !semantic.match_typing_expr(value, "Annotated") {
-            return None;
-        }
-
-        let Expr::Tuple(tuple) = slice.as_ref() else {
+        let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
             return None;
         };
 
@@ -446,16 +442,74 @@ fn is_pydantic_base_model(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
 }
 
+/// Resolves an expression (or a type alias referencing an expression) to a `typing.Annotated` subscript.
+fn resolve_annotated_subscript<'a>(
+    mut expr: &'a Expr,
+    semantic: &SemanticModel<'a>,
+) -> Option<&'a ast::ExprSubscript> {
+    for _ in 0..5 {
+        match expr {
+            Expr::Subscript(subscript) => {
+                if semantic.match_typing_expr(&subscript.value, "Annotated") {
+                    return Some(subscript);
+                }
+                // If this is a generic type alias specialization like `Alias[int]`,
+                // check if the generic type alias itself resolves to `Annotated`.
+                expr = &subscript.value;
+            }
+            Expr::Name(name) => {
+                let binding_id = semantic
+                    .only_binding(name)
+                    .or_else(|| semantic.lookup_symbol(name.id.as_str()).binding_id())?;
+                let binding = semantic.binding(binding_id);
+                let statement = binding.statement(semantic)?;
+                match statement {
+                    Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                        if targets
+                            .iter()
+                            .any(|target| target.as_name_expr().is_some_and(|n| n.id == name.id))
+                        {
+                            expr = value.as_ref();
+                        } else {
+                            return None;
+                        }
+                    }
+                    Stmt::AnnAssign(ast::StmtAnnAssign {
+                        target,
+                        value: Some(value),
+                        ..
+                    }) => {
+                        if target.as_name_expr().is_some_and(|n| n.id == name.id) {
+                            expr = value.as_ref();
+                        } else {
+                            return None;
+                        }
+                    }
+                    Stmt::TypeAlias(ast::StmtTypeAlias {
+                        name: alias_name,
+                        value,
+                        ..
+                    }) => {
+                        if alias_name.as_name_expr().is_some_and(|n| n.id == name.id) {
+                            expr = value.as_ref();
+                        } else {
+                            return None;
+                        }
+                    }
+                    _ => return None,
+                }
+            }
+            _ => return None,
+        }
+    }
+    None
+}
+
 /// Extract the expected in-route name for a given parameter, if it has an alias.
 /// For example, given `document_id: Annotated[str, Path(alias="documentId")]`, returns `"documentId"`.
-fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Option<&'a str> {
-    let Some(annotation) = &parameter.annotation else {
-        return None;
-    };
-
-    let Expr::Subscript(subscript) = annotation.as_ref() else {
-        return None;
-    };
+fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel<'a>) -> Option<&'a str> {
+    let annotation = parameter.annotation.as_deref()?;
+    let subscript = resolve_annotated_subscript(annotation, semantic)?;
 
     let Expr::Tuple(tuple) = subscript.slice.as_ref() else {
         return None;
@@ -475,11 +529,6 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
     let Expr::StringLiteral(alias) = alias else {
         return None;
     };
-
-    // Verify that the subscript was a `typing.Annotated`.
-    if !semantic.match_typing_expr(&subscript.value, "Annotated") {
-        return None;
-    }
 
     // Verify that the call was a `fastapi.Path`.
     if !semantic

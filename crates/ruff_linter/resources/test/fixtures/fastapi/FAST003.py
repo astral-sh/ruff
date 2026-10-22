@@ -369,3 +369,60 @@ async def read_thing_callable_dep_instance_default(query: str = Depends(Callable
 # Error: `__call__` has `other`, not `thing_id`.
 @app.get("/things/{thing_id}")
 async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
+
+
+# https://github.com/astral-sh/ruff/issues/21075
+ThingDep = Annotated[str, Depends(takes_thing_id)]
+
+
+# OK: type alias to Annotated with Depends
+@app.get("/things/{thing_id}")
+async def read_thing_annotated_alias(other: ThingDep): ...
+
+
+# Error: ThingDep does not declare `other_id`
+@app.get("/things/{other_id}")
+async def read_thing_annotated_alias_missing(other: ThingDep): ...
+
+
+# OK: type alias to Annotated with Path(alias=...)
+DocumentId = Annotated[str, Path(alias="documentId")]
+
+
+@app.get("/documents/{documentId}")
+async def read_document(doc_id: DocumentId): ...
+
+
+# OK: PEP 695 type alias
+type ThingTypeAlias = Annotated[str, Depends(takes_thing_id)]
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_pep695_alias(other: ThingTypeAlias): ...
+
+
+# OK: nested type alias
+NestedThingDep = ThingDep
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_nested_alias(other: NestedThingDep): ...
+
+
+# OK: class dependency via Annotated shortcut
+ClassDep = Annotated[InitAndCallQuery, Depends()]
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_class_dep_alias(other: ClassDep): ...
+
+
+# OK: generic type alias specialization
+type GenericThingDep[T] = Annotated[T, Depends(takes_thing_id)]
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_generic_alias(other: GenericThingDep[int]): ...
+
+
+
