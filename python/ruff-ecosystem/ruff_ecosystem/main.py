@@ -21,7 +21,6 @@ from ruff_ecosystem.projects import (
 from ruff_ecosystem.types import Comparison, Result, Serializable
 
 T = TypeVar("T")
-GITHUB_MAX_COMMENT_LENGTH = 65536
 
 
 class OutputFormat(Enum):
@@ -41,6 +40,7 @@ async def main(
     raise_on_failure: bool = False,
     html_output: Path | None = None,
     html_title: str = "Ruff ecosystem report",
+    markdown_limit: int | None = None,
 ) -> None:
     logger.debug("Using command %s", command.value)
     logger.debug("Using baseline executable at %s", baseline_executable)
@@ -98,9 +98,9 @@ async def main(
         case OutputFormat.markdown:
             match command:
                 case RuffCommand.check:
-                    print(markdown_check_result(result))
+                    print(markdown_check_result(result, markdown_limit))
                 case RuffCommand.format:
-                    print(markdown_format_result(result))
+                    print(markdown_format_result(result, markdown_limit))
                 case _:
                     raise ValueError(f"Unknown target Ruff command {command}")
         case _:

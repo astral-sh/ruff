@@ -100,6 +100,7 @@ def entrypoint():
                 raise_on_failure=args.pdb,
                 format_comparison=format_comparison,
                 html_output=args.html_output,
+                markdown_limit=args.markdown_limit,
                 html_title=f"{'Linter' if args.ruff_command == 'check' else 'Formatter'} ({'preview' if args.force_preview else 'stable'})",
             )
         )
@@ -143,6 +144,11 @@ def parse_args() -> argparse.Namespace:
         help="Also write the complete HTML report to this path",
     )
     parser.add_argument(
+        "--markdown-limit",
+        type=int,
+        help="Limit Markdown output to this many characters by omitting whole detail sections (minimum 512)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -178,7 +184,10 @@ def parse_args() -> argparse.Namespace:
         type=Path,
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.markdown_limit is not None and args.markdown_limit < 512:
+        parser.error("--markdown-limit must be at least 512")
+    return args
 
 
 def get_executable_path(name: str) -> Path | None:

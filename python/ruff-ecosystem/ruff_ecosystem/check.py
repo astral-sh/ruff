@@ -21,6 +21,7 @@ from ruff_ecosystem.markdown import (
     markdown_details,
     markdown_plus_minus,
     markdown_project_section,
+    markdown_sections,
 )
 from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import (
@@ -54,10 +55,8 @@ PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
-GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
 
-
-def markdown_check_result(result: Result) -> str:
+def markdown_check_result(result: Result, max_length: int | None = None) -> str:
     """
     Render a `ruff check` ecosystem check result as markdown.
     """
@@ -77,14 +76,10 @@ def markdown_check_result(result: Result) -> str:
         if diff:
             projects_with_changes += 1
 
-    lines: list[str] = []
     total_removed = all_rule_changes.total_removed_violations()
     total_added = all_rule_changes.total_added_violations()
     total_added_fixes = all_rule_changes.total_added_fixes()
     total_removed_fixes = all_rule_changes.total_removed_fixes()
-    total_changes = (
-        total_added + total_removed + total_added_fixes + total_removed_fixes
-    )
     error_count = len(result.errored)
     total_affected_rules = len(all_rule_changes.rule_codes())
 
@@ -95,9 +90,7 @@ def markdown_check_result(result: Result) -> str:
     if total_affected_rules == 0:
         # Only errors
         s = "s" if error_count != 1 else ""
-        lines.append(
-            f"\u2139\ufe0f ecosystem check **encountered linter errors**. (no lint changes; {error_count} project error{s})"
-        )
+        summary = f"\u2139\ufe0f ecosystem check **encountered linter errors**. (no lint changes; {error_count} project error{s})"
     else:
         change_summary = (
             f"{markdown_plus_minus(total_added, total_removed)} violations, "
@@ -113,23 +106,11 @@ def markdown_check_result(result: Result) -> str:
             s = "s" if unchanged_projects != 1 else ""
             change_summary += f"; {unchanged_projects} project{s} unchanged"
 
-        lines.append(
-            f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
-        )
-    lines.append("")
+        summary = f"\u2139\ufe0f ecosystem check **detected linter changes**. ({change_summary})"
+    sections: list[str] = []
 
     # Display per project changes
     for project, comparison in result.completed:
-        # TODO: This is not a performant way to check the length but the whole
-        #       GitHub comment length issue needs to be addressed anyway
-        if len(" ".join(lines)) > GITHUB_MAX_COMMENT_LENGTH // 3:
-            lines.append("")
-            lines.append(
-                "_... Truncated remaining completed project reports due to GitHub comment length restrictions_"
-            )
-            lines.append("")
-            break
-
         if not comparison.diff:
             continue  # Skip empty diffs
 
@@ -139,86 +120,14 @@ def markdown_check_result(result: Result) -> str:
         project_added_violations = rule_changes.total_added_violations()
         project_added_fixes = rule_changes.total_added_fixes()
         project_removed_fixes = rule_changes.total_removed_fixes()
-        project_changes = (
-            project_added_violations
-            + project_removed_violations
-            + project_added_fixes
-            + project_removed_fixes
-        )
-
-        # Limit the number of items displayed per project to between 10 and 50
-        # based on the proportion of total changes present in this project
-        max_display_per_project = max(
-            10,
-            int(
-                (
-                    # TODO(zanieb): We take the `max` here to avoid division by zero errors where
-                    # `total_changes` is zero but `total_affected_rules` is non-zero so we did not
-                    # skip display. This shouldn't really happen and indicates a problem in the
-                    # calculation of these values. Instead of skipping entirely when `total_changes`
-                    # is zero, we'll attempt to report the results to help diagnose the problem.
-                    #
-                    # There's similar issues with the `max_display_per_rule` calculation immediately
-                    # below as well.
-                    project_changes / max(total_changes, 1)
-                )
-                * 50
-            ),
-        )
-
-        # Limit the number of items displayed per rule to between 5 and the max for
-        # the project based on the number of rules affected (less rules, more per rule)
-        max_display_per_rule = max(
-            5,
-            # TODO: remove the need for the max() call here,
-            # which is a workaround for if `len(rule_changes.rule_codes()) == 0`
-            # (see comment in the assignment of `max_display_per_project` immediately above)
-            max_display_per_project // max(len(rule_changes.rule_codes()), 1),
-        )
-
-        # Display the diff
-        displayed_changes_per_rule = Counter()
-        displayed_changes = 0
-
-        # Wrap with `<pre>` for code-styling with support for links
-        diff_lines = ["<pre>"]
-        for line in diff.parsed_lines:
-            rule_code = line.rule_code
-
-            # Limit the number of changes we'll show per rule code
-            if displayed_changes_per_rule[rule_code] > max_display_per_rule:
-                continue
-
-            diff_lines.append(
+        diff_lines = [
+            "<pre>",
+            *(
                 add_permalink_to_diagnostic_line(comparison.repo, line.to_string())
-            )
-
-            displayed_changes_per_rule[rule_code] += 1
-            displayed_changes += 1
-
-            # If we just reached the maximum... display an omission line
-            if displayed_changes_per_rule[rule_code] > max_display_per_rule:
-                hidden_count = (
-                    rule_changes.added_violations[rule_code]
-                    + rule_changes.removed_violations[rule_code]
-                    + rule_changes.added_fixes[rule_code]
-                    + rule_changes.removed_fixes[rule_code]
-                    - max_display_per_rule
-                )
-                diff_lines.append(
-                    f"... {hidden_count} additional changes omitted for rule {rule_code}"
-                )
-
-            if displayed_changes >= max_display_per_project:
-                break
-
-        if project_changes > max_display_per_project:
-            hidden_count = project_changes - displayed_changes
-            diff_lines.append(
-                f"... {hidden_count} additional changes omitted for project"
-            )
-
-        diff_lines.append("</pre>")
+                for line in diff.parsed_lines
+            ),
+            "</pre>",
+        ]
 
         title = (
             f"+{project_added_violations} "
@@ -227,22 +136,27 @@ def markdown_check_result(result: Result) -> str:
             f"-{project_removed_fixes} fixes"
         )
 
-        lines.extend(
-            markdown_project_section(
-                title=title,
-                content=diff_lines,
-                options=project.check_options,
-                project=project,
+        sections.append(
+            "\n".join(
+                markdown_project_section(
+                    title=title,
+                    content=diff_lines,
+                    options=project.check_options,
+                    project=project,
+                )
             )
         )
 
+    overview: list[str] = []
     for project, error in result.errored:
-        lines.extend(
-            markdown_project_section(
-                title="error",
-                content=f"```\n{str(error).strip()}\n```",
-                options=project.check_options,
-                project=project,
+        overview.append(
+            "\n".join(
+                markdown_project_section(
+                    title="error",
+                    content=f"```\n{str(error).strip()}\n```",
+                    options=project.check_options,
+                    project=project,
+                )
             )
         )
 
@@ -269,15 +183,17 @@ def markdown_check_result(result: Result) -> str:
                 f"| {added_fixes} | {removed_fixes} |"
             )
 
-        lines.extend(
-            markdown_details(
-                summary=f"Changes by rule ({total_affected_rules} rules affected)",
-                preface="",
-                content=table_lines,
+        overview.append(
+            "\n".join(
+                markdown_details(
+                    summary=f"Changes by rule ({total_affected_rules} rules affected)",
+                    preface="",
+                    content=table_lines,
+                )
             )
         )
 
-    return "\n".join(lines)
+    return markdown_sections(summary, overview + sections, max_length)
 
 
 @dataclass(frozen=True)

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 from unidiff import PatchSet
 
 from ruff_ecosystem import logger
-from ruff_ecosystem.markdown import markdown_project_section
+from ruff_ecosystem.markdown import markdown_project_section, markdown_sections
 from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import Comparison, Diff, Result, ToolError
 
@@ -23,11 +23,10 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, ConfigOverrides, FormatOptions
 
 
-def markdown_format_result(result: Result) -> str:
+def markdown_format_result(result: Result, max_length: int | None = None) -> str:
     """
     Render a `ruff format` ecosystem check result as markdown.
     """
-    lines: list[str] = []
     total_lines_removed = total_lines_added = 0
     total_files_modified = 0
     projects_with_changes = 0
@@ -49,12 +48,10 @@ def markdown_format_result(result: Result) -> str:
         return "\u2705 ecosystem check detected no format changes."
 
     # Summarize the total changes
-    if total_lines_added == 0 and total_lines_added == 0:
+    if total_lines_added == 0 and total_lines_removed == 0:
         # Only errors
         s = "s" if error_count != 1 else ""
-        lines.append(
-            f"\u2139\ufe0f ecosystem check **encountered format errors**. (no format changes; {error_count} project error{s})"
-        )
+        summary = f"\u2139\ufe0f ecosystem check **encountered format errors**. (no format changes; {error_count} project error{s})"
     else:
         s = "s" if total_files_modified != 1 else ""
         changes = (
@@ -72,11 +69,11 @@ def markdown_format_result(result: Result) -> str:
             s = "s" if unchanged_projects != 1 else ""
             changes += f"; {unchanged_projects} project{s} unchanged"
 
-        lines.append(
+        summary = (
             f"\u2139\ufe0f ecosystem check **detected format changes**. ({changes})"
         )
 
-    lines.append("")
+    sections: list[str] = []
 
     # Then per-project changes
     for (project, comparison), patch_set in zip(result.completed, patch_sets):
@@ -87,26 +84,31 @@ def markdown_format_result(result: Result) -> str:
         s = "s" if files != 1 else ""
         title = f"+{comparison.diff.lines_added} -{comparison.diff.lines_removed} lines across {files} file{s}"
 
-        lines.extend(
-            markdown_project_section(
-                title=title,
-                content=format_patchset(patch_set, comparison.repo),
-                options=project.format_options,
-                project=project,
+        sections.append(
+            "\n".join(
+                markdown_project_section(
+                    title=title,
+                    content=format_patchset(patch_set, comparison.repo),
+                    options=project.format_options,
+                    project=project,
+                )
             )
         )
 
+    errors: list[str] = []
     for project, error in result.errored:
-        lines.extend(
-            markdown_project_section(
-                title="error",
-                content=f"```\n{str(error).strip()}\n```",
-                options=project.format_options,
-                project=project,
+        errors.append(
+            "\n".join(
+                markdown_project_section(
+                    title="error",
+                    content=f"```\n{str(error).strip()}\n```",
+                    options=project.format_options,
+                    project=project,
+                )
             )
         )
 
-    return "\n".join(lines)
+    return markdown_sections(summary, errors + sections, max_length)
 
 
 def format_patchset(patch_set: PatchSet, repo: ClonedRepository) -> str:

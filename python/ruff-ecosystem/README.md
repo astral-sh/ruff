@@ -47,6 +47,7 @@ The default output format is markdown, which includes nice summaries of the chan
 particularly useful when making changes to the ecosystem checks.
 
 Add `--html-output report.html` to also write a searchable HTML report containing all changes.
+Use `--markdown-limit 14000` to limit the summary by omitting whole detail sections. This limit does not affect HTML or JSON output.
 
 ## Development
 
