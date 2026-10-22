@@ -51,7 +51,7 @@ jobs:
           CARGO_UNSTABLE_MTIME_ON_USE: ""
           RUSTC_BOOTSTRAP: ""
         with:
-          prefix-key: ruff-dual-cache-20261022-v1-deps
+          prefix-key: ruff-dual-cache-20261022-v2-deps
           shared-key: ruff-linux-debug
           lookup-only: true
           cache-workspace-crates: "false"
@@ -60,11 +60,12 @@ jobs:
         id: rust-cache
         uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
         with:
-          prefix-key: ruff-dual-cache-20261022-v1-workspace
+          prefix-key: ruff-dual-cache-20261022-v2-workspace
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: "true"
           restore-build-script-mtimes: "true"
+          cache-bin: "false"
       - name: Install mold
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Install uv
@@ -140,7 +141,7 @@ jobs:
         id: rust-cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
-          prefix-key: ruff-dual-cache-20261022-v1-deps
+          prefix-key: ruff-dual-cache-20261022-v2-deps
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: "false"
@@ -187,7 +188,7 @@ jobs:
           CARGO_UNSTABLE_MTIME_ON_USE: ""
           RUSTC_BOOTSTRAP: ""
         with:
-          prefix-key: ruff-dual-cache-20261022-v1-deps
+          prefix-key: ruff-dual-cache-20261022-v2-deps
           shared-key: ruff-linux-debug
           lookup-only: true
           cache-workspace-crates: "false"
