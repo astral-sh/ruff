@@ -8896,7 +8896,7 @@ impl<'db> Type<'db> {
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
-                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db, env),
+                    Some(KnownClass::Complex) => KnownClass::Complex.to_instance(db, env),
                     Some(KnownClass::Float)
                         if !inference_flags
                             .contains(InferenceFlags::DISABLE_INT_FLOAT_SPECIAL_CASE) =>

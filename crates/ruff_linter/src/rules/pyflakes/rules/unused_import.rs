@@ -687,9 +687,9 @@ fn unused_imports_in_scope<'a, 'b>(
             {
                 unused_imports_from_binding(semantic, id, scope)
             } else if bdg.is_used()
-                && !bdg
-                    .as_any_import()
-                    .is_some_and(|import| import.qualified_name().segments() == ["os"])
+                && !bdg.as_any_import().is_some_and(|import| {
+                    matches!(import.qualified_name().segments(), ["os" | "sys"])
+                })
             {
                 vec![]
             } else {
