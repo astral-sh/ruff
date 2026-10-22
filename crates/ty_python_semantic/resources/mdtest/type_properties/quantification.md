@@ -309,3 +309,72 @@ def alternation[X: (int, str), Y: (int, str)]() -> None:
     missing_str = int_only.exists(tuple[X]).for_all(tuple[Y])
     static_assert(not missing_str)
 ```
+
+## Unsatisfiable bodies with free variables
+
+No type `X` can be both a supertype of `int` and a subtype of `tuple[A, B]`, regardless of what
+types `A` and `B` are specialized to. As an optimization, when quantifying over `X` we detect that
+"eagerly", and reduce the constraint set to the "always false" terminal BDD, instead of evaluating
+the satisfiability of the body each time we solve.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def impossible[X, A, B]() -> None:
+    body = ConstraintSet.lower_bound(int, X) & ConstraintSet.upper_bound(X, tuple[A, B])
+    # ∃X. int ≤ X ≤ tuple[A, B]
+    impossible = body.exists(tuple[X])
+    # Note that this constraint set is not just never satisfied; it reduces specifically
+    # to the `false` terminal.
+    static_assert(impossible.is_trivially_never_satisfied())
+```
+
+## Satisfiability depends on free variables
+
+There is an `X` satisfying `A ≤ X ≤ int` when `A` is `int`, but not when `A` is `str`. When we
+quantify over `X`, the resulting constraint set must preserve that distinction.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def possible[X, A]() -> None:
+    body = ConstraintSet.lower_bound(A, X) & ConstraintSet.upper_bound(X, int)
+    # ∃X. A ≤ X ≤ int
+    quantified = body.exists(tuple[X])
+
+    # (∃X. A ≤ X ≤ int) ∧ A = int
+    valid = quantified & ConstraintSet.equality(A, int)
+    # revealed: tuple[Solution[A=int]]
+    reveal_type(valid.solutions(inferable=tuple[A]))
+
+    # (∃X. A ≤ X ≤ int) ∧ A = str
+    invalid = quantified & ConstraintSet.equality(A, str)
+    # revealed: None
+    reveal_type(invalid.solutions(inferable=tuple[A]))
+```
+
+## Negated inner quantification with free variables
+
+An inner existential can hold for some choices of a free variable and fail for others. Its negation
+must preserve the choices for which it fails when an enclosing existential is evaluated.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def nested[X, Y, A]() -> None:
+    # ∃X. X = int ∧ X = A
+    inner = (ConstraintSet.equality(X, int) & ConstraintSet.equality(X, A)).exists(tuple[X])
+    # ∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str
+    outer = (~inner & ConstraintSet.equality(Y, str)).exists(tuple[Y])
+
+    # (∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str) ∧ A = str
+    valid = outer & ConstraintSet.equality(A, str)
+    # revealed: tuple[Solution[A=str]]
+    reveal_type(valid.solutions(inferable=tuple[A]))
+
+    # (∃Y. ¬(∃X. X = int ∧ X = A) ∧ Y = str) ∧ A = int
+    invalid = outer & ConstraintSet.equality(A, int)
+    # revealed: None
+    reveal_type(invalid.solutions(inferable=tuple[A]))
+```

@@ -74,7 +74,9 @@ jobs:
     timeout-minutes: 20
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write # for STS
@@ -128,7 +130,7 @@ jobs:
           git commit -am "Sync Linux docstrings" --allow-empty
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -158,7 +160,9 @@ jobs:
     # (https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-requiring-successful-dependent-jobs)
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
 
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write # for STS
@@ -185,7 +189,7 @@ jobs:
         run: ./scripts/codemod_docstrings.sh
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -217,7 +221,9 @@ jobs:
     # (https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#example-requiring-successful-dependent-jobs)
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
 
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write # for STS
@@ -266,7 +272,7 @@ jobs:
           git commit -am "Remove pyproject.toml file"
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}
@@ -318,8 +324,6 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
@@ -360,7 +364,9 @@ jobs:
     # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out.
     if: ${{ always() && needs.sync.result == 'success' && needs.docstrings-windows.result == 'success' && needs.docstrings-macos.result == 'success' && (github.repository == 'astral-sh/ruff' || github.event_name != 'schedule') }}
 
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write # for STS
@@ -379,7 +385,7 @@ jobs:
           path: ${{ runner.temp }}/snapshot-updates
       - name: Get repository token
         id: token
-        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        uses: astral-sh/github-actions/simple-token-service@eb81cf4d13127c3f9539f621c17e4c65327636c8
         with:
           exchange-url: ${{ secrets.STS_API_URL }}/exchange
           audience: ${{ secrets.STS_API_URL }}

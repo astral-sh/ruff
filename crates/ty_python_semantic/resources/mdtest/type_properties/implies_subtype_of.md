@@ -747,7 +747,8 @@ def lower_bound[T, U]():
 ### Substituting gradual equivalences into nested bounds
 
 Substituting a gradual equivalence into a lower bound preserves assignability, but does not
-establish subtyping.
+establish subtyping. This also holds for equivalence bounds: separate occurrences of `Any` in a
+subtype comparison can materialize to different types.
 
 ```py
 from typing import Any
@@ -765,8 +766,9 @@ def equivalence_into_lower[T, U]():
 
 def equivalence_into_equality[T, U]():
     constraints = ConstraintSet.equality(T, Any) & ConstraintSet.equality(U, Covariant[T])
-    static_assert(constraints.implies_subtype_of(Covariant[Any], U))
-    static_assert(constraints.implies_subtype_of(U, Covariant[Any]))
+    static_assert(constraints.satisfies(ConstraintSet.equality(U, Covariant[Any])))
+    static_assert(not constraints.implies_subtype_of(Covariant[Any], U))
+    static_assert(not constraints.implies_subtype_of(U, Covariant[Any]))
 ```
 
 ### Gradual range substitutions do not preserve correlation

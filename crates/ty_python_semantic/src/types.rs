@@ -6266,6 +6266,22 @@ impl<'db> Type<'db> {
                     .into()
                 }
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "is_trivially_always_satisfied" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                    if name == "is_trivially_never_satisfied" =>
+                {
+                    Place::bound(Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(tracked),
+                    ))
+                    .into()
+                }
+                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                     if name == "with_detailed_display" =>
                 {
                     Place::bound(Type::KnownBoundMethod(
@@ -9499,6 +9515,8 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetSolutions(_)
                         | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                         | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                        | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                        | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_)
                 )
         ) {
@@ -9558,6 +9576,51 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::GeneralizeLocalTypes(scope) = type_mapping {
+            let is_local = |definition: Definition<'db>| {
+                definition.program_file(db) == scope.program_file(db)
+                    && semantic_index(db, scope.program_file(db))
+                        .ancestor_scopes(definition.file_scope(db))
+                        .any(|(id, _)| id == scope.file_scope_id(db))
+            };
+
+            let class = match self {
+                Type::ClassLiteral(class) => Some(class),
+                Type::GenericAlias(alias) => Some(alias.origin(db).into()),
+                Type::NominalInstance(instance) => Some(instance.class_literal(db, visitor.env)),
+                Type::SubclassOf(subclass) => match subclass.subclass_of() {
+                    SubclassOfInner::Class(class) => Some(class.class_literal(db)),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if class
+                .and_then(|class| class.definition(db))
+                .is_some_and(is_local)
+            {
+                // See doc comment for `TypeMapping::GeneralizeLocalTypes`: we might want to
+                // create a synthetic protocol that represents the local class, instead of
+                // returning `Unknown`.
+                return Type::unknown();
+            }
+
+            if let Type::FunctionLiteral(function) = self
+                && is_local(function.definition(db))
+            {
+                // Preserve the signature, but not the identity of a function object.
+                return visitor.visit(db, self, type_mapping, || {
+                    Type::Callable(CallableType::new(
+                        db,
+                        function
+                            .signature_with_inferred_return_type(db)
+                            .into_owned(),
+                        function.callable_type_kind(db),
+                    ))
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                });
+            }
+        }
+
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9898,6 +9961,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -9920,6 +9984,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -9957,6 +10022,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
@@ -10324,6 +10391,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
                 | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsTriviallyNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
@@ -11287,6 +11356,29 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+
+    /// This type mapping is used in return type inference. It "promotes" certain types to supertypes
+    /// or to dynamic types in order to prevent nested definitions from leaking into the inferred
+    /// return type.
+    ///
+    /// For example, consider this unannotated decorator:
+    /// ```python
+    ///  def register(event: str):
+    ///      def wrapper(func):
+    ///          # ...
+    ///          return func
+    ///
+    ///      return wrapper
+    /// ```
+    ///
+    /// We do not want to infer `def wrapper(func) -> Unknown` as the return type of `register`. This would
+    /// not just expose internal details, it would also incorrectly suggest that each call to `register`
+    /// returns the same function object. Instead, we generalize to an anonymous `(func) -> Unknown` callable.
+    ///
+    /// For nested classes, we cannot easily do the same, so we return `Unknown` instead. In the future, to
+    /// improve this, we might want to synthesize a protocol that has the same attributes and methods as the
+    /// nested class.
+    GeneralizeLocalTypes(ScopeId<'db>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -11350,6 +11442,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11402,6 +11495,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
+            | TypeMapping::GeneralizeLocalTypes(_)
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

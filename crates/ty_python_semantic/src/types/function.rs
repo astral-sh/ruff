@@ -1794,7 +1794,14 @@ impl<'db> FunctionType<'db> {
         let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
         else {
             // For free functions, we simply use the type inferred from the function body.
-            return infer_complete_scope_types(db, scope).return_type();
+            return infer_complete_scope_types(db, scope)
+                .return_type()
+                .apply_type_mapping(
+                    db,
+                    &env,
+                    &TypeMapping::GeneralizeLocalTypes(scope),
+                    TypeContext::default(),
+                );
         };
         if self
             .literal(db)
@@ -1833,7 +1840,14 @@ impl<'db> FunctionType<'db> {
             return_type = UnionType::from_two_elements(db, &env, return_type, Type::unknown());
         }
 
-        return_type.apply_optional_specialization(db, self.class_specialization(db))
+        return_type
+            .apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::GeneralizeLocalTypes(scope),
+                TypeContext::default(),
+            )
+            .apply_optional_specialization(db, self.class_specialization(db))
     }
 
     #[salsa::tracked(

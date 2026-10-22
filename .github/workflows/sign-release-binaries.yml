@@ -111,6 +111,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signing-assembly-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+          compression-level: 0
           path: |
             wheels
             sdists
@@ -267,6 +268,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signed-wheels-macos-${{ github.run_id }}-${{ github.run_attempt }}
+          compression-level: 0
           path: signed-artifacts/wheels/macos
           if-no-files-found: error
 
@@ -275,6 +277,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signed-wheels-windows-${{ github.run_id }}-${{ github.run_attempt }}
+          compression-level: 0
           path: signed-artifacts/wheels/windows
           if-no-files-found: error
 
@@ -283,6 +286,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-pypi-${{ github.run_id }}-${{ github.run_attempt }}
+          compression-level: 0
           path: pypi
           if-no-files-found: error
 
@@ -291,6 +295,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: signed-github-archives-${{ github.run_id }}-${{ github.run_attempt }}
+          compression-level: 0
           path: signed-artifacts/github-archives/*
           if-no-files-found: error
 

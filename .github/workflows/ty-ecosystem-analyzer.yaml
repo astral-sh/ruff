@@ -84,9 +84,6 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-
       - name: Build ty
         env:
           REVISION: ${{ matrix.revision }}
@@ -304,17 +301,12 @@ jobs:
 
           echo "diff_statistics_exit_code=$DIFF_STATISTICS_EXIT_CODE" >> "$GITHUB_OUTPUT"
 
-      # NOTE: astral-bot deploys every file in this artifact and uses the
-      # deployed HTML URLs for the report links in its PR comment.
-      # Make sure to update the bot if you rename the artifact.
       - name: "Upload full report"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: full-report
           path: dist/
 
-      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
-      # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -324,3 +316,23 @@ jobs:
       - name: Fail on new abnormal exits
         if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'
         run: exit 1
+
+  publish-report:
+    needs: generate-report
+    if: >-
+      !cancelled() && github.event_name == 'pull_request' &&
+      github.repository == 'astral-sh/ruff' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (needs.generate-report.result == 'success' || needs.generate-report.result == 'failure')
+    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@main # zizmor: ignore[unpinned-uses]
+    secrets:
+      KV_API_URL: ${{ secrets.KV_API_URL }}
+      STS_API_URL: ${{ secrets.STS_API_URL }}
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      report: ty-ecosystem
+      artifact: comment.md
+      filename: comment.md
+      full-report-artifact: full-report

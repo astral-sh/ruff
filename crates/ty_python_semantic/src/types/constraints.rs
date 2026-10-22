@@ -802,6 +802,29 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
         let mut storage = builder.storage.borrow_mut();
+        // A quantified body is false if no assignment to its locals or free variables can
+        // satisfy it.
+        if let Some(support) = storage.node_support(self.node)
+            && support.is_complete()
+        {
+            let inferable =
+                TypeVarSet::from_typevars(db, support.iter().map(|id| storage.typevar_data(id)));
+            let budget = SolutionBudget::default();
+            let limits = BoundedSolutionLimits {
+                remaining_paths: budget.paths,
+                remaining_visits: budget.visits,
+            };
+            if let ControlFlow::Continue(true) = self.node.is_never_satisfied_with_limits(
+                db,
+                env,
+                &mut storage,
+                inferable,
+                self.source_order,
+                limits,
+            ) {
+                return Self::never(builder);
+            }
+        }
         let (node, derived_source_order) =
             self.node
                 .exists(db, env, &mut storage, to_remove, self.source_order);
@@ -5678,6 +5701,60 @@ class E: ...
             PathBoundSolution::BudgetExceeded { fallback: None }
         );
         Ok(())
+    }
+
+    #[test]
+    fn gradual_equivalence_preserves_alternative_bounds() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let list = |ty| KnownClass::List.to_specialized_instance(db, &env, &[ty]);
+
+        for dynamic in [Type::any(), Type::unknown()] {
+            for (gradual, bound, witness) in
+                [(dynamic, int, str), (list(dynamic), list(int), list(str))]
+            {
+                for (lower, upper) in [(Some(bound), None), (None, Some(bound))] {
+                    let builder = ConstraintSetBuilder::new();
+                    let equivalent = ConstraintSet::constrain_typevar_equivalence_bound(
+                        db,
+                        &env,
+                        &builder,
+                        ConstraintProvenance::Evidence,
+                        t,
+                        gradual,
+                    );
+                    let range =
+                        create_constraint_set_with_bounds(db, &env, &builder, t, lower, upper);
+                    let witness = ConstraintSet::constrain_typevar_equivalence_bound(
+                        db,
+                        &env,
+                        &builder,
+                        ConstraintProvenance::Evidence,
+                        t,
+                        witness,
+                    );
+
+                    // `T = Any` permits `T = str`, even though `int ≤ T` (or `T ≤ int`)
+                    // does not. The same holds inside an invariant container.
+                    let alternatives =
+                        equivalent
+                            .or(db, &builder, || range)
+                            .and(db, &builder, || witness);
+                    assert!(!alternatives.is_never_satisfied(db, &env, TypeVarSet::None));
+
+                    // Requiring both bounds still rules out that specialization.
+                    let conjunction =
+                        equivalent
+                            .and(db, &builder, || range)
+                            .and(db, &builder, || witness);
+                    assert!(conjunction.is_never_satisfied(db, &env, TypeVarSet::None));
+                }
+            }
+        }
     }
 
     #[test]

@@ -1731,10 +1731,10 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 class P(Generic[T]):
-    x: T
+    p: T
 
 class Q(Generic[T]):
-    x: T
+    q: T
 
 def extract_t(x: P[T] | Q[T]) -> T:
     raise NotImplementedError
@@ -2100,6 +2100,44 @@ def infer_list_bound(value: list[ListBoundT] | Other) -> ListBoundT:
 
 reveal_type(infer_any_bound(list[str]()))  # revealed: str
 reveal_type(infer_list_bound(list[list[str]]()))  # revealed: list[str]
+```
+
+## Gradual specializations in callable union returns
+
+A callable's return type only needs to match one member of an expected union, even when the match
+relies on a gradual type argument. If several declared constraints remain possible, inference
+preserves the gradual type argument.
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+T = TypeVar("T", str, bytes)
+
+class Box(Generic[T]):
+    value: T
+
+def infer(callback: Callable[[], T | Box[T]]) -> T:
+    raise NotImplementedError
+
+unknown = Box()
+any_ = Box[Any]()
+
+unknown_result = infer(lambda: unknown)  # no diagnostic
+reveal_type(unknown_result)  # revealed: Unknown
+any_result = infer(lambda: any_)  # no diagnostic
+reveal_type(any_result)  # revealed: Any
+```
+
+Other arguments must still satisfy the type variable's declared constraints. Gradual evidence from a
+callback does not make an incompatible argument valid:
+
+```py
+def consume(callback: Callable[[], Box[T]], other: T) -> None: ...
+
+# The callback returns a box, as required by `Box[T]`. The second argument must instead
+# be `str` or `bytes`, but is also a box: only its type argument is gradual.
+consume(lambda: unknown, unknown)  # error: [invalid-argument-type] "does not satisfy constraints"
+consume(lambda: any_, any_)  # error: [invalid-argument-type] "does not satisfy constraints"
 ```
 
 ## Invalid bounds in generic union members

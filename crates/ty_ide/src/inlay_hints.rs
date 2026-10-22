@@ -1082,11 +1082,9 @@ mod tests {
             return 42
         "#,
         );
-        // TODO: Do not expose `def wrapper` in the return-type hint for `stringify`,
-        // and ideally show the return type of `str` for the returned callable.
         assert_snapshot!(test.inlay_hints(), @r#"
 
-        def stringify(function)[ -> def wrapper() -> Unknown]:
+        def stringify(function)[ -> () -> str]:
             def wrapper()[ -> str]:
                 return str([object=]function())
 
@@ -1098,15 +1096,15 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions/_internal.pyi:LL:1
+          --> stdlib/builtins.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | ^^^^^^^
+        LL | class str(Sequence[str]):
+           |       ^^^
         info: Source
-          --> main2.py:LL:46
+          --> main2.py:LL:35
            |
-        LL | def stringify(function)[ -> def wrapper() -> Unknown]:
-           |                                              ^^^^^^^
+        LL | def stringify(function)[ -> () -> str]:
+           |                                   ^^^
 
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
