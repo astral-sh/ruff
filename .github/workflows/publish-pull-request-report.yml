@@ -48,9 +48,10 @@ jobs:
           enable-cache: false
       - name: Read the stored comment ID
         id: comment-state
-        uses: astral-sh/github-actions/key-value-store/get@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
+        uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
         with:
           service-url: ${{ secrets.KV_API_URL }}
+          scope: pull-request
           key: report-comment-${{ inputs.report }}
           mask-value: "false"
       - name: Get a report publishing token
@@ -85,8 +86,9 @@ jobs:
           uv run --script scripts/publish_pr_report.py "${args[@]}"
       - name: Store the comment ID
         if: steps.publish.outputs.comment-id != ''
-        uses: astral-sh/github-actions/key-value-store/put@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
+        uses: astral-sh/github-actions/key-value-store/put@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
         with:
           service-url: ${{ secrets.KV_API_URL }}
+          scope: pull-request
           key: report-comment-${{ inputs.report }}
           value: ${{ steps.publish.outputs.comment-id }}
