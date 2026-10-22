@@ -37,8 +37,18 @@ jobs:
       with:
         persist-credentials: false
         ref: 461120ebea87b783888cdba1ed17e342b373d09f
-    - name: Install Rust toolchain
-      run: rustup show
+    - name: Match measured toolchain inventory
+      run: 'rustup show
+
+        rustup toolchain install 1.98.1 --profile minimal --no-self-update
+
+        rustup default 1.98.1
+
+        rustup toolchain uninstall stable
+
+        rustup show
+
+        '
     - uses: astral-sh/github-actions/rust-workspace-cache@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
       with:
         key: ruff-linux-debug
