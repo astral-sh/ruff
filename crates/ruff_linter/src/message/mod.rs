@@ -10,6 +10,7 @@ use strum::IntoEnumIterator;
 use ruff_db::diagnostic::render::{
     AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer,
     JsonLinesRenderer, JsonRenderer, JunitRenderer, PylintRenderer, RdjsonRenderer, Renderer,
+    SarifRenderer,
 };
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, FileResolver, Input, LintName,
@@ -21,14 +22,12 @@ pub(crate) use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub(crate) use sarif::SarifEmitter;
 
 use crate::Fix;
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::settings::types::OutputFormat;
 
 mod grouped;
-mod sarif;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -246,9 +245,8 @@ pub fn render_diagnostics(
             .with_prefer_rule_codes(config.is_prefer_rule_codes_enabled())
             .emit(writer, diagnostics, context)
             .map_err(std::io::Error::other),
-        OutputFormat::Sarif => SarifEmitter::new(config)
-            .emit(writer, diagnostics, context)
-            .map_err(std::io::Error::other),
+        OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
+            .write(writer, diagnostics),
     }
 }
 

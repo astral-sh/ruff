@@ -3267,6 +3267,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ty_static",
+ "url",
  "web-time",
  "which",
  "zip",
@@ -3433,7 +3434,6 @@ dependencies = [
  "typed-arena",
  "unicode-normalization",
  "unicode-width",
- "url",
 ]
 
 [[package]]

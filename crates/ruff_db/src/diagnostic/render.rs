@@ -35,6 +35,8 @@ pub use junit::JunitRenderer;
 pub use pylint::PylintRenderer;
 #[cfg(feature = "serde")]
 pub use rdjson::RdjsonRenderer;
+#[cfg(feature = "serde")]
+pub use sarif::SarifRenderer;
 
 mod azure;
 mod concise;
@@ -51,6 +53,8 @@ mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
+#[cfg(feature = "serde")]
+mod sarif;
 
 /// Renders diagnostics in a particular output format.
 pub trait Renderer {
@@ -1046,6 +1050,8 @@ mod tests {
 
     use ruff_diagnostics::{Applicability, Edit, Fix};
 
+    #[cfg(feature = "serde")]
+    use crate::diagnostic::RuleMetadata;
     use crate::diagnostic::{
         Annotation, DiagnosticId, IntoDiagnosticMessage, SecondaryCode, Severity, Span,
         SubDiagnosticSeverity,
@@ -2470,6 +2476,8 @@ watermelon
         Rdjson,
         #[cfg(feature = "serde")]
         Gitlab,
+        #[cfg(feature = "serde")]
+        Sarif,
         #[cfg(feature = "junit")]
         Junit,
     }
@@ -2688,6 +2696,27 @@ watermelon
                 #[cfg(feature = "serde")]
                 DiagnosticFormat::Gitlab => {
                     GitlabRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Sarif => {
+                    let metadata = diagnostics
+                        .iter()
+                        .filter_map(|diagnostic| diagnostic.id().as_lint())
+                        .map(|name| {
+                            (
+                                name,
+                                RuleMetadata {
+                                    name,
+                                    summary: name.as_str(),
+                                    description: format!("Documentation for `{name}`.").into(),
+                                    help_url: format!("https://ty.dev/rules#{name}"),
+                                    linter: Some("example"),
+                                },
+                            )
+                        })
+                        .collect();
+                    SarifRenderer::new(&self.db, &self.config, metadata, "1.0.0")
+                        .render(f, diagnostics)
                 }
                 #[cfg(feature = "junit")]
                 DiagnosticFormat::Junit => {

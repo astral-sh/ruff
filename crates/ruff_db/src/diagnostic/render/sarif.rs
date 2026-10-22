@@ -1,71 +1,51 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::Write;
 
-use anyhow::Result;
 use rustc_hash::FxHashMap;
 use serde::{Serialize, Serializer};
 
-use ruff_db::diagnostic::render::Renderer;
-use ruff_db::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, LintName, RuleMetadata, SecondaryCode, Severity,
-};
 use ruff_source_file::{OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::VERSION;
-use crate::message::{Emitter, EmitterContext, rule_metadata};
+use crate::diagnostic::{
+    Diagnostic, DisplayDiagnosticConfig, LintName, RuleMetadata, SecondaryCode, Severity,
+};
 
-/// An emitter for producing SARIF 2.1.0-compliant JSON output.
+use super::{FileResolver, Renderer};
+
+/// A renderer for producing SARIF 2.1.0-compliant JSON output.
 ///
 /// Static Analysis Results Interchange Format (SARIF) is a standard format
 /// for static analysis results. For full specification, see:
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-pub(crate) struct SarifEmitter<'a> {
-    config: &'a DisplayDiagnosticConfig,
-}
-
-impl<'a> SarifEmitter<'a> {
-    pub(crate) fn new(config: &'a DisplayDiagnosticConfig) -> Self {
-        Self { config }
-    }
-}
-
-impl Emitter for SarifEmitter<'_> {
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        _context: &EmitterContext,
-    ) -> Result<()> {
-        Ok(SarifRenderer::new(self.config, rule_metadata(), VERSION).write(writer, diagnostics)?)
-    }
-}
-
-pub(super) struct SarifRenderer<'a> {
+pub struct SarifRenderer<'a> {
+    resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
     metadata: FxHashMap<LintName, RuleMetadata>,
     version: &'a str,
 }
 
 impl<'a> SarifRenderer<'a> {
-    pub(super) fn new(
+    pub fn new(
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         metadata: FxHashMap<LintName, RuleMetadata>,
         version: &'a str,
     ) -> Self {
         Self {
+            resolver,
             config,
             metadata,
             version,
         }
     }
 }
+
 impl Renderer for SarifRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let results = diagnostics
             .iter()
-            .map(|diagnostic| SarifResult::from_message(diagnostic, self.config))
+            .map(|diagnostic| SarifResult::from_message(diagnostic, self.resolver, self.config))
             .collect::<Vec<_>>();
 
         let mut unique_rules = HashMap::new();
@@ -98,8 +78,11 @@ impl Renderer for SarifRenderer<'_> {
             runs: [SarifRun {
                 tool: SarifTool {
                     driver: SarifDriver {
-                        name: "ruff",
-                        information_uri: "https://github.com/astral-sh/ruff",
+                        name: self.config.program,
+                        information_uri: format!(
+                            "https://github.com/astral-sh/{}",
+                            self.config.program,
+                        ),
                         rules,
                         version: self.version,
                     },
@@ -133,7 +116,7 @@ struct SarifTool<'a> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifDriver<'a> {
-    information_uri: &'static str,
+    information_uri: String,
     name: &'static str,
     rules: Vec<SarifRule<'a>>,
     version: &'a str,
@@ -387,13 +370,19 @@ impl<'a> SarifResult<'a> {
         }
     }
 
-    fn from_message(diagnostic: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
+    fn from_message(
+        diagnostic: &'a Diagnostic,
+        resolver: &dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> Self {
         let (locations, fixes) = diagnostic
-            .ruff_source_file()
-            .map(|source| {
-                let uri = Self::uri(source.name());
-                let source_code = source.to_source_code();
-                let region = diagnostic
+            .primary_span()
+            .map(|span| {
+                let file = span.file();
+                let uri = Self::uri(file.path(resolver));
+                let source = file.diagnostic_source(resolver);
+                let source_code = source.as_source_code();
+                let region = span
                     .range()
                     .map(|range| Self::range_to_sarif_region(&source_code, range))
                     .unwrap_or_default();
@@ -425,17 +414,13 @@ impl<'a> SarifResult<'a> {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::diagnostic::DisplayDiagnosticConfig;
-
-    use crate::message::SarifEmitter;
-    use crate::message::tests::{
-        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     fn get_output() -> String {
-        let config = DisplayDiagnosticConfig::new("ruff");
-        let mut emitter = SarifEmitter::new(&config);
-        capture_emitter_output(&mut emitter, &create_diagnostics())
+        let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Sarif);
+        env.render_diagnostics(&diagnostics)
     }
 
     #[test]
@@ -446,9 +431,8 @@ mod tests {
 
     #[test]
     fn valid_syntax_error_json() {
-        let config = DisplayDiagnosticConfig::new("ruff");
-        let mut emitter = SarifEmitter::new(&config);
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
+        let (env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Sarif);
+        let content = env.render_diagnostics(&diagnostics);
         serde_json::from_str::<serde_json::Value>(&content).unwrap();
     }
 
