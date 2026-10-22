@@ -1,12 +1,14 @@
 name: Select pull request reviewers
 
 on:
-  pull_request:
-    types: [opened, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
-      pull-request:
+      pull_request:
         description: Pull request number
+        required: true
+        type: string
+      head_sha:
+        description: Pull request head commit
         required: true
         type: string
 
@@ -16,18 +18,6 @@ env:
   UV_LOCKED: 1
 
 jobs:
-  dispatch:
-    if: >-
-      github.repository == 'astral-sh/ruff' &&
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      !github.event.pull_request.draft && vars.KEY_VALUE_SERVICE_URL != ''
-    uses: astral-sh/ruff/.github/workflows/dispatch-pull-request-reviewer.yml@fb3919b95857263335174dbea27c26cfb22d5d3d
-    secrets:
-      STS_API_URL: ${{ secrets.STS_API_URL }}
-    permissions:
-      id-token: write
-
   assign:
     if: >-
       github.repository == 'astral-sh/ruff' &&
@@ -62,7 +52,7 @@ jobs:
       - name: Read reviewer credits
         uses: astral-sh/github-actions/key-value-store/get@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          service-url: ${{ vars.KV_URL }}
           key: reviewer-round-robin-v1
           path: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
       - name: Get a reviewer token
@@ -77,17 +67,18 @@ jobs:
       - name: Request a reviewer
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
-          PULL_REQUEST: ${{ inputs.pull-request }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          HEAD_SHA: ${{ inputs.head_sha }}
           REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
           NEXT_REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json
           LEGACY_REVIEWER_STATE: ${{ vars.PR_REVIEWER_ROUND_ROBIN_STATE || vars.PR_ASSIGNEE_ROUND_ROBIN_STATE }}
         run: >-
           uv run --script scripts/pull_request_reviewers.py
-          --pull-request "$PULL_REQUEST" --state "$REVIEWER_STATE"
+          --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA" --state "$REVIEWER_STATE"
           --output "$NEXT_REVIEWER_STATE"
       - name: Store reviewer credits
         uses: astral-sh/github-actions/key-value-store/put@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          service-url: ${{ vars.KV_URL }}
           key: reviewer-round-robin-v1
           path: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json

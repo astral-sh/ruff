@@ -7,21 +7,21 @@ the current configuration file is absent.
 
 ## Workflow and credentials
 
-The PR event calls the pinned `dispatch-pull-request-reviewer.yml` helper. That helper uses STS to
-obtain `actions: write` and dispatches the worker on `main` with the PR number. It does not check out
-or execute PR code. The worker checks out its own commit on `main`, reads the PR and changed-file
-metadata through GitHub's API, and uses an STS token with `pull_requests: write` to request a review
-as `astral-automations-bot[bot]`.
+The actions dispatch service reads `.github/automations-dispatch.json` from Ruff's `main` branch,
+verifies signed `pull_request` webhooks, and dispatches the worker on `main` with the canonical
+`pull_request` and `head_sha` inputs. The worker checks out its own commit on `main`, reads the PR
+and changed-file metadata through GitHub's API, and uses an STS token with
+`pull_requests: write` to request a review as `astral-automations-bot[bot]`. It skips requests whose
+head commit is no longer current and does not execute PR code.
 
-The dispatcher and worker use the `automations` environment. The repository STS policy authorizes
-the PR caller at the exact dispatcher revision, and separately authorizes the worker on
-`refs/heads/main` for `workflow_dispatch`. Changes to the dispatcher require updating its caller
-and policy pins together.
+The worker uses the `automations` environment. The repository STS policy authorizes it on
+`refs/heads/main` for `workflow_dispatch`.
 
-Set the repository variable `KEY_VALUE_SERVICE_URL` to the deployed key-value service's HTTPS origin
-and provide `STS_API_URL` in the `automations` environment. Automatic dispatch is disabled while the
-KV URL is unset. The service must allow Ruff's repository identity. Keep only one reviewer assigner
-active when enabling this workflow.
+Set the repository variable `KV_URL` to the deployed key-value service's HTTPS origin and provide
+`STS_API_URL` in the `automations` environment. The key-value service must allow Ruff's repository
+identity. The dispatcher must support repository-owned policies, use
+`.github/automations-dispatch.json` as its policy path, and receive Ruff's `pull_request` webhooks.
+Keep only one reviewer assigner active when enabling this workflow.
 
 ## Shared state
 
@@ -58,11 +58,11 @@ rechecks the PR before each request. A `422` response tries another candidate, t
 pool if needed. Failed requests do not advance credits.
 
 To preview a selection from a trusted checkout without requesting a review or writing state, set
-`GH_TOKEN` to a GitHub token, `PULL_REQUEST` to the PR number, and `REVIEWER_STATE` to a JSON state
-file path. An absent state file uses the legacy state from `LEGACY_REVIEWER_STATE`, or zero credits
-when that variable is unset.
+`GH_TOKEN` to a GitHub token, `PULL_REQUEST` to the PR number, `HEAD_SHA` to its current head commit,
+and `REVIEWER_STATE` to a JSON state file path. An absent state file uses the legacy state from
+`LEGACY_REVIEWER_STATE`, or zero credits when that variable is unset.
 
 ```sh
 uv run --script scripts/pull_request_reviewers.py \
-  --pull-request "$PULL_REQUEST" --state "$REVIEWER_STATE" --dry-run
+  --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA" --state "$REVIEWER_STATE" --dry-run
 ```

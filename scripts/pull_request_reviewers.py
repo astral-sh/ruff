@@ -154,13 +154,14 @@ def load_state(path: Path, legacy: str) -> State:
     return parse_state(legacy) if legacy else {}
 
 
-def eligible_pull(pull: dict, pull_request: int) -> bool:
+def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
     return (
         pull["number"] == pull_request
         and pull["state"] == "open"
         and not pull["draft"]
         and pull["base"]["repo"]["id"] == REPOSITORY_ID
         and (pull["head"]["repo"] or {}).get("id") == REPOSITORY_ID
+        and pull["head"]["sha"] == head_sha
     )
 
 
@@ -171,6 +172,7 @@ def has_reviewer(pull: dict) -> bool:
 
 def assign_reviewer(
     pull_request: int,
+    head_sha: str,
     pools: list[Pool],
     state: State,
     *,
@@ -179,7 +181,7 @@ def assign_reviewer(
 ) -> tuple[str, str] | None:
     rng = rng or random.Random()
     pull = api(f"pulls/{pull_request}")
-    if not eligible_pull(pull, pull_request) or has_reviewer(pull):
+    if not eligible_pull(pull, pull_request, head_sha) or has_reviewer(pull):
         return None
     author = pull["user"]["login"].lower()
     matched = matching_pools(pools, changed_files(pull_request))
@@ -201,10 +203,8 @@ def assign_reviewer(
             )
             candidates.remove(reviewer)
             current = api(f"pulls/{pull_request}")
-            if (
-                not eligible_pull(current, pull_request)
-                or has_reviewer(current)
-                or current["head"]["sha"] != pull["head"]["sha"]
+            if not eligible_pull(current, pull_request, head_sha) or has_reviewer(
+                current
             ):
                 return None
             if dry_run:
@@ -232,6 +232,7 @@ def assign_reviewer(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pull-request", required=True, type=int)
+    parser.add_argument("--head-sha", required=True)
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--config-directory", type=Path, default=Path(".github"))
@@ -245,7 +246,9 @@ def main() -> None:
         parser.error("--output is required when requesting a review.")
     pools = load_pools(args.config_directory)
     state = load_state(args.state, os.environ.get("LEGACY_REVIEWER_STATE", ""))
-    assign_reviewer(args.pull_request, pools, state, dry_run=args.dry_run)
+    assign_reviewer(
+        args.pull_request, args.head_sha, pools, state, dry_run=args.dry_run
+    )
     if not args.dry_run:
         # Rewriting unchanged state also renews its retention after a no-op request.
         args.output.write_text(json.dumps(state, sort_keys=True, separators=(",", ":")))
