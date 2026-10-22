@@ -85,7 +85,7 @@ jobs:
         run: rustup show
 
       - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
 
       - name: Build ty
         env:
@@ -339,3 +339,10 @@ jobs:
       artifact: comment.md
       filename: comment.md
       full-report-artifact: full-report
+      upload-html: true
+      html-files: |
+        {
+          "diff.html": {"content-type": "text/html; charset=utf-8", "label": "Full report with detailed diff"},
+          "timing.html": {"content-type": "text/html; charset=utf-8", "label": "Timing results"},
+          "diff.json": {"content-type": "application/json"}
+        }
