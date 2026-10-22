@@ -6384,6 +6384,39 @@ impl<'db> CallInference<'_, 'db> {
         let db = self.db;
         let env = self.env;
 
+        let mut returns = Vec::with_capacity(specializations.len());
+        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
+        for &specialization in specializations {
+            let return_ty = self.return_ty.apply_specialization(db, specialization);
+            budget.charge_type(db, return_ty).ok()?;
+            // Expose aliased unions to the intersection constructor's expansion budget.
+            returns.push(match return_ty.resolve_type_alias(db) {
+                Type::Union(union) => union.expand_aliases(db, env),
+                ty => ty,
+            });
+        }
+
+        // If one valid specialization's return type is a subtype of all the others, use it
+        // directly. For example, `int` can be selected over `int | list[int]`, even though the
+        // invariant-type check below would otherwise prevent intersecting them. Compare complete
+        // return types: substituting a narrower type argument can produce an incomparable
+        // (`list[T]`) or wider (`Callable[[T], None]`) return type.
+        //
+        // Find a candidate in one pass, then check it against every return type; two
+        // incomparable returns may still have a later return that is a subtype of both.
+        let mut candidate = *returns.first()?;
+        for &return_ty in returns.iter().skip(1) {
+            if return_ty != candidate && return_ty.is_subtype_of(db, env, candidate) {
+                candidate = return_ty;
+            }
+        }
+        if returns
+            .iter()
+            .all(|&return_ty| candidate == return_ty || candidate.is_subtype_of(db, env, return_ty))
+        {
+            return Some(candidate);
+        }
+
         // A fresh invariant container can receive its specialization from context: the same
         // expression `[]` is valid as either `list[A]` or `list[B]`. These typings make different,
         // mutually exclusive choices for the allocated list's static element type, rather than
@@ -6422,18 +6455,6 @@ impl<'db> CallInference<'_, 'db> {
                     self.has_invariant_return_difference(left, right, &invariant_visitor)
                 })
         });
-
-        let mut returns = Vec::with_capacity(specializations.len());
-        let mut budget = ProjectionTypeBudget::new(SolutionBudget::default().type_terms);
-        for &specialization in specializations {
-            let return_ty = self.return_ty.apply_specialization(db, specialization);
-            budget.charge_type(db, return_ty).ok()?;
-            // Expose aliased unions to the intersection constructor's expansion budget.
-            returns.push(match return_ty.resolve_type_alias(db) {
-                Type::Union(union) => union.expand_aliases(db, env),
-                ty => ty,
-            });
-        }
 
         if has_invariant_difference {
             let merged = inference.merged_specialization(db);

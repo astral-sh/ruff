@@ -1309,21 +1309,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: micro-a-l
+          # The r benchmarks dominate runtime, so group them with a-c to balance both modes.
+          - name: micro-1
             target: ty
-            filter: 'ty_micro\[[a-l]'
+            filter: 'ty_micro\[[a-cr]'
             mode: simulation
-          - name: micro-m-z
+          - name: micro-2
             target: ty
-            filter: 'ty_micro\[[^a-l]'
+            filter: 'ty_micro\[[^a-cr]'
             mode: simulation
-          - name: micro-a-l
+          - name: micro-1
             target: ty
-            filter: 'ty_micro\[[a-l]'
+            filter: 'ty_micro\[[a-cr]'
             mode: memory
-          - name: micro-m-z
+          - name: micro-2
             target: ty
-            filter: 'ty_micro\[[^a-l]'
+            filter: 'ty_micro\[[^a-cr]'
             mode: memory
           - name: constraint_set
             target: ty_constraint_set
