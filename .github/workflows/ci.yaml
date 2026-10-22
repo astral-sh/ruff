@@ -731,6 +731,8 @@ jobs:
         run: rustup component add rustfmt
       - name: Check report comment lookup
         run: uv run --script scripts/tests/check_pull_request_comments.py
+      - name: Check report publishing
+        run: uv run --script scripts/tests/check_publish_pr_report.py
       # Run all code generation scripts, and verify that the current output is
       # already checked into git.
       - run: python crates/ruff_python_ast/generate.py

@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = []
 # ///
-"""Look up automation report comments by cached ID, with discovery on a cache miss."""
+"""Look up automation report comments using IDs from the key-value store."""
 
 from __future__ import annotations
 
@@ -68,17 +68,6 @@ def api(
         raise
 
 
-def pages(endpoint: str):
-    page = 1
-    separator = "&" if "?" in endpoint else "?"
-    while True:
-        items = api(f"{endpoint}{separator}per_page=100&page={page}")
-        yield from items
-        if len(items) < 100:
-            return
-        page += 1
-
-
 def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
     author = comment.get("user") or {}
     return (
@@ -89,45 +78,39 @@ def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
     )
 
 
-def parse_comment_id(value: str) -> int | None:
-    # Cache values are untrusted, including values from other jobs on the same PR.
-    if re.fullmatch(r"[1-9][0-9]{0,19}", value.strip()):
-        return int(value)
-    return None
+def parse_comment_id(value: str) -> int:
+    # Stored values are untrusted, including values from other jobs on the same PR.
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", value):
+        raise ValueError("The stored comment ID must be a positive decimal integer.")
+    return int(value)
 
 
 def find_report(
     pull_request: int, report: str, comment_id: int | None = None
 ) -> dict | None:
-    if comment_id is not None:
-        comment = api(f"issues/comments/{comment_id}", missing_ok=True)
-        if comment and matches_comment(comment, pull_request, REPORTS[report].marker):
-            return comment
-    # Discovery repairs expired or invalid cache entries and recovers a comment
-    # created before a cache write failed.
-    return next(
-        (
-            comment
-            for comment in pages(f"issues/{pull_request}/comments")
-            if matches_comment(comment, pull_request, REPORTS[report].marker)
-        ),
-        None,
-    )
+    if comment_id is None:
+        return None
+    comment = api(f"issues/comments/{comment_id}", missing_ok=True)
+    if comment is not None and not matches_comment(
+        comment, pull_request, REPORTS[report].marker
+    ):
+        raise ValueError(
+            "The stored ID does not identify this bot's report on this PR."
+        )
+    return comment
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pull-request", required=True, type=int)
     parser.add_argument("--report", required=True, choices=REPORTS)
-    parser.add_argument("--comment-id", default="")
+    parser.add_argument("--comment-id", type=parse_comment_id)
     args = parser.parse_args()
     if os.environ.get("GITHUB_REPOSITORY", REPOSITORY) != REPOSITORY:
         parser.error(f"This script only supports {REPOSITORY}.")
     if args.pull_request <= 0:
         parser.error("The pull request number must be positive.")
-    if comment := find_report(
-        args.pull_request, args.report, parse_comment_id(args.comment_id)
-    ):
+    if comment := find_report(args.pull_request, args.report, args.comment_id):
         print(comment["id"])
 
 

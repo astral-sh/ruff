@@ -1,34 +1,50 @@
 # Pull request report comments
 
-Use `scripts/pull_request_comments.py` to find an automation report by its cached comment ID.
-The helper verifies the bot's numeric identity, the owning pull request, and the report marker
-before returning a comment. Missing, deleted, malformed, or mismatched IDs fall back to paginated
-comment discovery.
+`publish-pull-request-report.yml` provides a shared publisher for same-repository pull requests.
+Callers pass a `report` input and the `STS_API_URL` secret, and pin the reusable workflow to the same
+revision authorized by the STS policy. The publisher runs code from that revision in the
+`automations` environment. STS supplies the `actions: read` and `pull_requests: write` token used to
+publish as `astral-automations-bot[bot]`.
+
+## Comment IDs
+
+The publisher uses `key-value-store/get` and `key-value-store/put` from `astral-sh/github-actions`.
+Set the repository variable `KEY_VALUE_SERVICE_URL` to the service's HTTPS origin. The actions
+exchange the job's OIDC token for access to the service independently of STS.
+
+The key-value store is the only source of existing comment IDs. The publisher fetches a stored ID
+directly and verifies the bot's numeric identity, the owning PR, and the report marker. It never
+lists or scans PR comments. A missing or expired key, or a deleted comment, causes a new comment to
+be created and its ID stored. Malformed IDs and mismatched comments fail publication.
+
+Each report uses a separate key named `report-comment-<report>`, containing a positive decimal ID.
+The report names are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`. GitHub's
+signed OIDC context scopes these keys to the PR event, merge ref, and `automations` environment.
+Other jobs in the same context can write these keys, so stored IDs must pass the identity checks.
+
+A failed KV read stops publication. A failed write fails the job after the comment has been
+published. If the publisher created or updated a comment, its ID is available in that step's log for
+recovery. Rerunning without restoring the ID can create another comment. Successful writes renew the
+service's retention period, including when the comment is unchanged or already contains a newer report.
+
+The job holds the concurrency group
+`pull-request-report-${{ github.event.pull_request.number }}-${{ inputs.report }}` with `queue: max`
+and `cancel-in-progress: false` through lookup, publication, and storage.
+
+## Report artifacts
+
+The publisher checks the source workflow, repository, current PR head, and run attempt through
+GitHub's API. It reads one fixed ZIP member in memory without extracting or executing the artifact.
+Reports can be published when the producer fails after uploading its artifact. Missing or empty
+artifacts do not produce comments. Each comment records the run and attempt, so an older publication
+cannot overwrite a newer report. A partial rerun can reuse an artifact from an earlier attempt of
+the same run. The publisher rechecks the PR head before writing. ty ecosystem summaries link to the
+full HTML reports artifact when it is available.
+
+With `gh` installed and `GH_TOKEN` set to a token with read access, render a report without posting it:
 
 ```sh
-uv run --script scripts/pull_request_comments.py \
-  --pull-request "$PULL_REQUEST" --report ruff-ecosystem --comment-id "$CACHED_COMMENT_ID"
+uv run --script scripts/publish_pr_report.py \
+  --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
+  --report ruff-ecosystem --pull-request "$PULL_REQUEST" --dry-run
 ```
-
-Set `GH_TOKEN` to a GitHub token with access to the PR. Publishing uses an STS token for
-`astral-automations-bot[bot]`; comment lookup only accepts reports authored by that bot.
-
-## Key-value storage
-
-Store each report's comment ID in a separate key named `report-comment-<report>`. The available
-report keys are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`. Values contain
-only a positive decimal comment ID. Write the ID returned by GitHub after creating or updating the
-comment, including when discovery recovers an existing comment.
-
-The key-value service derives its namespace from GitHub's signed OIDC context. Publishers for the
-same PR must use the same event, ref, and `automations` environment to share state. Different PRs
-receive separate namespaces. Other jobs in the same context can replace cached values, so an ID
-must pass the helper's author, PR, and marker checks before use.
-
-Entries expire according to the service's retention policy. Discovery recovers from expiration and
-from a successful comment creation followed by a failed cache write. Cache availability must not
-prevent a report from being published.
-
-Serialize each report's lookup, publication, and cache write with the concurrency group
-`pull-request-report-${{ github.event.pull_request.number }}-${{ inputs.report }}`, using
-`queue: max` and `cancel-in-progress: false`.

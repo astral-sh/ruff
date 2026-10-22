@@ -1,0 +1,90 @@
+name: Publish a pull request report
+
+on:
+  workflow_call:
+    inputs:
+      report:
+        type: string
+        required: true
+    secrets:
+      STS_API_URL:
+        required: true
+
+permissions: {}
+
+env:
+  UV_LOCKED: 1
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'astral-sh/ruff' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 10
+    environment: automations
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: pull-request-report-${{ github.event.pull_request.number }}-${{ inputs.report }}
+      cancel-in-progress: false
+      queue: max
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          enable-cache: false
+      - name: Read the stored comment ID
+        id: comment-state
+        uses: astral-sh/github-actions/key-value-store/get@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
+        with:
+          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          key: report-comment-${{ inputs.report }}
+          mask-value: "false"
+      - name: Get a report publishing token
+        id: token
+        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            actions: read
+            pull_requests: write
+      - name: Publish the report
+        id: publish
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPORT: ${{ inputs.report }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+          STORED_COMMENT_ID: ${{ steps.comment-state.outputs.value }}
+          STORED_COMMENT_FOUND: ${{ steps.comment-state.outputs.found }}
+        run: |
+          args=(--run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
+                --report "$REPORT" --pull-request "$PULL_REQUEST")
+          if [[ "$STORED_COMMENT_FOUND" == "true" ]]; then
+            args+=(--comment-id "$STORED_COMMENT_ID")
+          elif [[ "$STORED_COMMENT_FOUND" != "false" ]]; then
+            echo "The key-value lookup did not return a result." >&2
+            exit 1
+          fi
+          uv run --script scripts/publish_pr_report.py "${args[@]}"
+      - name: Store the comment ID
+        if: steps.publish.outputs.comment-id != ''
+        uses: astral-sh/github-actions/key-value-store/put@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
+        with:
+          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
+          key: report-comment-${{ inputs.report }}
+          value: ${{ steps.publish.outputs.comment-id }}
