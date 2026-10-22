@@ -39,7 +39,6 @@ jobs:
           sparse-checkout: |
             scripts
             .github/pr-reviewer-pools.toml
-            .github/pr-assignee-pools.toml
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0

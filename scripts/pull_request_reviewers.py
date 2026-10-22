@@ -60,71 +60,28 @@ def changed_files(pull_request: int) -> list[str]:
 
 
 def parse_pools(contents: str) -> list[Pool]:
-    raw_pools = tomllib.loads(contents).get("pools")
-    if not isinstance(raw_pools, list):
-        raise TypeError("Reviewer configuration must contain a pools list.")
-    pools = []
-    seen = set()
-    for raw in raw_pools:
-        if not isinstance(raw, dict) or not isinstance(raw.get("name"), str):
-            continue
-        name = raw["name"].strip()
-        if not name or name.lower() in seen:
-            continue
-        seen.add(name.lower())
-        paths = raw.get("paths")
-        reviewers = raw.get("reviewers")
-        if not isinstance(paths, list) or not isinstance(reviewers, list):
-            continue
-        patterns: dict[str, None] = {}
-        for value in paths:
-            if isinstance(value, str):
-                pattern = value.strip().lstrip("/")
-                if pattern:
-                    patterns[pattern] = None
-        logins: dict[str, str] = {}
-        for value in reviewers:
-            if isinstance(value, str) and (login := value.strip().removeprefix("@")):
-                logins.setdefault(login.lower(), login)
-        if patterns and logins:
-            pools.append(Pool(name, tuple(patterns), tuple(logins.values())))
-    return pools
-
-
-def load_pools(directory: Path) -> list[Pool]:
-    for name in ("pr-reviewer-pools.toml", "pr-assignee-pools.toml"):
-        path = directory / name
-        if path.exists():
-            return parse_pools(path.read_text())
-    return []
+    return [
+        Pool(
+            name=pool["name"],
+            patterns=tuple(path.lstrip("/") for path in pool["paths"]),
+            reviewers=tuple(pool["reviewers"]),
+        )
+        for pool in tomllib.loads(contents)["pools"]
+    ]
 
 
 def matching_pools(pools: list[Pool], files: list[str]) -> list[tuple[Pool, int]]:
-    def matches(filename: str, pattern: str) -> bool:
-        try:
-            return PurePosixPath(filename.lstrip("/")).full_match(pattern)
-        except ValueError:
-            print(f"Invalid reviewer path pattern: {pattern}", file=sys.stderr)
-            return False
-
     matched = []
     for pool in pools:
         weight = sum(
-            any(matches(filename, pattern) for pattern in pool.patterns)
+            any(
+                PurePosixPath(filename).full_match(pattern) for pattern in pool.patterns
+            )
             for filename in files
         )
         if weight:
             matched.append((pool, weight))
     return matched
-
-
-def choose_pool(matched: list[tuple[Pool, int]], rng: random.Random) -> Pool:
-    pick = rng.random() * sum(weight for _, weight in matched)
-    for pool, weight in matched:
-        pick -= weight
-        if pick < 0:
-            return pool
-    return matched[-1][0]
 
 
 def parse_state(contents: str) -> State:
@@ -182,9 +139,9 @@ def assign_reviewer(
     author = pull["user"]["login"].lower()
     matched = matching_pools(pools, changed_files(pull_request))
     while matched:
-        pool = choose_pool(matched, rng)
+        eligible_pools, weights = zip(*matched, strict=True)
+        pool = rng.choices(eligible_pools, weights=weights)[0]
         stored = state.get(pool.name, {})
-        # All members earn credit when the pool assigns a review, including the author.
         credits = {
             login: min(1.0, stored.get(login, 0.0) + 1 / len(pool.reviewers))
             for login in pool.reviewers
@@ -229,7 +186,6 @@ def main() -> None:
     parser.add_argument("--head-sha", required=True)
     parser.add_argument("--state", required=True, type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--config-directory", type=Path, default=Path(".github"))
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if os.environ.get("GITHUB_REPOSITORY", REPOSITORY) != REPOSITORY:
@@ -238,7 +194,7 @@ def main() -> None:
         parser.error("The pull request number must be positive.")
     if not args.dry_run and args.output is None:
         parser.error("--output is required when requesting a review.")
-    pools = load_pools(args.config_directory)
+    pools = parse_pools(Path(".github/pr-reviewer-pools.toml").read_text())
     state = load_state(args.state)
     assign_reviewer(
         args.pull_request, args.head_sha, pools, state, dry_run=args.dry_run
