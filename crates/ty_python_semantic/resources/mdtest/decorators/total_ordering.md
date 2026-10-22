@@ -654,6 +654,32 @@ error[invalid-total-ordering]: `functools.total_ordering` requires at least one 
 info: The function may raise `ValueError` at runtime
 ```
 
+The same check applies when the argument has a type variable bounded by a class-object type:
+
+```py
+def check_class_bound[T: type[Unordered]](cls: T):
+    total_ordering(cls)  # snapshot: invalid-total-ordering
+```
+
+```snapshot
+error[invalid-total-ordering]: `functools.total_ordering` requires at least one ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`) to be defined
+  --> src/mdtest_snippet.py:51:5
+   |
+51 |     total_ordering(cls)  # snapshot: invalid-total-ordering
+   |     ^^^^^^^^^^^^^^^^^^^ `Unordered` does not define `__lt__`, `__le__`, `__gt__`, or `__ge__`
+info: The function may raise `ValueError` at runtime
+```
+
+```py
+ClassBound = TypeVar("ClassBound", bound=type[Unordered])
+
+def check_legacy_class_bound(cls: ClassBound):
+    total_ordering(cls)  # error: [invalid-total-ordering]
+
+def check_ordered_class_bound[T: type[Ordered]](cls: T):
+    total_ordering(cls)  # no diagnostic
+```
+
 ## Function call form with `type()`
 
 When `total_ordering` is called on a class created with `type()`, the same validation is performed:

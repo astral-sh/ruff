@@ -709,6 +709,56 @@ info: A class is only a protocol class if it directly inherits from `typing.Prot
 info: See https://typing.python.org/en/latest/spec/protocol.html#
 ```
 
+A type variable can also be bounded by the class-object type itself. Here, `T` describes the class
+object rather than the instance type in `type[T]`:
+
+```py
+def check_class_bound[T: type[NotAProtocol]](cls: T):
+    runtime_checkable(cls)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to `runtime_checkable`
+  --> src/mdtest_snippet.py:53:5
+   |
+53 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
+   |     ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+info: Only protocol classes can be passed to `runtime_checkable`
+info: `NotAProtocol` is declared here, but it is not a protocol class:
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | class NotAProtocol: ...
+  |       ^^^^^^^^^^^^
+info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+```
+
+```py
+ClassBound = TypeVar("ClassBound", bound=type[NotAProtocol])
+
+def check_legacy_class_bound(cls: ClassBound):
+    runtime_checkable(cls)  # error: [invalid-argument-type]
+
+def check_mixed_class_bound[T: type[NotAProtocol] | type[P]](cls: T):
+    runtime_checkable(cls)  # error: [invalid-argument-type]
+
+ClassChoice = TypeVar("ClassChoice", type[NotAProtocol], type[P])
+
+def check_legacy_class_constraints(cls: ClassChoice):
+    runtime_checkable(cls)  # error: [invalid-argument-type]
+
+def check_class_constraints[T: (type[NotAProtocol], type[P])](cls: T):
+    runtime_checkable(cls)  # error: [invalid-argument-type]
+```
+
+ty does not report a diagnostic for a protocol bound, even though a non-protocol subclass of the
+protocol could be passed:
+
+```py
+def check_protocol_class_bound[T: type[P]](cls: T):
+    runtime_checkable(cls)  # no diagnostic
+```
+
 ## `runtime_checkable` in stub files
 
 In a stub file, a class can inherit from `Protocol` through an alias defined later in the file:
@@ -1172,6 +1222,18 @@ info: `OtherNotAProtocol` is declared here, but it is not a protocol class:
    |       ^^^^^^^^^^^^^^^^^
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
+```
+
+The same check applies when the argument itself has a type variable bounded by a class-object type:
+
+```py
+def check_class_bound[T: type[NotAProtocol]](cls: T):
+    get_protocol_members(cls)  # error: [invalid-argument-type]
+
+ClassBound = TypeVar("ClassBound", bound=type[NotAProtocol])
+
+def check_legacy_class_bound(cls: ClassBound):
+    get_protocol_members(cls)  # error: [invalid-argument-type]
 ```
 
 ## Subtyping of protocols with attribute members

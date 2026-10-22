@@ -3691,6 +3691,12 @@ impl<'db> ClassMatches<'db> {
                     }
                 }
             }
+            Type::TypeVar(typevar) => {
+                let bound = typevar
+                    .require_bound_or_constraints(db, env)
+                    .as_type(db, env);
+                Self::find_matching_classes(db, env, bound, predicate)
+            }
             Type::Union(union) => {
                 let mut matching_classes = SmallVec::new();
                 let mut every_element_matches = true;
