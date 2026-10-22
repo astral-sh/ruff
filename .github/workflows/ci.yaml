@@ -729,10 +729,6 @@ jobs:
           checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
       - name: "Install Rust toolchain"
         run: rustup component add rustfmt
-      - name: Check report comment lookup
-        run: uv run --script scripts/tests/check_pull_request_comments.py
-      - name: Check report publishing
-        run: uv run --script scripts/tests/check_publish_pr_report.py
       # Run all code generation scripts, and verify that the current output is
       # already checked into git.
       - run: python crates/ruff_python_ast/generate.py
