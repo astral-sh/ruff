@@ -228,17 +228,12 @@ fn display_method<'db>(
         return None;
     }
 
-    // Construct `def get_<field>_display(self: Self) -> str`.
-    let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+    // Construct `def get_<field>_display(self: MyModel) -> str`.
+    let self_ty = Type::instance(
         db,
-        SelfTypeVarOrigin::Class(class.into()),
-        Type::instance(
-            db,
-            env,
-            class.apply_optional_specialization(db, specialization),
-        ),
-        BindingContext::Synthetic(env.program(db)),
-    ));
+        env,
+        class.apply_optional_specialization(db, specialization),
+    );
     let signature = Signature::new(
         Parameters::standard([
             Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty)
