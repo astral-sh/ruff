@@ -446,17 +446,55 @@ impl AttributeViolation<'_> {
     }
 }
 
+/// Find the first class in the MRO that supplies an attribute contract.
+fn attribute_owner<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &str,
+) -> Option<ClassType<'db>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|base| {
+            !base.own_class_member(db, env, None, name).is_undefined()
+                || !base.own_instance_member(db, env, name).is_undefined()
+        })
+}
+
+/// Whether any base that supplies this declaration permits an instance write.
+/// Probe with an unspecified value because a descriptor can accept a different type
+/// than it returns on reads.
+fn permits_instance_write<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    owner: ClassType<'db>,
+    name: &str,
+) -> bool {
+    let writable = |base| {
+        Type::instance(db, env, base).is_attribute_writable_with(db, env, name, Type::unknown())
+    };
+    // An intermediate base can add an instance dictionary without redeclaring the attribute.
+    writable(owner)
+        || class
+            .iter_mro(db)
+            .skip(1)
+            .filter_map(ClassBase::into_class)
+            .take_while(|base| *base != owner)
+            .any(|base| attribute_owner(db, env, base, name) == Some(owner) && writable(base))
+}
+
 /// Find the first read or write that the overriding contract fails to preserve.
 ///
-/// Both contracts are bound to the subclass receiver. `target_receiver` is the base
-/// instance used to verify that a promised write is actually supported there; rejecting
-/// an override for a write already rejected by the base would be a false positive.
+/// Both contracts are bound to the subclass receiver. The base instance determines
+/// which writes the overriding attribute must support.
 /// Read types are covariant and write types are contravariant.
 fn attribute_violation<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    receiver: Type<'db>,
-    target_receiver: Type<'db>,
+    class: ClassType<'db>,
+    target_owner: ClassType<'db>,
     name: &str,
     source: &AttributeContract<'db>,
     target: &AttributeContract<'db>,
@@ -466,9 +504,12 @@ fn attribute_violation<'db>(
     {
         return None;
     }
+    let target_receiver = Type::instance(db, env, target_owner);
     if let (Some(source_kind), Some(target_kind)) = (source.variable_kind, target.variable_kind)
         && !source_kind.can_override(target_kind)
-        && (target_kind == super::VariableKind::Class || target.write.is_some())
+        && (target_kind == super::VariableKind::Class
+            || target.write.is_some_and(|write| !write.is_never())
+                && permits_instance_write(db, env, class, target_owner, name))
     {
         return Some(AttributeViolation::Storage {
             source: source_kind,
@@ -495,14 +536,14 @@ fn attribute_violation<'db>(
     // fields can become read-only there, even though writes to the base are allowed.
     // Preserve this permission when that frozen field is inherited by another subclass.
     if target.kind != AttributeKind::Property
-        && target_receiver
-            .nominal_class(db, env)
-            .and_then(|class| class.static_class_literal(db))
+        && target_owner
+            .static_class_literal(db)
             .is_some_and(|(literal, _)| literal.is_neutral_dataclass(db))
         && source.is_frozen_field
     {
         return None;
     }
+    let receiver = Type::instance(db, env, class);
     let receiver = if target.qualifiers.contains(TypeQualifiers::CLASS_VAR) {
         receiver.to_meta_type(db, env)
     } else {
@@ -682,15 +723,8 @@ pub(super) fn check_override<'db>(
     {
         return OverrideCheck::Callable;
     }
-    let Some(violation) = attribute_violation(
-        db,
-        env,
-        receiver,
-        Type::instance(db, env, superclass),
-        name,
-        &source,
-        &target,
-    ) else {
+    let Some(violation) = attribute_violation(db, env, class, superclass, name, &source, &target)
+    else {
         return OverrideCheck::Attribute(None);
     };
     // Suppress only conflicts already present with the parent's own specialization of
@@ -714,8 +748,8 @@ pub(super) fn check_override<'db>(
                             attribute_violation(
                                 db,
                                 env,
-                                parent_receiver,
-                                Type::instance(db, env, ancestor),
+                                parent,
+                                ancestor,
                                 name,
                                 &parent_source,
                                 &parent_target,
@@ -856,14 +890,7 @@ fn already_inherited<'db>(
         .skip(1)
         .filter_map(ClassBase::into_class)
         .any(|parent| {
-            let Some(owner) = parent
-                .iter_mro(db)
-                .filter_map(ClassBase::into_class)
-                .find(|owner| {
-                    !owner.own_class_member(db, env, None, name).is_undefined()
-                        || !owner.own_instance_member(db, env, name).is_undefined()
-                })
-            else {
+            let Some(owner) = attribute_owner(db, env, parent, name) else {
                 return false;
             };
             let Some(inherited) = attribute_contract(db, env, owner, child_receiver, name, kind)
@@ -893,16 +920,8 @@ fn already_inherited<'db>(
                     else {
                         return false;
                     };
-                    attribute_violation(
-                        db,
-                        env,
-                        receiver,
-                        Type::instance(db, env, ancestor),
-                        name,
-                        &inherited,
-                        &target,
-                    )
-                    .is_some()
+                    attribute_violation(db, env, parent, ancestor, name, &inherited, &target)
+                        .is_some()
                 })
         })
 }
@@ -940,15 +959,9 @@ pub(super) fn check_inherited_conflict<'db>(
         let Some(target) = attribute_contract(db, env, target_owner, receiver, name, kind) else {
             continue;
         };
-        let Some(violation) = attribute_violation(
-            db,
-            env,
-            receiver,
-            Type::instance(db, env, target_owner),
-            name,
-            &source,
-            &target,
-        ) else {
+        let Some(violation) =
+            attribute_violation(db, env, class_type, target_owner, name, &source, &target)
+        else {
             continue;
         };
         if pydantic::merges_inherited_attribute(db, env, class, name, [owner, target_owner]) {

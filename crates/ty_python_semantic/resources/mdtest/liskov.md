@@ -945,6 +945,8 @@ class DescriptorOverride(DescriptorBase):
 class DescriptorAnnotationBase:
     descriptor_attr: Descriptor
 
+DescriptorAnnotationBase().descriptor_attr = Descriptor()  # no diagnostic
+
 class DescriptorAnnotationOverride(DescriptorAnnotationBase):
     # error: [invalid-attribute-override] "class variable cannot override instance variable `DescriptorAnnotationBase.descriptor_attr`"
     descriptor_attr: ClassVar[Descriptor]
@@ -1104,6 +1106,42 @@ class SuppliesString:
     value: ClassVar[str] = ""
 
 class InheritedIncompatible(SuppliesString, Frozen): ...  # error: [invalid-attribute-override]
+```
+
+### Class variables replacing attributes on slotted classes
+
+A class variable can replace an inherited attribute when the base's instances have no storage for
+it. The value must still satisfy the base's declared read type.
+
+```py
+from typing import ClassVar
+
+class Slotted:
+    __slots__ = ()
+    value: int = 0
+
+class Direct(Slotted):
+    value: ClassVar[int] = 1  # no diagnostic
+
+class SuppliesValue:
+    value: ClassVar[int] = 1
+
+class Inherited(SuppliesValue, Slotted): ...  # no diagnostic
+
+class Incompatible(Slotted):
+    # error: [invalid-attribute-override] "Type `str` is not assignable to inherited type `int`"
+    value: ClassVar[str] = ""
+```
+
+A subclass that gains an instance dictionary can write the inherited attribute.
+
+```py
+class Writable(Slotted): ...
+
+Writable().value = 1  # no diagnostic
+
+class RemovesWrite(Writable):
+    value: ClassVar[int] = 1  # error: [invalid-attribute-override]
 ```
 
 ### Protocol implementations
