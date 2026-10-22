@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import io
 import json
 import logging
@@ -31,7 +32,7 @@ MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
 MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
-MAX_HTML_REPORT_BYTES = 128 * 1024 * 1024
+MAX_HTML_REPORT_BYTES = 512 * 1024 * 1024
 
 
 def read_html_files(value: str) -> dict[str, tuple[str, str]]:
@@ -218,11 +219,13 @@ def upload_html_report(
                 f"s3://{bucket}/{prefix}/{filename}",
                 "--content-type",
                 files[filename][0],
+                "--content-encoding",
+                "gzip",
                 "--cache-control",
                 "public, max-age=3600",
                 "--only-show-errors",
             ],
-            input=contents,
+            input=gzip.compress(contents, compresslevel=6, mtime=0),
             check=True,
             timeout=120,
         )

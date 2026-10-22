@@ -2,6 +2,10 @@ name: Publish the weekly ty ecosystem report
 
 on:
   workflow_call:
+    inputs:
+      html-files:
+        type: string
+        required: true
     secrets:
       STS_API_URL:
         required: true
@@ -58,8 +62,10 @@ jobs:
           WORKFLOW_REF: ${{ github.workflow_ref }}
           HTML_BUCKET: ${{ vars.REPORTS_BUCKET }}
           HTML_BASE_URL: ${{ vars.REPORTS_URL }}
+          HTML_FILES: ${{ inputs.html-files }}
         run: >-
           uv run --script scripts/publish_report.py weekly
           --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
           --workflow-ref "$WORKFLOW_REF"
           --html-bucket "$HTML_BUCKET" --html-base-url "$HTML_BASE_URL"
+          --html-files "$HTML_FILES"

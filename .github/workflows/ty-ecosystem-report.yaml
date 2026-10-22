@@ -52,6 +52,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
+          python-version: "3.13"
           enable-cache: true
           save-cache: false
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
@@ -112,5 +113,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    with:
+      html-files: '{"index.html": {"content-type": "text/html; charset=utf-8"}}'
     secrets:
       STS_API_URL: ${{ secrets.STS_API_URL }}

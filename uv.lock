@@ -506,7 +506,7 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#ebec9bd301f36aa1308fc2e0c743129ff23581fc" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#b4e9a8cd7ebf9e5f0fe210591a778f9b61d1ab60" }
 dependencies = [
     { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" } },
     { name = "jinja2" },
