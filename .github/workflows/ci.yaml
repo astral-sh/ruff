@@ -72,7 +72,7 @@ jobs:
           save-if: "true"
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
+        uses: astral-sh/github-actions/rust-workspace-cache@374b3d54bd4be0644dd1bb437decde17acd776b8
         with:
           prefix-key: ruff-dual-cache-20261022-v2-workspace
           key: ruff-linux-debug
@@ -305,7 +305,7 @@ jobs:
         run: rustup show
       - name: Restore Rust cache
         id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@7eaa7b9d1a13059d7b5305c2dab921fdc2c9cad3
+        uses: astral-sh/github-actions/rust-workspace-cache@374b3d54bd4be0644dd1bb437decde17acd776b8
         with:
           prefix-key: ruff-dual-cache-20261022-v2-workspace
           key: ruff-linux-debug
