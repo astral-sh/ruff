@@ -1837,7 +1837,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         protocol.interface(db),
                         Type::ProtocolInstance(protocol),
                         self,
-                    )
+                    );
                 };
                 if let Some(definition) = protocol
                     .class_origin(db)
