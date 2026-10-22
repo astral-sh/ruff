@@ -1331,6 +1331,43 @@ fn benchmark_gradual_vararg_call(criterion: &mut Criterion) {
     benchmark_micro_case(criterion, "ty_micro[gradual_vararg_call]", &code);
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4796>.
+///
+/// Capturing independently bounded generic overloads must not enumerate every combination of
+/// signatures specialized to their declared bounds.
+fn benchmark_paramspec_bounded_overloads(criterion: &mut Criterion) {
+    let mut code = "
+        from typing import Callable, Literal, overload
+
+        class Array[S: tuple[int, ...]]:
+            def shape(self) -> S:
+                raise NotImplementedError
+        "
+    .to_string();
+
+    for index in 0..6 {
+        writeln!(
+            &mut code,
+            "
+        @overload
+        def overloaded[S: tuple[int, ...]](value: Array[S], tag: Literal[{index}]) -> None: ..."
+        )
+        .ok();
+    }
+
+    code.push_str(
+        "
+        def overloaded(*args, **kwargs) -> None: ...
+
+        def capture[**P](callback: Callable[P, object]) -> None: ...
+
+        capture(overloaded)
+        ",
+    );
+
+    benchmark_micro_case(criterion, "ty_micro[paramspec_bounded_overloads]", &code);
+}
+
 /// Regression benchmark for many precise arguments flowing into one variadic parameter.
 ///
 /// The declared type is intentionally non-gradual, so argument checks still run. The important
@@ -2576,6 +2613,7 @@ criterion_group!(
     benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
+    benchmark_paramspec_bounded_overloads,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
