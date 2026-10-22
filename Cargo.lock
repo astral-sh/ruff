@@ -3123,6 +3123,7 @@ dependencies = [
  "mimalloc",
  "notify",
  "path-absolutize",
+ "portable-atomic",
  "rayon",
  "regex",
  "rkyv",
