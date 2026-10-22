@@ -14,9 +14,6 @@ Released on 2026-10-22.
 - \[`pydocstyle`\] Treat backslash-escaped `*args` and `**kwargs` as documented (`D417`) ([#29536](https://github.com/astral-sh/ruff/pull/29536))
 - \[`pylint`\] Avoid false positive on starred elements (`PLE0643`) ([#29483](https://github.com/astral-sh/ruff/pull/29483))
 - \[`pylint`\] Mark fixes unsafe when deleting comments (`PLR5501`, `PLW0120`) ([#29414](https://github.com/astral-sh/ruff/pull/29414))
-
-### Rule changes
-
 - \[`pyupgrade`\] Mark fix unsafe when deleting comments (`UP035`) ([#29413](https://github.com/astral-sh/ruff/pull/29413))
 
 ### Performance
