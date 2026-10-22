@@ -4778,6 +4778,7 @@ dependencies = [
  "camino",
  "compact_str",
  "get-size2",
+ "html-escape",
  "indexmap",
  "insta",
  "itertools 0.15.0",
