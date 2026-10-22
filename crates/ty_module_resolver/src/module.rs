@@ -263,6 +263,8 @@ pub enum KnownModule {
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
     // Third-party modules
+    #[strum(serialize = "django.db.models.base")]
+    DjangoDbModelsBase,
     #[strum(serialize = "pydantic.config")]
     PydanticConfig,
     #[strum(serialize = "pydantic.fields")]
@@ -322,6 +324,7 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::DjangoDbModelsBase => "django.db.models.base",
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticFields => "pydantic.fields",
             Self::PydanticFunctionalValidators => "pydantic.functional_validators",
@@ -356,7 +359,8 @@ impl KnownModule {
     /// Return `true` if this module is provided by a supported third-party package.
     pub const fn is_third_party(self) -> bool {
         match self {
-            Self::PydanticConfig
+            Self::DjangoDbModelsBase
+            | Self::PydanticConfig
             | Self::PydanticFields
             | Self::PydanticFunctionalValidators
             | Self::PydanticMain
