@@ -38,7 +38,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ty-ecosystem-analyzer.yaml",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@a2f3ca0cde3f89a8a1e5365e23ecfced130eae30",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b",
       "on": ["pull_request"],
       "permissions": { "actions": "read", "pull_requests": "write" },
       "target": "ruff"
