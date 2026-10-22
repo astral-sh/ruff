@@ -126,6 +126,14 @@ enum ProgramSource {
     Scope(Id),
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum DiagnosticMode {
+    Normal,
+    Suppressed,
+    /// Explain an invalid type expression without reporting errors in its defining file.
+    TypeExpressionExplanation,
+}
+
 /// Context for inferring the types of a single file.
 ///
 /// One context exists for at least for every inferred region but it's
@@ -147,7 +155,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     has_invalid_type_form: Cell<bool>,
-    diagnostics_suppressed: bool,
+    diagnostic_mode: DiagnosticMode,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
     bomb: DebugDropBomb,
@@ -175,7 +183,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             has_invalid_type_form: Cell::new(false),
-            diagnostics_suppressed: false,
+            diagnostic_mode: DiagnosticMode::Normal,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
                 "`InferContext` needs to be explicitly consumed by calling `::finish` to prevent accidental loss of diagnostics.",
@@ -240,12 +248,24 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(crate) fn extend(&mut self, other: &InferContextResult) {
         *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
-        self.diagnostics.get_mut().extend(&other.diagnostics);
+        let diagnostics = self.diagnostics.get_mut();
+        if self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation {
+            diagnostics.extend_diagnostics(
+                (&other.diagnostics)
+                    .into_iter()
+                    .filter(|diagnostic| {
+                        diagnostic.id() == DiagnosticId::Lint(LintId::of(&INVALID_TYPE_FORM).name())
+                    })
+                    .cloned(),
+            );
+        } else {
+            diagnostics.extend(&other.diagnostics);
+        }
     }
 
     /// Whether diagnostics inferred separately for a referenced alias should be collected.
     pub(super) fn should_collect_diagnostics(&self) -> bool {
-        !self.diagnostics_suppressed
+        self.diagnostic_mode == DiagnosticMode::Normal
             && self.db().should_check_file(self.file())
             && !self.is_in_no_type_check()
     }
@@ -261,8 +281,21 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     /// Prevents diagnostic construction for this inference context.
     pub(super) fn suppress_diagnostics(&mut self) {
-        debug_assert!(!self.diagnostics_suppressed);
-        self.diagnostics_suppressed = true;
+        debug_assert_ne!(self.diagnostic_mode, DiagnosticMode::Suppressed);
+        self.diagnostic_mode = DiagnosticMode::Suppressed;
+    }
+
+    /// Collect type-expression errors for use as explanations at a reference site.
+    ///
+    /// These errors describe why a value cannot be used as a type, independently of whether
+    /// diagnostics are enabled or suppressed in the file defining that value.
+    pub(super) fn collect_type_expression_diagnostics(&mut self) {
+        debug_assert_eq!(self.diagnostic_mode, DiagnosticMode::Normal);
+        self.diagnostic_mode = DiagnosticMode::TypeExpressionExplanation;
+    }
+
+    pub(super) fn is_type_expression_explanation(&self) -> bool {
+        self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
@@ -410,7 +443,7 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
             .field("has_invalid_type_form", &self.has_invalid_type_form)
-            .field("diagnostics_suppressed", &self.diagnostics_suppressed)
+            .field("diagnostic_mode", &self.diagnostic_mode)
             .field("inference_flags", &self.inference_flags)
             .finish()
     }
@@ -559,7 +592,7 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
             diag.clear_concise_message();
         }
 
-        if self.ctx.db().verbose() {
+        if !self.ctx.is_type_expression_explanation() && self.ctx.db().verbose() {
             let rule = diag.id();
 
             diag.info(match self.source {
@@ -628,8 +661,13 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: LintId,
     ) -> Option<(Severity, LintSource)> {
-        if ctx.diagnostics_suppressed {
-            return None;
+        match ctx.diagnostic_mode {
+            DiagnosticMode::Normal => {}
+            DiagnosticMode::Suppressed => return None,
+            DiagnosticMode::TypeExpressionExplanation => {
+                return (lint == LintId::of(&INVALID_TYPE_FORM))
+                    .then_some((Severity::Error, LintSource::Default));
+            }
         }
 
         // The comment below was copied from the original
@@ -665,17 +703,19 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
-        let suppressions = suppressions(ctx.db(), ctx.python_file());
-        if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
-            ctx.diagnostics.borrow_mut().mark_used(suppression.id());
-            return None;
-        }
+        if !ctx.is_type_expression_explanation() {
+            let suppressions = suppressions(ctx.db(), ctx.python_file());
+            if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
+                ctx.diagnostics.borrow_mut().mark_used(suppression.id());
+                return None;
+            }
 
-        // Suppress diagnostics in unreachable code. This checks both whether
-        // the scope itself is unreachable and whether the specific statement or
-        // expression containing this diagnostic is unreachable.
-        if !ctx.is_range_reachable(range) {
-            return None;
+            // Suppress diagnostics in unreachable code. This checks both whether
+            // the scope itself is unreachable and whether the specific statement or
+            // expression containing this diagnostic is unreachable.
+            if !ctx.is_range_reachable(range) {
+                return None;
+            }
         }
 
         Some(LintDiagnosticGuardBuilder {
@@ -754,7 +794,7 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
         id: DiagnosticId,
         severity: Severity,
     ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
-        if ctx.diagnostics_suppressed {
+        if ctx.diagnostic_mode != DiagnosticMode::Normal {
             return None;
         }
 

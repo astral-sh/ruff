@@ -2342,11 +2342,15 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
   |                 ^^^^^^
-info: See the following page for a reference on valid type expressions:
-info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+info: Invalid binary operator `+` in type annotation
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
 ```
 
-An expression that evaluates to a class does not automatically define a type alias:
+An expression that evaluates to a class does not automatically define a type alias. The diagnostic
+explains why its original definition is invalid as a type expression:
 
 ```py
 Called = type(1)
@@ -2362,6 +2366,11 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
    |
 18 | def inspect(called: Called):
    |                     ^^^^^^
+info: Function calls are not allowed in type alias values
+  --> src/mdtest_snippet.py:11:10
+   |
+11 | Called = type(1)
+   |          ^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -2474,6 +2483,11 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
   |
 4 | def inspect_forwarded(forwarded: ForwardedClass):
   |                                  ^^^^^^^^^^^^^^
+info: Function calls are not allowed in type alias values
+ --> dependencies/values.py:3:17
+  |
+3 | ComputedClass = (lambda: int)()
+  |                 ^^^^^^^^^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -2503,6 +2517,40 @@ def inspect_classes(
     local_attribute: AttributeClass,  # error: [invalid-type-form]
 ):
     reveal_type(local_attribute)  # revealed: Unknown
+```
+
+## Suppressing invalid implicit alias uses
+
+An invalid implicit alias is diagnosed where it is used as a type. An ignore on its ordinary
+assignment remains unused and does not hide the explanation at the annotation. Suppressing the error
+at a use does not make the value a valid type alias:
+
+```toml
+[rules]
+unused-ignore-comment = "error"
+```
+
+```py
+# error: [unused-ignore-comment]
+Number = 1 + 2  # ty: ignore[invalid-type-form]
+
+# snapshot: invalid-type-form
+def inspect(value: Number): ...
+def ignored(value: Number):  # ty: ignore[invalid-type-form]
+    reveal_type(value)  # revealed: Unknown
+```
+
+```snapshot
+error[invalid-type-form]: Variable of type `Literal[3]` is not allowed in a parameter annotation
+ --> src/mdtest_snippet.py:5:20
+  |
+5 | def inspect(value: Number): ...
+  |                    ^^^^^^
+info: Invalid binary operator `+` in type annotation
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | Number = 1 + 2  # ty: ignore[invalid-type-form]
+  |          ^^^^^
 ```
 
 ## Disabled invalid implicit alias diagnostics
