@@ -265,6 +265,8 @@ pub enum KnownModule {
     // Third-party modules
     #[strum(serialize = "django.db.models.base")]
     DjangoDbModelsBase,
+    #[strum(serialize = "django.db.models.fields")]
+    DjangoDbModelsFields,
     #[strum(serialize = "pydantic.config")]
     PydanticConfig,
     #[strum(serialize = "pydantic.fields")]
@@ -325,6 +327,7 @@ impl KnownModule {
             Self::Numbers => "numbers",
             Self::Struct => "struct",
             Self::DjangoDbModelsBase => "django.db.models.base",
+            Self::DjangoDbModelsFields => "django.db.models.fields",
             Self::PydanticConfig => "pydantic.config",
             Self::PydanticFields => "pydantic.fields",
             Self::PydanticFunctionalValidators => "pydantic.functional_validators",
@@ -360,6 +363,7 @@ impl KnownModule {
     pub const fn is_third_party(self) -> bool {
         match self {
             Self::DjangoDbModelsBase
+            | Self::DjangoDbModelsFields
             | Self::PydanticConfig
             | Self::PydanticFields
             | Self::PydanticFunctionalValidators

@@ -178,6 +178,7 @@ impl InstanceDictionary {
             | KnownClass::TyExtensionsIterator
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
+            | KnownClass::DjangoField
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict

@@ -164,6 +164,7 @@ pub enum KnownClass {
     TyExtensionsIterator,
     // Django
     DjangoModel,
+    DjangoField,
     // Pydantic
     PydanticBaseModel,
     PydanticBaseSettings,
@@ -291,6 +292,7 @@ impl KnownClass {
             | Self::TyExtensionsIterator
             | Self::UnittestTestCase
             | Self::DjangoModel
+            | Self::DjangoField
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -429,6 +431,7 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::UnittestTestCase
             | Self::DjangoModel
+            | Self::DjangoField
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -557,6 +560,7 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
+            | KnownClass::DjangoField
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -677,6 +681,7 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
+            | KnownClass::DjangoField
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
@@ -797,6 +802,7 @@ impl KnownClass {
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
+            | KnownClass::DjangoField
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -929,6 +935,7 @@ impl KnownClass {
             | Self::Sequence
             | Self::UnittestTestCase
             | Self::DjangoModel
+            | Self::DjangoField
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1050,6 +1057,7 @@ impl KnownClass {
             | KnownClass::Specialization
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
+            | KnownClass::DjangoField
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -1183,6 +1191,7 @@ impl KnownClass {
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::UnittestTestCase => "TestCase",
             Self::DjangoModel => "Model",
+            Self::DjangoField => "Field",
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
@@ -1621,6 +1630,7 @@ impl KnownClass {
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::DjangoModel => KnownModule::DjangoDbModelsBase,
+            Self::DjangoField => KnownModule::DjangoDbModelsFields,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
             Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
@@ -1744,6 +1754,7 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::DjangoModel
+            | Self::DjangoField
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1848,7 +1859,7 @@ impl KnownClass {
             "_version_info" => &[Self::VersionInfo],
             "EllipsisType" => &[Self::EllipsisType],
             "NotImplementedType" => &[Self::NotImplementedType],
-            "Field" => &[Self::Field],
+            "Field" => &[Self::Field, Self::DjangoField],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
@@ -1975,6 +1986,7 @@ impl KnownClass {
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
             | Self::DjangoModel
+            | Self::DjangoField
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict

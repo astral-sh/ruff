@@ -73,7 +73,6 @@ class Book(models.Model):
 
 def _(book: Book):
     reveal_type(book.title)  # revealed: str | None
-
     reveal_type(book.pages)  # revealed: int | None
 ```
 
@@ -91,12 +90,8 @@ class Book(models.Model):
     title = models.CharField()
 
 def _(book: Book):
-    # TODO: Should not be an error, and the type should be `int`
-    # error: [unresolved-attribute]
-    reveal_type(book.id)  # revealed: Unknown
-
-    # TODO: Should be `int`
-    reveal_type(book.pk)  # revealed: Any
+    reveal_type(book.id)  # revealed: int
+    reveal_type(book.pk)  # revealed: int
 ```
 
 A subclass inherits the primary key behavior of its parent.
@@ -106,9 +101,7 @@ class Ebook(Book):
     pass
 
 def _(ebook: Ebook):
-    # TODO: Should not be an error, and the type should be `int`
-    # error: [unresolved-attribute]
-    reveal_type(ebook.id)  # revealed: Unknown
+    reveal_type(ebook.id)  # revealed: int
 ```
 
 ### Custom primary key
@@ -123,9 +116,7 @@ class Book(models.Model):
 
 def _(book: Book):
     reveal_type(book.isbn)  # revealed: str
-
-    # TODO: Should be `str`
-    reveal_type(book.pk)  # revealed: Any
+    reveal_type(book.pk)  # revealed: str
 
     # This is an error now, `id` is not created when a custom primary key is defined.
     book.id  # error: [unresolved-attribute]
