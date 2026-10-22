@@ -1,6 +1,6 @@
 # Django
 
-These tests use [django-types] for Django's type stubs:
+Django support in ty currently relies on the stubs from [django-types]:
 
 ```toml
 [environment]
