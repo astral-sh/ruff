@@ -1,9 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = []
-#
-# [tool.ty.environment]
-# root = ["."]
 # ///
 """Publish report artifacts without executing code from the producing workflow."""
 
@@ -11,27 +8,129 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import re
 import subprocess
 import sys
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
 
-import pull_request_comments as comments
+REPOSITORY = "astral-sh/ruff"
+REPOSITORY_ID = 523043277
+API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
+BOT_ID = 305554984  # astral-automations-bot
 
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
 
 
+@dataclass(frozen=True)
+class Report:
+    workflow: str
+    artifact: str
+    filename: str
+
+
+REPORTS = {
+    "ruff-ecosystem": Report(
+        workflow="ci.yaml",
+        artifact="ecosystem-result",
+        filename="ecosystem-result",
+    ),
+    "memory": Report(
+        workflow="memory_report.yaml",
+        artifact="memory_report_diff",
+        filename="memory_report_diff.diff",
+    ),
+    "typing-conformance": Report(
+        workflow="typing_conformance.yaml",
+        artifact="typing_conformance_diagnostics_diff",
+        filename="typing_conformance_diagnostics.diff",
+    ),
+    "ty-ecosystem": Report(
+        workflow="ty-ecosystem-analyzer.yaml",
+        artifact="comment.md",
+        filename="comment.md",
+    ),
+}
+
+
+def report_marker(report: str) -> str:
+    return f"<!-- generated-comment {report} -->"
+
+
+def api(
+    endpoint: str,
+    *,
+    method: str = "GET",
+    body: str | None = None,
+    missing_ok: bool = False,
+) -> Any:
+    request = Request(
+        f"{API_ROOT}/{endpoint}",
+        data=json.dumps({"body": body}).encode() if body is not None else None,
+        headers={
+            "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method=method,
+    )
+    try:
+        with urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except HTTPError as error:
+        if missing_ok and error.code == 404:
+            return None
+        raise
+
+
+def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
+    author = comment.get("user") or {}
+    return (
+        author.get("id") == BOT_ID
+        and author.get("type") == "Bot"
+        and comment.get("issue_url") == f"{API_ROOT}/issues/{pull_request}"
+        and (comment.get("body") or "").startswith(f"{marker}\n")
+    )
+
+
+def parse_comment_id(value: str) -> int:
+    # Stored values are untrusted, including values from other jobs on the same PR.
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", value):
+        raise ValueError("The stored comment ID must be a positive decimal integer.")
+    return int(value)
+
+
+def find_report(
+    pull_request: int, report: str, comment_id: int | None = None
+) -> dict | None:
+    if comment_id is None:
+        return None
+    comment = api(f"issues/comments/{comment_id}", missing_ok=True)
+    if comment is not None and not matches_comment(
+        comment, pull_request, report_marker(report)
+    ):
+        raise ValueError(
+            "The stored ID does not identify this bot's report on this PR."
+        )
+    return comment
+
+
 def find_artifact(run_id: int, name: str) -> dict | None:
     matches = []
     page = 1
     while True:
-        artifacts = comments.api(
-            f"actions/runs/{run_id}/artifacts?per_page=100&page={page}"
-        )["artifacts"]
+        artifacts = api(f"actions/runs/{run_id}/artifacts?per_page=100&page={page}")[
+            "artifacts"
+        ]
         matches.extend(
             artifact
             for artifact in artifacts
@@ -51,7 +150,7 @@ def download_artifact(artifact: dict) -> bytes:
         [
             "gh",
             "api",
-            f"repos/{comments.REPOSITORY}/actions/artifacts/{artifact['id']}/zip",
+            f"repos/{REPOSITORY}/actions/artifacts/{artifact['id']}/zip",
         ],
         check=True,
         stdout=subprocess.PIPE,
@@ -87,7 +186,7 @@ def render_report(
     full_report: dict | None = None,
 ) -> str:
     if len(contents) > MAX_REPORT_CHARACTERS:
-        artifact_url = f"https://github.com/{comments.REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
+        artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
         contents = (
             contents[:MAX_REPORT_CHARACTERS]
             + f"\n\nReport truncated. [Download the full report]({artifact_url})."
@@ -95,13 +194,13 @@ def render_report(
     if report == "ruff-ecosystem":
         contents = f"## `ruff-ecosystem` results\n\n{contents}"
     if full_report is not None:
-        report_url = f"https://github.com/{comments.REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
+        report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
             f"{contents.rstrip()}\n\n[Download the HTML reports (ZIP)]({report_url})"
         )
-    run_url = f"https://github.com/{comments.REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
+    run_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
     return (
-        f"{comments.report_marker(report)}\n"
+        f"{report_marker(report)}\n"
         f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
         f"{contents.rstrip()}\n\n"
         f"[Workflow run]({run_url}) · `{run['head_sha'][:7]}`\n"
@@ -122,24 +221,24 @@ def report_run(comment: dict) -> tuple[int, int]:
 def current_run(
     run_id: int, run_attempt: int, report: str, pull_request: int
 ) -> dict | None:
-    run = comments.api(f"actions/runs/{run_id}")
+    run = api(f"actions/runs/{run_id}")
     if run["run_attempt"] != run_attempt:
         print("The workflow run has been rerun.", file=sys.stderr)
         return None
     if (
-        run["repository"]["id"] != comments.REPOSITORY_ID
-        or (run["head_repository"] or {}).get("id") != comments.REPOSITORY_ID
+        run["repository"]["id"] != REPOSITORY_ID
+        or (run["head_repository"] or {}).get("id") != REPOSITORY_ID
         or run["event"] != "pull_request"
-        or run["path"] != f".github/workflows/{comments.REPORTS[report].workflow}"
+        or run["path"] != f".github/workflows/{REPORTS[report].workflow}"
     ):
         raise ValueError("The workflow run is not an eligible same-repository PR run.")
-    pull = comments.api(f"pulls/{pull_request}")
+    pull = api(f"pulls/{pull_request}")
     if pull["number"] != pull_request:
         raise ValueError("The run does not belong to the requested pull request.")
     if (
         pull["state"] != "open"
-        or pull["base"]["repo"]["id"] != comments.REPOSITORY_ID
-        or (pull["head"]["repo"] or {}).get("id") != comments.REPOSITORY_ID
+        or pull["base"]["repo"]["id"] != REPOSITORY_ID
+        or (pull["head"]["repo"] or {}).get("id") != REPOSITORY_ID
         or pull["head"]["sha"] != run["head_sha"]
         or pull["head"]["ref"] != run["head_branch"]
     ):
@@ -159,7 +258,7 @@ def publish(
 ) -> int | None:
     if not (run := current_run(run_id, run_attempt, report, pull_request)):
         return
-    metadata = comments.REPORTS[report]
+    metadata = REPORTS[report]
     artifact = find_artifact(run_id, metadata.artifact)
     if artifact is None:
         print(f"No {metadata.artifact} artifact is available.", file=sys.stderr)
@@ -178,18 +277,18 @@ def publish(
     # Recheck after downloading: the PR may have advanced or the run may have been retried.
     if not current_run(run_id, run_attempt, report, pull_request):
         return
-    existing = comments.find_report(pull_request, report, stored_comment_id)
+    existing = find_report(pull_request, report, stored_comment_id)
     if existing and report_run(existing) > (run_id, run_attempt):
         print("A newer run already published this report.", file=sys.stderr)
         return existing["id"]
     if existing:
         comment_id = existing["id"]
         if existing["body"] != body:
-            comments.api(f"issues/comments/{comment_id}", method="PATCH", body=body)
+            api(f"issues/comments/{comment_id}", method="PATCH", body=body)
     else:
-        comment_id = comments.api(
-            f"issues/{pull_request}/comments", method="POST", body=body
-        )["id"]
+        comment_id = api(f"issues/{pull_request}/comments", method="POST", body=body)[
+            "id"
+        ]
     print(f"Published {report} report: {comment_id}")
     return comment_id
 
@@ -198,9 +297,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True, type=int)
     parser.add_argument("--run-attempt", required=True, type=int)
-    parser.add_argument("--report", required=True, choices=comments.REPORTS)
+    parser.add_argument("--report", required=True, choices=REPORTS)
     parser.add_argument("--pull-request", required=True, type=int)
-    parser.add_argument("--comment-id", type=comments.parse_comment_id)
+    parser.add_argument("--comment-id", type=parse_comment_id)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.run_id <= 0 or args.run_attempt <= 0:
