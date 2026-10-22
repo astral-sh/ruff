@@ -118,7 +118,6 @@ jobs:
              --output ../typing_conformance_diagnostics.diff
           )
 
-      # The shared report publisher reads this artifact to post the PR comment.
       - name: Upload diff
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -132,7 +131,7 @@ jobs:
       github.repository == 'astral-sh/ruff' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (needs.typing_conformance.result == 'success' || needs.typing_conformance.result == 'failure')
-    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b
+    uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782
     secrets:
       KV_API_URL: ${{ secrets.KV_API_URL }}
       STS_API_URL: ${{ secrets.STS_API_URL }}
