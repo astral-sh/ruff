@@ -378,6 +378,87 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid(Generic[U]): ...
 ```
 
+### Defaults containing generic callables
+
+A generic callable binds its own type variables, so a class or function can use it as a default
+without declaring those variables again.
+
+```py
+from typing_extensions import Generic, TypeVar
+from ty_extensions._internal import CallableTypeOf
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+F = TypeVar("F", default=CallableTypeOf[identity])
+
+class Holder(Generic[F]): ...  # no diagnostic
+
+# no diagnostic
+def use_default(value: F) -> F:
+    return value
+```
+
+### Defaults containing generic property accessors
+
+A property setter binds its own type variables. A protocol with such a setter is valid as a default
+for a class or function.
+
+```py
+from typing_extensions import Generic, ParamSpec, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> object: ...
+    @value.setter
+    def value(self, value: tuple[T, T]) -> None: ...
+
+F = TypeVar("F", default=HasValue)
+
+class Holder(Generic[F]): ...  # no diagnostic
+
+# no diagnostic
+def use_default(value: F) -> F:
+    return value
+```
+
+The protocol is also valid in a `ParamSpec` default list.
+
+```py
+P = ParamSpec("P", default=[HasValue])
+
+class ParamspecHolder(Generic[P]): ...  # no diagnostic
+```
+
+### Defaults containing captured type variables in properties
+
+A property setter can also capture a type variable from an enclosing function. Here, the setter
+binds `U`, but `T` still belongs to `outer` and is out of scope for the nested function's default.
+
+```py
+from typing_extensions import Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def outer(value: T):
+    class HasValue(Protocol):
+        @property
+        def value(self) -> object: ...
+        @value.setter
+        def value(self, value: tuple[U, T]) -> None: ...
+
+    F = TypeVar("F", default=HasValue)
+
+    # error: [invalid-type-variable-default]
+    def use_default(value: F) -> F:
+        return value
+```
+
 ### Defaults containing bounded type variables
 
 ```toml

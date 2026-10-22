@@ -166,7 +166,7 @@ impl<'db> Type<'db> {
 /// Specializations that the growth analysis proves finite are visited until an exact type repeats.
 /// A search that stops at a growing or unresolved recursive reference can miss occurrences exposed
 /// by later specializations. An incomplete search is never treated as a match.
-fn find_free_typevar<'db, T: Copy>(
+pub(super) fn find_free_typevar<'db, T: Copy>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
