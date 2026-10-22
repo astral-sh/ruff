@@ -21,6 +21,7 @@ name: Iterate Ruff workspace cache
         options:
           - all
           - mtimes
+          - narrow
         default: all
         required: true
       diagnostic:
@@ -59,8 +60,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Prepare cache input helper
-        run: cp .github/actions/cache-input-mtimes/inputs.py "$RUNNER_TEMP/cache-input-mtimes.py"
       - name: Install Rust toolchain
         run: rustup show
       - name: Restore Rust cache
@@ -140,8 +139,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Prepare cache input helper
-        run: cp .github/actions/cache-input-mtimes/inputs.py "$RUNNER_TEMP/cache-input-mtimes.py"
       - name: Install Rust toolchain
         run: rustup show
       - name: Restore Rust cache
@@ -220,29 +217,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Prepare cache input helper
-        run: cp .github/actions/cache-input-mtimes/inputs.py "$RUNNER_TEMP/cache-input-mtimes.py"
       - name: Install Rust toolchain
         run: rustup show
       - name: Restore Rust cache
         id: rust-cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
         with:
-          prefix-key: ruff-iterate-20261022-v2-mtimes
+          prefix-key: ruff-iterate-20261022-v3-mtimes
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: ${{ inputs.phase == 'seed' }}
-          cache-workspace-crates: "true"
-          cache-directories: .rust-cache-inputs
-      - name: Track workspace artifacts
-        uses: astral-sh/github-actions/rust-workspace-cache/prune@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
-        with:
-          workspace: .
-          target-directory: target
-          profile: debug
-          enabled: ${{ inputs.phase == 'seed' && steps.rust-cache.outputs.cache-hit != 'true' }}
-      - name: Restore matching input timestamps
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" restore .rust-cache-inputs/manifest.json
+          restore-build-script-mtimes: "true"
       - name: Require warm cache hit
         if: ${{ inputs.phase == 'warm' }}
         env:
@@ -296,12 +281,9 @@ jobs:
           --document-private-items
         env:
           RUSTDOCFLAGS: -D warnings
-      - name: Record build input timestamps
-        if: ${{ inputs.phase == 'seed' && steps.rust-cache.outputs.cache-hit != 'true' }}
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" save .rust-cache-inputs/manifest.json
   seed-narrow:
     name: Seed Ruff binary cache
-    if: ${{ inputs.phase == 'seed' && inputs.seed_variant == 'all' }}
+    if: ${{ inputs.phase == 'seed' && (inputs.seed_variant == 'all' || inputs.seed_variant == 'narrow') }}
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 20
     env:
@@ -312,41 +294,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Prepare cache input helper
-        run: cp .github/actions/cache-input-mtimes/inputs.py "$RUNNER_TEMP/cache-input-mtimes.py"
       - name: Install Rust toolchain
         run: rustup show
       - name: Install mold
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
         with:
-          prefix-key: ruff-iterate-20261022-v2-narrow
+          prefix-key: ruff-iterate-20261022-v3-narrow
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: ${{ inputs.phase == 'seed' }}
-          cache-workspace-crates: "true"
-          cache-directories: .rust-cache-inputs
-      - name: Track workspace artifacts
-        uses: astral-sh/github-actions/rust-workspace-cache/prune@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
-        with:
-          workspace: .
-          target-directory: target
-          profile: debug
-          enabled: ${{ inputs.phase == 'seed' && steps.rust-cache.outputs.cache-hit != 'true' }}
-      - name: Restore matching input timestamps
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" restore .rust-cache-inputs/manifest.json
+          restore-build-script-mtimes: "true"
       - name: Require warm cache hit
         if: ${{ inputs.phase == 'warm' }}
         env:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: test "$CACHE_HIT" = true
       - name: Build Ruff
-        run: cargo build --locked
-      - name: Record build input timestamps
-        if: ${{ inputs.phase == 'seed' && steps.rust-cache.outputs.cache-hit != 'true' }}
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" save .rust-cache-inputs/manifest.json
+        run: cargo build --bin ruff
   ecosystem-deps:
     name: Ecosystem builds / deps
     runs-on: depot-ubuntu-24.04-8
@@ -360,56 +327,6 @@ jobs:
         with:
           ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
           persist-credentials: false
-      - name: Prepare cache input helper
-        run:
-          "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
-          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
-          import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\n                \"cargo\",\n                \"metadata\",\n                \"--no-deps\",\n      \
-          \          \"--format-version\",\n                \"1\",\n                \"--offline\",\n                \"--locked\"\
-          ,\n            ],\n            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"\
-          ]).parent.relative_to(root))\n        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"\
-          kind\"] for target in package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n \
-          \   ]\n    if not packages:\n        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\"\
-          , \"-z\", \"--\", *packages], cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\\
-          0\") if name})\n\n\ndef safe_path(root, name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\"\
-          \ in relative.parts:\n        raise ValueError(f\"Invalid cached input path: {name}\")\n    path = root / relative\n\
-          \    if not path.resolve().is_relative_to(root):\n        return None\n    return path\n\n\ndef identity(path):\n\
-          \    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n\
-          \    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n        (entry.name,\
-          \ stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n  \
-          \  directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n        if path\
-          \ is None or not path.exists():\n            continue\n        value = identity(path)\n        if value is None:\n\
-          \            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n      \
-          \  for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Give changed tracked files the current timestamp, including edits\n            # made\
-          \ by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n        os.utime(path,\
-          \ ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for name, record\
-          \ in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"directories\"\
-          ].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in previous[\"entries\"\
-          ]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories += 1\n        else:\n\
-          \            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
-          \ subprocess.run(\n        [\n            \"git\",\n            \"update-index\",\n            \"-q\",\n         \
-          \   \"--ignore-submodules\",\n            \"--ignore-missing\",\n            \"--refresh\",\n        ],\n        cwd=root,\n\
-          \        check=True,\n    )\n    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n\
-          \        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
-          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
-          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
-          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
-          \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
-          \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
-          \    else:\n        result = {\"no_manifest\": True}\n    print(\n        json.dumps(\n            result | {\"operation\"\
-          : args.operation, \"seconds\": time.monotonic() - start}\n        )\n    )\n\n\nif __name__ == \"__main__\":\n   \
-          \ main()\nPYCODE\n"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -435,7 +352,9 @@ jobs:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: test "$CACHE_HIT" = true
       - name: Build baseline version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run:
+          "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi\n\
+          mv target/debug/ruff target/debug/ruff-baseline\n"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -443,7 +362,7 @@ jobs:
           persist-credentials: false
           clean: false
       - name: Build comparison version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
   ecosystem-workspace:
@@ -461,56 +380,6 @@ jobs:
         with:
           ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
           persist-credentials: false
-      - name: Prepare cache input helper
-        run:
-          "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
-          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
-          import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\n                \"cargo\",\n                \"metadata\",\n                \"--no-deps\",\n      \
-          \          \"--format-version\",\n                \"1\",\n                \"--offline\",\n                \"--locked\"\
-          ,\n            ],\n            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"\
-          ]).parent.relative_to(root))\n        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"\
-          kind\"] for target in package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n \
-          \   ]\n    if not packages:\n        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\"\
-          , \"-z\", \"--\", *packages], cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\\
-          0\") if name})\n\n\ndef safe_path(root, name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\"\
-          \ in relative.parts:\n        raise ValueError(f\"Invalid cached input path: {name}\")\n    path = root / relative\n\
-          \    if not path.resolve().is_relative_to(root):\n        return None\n    return path\n\n\ndef identity(path):\n\
-          \    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n\
-          \    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n        (entry.name,\
-          \ stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n  \
-          \  directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n        if path\
-          \ is None or not path.exists():\n            continue\n        value = identity(path)\n        if value is None:\n\
-          \            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n      \
-          \  for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Give changed tracked files the current timestamp, including edits\n            # made\
-          \ by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n        os.utime(path,\
-          \ ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for name, record\
-          \ in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"directories\"\
-          ].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in previous[\"entries\"\
-          ]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories += 1\n        else:\n\
-          \            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
-          \ subprocess.run(\n        [\n            \"git\",\n            \"update-index\",\n            \"-q\",\n         \
-          \   \"--ignore-submodules\",\n            \"--ignore-missing\",\n            \"--refresh\",\n        ],\n        cwd=root,\n\
-          \        check=True,\n    )\n    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n\
-          \        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
-          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
-          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
-          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
-          \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
-          \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
-          \    else:\n        result = {\"no_manifest\": True}\n    print(\n        json.dumps(\n            result | {\"operation\"\
-          : args.operation, \"seconds\": time.monotonic() - start}\n        )\n    )\n\n\nif __name__ == \"__main__\":\n   \
-          \ main()\nPYCODE\n"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -535,7 +404,9 @@ jobs:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: test "$CACHE_HIT" = true
       - name: Build baseline version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run:
+          "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi\n\
+          mv target/debug/ruff target/debug/ruff-baseline\n"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -543,7 +414,7 @@ jobs:
           persist-credentials: false
           clean: false
       - name: Build comparison version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
   ecosystem-mtimes:
@@ -561,56 +432,6 @@ jobs:
         with:
           ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
           persist-credentials: false
-      - name: Prepare cache input helper
-        run:
-          "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
-          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
-          import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\n                \"cargo\",\n                \"metadata\",\n                \"--no-deps\",\n      \
-          \          \"--format-version\",\n                \"1\",\n                \"--offline\",\n                \"--locked\"\
-          ,\n            ],\n            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"\
-          ]).parent.relative_to(root))\n        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"\
-          kind\"] for target in package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n \
-          \   ]\n    if not packages:\n        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\"\
-          , \"-z\", \"--\", *packages], cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\\
-          0\") if name})\n\n\ndef safe_path(root, name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\"\
-          \ in relative.parts:\n        raise ValueError(f\"Invalid cached input path: {name}\")\n    path = root / relative\n\
-          \    if not path.resolve().is_relative_to(root):\n        return None\n    return path\n\n\ndef identity(path):\n\
-          \    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n\
-          \    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n        (entry.name,\
-          \ stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n  \
-          \  directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n        if path\
-          \ is None or not path.exists():\n            continue\n        value = identity(path)\n        if value is None:\n\
-          \            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n      \
-          \  for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Give changed tracked files the current timestamp, including edits\n            # made\
-          \ by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n        os.utime(path,\
-          \ ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for name, record\
-          \ in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"directories\"\
-          ].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in previous[\"entries\"\
-          ]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories += 1\n        else:\n\
-          \            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
-          \ subprocess.run(\n        [\n            \"git\",\n            \"update-index\",\n            \"-q\",\n         \
-          \   \"--ignore-submodules\",\n            \"--ignore-missing\",\n            \"--refresh\",\n        ],\n        cwd=root,\n\
-          \        check=True,\n    )\n    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n\
-          \        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
-          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
-          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
-          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
-          \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
-          \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
-          \    else:\n        result = {\"no_manifest\": True}\n    print(\n        json.dumps(\n            result | {\"operation\"\
-          : args.operation, \"seconds\": time.monotonic() - start}\n        )\n    )\n\n\nif __name__ == \"__main__\":\n   \
-          \ main()\nPYCODE\n"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -623,30 +444,22 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
         with:
-          prefix-key: ruff-iterate-20261022-v2-mtimes
+          prefix-key: ruff-iterate-20261022-v3-mtimes
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: "false"
-          cache-workspace-crates: "true"
-          cache-directories: .rust-cache-inputs
-      - name: Track workspace artifacts
-        uses: astral-sh/github-actions/rust-workspace-cache/prune@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
-        with:
-          workspace: .
-          target-directory: target
-          profile: debug
-          enabled: "false"
-      - name: Restore matching input timestamps
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" restore .rust-cache-inputs/manifest.json
+          restore-build-script-mtimes: "true"
       - name: Require warm cache hit
         if: ${{ inputs.phase == 'warm' }}
         env:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: test "$CACHE_HIT" = true
       - name: Build baseline version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run:
+          "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi\n\
+          mv target/debug/ruff target/debug/ruff-baseline\n"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -654,7 +467,7 @@ jobs:
           persist-credentials: false
           clean: false
       - name: Build comparison version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
   ecosystem-narrow:
@@ -672,56 +485,6 @@ jobs:
         with:
           ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
           persist-credentials: false
-      - name: Prepare cache input helper
-        run:
-          "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
-          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
-          import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\n                \"cargo\",\n                \"metadata\",\n                \"--no-deps\",\n      \
-          \          \"--format-version\",\n                \"1\",\n                \"--offline\",\n                \"--locked\"\
-          ,\n            ],\n            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"\
-          ]).parent.relative_to(root))\n        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"\
-          kind\"] for target in package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n \
-          \   ]\n    if not packages:\n        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\"\
-          , \"-z\", \"--\", *packages], cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\\
-          0\") if name})\n\n\ndef safe_path(root, name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\"\
-          \ in relative.parts:\n        raise ValueError(f\"Invalid cached input path: {name}\")\n    path = root / relative\n\
-          \    if not path.resolve().is_relative_to(root):\n        return None\n    return path\n\n\ndef identity(path):\n\
-          \    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n\
-          \    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n        (entry.name,\
-          \ stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n  \
-          \  directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n        if path\
-          \ is None or not path.exists():\n            continue\n        value = identity(path)\n        if value is None:\n\
-          \            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n      \
-          \  for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Give changed tracked files the current timestamp, including edits\n            # made\
-          \ by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n        os.utime(path,\
-          \ ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for name, record\
-          \ in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"directories\"\
-          ].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in previous[\"entries\"\
-          ]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories += 1\n        else:\n\
-          \            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
-          \ subprocess.run(\n        [\n            \"git\",\n            \"update-index\",\n            \"-q\",\n         \
-          \   \"--ignore-submodules\",\n            \"--ignore-missing\",\n            \"--refresh\",\n        ],\n        cwd=root,\n\
-          \        check=True,\n    )\n    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n\
-          \        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
-          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
-          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
-          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
-          \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
-          \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
-          \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
-          \    else:\n        result = {\"no_manifest\": True}\n    print(\n        json.dumps(\n            result | {\"operation\"\
-          : args.operation, \"seconds\": time.monotonic() - start}\n        )\n    )\n\n\nif __name__ == \"__main__\":\n   \
-          \ main()\nPYCODE\n"
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -734,30 +497,22 @@ jobs:
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444
       - name: Restore Rust cache
         id: rust-cache
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        uses: astral-sh/github-actions/rust-workspace-cache@5c45c6106379096e20a13a600c26fd8947a021cc
         with:
-          prefix-key: ruff-iterate-20261022-v2-narrow
+          prefix-key: ruff-iterate-20261022-v3-narrow
           key: ruff-linux-debug
           add-job-id-key: "false"
           save-if: "false"
-          cache-workspace-crates: "true"
-          cache-directories: .rust-cache-inputs
-      - name: Track workspace artifacts
-        uses: astral-sh/github-actions/rust-workspace-cache/prune@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
-        with:
-          workspace: .
-          target-directory: target
-          profile: debug
-          enabled: "false"
-      - name: Restore matching input timestamps
-        run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" restore .rust-cache-inputs/manifest.json
+          restore-build-script-mtimes: "true"
       - name: Require warm cache hit
         if: ${{ inputs.phase == 'warm' }}
         env:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: test "$CACHE_HIT" = true
       - name: Build baseline version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run:
+          "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi\n\
+          mv target/debug/ruff target/debug/ruff-baseline\n"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -765,6 +520,6 @@ jobs:
           persist-credentials: false
           clean: false
       - name: Build comparison version
-        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --locked -vv\nelse\n  cargo build --locked\nfi"
+        run: "if [ \"$CACHE_DIAGNOSTIC\" = true ]; then\n  cargo build --bin ruff -vv\nelse\n  cargo build --bin ruff\nfi"
         env:
           CACHE_DIAGNOSTIC: ${{ inputs.diagnostic }}
