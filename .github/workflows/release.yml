@@ -170,7 +170,7 @@ jobs:
       - release-gate
       - custom-build-binaries
     if: ${{ always() && github.repository == 'astral-sh/ruff' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.plan.result == 'success' && needs.custom-build-binaries.result == 'success' && needs.release-gate.result == 'success' }}
-    uses: ./.github/workflows/sign-release-binaries.yml
+    uses: $/.github/workflows/sign-release-binaries.yml
     secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       contents: read
