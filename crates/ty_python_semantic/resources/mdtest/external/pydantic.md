@@ -1882,7 +1882,7 @@ class Parent(BaseModel):
 class Child(Parent):
     params: ClassVar[int] = 1  # error: [invalid-attribute-override]
 
-reveal_type(Child.__init__)  # revealed: (self: Child, *, name: LaxStr, **extra: Any) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, *, name: LaxStr, **extra: Any) -> None
 Child(name="child")  # ok
 Child()  # error: [missing-argument] "No argument provided for required parameter `name`"
 ```
@@ -1893,7 +1893,7 @@ The field stays excluded in subclasses, including their synthesized `__replace__
 class Grandchild(Child):
     pass
 
-reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, *, name: LaxStr, **extra: Any) -> None
+reveal_type(Grandchild.__init__)  # revealed: (self: Grandchild, /, *, name: LaxStr, **extra: Any) -> None
 reveal_type(Grandchild.__replace__)  # revealed: (self: Grandchild, *, name: str = ...) -> Grandchild
 Grandchild(name="grandchild")  # ok
 ```
@@ -1904,7 +1904,7 @@ A `ClassVar` declaration without a value also excludes the inherited field.
 class AnnotationOnly(Parent):
     params: ClassVar[int]  # error: [invalid-attribute-override]
 
-reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, *, name: LaxStr, **extra: Any) -> None
+reveal_type(AnnotationOnly.__init__)  # revealed: (self: AnnotationOnly, /, *, name: LaxStr, **extra: Any) -> None
 AnnotationOnly(name="child")  # ok
 ```
 
@@ -1922,7 +1922,7 @@ class Parent:
 class Child(BaseModel, Parent):
     params: ClassVar[int] = 1  # error: [invalid-attribute-override]
 
-reveal_type(Child.__init__)  # revealed: (self: Child, **extra: Any) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, /, **extra: Any) -> None
 child = Child()  # ok
 reveal_type(child.params)  # revealed: int
 ```
@@ -1936,7 +1936,7 @@ class Mixin(Parent):
 class Model(BaseModel, Mixin):
     pass
 
-reveal_type(Model.__init__)  # revealed: (self: Model, **extra: Any) -> None
+reveal_type(Model.__init__)  # revealed: (self: Model, /, **extra: Any) -> None
 Model()  # ok
 ```
 
