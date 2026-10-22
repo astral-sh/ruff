@@ -35,6 +35,8 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
       # Keep in sync with the job's timeout-minutes.
       FUZZ_JOB_TIMEOUT_MINUTES: 20
     permissions:
@@ -58,7 +60,7 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
