@@ -61,9 +61,6 @@ jobs:
         revision: [base, pr]
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
     timeout-minutes: 5
-    env:
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
-      RUSTC_BOOTSTRAP: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,12 +76,13 @@ jobs:
           gh auth setup-git
           git fetch --no-tags --filter=blob:none --unshallow origin
 
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          lookup-only: false
+          save-if: false
+
       - name: Install Rust toolchain
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
-        with:
-          profile: profiling
-          save-if: false
 
       - name: "Install mold"
         uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
