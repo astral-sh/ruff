@@ -1,6 +1,9 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = []
+#
+# [tool.ty.environment]
+# root = ["."]
 # ///
 """Publish report artifacts without executing code from the producing workflow."""
 
@@ -47,7 +50,7 @@ def find_artifact(run_id: int, name: str) -> dict | None:
             break
         page += 1
     # A rerun can leave artifacts from multiple attempts under the same name.
-    return max(matches, key=lambda artifact: artifact["id"], default=None)
+    return max(matches, key=lambda artifact: artifact["id"]) if matches else None
 
 
 def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:

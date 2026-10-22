@@ -1,6 +1,9 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = []
+#
+# [tool.ty.environment]
+# root = [".."]
 # ///
 """Exercise report lookup using only IDs from the key-value store."""
 

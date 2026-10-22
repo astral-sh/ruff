@@ -1,6 +1,9 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = []
+#
+# [tool.ty.environment]
+# root = [".."]
 # ///
 from __future__ import annotations
 
@@ -12,6 +15,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -28,7 +32,7 @@ def archive(members):
 
 class PublisherScenarios(unittest.TestCase):
     def setUp(self):
-        self.run = {
+        self.workflow_run: dict[str, Any] = {
             "id": 100,
             "run_attempt": 2,
             "head_sha": "a" * 40,
@@ -40,7 +44,7 @@ class PublisherScenarios(unittest.TestCase):
             "path": ".github/workflows/ci.yaml",
             "head_branch": "feature",
         }
-        self.pull = {
+        self.pull: dict[str, Any] = {
             "number": 42,
             "state": "open",
             "base": {"repo": {"id": publisher.comments.REPOSITORY_ID}},
@@ -108,45 +112,51 @@ class PublisherScenarios(unittest.TestCase):
             )
 
     def failed_source_can_publish(self):
-        with patch.object(publisher.comments, "api", side_effect=[self.run, self.pull]):
+        with patch.object(
+            publisher.comments, "api", side_effect=[self.workflow_run, self.pull]
+        ):
             self.assertEqual(
                 publisher.current_run(100, 2, "ruff-ecosystem", 42),
-                (self.run, self.pull),
+                (self.workflow_run, self.pull),
             )
 
     def new_attempt_invalidates_old_completion(self):
-        with patch.object(publisher.comments, "api", return_value=self.run):
+        with patch.object(publisher.comments, "api", return_value=self.workflow_run):
             self.assertIsNone(publisher.current_run(100, 1, "ruff-ecosystem", 42))
 
     def can_publish_while_other_ci_jobs_run(self):
-        self.run["status"] = "in_progress"
-        with patch.object(publisher.comments, "api", side_effect=[self.run, self.pull]):
+        self.workflow_run["status"] = "in_progress"
+        with patch.object(
+            publisher.comments, "api", side_effect=[self.workflow_run, self.pull]
+        ):
             self.assertIsNotNone(publisher.current_run(100, 2, "ruff-ecosystem", 42))
 
     def rejects_fork_source(self):
-        self.run["head_repository"]["id"] = 99
+        self.workflow_run["head_repository"]["id"] = 99
         with (
-            patch.object(publisher.comments, "api", return_value=self.run),
+            patch.object(publisher.comments, "api", return_value=self.workflow_run),
             self.assertRaises(ValueError),
         ):
             publisher.current_run(100, 2, "ruff-ecosystem", 42)
 
     def rejects_wrong_producer(self):
-        self.run["path"] = ".github/workflows/other.yaml"
+        self.workflow_run["path"] = ".github/workflows/other.yaml"
         with (
-            patch.object(publisher.comments, "api", return_value=self.run),
+            patch.object(publisher.comments, "api", return_value=self.workflow_run),
             self.assertRaises(ValueError),
         ):
             publisher.current_run(100, 2, "ruff-ecosystem", 42)
 
     def rejects_stale_pr_head(self):
         self.pull["head"]["sha"] = "b" * 40
-        with patch.object(publisher.comments, "api", side_effect=[self.run, self.pull]):
+        with patch.object(
+            publisher.comments, "api", side_effect=[self.workflow_run, self.pull]
+        ):
             self.assertIsNone(publisher.current_run(100, 2, "ruff-ecosystem", 42))
 
     def render_keeps_metadata_and_truncation_link(self):
         body = publisher.render_report(
-            "ruff-ecosystem", "x" * 70000, self.run, self.artifact
+            "ruff-ecosystem", "x" * 70000, self.workflow_run, self.artifact
         )
         self.assertLess(len(body), 65536)
         self.assertTrue(
@@ -165,7 +175,7 @@ class PublisherScenarios(unittest.TestCase):
                     publisher,
                     "current_run",
                     side_effect=sources,
-                    return_value=(self.run, {"number": 42}),
+                    return_value=(self.workflow_run, {"number": 42}),
                 )
             )
             stack.enter_context(
@@ -203,7 +213,7 @@ class PublisherScenarios(unittest.TestCase):
         existing = {
             "id": 5,
             "body": publisher.render_report(
-                "ruff-ecosystem", "result", self.run, self.artifact
+                "ruff-ecosystem", "result", self.workflow_run, self.artifact
             ),
         }
         api, comment_id = self.publishing(existing=existing)
@@ -218,13 +228,18 @@ class PublisherScenarios(unittest.TestCase):
         self.assertEqual(comment_id, 5)
 
     def changed_head_after_download_prevents_writes(self):
-        api, comment_id = self.publishing(sources=[(self.run, {"number": 42}), None])
+        api, comment_id = self.publishing(
+            sources=[(self.workflow_run, {"number": 42}), None]
+        )
         api.assert_not_called()
         self.assertIsNone(comment_id)
 
     def changed_pr_after_download_prevents_writes(self):
         api, comment_id = self.publishing(
-            sources=[(self.run, {"number": 42}), (self.run, {"number": 43})]
+            sources=[
+                (self.workflow_run, {"number": 42}),
+                (self.workflow_run, {"number": 43}),
+            ]
         )
         api.assert_not_called()
         self.assertIsNone(comment_id)
@@ -302,7 +317,7 @@ class PublisherScenarios(unittest.TestCase):
         body = publisher.render_report(
             "ty-ecosystem",
             "x" * 70000,
-            self.run,
+            self.workflow_run,
             self.artifact,
             full_report={"id": 300},
         )
@@ -317,7 +332,7 @@ class PublisherScenarios(unittest.TestCase):
                     patch.object(
                         publisher,
                         "current_run",
-                        return_value=(self.run, {"number": 42}),
+                        return_value=(self.workflow_run, {"number": 42}),
                     )
                 )
                 find = stack.enter_context(
