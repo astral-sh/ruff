@@ -26,6 +26,10 @@ paths:
       # `actionlint` does not yet recognize GitHub's `$/` syntax.
       # https://github.com/rhysd/actionlint/issues/711
       - '^reusable workflow call "\$/\.github/workflows/[^"/]+\.yml" at "uses" is not following the format '
+  ".github/workflows/publish-playground.yml":
+    ignore:
+      # actionlint doesn't yet support GitHub's $/ self-repository syntax.
+      - '^reusable workflow call "\$/\.github/workflows/build-playground\.yml" at "uses" is not following the format '
   ".github/workflows/pull-request-reviewers.yml":
     ignore:
       # actionlint doesn't yet support concurrency queues. The schema hook validates them.

@@ -163,6 +163,13 @@ jobs:
     permissions:
       "contents": "read"
 
+  build-playground:
+    needs: plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    uses: $/.github/workflows/build-playground.yml
+    permissions:
+      contents: read
+
   # Signing is a manually maintained stage between binary builds and cargo-dist manifests.
   sign-release-binaries:
     needs:
@@ -527,9 +534,11 @@ jobs:
     needs:
       - plan
       - announce
+      - build-playground
     uses: $/.github/workflows/publish-playground.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
+      artifact-id: ${{ needs.build-playground.outputs.artifact-id }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"
