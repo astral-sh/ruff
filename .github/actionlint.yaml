@@ -21,6 +21,10 @@ self-hosted-runner:
     - codspeed-macro
 
 paths:
+  ".github/workflows/pull-request-reviewers.yml":
+    ignore:
+      # actionlint doesn't yet support concurrency queues. The schema hook validates them.
+      - '^unexpected key "queue" for "concurrency" section\.'
   ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
     ignore:
       # actionlint doesn't yet support the cache-mode feature.
