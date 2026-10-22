@@ -29,7 +29,8 @@ use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarScope,
+    TypeVarScopeKind, TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -59,6 +60,30 @@ pub(crate) fn enclosing_generic_contexts<'db>(
     index
         .ancestor_scopes(scope)
         .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
+}
+
+/// Returns a [`TypeVarScope`] that can be used to resolve any typevars that appear lexically in
+/// the given scope. This is called when resolving typevars that appear in the body of a generic
+/// class or function, so all generic contexts in the scope are considered non-inferable.
+#[expect(dead_code, reason = "XXX")]
+pub(crate) fn enclosing_typevar_scope<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> Option<TypeVarScope<'db>> {
+    let scope = index.scope(scope);
+    let parent_typevar_scope = scope
+        .parent()
+        .and_then(|parent| enclosing_typevar_scope(db, index, parent));
+    let Some(generic_context) = GenericContext::lexical_of_node(db, scope.node(), index) else {
+        return parent_typevar_scope;
+    };
+    Some(TypeVarScope::new(
+        db,
+        TypeVarScopeKind::NonInferable,
+        generic_context,
+        parent_typevar_scope,
+    ))
 }
 
 /// Returns the binding contexts introduced by the given scope or any enclosing scope.
