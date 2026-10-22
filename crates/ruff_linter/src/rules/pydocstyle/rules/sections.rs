@@ -2293,3 +2293,37 @@ fn check_section_order<P: PartialOrd>(
         max_order = Some((position, context.section_name()));
     }
 }
+
+/// D422
+#[derive(ViolationMetadata)]
+#[violation_metadata(category = Category::Pedantic)]
+pub(crate) struct DuplicateSection {
+    name: String,
+}
+
+impl Violation for DuplicateSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DuplicateSection { name } = self;
+        format!("Duplicate section name (\"{name}\")")
+    }
+}
+
+fn check_duplicate_sections(checker: &Checker, section_contexts: &SectionContexts) {
+    if !checker.is_rule_enabled(Rule::DuplicateSection) {
+        return;
+    }
+
+    let mut seen: FxHashSet<&str> = FxHashSet::default();
+    for context in section_contexts {
+        let name = context.section_name();
+        if !seen.insert(name) {
+            checker.report_diagnostic(
+                DuplicateSection {
+                    name: name.to_string(),
+                },
+                context.section_name_range(),
+            );
+        }
+    }
+}
