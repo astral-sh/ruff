@@ -32,13 +32,35 @@ MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
 MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_HTML_REPORT_BYTES = 128 * 1024 * 1024
-HTML_REPORT_FILES = {
-    "ty-ecosystem": {
-        "diff.html": "text/html; charset=utf-8",
-        "timing.html": "text/html; charset=utf-8",
-        "diff.json": "application/json",
-    },
-}
+
+
+def read_html_files(value: str) -> dict[str, tuple[str, str]]:
+    files = json.loads(value)
+    if not isinstance(files, dict):
+        raise TypeError("HTML files must be a JSON object keyed by filename.")
+    result = {}
+    for filename, metadata in files.items():
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", filename):
+            raise ValueError(
+                "HTML filenames must be plain filenames without directories."
+            )
+        if not isinstance(metadata, dict) or metadata.keys() - {
+            "content-type",
+            "label",
+        }:
+            raise ValueError("HTML files accept a content-type and an optional label.")
+        content_type = metadata.get("content-type", "")
+        label = metadata.get("label", "")
+        if not isinstance(content_type, str) or not re.fullmatch(
+            r"[A-Za-z0-9.+-]+/[A-Za-z0-9.+-]+(?:; charset=utf-8)?", content_type
+        ):
+            raise ValueError("Invalid HTML report content type.")
+        if not isinstance(label, str) or not re.fullmatch(r"[^\r\n]{0,100}", label):
+            raise ValueError(
+                "HTML report labels must be at most 100 characters on one line."
+            )
+        result[filename] = (content_type, label)
+    return result
 
 
 def report_marker(report: str) -> str:
@@ -164,24 +186,28 @@ def read_report(
 
 
 def upload_html_report(
-    report: str,
+    files: dict[str, tuple[str, str]],
     artifact: dict,
-    run: dict,
-    pull_request: int,
     *,
+    prefix: str,
     bucket: str,
     base_url: str,
 ) -> str:
-    if report not in HTML_REPORT_FILES or not base_url:
-        raise ValueError("HTML report hosting is not configured for this report.")
+    if not files or not base_url:
+        raise ValueError(
+            "HTML report files and their public base URL must be configured."
+        )
     archive = download_artifact(artifact, max_bytes=MAX_HTML_ARCHIVE_BYTES)
-    reports = {
-        filename: read_report(
+    reports = {}
+    total_bytes = 0
+    for filename in files:
+        contents = read_report(
             archive, filename, max_bytes=MAX_HTML_REPORT_BYTES
         ).encode()
-        for filename in HTML_REPORT_FILES[report]
-    }
-    prefix = f"ruff/{pull_request}/{report}/{run['id']}/{run['run_attempt']}"
+        total_bytes += len(contents)
+        if total_bytes > MAX_HTML_REPORT_BYTES:
+            raise ValueError("The uncompressed HTML report exceeds the size limit.")
+        reports[filename] = contents
     for filename, contents in reports.items():
         subprocess.run(
             [
@@ -191,7 +217,7 @@ def upload_html_report(
                 "-",
                 f"s3://{bucket}/{prefix}/{filename}",
                 "--content-type",
-                HTML_REPORT_FILES[report][filename],
+                files[filename][0],
                 "--cache-control",
                 "public, max-age=3600",
                 "--only-show-errors",
@@ -212,6 +238,7 @@ def render_report(
     title: str = "",
     full_report: dict | None = None,
     full_report_url: str = "",
+    html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
     if len(contents) > MAX_REPORT_CHARACTERS:
         artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
@@ -222,11 +249,15 @@ def render_report(
     if title:
         contents = f"## {title}\n\n{contents}"
     if full_report_url:
-        contents = (
-            f"{contents.rstrip()}\n\n"
-            f"**[Full report with detailed diff]({full_report_url}/diff.html)** "
-            f"([timing results]({full_report_url}/timing.html))"
-        )
+        links = []
+        for filename, (_, label) in (html_files or {}).items():
+            if label:
+                label = (
+                    label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+                )
+                links.append(f"[{label}]({full_report_url}/{filename})")
+        if links:
+            contents = f"{contents.rstrip()}\n\n" + " · ".join(links)
     if full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
@@ -295,6 +326,7 @@ def publish(
     full_report_artifact: str = "",
     html_bucket: str = "",
     html_base_url: str = "",
+    html_files: dict[str, tuple[str, str]] | None = None,
     stored_comment_id: int | None = None,
     dry_run: bool = False,
 ) -> int | None:
@@ -314,10 +346,9 @@ def publish(
     if full_report is not None and html_bucket and not dry_run:
         try:
             full_report_url = upload_html_report(
-                report,
+                html_files or {},
                 full_report,
-                run,
-                pull_request,
+                prefix=f"ruff/pull-requests/{pull_request}/{report}/{run_id}/{run_attempt}",
                 bucket=html_bucket,
                 base_url=html_base_url,
             )
@@ -332,6 +363,7 @@ def publish(
         title=title,
         full_report=full_report,
         full_report_url=full_report_url,
+        html_files=html_files,
     )
     if dry_run:
         print(body, end="")
@@ -369,6 +401,7 @@ def main() -> None:
     parser.add_argument("--full-report-artifact", default="")
     parser.add_argument("--html-bucket", default="")
     parser.add_argument("--html-base-url", default="")
+    parser.add_argument("--html-files", type=read_html_files, default="{}")
     parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -388,6 +421,7 @@ def main() -> None:
         full_report_artifact=args.full_report_artifact,
         html_bucket=args.html_bucket,
         html_base_url=args.html_base_url,
+        html_files=args.html_files,
         stored_comment_id=args.comment_id,
         dry_run=args.dry_run,
     )

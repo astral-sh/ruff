@@ -337,3 +337,9 @@ jobs:
       filename: comment.md
       full-report-artifact: full-report
       upload-html: true
+      html-files: |
+        {
+          "diff.html": {"content-type": "text/html; charset=utf-8", "label": "Full report with detailed diff"},
+          "timing.html": {"content-type": "text/html; charset=utf-8", "label": "Timing results"},
+          "diff.json": {"content-type": "application/json"}
+        }
