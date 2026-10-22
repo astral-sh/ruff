@@ -336,3 +336,6 @@ jobs:
       id-token: write
     with:
       report: ty-ecosystem
+      artifact: comment.md
+      filename: comment.md
+      full-report-artifact: full-report
