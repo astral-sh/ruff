@@ -168,10 +168,6 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
         self.env
     }
 
-    fn should_visit_lazy_type_attributes(&self) -> bool {
-        false
-    }
-
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if !self.satisfied.get() {
             return;
