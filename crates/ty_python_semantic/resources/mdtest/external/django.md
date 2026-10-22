@@ -28,9 +28,6 @@ class Book(models.Model):
 Create an instance of this model:
 
 ```py
-# TODO: Synthesize a realistic constructor signature
-reveal_type(Book.__init__)  # revealed: def __init__(self, *args: Any, **kwargs: Any) -> None
-
 book = Book(
     title="The Hitchhiker's Guide to the Galaxy",
     published=date(1979, 10, 12),
@@ -56,8 +53,39 @@ book.pages = 208
 
 book.pages = models.F("pages") + 1
 
-book.title = 123  # error: [invalid-assignment]
+book.published = 123  # error: [invalid-assignment]
 book.pages = None  # error: [invalid-assignment]
+```
+
+Fields can be omitted during construction (and assigned before saving), so this is also fine:
+
+```py
+Book(
+    title="The Hitchhiker's Guide to the Galaxy",
+    pages=180,
+)
+```
+
+Invalid field types lead to a type error:
+
+```py
+# TODO: Reject the invalid type for `published`.
+Book(
+    title="The Hitchhiker's Guide to the Galaxy",
+    published=123,
+    pages=180,
+)
+```
+
+Unrecognized keyword arguments also lead to an error:
+
+```py
+# TODO: Reject the unknown keyword `publised`.
+Book(
+    title="The Hitchhiker's Guide to the Galaxy",
+    publised=date(1979, 10, 12),
+    pages=180,
+)
 ```
 
 ## Nullable fields
