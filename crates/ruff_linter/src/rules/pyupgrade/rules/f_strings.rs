@@ -305,14 +305,6 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
-                    for part in &field.parts {
-                        if let FieldNamePart::Attribute(name) = part
-                            && !is_identifier(name)
-                        {
-                            return Err(anyhow::anyhow!("non-identifier attribute"));
-                        }
-                    }
-
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
                         FieldType::Auto => IndexOrKeyword::Index(summary.arg_auto()),
@@ -357,6 +349,9 @@ impl FStringConversion {
                     for part in field.parts {
                         match part {
                             FieldNamePart::Attribute(name) => {
+                                if !is_identifier(&name) {
+                                    return Err(anyhow::anyhow!("non-identifier attribute"));
+                                }
                                 converted.push('.');
                                 converted.push_str(&name);
                             }
@@ -433,7 +428,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     }
 
     // `"{} {1}".format(a, b)` raises `ValueError`, but the equivalent f-string would succeed.
-    if !(summary.autos.is_empty() || summary.indices.is_empty()) {
+    if !summary.autos.is_empty() && !summary.indices.is_empty() {
         return;
     }
 

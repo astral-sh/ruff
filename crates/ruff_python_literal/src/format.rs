@@ -477,15 +477,6 @@ pub enum FieldNamePart {
     StringIndex(String),
 }
 
-/// Python only treats an all-digit field name or element index as an integer, so `"{+0}"` is the
-/// keyword `+0`, not index 0. `usize::from_str` accepts a leading `+`, hence the explicit check.
-fn parse_index(text: &str) -> Option<usize> {
-    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
-        return None;
-    }
-    text.parse().ok()
-}
-
 impl FieldNamePart {
     fn parse_part(
         chars: &mut impl PeekingNext<Item = char>,
@@ -743,6 +734,18 @@ impl<'a> FromTemplate<'a> for FormatString {
     fn from_raw_str(text: &'a str) -> Result<Self, Self::Err> {
         FormatString::parse(text, true)
     }
+}
+
+/// Python only treats an all-digit field name or element index as an integer, so `"{+0}"` is the
+/// keyword `+0`, not index 0. `usize::from_str` accepts a leading `+`, hence the explicit check.
+///
+/// See the `arg_name` and `element_index` productions in the
+/// [format string syntax](https://docs.python.org/3/library/string.html#format-string-syntax).
+fn parse_index(text: &str) -> Option<usize> {
+    if text.is_empty() || !text.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    text.parse().ok()
 }
 
 #[cfg(test)]
