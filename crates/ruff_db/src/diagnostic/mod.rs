@@ -1103,6 +1103,9 @@ pub enum DiagnosticId {
     /// Use of an invalid command-line option.
     InvalidCliOption,
 
+    /// The configured diagnostic baseline is invalid.
+    InvalidBaseline,
+
     /// Experimental feature requires preview mode.
     PreviewFeature,
 
@@ -1161,6 +1164,7 @@ impl DiagnosticId {
             DiagnosticId::UnsupportedPythonVersion => "unsupported-python-version",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::InvalidBaseline => "invalid-baseline",
             DiagnosticId::PreviewFeature => "preview-feature",
             DiagnosticId::InternalError => "internal-error",
         }

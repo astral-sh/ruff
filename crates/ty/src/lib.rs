@@ -132,6 +132,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
         MainLoopMode::Fix(FixMode::AddIgnore)
+    } else if args.update_baseline {
+        MainLoopMode::UpdateBaseline
     } else {
         MainLoopMode::Check
     };
@@ -175,6 +177,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+
+    if matches!(mode, MainLoopMode::UpdateBaseline) && project.settings(&db).baseline().is_none() {
+        return Err(anyhow!(
+            "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+        ));
+    }
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
@@ -416,7 +424,9 @@ impl MainLoop {
                     }
 
                     let mut result = result;
-                    retain_visible_diagnostics(&mut result);
+                    if !matches!(self.mode, MainLoopMode::UpdateBaseline) {
+                        retain_visible_diagnostics(&mut result);
+                    }
 
                     let result = match self.mode {
                         MainLoopMode::Check => {
@@ -476,6 +486,28 @@ impl MainLoop {
                             } else {
                                 Err(Canceled)
                             }
+                        }
+                        MainLoopMode::UpdateBaseline => {
+                            let settings = db.project().settings(db);
+                            let Some(baseline_path) = settings.baseline() else {
+                                return Err(anyhow!(
+                                    "`--update-baseline` requires a baseline path from `--baseline` or configuration"
+                                ));
+                            };
+                            let result = ty_project::baseline::write(db, baseline_path, result)?;
+                            if !result.diagnostics.is_empty() {
+                                self.write_diagnostics(db, &result.diagnostics, None)?;
+                            }
+
+                            if settings.terminal().output_format.is_human_readable() {
+                                let count = result.count;
+                                writeln!(
+                                    self.printer.stream_for_requested_summary(),
+                                    "Updated baseline `{baseline_path}` with {count} diagnostic{}.",
+                                    if count == 1 { "" } else { "s" }
+                                )?;
+                            }
+                            Ok(result.diagnostics)
                         }
                     };
 
@@ -677,6 +709,7 @@ impl MainLoop {
 enum MainLoopMode {
     Check,
     Fix(FixMode),
+    UpdateBaseline,
 }
 
 #[derive(Copy, Clone, Debug)]

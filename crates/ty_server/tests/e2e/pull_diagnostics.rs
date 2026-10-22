@@ -44,6 +44,56 @@ def foo() -> str:
 }
 
 #[test]
+fn baselined_diagnostic_is_a_hint_and_refreshes() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let baseline_path = SystemPath::new("src/baselines/ty.json");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+    let baseline = r#"{
+        "version": 0,
+        "files": {
+            "foo.py": [{
+                "rule": "invalid-return-type",
+                "precedingHash": "41b4ab2dc0fd3c0697a4f3c3c8e4a048",
+                "followingHash": "7d090b0c134202a4dc847ca723b9a012"
+            }]
+        }
+    }"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            "src/ty.toml",
+            "\
+baseline = 'baselines/ty.json'
+",
+        )?
+        .with_file(baseline_path, baseline)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    insta::assert_debug_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @r#""1:11..1:13[HINT]: Return type does not match returned value: expected `str`, found `Literal[42]`\n\ninfo: Suppressed by baseline `baselines/ty.json`""#);
+
+    server.write_file(
+        baseline_path,
+        r#"{
+            "version": 0,
+            "files": {}
+        }"#,
+    )?;
+    server.did_change_watched_file(baseline_path, FileChangeType::Changed);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    insta::assert_debug_snapshot!(condensed_document_diagnostic_snapshot(diagnostics), @r#""1:11..1:13[ERROR]: Return type does not match returned value: expected `str`, found `Literal[42]`""#);
+    Ok(())
+}
+
+#[test]
 fn unused_binding_has_unnecessary_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 

@@ -320,3 +320,102 @@ fn fix_clean_file() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// `--fix` respects the baseline so users can fix new diagnostics without also modifying code
+/// for existing ones. Users can apply all available fixes by running without a baseline.
+#[test]
+fn fix_skips_baselined_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r"
+            [tool.ty]
+            baseline = 'baseline.json'
+            ",
+        ),
+        (
+            "unused_ignore.py",
+            r"
+            x = 1  # ty: ignore[unresolved-reference]
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment", "--update-baseline"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 1 diagnostic.
+
+    ----- stderr -----
+    ");
+
+    case.write_file(
+        "unused_ignore.py",
+        r"
+        x = 1  # ty: ignore[unresolved-reference]
+        y = 2  # ty: ignore[unresolved-reference]
+        ",
+    )?;
+    assert_cmd_snapshot!(case.command().args(["--warn", "unused-ignore-comment", "--fix"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Found 1 diagnostic (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(case.root().join("unused_ignore.py"))?, @"
+    x = 1  # ty: ignore[unresolved-reference]
+    y = 2
+    ");
+    Ok(())
+}
+
+#[test]
+fn add_ignore_skips_baselined_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r"
+            [tool.ty]
+            baseline = 'baseline.json'
+            ",
+        ),
+        (
+            "errors.py",
+            r"
+            x: int = 'wrong'
+            ",
+        ),
+    ])?;
+    assert_cmd_snapshot!(case.command().arg("--update-baseline"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 1 diagnostic.
+
+    ----- stderr -----
+    ");
+
+    case.write_file(
+        "errors.py",
+        r"
+        x: int = 'wrong'
+        print(missing)
+        ",
+    )?;
+    assert_cmd_snapshot!(case.command().arg("--add-ignore"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 1 ignore comment
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(case.root().join("errors.py"))?, @r#"
+    x: int = 'wrong'
+    print(missing)  # ty: ignore[unresolved-reference]
+    "#);
+    Ok(())
+}

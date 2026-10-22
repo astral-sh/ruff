@@ -363,6 +363,9 @@ enum FixMode {
 
 impl FixMode {
     fn is_fixable(self, diagnostic: &Diagnostic) -> bool {
+        // The baseline demotes matching lint diagnostics to hints. Rechecking a file after an edit
+        // can return those hints again, so skip them here to keep `--fix` and `--add-ignore` from
+        // editing code for diagnostics the baseline already suppresses.
         if diagnostic.severity() == Severity::Hint && diagnostic.id().is_lint() {
             return false;
         }
