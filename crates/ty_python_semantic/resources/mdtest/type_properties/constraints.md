@@ -1579,6 +1579,49 @@ def upper_bounded_noninferable[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Type variables in union upper bounds
+
+An upper bound on a caller-fixed variable can provide evidence for an inferable variable inside the
+bound. From `U ≤ T | int`, we infer `U & ~int ≤ T`: `T` only needs to accept the portion of `U` that
+the concrete `int` arm does not cover. The solution preserves `U` symbolically without binding it.
+
+```py
+from typing import Any
+from ty_extensions._internal import ConstraintSet
+
+def union_upper[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int) & ConstraintSet.lower_bound(str, T)
+    # revealed: tuple[Solution[T=(U@union_upper & ~int) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+Every other union arm contributes to the residual, even when there is no separate lower-bound
+evidence for `T`.
+
+```py
+def several_arms[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int | bytes)
+    # revealed: tuple[Solution[T=U@several_arms & ~int & ~bytes]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
+```
+
+We reject the constraint when the remaining portion of `U` cannot satisfy `T`'s declared bound.
+
+```py
+def uncovered[T: str, U: int | bytes]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | int)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+```
+
+Moving an arm across the relation by negating it requires static types. Even `Any` inside a generic
+class prevents an upper bound from supplying this residual evidence.
+
+```py
+def nested_gradual[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(U, T | list[Any]) & ConstraintSet.lower_bound(str, T)
+    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+```
+
 ### Substitution exceeding the derivation budget
 
 If substituting an exact type into a deeply nested bound exceeds the derivation budget, the original

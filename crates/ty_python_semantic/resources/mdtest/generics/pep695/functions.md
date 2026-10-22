@@ -4276,6 +4276,183 @@ def check(
     reveal_type(ensure_box_reversed(box_first))  # revealed: Box[str]
 ```
 
+### Fixed outer variables in unions
+
+TODO: After #29236 lands, simplify these tests to use direct union annotations instead of `Callable`
+types, which are currently needed to exercise the full constraints.
+
+A caller's type variable contributes to the inferred return type even when the callee's type also
+accepts a concrete union member. Inferring only `str` would discard the caller's type variable and
+reject a valid call:
+
+```py
+from collections.abc import Callable
+
+def helper[T](value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def outer[U](value: Callable[[], U | str]) -> None:
+    reveal_type(helper(value))  # revealed: (U@outer & ~int) | str
+```
+
+A disjoint bound also preserves the caller's variable. When the variable's entire bound fits the
+concrete `int` member, only the remaining `str` member contributes to inference:
+
+```py
+def disjoint[U: bytes](value: Callable[[], U | str]) -> None:
+    reveal_type(helper(value))  # revealed: U@disjoint | str
+
+def covered[U: int](value: Callable[[], U | str]) -> None:
+    reveal_type(helper(value))  # revealed: str
+```
+
+The caller's variable also supplies inference evidence without a separate union member:
+
+```py
+def only_outer[U: str](value: Callable[[], U]) -> None:
+    reveal_type(helper(value))  # revealed: U@only_outer
+```
+
+A literal union member excludes only that literal from the caller's contribution:
+
+```py
+from typing import Literal
+
+def helper_literal[T](value: Callable[[], T | Literal[1]]) -> T:
+    raise NotImplementedError
+
+def outer_literal[U](value: Callable[[], U | str]) -> None:
+    reveal_type(helper_literal(value))  # revealed: (U@outer_literal & ~Literal[1]) | str
+```
+
+### Fully covered outer variables in unions
+
+When the concrete union member covers the caller's entire variable, it contributes no inference
+evidence. We use the callee's default, or `Unknown` if there is none.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Callable
+
+def helper[T](value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def defaulted[T = str](value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def covered[U: int](value: Callable[[], U]) -> int:
+    reveal_type(helper(value))  # revealed: Unknown
+    result = defaulted(value)
+    reveal_type(result)  # revealed: str
+    return result  # error: [invalid-return-type]
+```
+
+### Invariant arguments with unions
+
+When a union contains two inferred variables, invariant arguments can determine which variable
+accepts each union member. The caller's variable keeps its identity regardless of which inferred
+variable it supplies:
+
+```py
+from collections.abc import Callable
+
+def helper[T, V](value: Callable[[], T | V], first: list[T], second: list[V]) -> tuple[T, V]:
+    raise NotImplementedError
+
+def outer[U](value: Callable[[], U | str], variables: list[U], strings: list[str]) -> None:
+    reveal_type(helper(value, variables, strings))  # revealed: tuple[U@outer, str]
+    reveal_type(helper(value, strings, variables))  # revealed: tuple[str, U@outer]
+```
+
+### Fixed outer variables in protocol member unions
+
+The same inference preserves the caller's variable when a read-only protocol property supplies the
+union:
+
+```py
+from typing import Protocol
+
+class Supplier[T](Protocol):
+    @property
+    def value(self) -> T: ...
+
+def helper[T](value: Supplier[T | int]) -> T:
+    raise NotImplementedError
+
+def outer[U](value: Supplier[U | str]) -> None:
+    reveal_type(helper(value))  # revealed: (U@outer & ~int) | str
+```
+
+### Bounds and constraints with fixed outer union members
+
+The concrete union member can accept part of the caller's variable. The remaining part must satisfy
+the callee's bound or constraints; requiring the entire caller variable to satisfy them would reject
+these valid calls:
+
+```py
+from collections.abc import Callable
+
+def bounded[T: str](value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def constrained[T: (str, bytes)](value: Callable[[], T | int]) -> T:
+    raise NotImplementedError
+
+def split_constraints[U: (int, str)](value: Callable[[], U | str]) -> None:
+    reveal_type(bounded(value))  # revealed: str
+    reveal_type(constrained(value))  # revealed: str
+```
+
+Without a separate `str` member, the inferred bound preserves the caller's variable while excluding
+its `int` part. A constrained callee instead selects the compatible declared constraint:
+
+```py
+def only_bound[U: int | str](value: Callable[[], U]) -> None:
+    reveal_type(bounded(value))  # revealed: U@only_bound & ~int
+    reveal_type(constrained(value))  # revealed: str
+```
+
+The caller's variable remains fixed. An unrestricted variable, or one permitting an incompatible
+type, cannot be specialized just to make the call succeed:
+
+```py
+def invalid_bound[U](value: Callable[[], U | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
+
+def invalid_constraints[U: (int, complex)](value: Callable[[], U | str]) -> None:
+    constrained(value)  # error: [invalid-argument-type]
+```
+
+### Gradual types in union arms
+
+When matching the caller's `U` against `T | A`, a fully static `A` lets us infer `T` from the part
+of `U` that `A` does not cover: `U & ~A`. We cannot apply this subtraction when `A` contains `Any`,
+because gradual assignability does not treat `Any` as a single fixed type.
+
+Here, `U` is assignable to `tuple[list[Any]]`, so only `str` contributes to the inferred `T`. This
+holds whether `list[Any]` is written inline or wrapped in a lazy alias.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+type Gradual = list[Any]
+
+def aliased[T](value: Callable[[], T | tuple[Gradual]]) -> T:
+    raise NotImplementedError
+
+def inline[T](value: Callable[[], T | tuple[list[Any]]]) -> T:
+    raise NotImplementedError
+
+def outer[U: tuple[list[int]]](value: Callable[[], U | str]) -> None:
+    reveal_type(aliased(value))  # revealed: str
+    reveal_type(inline(value))  # revealed: str
+```
+
 ### Gradual overload alternatives remain compatible with other arguments
 
 An overload returning `Any` can satisfy a concrete callback return type independently of other
