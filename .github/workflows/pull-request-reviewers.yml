@@ -37,6 +37,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           sparse-checkout: |
+            /pyproject.toml
             scripts
             .github/pr-reviewer-pools.toml
           sparse-checkout-cone-mode: false
