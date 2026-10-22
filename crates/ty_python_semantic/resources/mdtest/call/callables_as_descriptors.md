@@ -101,55 +101,164 @@ If we were to treat `Callable`s as bound-method descriptors, then the signatures
 This would be equally unsound, because now we would allow a call to `C3().callable_n(1)` which would
 also fail at runtime.
 
-There is no perfect solution here. We treat inferred class-body callables, `ClassVar` callables, and
-callable dunders with a positional receiver as function descriptors. Other explicit callable
-annotations remain regular. Gradual callable dunders also retain function behavior for uses such as
-`Method.__call__.__code__`.
+There is no perfect solution here, but we can use some heuristics to improve the situation for
+certain use cases (at the cost of purity and simplicity).
 
-For members declared in a generic class, `Callable[P, R]` retains its full parameter list, and an
-attribute declared with a bare type variable describes a stored value whose descriptor protocol is
-not invoked. Descriptor classification is shared by direct attribute access, implicit calls, and
-`super()`. Direct access can also find a value stored on the instance instead of a class descriptor.
+We treat inferred class-body callables (`method = impl`), `ClassVar` callables
+(`method: ClassVar[Callable[[object], int]]`), and callable dunders with a positional or gradual
+receiver (`__call__: Callable[[object], int]` or `__call__: Callable[..., int]`) as method
+descriptors. Other explicit callable annotations (`method: Callable[[object], int]`) do not act as
+method descriptors.
 
-## Callable descriptor lookup modes
+For members declared in a generic class, `method: Callable[P, R]` and `method: T` never bind as a
+descriptor, regardless of how they are specialized. A generic attribute always describes a
+per-instance value, meaning it is not stored on the class and its descriptor protocol is not
+invoked.
 
-Inferred and `ClassVar` callables bind the receiver on instance reads. Class reads retain the full
-signature. This also applies when the callable is hidden behind a PEP 695 type alias or has a
-gradual `Concatenate` tail:
+Descriptor classification is shared by direct attribute access, implicit calls, and `super()`.
+
+## Inferred class-body callables
+
+A callable assigned in a class body without an annotation acts as a method descriptor. The callable
+can also be described by a type alias:
 
 ```py
 from collections.abc import Callable
-from typing import Any, ClassVar, Concatenate, cast
-
-def method(value: object, argument: str) -> int:
-    return len(argument)
-
-def gradual_method(value: object, *args: Any, **kwargs: Any) -> int:
-    return 1
 
 type Method = Callable[[object, str], int]
-type GradualMethod = Callable[Concatenate[object, ...], int]
 
-class C:
-    inferred = cast(Method, method)
-    inferred_gradual = cast(GradualMethod, gradual_method)
-    classvar: ClassVar[Method] = method
-    classvar_gradual: ClassVar[GradualMethod] = gradual_method
-    explicit: Method = method
+def check(impl: Method) -> None:
+    class C:
+        method = impl
 
-reveal_type(C.inferred)  # revealed: (object, str, /) -> int
-reveal_type(C().inferred)  # revealed: (str, /) -> int
-reveal_type(C.classvar)  # revealed: (object, str, /) -> int
-reveal_type(C().classvar)  # revealed: (str, /) -> int
-reveal_type(C().explicit)  # revealed: (object, str, /) -> int
+    reveal_type(C.method)  # revealed: (object, str, /) -> int
+    reveal_type(C().method)  # revealed: (str, /) -> int
+    reveal_type(C().method("value"))  # revealed: int
 
-C.inferred = method  # no diagnostic
-C.classvar = method  # no diagnostic
+    C.method = lambda receiver, argument: 1  # ok
+```
 
-reveal_type(C().inferred("value"))  # revealed: int
-reveal_type(C().classvar("value"))  # revealed: int
-reveal_type(C().inferred_gradual())  # revealed: int
-reveal_type(C().classvar_gradual())  # revealed: int
+## `ClassVar` callable attributes
+
+An explicit `ClassVar` annotation also makes a callable act as a method descriptor:
+
+```py
+from collections.abc import Callable
+from typing import ClassVar
+
+type Method = Callable[[object, str], int]
+
+def check(impl: Method) -> None:
+    class C:
+        method: ClassVar[Method] = impl
+
+    reveal_type(C.method)  # revealed: (object, str, /) -> int
+    reveal_type(C().method)  # revealed: (str, /) -> int
+    reveal_type(C().method("value"))  # revealed: int
+
+    C.method = impl  # ok
+```
+
+## Callable dunders
+
+A callable dunder with a positional receiver acts as a method descriptor even with an explicit
+annotation. Both direct attribute access and implicit calls bind the receiver:
+
+```py
+from collections.abc import Callable
+
+def check(impl: Callable[[object, str], int]) -> None:
+    class C:
+        __call__: Callable[[object, str], int] = impl
+
+    reveal_type(C.__call__)  # revealed: (object, str, /) -> int
+    reveal_type(C().__call__)  # revealed: (str, /) -> int
+    reveal_type(C()("value"))  # revealed: int
+```
+
+A gradual callable dunder also binds the instance as its receiver:
+
+```py
+def check_gradual(impl: Callable[..., int]) -> None:
+    class Method:
+        __call__: Callable[..., int] = impl
+
+    reveal_type(Method().__call__.__self__)  # revealed: Method
+    reveal_type(Method()("value"))  # revealed: int
+```
+
+The same binding behavior applies to inferred callable dunders, such as this comparison operator:
+
+```py
+def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
+    raise NotImplementedError
+
+class Matrix:
+    __lt__ = make_comparison_operator("lt")
+
+Matrix() < Matrix()  # ok
+```
+
+An explicitly annotated non-`ClassVar` callable dunder without a positional first parameter does not
+act as a method descriptor; it can't accept a receiver:
+
+```py
+class Thunk:
+    __value_thunk__: Callable[[], int]
+
+    def replace(self, other: "Thunk") -> None:
+        self.__value_thunk__ = other.__value_thunk__
+
+reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
+```
+
+As with inferred callable attributes, the heuristic does not check whether the receiver's type is
+compatible with the first parameter:
+
+```py
+def descriptor_candidate(value: str) -> int:
+    return len(value)
+
+class DescriptorCandidate:
+    __value__: Callable[[str], int] = descriptor_candidate
+
+reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
+```
+
+## Other explicitly annotated callable attributes
+
+An ordinary callable attribute with an explicit annotation does not act as a method descriptor:
+
+```py
+from collections.abc import Callable
+
+type Method = Callable[[object, str], int]
+
+def check(impl: Method) -> None:
+    class C:
+        method: Method = impl
+
+    reveal_type(C().method)  # revealed: (object, str, /) -> int
+```
+
+## Callable attributes with gradual signatures
+
+Inferred and `ClassVar` callables still bind a positional receiver when the remaining parameters are
+gradual:
+
+```py
+from collections.abc import Callable
+from typing import ClassVar, Concatenate
+
+type Method = Callable[Concatenate[object, ...], int]
+
+def check(impl: Method) -> None:
+    class C:
+        inferred = impl
+        classvar: ClassVar[Method] = impl
+
+    reveal_type(C().inferred())  # revealed: int
+    reveal_type(C().classvar())  # revealed: int
 ```
 
 ## Callable descriptors accessed through `super()`
@@ -159,21 +268,19 @@ when the attribute is a dunder:
 
 ```py
 from collections.abc import Callable
-from typing import ClassVar, cast
+from typing import ClassVar
 
-def impl(receiver: object, value: int) -> int:
-    return value
+def check(impl: Callable[[object, int], int]) -> None:
+    class Base:
+        method = impl
+        classvar: ClassVar[Callable[[object, int], int]] = impl
+        __call__ = impl
 
-class Base:
-    method = cast(Callable[[object, int], int], impl)
-    classvar: ClassVar[Callable[[object, int], int]] = impl
-    __call__ = cast(Callable[[object, int], int], impl)
-
-class Child(Base):
-    def check(self) -> None:
-        reveal_type(super().method(1))  # revealed: int
-        reveal_type(super().classvar(1))  # revealed: int
-        reveal_type(super().__call__(1))  # revealed: int
+    class Child(Base):
+        def check(self) -> None:
+            reveal_type(super().method(1))  # revealed: int
+            reveal_type(super().classvar(1))  # revealed: int
+            reveal_type(super().__call__(1))  # revealed: int
 ```
 
 ## Use case: Decorating a method with a `Callable`-typed decorator
@@ -431,61 +538,6 @@ class Path:
 
 def check(path: Path) -> None:
     reveal_type(path.write_bytes(b""))  # revealed: int
-```
-
-## Use case: Treating dunder methods as bound-method descriptors
-
-In the following example, the `__lt__` dunder attribute is not declared. The attribute type is
-inferred as `Callable[…]`, so we treat it as a bound-method descriptor:
-
-```py
-from collections.abc import Callable
-
-def make_comparison_operator(name: str) -> Callable[[Matrix, Matrix], bool]:
-    raise NotImplementedError
-
-class Matrix:
-    __lt__ = make_comparison_operator("lt")
-
-Matrix() < Matrix()
-```
-
-An explicitly annotated non-`ClassVar` callable dunder without a positional first parameter remains
-a regular callable:
-
-```py
-class Thunk:
-    __value_thunk__: Callable[[], int]
-
-    def replace(self, other: "Thunk") -> None:
-        self.__value_thunk__ = other.__value_thunk__
-
-reveal_type(Thunk().__value_thunk__)  # revealed: () -> int
-```
-
-As with inferred callable attributes, the heuristic does not check whether the receiver's type is
-compatible with the first parameter:
-
-```py
-def descriptor_candidate(value: str) -> int:
-    return len(value)
-
-class DescriptorCandidate:
-    __value__: Callable[[str], int] = descriptor_candidate
-
-reveal_type(DescriptorCandidate().__value__)  # revealed: () -> int
-```
-
-A gradual callable annotation on a dunder also describes a method, so function attributes are
-available on the class member:
-
-```py
-from typing import Any
-
-class Method:
-    __call__: Callable[..., Any]
-
-Method.__call__.__code__
 ```
 
 ## `self`-binding behaviour of function-like `Callable`s
@@ -1011,10 +1063,10 @@ C.with_new(1)
 C().with_new(1)
 C.with_init(1)
 C().with_init(1)
-C.extracted_new(1)  # no diagnostic
+C.extracted_new(1)  # ok
 # error: [too-many-positional-arguments]
 C().extracted_new(1)
-C.extracted_init(1)  # no diagnostic
+C.extracted_init(1)  # ok
 # error: [too-many-positional-arguments]
 C().extracted_init(1)
 ```

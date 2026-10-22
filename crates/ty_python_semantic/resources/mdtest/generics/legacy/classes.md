@@ -3376,24 +3376,22 @@ class Wrapper(Protocol[F]):
 def wrap(function: F) -> Wrapper[F]:
     raise NotImplementedError
 
-def format_bytes(value: bytes, *, prefix: str = "") -> str:
-    return prefix + value.hex()
+def f(value: int) -> str:
+    return ""
 
-wrapped = wrap(format_bytes)
-reveal_type(wrapped(b"", prefix="0x"))  # revealed: str
-reveal_type(wrapped.__call__(b"", prefix="0x"))  # revealed: str
-callback: Callable[[bytes], str] = wrapped  # no diagnostic
-gradual: Callable[..., object] = wrapped  # no diagnostic
-wrapped(1)  # error: [invalid-argument-type]
+wrapped = wrap(f)
+reveal_type(wrapped(1))  # revealed: str
+reveal_type(wrapped.__call__(1))  # revealed: str
+callback: Callable[[int], str] = wrapped  # ok
+wrapped("wrong")  # error: [invalid-argument-type]
 ```
 
 The same behavior applies when the protocol is explicitly specialized with a regular callable type.
 
 ```py
-def check(wrapper: Wrapper[Callable[[bytes], str]]) -> Callable[[bytes], str]:
-    reveal_type(wrapper(b""))  # revealed: str
-    callback: Callable[..., object] = wrapper  # no diagnostic
-    return wrapper  # no diagnostic
+def check(wrapper: Wrapper[Callable[[int], str]]) -> Callable[[int], str]:
+    reveal_type(wrapper(1))  # revealed: str
+    return wrapper  # ok
 ```
 
 ## Generic callable operator attributes
@@ -3457,8 +3455,8 @@ def format_bytes(value: bytes) -> str:
 
 holder = Holder(format_bytes)
 reveal_type(holder.value(b""))  # revealed: str
-name: str = holder.value.__name__  # no diagnostic
-code: CodeType = holder.value.__code__  # no diagnostic
+name: str = holder.value.__name__  # ok
+code: CodeType = holder.value.__code__  # ok
 holder.value("wrong")  # error: [invalid-argument-type]
 ```
 
@@ -3478,8 +3476,8 @@ class OptionalHolder(Generic[F]):
 optional = OptionalHolder(format_bytes)
 if optional.value is not None:
     reveal_type(optional.value(b""))  # revealed: str
-    name: str = optional.value.__name__  # no diagnostic
-    code: CodeType = optional.value.__code__  # no diagnostic
+    name: str = optional.value.__name__  # ok
+    code: CodeType = optional.value.__code__  # ok
     optional.value("wrong")  # error: [invalid-argument-type]
 ```
 

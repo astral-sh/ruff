@@ -168,12 +168,9 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
-### Descriptor binding for annotated callable dunders
+### Callable annotations overriding inherited dunders
 
-An explicitly annotated callable dunder with a positional first parameter is treated as a
-descriptor. This includes annotations that refine methods inherited from a base class. An annotation
-without a class-body value also permits instance storage, so direct access includes both
-possibilities:
+Callable annotations can refine inherited dunder methods, including through a type alias:
 
 ```toml
 [environment]
@@ -190,38 +187,18 @@ class Operand:
     def __add__(self, value: Any, /) -> Any: ...
     def __getitem__(self, value: Any, /) -> Any: ...
 
+type Add = Callable[[Index, Any], Index]
+
 class Index(Operand):
-    __add__: Callable[[Index, Any], Index]
+    __add__: Add
     __getitem__: Callable[[Index, Any], str]
 
 index = Index()
+# TODO: Direct access also includes an unbound callable from instance-attribute lookup,
+# even though no instance assignment is present.
 reveal_type(index.__add__)  # revealed: ((Any, /) -> Index) | ((Index, Any, /) -> Index)
 reveal_type(index + 1)  # revealed: Index
 reveal_type(index[1])  # revealed: str
-```
-
-A callable initialized in the class body binds the receiver on direct instance reads too:
-
-```py
-def add(value: Direct, other: int, /) -> Direct:
-    return value
-
-class Direct:
-    __add__: Callable[[Direct, int], Direct] = add
-
-reveal_type(Direct().__add__)  # revealed: (int, /) -> Direct
-reveal_type(Direct() + 1)  # revealed: Direct
-```
-
-The descriptor heuristic also applies through a type alias:
-
-```py
-type AliasedAdd = Callable[[Aliased, int], Aliased]
-
-class Aliased:
-    __add__: AliasedAdd
-
-reveal_type(Aliased() + 1)  # revealed: Aliased
 ```
 
 ### Dunder methods attached to instances

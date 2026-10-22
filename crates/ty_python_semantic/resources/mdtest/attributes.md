@@ -5661,6 +5661,20 @@ warning[possibly-missing-submodule]: Submodule `bar` might not have been importe
 help: Consider explicitly importing `baz.bar`
 ```
 
+## Function attributes on callable dunders
+
+A callable dunder with a gradual signature is treated as function-like and exposes function
+attributes:
+
+```py
+from collections.abc import Callable
+
+class Method:
+    __call__: Callable[..., int]
+
+reveal_type(Method.__call__.__code__)  # revealed: CodeType
+```
+
 ## Diagnostic for function attribute accessed on `Callable` type
 
 We show a special help message here that explains that not all callables are functions.
