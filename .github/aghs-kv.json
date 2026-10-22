@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "on": ["pull_request"],
+      "caller_workflow": "ci.yaml",
+      "caller_ref": "refs/pull/*/merge",
+      "environment": "automations",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b",
+      "permissions": { "pull-request": ["read", "write"] }
+    },
+    {
+      "on": ["pull_request"],
+      "caller_workflow": "memory_report.yaml",
+      "caller_ref": "refs/pull/*/merge",
+      "environment": "automations",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b",
+      "permissions": { "pull-request": ["read", "write"] }
+    },
+    {
+      "on": ["pull_request"],
+      "caller_workflow": "typing_conformance.yaml",
+      "caller_ref": "refs/pull/*/merge",
+      "environment": "automations",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b",
+      "permissions": { "pull-request": ["read", "write"] }
+    },
+    {
+      "on": ["pull_request"],
+      "caller_workflow": "ty-ecosystem-analyzer.yaml",
+      "caller_ref": "refs/pull/*/merge",
+      "environment": "automations",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@c3853ae9bb819a4fe663c89d0a9fab60c581494b",
+      "permissions": { "pull-request": ["read", "write"] }
+    }
+  ]
+}
