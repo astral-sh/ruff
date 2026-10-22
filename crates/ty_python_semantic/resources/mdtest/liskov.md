@@ -3831,6 +3831,207 @@ class PropertyChild(Base):
         return ""
 ```
 
+## Property overrides without instance storage
+
+When an instance attribute replaces a writable property and no custom `__setattr__` handles writes,
+the subclass needs a matching slot or an instance dictionary. A matching read type is not
+sufficient.
+
+```py
+class Base:
+    __slots__ = ()
+
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class Child(Base):
+    __slots__ = ()
+    value: int  # snapshot: invalid-property-type-override
+```
+
+```snapshot
+error[invalid-property-type-override]: Invalid override of attribute `value`
+  --> src/mdtest_snippet.py:13:5
+   |
+ 9 |     def value(self, value: int) -> None: ...
+   |         ----- `Base.value` declared here
+10 |
+11 | class Child(Base):
+12 |     __slots__ = ()
+13 |     value: int  # snapshot: invalid-property-type-override
+   |     ^^^^^ Override does not accept writes of type `int`
+info: Attribute `value` is not included in `__slots__`, and the class has no instance dictionary
+```
+
+## Descriptor overrides without instance storage
+
+An instance attribute replacing a writable descriptor must preserve its write contract. Without a
+custom `__setattr__`, that requires a matching slot or an instance dictionary.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+class Base:
+    __slots__ = ()
+    value: Descriptor = Descriptor()
+
+class Child(Base):
+    __slots__ = ()
+    value: int  # snapshot: invalid-mutable-override
+```
+
+```snapshot
+error[invalid-mutable-override]: Invalid override of attribute `value`
+  --> src/mdtest_snippet.py:13:5
+   |
+ 9 |     value: Descriptor = Descriptor()
+   |     ----- `Base.value` declared here
+10 |
+11 | class Child(Base):
+12 |     __slots__ = ()
+13 |     value: int  # snapshot: invalid-mutable-override
+   |     ^^^^^ Override does not accept writes of type `int`
+info: Attribute `value` is not included in `__slots__`, and the class has no instance dictionary
+```
+
+## Slotted property setters with incompatible write types
+
+A property setter does not require a slot for the property name. Narrowing its accepted type breaks
+its write contract, even when the subclass has no instance storage for that name.
+
+```py
+class Base:
+    __slots__ = ()
+
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class Child(Base):
+    __slots__ = ()
+
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: bool) -> None: ...  # snapshot: invalid-property-type-override
+```
+
+```snapshot
+error[invalid-property-type-override]: Invalid override of attribute `value`
+  --> src/mdtest_snippet.py:19:9
+   |
+19 |     def value(self, value: bool) -> None: ...  # snapshot: invalid-property-type-override
+   |         ^^^^^ Override does not accept writes of type `int`
+   |
+  ::: src/mdtest_snippet.py:9:9
+   |
+ 9 |     def value(self, value: int) -> None: ...
+   |         ----- `Base.value` declared here
+```
+
+## Slotted overrides with incompatible declared write types
+
+A custom `__setattr__` accepting the inherited write type does not make a narrower attribute
+declaration compatible. The diagnostic does not blame the custom setter for this incompatibility.
+
+```py
+class Base:
+    __slots__ = ()
+
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class Child(Base):
+    __slots__ = ()
+    value: bool  # snapshot: invalid-property-type-override
+
+    def __setattr__(self, name: str, value: int) -> None: ...
+```
+
+```snapshot
+error[invalid-property-type-override]: Invalid override of attribute `value`
+  --> src/mdtest_snippet.py:13:5
+   |
+ 9 |     def value(self, value: int) -> None: ...
+   |         ----- `Base.value` declared here
+10 |
+11 | class Child(Base):
+12 |     __slots__ = ()
+13 |     value: bool  # snapshot: invalid-property-type-override
+   |     ^^^^^ Override does not accept writes of type `int`
+```
+
+## Slotted overrides with incompatible `__setattr__`
+
+Without a matching slot or instance dictionary, the override relies on a custom `__setattr__` to
+accept writes. If the setter rejects the inherited write type, the diagnostic explains this and
+points to the setter, including when it is inherited from another module.
+
+`setters.py`:
+
+```py
+class Setter:
+    __slots__ = ()
+
+    def __setattr__(self, name: str, value: bool) -> None: ...
+```
+
+`main.py`:
+
+```py
+from setters import Setter
+
+class Base:
+    __slots__ = ()
+
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class Child(Base, Setter):
+    __slots__ = ()
+    value: int  # snapshot: invalid-property-type-override
+```
+
+```snapshot
+error[invalid-property-type-override]: Invalid override of attribute `value`
+  --> src/main.py:15:5
+   |
+11 |     def value(self, value: int) -> None: ...
+   |         ----- `Base.value` declared here
+12 |
+13 | class Child(Base, Setter):
+14 |     __slots__ = ()
+15 |     value: int  # snapshot: invalid-property-type-override
+   |     ^^^^^ Override does not accept writes of type `int`
+   |
+  ::: src/setters.py:4:9
+   |
+ 4 |     def __setattr__(self, name: str, value: bool) -> None: ...
+   |         ----------- This `__setattr__` does not accept writes of type `int`
+info: Attribute `value` is missing from `__slots__` and the class has no instance dictionary, so this override relies on `__setattr__` accepting writes
+```
+
 ## Attribute contracts inherited from `object`
 
 Typeshed declares metadata such as `__module__: str` on `object`. Normally, this annotation would

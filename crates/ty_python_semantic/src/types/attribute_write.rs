@@ -77,6 +77,55 @@ pub(super) enum AttributeWriteRequirement<'db> {
     },
 }
 
+impl<'db> AttributeWriteRequirement<'db> {
+    /// Explain a failed write that falls back to `__setattr__`.
+    /// Callers must first check that the write actually fails, since a custom setter can accept it.
+    pub(super) fn failure_reason(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        attribute: &str,
+    ) -> Option<AttributeWriteFailure<'db>> {
+        let Self::Instance {
+            object_ty,
+            receiver,
+            member: InstanceAttributeWriteMember::SetAttr,
+        } = self
+        else {
+            return None;
+        };
+        let missing_slot = object_ty
+            .nominal_class(db, env)
+            .and_then(|class| class.static_class_literal(db))
+            .is_some_and(|(class, _)| class.lacks_instance_storage(db, attribute));
+        match attribute_setattr_member(
+            db,
+            env,
+            *object_ty,
+            *receiver,
+            instance_setattr_dispatch(db, env, *object_ty, attribute),
+        )
+        .place
+        {
+            Place::Defined(setattr) => Some(AttributeWriteFailure::SetAttr {
+                definition: setattr.provenance.definition(),
+                missing_slot,
+            }),
+            Place::Undefined => missing_slot.then_some(AttributeWriteFailure::MissingSlot),
+        }
+    }
+}
+
+/// Context for a failed write when neither a descriptor nor instance storage handles it.
+#[derive(Clone, Copy)]
+pub(super) enum AttributeWriteFailure<'db> {
+    MissingSlot,
+    SetAttr {
+        definition: Option<Definition<'db>>,
+        missing_slot: bool,
+    },
+}
+
 /// How a writable protocol member validates an assigned value.
 pub(super) enum ProtocolMemberWriteRequirement<'db> {
     /// Check the assigned value against a directly representable write type.
