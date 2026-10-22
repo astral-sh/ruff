@@ -767,6 +767,121 @@ fn github_diagnostics() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn sarif_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "ty.toml",
+            r#"
+            [[overrides]]
+            include = ["a.py"]
+
+            [overrides.rules]
+            unresolved-reference = "warn"
+            "#,
+        ),
+        ("a.py", "print(x)"),
+        ("b.py", "print(x)"),
+    ])?
+    .with_filter(
+        r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
+        "$1[DESCRIPTION]$2",
+    )
+    .with_filter(r#"(?m)^(\s{10}"version": ")[^"]+"#, "$1[VERSION]")
+    .with_filter(r#"file://[^"]*/project/"#, "file://<temp_dir>/");
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=sarif"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    {
+      "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+      "runs": [
+        {
+          "results": [
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/a.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 1,
+                      "startColumn": 7,
+                      "startLine": 1
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 8,
+                      "endLine": 2,
+                      "startColumn": 7,
+                      "startLine": 2
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Name `x` used when not defined"
+              },
+              "ruleId": "unresolved-reference"
+            }
+          ],
+          "tool": {
+            "driver": {
+              "informationUri": "https://github.com/astral-sh/ty",
+              "name": "ty",
+              "rules": [
+                {
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects references to names that are not defined"
+                  },
+                  "helpUri": "https://ty.dev/rules#unresolved-reference",
+                  "id": "unresolved-reference",
+                  "properties": {
+                    "id": "unresolved-reference",
+                    "kind": null,
+                    "name": "unresolved-reference",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects references to names that are not defined"
+                  }
+                }
+              ],
+              "version": "[VERSION]"
+            }
+          }
+        }
+      ],
+      "version": "2.1.0"
+    }
+    ----- stderr -----
+    "#);
+
+    Ok(())
+}
+
 /// This tests the diagnostic format for revealed type.
 ///
 /// This test was introduced because changes were made to
