@@ -880,7 +880,6 @@ jobs:
       github.repository == 'astral-sh/ruff' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (needs.ecosystem.result == 'success' || needs.ecosystem.result == 'failure')
-    # For PR merge refs, KV and STS require the publisher from `main`.
     uses: astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@main # zizmor: ignore[unpinned-uses]
     secrets:
       KV_API_URL: ${{ secrets.KV_API_URL }}
