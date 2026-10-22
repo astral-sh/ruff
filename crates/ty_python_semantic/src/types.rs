@@ -8901,7 +8901,7 @@ impl<'db> Type<'db> {
                         if !inference_flags
                             .contains(InferenceFlags::DISABLE_INT_FLOAT_SPECIAL_CASE) =>
                     {
-                        KnownUnion::Float.to_type(db, env)
+                        KnownClass::Float.to_instance(db, env)
                     }
                     _ => Type::instance(db, env, class.default_specialization(db)),
                 };

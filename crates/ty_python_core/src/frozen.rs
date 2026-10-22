@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
 
 /// Compact immutable key-value entries stored in key order.
 ///
@@ -144,13 +143,10 @@ where
     V: Copy + Eq + Hash,
 {
     let mut values = IndexVec::new();
-    let mut value_indices = FxHashMap::default();
     let entries = entries
         .into_iter()
         .map(|(key, value)| {
-            let index = *value_indices
-                .entry(value)
-                .or_insert_with(|| values.push(value));
+            let index = values.push(value);
             (key, index)
         })
         .collect();
@@ -158,7 +154,7 @@ where
     (entries, values)
 }
 
-/// Compact immutable key-value entries that deduplicate repeated values.
+/// Immutable key-value entries with one stored value per key.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct FrozenValueMap<K, V> {
     entries: FrozenMap<K, FrozenValueIndex>,
