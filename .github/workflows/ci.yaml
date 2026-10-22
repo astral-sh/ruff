@@ -890,6 +890,9 @@ jobs:
       id-token: write
     with:
       report: ruff-ecosystem
+      artifact: ecosystem-result
+      filename: ecosystem-result
+      title: "`ruff-ecosystem` results"
 
   fuzz-ty:
     name: "Fuzz for new ty panics/timeouts"
