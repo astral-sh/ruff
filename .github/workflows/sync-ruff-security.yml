@@ -16,7 +16,9 @@ jobs:
     name: Sync ruff-security
     if: github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main'
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       id-token: write # for the credential broker
     defaults:
