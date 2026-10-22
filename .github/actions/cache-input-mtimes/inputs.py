@@ -127,6 +127,18 @@ def restore(root, saved):
         else:
             mtime = now
         os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)
+    subprocess.run(
+        [
+            "git",
+            "update-index",
+            "-q",
+            "--ignore-submodules",
+            "--ignore-missing",
+            "--refresh",
+        ],
+        cwd=root,
+        check=True,
+    )
     return {
         "restored_files": restored,
         "changed_files": changed,
