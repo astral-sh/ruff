@@ -30,9 +30,13 @@ BOT_ID = 305554984  # astral-automations-bot
 
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
-MAX_REPORT_CHARACTERS = 60_000
+MAX_COMMENT_CHARACTERS = 60_000
 MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_HTML_REPORT_BYTES = 512 * 1024 * 1024
+
+
+class ReportTooLargeError(ValueError):
+    pass
 
 
 def read_html_files(value: str) -> dict[str, tuple[str, str]]:
@@ -152,7 +156,7 @@ def find_artifact(run_id: int, name: str) -> dict | None:
 
 def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> bytes:
     if artifact["size_in_bytes"] > max_bytes:
-        raise ValueError("The report archive exceeds the download limit.")
+        raise ReportTooLargeError("The report archive exceeds the download limit.")
     result = subprocess.run(
         [
             "gh",
@@ -164,7 +168,7 @@ def download_artifact(artifact: dict, *, max_bytes: int = MAX_ARCHIVE_BYTES) -> 
         timeout=120,
     )
     if len(result.stdout) > max_bytes:
-        raise ValueError("The report archive exceeds the download limit.")
+        raise ReportTooLargeError("The report archive exceeds the download limit.")
     return result.stdout
 
 
@@ -178,11 +182,11 @@ def read_report(
         if len(members) != 1 or members[0].is_dir():
             raise ValueError(f"Expected exactly one {filename} report in the archive.")
         if members[0].file_size > max_bytes:
-            raise ValueError("The uncompressed report exceeds the size limit.")
+            raise ReportTooLargeError("The uncompressed report exceeds the size limit.")
         with archive.open(members[0]) as member:
             data = member.read(max_bytes + 1)
         if len(data) > max_bytes:
-            raise ValueError("The uncompressed report exceeds the size limit.")
+            raise ReportTooLargeError("The uncompressed report exceeds the size limit.")
         return data.decode("utf-8")
 
 
@@ -234,7 +238,7 @@ def upload_html_report(
 
 def render_report(
     report: str,
-    contents: str,
+    contents: str | None,
     run: dict,
     artifact: dict,
     *,
@@ -243,14 +247,12 @@ def render_report(
     full_report_url: str = "",
     html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
-    if len(contents) > MAX_REPORT_CHARACTERS:
-        artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
-        contents = (
-            contents[:MAX_REPORT_CHARACTERS]
-            + f"\n\nReport truncated. [Download the untruncated content (ZIP)]({artifact_url})."
-        )
+    header = (
+        f"{report_marker(report)}\n"
+        f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
+    )
     if title:
-        contents = f"## {title}\n\n{contents}"
+        header += f"## {title}\n\n"
     if full_report_url:
         links = []
         for filename, (_, label) in (html_files or {}).items():
@@ -260,20 +262,27 @@ def render_report(
                 )
                 links.append(f"[{label}]({full_report_url}/{filename})")
         if links:
-            contents = f"{contents.rstrip()}\n\n" + " · ".join(links)
+            header += " · ".join(links) + "\n\n"
     if full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
-        contents = (
-            f"{contents.rstrip()}\n\n[Download the full report (ZIP)]({report_url})"
-        )
+        header += f"[Download the full report (ZIP)]({report_url})\n\n"
     commit_url = f"https://github.com/{REPOSITORY}/commit/{run['head_sha']}"
     run_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
-    return (
-        f"{report_marker(report)}\n"
-        f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
-        f"{contents.rstrip()}\n\n---\n\n"
+    footer = (
+        "\n\n---\n\n"
         f"Results for [{run['head_sha'][:7]}]({commit_url}) · [Workflow run]({run_url})\n"
     )
+    budget = MAX_COMMENT_CHARACTERS - len(header) - len(footer)
+    if contents is None or len(contents) > budget:
+        artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
+        # Cutting arbitrary Markdown can leave the footer inside a code block.
+        contents = (
+            "This report exceeds a size limit. "
+            f"[Download the summary (ZIP)]({artifact_url})."
+        )
+    if len(contents) > budget:
+        raise ValueError("The report metadata exceeds the comment size limit.")
+    return header + contents.rstrip() + footer
 
 
 def report_run(comment: dict) -> tuple[int, int]:
@@ -339,8 +348,11 @@ def publish(
     if artifact is None:
         print(f"No {artifact_name} artifact is available.", file=sys.stderr)
         return
-    contents = read_report(download_artifact(artifact), filename)
-    if not contents.strip():
+    try:
+        contents = read_report(download_artifact(artifact), filename)
+    except ReportTooLargeError:
+        contents = None
+    if contents is not None and not contents.strip():
         return
     full_report = (
         find_artifact(run_id, full_report_artifact) if full_report_artifact else None

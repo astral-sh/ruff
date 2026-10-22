@@ -6,6 +6,25 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import CommandOptions, Project
 
 
+def markdown_sections(
+    summary: str, sections: list[str], max_length: int | None = None
+) -> str:
+    contents = "\n\n".join([summary, *sections])
+    if max_length is None or len(contents) <= max_length:
+        return contents
+
+    notice = "_Some detail sections are omitted from this summary._"
+    remaining = max_length - len(summary) - len(notice) - 2
+    if remaining < 0:
+        raise ValueError("The Markdown limit is too small for the summary.")
+    included = [summary]
+    for section in sections:
+        if len(section) + 2 <= remaining:
+            included.append(section)
+            remaining -= len(section) + 2
+    return "\n\n".join([*included, notice])
+
+
 def markdown_project_section(
     title: str, content: str | list[str], options: CommandOptions, project: Project
 ) -> list[str]:
