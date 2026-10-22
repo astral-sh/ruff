@@ -17,7 +17,7 @@ head commit is no longer current and does not execute PR code.
 The worker uses the `automations` environment. The repository STS policy authorizes it on
 `refs/heads/main` for `workflow_dispatch`.
 
-Set the repository variable `KV_URL` to the deployed key-value service's HTTPS origin and provide
+Set the repository variable `KEY_VALUE_SERVICE_URL` to the deployed key-value service's HTTPS origin and provide
 `STS_API_URL` in the `automations` environment. The key-value service must allow Ruff's repository
 identity. The dispatcher must support repository-owned policies, use
 `.github/automations-dispatch.json` as its policy path, and receive Ruff's `pull_request` webhooks.

@@ -52,7 +52,7 @@ jobs:
       - name: Read reviewer credits
         uses: astral-sh/github-actions/key-value-store/get@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KV_URL }}
+          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
           key: reviewer-round-robin-v1
           path: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
       - name: Get a reviewer token
@@ -79,6 +79,6 @@ jobs:
       - name: Store reviewer credits
         uses: astral-sh/github-actions/key-value-store/put@a45012f200a3a3fe3c319eaa34c9fa13c71f8f26
         with:
-          service-url: ${{ vars.KV_URL }}
+          service-url: ${{ vars.KEY_VALUE_SERVICE_URL }}
           key: reviewer-round-robin-v1
           path: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json
