@@ -504,20 +504,8 @@ impl Diagnostic {
         )
     }
 
-    /// Computes the end source location for the message.
-    ///
-    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
-    /// or if the span has no range.
-    pub fn ruff_end_location(&self) -> Option<LineColumn> {
-        Some(
-            self.ruff_source_file()?
-                .to_source_code()
-                .line_column(self.range()?.end()),
-        )
-    }
-
     /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn ruff_source_file(&self) -> Option<&SourceFile> {
+    fn ruff_source_file(&self) -> Option<&SourceFile> {
         self.primary_span_ref()?.as_ruff_file()
     }
 
