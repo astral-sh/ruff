@@ -18,9 +18,9 @@ on:
       full-report-artifact:
         type: string
         default: ""
-      full-report-url:
-        type: string
-        default: ""
+      upload-html:
+        type: boolean
+        default: false
     secrets:
       KV_API_URL:
         required: true
@@ -78,6 +78,17 @@ jobs:
           permissions: |
             actions: read
             pull_requests: write
+      - name: Get report upload credentials
+        if: inputs.upload-html
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.REPORTS_REGION }}
+          role-to-assume: ${{ vars.REPORTS_ROLE_ARN }}
+          role-duration-seconds: 900
+          role-session-name: report-${{ github.run_id }}-${{ github.run_attempt }}
+          unset-current-credentials: true
       - name: Publish the report
         id: publish
         env:
@@ -90,7 +101,8 @@ jobs:
           REPORT_FILENAME: ${{ inputs.filename }}
           REPORT_TITLE: ${{ inputs.title }}
           FULL_REPORT_ARTIFACT: ${{ inputs.full-report-artifact }}
-          FULL_REPORT_URL: ${{ inputs.full-report-url }}
+          HTML_BUCKET: ${{ steps.aws.outcome == 'success' && vars.REPORTS_BUCKET || '' }}
+          HTML_BASE_URL: ${{ vars.REPORTS_URL }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
           COMMENT_ID_FILE: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
         run: >-
@@ -100,7 +112,7 @@ jobs:
           --report "$REPORT" --pull-request "$PULL_REQUEST"
           --artifact "$REPORT_ARTIFACT" --filename "$REPORT_FILENAME"
           --title "$REPORT_TITLE" --full-report-artifact "$FULL_REPORT_ARTIFACT"
-          --full-report-url "$FULL_REPORT_URL"
+          --html-bucket "$HTML_BUCKET" --html-base-url "$HTML_BASE_URL"
           --comment-id-file "$COMMENT_ID_FILE"
       - name: Store the comment ID
         if: steps.publish.outputs.comment-id != ''
