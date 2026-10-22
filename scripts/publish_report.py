@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.11"
 # dependencies = []
 # ///
 """Publish report artifacts without executing code from the producing workflow."""
@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
+import hashlib
 import io
 import json
 import logging
@@ -15,15 +17,19 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 import zipfile
+from dataclasses import dataclass
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
 REPOSITORY = "astral-sh/ruff"
+REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
 BOT_ID = 305554984  # astral-automations-bot
@@ -33,10 +39,126 @@ MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_COMMENT_CHARACTERS = 60_000
 MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
 MAX_HTML_REPORT_BYTES = 512 * 1024 * 1024
+MAX_TEMPLATE_BYTES = 1024 * 1024
+# Keep the hash list comfortably below S3's 2 KiB user-metadata limit.
+MAX_INLINE_SCRIPTS = 32
+
+
+@dataclass(frozen=True)
+class ReportTemplate:
+    repository: Literal["ruff", "ecosystem-analyzer"]
+    path: str
+    filenames: tuple[str, ...]
+
+
+# Only templates from the publisher's trusted checkout (or its locked analyzer
+# revision) can authorize scripts. Never derive approved hashes from artifacts,
+# caller inputs, or a pull request checkout.
+REPORT_TEMPLATES = {
+    ".github/workflows/ci.yaml": ReportTemplate(
+        "ruff",
+        "python/ruff-ecosystem/ruff_ecosystem/report.html",
+        (
+            "check-stable.html",
+            "check-preview.html",
+            "format-stable.html",
+            "format-preview.html",
+        ),
+    ),
+    ".github/workflows/ty-ecosystem-analyzer.yaml": ReportTemplate(
+        "ecosystem-analyzer",
+        "src/ecosystem_analyzer/templates/diff.html",
+        ("diff.html",),
+    ),
+    ".github/workflows/ty-ecosystem-report.yaml": ReportTemplate(
+        "ecosystem-analyzer",
+        "src/ecosystem_analyzer/templates/ecosystem_report.html",
+        ("index.html",),
+    ),
+}
 
 
 class ReportTooLargeError(ValueError):
     pass
+
+
+class InlineScriptParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.hashes: list[str] = []
+        self.script: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "script":
+            return
+        if any(name == "src" for name, _ in attrs):
+            raise ValueError("External scripts are not supported in hosted reports.")
+        script_type = (
+            (next((value for name, value in attrs if name == "type"), None) or "")
+            .strip()
+            .lower()
+        )
+        if script_type == "application/json":
+            return
+        if script_type not in {
+            "",
+            "module",
+            "text/javascript",
+            "application/javascript",
+        }:
+            raise ValueError(f"Unsupported inline script type: {script_type!r}.")
+        if len(self.hashes) >= MAX_INLINE_SCRIPTS:
+            raise ValueError("The report contains too many inline scripts.")
+        self.script = []
+
+    def handle_data(self, data: str) -> None:
+        if self.script is not None:
+            self.script.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self.script is not None:
+            # Browsers normalize HTML line endings before hashing inline scripts.
+            source = "".join(self.script).replace("\r\n", "\n").replace("\r", "\n")
+            digest = hashlib.sha256(source.encode("utf-8")).digest()
+            self.hashes.append(base64.b64encode(digest).decode("ascii"))
+            self.script = None
+
+
+def script_hashes(html: str) -> list[str]:
+    parser = InlineScriptParser()
+    parser.feed(html)
+    parser.close()
+    if parser.script is not None:
+        raise ValueError("An inline script is missing its closing tag.")
+    return sorted(parser.hashes)
+
+
+def read_template(template: ReportTemplate) -> str:
+    if template.repository == "ruff":
+        return (REPOSITORY_ROOT / template.path).read_text(encoding="utf-8")
+
+    with (REPOSITORY_ROOT / "uv.lock").open("rb") as file:
+        packages = tomllib.load(file)["package"]
+    sources = [
+        package["source"].get("git", "")
+        for package in packages
+        if package["name"] == "ecosystem-analyzer"
+    ]
+    if len(sources) != 1 or not (
+        match := re.fullmatch(
+            r"https://github\.com/astral-sh/ecosystem-analyzer#([0-9a-f]{40})",
+            sources[0],
+        )
+    ):
+        raise ValueError(
+            "The trusted lockfile must pin ecosystem-analyzer to a Git commit."
+        )
+    url = f"https://raw.githubusercontent.com/astral-sh/ecosystem-analyzer/{match[1]}/{template.path}"
+    with urlopen(url, timeout=30) as response:
+        data = response.read(MAX_TEMPLATE_BYTES + 1)
+    if len(data) > MAX_TEMPLATE_BYTES:
+        raise ReportTooLargeError("The report template exceeds the size limit.")
+    return data.decode("utf-8")
 
 
 def read_html_files(value: str) -> dict[str, tuple[str, str]]:
@@ -197,43 +319,71 @@ def upload_html_report(
     prefix: str,
     bucket: str,
     base_url: str,
-) -> str:
+    workflow_path: str,
+) -> dict[str, str]:
     if not files or not base_url:
         raise ValueError(
             "HTML report files and their public base URL must be configured."
         )
     archive = download_artifact(artifact, max_bytes=MAX_HTML_ARCHIVE_BYTES)
-    reports = {}
+    template = REPORT_TEMPLATES.get(workflow_path)
+    approved_hashes = (
+        script_hashes(read_template(template))
+        if template is not None and any(name in files for name in template.filenames)
+        else []
+    )
+    reports: dict[str, tuple[bytes, str]] = {}
     total_bytes = 0
     for filename in files:
-        contents = read_report(
-            archive, filename, max_bytes=MAX_HTML_REPORT_BYTES
-        ).encode()
-        total_bytes += len(contents)
+        contents = read_report(archive, filename, max_bytes=MAX_HTML_REPORT_BYTES)
+        encoded = contents.encode("utf-8")
+        total_bytes += len(encoded)
         if total_bytes > MAX_HTML_REPORT_BYTES:
             raise ValueError("The uncompressed HTML report exceeds the size limit.")
-        reports[filename] = contents
-    for filename, contents in reports.items():
+        metadata = ""
+        if template is not None and filename in template.filenames:
+            if files[filename][0] != "text/html; charset=utf-8":
+                raise ValueError(f"Expected {filename} to be UTF-8 HTML.")
+            try:
+                actual_hashes = script_hashes(contents)
+            except ValueError as error:
+                logger.warning("Skipping %s: invalid script: %s", filename, error)
+                continue
+            if actual_hashes != approved_hashes:
+                logger.warning(
+                    "Skipping %s: scripts do not match the trusted template.", filename
+                )
+                continue
+            metadata = " ".join(dict.fromkeys(approved_hashes))
+        reports[filename] = (encoded, metadata)
+    for filename, (contents, metadata) in reports.items():
+        command = [
+            "aws",
+            "s3",
+            "cp",
+            "-",
+            f"s3://{bucket}/{prefix}/{filename}",
+            "--content-type",
+            files[filename][0],
+            "--content-encoding",
+            "gzip",
+            "--cache-control",
+            "public, max-age=3600",
+            "--only-show-errors",
+        ]
+        if metadata:
+            # CloudFront must turn these space-separated base64 SHA-256 digests
+            # into script-src hash sources and use 'none' for absent or invalid metadata.
+            command.extend(["--metadata", json.dumps({"csp-script-sha256": metadata})])
         subprocess.run(
-            [
-                "aws",
-                "s3",
-                "cp",
-                "-",
-                f"s3://{bucket}/{prefix}/{filename}",
-                "--content-type",
-                files[filename][0],
-                "--content-encoding",
-                "gzip",
-                "--cache-control",
-                "public, max-age=3600",
-                "--only-show-errors",
-            ],
+            command,
             input=gzip.compress(contents, compresslevel=6, mtime=0),
             check=True,
             timeout=120,
         )
-    return f"{base_url.rstrip('/')}/{prefix}"
+    return {
+        filename: f"{base_url.rstrip('/')}/{prefix}/{filename}" for filename in reports
+    }
 
 
 def render_report(
@@ -244,7 +394,7 @@ def render_report(
     *,
     title: str = "",
     full_report: dict | None = None,
-    full_report_url: str = "",
+    html_urls: dict[str, str] | None = None,
     html_files: dict[str, tuple[str, str]] | None = None,
 ) -> str:
     header = (
@@ -253,14 +403,14 @@ def render_report(
     )
     if title:
         header += f"## {title}\n\n"
-    if full_report_url:
+    if html_urls:
         links = []
         for filename, (_, label) in (html_files or {}).items():
-            if label:
+            if label and (url := html_urls.get(filename)):
                 label = (
                     label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
                 )
-                links.append(f"[{label}]({full_report_url}/{filename})")
+                links.append(f"[{label}]({url})")
         if links:
             header += " · ".join(links) + "\n\n"
     if full_report is not None:
@@ -357,15 +507,16 @@ def publish(
     full_report = (
         find_artifact(run_id, full_report_artifact) if full_report_artifact else None
     )
-    full_report_url = ""
+    html_urls = {}
     if full_report is not None and html_bucket and not dry_run:
         try:
-            full_report_url = upload_html_report(
+            html_urls = upload_html_report(
                 html_files or {},
                 full_report,
                 prefix=f"ruff/pull-requests/{pull_request}/{report}/{run_id}/{run_attempt}",
                 bucket=html_bucket,
                 base_url=html_base_url,
+                workflow_path=run["path"],
             )
         except Exception:
             # An upload failure must not suppress the summary or artifact link.
@@ -377,7 +528,7 @@ def publish(
         artifact,
         title=title,
         full_report=full_report,
-        full_report_url=full_report_url,
+        html_urls=html_urls,
         html_files=html_files,
     )
     if dry_run:
@@ -438,14 +589,17 @@ def publish_weekly_report(
         raise ValueError("No full-report artifact is available.")
     if not bucket:
         raise ValueError("The report bucket must be configured.")
-    report_url = upload_html_report(
+    html_urls = upload_html_report(
         html_files,
         artifact,
         prefix="ruff/ty-ecosystem",
         bucket=bucket,
         base_url=base_url,
+        workflow_path=run["path"],
     )
-    return f"{report_url}/index.html"
+    if (report_url := html_urls.get("index.html")) is None:
+        raise ValueError("The weekly HTML report was not uploaded.")
+    return report_url
 
 
 def main() -> None:
