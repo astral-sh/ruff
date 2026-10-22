@@ -7,9 +7,7 @@ use insta::assert_snapshot;
 #[cfg(feature = "test-uv")]
 use insta::internals::SettingsBindDropGuard;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
-};
+use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -20,7 +18,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_trivia::textwrap::dedent;
 use ruff_ranged_value::{RangedValue, ValueSource};
 use ty_module_resolver::{Module, ModuleName};
-use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
+use ty_project::metadata::options::{EnvironmentOptions, Options, OutputFormat, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
@@ -318,12 +316,9 @@ impl TestCase {
     }
 
     fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
-        DisplayDiagnostics::new(
-            self.db(),
-            &DisplayDiagnosticConfig::new("ty").format(DiagnosticFormat::Concise),
-            diagnostics,
-        )
-        .to_string()
+        OutputFormat::Concise
+            .display(self.db(), &DisplayDiagnosticConfig::new("ty"), diagnostics)
+            .to_string()
     }
 }
 

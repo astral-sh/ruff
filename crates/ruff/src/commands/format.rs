@@ -603,7 +603,7 @@ impl<'a> FormatResults<'a> {
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
 
-        render_diagnostics(f, output_format, config, &context, &diagnostics)
+        render_diagnostics(f, output_format, &config, &context, &diagnostics)
     }
 
     /// Write a summary of the formatting results to the given writer.

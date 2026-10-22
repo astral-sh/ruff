@@ -6,7 +6,6 @@ use annotate_snippets::{
     Annotation as AnnotateAnnotation, AnnotationKind, Group as AnnotateGroup,
     Level as AnnotateLevel, Snippet as AnnotateSnippet,
 };
-use full::FullRenderer;
 use ruff_notebook::{Notebook, NotebookIndex};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -18,19 +17,29 @@ use crate::{
 };
 
 use super::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticSource, DisplayDiagnosticConfig,
-    SubDiagnostic, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, SubDiagnostic, UnifiedFile,
 };
 
-use azure::AzureRenderer;
-use concise::ConciseRenderer;
-use github::GithubRenderer;
-use pylint::PylintRenderer;
+pub use azure::AzureRenderer;
+pub use concise::ConciseRenderer;
+pub use full::FullRenderer;
+pub use github::GithubRenderer;
+#[cfg(feature = "serde")]
+pub use gitlab::GitlabRenderer;
+#[cfg(feature = "serde")]
+pub use json::JsonRenderer;
+#[cfg(feature = "serde")]
+pub use json_lines::JsonLinesRenderer;
+#[cfg(feature = "junit")]
+pub use junit::JunitRenderer;
+pub use pylint::PylintRenderer;
+#[cfg(feature = "serde")]
+pub use rdjson::RdjsonRenderer;
 
 mod azure;
 mod concise;
 mod full;
-pub mod github;
+mod github;
 #[cfg(feature = "serde")]
 mod gitlab;
 #[cfg(feature = "serde")]
@@ -43,115 +52,23 @@ mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
 
-/// A type that implements `std::fmt::Display` for diagnostic rendering.
-///
-/// It is created via [`Diagnostic::display`].
-///
-/// The lifetime parameter, `'a`, refers to the shorter of:
-///
-/// * The lifetime of the rendering configuration.
-/// * The lifetime of the resolver used to load the contents of `Span`
-///   values. When using Salsa, this most commonly corresponds to the lifetime
-///   of a Salsa `Db`.
-/// * The lifetime of the diagnostic being rendered.
-pub struct DisplayDiagnostic<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a dyn FileResolver,
-    diag: &'a Diagnostic,
-}
+/// Renders diagnostics in a particular output format.
+pub trait Renderer {
+    /// Renders diagnostics to a formatter.
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result;
 
-impl<'a> DisplayDiagnostic<'a> {
-    pub(crate) fn new(
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-        diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a> {
-        DisplayDiagnostic {
-            config,
-            resolver,
-            diag,
-        }
+    /// Returns a display implementation for these diagnostics.
+    fn display<'a>(&'a self, diagnostics: &'a [Diagnostic]) -> impl std::fmt::Display + 'a {
+        std::fmt::from_fn(move |f| self.render(f, diagnostics))
     }
-}
 
-impl std::fmt::Display for DisplayDiagnostic<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        DisplayDiagnostics::new(self.resolver, self.config, std::slice::from_ref(self.diag)).fmt(f)
-    }
-}
-
-/// A type that implements `std::fmt::Display` for rendering a collection of diagnostics.
-///
-/// It is intended for collections of diagnostics that need to be serialized together, as is the
-/// case for JSON, for example.
-///
-/// See [`DisplayDiagnostic`] for rendering individual `Diagnostic`s and details about the lifetime
-/// constraints.
-pub struct DisplayDiagnostics<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a dyn FileResolver,
-    diagnostics: &'a [Diagnostic],
-}
-
-impl<'a> DisplayDiagnostics<'a> {
-    pub fn new(
-        resolver: &'a dyn FileResolver,
-        config: &'a DisplayDiagnosticConfig,
-        diagnostics: &'a [Diagnostic],
-    ) -> DisplayDiagnostics<'a> {
-        DisplayDiagnostics {
-            config,
-            resolver,
-            diagnostics,
-        }
-    }
-}
-
-impl std::fmt::Display for DisplayDiagnostics<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.config.format {
-            DiagnosticFormat::Concise => {
-                ConciseRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Full => {
-                FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Json => {
-                json::JsonRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::JsonLines => {
-                json_lines::JsonLinesRenderer::new(self.resolver, self.config)
-                    .render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver, self.config)
-                    .render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "junit")]
-            DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config)
-                    .render(f, self.diagnostics)?;
-            }
-            #[cfg(feature = "serde")]
-            DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver, self.config)
-                    .render(f, self.diagnostics)?;
-            }
-            DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
-            }
-        }
-
-        Ok(())
+    /// Writes diagnostics to an I/O writer.
+    fn write(
+        &self,
+        writer: &mut dyn std::io::Write,
+        diagnostics: &[Diagnostic],
+    ) -> std::io::Result<()> {
+        write!(writer, "{}", self.display(diagnostics))
     }
 }
 
@@ -2537,11 +2454,32 @@ watermelon
         );
     }
 
+    #[derive(Default)]
+    pub(super) enum DiagnosticFormat {
+        #[default]
+        Full,
+        Concise,
+        Azure,
+        Github,
+        Pylint,
+        #[cfg(feature = "serde")]
+        Json,
+        #[cfg(feature = "serde")]
+        JsonLines,
+        #[cfg(feature = "serde")]
+        Rdjson,
+        #[cfg(feature = "serde")]
+        Gitlab,
+        #[cfg(feature = "junit")]
+        Junit,
+    }
+
     /// A small harness for setting up an environment specifically for testing
     /// diagnostic rendering.
     pub(super) struct TestEnvironment {
         db: TestDb,
         config: DisplayDiagnosticConfig,
+        format: DiagnosticFormat,
     }
 
     impl TestEnvironment {
@@ -2552,6 +2490,7 @@ watermelon
             let mut env = TestEnvironment {
                 db: TestDb::new(),
                 config: DisplayDiagnosticConfig::new("ty"),
+                format: DiagnosticFormat::default(),
             };
             // Default to a merge window of 0 for testing purposes,
             // even though this is not the default for user-facing diagnostics.
@@ -2581,8 +2520,7 @@ watermelon
 
         /// Set the output format to use in diagnostic rendering.
         pub(super) fn format(&mut self, format: DiagnosticFormat) {
-            let config = self.config.clone();
-            self.config = config.format(format);
+            self.format = format;
         }
 
         /// Enable preview functionality for diagnostic rendering.
@@ -2710,7 +2648,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         pub(super) fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(&self.db, &self.config).to_string()
+            self.render_diagnostics(std::slice::from_ref(diag))
         }
 
         /// Render the given diagnostics into a `String`.
@@ -2719,7 +2657,44 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         pub(super) fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
-            DisplayDiagnostics::new(&self.db, &self.config, diagnostics).to_string()
+            std::fmt::from_fn(|f| match self.format {
+                DiagnosticFormat::Full => {
+                    FullRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Concise => {
+                    ConciseRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Azure => {
+                    AzureRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Github => {
+                    GithubRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                DiagnosticFormat::Pylint => {
+                    PylintRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Json => {
+                    JsonRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::JsonLines => {
+                    JsonLinesRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Rdjson => {
+                    RdjsonRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "serde")]
+                DiagnosticFormat::Gitlab => {
+                    GitlabRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+                #[cfg(feature = "junit")]
+                DiagnosticFormat::Junit => {
+                    JunitRenderer::new(&self.db, &self.config).render(f, diagnostics)
+                }
+            })
+            .to_string()
         }
     }
 

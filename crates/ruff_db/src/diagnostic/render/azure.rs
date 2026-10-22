@@ -2,25 +2,21 @@ use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
-pub(super) struct AzureRenderer<'a> {
+pub struct AzureRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> AzureRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl AzureRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for AzureRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diag in diagnostics {
             let severity = match diag.severity() {
                 Severity::Info | Severity::Warning => "warning",
@@ -63,9 +59,8 @@ impl AzureRenderer<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

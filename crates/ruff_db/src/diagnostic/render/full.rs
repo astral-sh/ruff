@@ -11,25 +11,23 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::diagnostic::render::{FileResolver, Resolved};
+use crate::diagnostic::render::{FileResolver, Renderer, Resolved};
 use crate::diagnostic::stylesheet::{DiagnosticStylesheet, fmt_styled};
 use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
-pub(super) struct FullRenderer<'a> {
+pub struct FullRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> FullRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for FullRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let stylesheet = if self.config.color {
             DiagnosticStylesheet::styled().hyperlinks(self.config.hyperlinks)
         } else {
@@ -385,10 +383,10 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
-        Annotation, DiagnosticFormat, Severity,
+        Annotation, Severity,
         render::tests::{
-            NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
-            create_syntax_error_diagnostics,
+            DiagnosticFormat, NOTEBOOK, TestEnvironment, create_diagnostics,
+            create_notebook_diagnostics, create_syntax_error_diagnostics,
         },
     };
 
