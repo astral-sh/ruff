@@ -20,7 +20,10 @@ use crate::types::constraints::{
 use crate::types::signatures::CallableSignature;
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    DynamicContentMode, TypeCollector, TypeVisitor, any_over_type_expanding_aliases,
+    dynamic_content_impl, walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplySpecialization, ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type,
     TypeContext, TypeMapping, TypeVarVariance, UnionType,
@@ -392,6 +395,12 @@ impl<'db> SequentMap<'db> {
             AtomicConstraint::ConcreteUpper(bound) => {
                 bound.bound == bound.typevar.domain(db).top(db)
                     || bound.bound == bound.typevar.domain(db).bottom(db)
+                    || bound.bound.as_union().is_some_and(|union| {
+                        union
+                            .elements(db)
+                            .iter()
+                            .any(|element| element.is_type_var())
+                    })
             }
             AtomicConstraint::ConcreteEquivalence(_) => false,
             AtomicConstraint::TypeVarRange(bound) => bound.left.is_same_typevar_as(db, bound.right),
@@ -1655,7 +1664,7 @@ impl<'db> ConcreteUpperBound<'db> {
     fn add_sequents(
         self,
         db: &'db dyn Db,
-        _env: &ProgramEnvironment<'db>,
+        env: &ProgramEnvironment<'db>,
         map: &mut SequentMapBuilder<'db>,
     ) {
         // `T ≤ ⊤` is always true
@@ -1667,6 +1676,48 @@ impl<'db> ConcreteUpperBound<'db> {
         if self.bound == self.typevar.domain(db).bottom(db) {
             let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
+        }
+
+        // `U ≤ T | A` implies `U & ~A ≤ T`. In particular, when U is fixed by the caller,
+        // the original upper bound cannot select a solution for T. The residual lower bound
+        // preserves U without requiring T to accept the part of U already covered by A.
+        // This set-theoretic implication requires static bounds: gradual assignability does
+        // not support moving a union member across the relation by negating it.
+        let Type::Union(union) = self.bound else {
+            return;
+        };
+        for element in union.elements(db) {
+            let Type::TypeVar(typevar) = *element else {
+                continue;
+            };
+            let other_elements = union.elements(db).iter().filter(|other| *other != element);
+            // Wait for substitutions to resolve other type variables in the union. Otherwise,
+            // `U ≤ T | V` would produce mutually dependent lower bounds `U & ~V ≤ T` and
+            // `U & ~T ≤ V`, which cannot independently select solutions for T and V.
+            // Inspect aliases and lazy structural members for gradual content, while leaving
+            // the inferred variable's own bound and default opaque.
+            if other_elements.clone().any(|other| {
+                any_over_type_expanding_aliases(db, env, *other, Type::is_type_var)
+                    || !dynamic_content_impl(db, env, *other, DynamicContentMode::Materialization)
+                        .is_absent()
+            }) {
+                continue;
+            }
+            let residual = IntersectionType::bounded_from_elements(
+                db,
+                env,
+                std::iter::once(Type::TypeVar(self.typevar))
+                    .chain(other_elements.map(|other| other.negate(db, env))),
+            );
+            // `Never ≤ T` supplies no inference evidence and must not override T's default.
+            let Some(residual) = residual.filter(|residual| !residual.is_never()) else {
+                continue;
+            };
+            for derived in AtomicConstraint::new_lower_bound(db, self.provenance, typevar, residual)
+                .filter_map(Result::ok)
+            {
+                map.add_single_implication(self.into(), derived);
+            }
         }
     }
 
