@@ -8,8 +8,8 @@ use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
     InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_setattr_member,
-    attribute_write_requirement, descriptor_setter_domain, instance_attribute_write_is_blocked,
-    instance_setattr_dispatch, property_setter_returns_never,
+    attribute_write_abstains, attribute_write_requirement, descriptor_setter_domain,
+    instance_attribute_write_is_blocked, instance_setattr_dispatch, property_setter_returns_never,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
@@ -123,7 +123,7 @@ impl<'db> AttributeDeprecation<'db> {
                 let requirement = attribute_write_requirement(db, env, *ty, attribute, *receiver);
                 deprecation.union(db, Self::from_requirement(db, env, &requirement, attribute))
             }),
-            AttributeWriteRequirement::Any {
+            AttributeWriteRequirement::Intersection {
                 intersection,
                 receiver,
                 ..
@@ -282,9 +282,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
         let env = self.builder.program_environment();
         if let Some(deprecation) = deprecation.as_deref_mut() {
             *deprecation = match requirement {
-                AttributeWriteRequirement::All { .. } | AttributeWriteRequirement::Any { .. } => {
-                    AttributeDeprecation::Missing
-                }
+                AttributeWriteRequirement::All { .. }
+                | AttributeWriteRequirement::Intersection { .. } => AttributeDeprecation::Missing,
                 _ => AttributeDeprecation::from_requirement(db, env, requirement, self.attribute),
             };
         }
@@ -337,23 +336,52 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 }
                 valid
             }
-            AttributeWriteRequirement::Any {
+            AttributeWriteRequirement::Intersection {
                 object_ty,
                 intersection,
                 receiver,
             } => {
+                // Reading this attribute combines every positive element's declared type into an
+                // intersection, so a write must satisfy every element that declares it too. An
+                // element with no declaration of its own and no `__setattr__` anywhere in its MRO
+                // has nothing to say about this attribute and is skipped, rather than treated as
+                // the attribute-not-found failure it would be as a standalone (non-intersection)
+                // receiver.
                 let attribute = self.attribute;
-                let mut requirements = intersection
-                    .positive(db)
+                let positive = intersection.positive(db);
+                // When every positive element abstains, nobody has anything to say about this
+                // attribute; evaluate each one for real instead of vacuously skipping all of
+                // them, so a write still gets the same composite diagnostic a lone element with
+                // no declaration and no `__setattr__` would produce.
+                let all_abstain = positive.iter().all(|ty| {
+                    attribute_write_abstains(
+                        db,
+                        env,
+                        &attribute_write_requirement(db, env, *ty, attribute, *receiver),
+                    )
+                });
+                let mut requirements = positive
                     .iter()
                     .map(|ty| attribute_write_requirement(db, env, *ty, attribute, *receiver));
-                let valid = requirements.by_ref().any(|requirement| {
+                // The context used to commit a context-sensitive value (a lambda, an overload)
+                // is the first non-abstaining element's, matching what the single successful
+                // element would have been under the old any-of-the-elements check: every element
+                // still has to independently accept the value, but only the first one's context
+                // drives contextual inference. Captured right after that element's own (silent)
+                // check, rather than by re-running it, so its diagnostics (e.g. a possibly-missing
+                // declaration) are not reported twice.
+                let mut first_tcx = None;
+                let valid = requirements.by_ref().all(|requirement| {
+                    if !all_abstain && attribute_write_abstains(db, env, &requirement) {
+                        return true;
+                    }
                     let mut current = AttributeDeprecation::Missing;
                     let valid = self.evaluate(
                         &requirement,
                         false,
                         deprecation.as_ref().map(|_| &mut current),
                     );
+                    first_tcx.get_or_insert_with(|| self.infer_value_ty.last_tcx());
                     if let Some(deprecation) = deprecation.as_deref_mut() {
                         *deprecation = deprecation.intersection(db, current);
                     }
@@ -375,7 +403,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     }
                 }
                 if valid {
-                    self.infer_with_last_context(emit_diagnostics);
+                    self.infer_value(first_tcx.unwrap_or_default(), emit_diagnostics);
                     self.validate_composite_final_assignment(*object_ty, emit_diagnostics);
                 } else {
                     let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);

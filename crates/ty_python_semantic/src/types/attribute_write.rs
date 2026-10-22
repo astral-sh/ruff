@@ -41,8 +41,11 @@ pub(super) enum AttributeWriteRequirement<'db> {
         element_tys: &'db [Type<'db>],
         receiver: Option<Type<'db>>,
     },
-    /// A write to an intersection may target any positive intersection element.
-    Any {
+    /// A write to an intersection must be valid for every positive element that declares the
+    /// attribute; an element with no declaration of its own falls through to `__setattr__`.
+    /// Reading the same attribute combines every element's declared type into an intersection
+    /// (`P & Q`), so a write that satisfied only one element's type could violate the other's.
+    Intersection {
         object_ty: Type<'db>,
         intersection: IntersectionType<'db>,
         receiver: Option<Type<'db>>,
@@ -127,6 +130,39 @@ pub(super) enum InstanceAttributeWriteMember<'db> {
     Instance(FallbackAttributeWriteRequirement<'db>),
     /// No declared member was found, so the write is governed by `__setattr__`.
     SetAttr,
+}
+
+/// Whether a positive intersection element has nothing to say about this attribute: no declared
+/// field, class member, or metaclass member, and no `__setattr__` resolvable anywhere in its own
+/// MRO (excluding `object`'s default). Such an element should not veto a write that a sibling
+/// element's declared type accepts; it is simply silent about this attribute, not actively
+/// blocking it.
+pub(super) fn attribute_write_abstains<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    requirement: &AttributeWriteRequirement<'db>,
+) -> bool {
+    let object_ty = match requirement {
+        AttributeWriteRequirement::Instance {
+            member: InstanceAttributeWriteMember::SetAttr,
+            object_ty,
+            ..
+        }
+        | AttributeWriteRequirement::Class {
+            member: ClassAttributeWriteMember::Unresolved { .. },
+            object_ty,
+        } => *object_ty,
+        _ => return false,
+    };
+    object_ty
+        .member_lookup_with_policy(
+            db,
+            env,
+            "__setattr__",
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
+        .place
+        .is_undefined()
 }
 
 /// Resolve attribute-specific dispatch through inherited frozen-dataclass setters.
@@ -354,7 +390,7 @@ pub(super) fn attribute_write_requirement<'db>(
 
         Type::Intersection(intersection) => {
             // TODO: Handle negative intersection elements.
-            AttributeWriteRequirement::Any {
+            AttributeWriteRequirement::Intersection {
                 object_ty: receiver.unwrap_or(object_ty),
                 intersection,
                 receiver,
@@ -1462,24 +1498,37 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
                 result
             }
-            AttributeWriteRequirement::Any {
+            AttributeWriteRequirement::Intersection {
                 intersection,
                 receiver,
                 ..
             } => {
                 let env = self.env;
-                let mut result = self.never();
-                for element_ty in intersection.positive(db) {
+                let positive = intersection.positive(db);
+                // When every positive element abstains, nobody has anything to say about this
+                // attribute; check each one for real instead of vacuously skipping all of them.
+                let all_abstain = positive.iter().all(|element_ty| {
+                    attribute_write_abstains(
+                        db,
+                        env,
+                        &attribute_write_requirement(db, env, *element_ty, member_name, *receiver),
+                    )
+                });
+                let mut result = self.always();
+                for element_ty in positive {
                     let requirement =
                         attribute_write_requirement(db, env, *element_ty, member_name, *receiver);
+                    if !all_abstain && attribute_write_abstains(db, env, &requirement) {
+                        continue;
+                    }
                     let element_result = self.check_attribute_write_requirement(
                         db,
                         &requirement,
                         member_name,
                         value_ty,
                     );
-                    result = result.or(db, self.constraints, || element_result);
-                    if result.is_trivially_always_satisfied() {
+                    result = result.and(db, self.constraints, || element_result);
+                    if result.is_trivially_never_satisfied() {
                         break;
                     }
                 }
