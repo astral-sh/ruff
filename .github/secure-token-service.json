@@ -28,7 +28,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ty-ecosystem-analyzer.yaml",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "on": ["pull_request"],
       "permissions": { "actions": "read", "pull_requests": "write" },
       "target": "ruff"
@@ -38,7 +38,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "typing_conformance.yaml",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "on": ["pull_request"],
       "permissions": { "actions": "read", "pull_requests": "write" },
       "target": "ruff"
@@ -48,7 +48,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "memory_report.yaml",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "on": ["pull_request"],
       "permissions": { "actions": "read", "pull_requests": "write" },
       "target": "ruff"
@@ -58,7 +58,7 @@
       "environment": "automations",
       "caller_ref": "refs/pull/*/merge",
       "caller_workflow": "ci.yaml",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "on": ["pull_request"],
       "permissions": { "actions": "read", "pull_requests": "write" },
       "target": "ruff"

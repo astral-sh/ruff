@@ -13,7 +13,7 @@
       "caller_workflow": "ci.yaml",
       "caller_ref": "refs/pull/*/merge",
       "environment": "automations",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "permissions": { "pull-request": ["read", "write"] }
     },
     {
@@ -21,7 +21,7 @@
       "caller_workflow": "memory_report.yaml",
       "caller_ref": "refs/pull/*/merge",
       "environment": "automations",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "permissions": { "pull-request": ["read", "write"] }
     },
     {
@@ -29,7 +29,7 @@
       "caller_workflow": "typing_conformance.yaml",
       "caller_ref": "refs/pull/*/merge",
       "environment": "automations",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "permissions": { "pull-request": ["read", "write"] }
     },
     {
@@ -37,7 +37,7 @@
       "caller_workflow": "ty-ecosystem-analyzer.yaml",
       "caller_ref": "refs/pull/*/merge",
       "environment": "automations",
-      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@719338368f9f8e2ebedeb9ab0ded3d71a7099782",
+      "reusable_workflow": "astral-sh/ruff/.github/workflows/publish-pull-request-report.yml@refs/heads/main",
       "permissions": { "pull-request": ["read", "write"] }
     }
   ]
