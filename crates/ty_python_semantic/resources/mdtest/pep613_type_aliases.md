@@ -524,6 +524,26 @@ def f(x: B | Not[B]):
     reveal_type(x)  # revealed: B | ~B
 ```
 
+## Negated recursive unions
+
+Negating a recursive union is equivalent to intersecting the negations of its members, including
+when the alias contains gradual types.
+
+```py
+from typing import Any, TypeAlias, TypeVar, assert_type
+from ty_extensions import Intersection, Not
+
+A: TypeAlias = "int | list[tuple[Any, A]]"
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Intersection[Not[int], Not[list[tuple[Any, A]]]]):
+    assert_type(identity(x), Intersection[Not[int], Not[list[tuple[Any, A]]]])
+    assert_type(identity(y), Not[A])
+```
+
 ## Specializing non-generic recursive aliases
 
 A recursive alias without type variables cannot be specialized. Quoting the entire definition does
