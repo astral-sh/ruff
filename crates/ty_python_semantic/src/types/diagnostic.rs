@@ -3630,9 +3630,9 @@ pub(super) enum ClassMatches<'db> {
 }
 
 impl<'db> ClassMatches<'db> {
-    fn into_possible(self) -> Self {
+    fn into_always(self) -> Self {
         match self {
-            Self::Always(classes) | Self::Possibly(classes) => Self::Possibly(classes),
+            Self::Always(classes) | Self::Possibly(classes) => Self::Always(classes),
         }
     }
 
@@ -3642,33 +3642,52 @@ impl<'db> ClassMatches<'db> {
         }
     }
 
+    /// Find non-protocol class literals or known bounds in `ty`.
+    pub(super) fn find_non_protocol_classes(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Option<Self> {
+        Self::find_matching_classes(db, env, ty, |class| {
+            // ty's protocol-base rule forbids protocols from inheriting from non-protocol
+            // classes other than `object`, so subclasses of other non-protocol classes cannot
+            // be protocols. A `type[object]` bound is normalized to `type`, so it does not
+            // reach this predicate; the exact class `object` is itself not a protocol.
+            if class.is_protocol(db) {
+                None
+            } else {
+                Some(Self::Always(smallvec_inline![class]))
+            }
+        })
+    }
+
     /// Find class literals or known bounds in `ty` that satisfy `predicate`.
     ///
-    /// The search does not inspect arbitrary subclasses, so returning `None` does not rule out
-    /// other values that satisfy `predicate`.
+    /// The predicate returns a match if the class itself satisfies it. `Always` means that its
+    /// subclasses also match; `Possibly` allows them not to. For an exact class literal, a match
+    /// is always definite regardless of its subclasses.
+    ///
+    /// The search does not inspect arbitrary subclasses or every type form, so returning `None`
+    /// does not rule out other values that satisfy `predicate`.
     pub(super) fn find_matching_classes(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
-        predicate: impl Fn(ClassType<'db>) -> bool + Copy,
+        predicate: impl Fn(ClassType<'db>) -> Option<Self> + Copy,
     ) -> Option<Self> {
         match ty {
             Type::ClassLiteral(class) => {
-                let class = ClassType::NonGeneric(class);
-                predicate(class).then(|| Self::Always(smallvec_inline![class]))
+                predicate(ClassType::NonGeneric(class)).map(Self::into_always)
             }
             Type::SubclassOf(subclass) => {
                 match subclass.subclass_of().with_transposed_type_var(db, env) {
-                    SubclassOfInner::Class(class) => {
-                        predicate(class).then(|| Self::Possibly(smallvec_inline![class]))
-                    }
+                    SubclassOfInner::Class(class) => predicate(class),
                     SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => None,
                     SubclassOfInner::TypeVar(typevar) => {
                         let bound = typevar
                             .require_bound_or_constraints(db, env)
                             .as_type(db, env);
                         Self::find_matching_classes(db, env, bound, predicate)
-                            .map(Self::into_possible)
                     }
                 }
             }

@@ -532,8 +532,8 @@ runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
 runtime_checkable(P)  # no diagnostic
 ```
 
-An argument annotated as `type[NotAProtocol]` may be `NotAProtocol` itself, so this call may raise
-`TypeError`:
+ty treats both `NotAProtocol` and its subclasses as non-protocol classes, so it reports that the
+call will raise `TypeError`:
 
 ```py
 def check(cls: type[NotAProtocol]):
@@ -545,6 +545,52 @@ error[invalid-argument-type]: Invalid argument to `runtime_checkable`
   --> src/mdtest_snippet.py:13:5
    |
 13 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
+   |     ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+info: Only protocol classes can be passed to `runtime_checkable`
+info: `NotAProtocol` is declared here, but it is not a protocol class:
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | class NotAProtocol: ...
+  |       ^^^^^^^^^^^^
+info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+```
+
+An upper bound on a type variable gives the same result:
+
+```py
+def check_bounded[T: NotAProtocol](cls: type[T]):
+    runtime_checkable(cls)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to `runtime_checkable`
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
+   |     ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+info: Only protocol classes can be passed to `runtime_checkable`
+info: `NotAProtocol` is declared here, but it is not a protocol class:
+ --> src/mdtest_snippet.py:4:7
+  |
+4 | class NotAProtocol: ...
+  |       ^^^^^^^^^^^^
+info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
+info: See https://typing.python.org/en/latest/spec/protocol.html#
+```
+
+A union that also permits a protocol class may succeed:
+
+```py
+def check_union(cls: type[NotAProtocol] | type[P]):
+    runtime_checkable(cls)  # snapshot: invalid-argument-type
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid argument to `runtime_checkable`
+  --> src/mdtest_snippet.py:17:5
+   |
+17 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
    |     ^^^^^^^^^^^^^^^^^^^^^^ This call may raise `TypeError` at runtime
 info: Only protocol classes can be passed to `runtime_checkable`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
@@ -560,15 +606,9 @@ info: See https://typing.python.org/en/latest/spec/protocol.html#
 def check_extensions(cls: type[NotAProtocol]):
     runtime_checkable_extensions(cls=cls)  # error: [invalid-argument-type]
 
-def check_bounded[T: NotAProtocol](cls: type[T]):
-    runtime_checkable(cls)  # error: [invalid-argument-type]
-
 T = TypeVar("T", bound=NotAProtocol)
 
 def check_legacy_bounded(cls: type[T]):
-    runtime_checkable(cls)  # error: [invalid-argument-type]
-
-def check_union(cls: type[NotAProtocol] | type[P]):
     runtime_checkable(cls)  # error: [invalid-argument-type]
 
 class Q(Protocol): ...
@@ -589,9 +629,9 @@ def check_union_literals(flag: bool):
 
 ```snapshot
 error[invalid-argument-type]: Invalid argument to `runtime_checkable`
-  --> src/mdtest_snippet.py:41:5
+  --> src/mdtest_snippet.py:39:5
    |
-41 |     runtime_checkable(NotAProtocol if flag else P)  # snapshot: invalid-argument-type
+39 |     runtime_checkable(NotAProtocol if flag else P)  # snapshot: invalid-argument-type
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call may raise `TypeError` at runtime
 info: Only protocol classes can be passed to `runtime_checkable`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
@@ -619,9 +659,9 @@ def check_invalid_union_concise(flag: bool):
 
 ```snapshot
 error[invalid-argument-type]: Invalid argument to `runtime_checkable`
-  --> src/mdtest_snippet.py:45:5
+  --> src/mdtest_snippet.py:43:5
    |
-45 |     runtime_checkable(NotAProtocol if flag else OtherNotAProtocol)  # snapshot: invalid-argument-type
+43 |     runtime_checkable(NotAProtocol if flag else OtherNotAProtocol)  # snapshot: invalid-argument-type
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
 info: Only protocol classes can be passed to `runtime_checkable`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
@@ -630,16 +670,16 @@ info: `NotAProtocol` is declared here, but it is not a protocol class:
 4 | class NotAProtocol: ...
   |       ^^^^^^^^^^^^
 info: `OtherNotAProtocol` is declared here, but it is not a protocol class:
-  --> src/mdtest_snippet.py:42:7
+  --> src/mdtest_snippet.py:40:7
    |
-42 | class OtherNotAProtocol: ...
+40 | class OtherNotAProtocol: ...
    |       ^^^^^^^^^^^^^^^^^
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
 ```
 
-The class can also be a subclass of either constraint. ty does not determine whether every subclass
-is a non-protocol, so it reports that the call may raise `TypeError`:
+ty treats both constraints and their subclasses as non-protocol classes, so it reports that the call
+will raise `TypeError`:
 
 ```py
 BothNonProtocols = TypeVar("BothNonProtocols", NotAProtocol, OtherNotAProtocol)
@@ -650,10 +690,10 @@ def check_constrained_non_protocols(cls: type[BothNonProtocols]):
 
 ```snapshot
 error[invalid-argument-type]: Invalid argument to `runtime_checkable`
-  --> src/mdtest_snippet.py:53:5
+  --> src/mdtest_snippet.py:51:5
    |
-53 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
-   |     ^^^^^^^^^^^^^^^^^^^^^^ This call may raise `TypeError` at runtime
+51 |     runtime_checkable(cls)  # snapshot: invalid-argument-type
+   |     ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
 info: Only protocol classes can be passed to `runtime_checkable`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
  --> src/mdtest_snippet.py:4:7
@@ -661,9 +701,9 @@ info: `NotAProtocol` is declared here, but it is not a protocol class:
 4 | class NotAProtocol: ...
   |       ^^^^^^^^^^^^
 info: `OtherNotAProtocol` is declared here, but it is not a protocol class:
-  --> src/mdtest_snippet.py:42:7
+  --> src/mdtest_snippet.py:40:7
    |
-42 | class OtherNotAProtocol: ...
+40 | class OtherNotAProtocol: ...
    |       ^^^^^^^^^^^^^^^^^
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
@@ -726,8 +766,8 @@ class Ordinary: ...
 class ReplacedWithClass(Protocol): ...
 ```
 
-The inner decorator's return annotation describes `Ordinary` or a subclass, so ty reports that
-`runtime_checkable` may receive a non-protocol class:
+The inner decorator's return annotation describes `Ordinary` or a subclass. ty treats both as
+non-protocol classes, so it reports that `runtime_checkable` will raise `TypeError`:
 
 ```py
 def replace_with_subclass(cls: type) -> type[Ordinary]:
@@ -744,7 +784,7 @@ error[invalid-argument-type]: Invalid argument to `runtime_checkable`
   --> src/mdtest_snippet.py:22:1
    |
 22 | @runtime_checkable
-   | ^^^^^^^^^^^^^^^^^^ This call may raise `TypeError` at runtime
+   | ^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
 info: Only protocol classes can be passed to `runtime_checkable`
 info: `Ordinary` is declared here, but it is not a protocol class:
   --> src/mdtest_snippet.py:12:7
@@ -1013,8 +1053,8 @@ get_protocol_members(GenericProtocol[int])  # TODO: should emit a diagnostic her
 
 ## Calling `get_protocol_members` with `type[...]` arguments
 
-An argument annotated as `type[NotAProtocol]` may be `NotAProtocol` itself, so this call may raise
-`TypeError`:
+ty treats both `NotAProtocol` and its subclasses as non-protocol classes, so it reports that the
+call will raise `TypeError`:
 
 ```toml
 [environment]
@@ -1036,7 +1076,7 @@ error[invalid-argument-type]: Invalid argument to `get_protocol_members`
  --> src/mdtest_snippet.py:7:5
   |
 7 |     get_protocol_members(cls)  # snapshot: invalid-argument-type
-  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ This call may raise `TypeError` at runtime
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
 info: Only protocol classes can be passed to `get_protocol_members`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
  --> src/mdtest_snippet.py:4:7

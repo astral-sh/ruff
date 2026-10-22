@@ -57,6 +57,7 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_edits::unwrapped_call_argument;
+use smallvec::smallvec_inline;
 use ty_module_resolver::{ImportingFile, ModuleName, resolve_module};
 use ty_python_core::{
     Truthiness,
@@ -1897,11 +1898,10 @@ impl KnownFunction {
 
             KnownFunction::GetProtocolMembers | KnownFunction::RuntimeCheckable => {
                 if let [Some(parameter_type)] = parameter_types
-                    && let Some(argument) = ClassMatches::find_matching_classes(
+                    && let Some(argument) = ClassMatches::find_non_protocol_classes(
                         db,
                         builder.program_environment(),
                         *parameter_type,
-                        |class| !class.is_protocol(db),
                     )
                 {
                     report_bad_argument_to_protocol_function(
@@ -2133,7 +2133,12 @@ impl KnownFunction {
                 let env = builder.program_environment();
                 if let Some(argument) =
                     ClassMatches::find_matching_classes(db, env, *class_type, |class| {
-                        !class.has_ordering_method_in_mro(db)
+                        // A subclass may add an ordering method.
+                        if !class.has_ordering_method_in_mro(db) {
+                            Some(ClassMatches::Possibly(smallvec_inline![class]))
+                        } else {
+                            None
+                        }
                     })
                 {
                     report_invalid_total_ordering_call(

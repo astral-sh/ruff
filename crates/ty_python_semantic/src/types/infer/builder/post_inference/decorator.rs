@@ -27,10 +27,7 @@ pub(crate) fn check_decorator_calls<'db>(
         if decorator_ty
             .as_function_literal()
             .is_some_and(|function| function.is_known(db, KnownFunction::RuntimeCheckable))
-            && let Some(argument) =
-                ClassMatches::find_matching_classes(db, env, input_ty, |class| {
-                    !class.is_protocol(db)
-                })
+            && let Some(argument) = ClassMatches::find_non_protocol_classes(db, env, input_ty)
         {
             report_bad_argument_to_protocol_function(
                 context,
