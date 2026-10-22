@@ -324,8 +324,6 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - name: "Install Rust toolchain"
         run: rustup show
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
