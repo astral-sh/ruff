@@ -71,7 +71,6 @@ jobs:
           HEAD_SHA: ${{ inputs.head_sha }}
           REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-${{ github.run_id }}-${{ github.run_attempt }}.json
           NEXT_REVIEWER_STATE: ${{ runner.temp }}/reviewer-state-next-${{ github.run_id }}-${{ github.run_attempt }}.json
-          LEGACY_REVIEWER_STATE: ${{ vars.PR_REVIEWER_ROUND_ROBIN_STATE || vars.PR_ASSIGNEE_ROUND_ROBIN_STATE }}
         run: >-
           uv run --script scripts/pull_request_reviewers.py
           --pull-request "$PULL_REQUEST" --head-sha "$HEAD_SHA" --state "$REVIEWER_STATE"

@@ -22,7 +22,7 @@ from urllib.request import Request, urlopen
 REPOSITORY = "astral-sh/ruff"
 REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
-State = dict[str, int | dict[str, float]]
+State = dict[str, dict[str, float]]
 
 
 @dataclass(frozen=True)
@@ -133,25 +133,21 @@ def parse_state(contents: str) -> State:
         raise TypeError("Reviewer state must be an object.")
     state: State = {}
     for name, value in parsed.items():
-        if type(value) is int and value >= 0:
-            # Integer counters predate reviewer credits and seed new credits at zero.
-            state[name] = value
-        elif isinstance(value, dict):
-            credits = {}
-            for login, credit in value.items():
-                if type(credit) not in (int, float) or not math.isfinite(credit):
-                    raise ValueError(f"Invalid reviewer credit in pool {name}.")
-                credits[login] = float(credit)
-            state[name] = credits
-        else:
-            raise ValueError(f"Invalid reviewer state for pool {name}.")
+        if not isinstance(value, dict):
+            raise TypeError(f"Reviewer state for pool {name} must be an object.")
+        credits = {}
+        for login, credit in value.items():
+            if type(credit) not in (int, float) or not math.isfinite(credit):
+                raise ValueError(f"Invalid reviewer credit in pool {name}.")
+            credits[login] = float(credit)
+        state[name] = credits
     return state
 
 
-def load_state(path: Path, legacy: str) -> State:
+def load_state(path: Path) -> State:
     if path.exists():
         return parse_state(path.read_text())
-    return parse_state(legacy) if legacy else {}
+    return {}
 
 
 def eligible_pull(pull: dict, pull_request: int, head_sha: str) -> bool:
@@ -188,8 +184,6 @@ def assign_reviewer(
     while matched:
         pool = choose_pool(matched, rng)
         stored = state.get(pool.name, {})
-        if not isinstance(stored, dict):
-            stored = {}
         # All members earn credit when the pool assigns a review, including the author.
         credits = {
             login: min(1.0, stored.get(login, 0.0) + 1 / len(pool.reviewers))
@@ -245,7 +239,7 @@ def main() -> None:
     if not args.dry_run and args.output is None:
         parser.error("--output is required when requesting a review.")
     pools = load_pools(args.config_directory)
-    state = load_state(args.state, os.environ.get("LEGACY_REVIEWER_STATE", ""))
+    state = load_state(args.state)
     assign_reviewer(
         args.pull_request, args.head_sha, pools, state, dry_run=args.dry_run
     )
