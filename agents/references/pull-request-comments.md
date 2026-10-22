@@ -1,42 +1,34 @@
-# Pull request automation reports
+# Pull request report comments
 
-CI calls `pull-request-comment.yml` to attempt to reserve one of the first three issue comments for a pull request
-whose source branch is in this repository. The reusable workflow runs code from its pinned revision
-and uses STS to post as `astral-automations-bot[bot]`. The comment is an index of links to separate
-report comments.
-
-The caller passes `STS_API_URL` by name so the reusable job can use its value from the `automations`
-environment. The repository's STS policy authorizes the CI caller on `refs/pull/*/merge` and the exact
-reusable workflow revision for `pull_requests: write`. Fork pull requests are excluded. Changes to
-the reusable workflow or its script require updating both its caller and the policy pin.
-
-The helper checks the bot's numeric identity, the owning pull request, and the comment marker before
-using a comment. It finds the index with one request for the first three comments:
+Use `scripts/pull_request_comments.py` to find an automation report by its cached comment ID.
+The helper verifies the bot's numeric identity, the owning pull request, and the report marker
+before returning a comment. Missing, deleted, malformed, or mismatched IDs fall back to paginated
+comment discovery.
 
 ```sh
-uv run --script scripts/pull_request_comments.py find --pull-request "$PULL_REQUEST"
+uv run --script scripts/pull_request_comments.py \
+  --pull-request "$PULL_REQUEST" --report ruff-ecosystem --comment-id "$CACHED_COMMENT_ID"
 ```
 
-Publishers look up their report through the index, then fetch that comment directly to verify its
-identity and marker. A missing or deleted entry falls back to paginated discovery. This also supports
-older pull requests whose first three comment positions are occupied.
+Set `GH_TOKEN` to a GitHub token with access to the PR. Publishing uses an STS token for
+`astral-automations-bot[bot]`; comment lookup only accepts reports authored by that bot.
 
-```sh
-uv run --script scripts/pull_request_comments.py lookup \
-  --pull-request "$PULL_REQUEST" --report ruff-ecosystem
-uv run --script scripts/pull_request_comments.py register \
-  --pull-request "$PULL_REQUEST" --report ruff-ecosystem --comment-id "$COMMENT_ID"
-```
+## Key-value storage
 
-Register the ID returned by GitHub after creating or updating the report. Registration verifies the
-report and updates only its index entry. It leaves publication intact when there is no index. If a
-human comment races the reservation into a later position, registration can still find that index.
+Store each report's comment ID in a separate key named `report-comment-<report>`. The available
+report keys are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`. Values contain
+only a positive decimal comment ID. Write the ID returned by GitHub after creating or updating the
+comment, including when discovery recovers an existing comment.
 
-All publishers must hold the job concurrency group
-`pull-request-automation-comment-${{ github.event.pull_request.number }}` with `queue: max` and
-`cancel-in-progress: false` while looking up, publishing, and registering a report. This serializes
-report creation and index edits across different workflows and allows multiple jobs to wait.
+The key-value service derives its namespace from GitHub's signed OIDC context. Publishers for the
+same PR must use the same event, ref, and `automations` environment to share state. Different PRs
+receive separate namespaces. Other jobs in the same context can replace cached values, so an ID
+must pass the helper's author, PR, and marker checks before use.
 
-The available report keys are `ruff-ecosystem`, `memory`, `typing-conformance`, and `ty-ecosystem`.
-Report bodies start with the corresponding marker in `REPORTS`, followed by a newline. Preserve the
-index marker and its report-ID markers when updating the index.
+Entries expire according to the service's retention policy. Discovery recovers from expiration and
+from a successful comment creation followed by a failed cache write. Cache availability must not
+prevent a report from being published.
+
+Serialize each report's lookup, publication, and cache write with the concurrency group
+`pull-request-report-${{ github.event.pull_request.number }}-${{ inputs.report }}`, using
+`queue: max` and `cancel-in-progress: false`.

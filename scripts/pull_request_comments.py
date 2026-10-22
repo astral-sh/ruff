@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = []
 # ///
-"""Reserve an early automation index and look up its report comments."""
+"""Look up automation report comments by cached ID, with discovery on a cache miss."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import argparse
 import json
 import os
 import re
-import sys
 from typing import Any, NamedTuple
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -18,31 +17,24 @@ from urllib.request import Request, urlopen
 REPOSITORY = "astral-sh/ruff"
 REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
-COMMENT_LIMIT = 3
-INDEX_MARKER = "<!-- ruff-automation-reports -->"
 BOT_ID = 305554984  # astral-automations-bot
 
 
 class Report(NamedTuple):
-    title: str
     marker: str
     workflow: str
 
 
 REPORTS = {
-    "ruff-ecosystem": Report(
-        "Ruff ecosystem", "<!-- generated-comment ecosystem -->", "ci.yaml"
-    ),
+    "ruff-ecosystem": Report("<!-- generated-comment ecosystem -->", "ci.yaml"),
     "memory": Report(
-        "Memory", "<!-- generated-comment memory_report_diff -->", "memory_report.yaml"
+        "<!-- generated-comment memory_report_diff -->", "memory_report.yaml"
     ),
     "typing-conformance": Report(
-        "Typing conformance",
         "<!-- generated-comment typing_conformance_diagnostics_diff -->",
         "typing_conformance.yaml",
     ),
     "ty-ecosystem": Report(
-        "ty ecosystem",
         "<!-- generated-comment ty ecosystem-analyzer -->",
         "ty-ecosystem-analyzer.yaml",
     ),
@@ -97,75 +89,22 @@ def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
     )
 
 
-def first_comments(pull_request: int) -> list[dict]:
-    return api(f"issues/{pull_request}/comments?per_page={COMMENT_LIMIT}")
+def parse_comment_id(value: str) -> int | None:
+    # Cache values are untrusted, including values from other jobs on the same PR.
+    if re.fullmatch(r"[1-9][0-9]{0,19}", value.strip()):
+        return int(value)
+    return None
 
 
-def find_index(pull_request: int, comments: list[dict] | None = None) -> dict | None:
-    if comments is None:
-        comments = first_comments(pull_request)
-    return next(
-        (c for c in comments if matches_comment(c, pull_request, INDEX_MARKER)), None
-    )
-
-
-def index_entries(comment: dict) -> dict[str, int]:
-    return {
-        key: int(comment_id)
-        for key, comment_id in re.findall(
-            r"^<!-- report:([a-z-]+):([1-9][0-9]*) -->$",
-            comment["body"],
-            flags=re.MULTILINE,
-        )
-        if key in REPORTS
-    }
-
-
-def index_body(pull_request: int, entries: dict[str, int]) -> str:
-    lines = [INDEX_MARKER, "## Automation reports", ""]
-    for key, report in REPORTS.items():
-        if comment_id := entries.get(key):
-            url = f"https://github.com/{REPOSITORY}/pull/{pull_request}#issuecomment-{comment_id}"
-            lines.extend(
-                [f"<!-- report:{key}:{comment_id} -->", f"- [{report.title}]({url})"]
-            )
-    if not entries:
-        lines.append(
-            "Links to automation reports will appear here as they become available."
-        )
-    return "\n".join(lines) + "\n"
-
-
-def reserve_index(pull_request: int) -> dict | None:
-    pull = api(f"pulls/{pull_request}")
-    if (
-        pull["state"] != "open"
-        or pull["base"]["repo"]["id"] != REPOSITORY_ID
-        or (pull["head"]["repo"] or {}).get("id") != REPOSITORY_ID
-    ):
-        return None
-    comments = first_comments(pull_request)
-    if index := find_index(pull_request, comments):
-        return index
-    if len(comments) >= COMMENT_LIMIT:
-        print("The first three comment positions are occupied.", file=sys.stderr)
-        return None
-    return api(
-        f"issues/{pull_request}/comments",
-        method="POST",
-        body=index_body(pull_request, {}),
-    )
-
-
-def find_report(pull_request: int, report: str) -> dict | None:
-    if (index := find_index(pull_request)) and (
-        comment_id := index_entries(index).get(report)
-    ):
+def find_report(
+    pull_request: int, report: str, comment_id: int | None = None
+) -> dict | None:
+    if comment_id is not None:
         comment = api(f"issues/comments/{comment_id}", missing_ok=True)
         if comment and matches_comment(comment, pull_request, REPORTS[report].marker):
             return comment
-    # Older PRs may have no early index. Discovery also handles deleted reports
-    # and a successful comment creation followed by a failed index update.
+    # Discovery repairs expired or invalid cache entries and recovers a comment
+    # created before a cache write failed.
     return next(
         (
             comment
@@ -176,57 +115,20 @@ def find_report(pull_request: int, report: str) -> dict | None:
     )
 
 
-def register_report(pull_request: int, report: str, comment_id: int) -> None:
-    comment = api(f"issues/comments/{comment_id}")
-    if not matches_comment(comment, pull_request, REPORTS[report].marker):
-        raise ValueError("The report comment has the wrong author, PR, or marker.")
-    index = find_index(pull_request)
-    if index is None:
-        # A human comment can race the reservation into a later position.
-        index = next(
-            (
-                comment
-                for comment in pages(f"issues/{pull_request}/comments")
-                if matches_comment(comment, pull_request, INDEX_MARKER)
-            ),
-            None,
-        )
-    if index is None:
-        return
-    entries = index_entries(index)
-    entries[report] = comment_id
-    body = index_body(pull_request, entries)
-    if body != index["body"]:
-        api(f"issues/comments/{index['id']}", method="PATCH", body=body)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("reserve", "find", "lookup", "register"):
-        subparser = subparsers.add_parser(command)
-        subparser.add_argument("--pull-request", required=True, type=int)
-        if command in {"lookup", "register"}:
-            subparser.add_argument("--report", required=True, choices=REPORTS)
-        if command == "register":
-            subparser.add_argument("--comment-id", required=True, type=int)
+    parser.add_argument("--pull-request", required=True, type=int)
+    parser.add_argument("--report", required=True, choices=REPORTS)
+    parser.add_argument("--comment-id", default="")
     args = parser.parse_args()
     if os.environ.get("GITHUB_REPOSITORY", REPOSITORY) != REPOSITORY:
         parser.error(f"This script only supports {REPOSITORY}.")
-    for name in ("pull_request", "comment_id"):
-        if (value := getattr(args, name, None)) is not None and value <= 0:
-            parser.error(f"{name} must be positive")
-    if args.command == "register":
-        register_report(args.pull_request, args.report, args.comment_id)
-    else:
-        if args.command == "reserve":
-            comment = reserve_index(args.pull_request)
-        elif args.command == "lookup":
-            comment = find_report(args.pull_request, args.report)
-        else:
-            comment = find_index(args.pull_request)
-        if comment:
-            print(comment["id"])
+    if args.pull_request <= 0:
+        parser.error("The pull request number must be positive.")
+    if comment := find_report(
+        args.pull_request, args.report, parse_comment_id(args.comment_id)
+    ):
+        print(comment["id"])
 
 
 if __name__ == "__main__":

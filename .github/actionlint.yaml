@@ -25,12 +25,6 @@ paths:
     ignore:
       # actionlint doesn't yet support concurrency queues. The schema hook validates them.
       - '^unexpected key "queue" for "concurrency" section\.'
-  ".github/workflows/pull-request-comment.yml":
-    ignore:
-      # actionlint doesn't yet support concurrency queues. The schema hook validates them.
-      - '^unexpected key "queue" for "concurrency" section\.'
-      # actionlint doesn't yet recognize the reusable workflow's own revision context.
-      - 'property "workflow_(repository|sha)" is not defined in object type'
   ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
     ignore:
       # actionlint doesn't yet support the cache-mode feature.
