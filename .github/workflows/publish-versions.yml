@@ -27,10 +27,6 @@ jobs:
     env:
       VERSION: ${{ fromJson(inputs.plan).announcement_tag }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
       - name: "Set branch name"
         run: echo "BRANCH_NAME=update-versions-$VERSION-$(date +%s)" >> "$GITHUB_ENV"
 
