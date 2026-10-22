@@ -140,3 +140,5 @@ jobs:
       id-token: write
     with:
       report: typing-conformance
+      artifact: typing_conformance_diagnostics_diff
+      filename: typing_conformance_diagnostics.diff
