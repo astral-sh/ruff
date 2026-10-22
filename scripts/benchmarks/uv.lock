@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.14"
 
 [options]
@@ -216,7 +216,7 @@ wheels = [
 
 [[package]]
 name = "scripts"
-version = "0.16.3"
+version = "0.17.1"
 source = { virtual = "." }
 dependencies = [
     { name = "autoflake" },

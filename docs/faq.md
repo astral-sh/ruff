@@ -11,8 +11,10 @@ such, will defer implementing stylistic rules that are obviated by automated for
 Note that Ruff's linter and Black treat line-length enforcement a little differently. Black, like
 Ruff's formatter, makes a best-effort attempt to adhere to the
 [`line-length`](settings.md#line-length), but avoids automatic line-wrapping in some cases (e.g.,
-within comments). Ruff, on the other hand, will flag [`line-too-long`](rules/line-too-long.md)
-(`E501`) for any line that exceeds the [`line-length`](settings.md#line-length) setting. As such, if
+within comments). Ruff's [`line-too-long`](rules/line-too-long.md) (`E501`) rule checks lines against
+[`line-length`](settings.md#line-length), subject to the rule's documented exceptions. You can
+override this limit for the linter with
+[`lint.pycodestyle.max-line-length`](settings.md#lint_pycodestyle_max-line-length). As such, if
 [`line-too-long`](rules/line-too-long.md) (`E501`) is enabled, Ruff can still trigger line-length
 violations even when Black or `ruff format` is enabled.
 
@@ -65,7 +67,7 @@ natively, including:
 - [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://pypi.org/project/flake8-import-conventions/)
-- [flake8-logging](https://pypi.org/project/flake8-logging-format/)
+- [flake8-logging](https://pypi.org/project/flake8-logging/)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
 - [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 - [flake8-pie](https://pypi.org/project/flake8-pie/)
@@ -116,7 +118,7 @@ Ruff is not a "pure" drop-in replacement for Pylint (and vice versa), as they en
 of rules.
 
 Despite these differences, many users have successfully switched from Pylint to Ruff, especially
-those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
+those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-ty-mypy-pyright-or-pyre),
 which can cover some of the functionality that Pylint provides.
 
 Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively
@@ -132,7 +134,7 @@ see violations for rules that weren't previously enabled through your Pylint con
 
 Pylint parity is being tracked in [#970](https://github.com/astral-sh/ruff/issues/970).
 
-## How does Ruff compare to Mypy, or Pyright, or Pyre?
+## How does Ruff compare to ty, Mypy, Pyright or Pyre?
 
 Ruff is a linter, not a type checker. It can detect some of the same problems that a type checker
 can, but a type checker will catch certain errors that Ruff would miss. The opposite is also true:
@@ -143,7 +145,7 @@ references to that import in the source code; on the other hand, a type checker 
 passed an integer argument to a function that expects a string, which Ruff would miss. The
 tools are complementary.
 
-It's recommended that you use Ruff in conjunction with a type checker, like Mypy, Pyright, or Pyre,
+It's recommended that you use Ruff in conjunction with a type checker, like ty, Mypy, Pyright or Pyre,
 with Ruff providing faster feedback on lint violations and the type checker providing more detailed
 feedback on type errors.
 
@@ -211,7 +213,7 @@ Ruff as a formatter, but not a linter, or vice versa.
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards, including Python 3.13.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.15.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).
@@ -290,9 +292,8 @@ Like isort, Ruff's import sorting is compatible with Black.
 
 ## How does Ruff determine which of my imports are first-party, third-party, etc.?
 
-Ruff accepts a `src` option that in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file,
-specifies the directories that Ruff should consider when determining whether an import is
-first-party.
+The `src` option in your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file specifies the
+directories Ruff considers when determining whether an import is first-party.
 
 For example, if you have a project with the following structure:
 
@@ -362,7 +363,7 @@ explicit, exclusive first-party source like so:
 
 If your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` extends another configuration file, Ruff
 will still use the directory containing your `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file as
-the project root (as opposed to the directory of the file pointed to via the `extends` option).
+the project root (as opposed to the directory of the file pointed to via the `extend` option).
 
 For example, if you add a configuration file to the `tests` directory in the above example, you'll
 want to explicitly set the `src` option in the extended configuration file:
@@ -455,13 +456,13 @@ Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
 Found 3 errors.
-1 potentially fixable with the `--fix` option.
+1 potentially fixable with `--fix`.
 ```
 
 ## Does Ruff support NumPy- or Google-style docstrings?
 
-Yes! To enforce a docstring convention, add a [`convention`](settings.md#lint_pydocstyle_convention)
-setting following to your configuration file:
+Yes! To enforce a docstring convention, add the following [`convention`](settings.md#lint_pydocstyle_convention)
+setting to your configuration file:
 
 === "pyproject.toml"
 
@@ -588,8 +589,8 @@ Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 
 ## How can I change Ruff's default configuration?
 
-When no configuration file is found, Ruff will look for a user-specific `ruff.toml` file as a
-last resort. This behavior is similar to Flake8's `~/.config/flake8`.
+When no project configuration file is found, Ruff looks for a user-specific `.ruff.toml`,
+`ruff.toml`, or `pyproject.toml`, in that order. The examples below use `ruff.toml`.
 
 On macOS and Linux, Ruff expects that file to be located at `~/.config/ruff/ruff.toml`,
 and respects the `XDG_CONFIG_HOME` specification.
@@ -606,7 +607,7 @@ For more, see the [`etcetera`](https://crates.io/crates/etcetera) crate.
 ## Ruff tried to fix something — but it broke my code. What's going on?
 
 Ruff labels fixes as "safe" and "unsafe". By default, Ruff will fix all violations for which safe
-fixes are available, while unsafe fixes can be enabled via the [`unsafe-fixes`](settings.md#unsafe-fixes)
+fixes are available, while unsafe fixes can be applied via the [`unsafe-fixes`](settings.md#unsafe-fixes)
 setting, or passing the [`--unsafe-fixes`](settings.md#unsafe-fixes) flag to `ruff check`. For
 more, see [the fix documentation](linter.md#fixes).
 
@@ -631,7 +632,7 @@ Ruff does not support `source.organizeImports` and `source.fixAll` code actions 
 actions for the same such as `notebook.source.organizeImports` and `notebook.source.fixAll`
 respectively.
 
-Ruff requires to have a full view of the notebook to provide accurate diagnostics and fixes. For
+Ruff requires a full view of the notebook to provide accurate diagnostics and fixes. For
 example, if you have a cell that imports a module and another cell that uses that module, Ruff
 needs to see both cells to mark the import as used. If Ruff were to only see one cell at a time,
 it would incorrectly mark the import as unused.

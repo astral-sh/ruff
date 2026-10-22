@@ -679,7 +679,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionKind::Function(FunctionDefinitionKind {
+                    node: AstNodeRef::new(parsed, function),
+                    has_decorators: !function.decorator_list.is_empty(),
+                })
             }
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
@@ -898,7 +901,7 @@ impl DefinitionCategory {
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
     ///
-    /// Annotations establish a declared type. So do function and class definitions, and imports.
+    /// Annotations establish a declared type. So do function and class definitions.
     pub fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -930,7 +933,7 @@ pub enum DefinitionKind<'db> {
     ImportFrom(ImportFromDefinitionKind),
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
+    Function(FunctionDefinitionKind),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
@@ -1129,13 +1132,10 @@ impl<'db> DefinitionKind<'db> {
 
     pub fn category(&self, in_stub: bool, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
-            // functions, classes, and imports always bind, and we consider them declarations
+            // Functions and classes always bind, and we consider them declarations.
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
@@ -1162,6 +1162,9 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::LoopHeader(_)
@@ -1179,6 +1182,27 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
             _ => None,
         }
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct FunctionDefinitionKind {
+    node: AstNodeRef<ast::StmtFunctionDef>,
+    has_decorators: bool,
+}
+
+impl FunctionDefinitionKind {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+        self.node.node(module)
+    }
+
+    pub fn node_key(&self) -> NodeKey {
+        NodeKey::from_node_ref(&self.node)
+    }
+
+    /// Whether the function has decorators, without loading its module's AST.
+    pub fn has_decorators(&self) -> bool {
+        self.has_decorators
     }
 }
 

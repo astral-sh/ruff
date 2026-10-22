@@ -17,13 +17,14 @@
 
 use std::collections::BTreeMap;
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::script::ScriptTag;
 use serde::{Deserialize, Serialize};
 use ty_module_resolver::ModuleName;
 use ty_python_core::platform::PythonPlatform;
+use ty_python_semantic::ReturnTypeInference;
 use ty_python_semantic::dependency::{
     DependencyDistribution, DependencyMetadata, DependencyProject, DependencyProjectKind,
 };
@@ -164,6 +165,8 @@ pub(crate) struct Environment {
 #[derive(Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
+    pub(crate) return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub(crate) strict_generic_narrowing: Option<bool>,
 
@@ -275,25 +278,25 @@ struct DependencyMetadataOptions {
     #[serde(default)]
     projects: Vec<DependencyProjectOptions>,
     #[serde(default)]
-    distributions: BTreeMap<CompactString, DependencyDistributionOptions>,
+    distributions: BTreeMap<CharStr, DependencyDistributionOptions>,
     #[serde(default)]
-    module_owners: BTreeMap<CompactString, Vec<CompactString>>,
+    module_owners: BTreeMap<CharStr, Vec<CharStr>>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyProjectOptions {
     path: SystemPathBuf,
-    distribution: Option<CompactString>,
+    distribution: Option<CharStr>,
     #[serde(default)]
-    dependencies: Vec<CompactString>,
+    dependencies: Vec<CharStr>,
     #[serde(default)]
-    group_dependencies: Vec<CompactString>,
+    group_dependencies: Vec<CharStr>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 struct DependencyDistributionOptions {
-    name: CompactString,
+    name: CharStr,
     editable_path: Option<SystemPathBuf>,
 }

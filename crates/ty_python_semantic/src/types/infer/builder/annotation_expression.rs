@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::is_dotted_name;
+use ty_python_core::definition::Definition;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
@@ -106,11 +107,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         pep_613_policy: PEP613Policy,
     ) -> TypeAndQualifiers<'db> {
         fn infer_name_or_attribute<'db>(
-            ty: Type<'db>,
+            reference: (Type<'db>, Option<Definition<'db>>),
             annotation: &ast::Expr,
             builder: &mut TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> AnnotationExpressionInference<'db> {
+            let (ty, definition) = reference;
             let special_case = match ty {
                 Type::SpecialForm(special_form) => match special_form {
                     SpecialFormType::TypeQualifier(qualifier) => {
@@ -162,7 +164,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let annotation_ty = special_case.unwrap_or_else(|| {
                 TypeAndQualifiers::declared(
-                    builder.infer_name_or_attribute_type_expression(ty, annotation),
+                    builder.infer_name_or_attribute_type_expression(ty, definition, annotation),
                 )
             });
 
@@ -191,7 +193,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 match attribute.ctx {
                     ast::ExprContext::Load => infer_name_or_attribute(
-                        self.infer_attribute_expression(attribute),
+                        self.infer_type_expression_reference(annotation),
                         annotation,
                         self,
                         pep_613_policy,
@@ -209,7 +211,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => infer_name_or_attribute(
-                    self.infer_name_expression(name),
+                    self.infer_type_expression_reference(annotation),
                     annotation,
                     self,
                     pep_613_policy,
@@ -230,7 +232,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let slice = &**slice;
-                let value_ty = self.infer_expression(value, TypeContext::default());
+                let (value_ty, definition) = self.infer_type_expression_reference(value);
+                let value_ty = self.finish_expression_type(value, value_ty, TypeContext::default());
 
                 let annotation_ty = match value_ty {
                     Type::SpecialForm(special_form) => match special_form {
@@ -346,13 +349,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         _ => TypeAndQualifiers::declared(
                             self.infer_subscript_type_expression_no_store(
-                                subscript, slice, value_ty,
+                                subscript, slice, value_ty, definition,
                             ),
                         ),
                     },
-                    _ => TypeAndQualifiers::declared(
-                        self.infer_subscript_type_expression_no_store(subscript, slice, value_ty),
-                    ),
+                    _ => {
+                        TypeAndQualifiers::declared(self.infer_subscript_type_expression_no_store(
+                            subscript, slice, value_ty, definition,
+                        ))
+                    }
                 };
 
                 AnnotationExpressionInference::new(annotation_ty)

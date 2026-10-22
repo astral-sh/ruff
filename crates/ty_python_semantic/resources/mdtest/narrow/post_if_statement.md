@@ -504,8 +504,8 @@ async def main(val: int | None):
 data: dict[str, str] = {}
 api_key = data.get("api_key")
 
-if not api_key:
+if api_key is None:
     exit(1)
 
-reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str
 ```

@@ -302,14 +302,26 @@ reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ### Gradual specializations
 
 A type variable tuple remains assignable to an explicitly gradual specialization of its generic
-class.
+class, or its top materialization.
 
 ```py
 from typing import Any
+from ty_extensions import Bottom, Top
 
 class Array[*Ts]:
+    values: tuple[*Ts]
+
     def erase_shape(self) -> "Array[*tuple[Any, ...]]":
         return self
+
+    def erase_shape_top(self) -> "Top[Array[*tuple[Any, ...]]]":
+        return self
+
+    def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
+        return self  # error: [invalid-return-type]
+
+    def fixed_shape(self) -> "Top[Array[Any]]":
+        return self  # error: [invalid-return-type]
 ```
 
 ### Constrained inference from synthetic `Self`
@@ -341,6 +353,20 @@ class Interface(Generic[C]):
 ```
 
 ## Functions
+
+### Immediate list arguments
+
+The elements of a list constructed in the call retain their individual positions when inferring a
+variadic return. Elements consumed by an earlier parameter are excluded from the return.
+
+```py
+def tail[*Ts](head: int, *args: *Ts) -> tuple[*Ts]:
+    return args
+
+reveal_type(tail(*[1, "two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1]))  # revealed: tuple[()]
+```
 
 ### Multiple type variable tuples
 
@@ -912,7 +938,8 @@ info: Type variable defined here
 ### Union splatted arguments
 
 Equal-length tuple unions preserve their length and combine the types at each position. Different
-lengths produce an open tuple, while direct arguments around the splat keep their known positions.
+lengths produce a variable-length tuple that preserves the minimum length of the union members.
+Direct arguments around the splat keep their known positions.
 
 ```py
 def collect[*Ts](*args: *Ts) -> tuple[*Ts]:
@@ -927,7 +954,8 @@ def check(
 ) -> None:
     reveal_type(collect(*same_length))  # revealed: tuple[int | str]
     reveal_type(collect(*paired))  # revealed: tuple[int | bytes, str | bool]
-    reveal_type(collect(*different_lengths))  # revealed: tuple[int | str | bytes, ...]
+    # revealed: tuple[int | str | bytes, *tuple[int | str | bytes, ...]]
+    reveal_type(collect(*different_lengths))
     reveal_type(collect(prefix, *same_length, suffix))  # revealed: tuple[bool, int | str, bytes]
 
     # error: [invalid-assignment]
@@ -1270,6 +1298,20 @@ def forward_mixed[*Ts](
     accept_mixed_forwarded(callback, args)
 ```
 
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+
+def accept[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
+```
+
 ### Callable inference through nested callable parameters
 
 Nested callable parameters make the pack covariant, but inference currently loses its fixed length.
@@ -1590,6 +1632,49 @@ repeat_without_return((1, "value"), 1, "value")
 repeat_without_return((1, "value"), 1)
 ```
 
+### Partials with bound variadic arguments
+
+Binding positional arguments infers a fixed-length type variable tuple. The resulting partial
+accepts a call with no additional arguments because the bound values already fill those positions.
+
+```py
+from functools import partial
+
+def accept[*Ts](*args: *Ts) -> None: ...
+
+one = partial(accept, 1)
+reveal_type(one)  # revealed: partial[() -> None]
+one()
+
+two = partial(accept, 1, "x")
+reveal_type(two)  # revealed: partial[() -> None]
+two()
+```
+
+### Partials with inferred variadic arguments
+
+A bound tuple determines the number and types of remaining positional parameters. A bound keyword
+after the variadic parameter retains its name and default, including when the tuple is empty.
+
+```py
+from functools import partial
+
+def repeat[*Ts](values: tuple[*Ts], *args: *Ts, kw: int) -> tuple[*Ts]:
+    return values
+
+def check(i: int, s: str) -> None:
+    empty = partial(repeat, (), kw=1)
+    reveal_type(empty())  # revealed: tuple[()]
+
+    one = partial(repeat, (i,), kw=1)
+    reveal_type(one(i, kw=2))  # revealed: tuple[int]
+    one()  # error: [missing-argument]
+
+    two = partial(repeat, (i, s), kw=1)
+    reveal_type(two(i, s))  # revealed: tuple[int, str]
+    two(i, i)  # error: [invalid-argument-type]
+```
+
 ## Type concatenation
 
 A type variable tuple can be combined with fixed leading or trailing types.
@@ -1629,6 +1714,18 @@ reveal_type(del_letter_c(Array[A, B]()))  # revealed: Array[A]
 
 reveal_type(generic(A(), Array[B, D]()))  # revealed: Array[A, B, D]
 reveal_type(generic(A(), Array[()]()))  # revealed: Array[A]
+```
+
+## Tuple concatenation with type variables
+
+Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
+between them. The inferred result satisfies the corresponding generic return annotation.
+
+```py
+def enclose[T, *Ts](edge: tuple[T], middle: tuple[*Ts]) -> tuple[T, *Ts, T]:
+    result = edge + middle + edge
+    reveal_type(result)  # revealed: tuple[T@enclose, *Ts@enclose, T@enclose]
+    return result
 ```
 
 ## Unpacking Unbounded Tuple Types

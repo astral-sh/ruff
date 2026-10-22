@@ -651,6 +651,31 @@ fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     });
 }
 
+/// Repeated unions share source-order subtrees even after the TDD stops growing. Persisting each
+/// result must not expand those shared subtrees into exponentially many copies.
+fn benchmark_shared_source_order_compaction(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from ty_extensions._internal import ConstraintSet\n\ndef repeated[T]() -> None:\n    c0 = ConstraintSet.lower_bound(int, T)\n    c1 = ConstraintSet.lower_bound(str, T)\n",
+    );
+    for i in 2..26 {
+        writeln!(&mut code, "    c{i} = c{} | c{}", i - 2, i - 1).ok();
+    }
+
+    criterion.bench_function("ty_micro[shared_source_order_compaction]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 criterion_group!(
     constraint_set,
     benchmark_typevar_mapping_large_accumulation,
@@ -667,5 +692,6 @@ criterion_group!(
     benchmark_many_invariant_typevars,
     benchmark_mixed_many_invariant_typevars,
     benchmark_pydantic_core_schema_dict,
+    benchmark_shared_source_order_compaction,
 );
 criterion_main!(constraint_set);

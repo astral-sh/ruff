@@ -2715,7 +2715,6 @@ else:
           Dictionary of strings mapping to strings.
         """
 
-@deprecated("Soft deprecated. Use the subprocess module instead.")
 def system(command: StrOrBytesPath) -> int:
     """Execute the command in a subshell."""
 

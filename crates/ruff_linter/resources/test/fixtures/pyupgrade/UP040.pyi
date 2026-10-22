@@ -2,7 +2,7 @@ import typing
 from typing import TypeAlias
 
 # UP040
-# Fixes in type stub files should be safe to apply unlike in regular code where runtime behavior could change
+# Fixes are unsafe even in stub files.
 x: typing.TypeAlias = int
 x: TypeAlias = int
 

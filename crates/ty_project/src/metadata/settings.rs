@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ruff_db::files::File;
+use ruff_db::system::SystemPath;
 use ty_combine::Combine;
 use ty_python_semantic::AnalysisSettings;
 use ty_python_semantic::lint::RuleSelection;
@@ -85,11 +86,11 @@ pub struct SrcSettings {
     pub(crate) files: IncludeExcludeFilter,
 }
 impl SrcSettings {
-    pub(crate) fn default() -> Self {
+    pub(crate) fn default(project_root: &SystemPath) -> Self {
         Self {
             respect_ignore_files: true,
             exclude_scripts: false,
-            files: IncludeExcludeFilter::default(),
+            files: IncludeExcludeFilter::default_for_root(project_root),
         }
     }
 }
@@ -111,7 +112,7 @@ pub struct Override {
 
 impl Override {
     /// Returns whether this override applies to the given file path.
-    fn matches_file(&self, path: &ruff_db::system::SystemPath) -> bool {
+    fn matches_file(&self, path: &SystemPath) -> bool {
         use crate::glob::{GlobFilterCheckMode, IncludeResult};
 
         matches!(

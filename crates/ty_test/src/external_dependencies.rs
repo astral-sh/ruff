@@ -2,6 +2,7 @@ use crate::db::Db;
 
 use anyhow::{Context, Result, anyhow, bail};
 use camino::Utf8Path;
+use ruff_db::files::File;
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
 use ty_python_core::platform::PythonPlatform;
@@ -181,6 +182,8 @@ fn copy_site_packages_to_db(
 
     // Recursively copy all files from site-packages
     copy_directory_recursive(db, &site_packages_path, &dest_site_packages)?;
+
+    File::sync_path(db, &dest_site_packages);
 
     Ok(())
 }

@@ -4,7 +4,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::source::source_text;
+use ruff_db::source::{is_notebook, source_text};
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -105,8 +105,14 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let environment = script_environment(db, file);
     let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
 
-    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
-        diagnostics.report_invalid(uv_metadata_diagnostic(file, tag, error));
+    if let Some(diagnostic) =
+        environment.and_then(|environment| environment.initialization_error(db))
+    {
+        let mut diagnostic = diagnostic.clone();
+        let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
+        annotation.hide_snippet(true);
+        diagnostic.annotate(annotation);
+        diagnostics.report_invalid(diagnostic);
     }
 
     let configuration_root = file
@@ -160,11 +166,12 @@ pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
         return None;
     }
 
-    let source = source_text(db, file);
-    if source.is_notebook() {
+    // Notebook outputs can be large, so skip notebooks before reading their contents.
+    if is_notebook(db, file) {
         return None;
     }
 
+    let source = source_text(db, file);
     ScriptTag::parse(source.as_bytes()).map(Box::new)
 }
 
@@ -223,7 +230,6 @@ fn resolve_script_options(
 
     let uv_options = uv_metadata.map(|metadata| Options {
         environment: Some(EnvironmentOptions {
-            python_version: metadata.python_version().cloned(),
             python: metadata
                 .environment()
                 .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
@@ -368,14 +374,6 @@ impl ScriptConfigurationDiagnostics {
     }
 }
 
-fn uv_metadata_diagnostic(file: File, tag: &ScriptTag, message: &str) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
-    let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
-    annotation.hide_snippet(true);
-    diagnostic.annotate(annotation);
-    diagnostic
-}
-
 fn invalid_script_metadata_diagnostic(
     file: File,
     message: impl std::fmt::Display,
@@ -395,8 +393,9 @@ fn invalid_script_metadata_diagnostic(
 #[cfg(test)]
 mod tests {
     use ruff_db::files::system_path_to_file;
+    use ruff_db::source::source_text;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
@@ -431,6 +430,30 @@ mod tests {
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(&db, crate::should_check_file, ordinary, &events);
         assert_function_query_was_not_run(&db, script, ordinary, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn script_tag_does_not_read_notebook_source() -> anyhow::Result<()> {
+        let mut db = TestDb::new(ProjectMetadata::new(
+            "test",
+            SystemPathBuf::from("/project"),
+        ));
+        db.write_file(
+            "/project/notebook.ipynb",
+            r#"{"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}"#,
+        )?;
+        let notebook = system_path_to_file(&db, SystemPath::new("/project/notebook.ipynb"))?;
+
+        assert_eq!(db.project().script_files(&db).iter().count(), 0);
+        assert!(db.project().files(&db).contains(notebook));
+
+        db.take_salsa_events();
+        source_text(&db, notebook);
+        let events = db.take_salsa_events();
+        // This assertion would fail if index already read the full text of notebook.
+        assert_function_query_was_run(&db, source_text, notebook, &events);
 
         Ok(())
     }

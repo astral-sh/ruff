@@ -7,8 +7,9 @@ use crate::place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers};
 use crate::types::attribute_write::{
     AttributeWriteRequirement, ClassAttributeWriteMember, DescriptorSetterDomain,
     ExplicitAttributeWriteRequirement, FallbackAttributeWriteRequirement,
-    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_write_requirement,
-    descriptor_setter_domain, property_setter_returns_never,
+    InstanceAttributeWriteMember, ProtocolMemberWriteRequirement, attribute_setattr_member,
+    attribute_write_requirement, descriptor_setter_domain, instance_attribute_write_is_blocked,
+    instance_setattr_dispatch, property_setter_returns_never,
 };
 use crate::types::call::{Bindings, CallArguments, CallDiagnosticOverride, CallError};
 use crate::types::class::FrozenDataclassDispatch;
@@ -41,7 +42,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> bool {
         let db = self.db();
         let requirement =
-            attribute_write_requirement(db, self.program_environment(), object_ty, attribute);
+            attribute_write_requirement(db, self.program_environment(), object_ty, attribute, None);
         let mut deprecation = (emit_diagnostics && self.context.is_lint_enabled(&DEPRECATED))
             .then_some(AttributeDeprecation::Missing);
         let mut evaluator = AssignmentAttributeWriteEvaluator {
@@ -69,7 +70,7 @@ enum AssignmentAttributeWriteDiagnostic<'db> {
     CannotAssignToClassVar,
     TerminalSetAttr {
         member_exists: bool,
-        is_setattr_synthesized: bool,
+        is_read_only: bool,
     },
     TerminalDescriptor,
     BadDunderSet {
@@ -106,7 +107,7 @@ enum AttributeDeprecation<'db> {
 
 impl<'db> AttributeDeprecation<'db> {
     /// Inspect a resolved requirement without inferring or validating the assigned value.
-    /// Only union and intersection children need further attribute lookups.
+    /// Composite requirements need further attribute lookups.
     fn from_requirement(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -114,16 +115,23 @@ impl<'db> AttributeDeprecation<'db> {
         attribute: &str,
     ) -> Self {
         match requirement {
-            AttributeWriteRequirement::All { element_tys, .. } => {
-                element_tys.iter().fold(Self::Missing, |deprecation, ty| {
-                    let requirement = attribute_write_requirement(db, env, *ty, attribute);
-                    deprecation.union(db, Self::from_requirement(db, env, &requirement, attribute))
-                })
-            }
-            AttributeWriteRequirement::Any { intersection, .. } => {
+            AttributeWriteRequirement::All {
+                element_tys,
+                receiver,
+                ..
+            } => element_tys.iter().fold(Self::Missing, |deprecation, ty| {
+                let requirement = attribute_write_requirement(db, env, *ty, attribute, *receiver);
+                deprecation.union(db, Self::from_requirement(db, env, &requirement, attribute))
+            }),
+            AttributeWriteRequirement::Any {
+                intersection,
+                receiver,
+                ..
+            } => {
                 let mut deprecation = Self::Missing;
                 for ty in intersection.positive(db) {
-                    let requirement = attribute_write_requirement(db, env, *ty, attribute);
+                    let requirement =
+                        attribute_write_requirement(db, env, *ty, attribute, *receiver);
                     deprecation = deprecation
                         .intersection(db, Self::from_requirement(db, env, &requirement, attribute));
                     if matches!(deprecation, Self::NotDeprecated) {
@@ -233,7 +241,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     /// ```
     fn infer_and_try_call_setattr(
         &mut self,
-        object_ty: Type<'db>,
+        setattr_member: PlaceAndQualifiers<'db>,
         emit_diagnostics: bool,
     ) -> (Result<Bindings<'db>, CallDunderError<'db>>, Type<'db>) {
         let db = self.builder.db();
@@ -243,16 +251,8 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ast::ArgOrKeyword::Arg(self.value),
         ];
         let mut call_arguments = CallArguments::positional([name_ty, Type::unknown()]);
-        // A bound `super` must use its own MRO lookup rather than the normal instance fallback.
-        let lookup_policy = if matches!(object_ty, Type::BoundSuper(_)) {
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-        } else {
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK | MemberLookupPolicy::NO_INSTANCE_FALLBACK
-        };
-        let setattr_result = self.builder.infer_and_try_call_dunder(
-            object_ty,
-            "__setattr__",
-            lookup_policy,
+        let setattr_result = self.builder.infer_and_try_call_dunder_member(
+            setattr_member,
             ArgumentsIter::synthesized(&ast_arguments),
             &mut call_arguments,
             &mut |builder, (argument_index, _, tcx)| {
@@ -293,12 +293,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::All {
                 object_ty,
                 element_tys,
+                receiver,
             } => {
                 let value_ty = self.infer_value(TypeContext::default(), emit_diagnostics);
                 let attribute = self.attribute;
                 let mut requirements = element_tys
                     .iter()
-                    .map(|ty| attribute_write_requirement(db, env, *ty, attribute));
+                    .map(|ty| attribute_write_requirement(db, env, *ty, attribute, *receiver));
                 let valid = requirements.by_ref().all(|requirement| {
                     let mut current = AttributeDeprecation::Missing;
                     let valid = self.evaluate(
@@ -339,12 +340,13 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::Any {
                 object_ty,
                 intersection,
+                receiver,
             } => {
                 let attribute = self.attribute;
                 let mut requirements = intersection
                     .positive(db)
                     .iter()
-                    .map(|ty| attribute_write_requirement(db, env, *ty, attribute));
+                    .map(|ty| attribute_write_requirement(db, env, *ty, attribute, *receiver));
                 let valid = requirements.by_ref().any(|requirement| {
                     let mut current = AttributeDeprecation::Missing;
                     let valid = self.evaluate(
@@ -402,7 +404,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             AttributeWriteRequirement::Module(write_ty) => {
                 if let Some(write_ty) = write_ty {
                     let value_ty =
-                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 } else {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
@@ -414,19 +416,22 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             }
-            AttributeWriteRequirement::ProtocolMember { write, qualifiers } => match write {
+            AttributeWriteRequirement::ProtocolMember {
+                receiver_ty,
+                write,
+                qualifiers,
+            } => match write {
                 Some(ProtocolMemberWriteRequirement::AssignableTo(write_ty)) => {
                     let value_ty =
-                        self.infer_value(TypeContext::new(Some(*write_ty)), emit_diagnostics);
+                        self.infer_value(TypeContext::declared(Some(*write_ty)), emit_diagnostics);
                     self.check_type_pair(value_ty, *write_ty, emit_diagnostics)
                 }
                 Some(ProtocolMemberWriteRequirement::Descriptor {
                     descriptor_ty,
-                    receiver_ty,
                     domain,
                 }) => {
                     let value_ty = self.infer_value(
-                        TypeContext::new(Some(domain.unwrap_or_else(Type::unknown))),
+                        TypeContext::declared(Some(domain.unwrap_or_else(Type::unknown))),
                         emit_diagnostics,
                     );
                     if let Some(domain) = domain
@@ -474,9 +479,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     false
                 }
             },
-            AttributeWriteRequirement::Instance { object_ty, member } => {
-                self.evaluate_instance(*object_ty, member, emit_diagnostics)
-            }
+            AttributeWriteRequirement::Instance {
+                object_ty,
+                receiver,
+                member,
+            } => self.evaluate_instance(*object_ty, *receiver, member, emit_diagnostics),
             AttributeWriteRequirement::Class { object_ty, member } => {
                 self.evaluate_class(*object_ty, member, emit_diagnostics)
             }
@@ -536,95 +543,83 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
     fn evaluate_instance(
         &mut self,
         object_ty: Type<'db>,
+        receiver: Option<Type<'db>>,
         member: &InstanceAttributeWriteMember<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         let db = self.builder.db();
         let env = self.builder.program_environment();
 
-        let frozen_dataclass_dispatch = object_ty
-            .nominal_class(db, env)
-            .and_then(|class| class.static_class_literal(db))
-            .and_then(|(class, specialization)| {
-                class.inherited_frozen_dataclass_dispatch(
-                    db,
-                    specialization,
-                    "__setattr__",
-                    self.attribute,
-                )
-            });
-        let setattr_receiver = frozen_dataclass_dispatch
-            .map_or(object_ty, |dispatch| dispatch.receiver(db, env, object_ty));
+        let frozen_dataclass_dispatch =
+            instance_setattr_dispatch(db, env, object_ty, self.attribute);
+        let setattr_member =
+            attribute_setattr_member(db, env, object_ty, receiver, frozen_dataclass_dispatch);
 
         let (setattr_result, value_ty) = if matches!(member, InstanceAttributeWriteMember::SetAttr)
             || matches!(
                 frozen_dataclass_dispatch,
                 Some(FrozenDataclassDispatch::Delegate(_))
             ) {
-            self.infer_and_try_call_setattr(setattr_receiver, emit_diagnostics)
+            self.infer_and_try_call_setattr(setattr_member, emit_diagnostics)
         } else {
             let tcx = match member {
                 InstanceAttributeWriteMember::Explicit { member, .. } => {
-                    self.descriptor_type_context(object_ty, member)
+                    self.descriptor_type_context(member)
                 }
                 _ => TypeContext::default(),
             };
             let value_ty = self.infer_value(tcx, emit_diagnostics);
-            let setattr_result = setattr_receiver.try_call_dunder_with_policy(
+            let setattr_result = Type::try_call_dunder_member_impl(
                 db,
                 env,
-                "__setattr__",
+                setattr_member.into(),
                 &mut CallArguments::positional([
                     Type::string_literal(db, self.attribute),
                     value_ty,
                 ]),
                 TypeContext::default(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
             );
             (setattr_result, value_ty)
         };
 
-        // A terminal `__setattr__` blocks even explicitly declared attributes.
-        let setattr_returns_never = matches!(
+        let assignment_blocked = instance_attribute_write_is_blocked(
+            db,
+            env,
+            object_ty,
+            member,
+            self.attribute,
+            &setattr_result,
             frozen_dataclass_dispatch,
-            Some(FrozenDataclassDispatch::FrozenField)
-        ) || match &setattr_result {
-            Ok(bindings) => bindings.return_type(db, env).is_never(),
-            Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
-        };
+        );
 
-        // We could also model this more precisely by synthesizing a `__setattr__`overload set
-        // that only disallows mutation on non-private fields, but for now, we just suppress the
-        // diagnostic here. This is much easier and faster.
-        let is_private_pydantic_attribute =
-            matches!(member, InstanceAttributeWriteMember::Explicit { .. })
-                && pydantic::is_private_attribute(self.attribute)
-                && pydantic::is_model_instance(db, env, object_ty);
-
-        if setattr_returns_never && !is_private_pydantic_attribute {
+        if assignment_blocked {
             if emit_diagnostics {
-                let is_setattr_synthesized = !matches!(
-                    frozen_dataclass_dispatch,
-                    Some(FrozenDataclassDispatch::Delegate(_))
-                ) && match object_ty.class_member_with_policy(
-                    db,
-                    env,
-                    "__setattr__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-                ) {
-                    PlaceAndQualifiers {
-                        place: Place::Defined(DefinedPlace { ty, .. }),
-                        ..
-                    } => ty.is_callable_type(),
-                    _ => false,
-                };
+                let pydantic_setattr =
+                    pydantic::setattr_behavior(db, env, object_ty, self.attribute);
+                let is_read_only =
+                    matches!(pydantic_setattr, Some(pydantic::SetAttrBehavior::Frozen))
+                        || !matches!(
+                            frozen_dataclass_dispatch,
+                            Some(FrozenDataclassDispatch::Delegate(_))
+                        ) && match object_ty.class_member_with_policy(
+                            db,
+                            env,
+                            "__setattr__",
+                            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        ) {
+                            PlaceAndQualifiers {
+                                place: Place::Defined(DefinedPlace { ty, .. }),
+                                ..
+                            } => ty.is_callable_type(),
+                            _ => false,
+                        };
                 let member_exists = !object_ty
                     .member(db, env, self.attribute)
                     .place
                     .is_undefined();
                 self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                     member_exists,
-                    is_setattr_synthesized,
+                    is_read_only,
                 });
             }
             return false;
@@ -638,8 +633,11 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 false
             }
             InstanceAttributeWriteMember::Explicit { member, fallback } => {
-                if !self.final_assignment_is_valid(object_ty, member.qualifiers(), emit_diagnostics)
-                {
+                if !self.final_assignment_is_valid(
+                    receiver.unwrap_or(object_ty),
+                    member.qualifiers(),
+                    emit_diagnostics,
+                ) {
                     return false;
                 }
                 if matches!(
@@ -656,18 +654,23 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     return false;
                 }
                 let member_valid =
-                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
+                    self.evaluate_explicit_member(member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
-                    let fallback_valid =
-                        self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics);
+                    let fallback_valid = self.evaluate_instance_fallback(
+                        receiver.unwrap_or(object_ty),
+                        fallback,
+                        emit_diagnostics,
+                    );
                     member_valid && fallback_valid
                 } else {
                     member_valid
                 }
             }
-            InstanceAttributeWriteMember::Instance(fallback) => {
-                self.evaluate_instance_fallback(object_ty, fallback, emit_diagnostics)
-            }
+            InstanceAttributeWriteMember::Instance(fallback) => self.evaluate_instance_fallback(
+                receiver.unwrap_or(object_ty),
+                fallback,
+                emit_diagnostics,
+            ),
             InstanceAttributeWriteMember::SetAttr => match setattr_result {
                 Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => true,
                 Err(CallDunderError::CallError(kind, bindings, _)) => {
@@ -714,10 +717,10 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     self.infer_value(TypeContext::default(), emit_diagnostics);
                     return false;
                 }
-                let tcx = self.descriptor_type_context(object_ty, member);
+                let tcx = self.descriptor_type_context(member);
                 let value_ty = self.infer_value(tcx, emit_diagnostics);
                 let member_valid =
-                    self.evaluate_explicit_member(object_ty, member, value_ty, emit_diagnostics);
+                    self.evaluate_explicit_member(member, value_ty, emit_diagnostics);
                 if let Some(fallback) = fallback {
                     let fallback_valid = self.evaluate_class_fallback(
                         object_ty,
@@ -739,8 +742,9 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             ClassAttributeWriteMember::Unresolved {
                 has_instance_attribute,
             } => {
+                let setattr_member = attribute_setattr_member(db, env, object_ty, None, None);
                 let (setattr_result, value_ty) =
-                    self.infer_and_try_call_setattr(object_ty, emit_diagnostics);
+                    self.infer_and_try_call_setattr(setattr_member, emit_diagnostics);
                 let setattr_returns_never = match &setattr_result {
                     Ok(bindings) => bindings.return_type(db, env).is_never(),
                     Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
@@ -749,7 +753,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                     if emit_diagnostics {
                         self.report(AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                             member_exists: false,
-                            is_setattr_synthesized: false,
+                            is_read_only: false,
                         });
                     }
                     return false;
@@ -783,18 +787,21 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
     fn descriptor_type_context(
         &self,
-        receiver_ty: Type<'db>,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
     ) -> TypeContext<'db> {
-        if let ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } = requirement
+        if let ExplicitAttributeWriteRequirement::Descriptor {
+            descriptor_ty,
+            receiver_ty,
+            ..
+        } = requirement
             && let DescriptorSetterDomain::Known(write_ty) = descriptor_setter_domain(
                 self.builder.db(),
                 self.builder.program_environment(),
                 *descriptor_ty,
-                receiver_ty,
+                *receiver_ty,
             )
         {
-            TypeContext::new(Some(write_ty))
+            TypeContext::declared(Some(write_ty))
         } else {
             TypeContext::default()
         }
@@ -802,25 +809,28 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
 
     fn evaluate_explicit_member(
         &mut self,
-        object_ty: Type<'db>,
         requirement: &ExplicitAttributeWriteRequirement<'db>,
         value_ty: Type<'db>,
         emit_diagnostics: bool,
     ) -> bool {
         match requirement {
-            ExplicitAttributeWriteRequirement::Descriptor { descriptor_ty, .. } => self
+            ExplicitAttributeWriteRequirement::Descriptor {
+                descriptor_ty,
+                receiver_ty,
+                ..
+            } => self
                 .descriptor_write_alternatives(*descriptor_ty)
                 .all(|descriptor_ty| {
                     self.evaluate_descriptor_write(
                         descriptor_ty,
-                        object_ty,
+                        *receiver_ty,
                         value_ty,
                         emit_diagnostics,
                     )
                     .is_some()
                 }),
             ExplicitAttributeWriteRequirement::AssignableTo { ty, .. } => {
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
                 self.check_type_pair(value_ty, *ty, emit_diagnostics)
             }
         }
@@ -927,7 +937,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 if !self.final_assignment_is_valid(object_ty, *qualifiers, emit_diagnostics) {
                     return false;
                 }
-                let value_ty = self.infer_value(TypeContext::new(Some(*ty)), false);
+                let value_ty = self.infer_value(TypeContext::declared(Some(*ty)), false);
                 let valid = self.check_type_pair(value_ty, *ty, emit_diagnostics);
                 if *possibly_missing {
                     self.report(AssignmentAttributeWriteDiagnostic::PossiblyMissing);
@@ -955,7 +965,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                 possibly_missing,
             } => {
                 let value_ty = self.infer_value(
-                    TypeContext::new(Some(*ty)),
+                    TypeContext::declared(Some(*ty)),
                     matches!(inference, ContextualInference::Commit) && emit_diagnostics,
                 );
                 if !self.builder.validate_generic_class_attribute_access(
@@ -1035,7 +1045,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             }
             AssignmentAttributeWriteDiagnostic::TerminalSetAttr {
                 member_exists,
-                is_setattr_synthesized,
+                is_read_only,
             } => {
                 if let Some(builder) = self
                     .builder
@@ -1048,7 +1058,7 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
                             self.attribute,
                             self.object_ty.display(db, env)
                         )
-                    } else if is_setattr_synthesized {
+                    } else if is_read_only {
                         format!(
                             "Property `{}` defined in `{}` is read-only",
                             self.attribute,

@@ -70,10 +70,7 @@ impl IncludeExcludeFilter {
             }
         }
     }
-}
-
-impl Default for IncludeExcludeFilter {
-    fn default() -> Self {
+    pub(crate) fn default_for_root(root: &SystemPath) -> Self {
         let mut includes = IncludeFilterBuilder::new();
         includes
             .add(
@@ -87,7 +84,7 @@ impl Default for IncludeExcludeFilter {
 
         for pattern in DEFAULT_SRC_EXCLUDES {
             PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+                .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(root))?))
                 .unwrap_or_else(|err| {
                     panic!(
                         "Expected default exclude to be valid glob but adding it failed with: {err}"

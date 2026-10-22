@@ -9,7 +9,7 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
-        callable::CallableTypes,
+        callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -105,9 +105,8 @@ impl<'db> MethodWrapper<'db> {
         kind: MethodWrapperKind,
     ) -> Type<'db> {
         match wrapped {
-            // Function definitions already record built-in method decorators, including their
-            // consistency across overloads. Keep that representation for overload validation.
-            // A replacement function without this metadata needs its own descriptor.
+            // Descriptor access can expose the ordinary function while retaining its declaration
+            // metadata. Reapplying the declared wrapper restores its descriptor state.
             Type::FunctionLiteral(function)
                 if function.has_known_decorator(
                     db,
@@ -115,9 +114,22 @@ impl<'db> MethodWrapper<'db> {
                         MethodWrapperKind::Classmethod => FunctionDecorators::CLASSMETHOD,
                         MethodWrapperKind::Staticmethod => FunctionDecorators::STATICMETHOD,
                     },
-                ) =>
+                ) && match function.callable_type_kind(db) {
+                    CallableTypeKind::FunctionLike => true,
+                    CallableTypeKind::ClassMethodLike => kind == MethodWrapperKind::Classmethod,
+                    CallableTypeKind::StaticMethodLike => kind == MethodWrapperKind::Staticmethod,
+                    CallableTypeKind::Regular
+                    | CallableTypeKind::DunderParamSpec
+                    | CallableTypeKind::ParamSpecValue => false,
+                } =>
             {
-                wrapped
+                Type::FunctionLiteral(function.with_descriptor_kind(
+                    db,
+                    match kind {
+                        MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
+                        MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
+                    },
+                ))
             }
             // These callables already encode the matching descriptor behavior in their kind,
             // so they do not need another method wrapper.
@@ -210,12 +222,18 @@ pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Protocol` is represented by [`super::SpecialFormType::Protocol`], not this type.
-    SubscriptedProtocol(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Protocol[()]`, which has no type variables and is distinct from
+    /// an unsubscripted `Protocol`.
+    SubscriptedProtocol(Option<GenericContext<'db>>),
 
     /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Generic` is represented by [`super::SpecialFormType::Generic`], not this type.
-    SubscriptedGeneric(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Generic[()]`, which has no type variables and is distinct from an
+    /// unsubscripted `Generic`.
+    SubscriptedGeneric(Option<GenericContext<'db>>),
 
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
@@ -296,7 +314,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(db, context, visitor);
+            if let Some(context) = context {
+                walk_generic_context(db, context, visitor);
+            }
         }
         KnownInstanceType::TypeVar(typevar) => {
             visitor.visit_type_var_type(db, typevar);
@@ -406,15 +426,27 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Literal),
-            Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .map(Self::Annotated),
+            Self::Annotated(ty) => {
+                // Keep the runtime Annotated object when its wrapped type diverges. The wrapped
+                // type is still nested: TypeOf can make it another runtime Annotated object.
+                let inner = ty.recursive_type_normalized_impl(db, env, div, true);
+                if nested {
+                    inner.map(Self::Annotated)
+                } else {
+                    Some(Self::Annotated(
+                        inner.unwrap_or_else(|| InternedType::new(db, div)),
+                    ))
+                }
+            }
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::TypeGenericAlias),
-            Self::LiteralStringAlias(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .map(Self::LiteralStringAlias),
+            // A stringified alias is still a string value when its aliased type diverges.
+            // Preserve the wrapper so type-expression checks can validate uses of the alias.
+            Self::LiteralStringAlias(ty) => Some(Self::LiteralStringAlias(
+                ty.recursive_type_normalized_impl(db, env, div, true)
+                    .unwrap_or_else(|| InternedType::new(db, div)),
+            )),
             Self::Callable(callable) => callable
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::Callable),
@@ -585,7 +617,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
+                | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
@@ -609,6 +642,9 @@ impl<'db> KnownInstanceType<'db> {
                     wrapper.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::Field(field) => Type::KnownInstance(KnownInstanceType::Field(
+                field.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )),
             KnownInstanceType::FunctoolsPartial(partial) => {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -644,7 +680,6 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
             | KnownInstanceType::Deprecated(_)
-            | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
             | KnownInstanceType::ConstraintSetSolution(_)
             | KnownInstanceType::GenericContext(_)
@@ -719,12 +754,45 @@ pub struct FieldInstance<'db> {
     /// The mode selected by Pydantic's `strict` argument.
     #[returns(copy)]
     pub strict: ConfigBoolean,
+
+    /// Whether Pydantic's `frozen` argument makes this field immutable.
+    #[returns(copy)]
+    pub frozen: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let default_type = self
+            .default_type(db)
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        // The converter's input is a callable parameter, so it is contravariant.
+        let converter = self.converter(db).map(|(input_ty, output_ty)| {
+            (
+                input_ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                output_ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
+        });
+        Self::new(
+            db,
+            default_type,
+            self.init(db),
+            self.kw_only(db),
+            self.alias(db),
+            converter,
+            self.strict(db),
+            self.frozen(db),
+        )
+    }
+
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -766,6 +834,7 @@ impl<'db> FieldInstance<'db> {
             self.alias(db),
             converter,
             self.strict(db),
+            self.frozen(db),
         ))
     }
 }
@@ -848,9 +917,17 @@ impl<'db> UnionTypeInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let Ok(union_type) = self.union_type(db) {
+            let value_expr_types = match *self._value_expr_types(db) {
+                Some([first, second]) if type_mapping.is_structural() => Some([
+                    first.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    second.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ]),
+                value_expr_types => value_expr_types,
+            };
+
             UnionTypeInstance::new(
                 db,
-                self._value_expr_types(db),
+                value_expr_types,
                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
             )
         } else {
@@ -940,14 +1017,36 @@ impl<'db> FunctoolsPartialInstance<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        // Repeated `f = partial(f)` assignments add a new layer to the wrapped callable.
+        // Treat it as nested so that cycle recovery can collapse these layers while
+        // preserving the reduced signature of the outer partial.
+        let wrapped = match self.wrapped(db).inner(db) {
+            Type::Union(union) if !nested => {
+                // Keep known callable alternatives in `func`, even if another alternative
+                // diverges. For example, `p = partial(p.func)` does not add wrapped layers.
+                let mut builder = UnionBuilder::new(db, env)
+                    .cycle_recovery(true)
+                    .or_recursively_defined(union.recursively_defined(db));
+                for ty in union.elements(db) {
+                    builder.add_in_place(
+                        ty.recursive_type_normalized_impl(db, env, div, true)
+                            .unwrap_or(div),
+                    );
+                }
+                builder.build()
+            }
+            wrapped => {
+                let wrapped = wrapped.recursive_type_normalized_impl(db, env, div, true);
+                if nested {
+                    wrapped?
+                } else {
+                    wrapped.unwrap_or(div)
+                }
+            }
+        };
         Some(Self::new(
             db,
-            InternedType::new(
-                db,
-                self.wrapped(db)
-                    .inner(db)
-                    .recursive_type_normalized_impl(db, env, div, nested)?,
-            ),
+            InternedType::new(db, wrapped),
             self.partial(db)
                 .recursive_type_normalized_impl(db, env, div, nested)?,
         ))

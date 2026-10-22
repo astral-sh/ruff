@@ -118,6 +118,10 @@ if sys.version_info < (3, 13):
 
 _T = TypeVar("_T")
 
+# Note that this is often the wrong class: it is only useful for sub-classing
+# (e.g. csv.excel). Dialect objects returned at runtime, such as the return
+# value of get_dialect(), are usually _csv.Dialect, which is not a subclass
+# of csv.Dialect.
 class Dialect:
     """Describe a CSV dialect.
 
