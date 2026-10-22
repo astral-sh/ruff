@@ -176,7 +176,7 @@ def render_report(
     return (
         f"{report_marker(report)}\n"
         f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
-        f"{contents.rstrip()}\n\n"
+        f"{contents.rstrip()}\n\n---\n\n"
         f"Results for [{run['head_sha'][:7]}]({commit_url}) · [Workflow run]({run_url})\n"
     )
 
