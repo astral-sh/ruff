@@ -6,6 +6,18 @@ on:
       report:
         type: string
         required: true
+      artifact:
+        type: string
+        required: true
+      filename:
+        type: string
+        required: true
+      title:
+        type: string
+        default: ""
+      full-report-artifact:
+        type: string
+        default: ""
     secrets:
       KV_API_URL:
         required: true
@@ -47,13 +59,12 @@ jobs:
           checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
           enable-cache: false
       - name: Read the stored comment ID
-        id: comment-state
         uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
         with:
           service-url: ${{ secrets.KV_API_URL }}
           scope: pull-request
           key: report-comment-${{ inputs.report }}
-          mask-value: "false"
+          path: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Get a report publishing token
         id: token
         uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
@@ -70,20 +81,22 @@ jobs:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
           REPORT: ${{ inputs.report }}
+          REPORT_ARTIFACT: ${{ inputs.artifact }}
+          REPORT_FILENAME: ${{ inputs.filename }}
+          REPORT_TITLE: ${{ inputs.title }}
+          FULL_REPORT_ARTIFACT: ${{ inputs.full-report-artifact }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
-          STORED_COMMENT_ID: ${{ steps.comment-state.outputs.value }}
-          STORED_COMMENT_FOUND: ${{ steps.comment-state.outputs.found }}
-        run: |
-          args=(--run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
-                --report "$REPORT" --pull-request "$PULL_REQUEST")
-          if [[ "$STORED_COMMENT_FOUND" == "true" ]]; then
-            args+=(--comment-id "$STORED_COMMENT_ID")
-          elif [[ "$STORED_COMMENT_FOUND" != "false" ]]; then
-            echo "The key-value lookup did not return a result." >&2
-            exit 1
-          fi
-          uv run --script scripts/publish_pr_report.py "${args[@]}"
+          COMMENT_ID_FILE: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
+        run: >-
+          uv run --script scripts/publish_pr_report.py
+          --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
+          --workflow-ref "$WORKFLOW_REF"
+          --report "$REPORT" --pull-request "$PULL_REQUEST"
+          --artifact "$REPORT_ARTIFACT" --filename "$REPORT_FILENAME"
+          --title "$REPORT_TITLE" --full-report-artifact "$FULL_REPORT_ARTIFACT"
+          --comment-id-file "$COMMENT_ID_FILE"
       - name: Store the comment ID
         if: steps.publish.outputs.comment-id != ''
         uses: astral-sh/github-actions/key-value-store/put@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454

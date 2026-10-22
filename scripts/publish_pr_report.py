@@ -14,7 +14,6 @@ import re
 import subprocess
 import sys
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
@@ -28,37 +27,6 @@ BOT_ID = 305554984  # astral-automations-bot
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
-
-
-@dataclass(frozen=True)
-class Report:
-    workflow: str
-    artifact: str
-    filename: str
-
-
-REPORTS = {
-    "ruff-ecosystem": Report(
-        workflow="ci.yaml",
-        artifact="ecosystem-result",
-        filename="ecosystem-result",
-    ),
-    "memory": Report(
-        workflow="memory_report.yaml",
-        artifact="memory_report_diff",
-        filename="memory_report_diff.diff",
-    ),
-    "typing-conformance": Report(
-        workflow="typing_conformance.yaml",
-        artifact="typing_conformance_diagnostics_diff",
-        filename="typing_conformance_diagnostics.diff",
-    ),
-    "ty-ecosystem": Report(
-        workflow="ty-ecosystem-analyzer.yaml",
-        artifact="comment.md",
-        filename="comment.md",
-    ),
-}
 
 
 def report_marker(report: str) -> str:
@@ -102,7 +70,11 @@ def matches_comment(comment: dict, pull_request: int, marker: str) -> bool:
     )
 
 
-def parse_comment_id(value: str) -> int:
+def read_comment_id(path: str) -> int | None:
+    try:
+        value = Path(path).read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
     # Stored values are untrusted, including values from other jobs on the same PR.
     if not re.fullmatch(r"[1-9][0-9]{0,19}", value):
         raise ValueError("The stored comment ID must be a positive decimal integer.")
@@ -183,20 +155,21 @@ def render_report(
     run: dict,
     artifact: dict,
     *,
+    title: str = "",
     full_report: dict | None = None,
 ) -> str:
     if len(contents) > MAX_REPORT_CHARACTERS:
         artifact_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{artifact['id']}"
         contents = (
             contents[:MAX_REPORT_CHARACTERS]
-            + f"\n\nReport truncated. [Download the full report]({artifact_url})."
+            + f"\n\nReport truncated. [Download the untruncated content (ZIP)]({artifact_url})."
         )
-    if report == "ruff-ecosystem":
-        contents = f"## `ruff-ecosystem` results\n\n{contents}"
+    if title:
+        contents = f"## {title}\n\n{contents}"
     if full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
-            f"{contents.rstrip()}\n\n[Download the HTML reports (ZIP)]({report_url})"
+            f"{contents.rstrip()}\n\n[Download the full report (ZIP)]({report_url})"
         )
     run_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
     return (
@@ -219,7 +192,7 @@ def report_run(comment: dict) -> tuple[int, int]:
 
 
 def current_run(
-    run_id: int, run_attempt: int, report: str, pull_request: int
+    run_id: int, run_attempt: int, workflow_ref: str, pull_request: int
 ) -> dict | None:
     run = api(f"actions/runs/{run_id}")
     if run["run_attempt"] != run_attempt:
@@ -229,7 +202,7 @@ def current_run(
         run["repository"]["id"] != REPOSITORY_ID
         or (run["head_repository"] or {}).get("id") != REPOSITORY_ID
         or run["event"] != "pull_request"
-        or run["path"] != f".github/workflows/{REPORTS[report].workflow}"
+        or workflow_ref != f"{REPOSITORY}/{run['path']}@refs/pull/{pull_request}/merge"
     ):
         raise ValueError("The workflow run is not an eligible same-repository PR run.")
     pull = api(f"pulls/{pull_request}")
@@ -253,29 +226,35 @@ def publish(
     report: str,
     pull_request: int,
     *,
+    workflow_ref: str,
+    artifact_name: str,
+    filename: str,
+    title: str = "",
+    full_report_artifact: str = "",
     stored_comment_id: int | None = None,
     dry_run: bool = False,
 ) -> int | None:
-    if not (run := current_run(run_id, run_attempt, report, pull_request)):
+    if not (run := current_run(run_id, run_attempt, workflow_ref, pull_request)):
         return
-    metadata = REPORTS[report]
-    artifact = find_artifact(run_id, metadata.artifact)
+    artifact = find_artifact(run_id, artifact_name)
     if artifact is None:
-        print(f"No {metadata.artifact} artifact is available.", file=sys.stderr)
+        print(f"No {artifact_name} artifact is available.", file=sys.stderr)
         return
-    contents = read_report(download_artifact(artifact), metadata.filename)
+    contents = read_report(download_artifact(artifact), filename)
     if not contents.strip():
         return
     full_report = (
-        find_artifact(run_id, "full-report") if report == "ty-ecosystem" else None
+        find_artifact(run_id, full_report_artifact) if full_report_artifact else None
     )
-    body = render_report(report, contents, run, artifact, full_report=full_report)
+    body = render_report(
+        report, contents, run, artifact, title=title, full_report=full_report
+    )
     if dry_run:
         print(body, end="")
         return
 
     # Recheck after downloading: the PR may have advanced or the run may have been retried.
-    if not current_run(run_id, run_attempt, report, pull_request):
+    if not current_run(run_id, run_attempt, workflow_ref, pull_request):
         return
     existing = find_report(pull_request, report, stored_comment_id)
     if existing and report_run(existing) > (run_id, run_attempt):
@@ -297,9 +276,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-id", required=True, type=int)
     parser.add_argument("--run-attempt", required=True, type=int)
-    parser.add_argument("--report", required=True, choices=REPORTS)
+    parser.add_argument("--report", required=True)
     parser.add_argument("--pull-request", required=True, type=int)
-    parser.add_argument("--comment-id", type=parse_comment_id)
+    parser.add_argument("--workflow-ref", required=True)
+    parser.add_argument("--artifact", required=True)
+    parser.add_argument("--filename", required=True)
+    parser.add_argument("--title", default="")
+    parser.add_argument("--full-report-artifact", default="")
+    parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     if args.run_id <= 0 or args.run_attempt <= 0:
@@ -311,6 +295,11 @@ def main() -> None:
         args.run_attempt,
         args.report,
         args.pull_request,
+        workflow_ref=args.workflow_ref,
+        artifact_name=args.artifact,
+        filename=args.filename,
+        title=args.title,
+        full_report_artifact=args.full_report_artifact,
         stored_comment_id=args.comment_id,
         dry_run=args.dry_run,
     )
