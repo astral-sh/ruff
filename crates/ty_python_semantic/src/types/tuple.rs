@@ -1028,10 +1028,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             Some(Self::from_elements(
                 self.0
                     .iter()
-                    .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, env, div, true)
-                            .unwrap_or(div)
-                    })
+                    .map(|ty| ty.recursive_type_normalized_component(db, env, div))
                     .collect::<Box<[_]>>(),
             ))
         }
@@ -2204,26 +2201,24 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
 
             Self::try_new(prefix, variable_segment, suffix)
         } else {
-            let prefix = self.prefix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
+            let prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_component(db, env, div));
 
             let variable_segment = match self.variable() {
                 VariableSegment::Homogeneous(variable) => VariableSegment::Homogeneous(
-                    variable
-                        .recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div),
+                    variable.recursive_type_normalized_component(db, env, div),
                 ),
                 VariableSegment::TypeVarTuple(typevartuple) => {
                     VariableSegment::TypeVarTuple(typevartuple)
                 }
             };
 
-            let suffix = self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, env, div, true)
-                    .unwrap_or(div)
-            });
+            let suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_component(db, env, div));
 
             Some(Self::new(prefix, variable_segment, suffix))
         }

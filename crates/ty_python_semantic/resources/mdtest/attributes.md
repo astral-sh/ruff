@@ -482,7 +482,7 @@ class C:
     def update(self) -> None:
         self.value += (self.value,)
 
-reveal_type(C().value)  # revealed: tuple[int] | tuple[Divergent, ...]
+reveal_type(C().value)  # revealed: tuple[int | tuple[int] | Divergent, ...]
 ```
 
 #### Augmented assignments to inherited instance attributes
@@ -5111,7 +5111,7 @@ class C3:
         self.x = [self.x[0].flip()]
 
 # TODO: should be `list[Sub] | list[Base]`
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base | Divergent] | list[Sub | Divergent]
 ```
 
 And cycles between many attributes:
@@ -5169,7 +5169,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[int] | list[Divergent] | list[Unknown] | list[list[Unknown] | int]
+        # revealed: list[int] | list[Unknown] | list[Divergent | list[Unknown] | int] | list[Divergent | int] | list[int | list[int] | list[Unknown] | Divergent] | list[Divergent | list[int] | list[Unknown]] | list[Divergent] | list[Divergent | list[Unknown]]
+        reveal_type(self.x3)
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -5242,7 +5243,7 @@ class NestedLists:
     def f(self: "NestedLists"):
         self.x = [self.x]
 
-reveal_type(NestedLists().x)  # revealed: int | list[Divergent]
+reveal_type(NestedLists().x)  # revealed: int | list[int | Divergent]
 
 class NestedMixed:
     def f(self: "NestedMixed"):

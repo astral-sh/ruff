@@ -1206,6 +1206,32 @@ pub(super) fn walk_specialization_types<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Compare stored arguments without type relations, ignoring only flat union member order.
+    pub(super) fn is_same_ignoring_union_order(self, db: &'db dyn Db, other: Self) -> bool {
+        self.generic_context(db) == other.generic_context(db)
+            && self.materialization_kind(db) == other.materialization_kind(db)
+            && self.tuple_inner(db) == other.tuple_inner(db)
+            && self.types(db).len() == other.types(db).len()
+            && self
+                .types(db)
+                .iter()
+                .zip(other.types(db))
+                .all(|(left, right)| {
+                    left == right
+                        || match (left, right) {
+                            (Type::Union(left), Type::Union(right)) => {
+                                left.recursively_defined(db) == right.recursively_defined(db)
+                                    && left.elements(db).len() == right.elements(db).len()
+                                    && left
+                                        .elements(db)
+                                        .iter()
+                                        .all(|element| right.elements(db).contains(element))
+                            }
+                            _ => false,
+                        }
+                })
+    }
+
     /// Merge cycle iterations that differ only by gradual `Unknown` type arguments.
     ///
     /// Known argument mismatches are not merged because doing so would be unsound for invariant
@@ -1534,10 +1560,7 @@ impl<'db> Specialization<'db> {
         } else {
             self.types(db)
                 .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, env, div, true)
-                        .unwrap_or(div)
-                })
+                .map(|ty| ty.recursive_type_normalized_component(db, env, div))
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {

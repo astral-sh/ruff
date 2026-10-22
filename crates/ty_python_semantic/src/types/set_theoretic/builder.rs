@@ -1084,6 +1084,16 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Preserve the first representation when cycle iterations reorder argument unions.
+            // Structural comparison retains exact marker identities without inference queries.
+            if self.cycle_recovery
+                && let (Type::NominalInstance(left), Type::NominalInstance(right)) =
+                    (ty, element_type)
+                && left.is_same_ignoring_union_order(db, right)
+            {
+                return;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
@@ -2605,6 +2615,44 @@ mod tests {
         assert_eq!(
             UnionType::widen_growing_tuples(&db, &env, first, second),
             None
+        );
+    }
+
+    #[test]
+    fn cycle_recovery_deduplicates_reordered_union_arguments() {
+        let db = setup_db();
+        let mut events_db = db.clone();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+        let other_div = Type::divergent(salsa::plumbing::Id::from_bits(2));
+        let list_of = |elements| {
+            let argument = UnionType::from_elements_cycle_recovery(&db, &env, elements);
+            KnownClass::List.to_specialized_instance(&db, &env, &[argument])
+        };
+        let first = list_of([int, div]);
+        let reordered = list_of([div, int]);
+        let distinct_marker = list_of([int, other_div]);
+        assert_ne!(first, reordered);
+        events_db.clear_salsa_events();
+
+        for (left, right) in [(first, reordered), (reordered, first)] {
+            assert_eq!(
+                UnionType::from_elements_cycle_recovery(&db, &env, [left, right]),
+                left,
+            );
+        }
+        let union =
+            UnionType::from_elements_cycle_recovery(&db, &env, [first, reordered, distinct_marker]);
+        assert_eq!(
+            union.expect_union().elements(&db),
+            &[first, distinct_marker]
+        );
+        assert!(
+            events_db
+                .take_salsa_events()
+                .iter()
+                .all(|event| !matches!(event.kind, salsa::EventKind::WillExecute { .. }))
         );
     }
 
