@@ -276,6 +276,38 @@ Summary.
         );
     }
 
+    #[test]
+    fn preserves_html_character_references() {
+        let tags = ["p", "code"].map(str::to_string);
+        let docstring = Docstring::new(
+            "<p>Tea &amp; coffee; 2 &lt; 3.</p>\n<code>&lt;object&gt;</code>\n&#60; &#x3e; &#X3E; &CounterClockwiseContourIntegral;".to_string(),
+        );
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(
+            rendered,
+            "<p>Tea &amp; coffee; 2 &lt; 3.</p>  \n<code>&lt;object&gt;</code>  \n&#60; &#x3e; &#X3E; &CounterClockwiseContourIntegral;"
+        );
+        assert_eq!(
+            Docstring::new("&amp; and `&lt;`".to_string()).render(MarkupKind::Markdown, &[]),
+            "&amp; and `&lt;`"
+        );
+    }
+
+    #[test]
+    fn escapes_ampersands_without_complete_character_references() {
+        let docstring =
+            Docstring::new("R&D &amp &notanentity; &#; &#x; &#12345678; &#x1234567;".to_string());
+
+        let rendered = docstring.render(MarkupKind::Markdown, &[]);
+
+        assert_eq!(
+            rendered,
+            "R&amp;D &amp;amp &amp;notanentity; &amp;#; &amp;#x; &amp;#12345678; &amp;#x1234567;"
+        );
+    }
+
     // A literal block where the `::` is flush with the paragraph
     // and should become `:`
     #[test]

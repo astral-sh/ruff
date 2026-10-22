@@ -617,7 +617,14 @@ fn render_prose(output: &mut String, input: &str, allowed_html_tags: &[String]) 
 
         cursor.bump();
         match char {
-            '&' => output.push_str("&amp;"),
+            '&' => {
+                if let Some(reference) = consume_character_reference(&mut cursor) {
+                    output.push('&');
+                    output.push_str(reference);
+                } else {
+                    output.push_str("&amp;");
+                }
+            }
             '<' => output.push_str("&lt;"),
             '>' => output.push_str("&gt;"),
             '_' if !allowed_html_tags.is_empty() => {
@@ -641,6 +648,40 @@ fn render_prose(output: &mut String, input: &str, allowed_html_tags: &[String]) 
             _ => output.push(char),
         }
     }
+}
+
+/// Consumes a complete HTML character reference after its leading `&`.
+fn consume_character_reference<'a>(cursor: &mut Cursor<'a>) -> Option<&'a str> {
+    let input = cursor.as_str();
+    let mut lookahead = cursor.clone();
+
+    let valid = if lookahead.eat_char('#') {
+        let hexadecimal = lookahead.eat_if(|char| matches!(char, 'x' | 'X'));
+        let digits = lookahead.as_str();
+        lookahead.eat_while(|char| {
+            if hexadecimal {
+                char.is_ascii_hexdigit()
+            } else {
+                char.is_ascii_digit()
+            }
+        });
+        let len = digits.len() - lookahead.as_str().len();
+        (1..=if hexadecimal { 6 } else { 7 }).contains(&len)
+    } else {
+        lookahead.eat_while(|char| char.is_ascii_alphanumeric());
+        let name = &input[..input.len() - lookahead.as_str().len()];
+        html_escape::NAMED_ENTITIES
+            .binary_search_by(|(candidate, _)| candidate.cmp(&name.as_bytes()))
+            .is_ok()
+    };
+
+    if !valid || !lookahead.eat_char(';') {
+        return None;
+    }
+
+    let reference = &input[..input.len() - lookahead.as_str().len()];
+    *cursor = lookahead;
+    Some(reference)
 }
 
 /// Consumes and returns a supported tag, or returns `None` without advancing.
