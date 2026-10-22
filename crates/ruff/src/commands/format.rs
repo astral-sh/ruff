@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
-use std::io::{Write, stderr, stdout};
+use std::io::{BufWriter, IsTerminal, Write, stderr, stdout};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -201,16 +201,19 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    if config_arguments.log_level > LogLevel::Silent {
-        match mode {
-            FormatMode::Write => {}
-            FormatMode::Check => {
-                results.write_changed(&mut stdout().lock(), output_format, &errors)?;
-            }
-            FormatMode::Diff => {
-                results.write_diff(&mut stdout().lock())?;
-            }
+    if config_arguments.log_level > LogLevel::Silent && !mode.is_write() {
+        let stdout = stdout().lock();
+        let mut writer = if stdout.is_terminal() {
+            Left(stdout)
+        } else {
+            Right(BufWriter::new(stdout))
+        };
+        if mode.is_check() {
+            results.write_changed(&mut writer, output_format, &errors)?;
+        } else {
+            results.write_diff(&mut writer)?;
         }
+        writer.flush()?;
     }
 
     // Report on the formatting changes.
