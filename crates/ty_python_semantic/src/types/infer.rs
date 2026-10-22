@@ -54,6 +54,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::types::context::InferContextResult;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -75,6 +76,7 @@ use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, se
 
 mod builder;
 mod implicit_alias;
+use implicit_alias::implicit_alias_definition;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
 mod expression_truthiness;
@@ -94,10 +96,10 @@ pub(super) struct CyclicTypeAliasError<'db> {
 
 /// Infer the type denoted by an implicit or PEP 613 alias independently of its runtime value.
 ///
-/// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
-/// Although the function body does not read it, Salsa's `cycle_initial` uses it to construct
-/// `μa. a` with an identity specialization (for example, `T -> T`) on both the recursive type and
-/// its self-reference. This lets recursive uses such as `Alias[int]` or `Alias[list[T]]` specialize
+/// The generic parameters are part of the query key and are used by Salsa's cycle callbacks.
+/// `cycle_initial` uses them to construct `μa. a` with an identity specialization (for example,
+/// `T -> T`) on both the recursive type and its self-reference. This lets recursive uses such as
+/// `Alias[int]` or `Alias[list[T]]` specialize
 /// the provisional type before inference of the alias's body is complete. `cycle_fn` then binds
 /// self-references in the inferred result through [`RecursiveType::recover`].
 ///
@@ -110,7 +112,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
-            diagnostics: TypeCheckDiagnostics::default(),
+            context: InferContextResult::default(),
             implicit_aliases: Box::default(),
         }
     },
@@ -134,7 +136,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return ImplicitAliasInference {
             ty: Ok(Type::unknown()),
-            diagnostics: TypeCheckDiagnostics::default(),
+            context: InferContextResult::default(),
             implicit_aliases: Box::default(),
         };
     };
@@ -160,7 +162,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAliasInference<'db> {
     pub(super) ty: ImplicitAliasResult<'db>,
-    pub(super) diagnostics: TypeCheckDiagnostics,
+    pub(super) context: InferContextResult,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }
 
@@ -352,7 +354,7 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     known_decorators: FunctionDecorators,
     /// Whether any decorator is unrecognized, or decorator inference is incomplete.
     has_unknown_decorators: bool,
-    diagnostics: TypeCheckDiagnostics,
+    context: InferContextResult,
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
@@ -389,8 +391,8 @@ impl<'db> FunctionDecoratorInference<'db> {
         self.has_unknown_decorators
     }
 
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
+    fn context_result(&self) -> &InferContextResult {
+        &self.context
     }
 }
 
@@ -1084,8 +1086,8 @@ struct ScopeInferenceExtra<'db> {
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// For function bodies, this type represents the inferred return type, a union of all types inferred
     /// for the expressions in reachable `return` statements, and possibly `None` if control flow can
@@ -1151,7 +1153,9 @@ impl<'db> ScopeInference<'db> {
     }
 
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
-        self.extra.as_deref().map(|extra| &extra.diagnostics)
+        self.extra
+            .as_deref()
+            .map(|extra| &extra.context.diagnostics)
     }
 
     pub(crate) fn implicit_aliases(&self) -> &[Definition<'db>] {
@@ -1467,7 +1471,10 @@ enum DefinitionInferenceExtra<'db> {
     /// Deferred definitions are the only extra data for most definitions with annotations.
     Deferred(Box<[Definition<'db>]>),
 
-    Diagnostics(Box<TypeCheckDiagnostics>),
+    Context(Box<InferContextResult>),
+
+    /// Invalid type form with no emitted diagnostics or used suppressions.
+    InvalidTypeForm,
 
     Undecorated(Box<Type<'db>>),
 
@@ -1521,8 +1528,8 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
@@ -1550,8 +1557,15 @@ impl<'db> DefinitionInferenceExtra<'db> {
                 deferred,
                 ..OtherDefinitionInferenceExtra::default()
             },
-            Self::Diagnostics(diagnostics) => OtherDefinitionInferenceExtra {
-                diagnostics: *diagnostics,
+            Self::Context(context) => OtherDefinitionInferenceExtra {
+                context: *context,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::InvalidTypeForm => OtherDefinitionInferenceExtra {
+                context: InferContextResult {
+                    has_invalid_type_form: true,
+                    ..InferContextResult::default()
+                },
                 ..OtherDefinitionInferenceExtra::default()
             },
             Self::Undecorated(undecorated_type) => OtherDefinitionInferenceExtra {
@@ -2033,8 +2047,8 @@ struct ExpressionInferenceExtra<'db> {
     /// Only very few expression regions have bindings (around 0.1%).
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// Functions called while inferring this expression.
     called_functions: Box<[FunctionType<'db>]>,
@@ -2267,8 +2281,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// The definitions that have some deferred parts.
     deferred: Box<[Definition<'db>]>,
 
-    /// The diagnostics for this region.
-    diagnostics: TypeCheckDiagnostics,
+    /// Diagnostics and semantic validity for this region.
+    context: InferContextResult,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.

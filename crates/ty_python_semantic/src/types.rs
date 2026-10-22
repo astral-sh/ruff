@@ -244,11 +244,11 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
         // expression context. Keep that diagnostic when the rule and source location match.
         // Compare with earlier inference results only: one alias can produce distinct errors
         // for the same rule and location.
-        diagnostics.extend_filtered(&inference.diagnostics, |diagnostic| {
+        diagnostics.extend_filtered(&inference.context.diagnostics, |diagnostic| {
             diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
         });
         reported.extend(
-            (&inference.diagnostics)
+            (&inference.context.diagnostics)
                 .into_iter()
                 .filter_map(diagnostic_key),
         );

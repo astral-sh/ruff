@@ -18,6 +18,7 @@ use crate::diagnostic::DiagnosticGuard;
 use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
+use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -131,11 +132,11 @@ enum ProgramSource {
 /// possible that inferring a sub-region, like an unpack assignment, creates
 /// a sub-context.
 ///
-/// Tracks the reported diagnostics of the inferred region.
+/// Tracks the reported diagnostics and semantic validity of the inferred region.
 ///
 /// ## Consuming
 /// It's important that the context is explicitly consumed before dropping by calling
-/// [`InferContext::finish`] and the returned diagnostics must be stored
+/// [`InferContext::finish`] and the returned metadata must be stored
 /// on the current inference result.
 pub(crate) struct InferContext<'db, 'ast> {
     db: &'db dyn Db,
@@ -145,6 +146,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     program_file: ProgramFile<'db>,
     module: &'ast ParsedModuleRef,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
+    has_invalid_type_form: Cell<bool>,
     diagnostics_suppressed: bool,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
@@ -172,6 +174,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             file,
             program_file,
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
+            has_invalid_type_form: Cell::new(false),
             diagnostics_suppressed: false,
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
@@ -235,8 +238,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.db
     }
 
-    pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.get_mut().extend(other);
+    pub(crate) fn extend(&mut self, other: &InferContextResult) {
+        if other.has_invalid_type_form {
+            self.mark_invalid_type_form();
+        }
+        self.diagnostics.get_mut().extend(&other.diagnostics);
     }
 
     /// Whether diagnostics inferred separately for a referenced alias should be collected.
@@ -248,6 +254,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
+    }
+
+    /// Records an invalid type form even when its diagnostic is suppressed or inferred separately.
+    pub(super) fn mark_invalid_type_form(&self) {
+        self.has_invalid_type_form.set(true);
     }
 
     /// Prevents diagnostic construction for this inference context.
@@ -293,6 +304,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
+        if LintId::of(lint) == LintId::of(&INVALID_TYPE_FORM) {
+            self.mark_invalid_type_form();
+        }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
     }
 
@@ -371,18 +385,20 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     #[must_use]
-    pub(crate) fn finish(mut self) -> TypeCheckDiagnostics {
-        self.bomb.defuse();
-        let mut diagnostics = self.diagnostics.into_inner();
-        diagnostics.shrink_to_fit();
-        diagnostics
+    pub(crate) fn finish(self) -> InferContextResult {
+        let mut result = self.finish_uncompacted();
+        result.diagnostics.shrink_to_fit();
+        result
     }
 
     /// Consume this context without compacting its diagnostics.
     #[must_use]
-    pub(crate) fn finish_uncompacted(mut self) -> TypeCheckDiagnostics {
+    pub(crate) fn finish_uncompacted(mut self) -> InferContextResult {
         self.bomb.defuse();
-        self.diagnostics.into_inner()
+        InferContextResult {
+            diagnostics: self.diagnostics.into_inner(),
+            has_invalid_type_form: self.has_invalid_type_form.get(),
+        }
     }
 }
 
@@ -394,9 +410,27 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("file", &self.file)
             .field("program_file", &self.program_file)
             .field("diagnostics", &self.diagnostics)
+            .field("has_invalid_type_form", &self.has_invalid_type_form)
             .field("diagnostics_suppressed", &self.diagnostics_suppressed)
             .field("inference_flags", &self.inference_flags)
             .finish()
+    }
+}
+
+/// Diagnostics and semantic metadata that must survive inference-result caching and merging.
+///
+/// General inference results keep this in their optional extra storage. Invalid type forms
+/// must retain that storage even when diagnostic reporting is disabled or suppressed.
+#[derive(Debug, Default, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) struct InferContextResult {
+    pub(super) diagnostics: TypeCheckDiagnostics,
+    /// Whether inference encountered an invalid type form, regardless of diagnostic emission.
+    pub(super) has_invalid_type_form: bool,
+}
+
+impl InferContextResult {
+    pub(super) fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && !self.has_invalid_type_form
     }
 }
 
