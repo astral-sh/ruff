@@ -2,7 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Record source timestamps and restore them only for matching inputs."""
+"""Restore timestamps for matching tracked files and unchanged directory entries."""
 
 from __future__ import annotations
 
@@ -19,7 +19,15 @@ from pathlib import Path
 def tracked_paths(root):
     metadata = json.loads(
         subprocess.check_output(
-            ["cargo", "metadata", "--no-deps", "--format-version", "1", "--offline"],
+            [
+                "cargo",
+                "metadata",
+                "--no-deps",
+                "--format-version",
+                "1",
+                "--offline",
+                "--locked",
+            ],
             cwd=root,
         )
     )
@@ -51,8 +59,7 @@ def identity(path):
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode):
         return None
-    with path.open("rb") as stream:
-        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
     return [digest, stat.S_IMODE(info.st_mode)]
 
 
@@ -103,8 +110,8 @@ def restore(root, saved):
             mtime = previous["mtime_ns"]
             restored += 1
         else:
-            # Changed inputs must stay newer than the restored build, including
-            # edits made by tools that preserve their input's timestamp.
+            # Give changed tracked files the current timestamp, including edits
+            # made by tools that preserve their input's timestamp.
             mtime = now
             changed += 1
         os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)

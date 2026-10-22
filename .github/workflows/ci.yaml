@@ -16,6 +16,13 @@ name: Iterate Ruff workspace cache
           - ecosystem
         default: linux
         required: true
+      seed_variant:
+        type: choice
+        options:
+          - all
+          - mtimes
+        default: all
+        required: true
 permissions:
   contents: read
 defaults:
@@ -38,7 +45,9 @@ jobs:
   linux-deps:
     name: Linux tests / deps
     runs-on: depot-ubuntu-22.04-16
-    if: ${{ inputs.suite == 'linux' || inputs.phase == 'seed' }}
+    if:
+      ${{ (inputs.phase == 'warm' && inputs.suite == 'linux') || (inputs.phase == 'seed' && (inputs.seed_variant == 'all'
+      || inputs.seed_variant == 'deps')) }}
     timeout-minutes: 20
     env:
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
@@ -115,7 +124,9 @@ jobs:
   linux-workspace:
     name: Linux tests / workspace
     runs-on: depot-ubuntu-22.04-16
-    if: ${{ inputs.suite == 'linux' || inputs.phase == 'seed' }}
+    if:
+      ${{ (inputs.phase == 'warm' && inputs.suite == 'linux') || (inputs.phase == 'seed' && (inputs.seed_variant == 'all'
+      || inputs.seed_variant == 'workspace')) }}
     timeout-minutes: 20
     env:
       CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
@@ -193,7 +204,9 @@ jobs:
   linux-mtimes:
     name: Linux tests / mtimes
     runs-on: depot-ubuntu-22.04-16
-    if: ${{ inputs.suite == 'linux' || inputs.phase == 'seed' }}
+    if:
+      ${{ (inputs.phase == 'warm' && inputs.suite == 'linux') || (inputs.phase == 'seed' && (inputs.seed_variant == 'all'
+      || inputs.seed_variant == 'mtimes')) }}
     timeout-minutes: 20
     env:
       CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
@@ -284,7 +297,7 @@ jobs:
         run: python3 "$RUNNER_TEMP/cache-input-mtimes.py" save .rust-cache-inputs/manifest.json
   seed-narrow:
     name: Seed Ruff binary cache
-    if: ${{ inputs.phase == 'seed' }}
+    if: ${{ inputs.phase == 'seed' && inputs.seed_variant == 'all' }}
     runs-on: depot-ubuntu-24.04-8
     timeout-minutes: 20
     env:
@@ -346,44 +359,43 @@ jobs:
       - name: Prepare cache input helper
         run:
           "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Record source timestamps and restore them only for matching inputs.\"\"\"\n\nfrom __future__\
-          \ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
+          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
+          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
           import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\"],\n            cwd=root,\n\
-          \        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n    \
-          \    for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in package[\"\
-          targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n    \
-          \    return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
+          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\", \"--locked\"],\n\
+          \            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n\
+          \        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in\
+          \ package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n\
+          \        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
           \ cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\0\") if name})\n\n\ndef safe_path(root,\
           \ name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\" in relative.parts:\n        raise ValueError(f\"\
           Invalid cached input path: {name}\")\n    path = root / relative\n    if not path.resolve().is_relative_to(root):\n\
           \        return None\n    return path\n\n\ndef identity(path):\n    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n\
-          \        return None\n    with path.open(\"rb\") as stream:\n        digest = hashlib.file_digest(stream, \"sha256\"\
-          ).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n\
-          \        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n\
-          \    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n\
-          \        if path is None or not path.exists():\n            continue\n        value = identity(path)\n        if value\
-          \ is None:\n            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n\
-          \        for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Changed inputs must stay newer than the restored build, including\n            # edits\
-          \ made by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n      \
-          \  os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for\
-          \ name, record in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
-          directories\"].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in\
-          \ previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories\
-          \ += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n\
-          \    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n        \"restored_directories\"\
-          : restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"\
-          operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n    parser.add_argument(\"\
-          --root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n    start\
-          \ = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
+          \        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\
+          \n\ndef directory_entries(path):\n    return sorted(\n        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for\
+          \ entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n\
+          \        path = safe_path(root, name)\n        if path is None or not path.exists():\n            continue\n     \
+          \   value = identity(path)\n        if value is None:\n            continue\n        files[name] = {\"identity\":\
+          \ value, \"mtime_ns\": path.stat().st_mtime_ns}\n        for parent in path.parents:\n            if parent == root:\n\
+          \                break\n            directories.add(parent)\n    return {\n        \"version\": 1,\n        \"files\"\
+          : files,\n        \"directories\": {\n            str(path.relative_to(root)): {\n                \"entries\": directory_entries(path),\n\
+          \                \"mtime_ns\": path.stat().st_mtime_ns,\n            }\n            for path in sorted(directories)\n\
+          \        },\n    }\n\n\ndef restore(root, saved):\n    if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported\
+          \ input timestamp manifest\")\n    current = scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n  \
+          \  for name, record in current[\"files\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
+          files\"].get(name)\n        if previous and record[\"identity\"] == previous[\"identity\"]:\n            mtime = previous[\"\
+          mtime_ns\"]\n            restored += 1\n        else:\n            # Give changed tracked files the current timestamp,\
+          \ including edits\n            # made by tools that preserve their input's timestamp.\n            mtime = now\n \
+          \           changed += 1\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
+          \ restored_directories = 0\n    for name, record in current[\"directories\"].items():\n        path = safe_path(root,\
+          \ name)\n        previous = saved[\"directories\"].get(name)\n        if previous and record[\"entries\"] == [\n \
+          \           tuple(entry) for entry in previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"\
+          ]\n            restored_directories += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns,\
+          \ mtime), follow_symlinks=False)\n    return {\n        \"restored_files\": restored,\n        \"changed_files\":\
+          \ changed,\n        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
+          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
+          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
+          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
           \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
           \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
           \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
@@ -444,44 +456,43 @@ jobs:
       - name: Prepare cache input helper
         run:
           "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Record source timestamps and restore them only for matching inputs.\"\"\"\n\nfrom __future__\
-          \ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
+          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
+          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
           import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\"],\n            cwd=root,\n\
-          \        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n    \
-          \    for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in package[\"\
-          targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n    \
-          \    return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
+          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\", \"--locked\"],\n\
+          \            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n\
+          \        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in\
+          \ package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n\
+          \        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
           \ cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\0\") if name})\n\n\ndef safe_path(root,\
           \ name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\" in relative.parts:\n        raise ValueError(f\"\
           Invalid cached input path: {name}\")\n    path = root / relative\n    if not path.resolve().is_relative_to(root):\n\
           \        return None\n    return path\n\n\ndef identity(path):\n    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n\
-          \        return None\n    with path.open(\"rb\") as stream:\n        digest = hashlib.file_digest(stream, \"sha256\"\
-          ).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n\
-          \        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n\
-          \    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n\
-          \        if path is None or not path.exists():\n            continue\n        value = identity(path)\n        if value\
-          \ is None:\n            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n\
-          \        for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Changed inputs must stay newer than the restored build, including\n            # edits\
-          \ made by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n      \
-          \  os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for\
-          \ name, record in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
-          directories\"].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in\
-          \ previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories\
-          \ += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n\
-          \    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n        \"restored_directories\"\
-          : restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"\
-          operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n    parser.add_argument(\"\
-          --root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n    start\
-          \ = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
+          \        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\
+          \n\ndef directory_entries(path):\n    return sorted(\n        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for\
+          \ entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n\
+          \        path = safe_path(root, name)\n        if path is None or not path.exists():\n            continue\n     \
+          \   value = identity(path)\n        if value is None:\n            continue\n        files[name] = {\"identity\":\
+          \ value, \"mtime_ns\": path.stat().st_mtime_ns}\n        for parent in path.parents:\n            if parent == root:\n\
+          \                break\n            directories.add(parent)\n    return {\n        \"version\": 1,\n        \"files\"\
+          : files,\n        \"directories\": {\n            str(path.relative_to(root)): {\n                \"entries\": directory_entries(path),\n\
+          \                \"mtime_ns\": path.stat().st_mtime_ns,\n            }\n            for path in sorted(directories)\n\
+          \        },\n    }\n\n\ndef restore(root, saved):\n    if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported\
+          \ input timestamp manifest\")\n    current = scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n  \
+          \  for name, record in current[\"files\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
+          files\"].get(name)\n        if previous and record[\"identity\"] == previous[\"identity\"]:\n            mtime = previous[\"\
+          mtime_ns\"]\n            restored += 1\n        else:\n            # Give changed tracked files the current timestamp,\
+          \ including edits\n            # made by tools that preserve their input's timestamp.\n            mtime = now\n \
+          \           changed += 1\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
+          \ restored_directories = 0\n    for name, record in current[\"directories\"].items():\n        path = safe_path(root,\
+          \ name)\n        previous = saved[\"directories\"].get(name)\n        if previous and record[\"entries\"] == [\n \
+          \           tuple(entry) for entry in previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"\
+          ]\n            restored_directories += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns,\
+          \ mtime), follow_symlinks=False)\n    return {\n        \"restored_files\": restored,\n        \"changed_files\":\
+          \ changed,\n        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
+          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
+          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
+          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
           \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
           \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
           \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
@@ -541,44 +552,43 @@ jobs:
       - name: Prepare cache input helper
         run:
           "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Record source timestamps and restore them only for matching inputs.\"\"\"\n\nfrom __future__\
-          \ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
+          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
+          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
           import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\"],\n            cwd=root,\n\
-          \        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n    \
-          \    for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in package[\"\
-          targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n    \
-          \    return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
+          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\", \"--locked\"],\n\
+          \            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n\
+          \        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in\
+          \ package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n\
+          \        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
           \ cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\0\") if name})\n\n\ndef safe_path(root,\
           \ name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\" in relative.parts:\n        raise ValueError(f\"\
           Invalid cached input path: {name}\")\n    path = root / relative\n    if not path.resolve().is_relative_to(root):\n\
           \        return None\n    return path\n\n\ndef identity(path):\n    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n\
-          \        return None\n    with path.open(\"rb\") as stream:\n        digest = hashlib.file_digest(stream, \"sha256\"\
-          ).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n\
-          \        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n\
-          \    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n\
-          \        if path is None or not path.exists():\n            continue\n        value = identity(path)\n        if value\
-          \ is None:\n            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n\
-          \        for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Changed inputs must stay newer than the restored build, including\n            # edits\
-          \ made by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n      \
-          \  os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for\
-          \ name, record in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
-          directories\"].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in\
-          \ previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories\
-          \ += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n\
-          \    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n        \"restored_directories\"\
-          : restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"\
-          operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n    parser.add_argument(\"\
-          --root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n    start\
-          \ = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
+          \        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\
+          \n\ndef directory_entries(path):\n    return sorted(\n        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for\
+          \ entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n\
+          \        path = safe_path(root, name)\n        if path is None or not path.exists():\n            continue\n     \
+          \   value = identity(path)\n        if value is None:\n            continue\n        files[name] = {\"identity\":\
+          \ value, \"mtime_ns\": path.stat().st_mtime_ns}\n        for parent in path.parents:\n            if parent == root:\n\
+          \                break\n            directories.add(parent)\n    return {\n        \"version\": 1,\n        \"files\"\
+          : files,\n        \"directories\": {\n            str(path.relative_to(root)): {\n                \"entries\": directory_entries(path),\n\
+          \                \"mtime_ns\": path.stat().st_mtime_ns,\n            }\n            for path in sorted(directories)\n\
+          \        },\n    }\n\n\ndef restore(root, saved):\n    if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported\
+          \ input timestamp manifest\")\n    current = scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n  \
+          \  for name, record in current[\"files\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
+          files\"].get(name)\n        if previous and record[\"identity\"] == previous[\"identity\"]:\n            mtime = previous[\"\
+          mtime_ns\"]\n            restored += 1\n        else:\n            # Give changed tracked files the current timestamp,\
+          \ including edits\n            # made by tools that preserve their input's timestamp.\n            mtime = now\n \
+          \           changed += 1\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
+          \ restored_directories = 0\n    for name, record in current[\"directories\"].items():\n        path = safe_path(root,\
+          \ name)\n        previous = saved[\"directories\"].get(name)\n        if previous and record[\"entries\"] == [\n \
+          \           tuple(entry) for entry in previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"\
+          ]\n            restored_directories += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns,\
+          \ mtime), follow_symlinks=False)\n    return {\n        \"restored_files\": restored,\n        \"changed_files\":\
+          \ changed,\n        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
+          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
+          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
+          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
           \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
           \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
           \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
@@ -649,44 +659,43 @@ jobs:
       - name: Prepare cache input helper
         run:
           "cat > \"$RUNNER_TEMP/cache-input-mtimes.py\" <<'PYCODE'\n# /// script\n# requires-python = \">=3.11\"\n# dependencies\
-          \ = []\n# ///\n\"\"\"Record source timestamps and restore them only for matching inputs.\"\"\"\n\nfrom __future__\
-          \ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
+          \ = []\n# ///\n\"\"\"Restore timestamps for matching tracked files and unchanged directory entries.\"\"\"\n\nfrom\
+          \ __future__ import annotations\n\nimport argparse\nimport hashlib\nimport json\nimport os\nimport stat\nimport subprocess\n\
           import time\nfrom pathlib import Path\n\n\ndef tracked_paths(root):\n    metadata = json.loads(\n        subprocess.check_output(\n\
-          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\"],\n            cwd=root,\n\
-          \        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n    \
-          \    for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in package[\"\
-          targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n    \
-          \    return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
+          \            [\"cargo\", \"metadata\", \"--no-deps\", \"--format-version\", \"1\", \"--offline\", \"--locked\"],\n\
+          \            cwd=root,\n        )\n    )\n    packages = [\n        str(Path(package[\"manifest_path\"]).parent.relative_to(root))\n\
+          \        for package in metadata[\"packages\"]\n        if any(\"custom-build\" in target[\"kind\"] for target in\
+          \ package[\"targets\"])\n        and Path(package[\"manifest_path\"]).is_relative_to(root)\n    ]\n    if not packages:\n\
+          \        return []\n    output = subprocess.check_output(\n        [\"git\", \"ls-files\", \"-z\", \"--\", *packages],\
           \ cwd=root\n    )\n    return sorted({os.fsdecode(name) for name in output.split(b\"\\0\") if name})\n\n\ndef safe_path(root,\
           \ name):\n    relative = Path(name)\n    if relative.is_absolute() or \"..\" in relative.parts:\n        raise ValueError(f\"\
           Invalid cached input path: {name}\")\n    path = root / relative\n    if not path.resolve().is_relative_to(root):\n\
           \        return None\n    return path\n\n\ndef identity(path):\n    info = path.lstat()\n    if not stat.S_ISREG(info.st_mode):\n\
-          \        return None\n    with path.open(\"rb\") as stream:\n        digest = hashlib.file_digest(stream, \"sha256\"\
-          ).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\n\ndef directory_entries(path):\n    return sorted(\n\
-          \        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for entry in path.iterdir()\n    )\n\n\ndef scan(root):\n\
-          \    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n        path = safe_path(root, name)\n\
-          \        if path is None or not path.exists():\n            continue\n        value = identity(path)\n        if value\
-          \ is None:\n            continue\n        files[name] = {\"identity\": value, \"mtime_ns\": path.stat().st_mtime_ns}\n\
-          \        for parent in path.parents:\n            if parent == root:\n                break\n            directories.add(parent)\n\
-          \    return {\n        \"version\": 1,\n        \"files\": files,\n        \"directories\": {\n            str(path.relative_to(root)):\
-          \ {\n                \"entries\": directory_entries(path),\n                \"mtime_ns\": path.stat().st_mtime_ns,\n\
-          \            }\n            for path in sorted(directories)\n        },\n    }\n\n\ndef restore(root, saved):\n  \
-          \  if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported input timestamp manifest\")\n    current =\
-          \ scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n    for name, record in current[\"files\"].items():\n\
-          \        path = safe_path(root, name)\n        previous = saved[\"files\"].get(name)\n        if previous and record[\"\
-          identity\"] == previous[\"identity\"]:\n            mtime = previous[\"mtime_ns\"]\n            restored += 1\n  \
-          \      else:\n            # Changed inputs must stay newer than the restored build, including\n            # edits\
-          \ made by tools that preserve their input's timestamp.\n            mtime = now\n            changed += 1\n      \
-          \  os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n    restored_directories = 0\n    for\
-          \ name, record in current[\"directories\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
-          directories\"].get(name)\n        if previous and record[\"entries\"] == [\n            tuple(entry) for entry in\
-          \ previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"]\n            restored_directories\
-          \ += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n\
-          \    return {\n        \"restored_files\": restored,\n        \"changed_files\": changed,\n        \"restored_directories\"\
-          : restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"\
-          operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n    parser.add_argument(\"\
-          --root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n    start\
-          \ = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
+          \        return None\n    digest = hashlib.sha256(path.read_bytes()).hexdigest()\n    return [digest, stat.S_IMODE(info.st_mode)]\n\
+          \n\ndef directory_entries(path):\n    return sorted(\n        (entry.name, stat.S_IFMT(entry.lstat().st_mode)) for\
+          \ entry in path.iterdir()\n    )\n\n\ndef scan(root):\n    files = {}\n    directories = set()\n    for name in tracked_paths(root):\n\
+          \        path = safe_path(root, name)\n        if path is None or not path.exists():\n            continue\n     \
+          \   value = identity(path)\n        if value is None:\n            continue\n        files[name] = {\"identity\":\
+          \ value, \"mtime_ns\": path.stat().st_mtime_ns}\n        for parent in path.parents:\n            if parent == root:\n\
+          \                break\n            directories.add(parent)\n    return {\n        \"version\": 1,\n        \"files\"\
+          : files,\n        \"directories\": {\n            str(path.relative_to(root)): {\n                \"entries\": directory_entries(path),\n\
+          \                \"mtime_ns\": path.stat().st_mtime_ns,\n            }\n            for path in sorted(directories)\n\
+          \        },\n    }\n\n\ndef restore(root, saved):\n    if saved[\"version\"] != 1:\n        raise ValueError(\"Unsupported\
+          \ input timestamp manifest\")\n    current = scan(root)\n    restored = changed = 0\n    now = time.time_ns()\n  \
+          \  for name, record in current[\"files\"].items():\n        path = safe_path(root, name)\n        previous = saved[\"\
+          files\"].get(name)\n        if previous and record[\"identity\"] == previous[\"identity\"]:\n            mtime = previous[\"\
+          mtime_ns\"]\n            restored += 1\n        else:\n            # Give changed tracked files the current timestamp,\
+          \ including edits\n            # made by tools that preserve their input's timestamp.\n            mtime = now\n \
+          \           changed += 1\n        os.utime(path, ns=(path.stat().st_atime_ns, mtime), follow_symlinks=False)\n   \
+          \ restored_directories = 0\n    for name, record in current[\"directories\"].items():\n        path = safe_path(root,\
+          \ name)\n        previous = saved[\"directories\"].get(name)\n        if previous and record[\"entries\"] == [\n \
+          \           tuple(entry) for entry in previous[\"entries\"]\n        ]:\n            mtime = previous[\"mtime_ns\"\
+          ]\n            restored_directories += 1\n        else:\n            mtime = now\n        os.utime(path, ns=(path.stat().st_atime_ns,\
+          \ mtime), follow_symlinks=False)\n    return {\n        \"restored_files\": restored,\n        \"changed_files\":\
+          \ changed,\n        \"restored_directories\": restored_directories,\n    }\n\n\ndef main():\n    parser = argparse.ArgumentParser()\n\
+          \    parser.add_argument(\"operation\", choices=[\"save\", \"restore\"])\n    parser.add_argument(\"manifest\", type=Path)\n\
+          \    parser.add_argument(\"--root\", type=Path, default=Path.cwd())\n    args = parser.parse_args()\n    root = args.root.resolve()\n\
+          \    start = time.monotonic()\n    if args.operation == \"save\":\n        data = scan(root)\n        args.manifest.parent.mkdir(parents=True,\
           \ exist_ok=True)\n        args.manifest.write_text(json.dumps(data, separators=(\",\", \":\")) + \"\\n\")\n      \
           \  result = {\n            \"saved_files\": len(data[\"files\"]),\n            \"manifest_bytes\": args.manifest.stat().st_size,\n\
           \        }\n    elif args.manifest.exists():\n        result = restore(root, json.loads(args.manifest.read_text()))\n\
