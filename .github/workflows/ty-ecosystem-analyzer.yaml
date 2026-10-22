@@ -84,9 +84,6 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: "Install mold"
-        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
-
       - name: Build ty
         env:
           REVISION: ${{ matrix.revision }}
