@@ -582,6 +582,62 @@ def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]
 ```
 
+## Tuples constructed from list literals
+
+Expanding a list literal into a tuple preserves the type and position of each element. Unpacking the
+resulting tuple therefore gives the same types as unpacking the literal directly.
+
+```py
+source = (*[1, "two"],)
+reveal_type(source)  # revealed: tuple[Literal[1], Literal["two"]]
+
+first, second = source
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(second)  # revealed: Literal["two"]
+```
+
+Literal expansions can be nested, including through assignment expressions. Each assignment still
+binds the type of its own container.
+
+```py
+source = (0, *[1, *(pair := ("two", *[False]))])
+reveal_type(source)  # revealed: tuple[Literal[0], Literal[1], Literal["two"], Literal[False]]
+reveal_type(pair)  # revealed: tuple[Literal["two"], Literal[False]]
+
+source = (*[(first := 1), first], (last := "two"), last)
+reveal_type(source)  # revealed: tuple[Literal[1], Literal[1], Literal["two"], Literal["two"]]
+```
+
+An invalid expansion reports its iteration error once, while the surrounding literal elements retain
+their positions.
+
+```py
+# error: [not-iterable] "Object of type `Literal[2]` is not iterable"
+source = (*[1, *2, "two"],)
+reveal_type(source)  # revealed: tuple[Literal[1], *tuple[Unknown, ...], Literal["two"]]
+```
+
+## Literal expansions containing variable-length tuples
+
+A list literal can contain an expansion whose length is unknown. Converting that literal to a tuple
+preserves the fixed elements on either side of the expansion, including when the variable portion is
+a symbolic `TypeVarTuple`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def homogeneous(values: tuple[float, ...]):
+    source = (*[1, *values, "two"],)
+    reveal_type(source)  # revealed: tuple[Literal[1], *tuple[float, ...], Literal["two"]]
+
+def symbolic[*Ts](values: tuple[*Ts]):
+    source = (*[1, *values, "two"],)
+    reveal_type(source)  # revealed: tuple[Literal[1], *Ts@symbolic, Literal["two"]]
+```
+
 ## `Literal` promotion for large unannotated tuples
 
 We infer `Literal` types for a tuple's elements only if it has \<=64 elements. For larger tuples, if
@@ -641,6 +697,44 @@ reveal_type(len(annotated_tuple_with_65))  # revealed: Literal[65]
 reveal_type(annotated_tuple_with_65)
 
 # fmt: on
+```
+
+The limit counts elements introduced by list and tuple literal expansions, including elements from
+several smaller literals. A 64-element expansion retains its literals; adding one more element
+widens the whole tuple. Empty expansions do not consume this budget.
+
+```py
+# fmt: off
+expanded_64 = (*[], *[
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63,
+], *())
+expanded_65 = (*[
+    0, (1,), 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+], *(
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63,
+), 64)
+# fmt: on
+reveal_type(expanded_64[0])  # revealed: Literal[0]
+reveal_type(expanded_64[-1])  # revealed: Literal[63]
+reveal_type(expanded_65[0])  # revealed: int
+reveal_type(expanded_65[-1])  # revealed: int
+```
+
+Widening also applies inside the nested tuple in `expanded_65`.
+
+```py
+reveal_type(expanded_65[1])  # revealed: tuple[int]
 ```
 
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

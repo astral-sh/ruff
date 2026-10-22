@@ -7,6 +7,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -49,10 +50,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// obj.ſ = 1  # This is interpreted as obj.s = 1, not obj.ſ = 1
 /// ```
 ///
+/// ## Known issues
+/// In some cases, a type checker may be able to analyze an assignment more
+/// thoroughly than a `setattr` call. Applying the fix in such cases may result
+/// in new type checking diagnostics, even if the runtime behavior of the code
+/// is unchanged.
+///
 /// ## References
 /// - [Python documentation: `setattr`](https://docs.python.org/3/library/functions.html#setattr)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.111")]
+#[violation_metadata(stable_since = "v0.0.111", category = Category::Complexity)]
 pub(crate) struct SetAttrWithConstant;
 
 impl AlwaysFixableViolation for SetAttrWithConstant {

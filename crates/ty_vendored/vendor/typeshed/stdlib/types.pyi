@@ -185,7 +185,7 @@ class CodeType:
     def co_firstlineno(self) -> int: ...
     if sys.version_info < (3, 15):
         @property
-        @deprecated("Deprecated since Python 3.10; will be removed in Python 3.15. Use `CodeType.co_lines()` instead.")
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `CodeType.co_lines()` instead.")
         def co_lnotab(self) -> bytes: ...
 
     @property
@@ -421,11 +421,10 @@ class ModuleType:
 class CellType:
     """Create a new cell object.
 
-     contents
-       the contents of the cell. If not specified, the cell will be empty,
-       and
-    further attempts to access its cell_contents attribute will
-       raise a ValueError.
+    contents
+      the contents of the cell. If not specified, the cell will be empty,
+      and further attempts to access its cell_contents attribute will
+      raise a ValueError.
     """
 
     def __new__(cls, contents: object = ..., /) -> Self: ...
@@ -803,6 +802,16 @@ if sys.version_info >= (3, 15):
 
         def __contains__(self, key: object, /) -> bool: ...
         def __reversed__(self) -> Iterator[str]: ...
+        def __or__(self, other: dict[str, Any] | FrameLocalsProxyType, /) -> dict[str, Any]:
+            """Return self|value."""
+
+        # Will raise a NameError if invoked via |=
+        def __ior__(self, other: dict[str, Any] | FrameLocalsProxyType, /) -> dict[str, Any]:  # noqa: Y034
+            """Return self|=value."""
+
+        def __ror__(self, other: dict[str, Any] | FrameLocalsProxyType, /) -> dict[str, Any]:
+            """Return value|self."""
+
         def copy(self) -> dict[str, Any]: ...
         def pop(self, key: str, default: Any = ..., /) -> Any: ...
         def setdefault(self, key: str, default: Any = ..., /) -> Any: ...
@@ -817,10 +826,8 @@ if sys.version_info >= (3, 15):
         the imported value.
         """
 
-        @property
-        def __name__(self) -> str: ...
         def resolve(self) -> Any:
-            """resolves the lazy import and returns the actual object"""
+            """Resolve the lazy import and return the imported object."""
 
 @final
 class GetSetDescriptorType:

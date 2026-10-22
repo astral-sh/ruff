@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub(crate) enum VarKind {
@@ -46,7 +47,7 @@ impl fmt::Display for VarKind {
 /// _T = TypeVar("_T")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Style)]
 pub(crate) struct UnprefixedTypeParam {
     kind: VarKind,
 }

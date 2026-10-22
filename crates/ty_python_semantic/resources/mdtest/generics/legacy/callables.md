@@ -76,6 +76,35 @@ reveal_type(generic_context(into_regular_callable(C)))
 reveal_type(into_regular_callable(C)(1))
 ```
 
+## Constructor callbacks with receiver-specific overloads
+
+In the below example, the applicable `__new__` overload for `Factory[int]` returns a `Factory[int]`,
+so construction also calls `__init__`. Callback compatibility therefore requires its `int` argument.
+The overload that returns `str` applies only to `Factory[str]` and cannot bypass this requirement.
+
+```py
+from __future__ import annotations
+from typing import Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class Factory(Generic[T]):
+    value: T
+
+    @overload
+    def __new__(cls: type[Factory[int]], *args: object) -> Factory[int]: ...
+    @overload
+    def __new__(cls: type[Factory[str]], *args: object) -> str: ...
+    def __new__(cls, *args: object) -> Factory[int] | str:
+        raise NotImplementedError
+
+    def __init__(self, value: int) -> None: ...
+
+valid: Callable[[int], Factory[int]] = Factory[int]
+missing_argument: Callable[[], Factory[int]] = Factory[int]  # error: [invalid-assignment]
+wrong_argument: Callable[[str], Factory[int]] = Factory[int]  # error: [invalid-assignment]
+```
+
 ## Naming a generic `Callable`: type aliases
 
 The easiest way to refer to a generic `Callable` type directly is via a type alias:
@@ -269,14 +298,250 @@ reveal_type(generic_context(outside_callable(int_identity)))
 outside_callable(int_identity)("string")
 ```
 
+## Union without intersection does not consider budget
+
+A single union upper bound remains precise even when it has more alternatives than the solution
+budget. Nested `TypeAliasType` aliases preserve the same result.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def infer_from_consumer(consumer: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume(value: A | B | C | D | E) -> None: ...
+
+reveal_type(infer_from_consumer(consume))  # revealed: A | B | C | D | E
+```
+
+The aliases retain nested union members until inference expands them:
+
+```py
+FirstTwo = TypeAliasType("FirstTwo", A | B)
+NextTwo = TypeAliasType("NextTwo", C | D)
+Options = TypeAliasType("Options", FirstTwo | NextTwo | E)
+
+def consume_alias(value: Options) -> None: ...
+
+reveal_type(infer_from_consumer(consume_alias))  # revealed: A | B | C | D | E
+```
+
+## Overlapping inferred union upper bounds with few surviving alternatives
+
+The individual union upper bounds can exceed the solution budget when only a few alternatives
+survive their intersection. Disjoint alternatives do not count toward the budget.
+
+```py
+from typing import Callable, TypeVar, final
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+def infer_from_consumers(left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+@final
+class A: ...
+
+@final
+class B: ...
+
+@final
+class C: ...
+
+@final
+class D: ...
+
+@final
+class E: ...
+
+@final
+class F: ...
+
+@final
+class G: ...
+
+@final
+class H: ...
+
+def consume_left(value: A | B | C | D | E) -> None: ...
+def consume_right(value: A | B | F | G | H) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left, consume_right))  # revealed: A | B
+```
+
+Aliases for these unions also preserve the precise intersection in either argument order:
+
+```py
+Left = TypeAliasType("Left", A | B | C | D | E)
+Right = TypeAliasType("Right", A | B | F | G | H)
+
+def consume_left_alias(value: Left) -> None: ...
+def consume_right_alias(value: Right) -> None: ...
+
+reveal_type(infer_from_consumers(consume_left_alias, consume_right_alias))  # revealed: A | B
+reveal_type(infer_from_consumers(consume_right_alias, consume_left_alias))  # revealed: A | B
+```
+
+## Intersecting aliased upper bounds exceeding the solution budget
+
+Each consumer constrains `T` to a different union. The classes can share subclasses, so their
+intersection has eight distinct alternatives. Type aliases do not exempt this expansion from the
+solution budget: inference falls back to `Unknown` instead of constructing the entire intersection.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+First = TypeAliasType("First", A | B)
+Second = TypeAliasType("Second", C | D)
+Third = TypeAliasType("Third", E | F)
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_third(value: Third) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_third))  # revealed: Unknown
+```
+
+The same budget applies when an explicit union is intersected with aliased unions:
+
+```py
+def consume_explicit(value: E | F) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_explicit))  # revealed: Unknown
+```
+
+## Narrowing negated intersection aliases
+
+The negation of an aliased intersection acts as a union of negations. Intersecting three such upper
+bounds can exceed the solution budget, but an additional literal upper bound leaves just one
+solution. We infer the literal regardless of the consumer order.
+
+```py
+from typing import Callable, Literal, TypeVar
+from typing_extensions import TypeAliasType
+from ty_extensions import Intersection, Not
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+AB = TypeAliasType("AB", Intersection[A, B])
+CD = TypeAliasType("CD", Intersection[C, D])
+EF = TypeAliasType("EF", Intersection[E, F])
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+    fourth: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def exclude_ab(value: Not[AB]) -> None: ...
+def exclude_cd(value: Not[CD]) -> None: ...
+def exclude_ef(value: Not[EF]) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(exclude_ab, exclude_cd, exclude_ef, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, exclude_ab, exclude_cd, exclude_ef))  # revealed: Literal[5]
+```
+
+## Intersecting recursive inferred union upper bounds
+
+A recursive alias can contribute an upper bound without expanding its nested occurrences. Here, only
+`int` satisfies both consumers, regardless of their order.
+
+```py
+from typing import Callable, TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Recursive = TypeAliasType("Recursive", "int | list[Recursive]")
+
+def infer_from_consumers(left: Callable[[T], None], right: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def consume_recursive(value: Recursive) -> None: ...
+def consume_int_or_str(value: int | str) -> None: ...
+
+reveal_type(infer_from_consumers(consume_recursive, consume_int_or_str))  # revealed: int
+reveal_type(infer_from_consumers(consume_int_or_str, consume_recursive))  # revealed: int
+```
+
+## Narrowing recursive inferred union upper bounds
+
+The third consumer restricts two recursive unions to the literal `5`. Its position does not change
+the inferred result.
+
+```py
+from typing import Callable, Literal, TypeVar
+
+T = TypeVar("T")
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+First = Literal[5] | A | B | list["First"]
+Second = Literal[5] | C | D | list["Second"]
+
+def infer_from_consumers(
+    first: Callable[[T], None],
+    second: Callable[[T], None],
+    third: Callable[[T], None],
+) -> T:
+    raise NotImplementedError
+
+def consume_first(value: First) -> None: ...
+def consume_second(value: Second) -> None: ...
+def consume_literal(value: Literal[5]) -> None: ...
+
+reveal_type(infer_from_consumers(consume_first, consume_second, consume_literal))  # revealed: Literal[5]
+reveal_type(infer_from_consumers(consume_literal, consume_first, consume_second))  # revealed: Literal[5]
+```
+
 ## Overloaded callable as generic `Callable` argument
 
 An overloaded callable should be assignable to a non-overloaded callable type when the overload set
 as a whole is compatible with the target callable.
 
-The type variable should be inferred from the first matching overload, rather than unioning
-parameter types across all overloads (which would create an unsatisfiable expected type for
-contravariant type variables).
+Each overload independently validates the same call, specializing `T` to `str` or `bytes`. Since the
+function receives only a consumer of `T`, it has no way to produce a value of type `T` to return.
+The return type must satisfy both specializations, so their intersection, `Never`, correctly
+captures that no value can be returned.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -287,13 +552,107 @@ def accepts_callable(converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 @overload
-def f(val: str) -> None: ...
+def overloaded_consumer(val: str) -> None: ...
 @overload
-def f(val: bytes) -> None: ...
-def f(val: str | bytes) -> None:
+def overloaded_consumer(val: bytes) -> None: ...
+def overloaded_consumer(val: str | bytes) -> None:
     pass
 
-reveal_type(accepts_callable(f))  # revealed: str | bytes
+def _() -> None:
+    reveal_type(accepts_callable(overloaded_consumer))  # revealed: Never
+```
+
+An additional argument of type `T` supplies the return value and constrains the valid
+specializations. A `str | bytes` value is accepted because the overload set covers both cases:
+
+```py
+def accepts_callable_and_value(converter: Callable[[T], None], value: T) -> T:
+    converter(value)
+    return value
+
+def _(string: str, data: bytes, either: str | bytes) -> None:
+    reveal_type(accepts_callable_and_value(overloaded_consumer, string))  # revealed: str
+    reveal_type(accepts_callable_and_value(overloaded_consumer, data))  # revealed: bytes
+    reveal_type(accepts_callable_and_value(overloaded_consumer, either))  # revealed: str | bytes
+```
+
+A `str | int` value is rejected because neither overload of the consumer accepts its `int`
+alternative:
+
+```py
+def _(value: str | int) -> None:
+    # TODO: Do not include the consumer's `bytes` alternative in the error-recovery return type.
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable_and_value(overloaded_consumer, value))  # revealed: str | bytes | int
+```
+
+Type variables inferred from the same overload remain correlated. Here, the valid assignments are
+`PairT = int, U = str` and `PairT = str, U = int`; inference does not mix the input type from one
+overload with the return type from the other:
+
+```py
+from typing import Generic
+
+ResultT = TypeVar("ResultT", covariant=True)
+PairT = TypeVar("PairT", int, str)
+U = TypeVar("U")
+
+class Result(Generic[ResultT]):
+    def use(self, callback: Callable[[ResultT], int]) -> int:
+        raise NotImplementedError
+
+def infer_pair(converter: Callable[[PairT], U]) -> Result[tuple[PairT, U]]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+def _() -> None:
+    reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
+```
+
+## Combining inferred and declared upper bounds
+
+The declared upper bound participates in selecting the inferred upper-bound solution. Even though
+the callable accepts `int | str`, the TypeVar cannot be specialized to `int`, so we use the declared
+upper bound:
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+
+StringT = TypeVar("StringT", bound=str)
+
+def infer_str(consumer: Callable[[StringT], None]) -> StringT:
+    raise NotImplementedError
+
+def consume_int_or_str(value: int | str) -> None: ...
+
+# revealed: str
+reveal_type(infer_str(consume_int_or_str))
+```
+
+A gradual declared bound restricts which specializations are valid without becoming part of a
+concrete specialization that already satisfies it:
+
+```py
+BaseT = TypeVar("BaseT")
+
+class GenericBase(Generic[BaseT]): ...
+class Child(GenericBase[int]): ...
+
+Inferred = TypeVar("Inferred", bound=GenericBase[Any])
+
+def infer_child(consumer: Callable[[Inferred], None]) -> Inferred:
+    raise NotImplementedError
+
+def consume_child(value: Child) -> None: ...
+
+# revealed: Child
+reveal_type(infer_child(consume_child))
 ```
 
 ## Rejected overloaded callbacks preserve valid specializations
@@ -332,6 +691,41 @@ reveal_type(infer_bound(invalid_first))  # revealed: int
 reveal_type(infer_bound(invalid_last))  # revealed: int
 reveal_type(infer_constrained(invalid_first))  # revealed: int
 reveal_type(infer_constrained(invalid_last))  # revealed: int
+```
+
+## Unresolved `Self` overloads
+
+The inferred callable retains the argument types accepted by every overload, even when a `Self`
+dependency in one overload cannot be resolved.
+
+```py
+from typing import Callable, TypeVar, overload
+from typing_extensions import Self
+
+A = TypeVar("A")
+B = TypeVar("B")
+R = TypeVar("R")
+
+def identity(fn: Callable[[A, B], R]) -> Callable[[A, B], R]:
+    return fn
+
+class C:
+    @overload
+    def method(self, value: int) -> "C": ...
+    @overload
+    def method(self, value: str) -> Self: ...
+    def method(self, value: int | str) -> "C":
+        return self
+
+# TODO: Accept the callback without error.
+# error: [invalid-argument-type]
+method = identity(C.method)
+reveal_type(method)  # revealed: (C, int | str, /) -> C
+
+class Sub(C): ...
+
+# TODO: revealed: Sub (preserve the generic `Self` overload)
+reveal_type(method(Sub(), ""))  # revealed: C
 ```
 
 ## Overloaded callable with a constrained type variable
@@ -384,6 +778,327 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
         return func
 
     return wrapper
+```
+
+## Dependent return types from generic callbacks
+
+A generic identity callback can be used as either `Callable[[A], A]` or `Callable[[B], B]`: it
+returns its argument unchanged:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+```
+
+This overloaded "consumer" can accept either an `A` or a `B`:
+
+```py
+from typing import Callable, overload
+
+class A: ...
+class B: ...
+
+@overload
+def consume(value: A) -> None: ...
+@overload
+def consume(value: B) -> None: ...
+def consume(value: A | B) -> None: ...
+```
+
+If we pass both the callback and the consumer to a generic function, we can solve `T` (and thus also
+`R`) to either `A` or `B`. This should allow us to infer `A & B` as the return type.
+
+```py
+R = TypeVar("R")
+
+def infer_result(callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
+    raise NotImplementedError
+
+# Eager subtype checking cannot yet infer callback-local type variables, so `identity`
+# wrongly fails revalidation against both `Callable[[A], A]` and `Callable[[B], B]`, so
+# we fall back to `A | B` instead of `A & B`.
+# TODO: revealed: A & B
+reveal_type(infer_result(identity, consume))  # revealed: A | B
+```
+
+If we additionally supply a value, that selects the specific consumer overload that accepts it. The
+identity callback's result type follows that selected argument type:
+
+```py
+def infer_result_with_value(callback: Callable[[T], R], consumer: Callable[[T], None], value: T) -> R:
+    return callback(value)
+
+def _(a: A, b: B) -> None:
+    reveal_type(infer_result_with_value(identity, consume, a))  # revealed: A
+    reveal_type(infer_result_with_value(identity, consume, b))  # revealed: B
+```
+
+## Return type inference from partially annotated overloads
+
+The catch-all overload returns `object`, which is preserved when inferring a return type from the
+whole callback even though the literal-specific overloads have unannotated return types.
+
+```py
+from typing import Callable, Literal, TypeVar, overload
+from typing_extensions import assert_type
+
+R = TypeVar("R")
+T = TypeVar("T")
+
+def infer_return(callback: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
+@overload
+def callback(value: Literal["a"]): ...
+@overload
+def callback(value: Literal["b"]): ...
+@overload
+def callback(value: Literal["c"]): ...
+@overload
+def callback(value: Literal["d", "e"]): ...
+@overload
+def callback(value: Literal["f", "g"]): ...
+@overload
+def callback(value: Literal["h", "i"]): ...
+@overload
+def callback(value: Literal["j", "k"]): ...
+@overload
+def callback(value: object) -> object: ...
+def callback(value):
+    raise NotImplementedError
+
+assert_type(infer_return(callback), object)
+```
+
+## Generic inference after projection budget exhaustion
+
+Each tuple element independently matches one of the callback's overloads. The combined alternative
+bindings exceed generic inference's projection limits. The precise type of `default=0` does not
+replace the missing callback evidence: we recover with `Unknown` in either argument order.
+
+```py
+from typing import Callable, Literal, TypeVar, overload
+from typing_extensions import assert_type
+from ty_extensions._internal import Unknown
+
+R = TypeVar("R")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def infer_return(callback: tuple[Callable[[T], R], Callable[[U], R], Callable[[V], R]], default: R) -> R:
+    raise NotImplementedError
+
+@overload
+def callback(value: Literal[0, 1]): ...
+@overload
+def callback(value: Literal[2, 3]): ...
+@overload
+def callback(value: Literal[4, 5]): ...
+@overload
+def callback(value: Literal[6, 7]): ...
+@overload
+def callback(value: Literal[8, 9]): ...
+@overload
+def callback(value: Literal[10, 11]): ...
+@overload
+def callback(value: Literal[12, 13]): ...
+@overload
+def callback(value: Literal[14, 15]): ...
+@overload
+def callback(value: Literal[16, 17]): ...
+@overload
+def callback(value: Literal[18, 19]): ...
+@overload
+def callback(value: object) -> object: ...
+def callback(value):
+    raise NotImplementedError
+
+assert_type(infer_return((callback, callback, callback), 0), Unknown)
+assert_type(infer_return(default=0, callback=(callback, callback, callback)), Unknown)
+```
+
+## Inference from a bounded callable type variable
+
+The upper bound of a bounded type variable is used to infer the signature of a callable type:
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+F = TypeVar("F", bound=Callable[[int], str])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: F):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+If the upper bound is a class type, the signature of the class's `__call__` method is used:
+
+```py
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+P = TypeVar("P", bound=Printer)
+
+def _(callback: P):
+    reveal_type(apply(callback))  # revealed: str
+
+    x1: Callable[[str], str] = callback  # error: [invalid-assignment]
+    x2: Callable[[int], int] = callback  # error: [invalid-assignment]
+```
+
+If `__call__` returns `Self`, the type variable is preserved as the inferred return type:
+
+```py
+from typing_extensions import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+C = TypeVar("C", bound=Clone)
+
+def _(callback: C) -> C:
+    reveal_type(apply(callback))  # revealed: C@_
+    return apply(callback)
+```
+
+The type variable is also preserved for class methods that return `Self`:
+
+```py
+class ClassClone:
+    @classmethod
+    def __call__(cls, value: int) -> Self:
+        return cls()
+
+H = TypeVar("H", bound=ClassClone)
+
+def _(callback: H) -> H:
+    reveal_type(apply(callback))  # revealed: H@_
+    return apply(callback)
+```
+
+## Explicit receivers in callable bounds
+
+An explicit receiver annotation restricts which specializations are callable:
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Restricted(Generic[T]):
+    def __call__(self: "Restricted[int]", value: int) -> str:
+        return str(value)
+
+def consume(callback: Callable[[int], str]) -> None: ...
+def _(callback: Restricted[str]):
+    consume(callback)  # error: [invalid-argument-type]
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+F = TypeVar("F", bound=Restricted[str])
+
+def _(callback: F):
+    consume(callback)  # TODO: This should error.
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+The upper bound of a type variable satisfies an explicit receiver annotation with the same type:
+
+```py
+def _(callback: Restricted[int]):
+    consume(callback)
+    x: Callable[[int], str] = callback
+
+G = TypeVar("G", bound=Restricted[int])
+
+def _(callback: G):
+    consume(callback)
+    # TODO: This should not error.
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+Note that a compatible receiver bound does not satisfy an incompatible return type:
+
+```py
+def _(callback: G):
+    wrong: Callable[[int], bytes] = callback  # error: [invalid-assignment]
+```
+
+## Constructor bounds in callable inference
+
+The signature of a class constructor can be inferred from a type variable with an upper bound of
+`type[C]` during callable inference:
+
+```py
+from typing import Callable, TypeVar
+
+class C:
+    def __init__(self, value: int) -> None: ...
+
+T = TypeVar("T")
+F = TypeVar("F", bound=type[C])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: F):
+    reveal_type(apply(callback))  # revealed: C
+
+    x1: Callable[[int], C] = callback
+    x2: Callable[[str], C] = callback  # error: [invalid-assignment]
+    x3: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+## Recursive callable types
+
+Callable inference falls back to an error when a `__call__` signature involves unbounded recursion:
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
+
+class Recursive:
+    __call__: "Recursive"
+
+def _(callback: Recursive):
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+F = TypeVar("F", bound=Recursive)
+
+def _(callback: F):
+    x1: CallableTypeOf[callback]  # error: [invalid-type-form]
+    x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+Concrete nested specializations of the same generic class do not trigger the fallback:
+
+```py
+T = TypeVar("T")
+
+class Wrapper(Generic[T]):
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+H = TypeVar("H", bound=Wrapper[Wrapper[Callable[[int], str]]])
+
+def apply(callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Wrapper[Wrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+def _(callback: H):
+    reveal_type(apply(callback))  # revealed: str
 ```
 
 ## Multiple occurrences of a higher-order generic callable
@@ -468,6 +1183,216 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Callbacks that accept final classes
+
+When a callback accepts `type[Closed]`, we infer `T` in `Callable[[type[T]], None]` as the instance
+type `Closed`. Declaring the class as final does not change this: `T` describes instances of
+`Closed`, not the class object itself.
+
+```py
+from typing import Callable, TypeVar, final
+
+T = TypeVar("T")
+
+def solve(callback: Callable[[type[T]], None]) -> T:
+    raise NotImplementedError
+
+@final
+class Closed: ...
+
+def takes_closed(cls: type[Closed]) -> None: ...
+
+reveal_type(solve(takes_closed))  # revealed: Closed
+```
+
+For a final generic class, the inferred instance type includes the class's type arguments:
+
+```py
+from typing import Generic
+
+@final
+class GenericClosed(Generic[T]): ...
+
+def takes_generic_closed(cls: type[GenericClosed[int]]) -> None: ...
+
+reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
+```
+
+## Decorating classmethods of final classes
+
+This decorator accepts a method whose first argument is a class object and leaves the remaining
+parameters unchanged:
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, final
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+def decorate(
+    f: Callable[Concatenate[type[T], P], None],
+) -> Callable[Concatenate[type[T], P], None]:
+    return f
+```
+
+For a classmethod on a final class, the inferred `cls` type is the class object itself. We accept
+the decorator by inferring `T` as the instance type `Closed`.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4664>.
+
+```py
+@final
+class Closed:
+    @decorate  # no diagnostic
+    @classmethod
+    def method(cls, value: int) -> None: ...
+```
+
+## Gradual class parameters
+
+A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T")
+
+def invoke(callback: Callable[[type], T]) -> T:
+    return callback(int)
+
+def _(f: Callable[[type[Any]], int], g: Callable[[type[Unknown]], str]):
+    reveal_type(invoke(f))  # revealed: int
+    reveal_type(invoke(g))  # revealed: str
+```
+
+A gradual class argument can also satisfy a callback's metaclass parameter:
+
+```py
+class Meta(type): ...
+
+def f(cls: Meta) -> int:
+    return 1
+
+def invoke_any(callback: Callable[[type[Any]], T], cls: type[Any]) -> T:
+    return callback(cls)
+
+def _(cls: type[Any]):
+    reveal_type(invoke_any(f, cls))  # revealed: int
+```
+
+## Inferring gradual tuple returns with concrete bounds
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
+elements and its length are gradual. Inference preserves the callback's return type.
+
+```py
+from typing import Any, Callable, TypeVar
+
+Fixed = TypeVar("Fixed", bound=tuple[int])
+
+def get_tuple() -> tuple[Any, ...]:
+    return ()
+
+def infer_fixed(callback: Callable[[], Fixed]) -> Fixed:
+    return callback()
+
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+The gradual length can also supply required elements at either end of a variable-length bound.
+
+```py
+Prefix = TypeVar("Prefix", bound=tuple[int, *tuple[int, ...]])
+Suffix = TypeVar("Suffix", bound=tuple[*tuple[int, ...], int])
+
+def infer_prefix(callback: Callable[[], Prefix]) -> Prefix:
+    return callback()
+
+def infer_suffix(callback: Callable[[], Suffix]) -> Suffix:
+    return callback()
+
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+```
+
+Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a
+gradual length.
+
+```py
+def wrong_element() -> tuple[str, *tuple[Any, ...]]:
+    return ("",)
+
+def get_ints() -> tuple[int, ...]:
+    return ()
+
+infer_fixed(wrong_element)  # error: [invalid-argument-type]
+infer_prefix(wrong_element)  # error: [invalid-argument-type]
+infer_fixed(get_ints)  # error: [invalid-argument-type]
+infer_prefix(get_ints)  # error: [invalid-argument-type]
+infer_suffix(get_ints)  # error: [invalid-argument-type]
+```
+
+## Inferring type variables from gradual tuple elements
+
+A callback returning a gradual-length tuple can constrain the type variables of a fixed-length
+tuple.
+
+```py
+from typing import Any, Callable, TypeVar
+from typing_extensions import Unpack
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+def infer_pair(callback: Callable[[], tuple[K, V]]) -> tuple[K, V]:
+    return callback()
+
+def _(
+    callback: Callable[[], tuple[Any, ...]],
+    prefix: Callable[[], tuple[int, Unpack[tuple[Any, ...]]]],
+    suffix: Callable[[], tuple[Unpack[tuple[Any, ...]], str]],
+):
+    reveal_type(infer_pair(callback))  # revealed: tuple[Any, Any]
+    reveal_type(infer_pair(prefix))  # revealed: tuple[int, Any]
+    reveal_type(infer_pair(suffix))  # revealed: tuple[Any, str]
+```
+
+A concrete homogeneous tuple does not guarantee the required length:
+
+```py
+def _(callback: Callable[[], tuple[int, ...]]):
+    infer_pair(callback)  # error: [invalid-argument-type]
+```
+
+## Source type variables in gradual tuple returns
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+A callback's fixed tuple element can contain an outer type variable and still satisfy a concrete
+bound. The gradual segment can be empty, and inference preserves the outer type variable.
+
+```py
+from typing import Any, Callable, TypeVar
+
+R = TypeVar("R", bound=tuple[object])
+T = TypeVar("T")
+
+def infer_tuple(callback: Callable[[], R]) -> R:
+    return callback()
+
+def outer(callback: Callable[[], tuple[list[T], *tuple[Any, ...]]]) -> None:
+    reveal_type(infer_tuple(callback))  # revealed: tuple[list[T@outer], *tuple[Any, ...]]
+```
+
 ## SymPy one-import MRE scaffold (multi-file)
 
 Reduced regression lock for a SymPy overload/protocol shape that can panic in the
@@ -543,4 +1468,36 @@ class IPolys(Protocol[T]):
     def __getitem__(self, key: int) -> IPolys[T]: ...
     @overload
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
+
+## Returned callables with recursive parameter aliases
+
+A type variable used by a recursive parameter alias belongs to the function. The returned callable
+uses the type argument inferred from that parameter.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+Tree = tuple[T, "Tree[T] | None"]
+
+def make(value: Tree[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback = make((1, None))
+reveal_type(callback)  # revealed: (int, /) -> int
+callback("bad")  # error: [invalid-argument-type]
+```
+
+The type argument can also change at each recursive step.
+
+```py
+Growing = tuple[T, "Growing[list[T]] | None"]
+
+def make_growing(value: Growing[T]) -> Callable[[T], T]:
+    raise NotImplementedError
+
+callback_growing = make_growing((1, None))
+reveal_type(callback_growing)  # revealed: (int, /) -> int
+callback_growing("bad")  # error: [invalid-argument-type]
 ```

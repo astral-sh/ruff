@@ -4,6 +4,7 @@ use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::visitor::Visitor;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -52,7 +53,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## Options
 /// - `lint.pylint.max-returns`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.242")]
+#[violation_metadata(stable_since = "v0.0.242", category = Category::Pedantic)]
 pub(crate) struct TooManyReturnStatements {
     returns: usize,
     max_returns: usize,

@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::delete_comment;
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -55,7 +56,7 @@ use super::suppression_comment_visitor::{
 /// This fix is always marked as unsafe because it deletes the invalid suppression comment,
 /// rather than trying to move it to a valid position, which the user more likely intended.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,
 }

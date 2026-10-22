@@ -15,7 +15,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ```
 1 | from typing_extensions import Protocol, TypeVar, Generic
 2 | 
-3 | T = TypeVar("T")
+3 | T = TypeVar("T", covariant=True)
 4 | 
 5 | class Foo(Protocol): ...
 6 | class Bar(Protocol[T]): ...

@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::noqa::{Codes, Directive, FileNoqaDirectives, NoqaDirectives};
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -25,7 +26,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// x = eval(command)  # noqa: S307
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct RedirectedNOQA {
     original: String,
     target: String,

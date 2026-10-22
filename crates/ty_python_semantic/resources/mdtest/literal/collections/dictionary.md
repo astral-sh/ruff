@@ -76,6 +76,69 @@ reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 reveal_type({x: y for x, y in enumerate(range(42))})
 ```
 
+## Immediately indexed dictionary literals
+
+Indexing a dictionary literal preserves the literal types of its values, since the dictionary cannot
+be mutated before the lookup. The result is the union of the value types.
+
+```py
+reveal_type({1: "a", 2: "b"}[1])  # revealed: Literal["a", "b"]
+reveal_type({"a": 1, "b": 2}["a"])  # revealed: Literal[1, 2]
+
+{"a": 1}[0]  # error: [invalid-argument-type]
+```
+
+This also allows a lookup table to convert between literal unions:
+
+```py
+from typing import Literal
+
+Letter = Literal["A", "B", "C"]
+Word = Literal["Alpha", "Beta", "Charlie"]
+
+def expand_letter(letter: Letter) -> Word:
+    return {"A": "Alpha", "B": "Beta", "C": "Charlie"}[letter]  # no diagnostic
+```
+
+The key need not itself have a literal type:
+
+```py
+def _(string_key: str, integer_key: int):
+    reveal_type({"a": 1, "b": 2}[string_key])  # revealed: Literal[1, 2]
+    reveal_type({1: "a", 2: "b"}[integer_key])  # revealed: Literal["a", "b"]
+```
+
+Nested mutable values still permit mutation:
+
+```py
+values = {"a": [1]}["a"]
+reveal_type(values)  # revealed: list[int]
+values.append(2)  # no diagnostic
+```
+
+A dictionary stored in a variable still permits later mutation and promotes its value type:
+
+```py
+def _(key: str):
+    values = {"a": 1, "b": 2}
+    reveal_type(values)  # revealed: dict[str, int]
+    reveal_type(values[key])  # revealed: int
+    values["c"] = 3  # no diagnostic
+```
+
+## Dictionary escaping through a bound view method
+
+A saved view method exposes its dictionary through `__self__`, so its key and value types still
+permit mutation:
+
+```py
+method = {"a": 1}.values
+dictionary = method.__self__
+reveal_type(dictionary)  # revealed: dict[str, int]
+dictionary["b"] = 2  # no diagnostic
+reveal_type(method())  # revealed: dict_values[str, int]
+```
+
 ## Key narrowing
 
 The original assignment to each key, as well as future assignments, are used to narrow access to
@@ -145,6 +208,22 @@ reveal_type(x12[0][1]["b"])  # revealed: Literal["4"]
 # Starred expressions and any elements that follow them are not narrowed.
 reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
+```
+
+## Key narrowing through dictionary unpacking
+
+Unpacking a dictionary literal preserves its key bindings. Later entries replace earlier entries,
+including any narrowing for their nested keys.
+
+```py
+d = {"outer": {"stale": 1}, **{"outer": {"current": 2}}}
+reveal_type(d["outer"]["current"])  # revealed: Literal[2]
+reveal_type(d["outer"]["stale"])  # revealed: int
+
+d = {"keep": 1, **{**{"outer": {"current": 2}}}, "outer": {"last": "value"}}
+reveal_type(d["keep"])  # revealed: Literal[1]
+reveal_type(d["outer"]["last"])  # revealed: Literal["value"]
+reveal_type(d["outer"]["current"])  # revealed: str
 ```
 
 ## Dict unpacking in function calls
@@ -324,6 +403,70 @@ def _(y: Y):
     y.inner = {"inner": {"a": 1}}
     # error: [invalid-argument-type]
     f1(**y.inner)
+```
+
+## Known key values after loop replacements
+
+An accepted dictionary replacement contributes its known key values to subsequent iterations.
+
+```py
+def accepted():
+    values: dict[str, int] = {"a": 1}
+    for _ in range(2):
+        reveal_type(values["a"])  # revealed: Literal[1, 2]
+        values = {"a": 2}
+    reveal_type(values["a"])  # revealed: Literal[2]
+```
+
+## Rejected dictionary replacements in loops
+
+A rejected replacement instead falls back to the declared value type. An assertion after the
+replacement narrows that fallback on the next iteration, rather than preserving the original key's
+literal type or using the rejected value.
+
+```py
+def rejected(repeat: bool):
+    values: dict[str, int | None] = {"a": 1}
+    while repeat:
+        reveal_type(values["a"])  # revealed: int
+        values = {"a": "bad"}  # error: [invalid-assignment]
+        assert values["a"] is not None
+    reveal_type(values["a"])  # revealed: int
+```
+
+## Setter dictionary assignments in loops
+
+A property setter need not store the assigned dictionary. Key reads use the getter's value type,
+including when a key was already read before the loop and the setter accepts a different value type.
+
+```py
+class C:
+    @property
+    def values(self) -> dict[str, int]:
+        return {"a": 1}
+
+    @values.setter
+    def values(self, value: dict[str, str]) -> None:
+        pass
+
+def f(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": "bad"}
+    return c.values["a"]
+```
+
+The same applies when the assigned dictionary depends on a key read from an earlier iteration.
+Inferring that assignment must converge without using the setter's input type for getter reads.
+
+```py
+def loop_carried_value(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": str(c.values["a"])}
+    return c.values["a"]
 ```
 
 ## Rejected annotations in stubs

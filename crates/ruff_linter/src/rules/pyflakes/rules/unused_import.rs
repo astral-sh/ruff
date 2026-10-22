@@ -14,6 +14,7 @@ use ruff_python_semantic::{
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::preview::{
     is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
@@ -142,7 +143,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Suspicious)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,

@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -30,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `while`](https://docs.python.org/3/reference/compound_stmts.html#the-while-statement)
 /// - [PEP 285 – Adding a bool type](https://peps.python.org/pep-0285/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.16.3")]
+#[violation_metadata(preview_since = "0.16.3", category = Category::Style)]
 pub(crate) struct WhileOne;
 
 impl AlwaysFixableViolation for WhileOne {

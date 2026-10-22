@@ -117,6 +117,7 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
+    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF074.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
@@ -125,7 +126,7 @@ mod tests {
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -289,7 +290,7 @@ mod tests {
     fn implicit_optional_py39(path: &Path) -> Result<()> {
         let snapshot = format!(
             "PY39_{}_{}",
-            Rule::ImplicitOptional.noqa_code(),
+            Rule::ImplicitOptional.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -769,7 +770,7 @@ mod tests {
     #[test_case(Rule::InvalidPyprojectToml, Path::new("various_invalid"))]
     #[test_case(Rule::InvalidPyprojectToml, Path::new("pep639"))]
     fn invalid_pyproject_toml(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let messages = test_toml_path(
             Path::new("ruff/pyproject_toml")
                 .join(path)
@@ -793,15 +794,10 @@ mod tests {
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
-    #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
     #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
@@ -814,7 +810,7 @@ mod tests {
     fn preview_rules_py37(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__py37__{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -831,7 +827,7 @@ mod tests {
     fn preview_rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__py38__{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy()
         );
         let diagnostics = test_path(
@@ -857,7 +853,7 @@ mod tests {
 
         let snapshot = format!(
             "custom_dummy_var_regexp_preset__{}_{}_{}",
-            rule_code.noqa_code(),
+            rule_code.name(),
             path.to_string_lossy(),
             id,
         );
@@ -874,11 +870,7 @@ mod tests {
 
     #[test_case(Rule::StarmapZip, Path::new("RUF058_2.py"))]
     fn map_strict_py314(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "py314__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("py314__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code)

@@ -66,6 +66,45 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+Narrowing established by a non-empty loop remains available after the loop.
+
+```py
+def narrowing_after_non_empty_range(value: int | None) -> None:
+    for _ in range(1):
+        if value is None:
+            return
+
+    reveal_type(value)  # revealed: int
+```
+
+The same narrowing is preserved at module scope.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+reveal_type(module_value)  # revealed: int
+```
+
+It also works in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
@@ -210,7 +249,7 @@ reveal_type(x)  # revealed: int
 for x in {"foo": 1}:
     pass
 
-reveal_type(x)  # revealed: str
+reveal_type(x)  # revealed: Literal["foo"]
 
 for x in "a":
     pass
@@ -321,6 +360,91 @@ async def _():
     # revealed: Unknown
     # error: [possibly-unresolved-reference]
     reveal_type(x)
+```
+
+## With literal dictionary
+
+Iterating over a dictionary literal preserves literal key types. Its key, value, and item views also
+preserve literal types because the dictionary cannot be mutated through those views.
+
+```py
+for key in {"a": 1, "b": 2}:
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for key in {"a": 1, "b": 2}.keys():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for value in {"a": 1, "b": 2}.values():
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+for key, value in {"a": 1, "b": 2}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+Storing the view in a variable retains these types:
+
+```py
+values = {"a": 1, "b": 2}.values()
+reveal_type(values)  # revealed: dict_values[Literal["a", "b"], Literal[1, 2]]
+```
+
+Comprehensions use the same precise types for their iteration targets:
+
+```py
+[reveal_type(key) for key in {"a": 1, "b": 2}]  # revealed: Literal["a", "b"]
+[reveal_type(value) for value in {1: "a", 2: "b"}.values()]  # revealed: Literal["a", "b"]
+```
+
+This also applies when the target is an attribute or a tuple of names:
+
+```py
+from typing import Literal
+
+class C:
+    key: Literal["a", "b"]
+
+c = C()
+[None for c.key in {"a": 1, "b": 2}]  # no diagnostic
+[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # no diagnostic
+
+for number, letter in {(1, "a"): 0, (2, "b"): 0}:
+    reveal_type(number)  # revealed: Literal[1, 2]
+    reveal_type(letter)  # revealed: Literal["a", "b"]
+```
+
+Nested mutable containers still permit mutation:
+
+```py
+for values in {"a": [1]}.values():
+    reveal_type(values)  # revealed: list[int]
+    values.append(2)  # no diagnostic
+```
+
+## With unpacked literal dictionary
+
+Unpacking another dictionary literal preserves its literal keys and values. Unpacking an arbitrary
+mapping uses that mapping's key and value types.
+
+```py
+for key, value in {"a": 1, **{"b": 2}}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def _(mapping: dict[str, int]):
+    for key, value in {"a": 1, **mapping}.items():
+        reveal_type(key)  # revealed: str
+        reveal_type(value)  # revealed: int
+```
+
+Repeated keys do not imply a fixed iteration length. Values from overwritten entries may still be
+included in the inferred union:
+
+```py
+for value in {**{1: "a"}, 1: "b"}.values():
+    reveal_type(value)  # revealed: Literal["a", "b"]
+
+(key,) = {1: "a", 1: "b"}  # no diagnostic
 ```
 
 ## With non-callable iterator
@@ -1719,6 +1843,28 @@ for _ in iterable():
 x
 ```
 
+### Deletions in nested loops reach the outer loop
+
+A deletion followed by `continue` in an inner loop can remain visible after a later `break`. The
+variable can be unbound on the next outer iteration, even when exhausting the inner loop returns
+from the function.
+
+```py
+def f(flags: list[bool]):
+    x = 0
+    for _ in flags:
+        x  # error: [possibly-unresolved-reference]
+        for stop in flags:
+            if stop:
+                break
+            x = 0
+            del x
+            continue
+        else:
+            return
+        x  # error: [possibly-unresolved-reference]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -1749,6 +1895,23 @@ x = 0
 for _ in range(1_000_000):
     x, y = x + 1, None
     reveal_type(x)  # revealed: int
+```
+
+### Unpacking alongside a recursively growing value
+
+The first element remains precise even when its sibling's type grows on each loop iteration. Reading
+each literal element independently preserves that information during cycle recovery.
+
+```py
+x = 0
+for _ in range(10):
+    first, x = (1, (x,))
+    reveal_type(first)  # revealed: Literal[1]
+
+x = 0
+for _ in range(10):
+    first, x = [1, (x,)]
+    reveal_type(first)  # revealed: Literal[1]
 ```
 
 ### Avoid oscillations
@@ -1929,7 +2092,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic
@@ -1979,7 +2142,10 @@ def _():
             nonlocal y  # error: [invalid-syntax] "name `y` is used prior to nonlocal declaration"
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
+
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
 
 ```py
 class C:
@@ -2000,4 +2166,62 @@ for _ in range(1):
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+The first iteration sees the initial object; later iterations see a replacement narrowed at the end
+of the previous iteration. A replacement's attribute initially has the full declared union.
+
+```py
+class Box:
+    value: int | str | None
+
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
+
+    for _ in range(2):
+        # The first iteration sees int; subsequent iterations see str.
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
+
+    # The loop is non-empty, so the current value has been narrowed to str.
+    reveal_type(box.value)  # revealed: str
+```
+
+### Boolean attribute narrowing after rebinding
+
+The loop body can observe either the initial object or a replacement from a previous iteration. A
+guard on the initial object therefore does not narrow `box.value` throughout the loop.
+
+```py
+class Box:
+    value: bool
+
+def f(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: bool
+        box = replacement
+```
+
+Narrowing established on a replacement object also reaches the next iteration. If each replacement
+has `value` narrowed to `False`, the loop body keeps that narrowing.
+
+```py
+def narrowed_replacement(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        assert not box.value
 ```

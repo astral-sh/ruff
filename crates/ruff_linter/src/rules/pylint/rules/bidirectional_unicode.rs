@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_source_file::Line;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::LintContext};
 
 const BIDI_UNICODE: [char; 11] = [
@@ -50,7 +51,7 @@ const BIDI_UNICODE: [char; 11] = [
 /// ## References
 /// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.244")]
+#[violation_metadata(stable_since = "v0.0.244", category = Category::Suspicious)]
 pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {
@@ -62,7 +63,12 @@ impl Violation for BidirectionalUnicode {
 
 /// PLE2502
 pub(crate) fn bidirectional_unicode(line: &Line, context: &LintContext) {
-    if line.contains(BIDI_UNICODE) {
+    let text = line.as_str();
+    // All characters in BIDI_UNICODE start with 0xD8 or 0xE2 in UTF-8. These are leading
+    // bytes, so the first match is a character boundary and the preceding text can be skipped.
+    if let Some(start) = memchr::memchr2(0xD8, 0xE2, text.as_bytes())
+        && text[start..].contains(BIDI_UNICODE)
+    {
         context.report_diagnostic(BidirectionalUnicode, line.full_range());
     }
 }

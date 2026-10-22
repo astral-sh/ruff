@@ -70,7 +70,7 @@ class Baz(Bar):
     # error: [empty-body]
     def f(self) -> int: ...
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Qux(Protocol[T]):
     def f(self) -> int: ...
@@ -975,7 +975,7 @@ unsound-return-statement = "error"
 ```py
 from typing import Generator, Protocol, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
 
 class Phantom(Protocol[T]):
     def ping(self) -> int: ...
@@ -1050,11 +1050,11 @@ unsound-return-statement = "error"
 ```py
 from typing import Any, Protocol, TypeVar
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
-class Growing(Protocol[T]):
+class Growing(Protocol[T_co]):
     @property
-    def next(self) -> "Growing[list[T]]": ...
+    def next(self) -> "Growing[list[T_co]]": ...
 
 def returns_recursive_protocol(value: Any) -> Growing[int]:
     return value
@@ -1065,6 +1065,8 @@ containing dictionary.
 
 ```py
 from typing import Generic, TypedDict
+
+T = TypeVar("T")
 
 class GrowingPayload(TypedDict, Generic[T]):
     child: "GrowingPayload[list[T]]"

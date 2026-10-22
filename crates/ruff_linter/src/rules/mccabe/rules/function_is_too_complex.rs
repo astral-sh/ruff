@@ -3,6 +3,7 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 
@@ -56,7 +57,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.mccabe.max-complexity`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.127")]
+#[violation_metadata(stable_since = "v0.0.127", category = Category::Restriction)]
 pub(crate) struct ComplexStructure {
     name: String,
     complexity: usize,

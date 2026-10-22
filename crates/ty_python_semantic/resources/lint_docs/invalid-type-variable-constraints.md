@@ -1,7 +1,7 @@
 ## What it does
 
-Checks for constrained [type variables] with only one constraint,
-or that those constraints reference type variables.
+Checks for constrained [type variables] with only one constraint, or that those constraints
+reference type variables.
 
 ## Why is this bad?
 

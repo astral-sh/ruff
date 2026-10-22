@@ -6,7 +6,6 @@ use crate::metadata::settings::{OverrideSettings, SrcSettings};
 
 use super::settings::{Override, Settings, TerminalSettings};
 use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
-use anyhow::Context;
 use ordermap::OrderMap;
 use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
@@ -17,9 +16,10 @@ use ruff_db::diagnostic::{
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_macros::{Combine, OptionsMetadata, RustDoc};
-use ruff_options_metadata::{OptionSet, OptionsMetadata, Visit};
+use ruff_options_metadata::{OptionSet, OptionSetKind, OptionsMetadata, Visit};
 use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -35,12 +35,12 @@ use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SitePackagesPaths, SysPrefixPathOrigin,
-    inferred_python_version_source_annotation,
+    PythonVersionWithSource, ReturnTypeInference, SitePackagesDiscoveryError, SitePackagesPaths,
+    SysPrefixPathOrigin, inferred_python_version_source_annotation,
 };
 use ty_static::EnvVars;
 
@@ -188,8 +188,10 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         strategy: &Strategy,
-    ) -> Result<(ProgramSettings, Vec<ProgramSettingsDiagnostic>), Strategy::Error<anyhow::Error>>
-    {
+    ) -> Result<
+        (ProgramSettings, Vec<ProgramSettingsDiagnostic>),
+        Strategy::Error<ToProgramSettingsError>,
+    > {
         let mut diagnostics = Vec::new();
         let environment = self.environment.or_default();
 
@@ -210,8 +212,16 @@ impl Options {
         let python_environment = match self.python_environment(context.configuration_root(), system)
         {
             Ok(None) => PythonEnvironment::discover(context.project_root(), system)
-                .context("Failed to discover local Python environment"),
-            configured => configured,
+                .map_err(ToProgramSettingsError::PythonEnvironmentDiscovery),
+            configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
+        };
+
+        let python_environment_error = match &python_environment {
+            Err(ToProgramSettingsError::PythonEnvironment(error)) => Some(PythonEnvironmentError {
+                message: error.to_string().into(),
+                last_usable: None,
+            }),
+            _ => None,
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
@@ -232,7 +242,7 @@ impl Options {
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
                 .site_packages_paths(system)
-                .context("Failed to discover the site-packages directory");
+                .map_err(ToProgramSettingsError::SitePackagesDiscovery);
             let site_packages_paths = strategy.fallback(site_packages_paths, |_| {
                 tracing::debug!("Default settings failed to discover site-packages directory");
                 SitePackagesPaths::default()
@@ -281,16 +291,18 @@ impl Options {
             .and_then(|resolution| resolution.into_program_version(&mut diagnostics))
             .unwrap_or_default();
 
-        // Safe mode is handled inside this function, so we just assume this can't fail
-        let search_paths = strategy.to_anyhow(self.to_search_paths(
-            context,
-            project_name,
-            site_packages_paths,
-            real_stdlib_path,
-            system,
-            vendored,
-            strategy,
-        ))?;
+        let search_paths = strategy.map_err(
+            self.to_search_paths(
+                context,
+                project_name,
+                site_packages_paths,
+                real_stdlib_path,
+                system,
+                vendored,
+                strategy,
+            ),
+            ToProgramSettingsError::SearchPaths,
+        )?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -302,6 +314,10 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
+                python_environment: match python_environment_error {
+                    Some(error) => Err(error),
+                    None => Ok(python_environment),
+                },
             },
             diagnostics,
         ))
@@ -312,7 +328,7 @@ impl Options {
         &self,
         configuration_root: &SystemPath,
         system: &dyn System,
-    ) -> anyhow::Result<Option<PythonEnvironment>> {
+    ) -> Result<Option<PythonEnvironment>, SitePackagesDiscoveryError> {
         let environment = self.environment.or_default();
         let Some(python_path) = environment.python.as_ref() else {
             return Ok(None);
@@ -325,7 +341,7 @@ impl Options {
             }
             ValueSource::ScriptMetadata(_) => SysPrefixPathOrigin::ScriptMetadataSetting,
             ValueSource::Editor => SysPrefixPathOrigin::Editor,
-            ValueSource::UvWorkspace => SysPrefixPathOrigin::UvWorkspace,
+            ValueSource::UvMetadata => SysPrefixPathOrigin::UvMetadata,
         };
 
         PythonEnvironment::new(
@@ -333,7 +349,6 @@ impl Options {
             origin,
             system,
         )
-        .map_err(anyhow::Error::from)
         .map(Some)
     }
 
@@ -494,7 +509,7 @@ impl Options {
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             });
-        let src = strategy.fallback(src, |_| SrcSettings::default())?;
+        let src = strategy.fallback(src, |_| SrcSettings::default(context.configuration_root()))?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -597,19 +612,24 @@ impl<'a> OptionsContext<'a> {
 fn python_version_from_config(
     ranged_version: &RangedValue<SupportedPythonVersion>,
 ) -> PythonVersionWithSource {
+    let source = match ranged_version.source() {
+        ValueSource::Cli => PythonVersionSource::Cli,
+        ValueSource::File(path) => PythonVersionSource::ConfigFile(PythonVersionFileSource::new(
+            path.clone(),
+            ranged_version.range(),
+        )),
+        ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
+            Span::from(*file).with_optional_range(ranged_version.range()),
+        ),
+        ValueSource::Editor => PythonVersionSource::Editor,
+        ValueSource::UvMetadata => {
+            unreachable!("uv metadata does not provide a configured Python version")
+        }
+    };
+
     PythonVersionWithSource {
         version: PythonVersion::from(**ranged_version),
-        source: match ranged_version.source() {
-            ValueSource::Cli => PythonVersionSource::Cli,
-            ValueSource::File(path) => PythonVersionSource::ConfigFile(
-                PythonVersionFileSource::new(path.clone(), ranged_version.range()),
-            ),
-            ValueSource::ScriptMetadata(file) => PythonVersionSource::ScriptMetadata(
-                Span::from(*file).with_optional_range(ranged_version.range()),
-            ),
-            ValueSource::Editor => PythonVersionSource::Editor,
-            ValueSource::UvWorkspace => PythonVersionSource::UvWorkspace,
-        },
+        source,
     }
 }
 
@@ -738,10 +758,6 @@ fn unsupported_inferred_python_version_diagnostic(
             SubDiagnosticSeverity::Info,
             "The version was inferred from your editor.",
         )),
-        PythonVersionSource::UvWorkspace => diagnostic.sub(SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            "The version was provided by uv workspace metadata.",
-        )),
         PythonVersionSource::Default => diagnostic.sub(SubDiagnostic::new(
             SubDiagnosticSeverity::Info,
             "ty fell back to its default Python version.",
@@ -860,7 +876,7 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.14""#,
+        default = r#""3.15""#,
         value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | "3.15""#,
         example = r#"
             python-version = "3.12"
@@ -1161,7 +1177,7 @@ impl Rules {
                 ValueSource::ScriptMetadata(_) => LintSource::ScriptMetadata,
                 ValueSource::Cli => LintSource::Cli,
                 ValueSource::Editor => LintSource::Editor,
-                ValueSource::UvWorkspace => LintSource::UvWorkspace,
+                ValueSource::UvMetadata => LintSource::UvMetadata,
             };
 
             let mut set_lint_level = |lint| {
@@ -1335,9 +1351,11 @@ fn build_exclude_filter(
     let system = db.system();
     let mut excludes = ExcludeFilterBuilder::new();
 
+    // Like excludes in a `ty.toml`, default excludes only apply under the project root.
+    // An explicit `../sibling/dist` is not excluded by project defaults.
     for pattern in default_patterns {
         PortableGlobPattern::parse(pattern, PortableGlobKind::Exclude)
-            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(""))?))
+            .and_then(|exclude| Ok(excludes.add(&exclude.into_absolute(project_root))?))
             .unwrap_or_else(|err| {
                 panic!("Expected default exclude to be valid glob but adding it failed with: {err}")
             });
@@ -1537,8 +1555,33 @@ pub struct TerminalOptions {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct AnalysisOptions {
+    /// This setting controls when ty infers return types for functions without an explicit
+    /// return type annotation.
+    ///
+    /// - `"never"`: Do not infer return types from function bodies. Unannotated functions
+    ///   will have an inferred return type of `Unknown`.
+    /// - `"always"`: Infer return types for unannotated functions and methods.
+    ///
+    /// Enabling return type inference will never override explicit return type annotations.
+    /// Lambda functions are not affected by this setting and their return type will always
+    /// be inferred.
+    ///
+    /// Return types for generator functions and asynchronous functions are currently not
+    /// inferred, but we plan to change this soon.
+    ///
+    /// Functions in stubs and `if TYPE_CHECKING` blocks are never considered for return type
+    /// inference.
+    #[option(
+        default = r#""never""#,
+        value_type = r#""never" | "always""#,
+        example = r#"
+            return-type-inference = "always"
+        "#
+    )]
+    pub return_type_inference: Option<ReturnTypeInference>,
+
     /// Whether ty should use strict narrowing for unspecialized generic classes in
-    /// `isinstance()` and `issubclass()` checks, as well as `match` class patterns.
+    /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
     /// When enabled, ty narrows to the top materialization of the class. For example,
     /// `isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
@@ -1729,6 +1772,7 @@ impl AnalysisOptions {
         diagnostics: &mut Vec<OptionDiagnostic>,
     ) -> AnalysisSettings {
         let Self {
+            return_type_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
@@ -1737,6 +1781,7 @@ impl AnalysisOptions {
         } = self;
 
         let AnalysisSettings {
+            return_type_inference: return_type_inference_default,
             strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
@@ -1767,6 +1812,7 @@ impl AnalysisOptions {
             };
 
         AnalysisSettings {
+            return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
             strict_generic_narrowing: strict_generic_narrowing
                 .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics
@@ -1861,6 +1907,12 @@ pub struct OverridesOptions(Vec<RangedValue<OverrideOptions>>);
 impl OptionsMetadata for OverridesOptions {
     fn documentation() -> Option<&'static str> {
         Some(<Self as RustDoc>::rust_doc())
+    }
+
+    fn kind() -> OptionSetKind {
+        OptionSetKind::Array {
+            example: r#"include = ["src"]"#,
+        }
     }
 
     fn record(visit: &mut dyn Visit) {
@@ -2151,6 +2203,66 @@ pub(super) struct InnerOverrideOptions {
     pub(super) analysis: Option<AnalysisOptions>,
 }
 
+/// A failure to resolve a project's or standalone script's program settings.
+#[derive(Debug, Error)]
+pub enum ToProgramSettingsError {
+    /// The explicitly configured Python environment could not be resolved.
+    #[error(transparent)]
+    PythonEnvironment(SitePackagesDiscoveryError),
+
+    /// No explicitly configured Python environment was available, and discovery failed.
+    #[error("Failed to discover local Python environment")]
+    PythonEnvironmentDiscovery(#[source] SitePackagesDiscoveryError),
+
+    /// The resolved Python environment did not contain usable site-packages directories.
+    #[error("Failed to discover the site-packages directory")]
+    SitePackagesDiscovery(#[source] SitePackagesDiscoveryError),
+
+    /// One of the configured Python module search paths could not be resolved.
+    #[error(transparent)]
+    SearchPaths(#[from] SearchPathSettingsError),
+}
+
+impl ToProgramSettingsError {
+    /// Returns the program-settings error without its optional diagnostic detail.
+    pub(crate) fn message(&self) -> String {
+        self.to_string()
+    }
+
+    /// Returns details for failures whose message only identifies the failed operation.
+    pub(crate) fn hint(&self) -> Option<String> {
+        match self {
+            Self::PythonEnvironmentDiscovery(error) | Self::SitePackagesDiscovery(error) => {
+                Some(error.to_string())
+            }
+            Self::PythonEnvironment(_) | Self::SearchPaths(_) => None,
+        }
+    }
+
+    pub(crate) fn setting_source<'a>(
+        &self,
+        options: &'a Options,
+    ) -> Option<(&'a ValueSource, Option<TextRange>)> {
+        let environment = options.environment.as_ref()?;
+
+        match self {
+            Self::PythonEnvironment(_) | Self::SitePackagesDiscovery(_) => environment
+                .python
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::SearchPaths(
+                SearchPathSettingsError::FailedToReadVersionsFile { .. }
+                | SearchPathSettingsError::VersionsParseError(_),
+            ) => environment
+                .typeshed
+                .as_ref()
+                .map(|setting| (setting.source(), setting.range())),
+            Self::PythonEnvironmentDiscovery(_)
+            | Self::SearchPaths(SearchPathSettingsError::InvalidSearchPath(_)) => None,
+        }
+    }
+}
+
 /// Error returned when the settings can't be resolved because of a hard error.
 #[derive(Debug)]
 pub struct ToSettingsError {
@@ -2354,9 +2466,9 @@ impl OptionDiagnostic {
                 SubDiagnosticSeverity::Info,
                 "The {value_label} was specified in the editor settings.",
             )),
-            ValueSource::UvWorkspace => self.sub(SubDiagnostic::new(
+            ValueSource::UvMetadata => self.sub(SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
-                format!("The {value_label} was provided by uv workspace metadata."),
+                format!("The {value_label} was provided by uv metadata."),
             )),
         }
     }

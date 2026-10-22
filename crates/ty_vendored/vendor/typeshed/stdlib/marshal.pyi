@@ -27,7 +27,6 @@ dumps() -- marshal value as a bytes object
 loads() -- read value from a bytes-like object
 """
 
-import builtins
 import sys
 import types
 from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
@@ -36,13 +35,8 @@ from typing import Any, Final, TypeAlias
 version: Final[int]
 
 _Marshallable: TypeAlias = (
-    # handled in w_object() in marshal.c
-    None
-    | type[StopIteration]
-    | builtins.ellipsis
-    | bool
     # handled in w_complex_object() in marshal.c
-    | int
+    int
     | float
     | complex
     | bytes
@@ -54,6 +48,11 @@ _Marshallable: TypeAlias = (
     | frozenset[_Marshallable]
     | types.CodeType
     | ReadableBuffer
+    # handled in w_object() in marshal.c
+    | type[StopIteration]
+    | types.EllipsisType
+    | bool
+    | None
 )
 
 if sys.version_info >= (3, 15):

@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::Violation;
+use crate::codes::Category;
 
 use crate::checkers::ast::Checker;
 
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 ///     raise ValueError("Expected positive value.")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Restriction)]
 pub(crate) struct Assert;
 
 impl Violation for Assert {

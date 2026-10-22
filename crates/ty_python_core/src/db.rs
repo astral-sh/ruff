@@ -166,6 +166,7 @@ pub(crate) mod tests {
                 .context("Failed to write test files")?;
 
             let program_settings = ProgramSettings {
+                python_environment: Ok(None),
                 python_version: PythonVersionWithSource {
                     version: self.python_version,
                     source: PythonVersionSource::default(),

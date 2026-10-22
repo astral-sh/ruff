@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for hardcoded bindings to all network interfaces (`0.0.0.0`).
@@ -27,7 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Common Weakness Enumeration: CWE-200](https://cwe.mitre.org/data/definitions/200.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct HardcodedBindAllInterfaces;
 
 impl Violation for HardcodedBindAllInterfaces {
@@ -48,12 +49,12 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
         StringLike::FString(ast::ExprFString { value, .. }) => {
             for part in value {
                 match part {
-                    ast::FStringPart::Literal(literal) => {
+                    ast::FStringPartRef::Literal(literal) => {
                         if &**literal == "0.0.0.0" {
                             checker.report_diagnostic(HardcodedBindAllInterfaces, literal.range());
                         }
                     }
-                    ast::FStringPart::FString(f_string) => {
+                    ast::FStringPartRef::FString(f_string) => {
                         for literal in f_string.elements.literals() {
                             if &**literal == "0.0.0.0" {
                                 checker

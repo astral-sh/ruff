@@ -259,23 +259,25 @@ class RemoteUnwinder:
         """
 
     def get_all_awaited_by(self) -> list[AwaitedInfo]:
-        """Get all tasks and their awaited_by relationships from the remote process.
+        """Get awaited_by relationships for tasks in the remote process.
 
-        This provides a tree structure showing which tasks are waiting for
-        other tasks.
+        Returns:
+            A list of AwaitedInfo objects, where each object contains:
 
-        For each task, returns:
-        1. The call stack frames leading to where the task is currently
-           executing
-        2. The name of the task
-        3. A list of tasks that this task is waiting for, with their own
-           frames/names/etc
+            - thread_id (int): Identifier of the thread, or 0 for tasks in the
+              interpreter's fallback task list.
+            - awaited_by (list[TaskInfo]): Tasks registered with this thread.
 
-        Returns a list of [frames, task_name, subtasks] where:
-        - frames: List of (func_name, filename, lineno) showing the call
-          stack
-        - task_name: String identifier for the task
-        - subtasks: List of tasks being awaited by this task, in same format
+        Each TaskInfo contains:
+            - task_id (int): Identifier of the task.
+            - task_name (str): Name of the task.
+            - coroutine_stack (list[CoroInfo]): Stack of coroutine frames.
+            - awaited_by (list[CoroInfo]): Coroutine information for tasks or futures
+              awaiting this task.
+
+        Each CoroInfo contains:
+            - call_stack (list[FrameInfo]): Call stack frames for the coroutine.
+            - task_name (int): Identifier of the task or future.
 
         Raises:
             RuntimeError: If AsyncioDebug section is not available in the
@@ -284,20 +286,20 @@ class RemoteUnwinder:
             OSError: If reading from the remote process fails
 
         Example output:
-        [
+
             [
-                [("c5", "script.py", 10), ("c4", "script.py", 14)],
-                "c2_root",
-                [
-                    [
-                        [("c1", "script.py", 23)],
-                        "sub_main_2",
-                        [...]
-                    ],
-                    [...]
-                ]
+                AwaitedInfo(
+                    thread_id=12345,
+                    awaited_by=[
+                        TaskInfo(
+                            task_id=1,
+                            task_name="Task-1",
+                            coroutine_stack=[...],
+                            awaited_by=[]
+                        )
+                    ]
+                )
             ]
-        ]
         """
 
     def get_async_stack_trace(self) -> list[AwaitedInfo]:
@@ -460,6 +462,11 @@ class BinaryWriter:
             timestamp_us: Current timestamp in microseconds (from
                 time.monotonic() * 1e6)
         """
+
+    def set_stats(
+        self, /, duration_sec: float, sample_rate: float, error_rate: float | None = None, missed_samples: float | None = None
+    ) -> None:
+        """Store measured profile statistics in the binary file."""
 
     def finalize(self) -> None:
         """Finalize and close the binary file.

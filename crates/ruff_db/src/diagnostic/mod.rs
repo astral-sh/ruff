@@ -145,7 +145,13 @@ impl Diagnostic {
     /// should be constructed via [`Annotation::primary`]. A diagnostic with no
     /// primary annotations is allowed, but its rendering may be sub-optimal.
     pub fn annotate(&mut self, ann: Annotation) {
-        Arc::make_mut(&mut self.inner).annotations.push(ann);
+        let annotations = &mut Arc::make_mut(&mut self.inner).annotations;
+        // Most diagnostics have exactly one annotation. Avoid the default allocation of four
+        // annotations on the first push, while retaining normal amortized growth thereafter.
+        if annotations.is_empty() {
+            annotations.reserve_exact(1);
+        }
+        annotations.push(ann);
     }
 
     /// Adds an "info" sub-diagnostic with the given message.
@@ -172,9 +178,11 @@ impl Diagnostic {
 
     /// Adds an "info" sub-diagnostic before any existing sub-diagnostics.
     pub fn prepend_info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
-        Arc::make_mut(&mut self.inner)
-            .subs
-            .insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
+        let subs = &mut Arc::make_mut(&mut self.inner).subs;
+        if subs.is_empty() {
+            subs.reserve_exact(1);
+        }
+        subs.insert(0, SubDiagnostic::new(SubDiagnosticSeverity::Info, message));
     }
 
     /// Adds a "help" sub-diagnostic with the given message.
@@ -190,7 +198,11 @@ impl Diagnostic {
     /// to it. For the simpler case of a sub-diagnostic with only a message,
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
-        Arc::make_mut(&mut self.inner).subs.push(sub);
+        let subs = &mut Arc::make_mut(&mut self.inner).subs;
+        if subs.is_empty() {
+            subs.reserve_exact(1);
+        }
+        subs.push(sub);
     }
 
     /// Return a `std::fmt::Display` implementation that renders this
@@ -685,6 +697,9 @@ impl SubDiagnostic {
     /// to have no annotations (e.g., a simple note) than for a diagnostic to
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
+        if self.inner.annotations.is_empty() {
+            self.inner.annotations.reserve_exact(1);
+        }
         self.inner.annotations.push(ann);
     }
 
@@ -1009,6 +1024,12 @@ pub enum DiagnosticId {
     /// A glob pattern doesn't follow the expected syntax.
     InvalidGlob,
 
+    /// A PEP 723 script contains invalid metadata or configuration.
+    InvalidScriptMetadata,
+
+    /// Metadata could not be loaded from uv.
+    UvMetadata,
+
     /// An `include` glob without any patterns.
     ///
     /// ## Why is this bad?
@@ -1137,6 +1158,8 @@ impl DiagnosticId {
             DiagnosticId::RevealedType => "revealed-type",
             DiagnosticId::UnknownRule => "unknown-rule",
             DiagnosticId::InvalidGlob => "invalid-glob",
+            DiagnosticId::InvalidScriptMetadata => "invalid-script-metadata",
+            DiagnosticId::UvMetadata => "uv-metadata",
             DiagnosticId::EmptyInclude => "empty-include",
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
@@ -1440,7 +1463,7 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
-    /// The lowest applicability that should be shown when reporting diagnostics.
+    /// The lowest applicability considered available for automatic fixing.
     fix_applicability: Applicability,
 
     cancellation_token: Option<CancellationToken>,
@@ -1552,12 +1575,10 @@ impl DisplayDiagnosticConfig {
         }
     }
 
-    /// Set the lowest fix applicability that should be shown.
+    /// Set the lowest applicability considered available for automatic fixing.
     ///
-    /// In other words, an applicability of `Safe` (the default) would suppress showing fixes or fix
-    /// availability for unsafe or display-only fixes.
-    ///
-    /// Note that this option is currently ignored when `hide_severity` is false.
+    /// This controls fix availability indicators. Full output shows all suggested fix diffs
+    /// regardless of applicability.
     pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,

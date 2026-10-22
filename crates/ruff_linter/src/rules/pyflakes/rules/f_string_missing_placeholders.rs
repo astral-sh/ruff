@@ -1,9 +1,11 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -51,10 +53,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// See [#10885](https://github.com/astral-sh/ruff/issues/10885) for more.
 ///
+/// ## Fix safety
+/// The fix is marked unsafe when it would create a docstring.
+///
 /// ## References
 /// - [PEP 498 – Literal String Interpolation](https://peps.python.org/pep-0498/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Complexity)]
 pub(crate) struct FStringMissingPlaceholders;
 
 impl AlwaysFixableViolation for FStringMissingPlaceholders {
@@ -79,6 +84,12 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
         return;
     }
 
+    let applicability = if checker.in_docstring_position(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     for f_string in expr.value.f_strings() {
         let first_char = checker
             .locator()
@@ -94,10 +105,9 @@ pub(crate) fn f_string_missing_placeholders(checker: &Checker, expr: &ast::ExprF
 
         let mut diagnostic =
             checker.report_diagnostic(FStringMissingPlaceholders, f_string.range());
-        diagnostic.set_fix(convert_f_string_to_regular_string(
-            prefix_range,
-            f_string.range(),
-            checker.locator(),
+        diagnostic.set_fix(Fix::applicable_edit(
+            convert_f_string_to_regular_string(prefix_range, f_string.range(), checker.locator()),
+            applicability,
         ));
     }
 }
@@ -111,12 +121,12 @@ fn unescape_f_string(content: &str) -> String {
     content.replace("{{", "{").replace("}}", "}")
 }
 
-/// Generate a [`Fix`] to rewrite an f-string as a regular string.
+/// Generate an [`Edit`] to rewrite an f-string as a regular string.
 fn convert_f_string_to_regular_string(
     prefix_range: TextRange,
     node_range: TextRange,
     locator: &Locator,
-) -> Fix {
+) -> Edit {
     // Extract the f-string body.
     let mut content =
         unescape_f_string(locator.slice(TextRange::new(prefix_range.end(), node_range.end())));
@@ -133,9 +143,5 @@ fn convert_f_string_to_regular_string(
         content.insert(0, ' ');
     }
 
-    Fix::safe_edit(Edit::replacement(
-        content,
-        prefix_range.start(),
-        node_range.end(),
-    ))
+    Edit::replacement(content, prefix_range.start(), node_range.end())
 }

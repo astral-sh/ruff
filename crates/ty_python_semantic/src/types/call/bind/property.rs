@@ -20,7 +20,7 @@ impl<'db> Bindings<'db> {
                 continue;
             }
             let function = match constructor.callable().callable_type {
-                Type::BoundMethod(method) => method.function(db),
+                Type::BoundMethod(method) if let Some(function) = method.function(db) => function,
                 Type::FunctionLiteral(function) => function,
                 _ => continue,
             };
@@ -79,14 +79,12 @@ impl<'db> Bindings<'db> {
                 call_arguments
                     .iter()
                     .zip(overload.argument_matches())
-                    .find_map(|((_, argument_types), argument_matches)| {
+                    .find_map(|(argument, argument_matches)| {
                         let parameter = argument_matches
                             .parameters
                             .iter()
                             .find(|parameter| parameter.index == parameter_index)?;
-                        parameter
-                            .argument_type
-                            .or_else(|| argument_types.get_default())
+                        argument.matched_type(None, parameter.argument_type)
                     })
                     .filter(|ty| !ty.is_none(db))
             };

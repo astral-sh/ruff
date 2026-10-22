@@ -1,4 +1,4 @@
-"""This is the module docstring."""
+"""This is the module docstring."""  # ok in both modes
 
 # convenience imports:
 import os
@@ -10,7 +10,7 @@ __all__: list[str] = __all__
 __all__ = __all__ = __all__
 
 MY_CONSTANT = 5
-"""This is an important constant."""
+"""This is an important constant."""  # ok in both modes
 
 os.environ["FOO"] = 1
 
@@ -40,6 +40,7 @@ def __dir__():  # ok
     return ["foo"]
 
 import pkgutil
+"""Not a docstring: only module and attribute docstrings are exempt."""  # RUF067 in both modes
 
 __path__ = pkgutil.extend_path(__path__, __name__)  # ok
 __path__ = unknown.extend_path(__path__, __name__)  # also ok

@@ -157,6 +157,89 @@ class Record(TypedDict):
     value: int
 ```
 
+### Deferred forward references in overloaded calls
+
+Selecting an overload must not recursively infer a loop-carried forward reference before its
+declared `TypedDict` is available.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+for _ in range(2):
+    record: Record
+    record = {"value": 1}
+    inspect(record)
+    reveal_type(record)  # revealed: Record
+    record["missing"]  # error: [invalid-key]
+
+class Record(TypedDict):
+    value: int
+```
+
+### Deferred forward references in nested non-function loops
+
+A loop-carried forward reference keeps its declared type when the module-level loop is nested inside
+a conditional.
+
+```py
+from __future__ import annotations
+from typing import Never, TypedDict, overload
+
+@overload
+def inspect(value: str) -> Never: ...
+@overload
+def inspect(value: object) -> int: ...
+def inspect(value: object) -> int:
+    return 1
+
+if bool(input()) and bool(input()):
+    for _ in range(2):
+        record: ModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: ModuleRecord
+
+class ModuleRecord(TypedDict):
+    value: int
+```
+
+A statically known outer branch also preserves the loop-carried declaration.
+
+```py
+if 1 + 1 == 2:
+    for _ in range(2):
+        record: StaticModuleRecord
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: StaticModuleRecord
+
+class StaticModuleRecord(TypedDict):
+    value: int
+```
+
+TODO: In class-body `while` loops, eager collection cycle recovery loses the declared `TypedDict`
+context.
+
+```py
+class Container:
+    while bool(input()):
+        record: ClassRecord  # error: [invalid-declaration]
+        record = {"value": 1}
+        inspect(record)
+        reveal_type(record)  # revealed: dict[str, int]
+
+class ClassRecord(TypedDict):
+    value: int
+```
+
 ### Deferred forward references on Python 3.14
 
 Annotations are deferred by default in Python 3.14 and later.
@@ -423,6 +506,9 @@ x5: dict[str, int] = {**42}
 
 ### Collection unions
 
+When a collection literal is inferred against a union type context, the union is narrowed to the
+first compatible element, with inference attempts performed in source-order.
+
 ```py
 from collections.abc import Mapping, Sequence
 from typing import Literal
@@ -460,6 +546,17 @@ type NestedOp[T] = T | Ops[T]
 
 x9: NestedOp[str] = {"$in": ["a", "b"]}
 reveal_type(x9)  # revealed: dict[Literal["$in", "$nin"], list[str]]
+```
+
+Tuple literals perform narrowing similarly.
+
+```py
+def _(key: str):
+    x10: tuple[int, list[str]] | tuple[str, list[int]] = (key, [True])
+    reveal_type(x10)  # revealed: tuple[str, list[int]]
+
+    x11: tuple[int, list[int]] | tuple[str, list[str]] = (key, [])
+    reveal_type(x11)  # revealed: tuple[str, list[str]]
 ```
 
 ### Binary operations
@@ -524,6 +621,14 @@ reveal_type(x2)  # revealed: tuple[list[Literal[1]], ...]
 
 x3: tuple[list[Literal[1]], ...] = 3 * ((singleton(1),) + (singleton(1),))
 reveal_type(x3)  # revealed: tuple[list[Literal[1]], ...]
+```
+
+Type context also reaches mutable elements inside a starred list literal. Preserving their positions
+in the resulting tuple does not discard the element annotations.
+
+```py
+x4: tuple[list[Literal[1]], ...] = (*[[1], []],)
+reveal_type(x4)  # revealed: tuple[list[Literal[1]], list[Literal[1]]]
 ```
 
 ## Generator expressions
@@ -664,6 +769,149 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Upper-bound type context
+
+The declared upper bound of a type variable provides type context for a nested generic call:
+
+```py
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(singleton(True))  # revealed: list[bool]
+reveal_type(bounded(singleton(True)))  # revealed: list[int]
+```
+
+Declared upper bounds also restrict the range of an inferred gradual solution:
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Any
+
+def singleton_sequence[T](value: T) -> Sequence[T]:
+    return [value]
+
+def bounded_sequence[T: Sequence[int]](value: T) -> T:
+    return value
+
+def consumer[T](value: T) -> Callable[[T], None]:
+    return lambda _: None
+
+def bounded_consumer[T: Callable[[int], None]](value: T) -> T:
+    return value
+
+def _(value: Any):
+    # TODO: This should be `Sequence[Any & int]`.
+    reveal_type(bounded_sequence(singleton_sequence(value)))  # revealed: Sequence[Any]
+    # TODO: This should be `list[int]`.
+    reveal_type(bounded(singleton(value)))  # revealed: list[Any | int]
+    reveal_type(bounded_consumer(consumer(value)))  # revealed: (Any | int, /) -> None
+```
+
+The argument of a callable is narrowed based on outer type context:
+
+```py
+def from_callback[T](f: Callable[[T], None]) -> list[T]:
+    return []
+
+def _(f: Callable[[object], None]):
+    reveal_type(from_callback(f))  # revealed: list[object]
+    reveal_type(bounded(from_callback(f)))  # revealed: list[int]
+```
+
+Upper bounds also provide context for `TypedDict` and lambda parameters:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def payload[T: Payload](value: T) -> T:
+    return value
+
+def callback[T: Callable[[int], list[int]]](value: T) -> T:
+    return value
+
+reveal_type(payload({"value": 1}))  # revealed: Payload
+reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
+```
+
+As well as propagate through lambda bodies:
+
+```py
+def _(value: Any):
+    f = callback(lambda _: singleton(value))
+    reveal_type(f(1))  # revealed: list[Any | int]
+```
+
+## Upper-bound context without inference evidence
+
+If there are no inferred or declared constraints for a given type variable, it remains unsolved,
+despite lower and upper validity bounds:
+
+```py
+def empty[T]() -> T:
+    raise NotImplementedError
+
+def bounded[T: int](value: T) -> T:
+    return value
+
+reveal_type(bounded(empty()))  # revealed: Unknown
+
+def empty_list[T]() -> list[T]:
+    return []
+
+def bounded_list[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(empty_list()))  # revealed: list[Unknown]
+```
+
+The type variable remains unsolved when the upper-bound context passes through another generic call:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(identity(empty_list())))  # revealed: list[Unknown]
+```
+
+If an explicit default is provided, it is instead used as the fallback value:
+
+```py
+def empty_with_default[T = bool]() -> T:
+    raise NotImplementedError
+
+reveal_type(bounded(empty_with_default()))  # revealed: bool
+```
+
+## Upper-bound context with constrained type variables
+
+The solution to a constrained type variable is chosen to satisfy outer validity constraints:
+
+```py
+def make[T: (int, str)]() -> T:
+    raise NotImplementedError
+
+def number[U: int](value: U) -> U:
+    return value
+
+reveal_type(number(make()))  # revealed: int
+```
+
+A default is only used when the type variable remains unsolved:
+
+```py
+def make_with_default[T: (int, str) = str]() -> T:
+    raise NotImplementedError
+
+reveal_type(make_with_default())  # revealed: str
+reveal_type(number(make_with_default()))  # revealed: int
+```
+
 ## Generic constructors
 
 The same applies to constructors of generic classes:
@@ -744,6 +992,142 @@ from typing import Any
 # string keys for keyword arguments. We special-case it to match the literal form.
 x1: dict[Hashable, Callable[..., object]] = {"x": lambda: 1}
 x2: dict[Hashable, Callable[..., object]] = dict(x=lambda: 1)
+```
+
+## Covariant constructors with outer return contexts
+
+A bounded, defaulted, covariant constructor should use its outer return context instead of falling
+back to its declared default.
+
+```py
+from __future__ import annotations
+
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class Client:
+    def no_argument(self) -> EmptyBox[Self]:
+        # revealed: EmptyBox[Self@no_argument]
+        return reveal_type(EmptyBox())
+
+T = TypeVar("T", bound=Client, default=Client, covariant=True)
+
+class EmptyBox(Generic[T]):
+    def __init__(self) -> None:
+        pass
+```
+
+## Dataclass constructors with outer return contexts
+
+A covariant dataclass argument referring to outer `Self` should not specialize to its declared
+default.
+
+```py
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Generic
+from typing_extensions import Self, TypeVar
+
+class PartialUser:
+    def equipped(self, present: bool) -> Equipped[Self]:
+        return Equipped(
+            first=Item(self) if present else None,
+        )
+
+class User(PartialUser):
+    pass
+
+UserT = TypeVar("UserT", bound=PartialUser, default=User, covariant=True)
+
+class Item(Generic[UserT]):
+    def __init__(self, owner: UserT) -> None:
+        self.owner = owner
+
+@dataclass
+class Equipped(Generic[UserT]):
+    first: Item[UserT] | None
+```
+
+## Generic dictionary factories retain contextual outer key types
+
+A zero-argument dictionary factory uses the expected outer key type instead of introducing a
+spurious `dict[str, T]` alternative.
+
+```py
+from collections import defaultdict
+from collections.abc import Hashable, Mapping
+from dataclasses import field
+
+class SharedMemory[K, T]:
+    value: dict[K, T] = field(default_factory=dict)
+
+def nested_defaultdict[K: Hashable, K2: Hashable, T](
+    data: Mapping[K, Mapping[K2, T]],
+) -> None:
+    value: defaultdict[K2, dict[K, T]] = defaultdict(dict)
+```
+
+## Callback diagnostics retain contextual outer type variables
+
+A constrained outer return type remains visible in an invalid callback diagnostic. The callback
+itself is still invalid, but replacing its expected result with `Unknown` would lose useful
+information.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+C = TypeVar("C", str, bytes, covariant=True)
+Selector = TypeVar("Selector", bound=Callable[[int], C])  # error: [invalid-type-variable-bound]
+
+class CallbackView(Generic[C]):
+    def __init__(self, callback: Callable[[int], C]) -> None:
+        self.callback = callback
+
+class CallbackInterface(Generic[C]):
+    def __init__(self, callback: Selector) -> None:
+        self.callback = callback
+
+    def view(self) -> CallbackView[C]:
+        # error: [invalid-argument-type] "Expected `(int, /) -> C@CallbackInterface`, found `Selector@__init__`"
+        return CallbackView(self.callback)
+```
+
+## Callable factories retain contextual outer element types
+
+Narrowing a union to a callable preserves its outer iterable element type. The callable factory
+argument remains invalid, but its expected result uses the outer `CT` instead of `Unknown`. After
+narrowing the other branch to a sequence, its constructor accepts the same outer element type.
+
+```py
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import Generic, TypeVar
+
+RT = TypeVar("RT")
+CT = TypeVar("CT")
+
+class FactoryView(Iterable[RT], Generic[RT]):
+    def __init__(self, factory: Callable[[], Iterable[RT]]) -> None:
+        self.factory = factory
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.factory())
+
+class SequenceView(Iterable[RT], Generic[RT]):
+    def __init__(self, sequence: Sequence[RT]) -> None:
+        self.sequence = sequence
+
+    def __iter__(self) -> Iterator[RT]:
+        return iter(self.sequence)
+
+def build_iter_view(matches: Iterable[CT] | Callable[[], Iterable[CT]]) -> Iterable[CT]:
+    if callable(matches):
+        # error: [invalid-argument-type] "Expected `() -> Iterable[CT@build_iter_view]`"
+        return FactoryView(matches)
+    if not isinstance(matches, Sequence):
+        matches = list(matches)
+    return SequenceView(matches)
 ```
 
 ## Generic call argument inference
@@ -1244,6 +1628,29 @@ x10: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(
 # fmt: on
 ```
 
+## Generic class specialization through recursive callable aliases
+
+A recursive callable context specializes a generic class used as a factory. The returned container
+keeps the recursive element type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+Factory = Callable[[], list["Factory"]]
+type ExplicitFactory = Callable[[], list[ExplicitFactory]]
+
+factory: Factory = list
+explicit_factory: ExplicitFactory = list
+
+reveal_type(factory())  # revealed: list[Factory]
+reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
+```
+
 ## Narrow union declared type for generic calls
 
 When a generic call is checked against a union declared type, the union is narrowed to the first
@@ -1402,6 +1809,58 @@ x8: EitherList = list(("1", "2", "3"))
 reveal_type(x8)  # revealed: list[int | str]
 ```
 
+## Literal union context for generic calls
+
+Narrowing a small literal union preserves the precise result of a nested generic call, including
+when the return type also contains `Any`:
+
+```py
+from typing import Any, Literal, assert_type
+
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def first[T](values: list[T]) -> T:
+    return values[0]
+
+def first_gradual[T](values: list[T]) -> Any | T:
+    return values[0]
+
+precise: Literal["a", "b"] = first(singleton("a"))
+assert_type(precise, Literal["a"])
+
+gradual: Literal["a", "b"] = reveal_type(first_gradual(singleton("a")))  # revealed: Any | Literal["a"]
+```
+
+A result can contain several literal alternatives without including every member of the declared
+union. The surrounding optional type does not add `None` to this result:
+
+```py
+def literal_union(value: Literal["a", "b"]) -> None:
+    result: Literal["a", "b"] | None = first(singleton(value))
+    assert_type(result, Literal["a", "b"])
+```
+
+A generic collection alternative still provides context when it follows literal alternatives. The
+empty list is inferred as `list[str]`:
+
+```py
+type Values = Literal[0, 1, 2]
+
+def identity[T](value: T) -> T:
+    return value
+
+collection: Values | list[str] | None = identity([])
+assert_type(collection, list[str])
+```
+
+The result also stays precise when the matching literal is the last member of the declared union:
+
+```py
+late: Values = first(singleton(2))
+assert_type(late, Literal[2])
+```
+
 ## Assignability diagnostics ignore declared type
 
 The type displayed in an invalid assignment diagnostic should account for the type context, e.g., to
@@ -1471,9 +1930,7 @@ def _(flag: bool):
     def _(c: C):
         c.x = reveal_type([1])  # revealed: list[int]
 
-        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
-        # error: [invalid-assignment]
-        C.x = [1]
+        C.x = reveal_type([1])  # revealed: list[Literal[1]]
 ```
 
 For union targets, each element of the union is considered as a separate type context:
@@ -1489,6 +1946,16 @@ class Y:
 
 def _(xy: X | Y):
     xy.x = reveal_type([1])  # revealed: list[int]
+```
+
+Unannotated lambda parameters do not prevent the inferred attribute type from providing context to
+the dictionary literals:
+
+```py
+class Callbacks:
+    def __init__(self):
+        self.values = [{"x": 0}, {"x": lambda x: 0}]
+        self.identities = [{"x": 0}, {"x": lambda x: x}]
 ```
 
 ## Overload evaluation
@@ -1599,10 +2066,8 @@ T2 = TypeVar("T2")
 def sink(func: Callable[[], Union[Awaitable[T2], T2]], future: Future[T2]) -> None:
     raise NotImplementedError
 
-# TODO: This should not error once we conjoin constraints from all call arguments.
 def f9(func: Callable[[], Union[Awaitable[T2], T2]]) -> Future[T2]:
     future: Future[T2] = Future()
-    # error: [invalid-argument-type]
     sink(func, future)
     return future
 ```
@@ -1664,7 +2129,7 @@ def from_or(values: list[str] | None) -> None:
         reveal_type(value)  # revealed: str
 
 def constructor_fallback(values: list[int] | None) -> None:
-    reveal_type(values or list())  # revealed: (list[int] & ~AlwaysFalsy) | list[Unknown]
+    reveal_type(values or list())  # revealed: list[int]
 
 def from_and(values: list[str]) -> None:
     reveal_type(values and [])  # revealed: list[str]
@@ -1737,7 +2202,7 @@ class SortParams[F]:
 def build_sort_spec[T](
     sort_params: SortParams[T] | None,
 ) -> dict[T, Literal[1, -1]] | None:
-    if not sort_params:
+    if sort_params is None:
         return None
     return {sort_params.field: 1}
 
@@ -1748,6 +2213,51 @@ def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
 params: SortParams[Path] | None = None
 sort = build_sort_spec(params) or {"name": -1}
 use_sort(sort)
+```
+
+An unspecialized collection parameter is not useful type context for a collection literal. The other
+operand of a conditional or boolean expression can supply it instead:
+
+```py
+def f[T](values: list[T]) -> list[T]:
+    return values
+
+def _(values: list[object], flag: bool):
+    reveal_type(f(values if flag else [1]))  # revealed: list[object]
+    reveal_type(f([1] if flag else values))  # revealed: list[object]
+    reveal_type(f(values or [1]))  # revealed: list[object]
+    reveal_type(f(values and [1]))  # revealed: list[object]
+```
+
+The same applies to set literals:
+
+```py
+def g[T](values: set[T]) -> set[T]:
+    return values
+
+def _(values: set[object], flag: bool):
+    reveal_type(g(values if flag else {1}))  # revealed: set[object]
+    reveal_type(g({1} if flag else values))  # revealed: set[object]
+    reveal_type(g(values or {1}))  # revealed: set[object]
+```
+
+As well as generic constructors:
+
+```py
+def _(values: dict[str | None, object], flag: bool):
+    reveal_type(dict(values if flag else {None: None}))  # revealed: dict[str | None, object]
+    reveal_type(dict({None: None} if flag else values))  # revealed: dict[str | None, object]
+    reveal_type(dict(values or {None: None}))  # revealed: dict[str | None, object]
+```
+
+Explicit gradual element types remain preferred over the other operand's specialization:
+
+```py
+from typing import Any
+
+def _(values: list[int], flag: bool):
+    x: list[Any] = values if flag else reveal_type([])  # revealed: list[Any]
+    reveal_type(x)  # revealed: list[Any]
 ```
 
 ## Lambda expressions
@@ -1846,10 +2356,10 @@ _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
 ```
 
-## Lambda contextual inference through union type aliases
+## Lambda contextual inference through type aliases
 
-A lambda parameter is inferred from a callable behind a union-valued type alias, including when that
-alias is itself an element of another union:
+A lambda parameter is inferred from a callable behind a type alias, including aliases that resolve
+to unions and aliases used as elements of another union:
 
 ```py
 from typing import Callable
@@ -1858,6 +2368,7 @@ from typing_extensions import TypeAliasType
 type IntCallback = Callable[[int], None]
 type IntCallbackOrInt = Callable[[int], None] | int
 IntCallbackOrIntAliasType = TypeAliasType("IntCallbackOrIntAliasType", Callable[[int], None] | int)
+IntCallbackAliasType = TypeAliasType("IntCallbackAliasType", Callable[[int], None])
 
 def consume(value: int) -> None:
     pass
@@ -1865,10 +2376,8 @@ def consume(value: int) -> None:
 x1: Callable[[int], None] | str = lambda value: consume(reveal_type(value))  # revealed: int
 x2: IntCallbackOrInt | str = lambda value: consume(reveal_type(value))  # revealed: int
 x3: IntCallbackOrIntAliasType | str = lambda value: consume(reveal_type(value))  # revealed: int
-
-# TODO: An alias that does not resolve to a union is not expanded here, so the parameter is not
-# inferred from the type context.
-x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: Unknown
+x4: IntCallback = lambda value: consume(reveal_type(value))  # revealed: int
+x5: IntCallbackAliasType = lambda value: consume(reveal_type(value))  # revealed: int
 ```
 
 ## Lambda contextual inference through `TypeAliasType` on Python 3.11
@@ -2221,6 +2730,137 @@ diagnostic_pair(non_generic(missing_argument), [1])
 diagnostic_pair(non_generic(suppressed_argument), [1])  # ty: ignore[unresolved-reference]
 ```
 
+## Dynamic type context
+
+A lambda parameter can use type context containing `Any`:
+
+```py
+from typing import Any, Callable
+
+def callable_pair[T](pair: tuple[Callable[[T], int], list[T]]) -> None:
+    function, values = pair
+    function(values[0])
+
+def _(values: list[list[Any]]):
+    callable_pair((lambda value: len(reveal_type(value)), values))  # revealed: list[Any]
+```
+
+List literals widen based on dynamic type context contributed from a sibling argument:
+
+```py
+def append[T](items: list[T], value: T) -> None:
+    items.append(value)
+
+def example(value: str | Any) -> None:
+    append([1], value)
+```
+
+This also applies when a generic base class contributes gradual type context:
+
+```py
+class GenericBase[T]: ...
+class Specialized(GenericBase[str]): ...
+class Mixed(Specialized, GenericBase[Any]): ...
+
+def g[T](values: list[T], base: GenericBase[T]) -> list[T]:
+    return values
+
+reveal_type(g([1], Specialized()))  # revealed: list[int | str]
+reveal_type(g([1], Mixed()))  # revealed: list[int | str | Any]
+```
+
+Dynamic arguments also participate when inferring the specialization for a nested collection
+literal:
+
+```py
+from ty_extensions._internal import Unknown
+
+def merge[K, V](*maps: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def _(dynamic: Unknown):
+    # TODO: The key and value types should also include `Unknown`.
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int, int | str]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
+
+def _(dynamic: Any):
+    # TODO: The key and value types should also include `Any`.
+    reveal_type(merge({"a": 1}, {2: "b"}, dynamic))  # revealed: tuple[str | int, int | str]
+    reveal_type(merge(dynamic, {"a": 1}, {2: "b"}))  # revealed: tuple[str | int, int | str]
+```
+
+## Lambda parameter cycles
+
+The return context can determine the types of mutually dependent identity callbacks. Unresolved
+parameter types do not contribute `Unknown` to the inferred return type:
+
+```toml
+[environment]
+python-version = "3.13"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from collections.abc import Callable
+
+def f[T, U, V](extract: Callable[[U], V], store: Callable[[V], U], key: Callable[[T], str]) -> list[V]:
+    raise NotImplementedError
+
+def _[T](key: Callable[[T], str]) -> list[T]:
+    return f(key=key, extract=lambda x: x, store=lambda x: x)
+```
+
+Gradual types from arguments still propagate through an identity lambda:
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def apply[T, R](function: Callable[[T], R], value: T) -> R:
+    return function(value)
+
+def _(value: Any):
+    reveal_type(apply(lambda x: x, value))  # revealed: Any
+
+def _(value: Unknown):
+    reveal_type(apply(lambda x: x, value))  # revealed: Unknown
+```
+
+## Type-variable defaults as type context
+
+An explicit type-variable default can provide fallback context when arguments do not determine a
+type:
+
+```py
+from collections.abc import Callable
+
+class Base[T]: ...
+class Child[T](Base[T]): ...
+
+class Container[T = Base[str]]:
+    def __init__(self, factory: Callable[[], T] | None = None) -> None: ...
+
+reveal_type(Container())  # revealed: Container[Base[str]]
+
+x1 = Container(Child)
+reveal_type(x1)  # revealed: Container[Child[str]]
+reveal_type(Container(Child))  # revealed: Container[Child[str]]
+```
+
+An inferred argument type takes precedence over the default:
+
+```py
+reveal_type(Container(Child[int]))  # revealed: Container[Child[int]]
+
+def create[T = Base[str]](factory: Callable[[], T], value: T) -> T:
+    return factory()
+
+def _(value: Child[int]):
+    reveal_type(create(Child, value))  # revealed: Child[int]
+```
+
 ## Dunder Calls
 
 The key and value parameters types are used as type context for `__setitem__` dunder calls:
@@ -2296,7 +2936,8 @@ def _(bar: Bar):
     bar |= reveal_type({"bar": [1]})  # revealed: Bar
 
 class X:
-    def __ior__(self, other: Baz): ...
+    def __ior__(self, other: Baz):
+        return self
 
 def _(x: X):
     x |= reveal_type({"bar": [1]})  # revealed: Baz
@@ -2305,7 +2946,8 @@ def _(x: X | Bar):
     x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
 
 class Y:
-    def __ior__(self, other: Bar): ...
+    def __ior__(self, other: Bar):
+        return self
 
 def _(x: Intersection[X, Y]):
     # TODO: Reveal `Bar` and `Baz` here.
@@ -2469,6 +3111,15 @@ def _() -> int:
     return invalid_x6  # error: [invalid-return-type]
 ```
 
+A return annotation can provide a union of fixed-length tuple element types. Inferring an empty list
+from this context doesn't wrongly widen the type of `result` to a list of variable-length tuples:
+
+```py
+def tuples() -> list[tuple[()] | tuple[int]]:
+    result = []
+    return result
+```
+
 ```py
 x7 = []
 x7[:] = [1, "2", 3.0]
@@ -2616,6 +3267,88 @@ reveal_type(x23)  # revealed: list[float | str | None]
 x24 = {"a": 1}
 x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
+```
+
+## Unconstrained collection use-sites
+
+Calling a method that does not constrain a collection's element type does not affect its inferred
+type.
+
+```py
+def _():
+    x1 = [1]
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[int]
+
+    x2 = {1}
+    x2.clear()
+    reveal_type(x2)  # revealed: set[int]
+
+    x3 = {"a": 1}
+    x3.clear()
+    reveal_type(x3)  # revealed: dict[str, int]
+```
+
+Calls that partially constrain the collection do not affect the type inferred for unrelated type
+variables.
+
+```py
+def _():
+    values = {"a": 1}
+    values.pop("a")
+    reveal_type(values)  # revealed: dict[str, int]
+```
+
+An empty collection remains unknown until another use supplies an element type:
+
+```py
+def _():
+    x1 = []
+    x1.reverse()
+    reveal_type(x1)  # revealed: list[Unknown]
+
+    x2 = []
+    x2.reverse()
+    x2.append(1)
+    reveal_type(x2)  # revealed: list[int]
+```
+
+Gradual types that explicitly constrain a collection are preserved in the inferred type.
+
+```py
+def _(unknown):
+    x1 = [1]
+    x1.reverse()
+    x1.append(unknown)
+    reveal_type(x1)  # revealed: list[Unknown | int]
+```
+
+An upper bound on the element type introduced by a callback does not influence the type of the
+collection literal:
+
+```py
+from typing import Any
+
+def key(value) -> int:
+    return 0
+
+def any_key(value: Any) -> int:
+    return 0
+
+def _():
+    x1 = [(0, "a")]
+    x1.sort(key=lambda x: x[0])
+    reveal_type(x1)  # revealed: list[tuple[int, str]]
+
+    x2 = [(0, "a")]
+    x2.sort(key=key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
+    reveal_type(x2)  # revealed: list[Unknown | tuple[int, str]]
+
+    x3 = [(0, "a")]
+    x3.sort(key=any_key)
+    # TODO: This should reveal `list[tuple[int, str]]`.
+    reveal_type(x3)  # revealed: list[Any | tuple[int, str]]
 ```
 
 ## Multi-inference diagnostics

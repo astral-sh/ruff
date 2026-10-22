@@ -1,6 +1,7 @@
-use std::fs;
+use std::{borrow::Cow, fs};
 
-pub use project_watcher::ProjectWatcher;
+pub use project_watcher::{ProjectWatcher, WatchPaths, watch_paths};
+use ruff_db::Db;
 use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPathBuf};
 pub use watcher::{EventHandler, Watcher, directory_watcher};
 
@@ -20,9 +21,12 @@ mod watcher;
 /// ## Renaming a directory
 /// It's up to the file watcher implementation to aggregate the rename event for a directory to a single rename
 /// event instead of emitting an event for each file or subdirectory in that path.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ChangeEvent {
-    /// The file corresponding to the given path was opened in an editor.
+    /// A new or existing file was opened in an editor.
+    ///
+    /// Refresh its metadata and add it to an existing project index if it is included.
+    /// The editor may open a file before its filesystem creation notification arrives.
     Opened(SystemPathBuf),
 
     /// A new path was created
@@ -70,6 +74,31 @@ impl ChangeEvent {
         }
     }
 
+    /// Refines ambiguous deletions using the project's cached file state.
+    ///
+    /// Created and modified paths can be classified from the filesystem, but deleted paths
+    /// no longer exist. If the cache records an existing file, classify its deletion as `File`.
+    /// Otherwise, keep `Any`: the path could have been an uncached file or a directory.
+    /// Resolve every event in a batch before updating any cached file state.
+    pub(crate) fn resolve(&self, db: &dyn Db) -> Cow<'_, Self> {
+        if let Self::Deleted {
+            path,
+            kind: DeletedKind::Any,
+        } = self
+            && db
+                .files()
+                .try_system(db, path)
+                .is_some_and(|file| file.exists(db))
+        {
+            Cow::Owned(Self::Deleted {
+                path: path.clone(),
+                kind: DeletedKind::File,
+            })
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+
     pub fn file_name(&self) -> Option<&str> {
         self.system_path().and_then(|path| path.file_name())
     }
@@ -88,7 +117,7 @@ impl ChangeEvent {
         matches!(self, ChangeEvent::Rescan)
     }
 
-    pub const fn is_created(&self) -> bool {
+    pub(crate) const fn is_created(&self) -> bool {
         matches!(self, ChangeEvent::Created { .. })
     }
 

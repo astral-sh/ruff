@@ -4,6 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix};
 use crate::{FixAvailability, Violation};
 
@@ -38,7 +39,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `list`](https://docs.python.org/3/library/functions.html#func-list)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Complexity)]
 pub(crate) struct ReimplementedContainerBuiltin {
     container: Container,
 }

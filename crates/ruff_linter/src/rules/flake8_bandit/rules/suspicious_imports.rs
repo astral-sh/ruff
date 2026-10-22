@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for imports of the `telnetlib` module.
@@ -25,7 +26,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `telnetlib` - Telnet client](https://docs.python.org/3.12/library/telnetlib.html#module-telnetlib)
 /// - [PEP 594: `telnetlib`](https://peps.python.org/pep-0594/#telnetlib)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousTelnetlibImport;
 
 impl Violation for SuspiciousTelnetlibImport {
@@ -52,7 +53,7 @@ impl Violation for SuspiciousTelnetlibImport {
 /// ## References
 /// - [Python documentation: `ftplib` - FTP protocol client](https://docs.python.org/3/library/ftplib.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousFtplibImport;
 
 impl Violation for SuspiciousFtplibImport {
@@ -80,7 +81,7 @@ impl Violation for SuspiciousFtplibImport {
 /// ## References
 /// - [Python documentation: `pickle` — Python object serialization](https://docs.python.org/3/library/pickle.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousPickleImport;
 
 impl Violation for SuspiciousPickleImport {
@@ -102,7 +103,7 @@ impl Violation for SuspiciousPickleImport {
 /// import subprocess
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousSubprocessImport;
 
 impl Violation for SuspiciousSubprocessImport {
@@ -126,7 +127,7 @@ impl Violation for SuspiciousSubprocessImport {
 /// import xml.etree.cElementTree
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlEtreeImport;
 
 impl Violation for SuspiciousXmlEtreeImport {
@@ -150,7 +151,7 @@ impl Violation for SuspiciousXmlEtreeImport {
 /// import xml.sax
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlSaxImport;
 
 impl Violation for SuspiciousXmlSaxImport {
@@ -174,7 +175,7 @@ impl Violation for SuspiciousXmlSaxImport {
 /// import xml.dom.expatbuilder
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlExpatImport;
 
 impl Violation for SuspiciousXmlExpatImport {
@@ -198,7 +199,7 @@ impl Violation for SuspiciousXmlExpatImport {
 /// import xml.dom.minidom
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlMinidomImport;
 
 impl Violation for SuspiciousXmlMinidomImport {
@@ -222,7 +223,7 @@ impl Violation for SuspiciousXmlMinidomImport {
 /// import xml.dom.pulldom
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlPulldomImport;
 
 impl Violation for SuspiciousXmlPulldomImport {
@@ -253,7 +254,7 @@ impl Violation for SuspiciousXmlPulldomImport {
 ///
 /// [deprecated]: https://github.com/tiran/defusedxml/blob/c7445887f5e1bcea470a16f61369d29870cfcfe1/README.md#defusedxmllxml
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "v0.3.0")]
+#[violation_metadata(removed_since = "v0.3.0", category = Category::Security)]
 pub(crate) struct SuspiciousLxmlImport;
 
 impl Violation for SuspiciousLxmlImport {
@@ -277,7 +278,7 @@ impl Violation for SuspiciousLxmlImport {
 /// import xmlrpc
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousXmlrpcImport;
 
 impl Violation for SuspiciousXmlrpcImport {
@@ -304,7 +305,7 @@ impl Violation for SuspiciousXmlrpcImport {
 /// ## References
 /// - [httpoxy website](https://httpoxy.org/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousHttpoxyImport;
 
 impl Violation for SuspiciousHttpoxyImport {
@@ -333,7 +334,7 @@ impl Violation for SuspiciousHttpoxyImport {
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousPycryptoImport;
 
 impl Violation for SuspiciousPycryptoImport {
@@ -359,7 +360,7 @@ impl Violation for SuspiciousPycryptoImport {
 /// ## References
 /// - [Buffer Overflow Issue](https://github.com/pycrypto/pycrypto/issues/176)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.12")]
+#[violation_metadata(preview_since = "v0.1.12", category = Category::Security)]
 pub(crate) struct SuspiciousPyghmiImport;
 
 impl Violation for SuspiciousPyghmiImport {

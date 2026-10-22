@@ -9,8 +9,9 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
-        class::{DynamicClassHeaderAnchor, dynamic_class_header_range},
+        PropertyInstanceType, SelfTypeVarOrigin, Signature, SubclassOfType, Type, TypeContext,
+        TypeMapping,
+        class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
         mro::Mro,
@@ -30,15 +31,18 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     name: &str,
-    instance_ty: Type<'db>,
+    class: ClassType<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
 ) -> Option<Type<'db>> {
+    let instance_ty = Type::instance(db, env, class);
+    let origin = SelfTypeVarOrigin::Class(class.class_literal(db));
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
             let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
             );
@@ -96,6 +100,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             // _replace(self, *, field1=..., field2=...) -> Self
             let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
             ));
@@ -161,8 +166,8 @@ pub struct DynamicNamedTupleLiteral<'db> {
     ///
     /// - `Definition`: The call is assigned to a variable. The definition
     ///   uniquely identifies this namedtuple and can be used to find the call.
-    /// - `ScopeOffset`: The call is "dangling" (not assigned). The offset
-    ///   is relative to the enclosing scope's anchor node index.
+    /// - `ScopeOffset`: The call is "dangling" (not assigned). Its location
+    ///   is relative to the enclosing scope.
     #[returns(ref)]
     pub anchor: DynamicNamedTupleAnchor<'db>,
 }
@@ -398,6 +403,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                                 db,
                                 env,
                                 &TypeMapping::ReplaceSelf {
+                                    new_origin: SelfTypeVarOrigin::Class(self.into()),
                                     new_upper_bound: instance_ty,
                                 },
                                 TypeContext::default(),
@@ -412,7 +418,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             db,
             env,
             name,
-            instance_ty,
+            ClassType::NonGeneric(self.into()),
             self.fields(db).iter().cloned(),
             None,
         );
@@ -430,6 +436,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     db,
                     env,
                     &TypeMapping::ReplaceSelf {
+                        new_origin: SelfTypeVarOrigin::Class(self.into()),
                         new_upper_bound: instance_ty,
                     },
                     TypeContext::default(),
@@ -515,8 +522,8 @@ pub enum DynamicNamedTupleAnchor<'db> {
     /// We're dealing with a `namedtuple()` or `NamedTuple` call that is
     /// "dangling" (not assigned to a variable).
     ///
-    /// The offset is relative to the enclosing scope's anchor node index.
-    /// For module scope, this is equivalent to an absolute index (anchor is 0).
+    /// The [`DynamicClassScopeOffset`] locates the call relative to the enclosing scope,
+    /// including when the call is inside a string annotation.
     ///
     /// Dangling calls can always store the spec. They *can* contain
     /// forward references if they appear in class bases:
@@ -532,7 +539,7 @@ pub enum DynamicNamedTupleAnchor<'db> {
     /// entirety during type inference.
     ScopeOffset {
         scope: ScopeId<'db>,
-        offset: u32,
+        offset: DynamicClassScopeOffset,
         spec: NamedTupleSpec<'db>,
     },
 }

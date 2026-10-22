@@ -1,7 +1,7 @@
 ## What it does
 
-Checks for type variables that are used in a scope where they are not bound
-to any enclosing generic context.
+Checks for type variables that are used in a scope where they are not bound to any enclosing generic
+context.
 
 ## Why is this bad?
 

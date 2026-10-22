@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -69,8 +70,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb" | "toml"),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "toml",
                 "Supported file types are: py (or python), pyi, ipynb, toml, and ignore"
             );
 

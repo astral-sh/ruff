@@ -2,8 +2,29 @@
 # requires-python = ">=3.12"
 # dependencies = ["tqdm"]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
+# [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
+#
 # [tool.uv]
+# no-build = true
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 # ///
 
 """This is @konstin's scripts for checking an entire checkout of ~2.1k packages for
@@ -71,6 +92,7 @@ def main() -> None:
                 cwd=project_dir,
                 capture_output=True,
                 text=True,
+                check=False,
             )
         except CalledProcessError as e:
             tqdm.write(f"Ruff failed on {project_dir}: {e}")

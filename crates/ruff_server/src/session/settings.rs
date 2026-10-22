@@ -114,7 +114,7 @@ impl TryFrom<ClientConfiguration> for ResolvedConfiguration {
             )),
             ClientConfiguration::Object(map) => {
                 let _guard = ValueSourceGuard::new(ValueSource::Editor, false);
-                let options = toml::Table::try_from(map)?.try_into::<Options>()?;
+                let options = Options::from_toml_table(toml::Table::try_from(map)?)?;
                 if options.extend.is_some() {
                     Err(ResolvedConfigurationError::ExtendNotSupported)
                 } else {

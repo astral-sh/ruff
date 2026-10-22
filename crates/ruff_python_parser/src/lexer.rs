@@ -119,12 +119,14 @@ impl<'src> Lexer<'src> {
     }
 
     /// Returns the range of the current token.
-    pub(crate) const fn current_range(&self) -> TextRange {
+    #[doc(hidden)]
+    pub const fn current_range(&self) -> TextRange {
         self.current_range
     }
 
     /// Returns the flags for the current token.
-    pub(crate) const fn current_flags(&self) -> TokenFlags {
+    #[doc(hidden)]
+    pub const fn current_flags(&self) -> TokenFlags {
         self.current_flags
     }
 
@@ -682,15 +684,15 @@ impl<'src> Lexer<'src> {
             .eat_while(|c| is_identifier_continuation(c, &mut is_ascii));
 
         if !is_ascii {
-            self.current_flags |= TokenFlags::NON_ASCII_NAME;
-            return TokenKind::Name;
+            self.current_flags |= TokenFlags::NON_ASCII_IDENTIFIER;
+            return TokenKind::Identifier;
         }
 
         let text = self.token_text();
 
         // No Python keyword is longer than eight bytes.
         if text.len() > 8 {
-            return TokenKind::Name;
+            return TokenKind::Identifier;
         }
 
         match text.as_bytes() {
@@ -733,7 +735,7 @@ impl<'src> Lexer<'src> {
             b"while" => TokenKind::While,
             b"with" => TokenKind::With,
             b"yield" => TokenKind::Yield,
-            _ => TokenKind::Name,
+            _ => TokenKind::Identifier,
         }
     }
 
@@ -1048,10 +1050,10 @@ impl<'src> Lexer<'src> {
     /// Lex a hex/octal/decimal/binary number without a decimal point.
     fn lex_number_radix(&mut self, radix: Radix) -> TokenKind {
         #[cfg(debug_assertions)]
-        debug_assert!(matches!(
-            self.cursor.previous().to_ascii_lowercase(),
-            'x' | 'o' | 'b'
-        ));
+        {
+            use std::debug_assert_matches;
+            debug_assert_matches!(self.cursor.previous().to_ascii_lowercase(), 'x' | 'o' | 'b');
+        }
 
         let number = self.radix_run(radix);
         if !number.has_digit {
@@ -1394,7 +1396,7 @@ impl<'src> Lexer<'src> {
     /// f"{test!r"
     /// ```
     ///
-    /// This function re-lexes the `r"` as `r` (a name token). The next `next_token` call will
+    /// This function re-lexes the `r"` as `r` (an identifier token). The next `next_token` call will
     /// return a unclosed string token for `"`, which [`Self::re_lex_string_token_in_interpolation_element`]
     /// can then re-lex as the end of the f-string.
     pub(crate) fn re_lex_raw_string_in_format_spec(&mut self) {
@@ -1413,7 +1415,7 @@ impl<'src> Lexer<'src> {
             }
 
             self.current_range = TextRange::at(self.current_range.start(), 'r'.text_len());
-            self.current_kind = TokenKind::Name;
+            self.current_kind = TokenKind::Identifier;
             self.current_flags = TokenFlags::empty();
             self.cursor = Cursor::new(self.source);
             self.cursor.skip_bytes(self.current_range.end().to_usize());
@@ -1617,6 +1619,7 @@ fn is_identifier_continuation(c: char, identifier_is_ascii_only: &mut bool) -> b
 }
 
 /// Create a new [`Lexer`] for the given source code and [`Mode`].
+#[doc(hidden)]
 pub fn lex(source: &str, mode: Mode) -> Lexer<'_> {
     Lexer::new(source, mode, TextSize::default())
 }
@@ -2110,7 +2113,7 @@ if first:
     }
 
     #[test]
-    fn test_non_ascii_name_flag() {
+    fn non_ascii_identifier_flag() {
         let mut lexer = Lexer::new("a€\naβ = β\nascii", Mode::Module, TextSize::default());
         let mut flags = Vec::new();
         loop {
@@ -2118,8 +2121,8 @@ if first:
             if kind.is_eof() {
                 break;
             }
-            if kind == TokenKind::Name {
-                flags.push(lexer.current_flags().is_non_ascii_name());
+            if kind == TokenKind::Identifier {
+                flags.push(lexer.current_flags().is_non_ascii_identifier());
             }
         }
 
@@ -2301,7 +2304,7 @@ if first:
     #[test]
     fn test_fstring_with_multiline_format_spec() {
         // The last f-string is invalid syntactically but we should still lex it.
-        // Note that the `b` is a `Name` token and not a `FStringMiddle` token.
+        // Note that the `b` is an `Identifier` token and not a `FStringMiddle` token.
         let source = r"f'''__{
     x:d
 }__'''
@@ -2486,7 +2489,7 @@ f"{(lambda x:{x})}"
     #[test]
     fn test_tstring_with_multiline_format_spec() {
         // The last t-string is invalid syntactically but we should still lex it.
-        // Note that the `b` is a `Name` token and not a `TStringMiddle` token.
+        // Note that the `b` is an `Identifier` token and not a `TStringMiddle` token.
         let source = r"t'''__{
     x:d
 }__'''
@@ -2721,7 +2724,7 @@ t"{(lambda x:{x})}"
         [
             FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
             Lbrace 2..3,
-            Name 3..6,
+            Identifier 3..6,
             Exclamation 6..7,
             String 7..9 (flags = DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING),
             Newline 9..9,
