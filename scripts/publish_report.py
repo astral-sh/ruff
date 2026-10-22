@@ -388,25 +388,89 @@ def publish(
     return comment_id
 
 
+def publish_weekly_report(
+    run_id: int,
+    run_attempt: int,
+    workflow_ref: str,
+    *,
+    html_files: dict[str, tuple[str, str]],
+    bucket: str,
+    base_url: str,
+) -> str | None:
+    run = api(f"actions/runs/{run_id}")
+    if run["run_attempt"] != run_attempt:
+        print("The workflow run has been rerun.", file=sys.stderr)
+        return None
+    if (
+        run["repository"]["id"] != REPOSITORY_ID
+        or (run["head_repository"] or {}).get("id") != REPOSITORY_ID
+        or run["event"] not in {"schedule", "workflow_dispatch"}
+        or run["head_branch"] != "main"
+        or run["path"] != ".github/workflows/ty-ecosystem-report.yaml"
+        or workflow_ref != f"{REPOSITORY}/{run['path']}@refs/heads/main"
+    ):
+        raise ValueError(
+            "Only weekly ty ecosystem runs from main can publish this report."
+        )
+    latest_runs = api(
+        "actions/workflows/ty-ecosystem-report.yaml/runs?branch=main&per_page=1"
+    )["workflow_runs"]
+    if latest_runs and latest_runs[0]["id"] > run_id:
+        print("A newer weekly report run exists.", file=sys.stderr)
+        return None
+    artifact = find_artifact(run_id, "full-report")
+    if artifact is None:
+        raise ValueError("No full-report artifact is available.")
+    if not bucket:
+        raise ValueError("The report bucket must be configured.")
+    report_url = upload_html_report(
+        html_files,
+        artifact,
+        prefix="ruff/ty-ecosystem",
+        bucket=bucket,
+        base_url=base_url,
+    )
+    return f"{report_url}/index.html"
+
+
 def main() -> None:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--run-id", required=True, type=int)
+    common.add_argument("--run-attempt", required=True, type=int)
+    common.add_argument("--workflow-ref", required=True)
+    common.add_argument("--html-bucket", default="")
+    common.add_argument("--html-base-url", default="")
+    common.add_argument("--html-files", type=read_html_files, default="{}")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-id", required=True, type=int)
-    parser.add_argument("--run-attempt", required=True, type=int)
-    parser.add_argument("--report", required=True)
-    parser.add_argument("--pull-request", required=True, type=int)
-    parser.add_argument("--workflow-ref", required=True)
-    parser.add_argument("--artifact", required=True)
-    parser.add_argument("--filename", required=True)
-    parser.add_argument("--title", default="")
-    parser.add_argument("--full-report-artifact", default="")
-    parser.add_argument("--html-bucket", default="")
-    parser.add_argument("--html-base-url", default="")
-    parser.add_argument("--html-files", type=read_html_files, default="{}")
-    parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
-    parser.add_argument("--dry-run", action="store_true")
+    commands = parser.add_subparsers(dest="command", required=True)
+    comment = commands.add_parser("comment", parents=[common])
+    comment.add_argument("--report", required=True)
+    comment.add_argument("--pull-request", required=True, type=int)
+    comment.add_argument("--artifact", required=True)
+    comment.add_argument("--filename", required=True)
+    comment.add_argument("--title", default="")
+    comment.add_argument("--full-report-artifact", default="")
+    comment.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
+    comment.add_argument("--dry-run", action="store_true")
+    commands.add_parser("weekly", parents=[common])
     args = parser.parse_args()
     if args.run_id <= 0 or args.run_attempt <= 0:
         parser.error("The run ID and attempt must be positive.")
+    if args.command == "weekly":
+        report_url = publish_weekly_report(
+            args.run_id,
+            args.run_attempt,
+            args.workflow_ref,
+            html_files=args.html_files,
+            bucket=args.html_bucket,
+            base_url=args.html_base_url,
+        )
+        if report_url is not None and (
+            summary := os.environ.get("GITHUB_STEP_SUMMARY")
+        ):
+            with Path(summary).open("a") as file:
+                file.write(f"[Full ty ecosystem report]({report_url})\n")
+        return
     if args.pull_request <= 0:
         parser.error("The pull request number must be positive.")
     comment_id = publish(

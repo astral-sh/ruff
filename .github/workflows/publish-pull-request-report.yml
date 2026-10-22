@@ -110,7 +110,7 @@ jobs:
           PULL_REQUEST: ${{ github.event.pull_request.number }}
           COMMENT_ID_FILE: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
         run: >-
-          uv run --script scripts/publish_pr_report.py
+          uv run --script scripts/publish_report.py comment
           --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
           --workflow-ref "$WORKFLOW_REF"
           --report "$REPORT" --pull-request "$PULL_REQUEST"
