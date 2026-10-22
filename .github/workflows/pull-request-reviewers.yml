@@ -24,7 +24,9 @@ jobs:
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: github-ubuntu-24.04-x86_64-2
     timeout-minutes: 10
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write

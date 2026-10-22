@@ -37,7 +37,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: github-ubuntu-24.04-x86_64-2
     timeout-minutes: 10
-    environment: automations
+    environment:
+      name: automations
+      deployment: false
     permissions:
       contents: read
       id-token: write
