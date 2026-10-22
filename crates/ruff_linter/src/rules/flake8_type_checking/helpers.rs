@@ -3,6 +3,7 @@ use std::cmp::Reverse;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{
     self as ast, Decorator, Expr, ExprContext, Operator, PythonVersion, StringLiteralFlags,
@@ -16,6 +17,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Edit;
 use crate::Locator;
+use crate::checkers::ast::Checker;
 use crate::settings::LinterSettings;
 
 /// Represents the kind of an existing or potential typing-only annotation.
@@ -376,6 +378,40 @@ pub(crate) fn quote_type_expression(
     let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
 
     Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
+}
+
+/// Safely remove quotes from a type expression.
+///
+/// This function handles edge cases like multiline strings correctly
+/// by checking for and potentially adding missing parentheses.
+pub(crate) fn unquote_annotation_string(
+    expr: &Expr,
+    annotation_expr: &ast::ExprStringLiteral,
+    checker: &Checker,
+) -> Edit {
+    let fix_string = annotation_expr.value.to_string();
+
+    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
+        && parenthesized_range(
+            // Check for parentheses outside the string ("""...""")
+            annotation_expr.into(),
+            checker.semantic().current_statement().into(),
+            checker.source_tokens(),
+        )
+        .is_none()
+        && parenthesized_range(
+            // Check for parentheses inside the string """(...)"""
+            expr.into(),
+            annotation_expr.into(),
+            checker.tokens(),
+        )
+        .is_none()
+    {
+        format!("({fix_string})")
+    } else {
+        fix_string
+    };
+    Edit::range_replacement(fix_string, annotation_expr.range())
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].

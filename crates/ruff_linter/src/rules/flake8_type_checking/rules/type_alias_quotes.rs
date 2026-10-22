@@ -9,9 +9,10 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::registry::Rule;
-use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
-use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
-use ruff_python_ast::token::parenthesized_range;
+use crate::rules::flake8_type_checking::helpers::{
+    quote_type_expression, quotes_are_unremovable, unquote_annotation_string,
+};
+use crate::{AlwaysFixableViolation, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -292,31 +293,9 @@ pub(crate) fn quoted_type_alias(
         return;
     }
 
-    let range = annotation_expr.range();
+    let edit = unquote_annotation_string(expr, annotation_expr, checker);
+    let range = edit.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
-    let fix_string = annotation_expr.value.to_string();
-
-    let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
-        && parenthesized_range(
-            // Check for parentheses outside the string ("""...""")
-            annotation_expr.into(),
-            checker.semantic().current_statement().into(),
-            checker.source_tokens(),
-        )
-        .is_none()
-        && parenthesized_range(
-            // Check for parentheses inside the string """(...)"""
-            expr.into(),
-            annotation_expr.into(),
-            checker.tokens(),
-        )
-        .is_none()
-    {
-        format!("({fix_string})")
-    } else {
-        fix_string
-    };
-    let edit = Edit::range_replacement(fix_string, range);
     if checker.comment_ranges().intersects(range) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {

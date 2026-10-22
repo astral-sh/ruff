@@ -1,6 +1,111 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 8
+Added: 8
+
+--- Removed ---
+TC010 Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:4:4
+  |
+4 | x: "int" | str  # TC010
+  |    ^^^^^
+5 | x: ("int" | str) | "bool"  # TC010
+  |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:5:5
+  |
+4 | x: "int" | str  # TC010
+5 | x: ("int" | str) | "bool"  # TC010
+  |     ^^^^^
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+ --> TC010_2.py:5:20
+  |
+4 | x: "int" | str  # TC010
+5 | x: ("int" | str) | "bool"  # TC010
+  |                    ^^^^^^
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:12:20
+   |
+12 | z: list[str, str | "int"] = []  # TC010
+   |                    ^^^^^
+13 |
+14 | type A = Value["int" | str]  # OK
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:16:30
+   |
+14 | type A = Value["int" | str]  # OK
+15 |
+16 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
+   |                              ^^^^^
+17 |
+18 | x: ("int"  # TC010 (unsafe fix)
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:18:5
+   |
+16 |   OldS = TypeVar('OldS', int | 'str', str)  # TC010
+17 |
+18 |   x: ("int"  # TC010 (unsafe fix)
+   |  _____^
+19 | |     " | str" | None)
+   | |____________^
+20 |
+21 |   OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:21:25
+   |
+19 |       " | str" | None)
+20 |
+21 |   OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
+   |  _________________________^
+22 | |                         " | str" | None))
+   | |________________________________^
+23 |
+24 |   x: """int |
+   |
+help: Remove quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:24:4
+   |
+22 |                           " | str" | None))
+23 |
+24 |   x: """int |
+   |  ____^
+25 | | str""" | None  # TC010 (tricky multiline string case)
+   | |______^
+help: Remove quotes
+
+
+
+--- Added ---
 TC010 [*] Invalid string member in `X | Y`-style union type
  --> TC010_2.py:4:4
   |
@@ -16,6 +121,7 @@ help: Remove quotes
 5 | x: ("int" | str) | "bool"  # TC010
   |
 
+
 TC010 [*] Invalid string member in `X | Y`-style union type
  --> TC010_2.py:5:5
   |
@@ -30,6 +136,7 @@ help: Remove quotes
 6 |
   |
 
+
 TC010 [*] Invalid string member in `X | Y`-style union type
  --> TC010_2.py:5:20
   |
@@ -43,6 +150,7 @@ help: Remove quotes
 5 + x: ("int" | str) | bool  # TC010
 6 |
   |
+
 
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_2.py:12:20
@@ -59,6 +167,7 @@ help: Remove quotes
 12 + z: list[str, str | int] = []  # TC010
 13 |
    |
+
 
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_2.py:16:30
@@ -77,6 +186,7 @@ help: Remove quotes
 16 + OldS = TypeVar('OldS', int | str, str)  # TC010
 17 |
    |
+
 
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_2.py:18:5
@@ -100,6 +210,7 @@ help: Remove quotes
    |
 note: This is an unsafe fix and may change runtime behavior
 
+
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_2.py:21:25
    |
@@ -109,11 +220,34 @@ TC010 [*] Invalid string member in `X | Y`-style union type
    |  _________________________^
 22 | |                         " | str" | None))
    | |________________________________^
+23 |
+24 |   x: """int |
+   |
 help: Remove quotes
    |
 20 |
    - OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
    -                         " | str" | None))
 21 + OldT = TypeVar("OldT", (int | str | None))
+22 |
    |
 note: This is an unsafe fix and may change runtime behavior
+
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_2.py:24:4
+   |
+22 |                           " | str" | None))
+23 |
+24 |   x: """int |
+   |  ____^
+25 | | str""" | None  # TC010 (tricky multiline string case)
+   | |______^
+help: Remove quotes
+   |
+23 |
+   - x: """int |
+   - str""" | None  # TC010 (tricky multiline string case)
+24 + x: (int |
+25 + str) | None  # TC010 (tricky multiline string case)
+   |

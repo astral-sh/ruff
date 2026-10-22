@@ -5,8 +5,10 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::rules::flake8_type_checking::helpers::{quote_type_expression, quotes_are_unremovable};
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::rules::flake8_type_checking::helpers::{
+    quote_annotation, quotes_are_unremovable, unquote_annotation_string,
+};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -50,9 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Preview
-/// In preview mode this rule has a fix available. However the logic for the rule
-/// has changed slightly as well. So there is a chance it will behave differently
-/// in untested corner cases.
+/// In preview mode this rule has a fix available.
 ///
 /// ## Fix safety
 /// This fix is safe as long as the fix doesn't remove a comment, which can happen
@@ -80,7 +80,6 @@ impl Violation for RuntimeStringUnion {
     fn fix_title(&self) -> Option<String> {
         let Self {
             strategy: Some(strategy),
-            ..
         } = self
         else {
             return None;
@@ -93,50 +92,7 @@ impl Violation for RuntimeStringUnion {
 }
 
 /// TC010
-pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
-    if !checker.semantic().in_type_definition() {
-        return;
-    }
-
-    // The union is only problematic at runtime. Even though stub files are never
-    // executed, some of the nodes still end up having a runtime execution context
-    if checker.source_type.is_stub() || !checker.semantic().execution_context().is_runtime() {
-        return;
-    }
-
-    // Search for strings within the binary operator.
-    let mut strings = Vec::new();
-    traverse_op(expr, &mut strings);
-
-    for string in strings {
-        checker.report_diagnostic(RuntimeStringUnion { strategy: None }, string.range());
-    }
-}
-
-/// Collect all string members in possibly-nested binary `|` expressions.
-fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>) {
-    match expr {
-        Expr::StringLiteral(_) => {
-            strings.push(expr);
-        }
-        Expr::BytesLiteral(_) => {
-            strings.push(expr);
-        }
-        Expr::BinOp(ast::ExprBinOp {
-            left,
-            right,
-            op: Operator::BitOr,
-            ..
-        }) => {
-            traverse_op(left, strings);
-            traverse_op(right, strings);
-        }
-        _ => {}
-    }
-}
-
-/// TC010 (preview version with fix)
-pub(crate) fn runtime_string_union_preview(
+pub(crate) fn runtime_string_union(
     checker: &Checker,
     expr: &Expr,
     annotation_expr: &ast::ExprStringLiteral,
@@ -157,69 +113,32 @@ pub(crate) fn runtime_string_union_preview(
     };
 
     if quotes_are_unremovable(checker.semantic(), expr, checker.target_version()) {
-        // extend the expression to the smallest possible expression that
-        // can still be quoted safely
-        let mut extended_expr = None;
-        for node_id in checker.semantic().current_expression_ids() {
-            let expr = checker
+        // extend the quotes
+        let mut diagnostic = checker.report_diagnostic(
+            RuntimeStringUnion {
+                strategy: Some(Strategy::ExtendQuotes),
+            },
+            annotation_expr.range(),
+        );
+        // the edit tells us where our extended expression starts
+        let edit = quote_annotation(
+            checker
                 .semantic()
-                .expression(node_id)
-                .expect("Expected expression");
-            match checker.semantic().parent_expression(node_id) {
-                Some(Expr::Subscript(parent)) => {
-                    if expr == parent.value.as_ref() {
-                        continue;
-                    }
-                }
-                Some(Expr::Attribute(parent)) => {
-                    if expr == parent.value.as_ref() {
-                        continue;
-                    }
-                }
-                Some(Expr::Call(parent)) => {
-                    if expr == parent.func.as_ref() {
-                        continue;
-                    }
-                }
-                Some(Expr::BinOp(ast::ExprBinOp {
-                    op: Operator::BitOr,
-                    ..
-                })) => {
-                    continue;
-                }
-                _ => {}
-            }
-
-            extended_expr = Some(expr);
-            break;
-        }
-        if let Some(extended_expr) = extended_expr {
-            let edit = quote_type_expression(
-                extended_expr,
-                checker.semantic(),
-                checker.stylist(),
-                checker.locator(),
-                checker.default_string_flags(),
-            );
-            let fix = if checker.comment_ranges().intersects(extended_expr.range()) {
+                .current_expression_id()
+                .expect("Expected to be called during expression traversal"),
+            checker.semantic(),
+            checker.stylist(),
+            checker.locator(),
+            checker.default_string_flags(),
+        );
+        diagnostic.set_parent(edit.range().start());
+        if checker.settings().preview.is_enabled() {
+            let fix = if checker.comment_ranges().intersects(edit.range()) {
                 Fix::unsafe_edit(edit)
             } else {
                 Fix::safe_edit(edit)
             };
-            let mut diagnostic = checker.report_diagnostic(
-                RuntimeStringUnion {
-                    strategy: Some(Strategy::ExtendQuotes),
-                },
-                annotation_expr.range(),
-            );
-            diagnostic.set_parent(extended_expr.range().start());
             diagnostic.set_fix(fix);
-        } else {
-            // this is not fixable
-            checker.report_diagnostic(
-                RuntimeStringUnion { strategy: None },
-                annotation_expr.range(),
-            );
         }
         return;
     }
@@ -231,11 +150,13 @@ pub(crate) fn runtime_string_union_preview(
         },
         annotation_expr.range(),
     );
-    let edit = Edit::range_replacement(annotation_expr.value.to_string(), annotation_expr.range());
-    if checker.comment_ranges().intersects(annotation_expr.range()) {
-        diagnostic.set_fix(Fix::unsafe_edit(edit));
-    } else {
-        diagnostic.set_fix(Fix::safe_edit(edit));
+    if checker.settings().preview.is_enabled() {
+        let edit = unquote_annotation_string(expr, annotation_expr, checker);
+        if checker.comment_ranges().intersects(edit.range()) {
+            diagnostic.set_fix(Fix::unsafe_edit(edit));
+        } else {
+            diagnostic.set_fix(Fix::safe_edit(edit));
+        }
     }
 }
 

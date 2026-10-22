@@ -1,6 +1,45 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 2
+Added: 2
+
+--- Removed ---
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:21:30
+   |
+19 | type A = Value["Foo" | str]  # OK
+20 |
+21 | OldS = TypeVar('OldS', int | 'foo.Bar', str)  # TC010
+   |                              ^^^^^^^^^
+22 |
+23 | x: ("Foo"  # TC010 (unsafe fix)
+   |
+help: Extend quotes
+
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_3.py:26:25
+   |
+24 |       " | str" | None)
+25 |
+26 |   OldT = TypeVar("OldT", ("Foo"  # TC010 (unsafe fix)
+   |  _________________________^
+27 | |                         " | str" | None))
+   | |________________________________^
+28 |
+29 |   x: """int |
+   |
+help: Extend quotes
+
+
+
+--- Added ---
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_3.py:21:30
    |
@@ -19,6 +58,7 @@ help: Extend quotes
 22 |
    |
 
+
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_3.py:26:25
    |
@@ -28,11 +68,15 @@ TC010 [*] Invalid string member in `X | Y`-style union type
    |  _________________________^
 27 | |                         " | str" | None))
    | |________________________________^
+28 |
+29 |   x: """int |
+   |
 help: Extend quotes
    |
 25 |
    - OldT = TypeVar("OldT", ("Foo"  # TC010 (unsafe fix)
    -                         " | str" | None))
 26 + OldT = TypeVar("OldT", ("Foo | str | None"))
+27 |
    |
 note: This is an unsafe fix and may change runtime behavior

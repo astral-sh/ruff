@@ -20,3 +20,6 @@ x: ("int"  # TC010 (unsafe fix)
 
 OldT = TypeVar("OldT", ("int"  # TC010 (unsafe fix)
                         " | str" | None))
+
+x: """int |
+str""" | None  # TC010 (tricky multiline string case)

@@ -15,7 +15,7 @@ mod tests {
 
     use crate::registry::{Linter, Rule};
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TC005.py"))]
     #[test_case(Rule::RuntimeCastValue, Path::new("TC006.py"))]
@@ -171,62 +171,26 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
-    fn runtime_string_union(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
-    fn runtime_string_union_pre_py314(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("pre_py314_{}_{}", rule_code.name(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code)
-                .with_target_version(PythonVersion::PY313),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
-    fn runtime_string_union_preview(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code).with_preview_mode(),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_1.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_2.py"))]
-    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_3.py"))]
-    fn runtime_string_union_preview_pre_py314(rule_code: Rule, path: &Path) -> Result<()> {
+    #[test_case(Path::new("TC010_1.py"), PythonVersion::PY313)]
+    #[test_case(Path::new("TC010_2.py"), PythonVersion::PY313)]
+    #[test_case(Path::new("TC010_3.py"), PythonVersion::PY313)]
+    #[test_case(Path::new("TC010_1.py"), PythonVersion::PY314)]
+    #[test_case(Path::new("TC010_2.py"), PythonVersion::PY314)]
+    #[test_case(Path::new("TC010_3.py"), PythonVersion::PY314)]
+    fn runtime_string_union(path: &Path, target_version: PythonVersion) -> Result<()> {
+        let settings = settings::LinterSettings::for_rule(Rule::RuntimeStringUnion)
+            .with_target_version(target_version);
         let snapshot = format!(
-            "preview_pre_py314__{}_{}",
-            rule_code.name(),
+            "runtime-string-union_{target_version}_{}",
             path.to_string_lossy()
         );
-        let diagnostics = test_path(
-            Path::new("flake8_type_checking").join(path).as_path(),
-            &settings::LinterSettings::for_rule(rule_code)
-                .with_preview_mode()
-                .with_target_version(PythonVersion::PY313),
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_type_checking").join(path),
+            &settings,
+            &settings.clone().with_preview_mode(),
+        );
         Ok(())
     }
 
