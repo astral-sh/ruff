@@ -348,7 +348,8 @@ class C:
     # parameter in a classmethod, and is always passed positionally at runtime,
     # We therefore understand both `cls` and `__x` here as positional-only; we do not
     # emit `[invalid-legacy-positional-parameter]` on the method.
-    def __new__(cls, __x: int): ...
+    def __new__(cls, __x: int):
+        return super().__new__(cls)
 
 # error: [positional-only-parameter-as-kwarg]
 C(42).method(__x=1)
@@ -1095,11 +1096,8 @@ def _(
     f1(*args6)
     f1(*args7)  # error: [invalid-argument-type]
 
-    # The reason for two errors here is because of the two fixed elements in the tuple of `args8`
-    # which are both `int`
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    f1(*args8)
+    # Both fixed elements have the same incompatible type, so we report the error once.
+    f1(*args8)  # error: [invalid-argument-type]
 
     f1(*args9)  # error: [invalid-argument-type]
     f1(*args10)  # error: [invalid-argument-type]
@@ -1202,17 +1200,61 @@ def f21(x: tuple[int, int] | tuple[int, int, int]) -> None:
 def f22(a: int, b: int, c: int) -> None: ...
 def f23(x: tuple[int, int] | tuple[int, int, int]) -> None:
     f22(*x)  # error: [missing-argument]
+```
 
-# Later positional arguments must not be allowed to "slide left" when a longer
-# union member would still bind an incompatible tuple element. We currently
-# handle this conservatively, so this still reports the broader iterator-based
-# family of errors.
-def f24(a: int, b: int, c: int = 0) -> None: ...
-def f25(x: tuple[int] | tuple[int, str]) -> None:
+### Tuple unions followed by positional arguments
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+A tuple union retains its minimum length when followed by another positional argument. Both members
+here supply at least one element, so the call always has too many arguments:
+
+```py
+def one(a: int) -> None: ...
+def _(args: tuple[int] | tuple[int, int]) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+The minimum can include several required elements:
+
+```py
+def two(a: int, b: int) -> None: ...
+def _(args: tuple[int, int] | tuple[int, int, int]) -> None:
+    two(*args, 1)  # error: [too-many-positional-arguments] "expected 2, got 3"
+```
+
+Type aliases preserve the same minimum:
+
+```py
+type Nonempty = tuple[int] | tuple[int, int]
+
+def _(args: Nonempty) -> None:
+    one(*args, 1)  # error: [too-many-positional-arguments] "expected 1, got 2"
+```
+
+An empty tuple member or an iterable of unknown length can leave room for the later argument:
+
+```py
+def optional(a: int, b: int = 0) -> None: ...
+def _(args: tuple[()] | tuple[int]) -> None:
+    optional(*args, 1)  # no diagnostic
+
+def _(args: list[int] | tuple[int]) -> None:
+    one(*args, 1)  # no diagnostic
+```
+
+When a tuple union is followed by another positional argument, we currently combine its element
+types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
+an error for both `a` and `b`, even though only `b` can receive a `str`:
+
+```py
+def f(a: int, b: int, c: int = 0) -> None: ...
+def _(args: tuple[int] | tuple[int, str]) -> None:
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [too-many-positional-arguments]
-    f24(*x, 1)  # error: [invalid-argument-type]
+    f(*args, 1)  # error: [invalid-argument-type]
 ```
 
 ### Mixed argument and parameter containing variadic
@@ -1284,16 +1326,11 @@ def _(args: tuple[str, str, str]) -> None:
     f(*args, c=1.0)
 ```
 
-However, when there's no explicit keyword argument, the behavior remains conservative:
+If no later argument is known to supply a positional value, we still assume that the first iterable
+fills every remaining positional parameter:
 
 ```py
-# Positional argument after variable-length variadic is ambiguous
-def _(args: list[str]) -> None:
-    # error: [invalid-argument-type]
-    # error: [too-many-positional-arguments]
-    f(*args, 1.0)
-
-# Multiple variable-length variadics are also ambiguous
+# Multiple variable-length variadics are ambiguous
 def _(args1: list[str], args2: list[float]) -> None:
     # error: [invalid-argument-type]
     f(*args1, *args2)
@@ -1312,6 +1349,171 @@ def _(args: list[str]) -> None:
     # error: [invalid-argument-type]
     # error: [parameter-already-assigned]
     f(*args, **CKwargs(c=1.0))
+```
+
+### Variable-length unpacking with later positional arguments
+
+For a callable without `*args`, we leave enough parameters for later positional arguments. The
+unpacked iterable may be short enough for the call to succeed.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3649>.
+
+```py
+def f(a: str, b: str, c: float) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, 1.0)  # no diagnostic
+```
+
+Arguments on either side of the iterable reduce the number of parameters it can fill:
+
+```py
+def _(args: list[str]) -> None:
+    f(*args, "b", 1.0)  # no diagnostic
+    f("a", *args, 1.0)  # no diagnostic
+```
+
+The later argument must match the type of its parameter:
+
+```py
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type] "Expected `float`, found `Literal["c"]`"
+    f(*args, "c")
+```
+
+Even an empty iterable cannot make room for more arguments than the callable accepts:
+
+```py
+def _(args: list[str]) -> None:
+    # error: [too-many-positional-arguments] "expected 3, got 4"
+    f(*args, "a", "b", 1.0, 2.0)
+```
+
+### Variable-length unpacking with positional and keyword arguments
+
+Both positional and keyword arguments leave fewer parameters for the unpacked iterable:
+
+```py
+def f(a: str, b: float, c: int) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, 1.0, c=1)  # no diagnostic
+```
+
+Unpacking a dictionary afterwards does not prevent the positional argument from filling `b`:
+
+```py
+def g(a: str, b: float) -> None: ...
+def _(args: list[str], kwargs: dict[str, int]) -> None:
+    g(*args, 1.0, **kwargs)  # no diagnostic
+```
+
+### Variable-length unpacking followed by another unpacked argument
+
+A later unpacked tuple also needs room for its elements:
+
+```py
+def f(a: str, b: str, c: float) -> None: ...
+def _(args: list[str]) -> None:
+    f(*args, *(1.0,))  # no diagnostic
+```
+
+If the tuple fills every parameter, the earlier iterable must be empty:
+
+```py
+def _(args: list[str], tail: tuple[str, str, float]) -> None:
+    f(*args, *tail)  # no diagnostic
+```
+
+A variable-length tuple needs room for at least its required elements:
+
+```py
+def _(args: list[str], more: tuple[float, *tuple[float, ...]]) -> None:
+    f(*args, *more)  # no diagnostic
+```
+
+A later iterable with no required elements can be empty. Only the explicit `1.0` needs room here:
+
+```py
+def _(args: list[str], more: list[float]) -> None:
+    f(*args, *more, 1.0)  # no diagnostic
+```
+
+### Required tuple elements before a later positional argument
+
+The variable-length part of a tuple can be empty, leaving only its required final element:
+
+```py
+def f(a: str, b: float) -> None: ...
+def _(args: tuple[*tuple[bytes, ...], str]) -> None:
+    f(*args, 1.0)  # no diagnostic
+```
+
+That final element cannot be omitted when its type is incompatible:
+
+```py
+def _(args: tuple[*tuple[str, ...], bytes]) -> None:
+    # error: [invalid-argument-type] "Expected `str`, found `bytes`"
+    f(*args, 1.0)
+```
+
+Required elements at both ends of the tuple keep their order when the variable-length part is empty:
+
+```py
+def g(a: str, b: bytes, c: float) -> None: ...
+def _(args: tuple[str, *tuple[int, ...], bytes]) -> None:
+    g(*args, 1.0)  # no diagnostic
+```
+
+When the variable-length part supplies one element, both required final elements still follow it:
+
+```py
+def h(a: str, b: bytes, c: int, d: float) -> None: ...
+def _(args: tuple[*tuple[str, ...], bytes, int]) -> None:
+    h(*args, 1.0)  # no diagnostic
+```
+
+We still report excess arguments when the tuple's required elements cannot all fit:
+
+```py
+def _(args: tuple[str, *tuple[str, ...], float, float]) -> None:
+    # error: [too-many-positional-arguments] "expected 2, got 4"
+    f(*args, 1.0)
+```
+
+### Later positional arguments and variadic parameters
+
+When the callable has a variadic parameter, we still assume the unpacked iterable fills the named
+positional parameters. Later arguments then go to the variadic parameter:
+
+```py
+def log(fmt: str, *args: object) -> None: ...
+def _(parts: list[str]) -> None:
+    log(*parts, 1)  # no diagnostic
+```
+
+This remains a limitation: we reject calls that would succeed if the iterable were shorter. With two
+strings in `args`, `1.0` would fill `c`:
+
+```py
+def v(a: str, b: str, c: float, *rest: str) -> None: ...
+def _(args: list[str]) -> None:
+    # TODO: Accept this call.
+    # error: [invalid-argument-type] "Expected `float`, found `str`"
+    # error: [invalid-argument-type] "Expected `str`"
+    v(*args, 1.0)
+```
+
+### Positional argument between unpacked iterables
+
+We also reject the middle-argument example from <https://github.com/astral-sh/ty/issues/3649>. The
+first iterable fills four parameters, leaving `text` to fill `e`. The call would succeed if each
+iterable supplied two integers instead:
+
+```py
+def f(a: int, b: int, c: str, d: int, e: int) -> None: ...
+def _(before, text: str, after) -> None:
+    # TODO: Accept this call.
+    # error: [invalid-argument-type] "Expected `int`, found `str`"
+    f(*before, text, *after)
 ```
 
 ### Keyword argument, positional-or-keyword parameter
@@ -1992,7 +2194,7 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
 
 The keys of the mapping passed to a double-starred argument must be strings.
 
-```py
+```pyi
 from collections.abc import Mapping
 
 def f(**kwargs: int) -> None: ...
@@ -2025,7 +2227,7 @@ f(**MappingProtocol())
 
 The key can also be a custom type that inherits from `str`.
 
-```py
+```pyi
 class SubStr(str): ...
 class SubInt(int): ...
 
@@ -2037,7 +2239,7 @@ def _(kwargs1: dict[SubStr, int], kwargs2: dict[SubInt, int]) -> None:
 
 Or, it can be a type that is assignable to `str`.
 
-```py
+```pyi
 from typing import Any
 from ty_extensions._internal import Unknown
 

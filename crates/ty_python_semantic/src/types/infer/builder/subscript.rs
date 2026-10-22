@@ -33,7 +33,7 @@ use crate::types::{
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    UnionType, UnionTypeInstance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -484,8 +484,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.typevar_binding_context,
                     &mut variables,
                 );
-                let generic_context = GenericContext::from_typevar_instances(db, env, variables);
-                return Ok(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)));
+                return Ok(
+                    GenericContext::try_from_typevar_instances(db, env, variables)
+                        .map_or(Type::unknown(), |context| {
+                            Type::Dynamic(DynamicType::UnknownGeneric(context))
+                        }),
+                );
             }
             _ => {}
         }
@@ -546,7 +550,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let result = self.infer_explicit_callable_specialization(
             subscript,
             value_ty,
-            generic_context,
+            Some(generic_context),
             specialize,
         );
 
@@ -593,7 +597,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_explicit_callable_specialization(
             subscript,
             value_ty,
-            generic_context,
+            Some(generic_context),
             specialize,
         )
     }
@@ -602,7 +606,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_context: GenericContext<'db>,
+        generic_context: Option<GenericContext<'db>>,
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         let previously_allowed_paramspec = self
@@ -626,7 +630,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_context: GenericContext<'db>,
+        generic_context: Option<GenericContext<'db>>,
         specialize: &dyn Fn(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
         enum ExplicitSpecializationError {
@@ -674,7 +678,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
 
-        let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
+        let exactly_one_paramspec =
+            generic_context.is_some_and(|context| context.exactly_one_paramspec(db));
         let (type_arguments, store_inferred_type_arguments) = match slice_node {
             ast::Expr::Tuple(tuple) => {
                 if exactly_one_paramspec && !tuple.elts.is_empty() {
@@ -687,7 +692,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let mut inferred_type_arguments = vec![None; type_arguments.len()];
 
-        let typevars = generic_context.variables(db).collect::<Vec<_>>();
+        let typevars =
+            generic_context.map_or_else(Vec::new, |context| context.variables(db).collect());
         let typevars_len = typevars.len();
         let typevartuple_index = typevars
             .iter()
@@ -1218,8 +1224,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ExplicitSpecializationError::MissingTypeVars
                 | ExplicitSpecializationError::TooManyArguments,
             ) => {
-                let unknowns = generic_context
-                    .variables(db)
+                let unknowns = typevars
+                    .iter()
                     .map(|typevar| {
                         Some(if typevar.is_paramspec(db) {
                             Type::paramspec_value_callable(db, Parameters::unknown())
@@ -1565,8 +1571,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.typevar_binding_context,
                     &mut variables,
                 );
-                let generic_context = GenericContext::from_typevar_instances(db, env, variables);
-                Ok(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)))
+                Ok(
+                    GenericContext::try_from_typevar_instances(db, env, variables)
+                        .map_or(Type::unknown(), |context| {
+                            Type::Dynamic(DynamicType::UnknownGeneric(context))
+                        }),
+                )
             }
             _ => value_ty.subscript(db, env, slice_ty, expr_context),
         };
@@ -2286,14 +2296,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         let items = typed_dict.items(db);
 
                                         if let Some(field) = items.get(key) {
-                                            // Key exists but is required (i.e., can't be deleted).
+                                            // Key exists but is read-only or required (i.e.,
+                                            // can't be deleted).
                                             report_cannot_delete_typed_dict_key(
                                                 &self.context,
                                                 (&*target.slice).into(),
                                                 typed_dict,
                                                 key,
                                                 Some(field),
-                                                TypedDictDeleteErrorKind::RequiredKey,
+                                                if field.is_read_only() {
+                                                    TypedDictDeleteErrorKind::ReadOnlyKey
+                                                } else {
+                                                    TypedDictDeleteErrorKind::RequiredKey
+                                                },
                                             );
                                         } else if typed_dict
                                             .explicit_extra_items(db)
@@ -2434,9 +2449,6 @@ enum LegacyGenericContextError<'db> {
     /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
     /// We should emit a diagnostic for this, but we don't yet.
     VariadicTupleArguments,
-    /// It's valid to subscribe `Generic` or `Protocol` with this type,
-    /// but the type is not yet supported.
-    NotYetSupported,
     /// A duplicate typevar was provided.
     DuplicateTypevar(&'db str),
     /// A `TypeVarTuple` was provided but not unpacked.
@@ -2444,20 +2456,6 @@ enum LegacyGenericContextError<'db> {
     /// The generic context is available when the argument is a bound `TypeVarTuple` and is used
     /// to avoid cascading errors during recovery.
     TypeVarTupleMustBeUnpacked(Option<GenericContext<'db>>),
-}
-
-impl<'db> LegacyGenericContextError<'db> {
-    const fn into_type(self) -> Type<'db> {
-        match self {
-            LegacyGenericContextError::InvalidArgument(_)
-            | LegacyGenericContextError::VariadicTupleArguments
-            | LegacyGenericContextError::DuplicateTypevar(_)
-            | LegacyGenericContextError::TypeVarTupleMustBeUnpacked(_) => Type::unknown(),
-            LegacyGenericContextError::NotYetSupported => {
-                todo_type!("ParamSpecs and TypeVarTuples")
-            }
-        }
-    }
 }
 
 /// Validate the type arguments to `Generic[...]` or `Protocol[...]`, returning
@@ -2471,7 +2469,7 @@ fn infer_legacy_generic_subscript<'db>(
     typevar_binding_context: Option<Definition<'db>>,
     slice_ty: Type<'db>,
     origin: LegacyGenericOrigin,
-    wrap_ok: impl FnOnce(GenericContext<'db>) -> KnownInstanceType<'db>,
+    wrap_ok: impl FnOnce(Option<GenericContext<'db>>) -> KnownInstanceType<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
     match legacy_generic_class_context(
         db,
@@ -2499,15 +2497,12 @@ fn infer_legacy_generic_subscript<'db>(
         Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(generic_context)) => {
             Err(SubscriptError::new(
                 generic_context.map_or(Type::unknown(), |generic_context| {
-                    Type::KnownInstance(wrap_ok(generic_context))
+                    Type::KnownInstance(wrap_ok(Some(generic_context)))
                 }),
                 SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
             ))
         }
-        Err(
-            error @ (LegacyGenericContextError::NotYetSupported
-            | LegacyGenericContextError::VariadicTupleArguments),
-        ) => Ok(error.into_type()),
+        Err(LegacyGenericContextError::VariadicTupleArguments) => Ok(Type::unknown()),
     }
 }
 
@@ -2520,7 +2515,7 @@ fn legacy_generic_class_context<'db>(
     file_scope_id: FileScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     typevars: Type<'db>,
-) -> Result<GenericContext<'db>, LegacyGenericContextError<'db>> {
+) -> Result<Option<GenericContext<'db>>, LegacyGenericContextError<'db>> {
     let typevars_class_tuple_spec = typevars.exact_tuple_instance_spec(db);
 
     let unpacked_typevars;
@@ -2574,19 +2569,11 @@ fn legacy_generic_class_context<'db>(
             )
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(None));
-        } else if any_over_type(db, env, argument_ty, true, |inner_ty| match inner_ty {
-            Type::NominalInstance(nominal) => matches!(
-                nominal.known_class(db),
-                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
-            ),
-            _ => false,
-        }) {
-            return Err(LegacyGenericContextError::NotYetSupported);
         } else {
             return Err(LegacyGenericContextError::InvalidArgument(argument_ty));
         }
     }
-    Ok(GenericContext::from_typevar_instances(
+    Ok(GenericContext::try_from_typevar_instances(
         db,
         env,
         validated_typevars,

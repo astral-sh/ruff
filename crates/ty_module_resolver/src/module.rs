@@ -112,12 +112,22 @@ impl<'db> Module<'db> {
     ///
     /// A project or installed module with the same name may still exist on a
     /// lower-priority search path and be available at runtime.
-    pub fn is_type_check_only(self, db: &'db dyn Database) -> bool {
+    pub fn is_bundled_typing_stub(self, db: &'db dyn Database) -> bool {
         self.search_path(db)
             .is_some_and(SearchPath::is_standard_library)
             && matches!(
                 self.name(db).first_component(),
                 "_typeshed" | "typing_extensions" | "ty_extensions"
+            )
+    }
+
+    /// Returns whether this module is a known typing helper with no runtime implementation.
+    pub fn is_known_stub_only(self, db: &'db dyn Database) -> bool {
+        self.search_path(db)
+            .is_some_and(SearchPath::is_standard_library)
+            && matches!(
+                self.name(db).first_component(),
+                "_typeshed" | "ty_extensions"
             )
     }
 

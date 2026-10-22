@@ -25,9 +25,9 @@ use crate::{
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
-        UnionBuilder, UnionType,
+        Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
+        StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
+        TypingModule, UnionBuilder, UnionType,
         attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -41,7 +41,7 @@ use crate::{
         },
         context::InferContext,
         dedicated::pydantic,
-        definition_expression_type, determine_upper_bound,
+        definition_expression_type, determine_self_class,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{DataclassTransformerParams, KnownFunction},
@@ -375,17 +375,31 @@ impl<'db> StaticClassLiteral<'db> {
         // Note that if a class has an explicit legacy generic context (by inheriting from
         // `typing.Generic`), and also an implicit one (by inheriting from other generic classes,
         // specialized by typevars), the explicit one takes precedence.
-        self.pep695_generic_context(db)
-            .or_else(|| self.legacy_generic_context(db))
-            .or_else(|| self.inherited_legacy_generic_context(db))
+        //
+        // An incomplete PEP 695 parameter list can be empty, but still takes precedence over any
+        // legacy type variables in the bases.
+        if self.has_type_params(db) {
+            return self.pep695_generic_context(db);
+        }
+        if self.has_explicit_legacy_generic_base(db) {
+            return self.legacy_generic_context(db);
+        }
+        self.inherited_legacy_generic_context(db)
     }
 
+    /// Returns `true` if the class has a PEP 695 type parameter list, including an empty list
+    /// recovered from invalid syntax such as `class C[]: ...`.
     pub(crate) fn has_pep_695_type_params(self, db: &'db dyn Db) -> bool {
-        self.pep695_generic_context(db).is_some()
+        self.has_type_params(db)
     }
 
+    /// Returns the generic context declared by the class's PEP 695 type parameter list.
+    ///
+    /// Returns `None` if there is no parameter list or it has no type variables, such as an empty
+    /// list recovered from invalid syntax. Use [`Self::has_pep_695_type_params`] to check whether
+    /// the list is present regardless of its contents.
     pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        if !self.has_type_params(db) {
+        if !self.has_pep_695_type_params(db) {
             return None;
         }
         self.pep695_generic_context_inner(db)
@@ -402,23 +416,49 @@ impl<'db> StaticClassLiteral<'db> {
         let python_file = program_file.python_file(db);
         let parsed = parsed_module(db, python_file).load(db);
         let class_def_node = scope.node(db).expect_class().node(&parsed);
-        class_def_node.type_params.as_ref().map(|type_params| {
+        class_def_node.type_params.as_ref().and_then(|type_params| {
             let index = semantic_index(db, program_file);
             let definition = index.expect_single_definition(class_def_node);
             GenericContext::from_type_params(db, index, definition, type_params)
         })
     }
 
-    pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.explicit_bases(db).iter().find_map(|base| match base {
-            Type::KnownInstance(
-                KnownInstanceType::SubscriptedGeneric(generic_context)
-                | KnownInstanceType::SubscriptedProtocol(generic_context),
-            ) => Some(*generic_context),
-            _ => None,
+    /// Returns `true` if the class has a subscripted `Generic` or `Protocol` base, including an
+    /// empty subscription such as `Generic[()]`.
+    pub(crate) fn has_explicit_legacy_generic_base(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db).iter().any(|base| {
+            matches!(
+                base,
+                Type::KnownInstance(
+                    KnownInstanceType::SubscriptedGeneric(_)
+                        | KnownInstanceType::SubscriptedProtocol(_)
+                )
+            )
         })
     }
 
+    /// Returns the generic context from the first subscripted `Generic` or `Protocol` base.
+    ///
+    /// Returns `None` if no such base exists or the first such base introduces no type variables,
+    /// as with `Generic[()]`. Use [`Self::has_explicit_legacy_generic_base`] to check whether such
+    /// a base is present regardless of its contents.
+    pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        for base in self.explicit_bases(db) {
+            if let Type::KnownInstance(
+                KnownInstanceType::SubscriptedGeneric(generic_context)
+                | KnownInstanceType::SubscriptedProtocol(generic_context),
+            ) = base
+            {
+                return *generic_context;
+            }
+        }
+        None
+    }
+
+    /// Returns the generic context that the class inherits from its base classes.
+    ///
+    /// Returns `None` if no base class contributes type variables bound to this class. This
+    /// includes classes with no explicit bases or only fully specialized bases such as `Base[int]`.
     pub(crate) fn inherited_legacy_generic_context(
         self,
         db: &'db dyn Db,
@@ -1778,6 +1818,7 @@ impl<'db> StaticClassLiteral<'db> {
                         default_ty,
                         alias,
                         strict,
+                        ..
                     } => (*init, *default_ty, None, alias.as_ref(), None, *strict),
                     FieldKind::TypedDict { .. } => continue,
                 };
@@ -1990,6 +2031,7 @@ impl<'db> StaticClassLiteral<'db> {
                             db,
                             env,
                             &TypeMapping::ReplaceSelf {
+                                new_origin: SelfTypeVarOrigin::Class(self.into()),
                                 new_upper_bound: instance_ty,
                             },
                             TypeContext::default(),
@@ -2017,7 +2059,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     env,
                     name,
-                    instance_ty,
+                    self.apply_optional_specialization(db, specialization),
                     fields_iter,
                     specialization.map(|s| s.generic_context(db)),
                 )
@@ -2098,19 +2140,20 @@ impl<'db> StaticClassLiteral<'db> {
                     .own_class_member(db, env, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_undefined()
                     .map(|ty| {
+                        let self_class = determine_self_class(
+                            db,
+                            self.apply_optional_specialization(db, specialization),
+                            |base| {
+                                base.into_class()
+                                    .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
+                            },
+                        );
                         ty.apply_type_mapping(
                             db,
                             env,
                             &TypeMapping::ReplaceSelf {
-                                new_upper_bound: determine_upper_bound(
-                                    db,
-                                    env,
-                                    self.apply_optional_specialization(db, specialization),
-                                    |base| {
-                                        base.into_class()
-                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
-                                    },
-                                ),
+                                new_origin: SelfTypeVarOrigin::Class(self_class.class_literal(db)),
+                                new_upper_bound: Type::instance(db, env, self_class),
                             },
                             TypeContext::default(),
                         )
@@ -2452,7 +2495,7 @@ impl<'db> StaticClassLiteral<'db> {
                     let own_fields =
                         class.own_fields_with_class_variables(db, specialization, field_policy);
 
-                    if field_policy.is_dataclass_like() {
+                    if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                         class_variables.extend(own_fields.class_variables.iter().cloned());
                         for name in own_fields.fields.keys() {
                             class_variables.swap_remove(name);
@@ -2488,7 +2531,7 @@ impl<'db> StaticClassLiteral<'db> {
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect();
 
-        if field_policy.is_dataclass_like() {
+        if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
             // `own_fields` excludes class variables, but their declarations can still mask
             // inherited fields. Delay removal so restoring a field preserves its original slot.
             map.retain(|name, _| !class_variables.contains(name));
@@ -2679,7 +2722,7 @@ impl<'db> StaticClassLiteral<'db> {
             let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
-                if field_policy.is_dataclass_like() {
+                if field_policy.is_dataclass_like() || field_policy.is_pydantic() {
                     class_variables.push(symbol.name().clone());
                 }
                 continue;
@@ -2712,6 +2755,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut alias = None;
                 let mut converter = None;
                 let mut strict = pydantic::ConfigBoolean::Unspecified;
+                let mut frozen = false;
                 if field_policy.is_pydantic() {
                     let metadata =
                         pydantic::field_metadata(db, first_declaration, default_ty, specialization);
@@ -2719,6 +2763,7 @@ impl<'db> StaticClassLiteral<'db> {
                     init = metadata.init;
                     alias = metadata.alias;
                     strict = metadata.strict;
+                    frozen = metadata.frozen.is_enabled();
                 } else if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) =
                     default_ty
                 {
@@ -2745,6 +2790,7 @@ impl<'db> StaticClassLiteral<'db> {
                         init: init && !pydantic::is_private_attribute(symbol.name()),
                         alias,
                         strict,
+                        frozen,
                     },
                     CodeGeneratorKind::TypedDict => {
                         let is_required = if attr.is_required() {
@@ -2896,6 +2942,7 @@ impl<'db> StaticClassLiteral<'db> {
                         db,
                         env,
                         &TypeMapping::ReplaceSelf {
+                            new_origin: SelfTypeVarOrigin::Class(self.into()),
                             new_upper_bound: Type::instance(
                                 db,
                                 env,

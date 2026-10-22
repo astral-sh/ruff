@@ -1,5 +1,8 @@
 # Non-inferable constraints and unconstrained solution paths
 
+`cast_to_call` accepts either a callback or an existing `Call`. The inferred return type preserves
+the caller's type variable, so `wait` can return the call's result as `T`.
+
 When inferring the inner `T` for the call to `cast_to_call`, the outer `T` from `wait` is
 non-inferable. A satisfiable path constraining only that outer type variable must be recognized as
 unconstrained for the inferable domain; otherwise, the inferred specialization degrades to
@@ -31,8 +34,8 @@ def cast_to_call(value: Callable[[], T | Awaitable[T]] | Call[T]) -> Call[T]:
 
 def wait(value: Callable[[], T] | Call[T]) -> T:
     call = cast_to_call(value)
-    reveal_type(call)  # revealed: Call[Awaitable[T@wait] | T@wait]
-    return call.result()  # error: [invalid-return-type]
+    reveal_type(call)  # revealed: Call[T@wait]
+    return call.result()
 ```
 
 ## Rigid outer-scope relationships
@@ -114,8 +117,8 @@ constrained_identity(b"invalid")  # error: [invalid-argument-type]
 When a rigid outer variable is bounded by two receiver types, a method shared by those types should
 retain both the outer variable and the matching receiver bound. The return diagnostic should remain,
 because `Response` is not necessarily compatible with `T`, but it should report
-`Response | (T@Manager & Socket)` instead of `Response | Unknown`. Calling the shared method does
-not produce receiver argument diagnostics.
+`Response | (T@Manager & Socket)` instead of `Response | Unknown`. The receiver of the `Socket`
+method has been narrowed to `Socket`, so the call should not produce a receiver argument diagnostic.
 
 ```py
 from __future__ import annotations
@@ -137,8 +140,11 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
-        # TODO(#26680): Keep the return error, but report `Response | (T@Manager & Socket)`.
-        # error: [invalid-return-type] "expected `T@Manager`, found `Response | T@Manager`"
+        # TODO(#26680): The return context causes inference to prefer `T` for
+        # `Socket.__aenter__`'s `Self`, and the bound check rejects `T` even though the
+        # receiver is `T & Socket`.
+        # error: [invalid-argument-type]
+        # error: [invalid-return-type] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
         return await self.response.__aenter__()
 ```
 

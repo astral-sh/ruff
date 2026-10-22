@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "repositories": {
+    "ruff": {
+      "name": "astral-sh/ruff",
+      "id": 523043277
+    }
+  },
+  "rules": [
+    {
+      "repository": "ruff",
+      "on": {
+        "pull_request": ["opened", "reopened", "ready_for_review"]
+      },
+      "workflow": "pull-request-reviewers.yml"
+    }
+  ]
+}

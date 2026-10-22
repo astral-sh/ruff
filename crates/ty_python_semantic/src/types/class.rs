@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member::{ClassBodyDeclaration, Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -2306,6 +2306,13 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Names assigned through a method receiver in this class, excluding inherited names.
+    pub(super) fn own_instance_attribute_names(self, db: &'db dyn Db) -> &'db [Name] {
+        self.static_class_literal(db).map_or(&[], |(literal, _)| {
+            implicit_attributes::implicit_attribute_names(db, literal.body_scope(db))
+        })
+    }
+
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(
@@ -2826,6 +2833,8 @@ pub(crate) enum FieldKind<'db> {
         alias: Option<Box<str>>,
         /// The mode selected by Pydantic's `strict` argument.
         strict: pydantic::ConfigBoolean,
+        /// Whether `Field(frozen=True)` forbids assigning to this field.
+        frozen: bool,
     },
     /// `TypedDict` field metadata
     TypedDict {
@@ -2922,21 +2931,20 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
     /// before continuing the MRO prevents a later sibling base from supplying a different contract.
-    /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
-    /// prevent us from determining which declaration applies. Final declarations are handled by
-    /// override diagnostics instead of supplying initializer context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    /// Methods and other non-annotation declarations mask older annotations. A dynamic base
+    /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
+    /// Final declarations are handled by override diagnostics instead of supplying context.
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<ClassBodyDeclaration<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
-                ClassBase::Generic | ClassBase::Protocol => continue,
+                ClassBase::Generic
+                | ClassBase::Protocol
+                | ClassBase::Any
+                | ClassBase::Dynamic(_) => continue,
                 ClassBase::Class(base) => base,
-                // A dynamic base may supply the member, a divergent base is not yet known,
-                // and TypedDict has a special member lookup.
-                ClassBase::Any
-                | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_)
-                | ClassBase::TypedDict(_) => return None,
+                // A divergent base is not yet known, and TypedDict has a special member lookup.
+                ClassBase::Divergent(_) | ClassBase::TypedDict(_) => return None,
             };
             let (base, specialization) = base.static_class_literal(db)?;
             let scope = base.body_scope(db);
@@ -2963,10 +2971,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             } else {
                 (!declared.qualifiers.contains(TypeQualifiers::FINAL)
                     && declarations.contains_only_annotated_assignments(db))
-                .then_some(declared)
+                .then_some(ClassBodyDeclaration {
+                    member: declared,
+                    class: base,
+                })
             };
-            return declaration.map(|declaration| {
-                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+            return declaration.map(|declaration| ClassBodyDeclaration {
+                member: declaration
+                    .member
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ..declaration
             });
         }
         None

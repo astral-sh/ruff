@@ -1,10 +1,9 @@
 use std::borrow::Cow;
 
 use lsp_types::{SemanticTokens, SemanticTokensParams, Uri};
-use ruff_db::source::source_text;
 use ty_project::ProjectDatabase;
 
-use crate::db::Db;
+use crate::document::cell_range;
 use crate::server::api::semantic_tokens::generate_semantic_tokens;
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
@@ -44,16 +43,17 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         // to the lines of this cell (instead of highlighting the entire notebook).
         // Not only avoids this unnecessary work, this is also required
         // because all ranges in the response must be within this **this document**.
-        let mut cell_range = None;
-
-        if snapshot.document().is_cell()
-            && let Some(notebook_document) = db.notebook_document(file)
-            && let Some(notebook) = source_text(db, file).as_notebook()
-        {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.document().uri());
-
-            cell_range = cell_index.and_then(|index| notebook.cell_range(index));
-        }
+        //
+        // A cell without a range in the notebook's Python source, such as one that uses a cell
+        // magic, has nothing to highlight.
+        let cell_range = if snapshot.document().is_cell() {
+            let Some(range) = cell_range(db, file, snapshot.document().uri()) else {
+                return Ok(None);
+            };
+            Some(range)
+        } else {
+            None
+        };
 
         let lsp_tokens = generate_semantic_tokens(
             db,

@@ -46,7 +46,7 @@ Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus doz
 [autoflake](https://pypi.org/project/autoflake/), and more, all while executing tens or hundreds of
 times faster than any individual tool.
 
-Ruff is extremely actively developed and used in major open-source projects like:
+Ruff is actively developed and used in major open-source projects like:
 
 - [Apache Airflow](https://github.com/apache/airflow)
 - [Apache Superset](https://github.com/apache/superset)
@@ -122,8 +122,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
 Invoke Ruff directly with [`uvx`](https://docs.astral.sh/uv/):
 
 ```shell
-uvx ruff@0.17.0 check   # Lint all files in the current directory.
-uvx ruff@0.17.0 format  # Format all files in the current directory.
+uvx ruff@0.17.1 check   # Lint all files in the current directory.
+uvx ruff@0.17.1 format  # Format all files in the current directory.
 ```
 
 Or install Ruff with `uv` (recommended), `pip`, or `pipx`:
@@ -150,8 +150,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.17.0/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.17.0/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.17.1/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.17.1/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -184,7 +184,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.17.0
+  rev: v0.17.1
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -381,7 +381,7 @@ quality tools, including:
 - [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://pypi.org/project/yesqa/)
 
-For a complete enumeration of the supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
+For the complete list of supported rules, see [_Rules_](https://docs.astral.sh/ruff/rules/).
 
 ## Contributing<a id="contributing"></a>
 

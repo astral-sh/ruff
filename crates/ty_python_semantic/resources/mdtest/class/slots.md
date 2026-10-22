@@ -483,8 +483,7 @@ An annotation on an assignment in the subclass's initializer establishes the sam
 ```py
 class InitializedChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: int = 1
+        self.value: int = 1  # error: [invalid-mutable-override]
 
     def get(self) -> int:
         return self.value
@@ -498,8 +497,7 @@ As with an ordinary instance attribute, an overriding annotation replaces the in
 ```py
 class StringChild(Base):
     def __init__(self) -> None:
-        # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-        self.value: str = "valid"
+        self.value: str = "valid"  # error: [invalid-attribute-override]
 
 reveal_type(StringChild().value)  # revealed: str
 StringChild().value = 1  # error: [invalid-assignment]

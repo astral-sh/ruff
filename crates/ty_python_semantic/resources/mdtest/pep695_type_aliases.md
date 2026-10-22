@@ -812,6 +812,22 @@ class C(Generic[S]):
 x: C[A]
 ```
 
+### Qualified name
+
+Python 3.15 supports a string or `None` for the `qualname` keyword argument.
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypeAliasType
+
+Qualified = TypeAliasType("Qualified", int, qualname="Qualified")  # no diagnostic
+Invalid = TypeAliasType("Invalid", int, qualname=1)  # error: [invalid-argument-type]
+```
+
 ### Error cases
 
 #### Name is not a string literal
@@ -835,6 +851,21 @@ from typing_extensions import TypeAliasType
 # error: [mismatched-type-name] "The name passed to `TypeAliasType` must match the variable it is assigned to: Expected "IntOrStr", got "WrongName""
 IntOrStr = TypeAliasType("WrongName", Union[int, str])
 reveal_type(IntOrStr)  # revealed: TypeAliasType
+```
+
+#### Invalid keyword arguments
+
+```py
+from typing_extensions import TypeAliasType
+
+Invalid = TypeAliasType("Invalid", int, bogus=True)  # error: [unknown-argument]
+Duplicate = TypeAliasType("Duplicate", int, name="Duplicate")  # error: [parameter-already-assigned]
+Unpacked = TypeAliasType("Unpacked", int, **{"bogus": True})  # error: [unknown-argument]
+NonStringKey = TypeAliasType("NonStringKey", int, **{1: 42})  # error: [invalid-argument-type]
+Unsupported = TypeAliasType("Unsupported", int, qualname="Unsupported")  # error: [unknown-argument]
+
+def f(value: Invalid) -> None:
+    reveal_type(value)  # revealed: int
 ```
 
 #### Not a simple variable assignment
@@ -1649,6 +1680,29 @@ def copy_json(value: dict[str, JSON]):
     consume_json(copied)
 ```
 
+### Copying dictionaries with recursive callable values
+
+Copying a dictionary preserves its recursive callable value type, including callables with gradual
+parameter lists.
+
+```py
+from typing import Callable
+
+type Callback = Callable[..., Callback]
+
+def copy_callbacks(value: dict[str, Callback]):
+    copied: dict[str, Callback] = dict(value)  # no diagnostic
+```
+
+This also applies when the callable is one alternative of a recursive union.
+
+```py
+type Value = float | None | Callable[..., Value]
+
+def copy_values(value: dict[str, Value]):
+    copied: dict[str, Value] = dict(value)  # no diagnostic
+```
+
 ### Cyclic defaults
 
 ```py
@@ -1738,6 +1792,54 @@ type X = tuple[X, int]
 
 def _(x: X):
     reveal_type(x is x)  # revealed: bool
+```
+
+### Recursive aliases and their complements
+
+For a fully static alias `A`, every object is either an `A` or not an `A`. This also holds when the
+alias refers to itself: the list element type `Not[A] | A` is `object`.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+### Negated recursive aliases
+
+The list element is not an `A`. We can describe its type without expanding the recursive list each
+time it is inspected.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A]]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+### Equivalent complements of a gradual recursive alias
+
+The presence of `Any` must not change what an alias means. Negating this recursive alias is
+equivalent to negating its definition. Generic inference respects that equivalence in either
+direction.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Not
+
+type A = list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
+    assert_type(identity(x), Not[list[tuple[Any, A]]])
+    assert_type(identity(y), Not[A])
 ```
 
 ### Recursive invariant

@@ -169,12 +169,18 @@ class ConstraintSet:
         """
         Returns whether this constraint set always holds with the given inferable
         type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
         """
 
     def is_never_satisfied(self, *, inferable: TypeForm[tuple[object, ...]]) -> bool:
         """
         Returns whether this constraint set never holds with the given inferable
         type variables, without checking their declared bounds or constraints.
+
+        If the computation budget is exceeded, the result has type `bool` rather
+        than a known literal value.
         """
 
     def solutions_for(

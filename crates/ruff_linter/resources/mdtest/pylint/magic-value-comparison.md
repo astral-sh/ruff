@@ -5,6 +5,15 @@
 select = ["PLR2004"]
 ```
 
+## Bitwise inversion
+
+```py
+x = 0
+x == ~0  # error: [magic-value-comparison]
+x == ~1  # error: [magic-value-comparison]
+x == ~2  # error: [magic-value-comparison]
+```
+
 ## `sys.version` family
 
 Comparisons against `sys.version`, `sys.version_info`, and
@@ -52,4 +61,38 @@ x = 3
 
 if x >= 3:  # error: [magic-value-comparison]
     pass
+```
+
+## Allowed values
+
+```toml
+[lint]
+select = ["PLR2004"]
+
+[lint.pylint]
+allow-magic-value-types = []
+allow-magic-values = ["allowed", -2.5, 2147483648, -2147483648]
+extend-allow-magic-values = [3.5]
+```
+
+```py
+x = 0
+x == "allowed"  # no diagnostic
+x == "other"  # error: [magic-value-comparison]
+x == -2.5  # no diagnostic
+x == +2.5  # error: [magic-value-comparison]
+x == +3.5  # no diagnostic
+x == 1  # error: [magic-value-comparison]
+```
+
+Large integers work too. Allowing `2147483648` doesn't also allow `2147483648.0`.
+
+```py
+x == 2147483648  # no diagnostic
+x == -2147483648  # no diagnostic
+x == +2147483648  # no diagnostic
+x == ~2147483648  # error: [magic-value-comparison]
+x == 2147483649  # error: [magic-value-comparison]
+x == -2147483649  # error: [magic-value-comparison]
+x == 2147483648.0  # error: [magic-value-comparison]
 ```

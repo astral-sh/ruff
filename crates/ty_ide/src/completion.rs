@@ -2039,7 +2039,7 @@ fn is_type_check_only_module<'db>(
     importing_from: ProgramFile<'db>,
     module: Module<'db>,
 ) -> bool {
-    if !module.is_type_check_only(db) {
+    if !module.is_bundled_typing_stub(db) {
         return false;
     }
 

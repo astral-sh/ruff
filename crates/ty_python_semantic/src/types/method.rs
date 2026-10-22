@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -198,6 +200,16 @@ impl<'db> BoundMethodType<'db> {
             Type::Callable(callable) => Some(callable.signatures(db)),
             _ => None,
         }
+    }
+
+    /// The unbound signatures, including an inferred return type for Python functions.
+    pub(super) fn unbound_signatures_with_inferred_return_type(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<Cow<'db, CallableSignature<'db>>> {
+        self.function(db)
+            .map(|function| function.signature_with_inferred_return_type(db))
+            .or_else(|| self.unbound_signatures(db).map(Cow::Borrowed))
     }
 
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.

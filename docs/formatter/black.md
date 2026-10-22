@@ -244,8 +244,8 @@ def test(max_history):
 
 Black's unstable style applies the same formatting.
 
-There are few rare cases where Ruff can't merge the implicitly concatenated strings automatically.
-In those cases, Ruff preserves if the implicit concatenated strings are formatted over multiple lines:
+In a few rare cases, Ruff can't merge implicitly concatenated strings automatically. In those
+cases, Ruff keeps the strings on multiple lines if they were written that way:
 
 ```python
 # Input
@@ -346,7 +346,7 @@ Ruff will instead remove them:
 await [1, 2, 3]
 ```
 
-This is more consistent to the formatting of other awaited expressions: Ruff and Black both
+This is more consistent with the formatting of other awaited expressions: Ruff and Black both
 remove parentheses around, e.g., `await (1)`, only retaining them when syntactically required,
 as in, e.g., `await (x := 1)`.
 

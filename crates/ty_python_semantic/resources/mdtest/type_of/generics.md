@@ -616,19 +616,20 @@ def expects_type_p(x: type[P]):  # error: [missing-type-argument]
 def expects_type_p_of_int(x: type[P[int]]):
     pass
 
-# OK, the default specialization of `P` is assignable to `type[P[Unknown]]`
-expects_type_p(P)
+def _(bare: type[P]):  # error: [missing-type-argument]
+    # OK, the default specialization of `P` is assignable to `type[P[Unknown]]`
+    expects_type_p(bare)
 
-# Also OK, because `P[int]` and `P[str]` are both assignable to `P[Unknown]`
-expects_type_p(P[int])
-expects_type_p(P[str])
+    # Also OK, because `P[int]` and `P[str]` are both assignable to `P[Unknown]`
+    expects_type_p(P[int])
+    expects_type_p(P[str])
 
-# Also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
-expects_type_p_of_int(P)
-expects_type_p_of_int(P[int])
+    # Also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
+    expects_type_p_of_int(bare)
+    expects_type_p_of_int(P[int])
 
-# Not OK, because `P[str]` is not assignable to `P[int]`
-expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
+    # Not OK, because `P[str]` is not assignable to `P[int]`
+    expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
 ```
 
 The same principles apply when typevar defaults are used, but the results are a bit different
@@ -636,32 +637,33 @@ because the default-specialization is no longer a forgiving `Unknown` type:
 
 ```py
 @final
-class P[T = str]:
+class Q[T = str]:
     x: T
 
-def expects_type_p(x: type[P]):
+def expects_type_q(x: type[Q]):
     pass
 
-def expects_type_p_of_int(x: type[P[int]]):
+def expects_type_q_of_int(x: type[Q[int]]):
     pass
 
-def expects_type_p_of_str(x: type[P[str]]):
+def expects_type_q_of_str(x: type[Q[str]]):
     pass
 
-# OK, the default specialization is now `P[str]`, but we have the default specialization on both
-# sides, so it is assignable.
-expects_type_p(P)
+def _(bare: type[Q]):
+    # OK, the default specialization is now `Q[str]`, but we have the default specialization on both
+    # sides, so it is assignable.
+    expects_type_q(bare)
 
-# Also OK if the explicit specialization lines up with the default, in either direction:
-expects_type_p(P[str])
-expects_type_p_of_str(P)
-expects_type_p_of_str(P[str])
+    # Also OK if the explicit specialization lines up with the default, in either direction:
+    expects_type_q(Q[str])
+    expects_type_q_of_str(bare)
+    expects_type_q_of_str(Q[str])
 
-# Not OK if the specializations don't line up:
-expects_type_p(P[int])  # error: [invalid-argument-type]
-expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
-expects_type_p_of_int(P)  # error: [invalid-argument-type]
-expects_type_p_of_str(P[int])  # error: [invalid-argument-type]
+    # Not OK if the specializations don't line up:
+    expects_type_q(Q[int])  # error: [invalid-argument-type]
+    expects_type_q_of_int(Q[str])  # error: [invalid-argument-type]
+    expects_type_q_of_int(bare)  # error: [invalid-argument-type]
+    expects_type_q_of_str(Q[int])  # error: [invalid-argument-type]
 ```
 
 This also works with `ParamSpec`:
@@ -698,26 +700,26 @@ And with a `ParamSpec` that has a default:
 
 ```py
 @final
-class C[**P = [int, str]]: ...
+class D[**P = [int, str]]: ...
 
-def expects_type_c_default(f: type[C]): ...
-def expects_type_c_default_of_int(f: type[C[int]]): ...
-def expects_type_c_default_of_int_str(f: type[C[int, str]]): ...
+def expects_type_d(f: type[D]): ...
+def expects_type_d_of_int(f: type[D[int]]): ...
+def expects_type_d_of_int_str(f: type[D[int, str]]): ...
+def _(bare: type[D]):
+    expects_type_d(bare)
+    expects_type_d(D[int, str])
+    expects_type_d_of_int(D[int])
+    expects_type_d_of_int_str(bare)
+    expects_type_d_of_int_str(D[int, str])
 
-expects_type_c_default(C)
-expects_type_c_default(C[int, str])
-expects_type_c_default_of_int(C[int])
-expects_type_c_default_of_int_str(C)
-expects_type_c_default_of_int_str(C[int, str])
-
-# error: [invalid-argument-type]
-expects_type_c_default(C[int])
-# error: [invalid-argument-type]
-expects_type_c_default_of_int(C)
-# error: [invalid-argument-type]
-expects_type_c_default_of_int(C[str])
-# error: [invalid-argument-type]
-expects_type_c_default_of_int_str(C[str, int])
+    # error: [invalid-argument-type]
+    expects_type_d(D[int])
+    # error: [invalid-argument-type]
+    expects_type_d_of_int(bare)
+    # error: [invalid-argument-type]
+    expects_type_d_of_int(D[str])
+    # error: [invalid-argument-type]
+    expects_type_d_of_int_str(D[str, int])
 ```
 
 ## Upcasting a `type[]` type to a `Callable` type

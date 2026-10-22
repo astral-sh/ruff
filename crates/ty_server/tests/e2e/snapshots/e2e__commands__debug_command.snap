@@ -19,6 +19,7 @@ Settings: WorkspaceSettings {
     inlay_hints: InlayHintSettings {
         variable_types: true,
         call_argument_names: true,
+        return_types: true,
     },
     completions: CompletionSettings {
         auto_import: true,
@@ -164,6 +165,7 @@ Settings: Settings {
         },
     },
     analysis: AnalysisSettings {
+        return_type_inference: Never,
         strict_generic_narrowing: false,
         strict_equality_semantics: false,
         respect_type_ignore_comments: true,

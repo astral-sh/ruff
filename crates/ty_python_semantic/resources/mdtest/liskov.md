@@ -2274,9 +2274,9 @@ error[invalid-method-override]: Invalid override of method `__eq__`
   3 |     def __eq__(self, other: "Bad") -> bool:  # snapshot: invalid-method-override
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
     |
-   ::: stdlib/builtins.pyi:136:9
+   ::: stdlib/builtins.pyi:137:9
     |
-136 |     def __eq__(self, value: object, /) -> bool: ...
+137 |     def __eq__(self, value: object, /) -> bool: ...
     |         -------------------------------------- `object.__eq__` defined here
 info: parameter `value` has an incompatible type: `object` is not assignable to `Bad`
 info: This violates the Liskov Substitution Principle
@@ -2287,6 +2287,142 @@ help:         if not isinstance(other, Bad):
 help:             return False
 help:         return <logic to compare two `Bad` instances>
 help: 
+```
+
+## Hash method overrides
+
+Override checking on `__hash__` methods is inherently unsound in Python, because `object` declares a
+`__hash__` method of type `(self) -> int`, making it hashable, but subclasses are explicitly allowed
+to set `__hash__ = None` to disable hashability -- which is Liskov-unsafe. Thus we have to make a
+policy decision about what exactly to enforce on `__hash__` overrides. We choose to require that a
+`__hash__` method must either have type `(self) -> int` (or a subtype), or be `None` to disable
+hashing. This same contract applies to all `__hash__` methods, regardless of the signatures declared
+by base classes.
+
+```pyi
+class Hashable:
+    def __hash__(self) -> int: ...  # no diagnostic
+
+class InvalidHash:
+    def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid `__hash__` definition
+ --> src/mdtest_snippet.pyi:5:9
+  |
+5 |     def __hash__(self) -> str: ...  # snapshot: invalid-method-override
+  |         ^^^^^^^^ Expected `(() -> int) | None`
+info: type `bound method InvalidHash.__hash__() -> str` is not assignable to any element of the union `(() -> int) | None`
+info: ├── incompatible return types: `str` is not assignable to `int`
+info: └── ... omitted 1 union element without additional context
+```
+
+```pyi
+class InvalidParameters:
+    def __hash__(self, extra: int) -> int: ...  # error: [invalid-method-override]
+
+class NonCallable:
+    __hash__ = 42  # error: [invalid-method-override]
+
+class Unhashable:
+    __hash__ = None  # no diagnostic
+```
+
+## Restoring hashability
+
+A subclass can replace a narrower hash signature, disable hashing, or restore it. Inherited
+annotations do not constrain the replacement or its inferred type:
+
+```pyi
+from typing import Callable, ClassVar
+
+class NarrowHash:
+    __hash__: ClassVar[Callable[..., bool]]
+
+class Assigned(NarrowHash):
+    __hash__ = object.__hash__  # no diagnostic
+
+reveal_type(Assigned.__hash__)  # revealed: def __hash__(self) -> int
+
+class Unhashable(Assigned):
+    __hash__ = None  # no diagnostic
+
+class Restored(Unhashable):
+    def __hash__(self) -> int: ...  # no diagnostic
+```
+
+The inherited `ClassVar` still prevents assignment through an instance:
+
+```pyi
+Assigned().__hash__ = object.__hash__  # error: [invalid-attribute-access]
+```
+
+## Restoring hashability with callable objects
+
+A callable object assigned to `__hash__` keeps its own calling convention. Its `__call__` method
+receives the callable object, with no additional argument for the object being hashed:
+
+```py
+from typing import ClassVar
+
+class Unhashable:
+    __hash__: ClassVar[None] = None
+
+class HashCallable:
+    def __call__(self) -> int:
+        return 0
+
+class Restored(Unhashable):
+    __hash__ = HashCallable()  # no diagnostic
+```
+
+An incompatible return type makes the replacement invalid:
+
+```py
+class StringHashCallable:
+    def __call__(self) -> str:
+        return "invalid"
+
+class InvalidReturn(Unhashable):
+    __hash__ = StringHashCallable()  # error: [invalid-method-override]
+```
+
+## Optional hash methods
+
+A class can declare that hashing is either disabled or provided by a compatible callable. The
+callable alternative must still return an `int`:
+
+```py
+from typing import Callable, ClassVar
+
+class OptionalHash:
+    __hash__: ClassVar[Callable[..., int] | None]  # no diagnostic
+
+class InvalidOptionalHash:
+    __hash__: ClassVar[Callable[..., str] | None]  # error: [invalid-method-override]
+```
+
+## Final hash definitions
+
+Finality still prevents subclasses from replacing a hash definition, including when changing whether
+hashing is enabled:
+
+```pyi
+from typing import Final, final
+
+class Unhashable:
+    __hash__: Final = None
+
+class RestoreFinalVariable(Unhashable):
+    __hash__ = object.__hash__  # error: [override-of-final-variable]
+
+class Hashable:
+    @final
+    def __hash__(self) -> int: ...
+
+class DisableFinalMethod(Hashable):
+    __hash__ = None  # error: [override-of-final-method]
 ```
 
 ## Class-private names do not override
@@ -2368,6 +2504,22 @@ info: `Baz._asdict` is a generated method created because `Baz` inherits from `t
    |
 37 | class Baz(NamedTuple):
    |       ^^^^^^^^^^^^^^^ Definition of `Baz`
+```
+
+## Functional named tuple methods
+
+Named tuples created with the functional syntax also expose generated method signatures.
+
+```pyi
+from typing import NamedTuple
+
+Base = NamedTuple("Base", [("value", int)])
+
+class Compatible(Base):
+    def _asdict(self) -> dict[str, int]: ...  # no diagnostic
+
+class Incompatible(Base):
+    def _asdict(self) -> int: ...  # error: [invalid-method-override]
 ```
 
 ## Staticmethods and classmethods
@@ -2734,8 +2886,9 @@ reveal_type(Compatible().method(1))  # revealed: int
 
 ## Attribute value types
 
-An overriding attribute must expose a value compatible with the superclass annotation. Mutable
-narrowing is allowed by default, but incompatible readable types are rejected.
+An overriding attribute must expose a value compatible with the superclass annotation. Disabling
+`invalid-mutable-override` permits mutable narrowing, but incompatible readable types are still
+rejected.
 
 ```toml
 [rules]
@@ -2753,7 +2906,7 @@ class InitializedAttribute(AttributeBase):
     value = 1
 
 class NarrowedAttribute(AttributeBase):
-    value: bool  # Mutable narrowing is allowed by default.
+    value: bool  # no diagnostic
 ```
 
 ```snapshot
@@ -2798,11 +2951,6 @@ class InheritsAnnotation(Declared):
 An instance assignment does not narrow an inherited annotation. Overrides in later subclasses use
 the declared type, just like ordinary attribute reads and writes, whether or not the base provides a
 class default.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 class Base:
@@ -2876,15 +3024,42 @@ class PropertyChild(PropertyParent):
         return True
 ```
 
+## Inherited attribute conflicts through instance assignments
+
+An ordinary assignment in an intermediate class does not introduce a new declaration. A later
+subclass can repeat the inherited annotation without reporting its existing conflict again, whether
+the annotation appears in the class body or in a method. New conflicts are still rejected.
+
+```py
+class Base:
+    value: int
+
+class Bad(Base):
+    value: str  # error: [invalid-attribute-override]
+
+class Bridge(Bad):
+    def reset(self) -> None:
+        self.value = ""
+
+class ClassBody(Bridge):
+    value: str  # no diagnostic
+
+class Receiver(Bridge):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+
+class NewClassBodyConflict(Bridge):
+    value: bytes  # error: [invalid-attribute-override]
+
+class NewReceiverConflict(Bridge):
+    def __init__(self) -> None:
+        self.value: bytes = b""  # error: [invalid-attribute-override]
+```
+
 ## Mutable attribute narrowing
 
-When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
+The `invalid-mutable-override` rule rejects narrowing that prevents writes allowed by the
 superclass. An `Any` annotation remains gradually compatible in either direction.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 from typing import Any, ClassVar
@@ -2938,6 +3113,26 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
    |         ----- `Base.value` declared here
 ```
 
+## Receiver annotations preserve property access
+
+An annotation in a method does not make a getter-only property writable. A subclass can repeat the
+property without adding a setter.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.value: int
+
+    @property
+    def value(self) -> int:
+        return 0
+
+class Child(Base):
+    @property
+    def value(self) -> int:  # no diagnostic
+        return 1
+```
+
 ## Methods and attributes with the same name
 
 The value exposed by a method is a bound callable, not its return type. It must still preserve the
@@ -2986,6 +3181,372 @@ class CallablePropertyBase:
 class CompatibleMethod(CallablePropertyBase):
     def value(self) -> int:  # no diagnostic
         return 1
+```
+
+## Decorators preserving method binding
+
+A decorator returning `Callable` preserves method binding. Overriding its result is checked as a
+method override, including when the diagnostic is suppressed.
+
+```pyi
+from collections.abc import Callable
+
+def decorate(function: Callable[..., int]) -> Callable[..., int]: ...
+
+class Base:
+    @decorate
+    def value(self) -> int: ...
+
+class Compatible(Base):
+    def value(self) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> str: ...  # error: [invalid-method-override]
+
+class Suppressed(Base):
+    def value(self) -> str: ...  # ty: ignore[invalid-method-override]
+```
+
+## Callable attributes and method binding
+
+A `Callable` attribute does not bind a receiver. When a method overrides it, we compare the bound
+method's signature with the attribute's callable type. The same comparison applies when an attribute
+overrides a method.
+
+The optional mutable-override rule is disabled here to isolate read compatibility.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class AttributeBase:
+    value: Callable[[int], int]
+
+class CompatibleMethod(AttributeBase):
+    def value(self, x: int, /) -> int: ...  # no diagnostic
+
+class IncompatibleMethod(AttributeBase):
+    def value(self) -> int: ...  # error: [invalid-attribute-override]
+
+class MethodBase:
+    def value(self, x: int, /) -> int: ...
+
+class CompatibleAttribute(MethodBase):
+    value: Callable[[int], int]  # no diagnostic
+
+class IncompatibleAttribute(MethodBase):
+    value: Callable[[], int]  # error: [invalid-attribute-override]
+```
+
+## Methods replacing inferred callable defaults
+
+A class assigned to an unannotated attribute is callable without binding a receiver. An overriding
+method must accept the constructor's arguments, even though the inferred attribute has no declared
+read or write type.
+
+```pyi
+class Float:
+    def __init__(self, num: int, dps: int) -> None: ...
+
+class FloatBaseType:
+    cast_nocheck = Float
+
+class Compatible(FloatBaseType):
+    def cast_nocheck(self, num: int, dps: int) -> Float: ...  # no diagnostic
+
+class Incompatible(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # error: [invalid-method-override]
+
+class Suppressed(FloatBaseType):
+    def cast_nocheck(self, num: int) -> Float: ...  # ty: ignore[invalid-method-override]
+```
+
+The same check applies to an instance with a `__call__` method. Ordinary inferred defaults still do
+not impose a declared attribute contract.
+
+```pyi
+class Callback:
+    def __call__(self, value: int) -> int: ...
+
+class Base:
+    callback = Callback()
+    value = 0
+
+class Compatible(Base):
+    def callback(self, value: int) -> int: ...  # no diagnostic
+    value = "text"  # no diagnostic
+
+class Incompatible(Base):
+    def callback(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Methods replacing final callable attributes
+
+Finality and signature compatibility are independent checks. A method that replaces a final callable
+attribute violates finality even if its signature is compatible. An incompatible signature also
+produces a method override diagnostic, including when the finality diagnostic is suppressed.
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # error: [override-of-final-variable]
+
+class Incompatible(Base):
+    # error: [override-of-final-variable]
+    # error: [invalid-method-override]
+    def value(self) -> int: ...
+
+class SuppressedFinality(Base):
+    # error: [invalid-method-override]
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable]
+
+class SuppressedSignature(Base):
+    # error: [override-of-final-variable]
+    def value(self) -> int: ...  # ty: ignore[invalid-method-override]
+
+class SuppressedBoth(Base):
+    def value(self) -> int: ...  # ty: ignore[override-of-final-variable, invalid-method-override]
+```
+
+## Disabling final variable override checks
+
+Disabling finality diagnostics still leaves signature compatibility checks enabled.
+
+```toml
+[rules]
+override-of-final-variable = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+from typing import Final
+
+class Base:
+    value: Final[Callable[[int], int]]
+
+class Compatible(Base):
+    def value(self, x: int, /) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> int: ...  # error: [invalid-method-override]
+```
+
+## Inactive method declarations
+
+An inactive declaration does not provide an override contract. An incompatible override is reported
+against the ancestor that defines the inherited method.
+
+```pyi
+class Bdb:
+    def set_trace(self, frame: object) -> None: ...
+
+class Pdb(Bdb):
+    if False:
+        def set_trace(self) -> None: ...
+
+class Debugger(Pdb):
+    # error: [invalid-method-override] "Definition is incompatible with `Bdb.set_trace`"
+    def set_trace(self) -> None: ...
+```
+
+## Descriptors exposing callables
+
+A descriptor that returns a callable has an attribute contract. We compare the value returned by
+`__get__` with the overriding bound method, and report incompatible attribute overrides.
+
+```pyi
+from collections.abc import Callable
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> Callable[[int], int]: ...
+
+class Base:
+    value = Descriptor()
+
+class Compatible(Base):
+    def value(self, x: int) -> int: ...  # no diagnostic
+
+class Incompatible(Base):
+    def value(self) -> int: ...  # error: [invalid-attribute-override]
+
+class Suppressed(Base):
+    def value(self) -> int: ...  # ty: ignore[invalid-attribute-override]
+```
+
+## Suppressing mixed override diagnostics
+
+Suppressing an incompatible attribute or property override does not expose a method override
+diagnostic for the same definition.
+
+```py
+from collections.abc import Callable
+
+class AttributeBase:
+    value: Callable[[int], int]
+
+class Incompatible(AttributeBase):
+    def value(self) -> int:  # error: [invalid-attribute-override]
+        return 0
+
+class Suppressed(AttributeBase):
+    def value(self) -> int:  # ty: ignore[invalid-attribute-override]
+        return 0
+
+class PropertyBase:
+    @property
+    def value(self) -> Callable[[int], int]:
+        return lambda x: x
+
+class SuppressedProperty(PropertyBase):
+    def value(self) -> int:  # ty: ignore[invalid-property-type-override]
+        return 0
+```
+
+## Suppressing decorated overrides
+
+A cached class method exposes attributes in addition to its call signature. Replacing it with an
+ordinary class method is an attribute override; suppressing that diagnostic does not expose a method
+override diagnostic.
+
+```py
+from functools import cache
+
+class Base:
+    @classmethod
+    @cache
+    def value(cls) -> int:
+        return 0
+
+class Child(Base):
+    @classmethod
+    def value(cls) -> int:  # ty: ignore[invalid-attribute-override]
+        return 0
+```
+
+## Disabling attribute override rules
+
+Disabling attribute and property override rules does not move their diagnostics to the method
+override rule. Incompatible overrides of ordinary methods are still rejected.
+
+```toml
+[rules]
+invalid-attribute-override = "ignore"
+invalid-property-type-override = "ignore"
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class Base:
+    attribute: Callable[[int], int]
+    @property
+    def property(self) -> Callable[[int], int]: ...
+    def method(self, x: int) -> int: ...
+
+class Child(Base):
+    def attribute(self) -> int: ...  # no diagnostic
+    def property(self) -> int: ...  # no diagnostic
+    def method(self) -> int: ...  # error: [invalid-method-override]
+
+class Compatible(Base):
+    def attribute(self, x: int) -> int: ...  # no diagnostic
+    def property(self, x: int) -> int: ...  # no diagnostic
+    def method(self, x: int) -> int: ...  # no diagnostic
+```
+
+Methods replacing inferred callable defaults still have their signatures checked.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Incompatible(CallableBase):
+    def make(self) -> Factory: ...  # error: [invalid-method-override]
+```
+
+## Disabling method override rules
+
+Disabling method override diagnostics still leaves attribute and property checks enabled.
+
+```toml
+[rules]
+invalid-method-override = "ignore"
+```
+
+```pyi
+from collections.abc import Callable
+
+class Base:
+    attribute: Callable[[int], int]
+    @property
+    def property(self) -> Callable[[int], int]: ...
+    def method(self, x: int) -> int: ...
+
+class Child(Base):
+    def attribute(self) -> int: ...  # error: [invalid-attribute-override]
+    def property(self) -> int: ...  # error: [invalid-property-type-override]
+    def method(self) -> int: ...  # no diagnostic
+```
+
+This also disables signature checking for methods that replace inferred callable defaults.
+
+```pyi
+class Factory:
+    def __init__(self, value: int) -> None: ...
+
+class CallableBase:
+    make = Factory
+
+class Child(CallableBase):
+    def make(self) -> Factory: ...  # no diagnostic
+```
+
+Finality checks remain enabled even when the overriding method has an incompatible signature.
+
+```pyi
+from typing import Final
+
+class FinalBase:
+    value: Final[Callable[[int], int]]
+
+class IncompatibleFinal(FinalBase):
+    def value(self) -> int: ...  # error: [override-of-final-variable]
+```
+
+## Disabled overrides do not hide other rules
+
+An override can violate different contracts from multiple bases. Disabling the rule for the first
+conflict does not suppress an enabled rule for a later conflict.
+
+```toml
+[rules]
+invalid-property-type-override = "ignore"
+invalid-mutable-override = "ignore"
+```
+
+```pyi
+class PropertyBase:
+    @property
+    def value(self) -> int: ...
+
+class AttributeBase:
+    value: str
+
+class Child(PropertyBase, AttributeBase):
+    value: bytes  # error: [invalid-attribute-override]
 ```
 
 ## Class variables replacing properties
@@ -3199,6 +3760,25 @@ def check(slot: Slots, child: ReceiverDeclaration) -> None:
     reveal_type(child.value)  # revealed: int
 ```
 
+An inferred instance attribute is still a valid target for `@override`. If it is stored in a slot,
+replacing it with a getter-only property removes the ability to write it.
+
+```py
+from typing_extensions import override
+
+class InferredSlot:
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value = 0
+
+class ReadOnlySlot(InferredSlot):
+    @property
+    @override
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
+```
+
 An annotation whose type implements `__get__` can also describe an instance-stored descriptor
 object. Ordinary reads include that object alongside its getter result. Replacing this storage with
 a slot preserves those possible reads.
@@ -3251,16 +3831,45 @@ class PropertyChild(Base):
         return ""
 ```
 
+## Attribute contracts inherited from `object`
+
+Typeshed declares metadata such as `__module__: str` on `object`. Normally, this annotation would
+permit instance writes. But instances of `object` do not provide instance-attribute storage, so
+writability of these attributes is not guaranteed by `object`. This means that slotted subclasses
+can assign this metadata in their class bodies without violating an inherited write contract.
+
+```py
+class Slotted:
+    __slots__ = ()
+    __module__ = "custom"  # no diagnostic
+    __doc__ = None  # no diagnostic
+    __annotations__ = {}  # no diagnostic
+```
+
+Overrides must still preserve the declared read types.
+
+```py
+class InvalidRead:
+    __module__: int = 0  # error: [invalid-attribute-override]
+```
+
+Explicit declarations on user-defined bases still constrain overrides of `__module__`.
+
+```py
+from typing import Literal
+
+class Declared:
+    __module__: str = "custom"
+
+class Narrowed(Declared):
+    __module__: Literal["custom"] = "custom"  # error: [invalid-mutable-override]
+```
+
 ## Descriptor setters cannot narrow accepted writes
 
 An explicit descriptor annotation establishes its own write type. Its setter must accept every value
 that the inherited attribute accepts. The same restriction applies when assigning the subclass to a
 protocol with that writable attribute.
-
-```toml
-[rules]
-invalid-mutable-override = "error"
-```
 
 ```py
 from typing import Protocol
@@ -3338,4 +3947,184 @@ class Base:
 class Child(Base):
     @property
     def value(self) -> str: ...  # error: [invalid-property-type-override]
+```
+
+## Attributes declared in methods
+
+An annotation on `self.value` declares an attribute just like an annotation in the class body. A
+subclass can repeat the same annotation.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.value: int = 0
+
+class Same(Base):
+    def __init__(self) -> None:
+        self.value: int = 1  # no diagnostic
+```
+
+An incompatible type is rejected. Narrowing to `bool` also violates the mutable-override rule: code
+using the base class can assign any `int` to the attribute.
+
+```py
+class Incompatible(Base):
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class Narrow(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+An assignment without an annotation does not change the inherited type.
+
+```py
+class Initialized(Base):
+    def __init__(self) -> None:
+        self.value = True  # no diagnostic
+```
+
+An annotation in the subclass's body is also checked against the base's constructor annotation.
+
+```py
+class ClassBodyOverride(Base):
+    value: str  # error: [invalid-attribute-override]
+```
+
+Repeating an incompatible annotation in a further subclass does not report the same error again.
+
+```py
+class Grandchild(Incompatible):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+```
+
+## Method annotations overriding class-body declarations
+
+An annotation on `self.value` must also be compatible with an annotation in the base class body.
+
+```py
+class Base:
+    value: int
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+## Method annotations alongside slots and class defaults
+
+A slot or an unannotated class default does not hide an explicit receiver annotation. The receiver
+annotation must preserve the inherited attribute's type.
+
+```py
+class Base:
+    value: int
+
+class Slotted(Base):
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class WithDefault(Base):
+    value = 0
+
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class CompatibleSlot(Base):
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+
+class CompatibleDefault(Base):
+    value = 0
+
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+```
+
+When the class body declares the attribute, we check that declaration once, even if a method repeats
+the annotation.
+
+```py
+class AnnotatedDefault(Base):
+    value: str = ""  # error: [invalid-attribute-override]
+
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+```
+
+Further subclasses can repeat the receiver declaration without reporting its existing conflict
+again. The unannotated default does not replace the receiver declaration's contract when the class
+is used as a base. Overrides with a different incompatible type still produce an error.
+
+```py
+class RepeatedReceiver(WithDefault):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+
+class RepeatedClassBody(WithDefault):
+    value: str  # no diagnostic
+
+class RepeatedDefault(WithDefault):
+    value = 0  # no diagnostic
+
+class NewReceiverConflict(WithDefault):
+    def __init__(self) -> None:
+        self.value: bytes = b""  # error: [invalid-attribute-override]
+
+class NewClassBodyConflict(WithDefault):
+    value: bytes  # error: [invalid-attribute-override]
+```
+
+## Method annotations overriding initialized class attributes
+
+The diagnostic points to the inherited declaration even when it includes a class-level default.
+
+```py
+class Base:
+    value: int = 0
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: str = ""  # snapshot: invalid-attribute-override
+```
+
+```snapshot
+error[invalid-attribute-override]: Invalid override of attribute `value`
+ --> src/mdtest_snippet.py:6:9
+  |
+2 |     value: int = 0
+  |     ----- `Base.value` declared here
+3 |
+4 | class Child(Base):
+5 |     def __init__(self) -> None:
+6 |         self.value: str = ""  # snapshot: invalid-attribute-override
+  |         ^^^^^^^^^^ Type `str` is not assignable to inherited type `int`
+```
+
+## Slots preserve inherited declarations
+
+A subclass can add a slot for an inherited attribute. Assignments to that slot do not replace the
+inherited annotation, so an override must still accept the declared type.
+
+```py
+class Base:
+    value: int
+
+class Slotted(Base):
+    __slots__ = ("value",)
+
+    def set_untyped(self, value):
+        self.value = value
+
+    def set_typed(self, value: int):
+        self.value = value
+
+class Child(Slotted):
+    value: str  # error: [invalid-attribute-override]
 ```

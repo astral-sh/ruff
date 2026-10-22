@@ -30,7 +30,7 @@ use crate::module_name::ModuleName;
 use crate::path::{ModuleDirectory, ModuleDirectoryEntry, ModulePath, SearchPath};
 
 use super::{
-    CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
+    CandidateOrigin, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
     ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
     StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
     search_paths, stub_package_index,
@@ -509,7 +509,7 @@ struct CachedCandidate {
     path: ModulePath,
     module: ResolvedModule,
     py_typed: PyTyped,
-    precedence: CandidatePrecedence,
+    origin: CandidateOrigin,
 
     /// Stores the result of the symlink policy for enumeration. This prevents
     /// unnecessary cache invalidation of a `ModuleListing`, since the symlink
@@ -529,7 +529,7 @@ impl CachedCandidate {
             enumeration_allowed: candidate.directory.enumeration_allowed(db),
             module: candidate.module,
             py_typed: candidate.py_typed,
-            precedence: candidate.precedence,
+            origin: candidate.origin,
         }
     }
 
@@ -542,7 +542,7 @@ impl CachedCandidate {
             ),
             module: self.module,
             py_typed: self.py_typed,
-            precedence: self.precedence,
+            origin: self.origin,
         }
     }
 }

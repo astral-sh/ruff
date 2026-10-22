@@ -170,7 +170,7 @@ class SupportsTrunc(Protocol):
 
 # The second and third overload could technically be combined, but splitting
 # them works better with some type checkers.
-class SupportsGet(Protocol[_KT_contra, _VT_co]):  # type: ignore[misc] # Covariant type as parameter
+class SupportsGet(Protocol[_KT_contra, _VT_co]):  # type: ignore[misc]  # ty:ignore[invalid-protocol]  # Covariant type as parameter
     @overload
     def get(self, key: _KT_contra, /) -> _VT_co | None: ...
     @overload
@@ -188,6 +188,18 @@ class SupportsItems(Protocol[_KT_co, _VT_co]):
 class SupportsKeysAndGetItem(Protocol[_KT, _VT_co]):
     def keys(self) -> Iterable[_KT]: ...
     def __getitem__(self, key: _KT, /) -> _VT_co: ...
+
+class SupportsKeysAndGet(Protocol[_KT, _VT_co]):  # type: ignore[misc]  # ty:ignore[invalid-protocol]  # Covariant type as parameter
+    def keys(self) -> Iterable[_KT]: ...
+
+    @overload
+    def get(self, key: _KT, /) -> _VT_co | None: ...
+    @overload
+    def get(  # pyrefly: ignore[invalid-variance]
+        self, key: _KT, default: _VT_co, /  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    ) -> _VT_co: ...
+    @overload
+    def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
 
 # stable
 class SupportsGetItem(Protocol[_KT_contra, _VT_co]):

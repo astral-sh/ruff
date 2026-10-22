@@ -3869,7 +3869,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                     .write_str("typing.Protocol")?;
-                generic_context.display(db).fmt_detailed(f)?;
+                DisplayOptionalGenericContext {
+                    generic_context: generic_context.as_ref(),
+                    db,
+                    hide_unused_self: false,
+                }
+                .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
@@ -3877,7 +3882,12 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Generic))
                     .write_str("typing.Generic")?;
-                generic_context.display(db).fmt_detailed(f)?;
+                DisplayOptionalGenericContext {
+                    generic_context: generic_context.as_ref(),
+                    db,
+                    hide_unused_self: false,
+                }
+                .fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {

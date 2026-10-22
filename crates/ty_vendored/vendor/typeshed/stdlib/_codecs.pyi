@@ -13,7 +13,7 @@ class _EncodingMap:
 
 _DecodeCharMap: TypeAlias = SupportsGetItem[int, str | int | None]
 _EncodeCharMap: TypeAlias = SupportsGetItem[int, bytes | int | None] | _EncodingMap
-_Handler: TypeAlias = Callable[[UnicodeError], tuple[str | bytes, int]]
+_Handler: TypeAlias = Callable[[UnicodeEncodeError | UnicodeDecodeError | UnicodeTranslateError], tuple[str | bytes, int]]
 _SearchFunction: TypeAlias = Callable[[str], codecs.CodecInfo | None]
 
 def register(search_function: _SearchFunction, /) -> None:
