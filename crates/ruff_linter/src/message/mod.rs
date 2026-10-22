@@ -5,6 +5,7 @@ use std::path::Path;
 
 use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
+use strum::IntoEnumIterator;
 
 use ruff_db::diagnostic::render::{
     AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer,
@@ -12,7 +13,7 @@ use ruff_db::diagnostic::render::{
 };
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, FileResolver, Input, LintName,
-    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    RuleMetadata, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -23,7 +24,7 @@ use ruff_text_size::{TextRange, TextSize};
 pub(crate) use sarif::SarifEmitter;
 
 use crate::Fix;
-use crate::registry::Rule;
+use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::settings::types::OutputFormat;
 
 mod grouped;
@@ -166,6 +167,28 @@ impl FileResolver for EmitterContext<'_> {
     fn current_directory(&self) -> &std::path::Path {
         crate::fs::get_cwd()
     }
+}
+
+fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
+    Rule::iter()
+        .map(|rule| {
+            let name = LintName::of(rule.into());
+            let linter = rule.noqa_code().and_then(|code| {
+                Linter::parse_code(&code.to_string()).map(|(linter, _)| linter.name())
+            });
+
+            (
+                name,
+                RuleMetadata {
+                    name,
+                    summary: rule.message_formats()[0],
+                    description: rule.explanation().into(),
+                    help_url: rule.url(),
+                    linter,
+                },
+            )
+        })
+        .collect()
 }
 
 /// Display format for [`Diagnostic`]s.

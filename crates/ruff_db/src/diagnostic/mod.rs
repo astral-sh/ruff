@@ -1418,6 +1418,21 @@ pub enum HyperlinkMode {
     Never,
 }
 
+/// Descriptive information about a lint rule, independent of any particular diagnostic.
+#[derive(Clone, Debug)]
+pub struct RuleMetadata {
+    /// The canonical name of the rule.
+    pub name: LintName,
+    /// A short description of what the rule detects.
+    pub summary: &'static str,
+    /// The rule's full documentation.
+    pub description: Cow<'static, str>,
+    /// The URL of the rule's documentation.
+    pub help_url: String,
+    /// The linter that defines the rule, if applicable.
+    pub linter: Option<&'static str>,
+}
+
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
