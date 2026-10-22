@@ -321,6 +321,7 @@ impl<'db> SameEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(db, operator)? {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if !self.supports_domain_narrowing() => {
@@ -938,6 +939,7 @@ impl<'db> ProjectedEnumComparison<'db> {
         operator: ComparisonOperator,
     ) -> Option<ComparisonResult<'db>> {
         match self.truthiness(operator) {
+            Truthiness::Uninhabited => Some(ComparisonResult::CanNarrow(Type::Never)),
             Truthiness::AlwaysTrue => Some(ComparisonResult::AlwaysTrue),
             Truthiness::AlwaysFalse => Some(ComparisonResult::AlwaysFalse),
             Truthiness::Ambiguous if operator.condition_expects_equality(branch) => {

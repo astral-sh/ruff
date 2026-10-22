@@ -19,14 +19,14 @@ use lsp_types::{
 use lsp_types::{ExitNotification, Notification};
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf, SystemVirtualPath};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::ChangeEvent;
+use ty_project::watch::{ChangeEvent, DeletedKind};
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
+    ScriptEnvironmentAvailability, UseUv, UvSyncChanges, UvWorkspace,
 };
 
 use index::DocumentError;
@@ -776,11 +776,11 @@ impl Session {
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
-                self.use_uv,
             )
         } else {
-            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
-        };
+            ProjectMetadata::discover(workspace_directory, &system)
+        }
+        .map(|metadata| metadata.with_use_uv(self.use_uv));
 
         let (mut metadata, discovery_result) =
             match metadata.context("Failed to discover project configuration") {
@@ -811,7 +811,15 @@ impl Session {
                     .apply_configuration_files(&system)
                     .context("Failed to apply configuration files"),
             )
-            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
+            .and_then(|()| {
+                if metadata.use_uv().workspace_discovery_enabled() {
+                    let workspace = UvWorkspace::discover(workspace_directory, &system);
+                    metadata
+                        .apply_uv_workspace(&system, workspace)
+                        .context("Failed to discover uv workspace")?;
+                }
+                ProjectDatabase::fallible(metadata.clone(), system.clone())
+            });
 
         let mut db = project.unwrap_or_else(|err| {
             tracing::error!(
@@ -1958,7 +1966,6 @@ impl OpenDocumentHandle {
         }
     }
 
-    #[expect(unused)]
     fn file_path(&self) -> Option<&AnySystemPath> {
         match self {
             Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
@@ -2084,21 +2091,29 @@ impl OpenDocumentHandle {
     }
 
     fn update_in_databases(&self, session: &mut Session, client: &Client) {
-        let path = self.notebook_or_file_path();
-        let (containing_workspace, is_virtual, changes) = match path {
-            AnySystemPath::System(system_path) => (
-                session.workspaces().for_path(system_path),
-                false,
-                [ChangeEvent::file_content_changed(system_path.clone())],
-            ),
-            AnySystemPath::SystemVirtual(virtual_path) => (
-                None,
-                true,
-                [ChangeEvent::ChangedVirtual(virtual_path.clone())],
-            ),
+        let change = match self.notebook_or_file_path() {
+            AnySystemPath::System(system_path) => {
+                ChangeEvent::file_content_changed(system_path.clone())
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                ChangeEvent::ChangedVirtual(virtual_path.clone())
+            }
         };
+        self.apply_change_in_databases(session, client, change);
+    }
 
-        if containing_workspace.is_some() || is_virtual {
+    fn apply_change_in_databases(
+        &self,
+        session: &mut Session,
+        client: &Client,
+        change: ChangeEvent,
+    ) {
+        let path = self.notebook_or_file_path();
+        let changes = [change];
+        let is_external = matches!(path, AnySystemPath::System(system_path)
+            if session.workspaces().for_path(system_path).is_none());
+
+        if !is_external {
             // A containing workspace determines the project for a system file, while virtual
             // documents select a single, arbitrary project. Neither selection depends on import
             // search paths, so update only the selected database.
@@ -2135,80 +2150,114 @@ impl OpenDocumentHandle {
     /// This can return an error when the document does not exist in the
     /// session index.
     pub(crate) fn close(&self, session: &mut Session, client: &Client) -> crate::Result<bool> {
-        let is_cell = self.is_cell();
-        let path = self.notebook_or_file_path();
-
         let removed_document = session.index_mut().close_document(&self.key())?;
 
-        // Close the text or notebook file in the database but skip this
-        // step for cells because closing a cell doesn't close its notebook.
-        let requires_clear_diagnostics = if is_cell {
-            true
-        } else {
-            let db = session.project_db_mut(path);
+        let should_clear_diagnostics = match self.file_path() {
+            // Closing a notebook cell clears its diagnostics but leaves its notebook open.
+            None => true,
+            Some(AnySystemPath::System(path)) => {
+                let is_deleted = self.close_system_file(session, client, path, &removed_document);
 
-            match path {
-                AnySystemPath::System(system_path) => {
-                    if let Some(file) = db.files().try_system(db, system_path) {
-                        db.project().close_file(db, file);
+                // For non-virtual files, we clear diagnostics if:
+                //
+                // 1. The file was deleted before it was closed
+                // 2. The file does not belong to any workspace e.g., opening a random file from
+                //    outside the workspace because closing it acts like the file doesn't exist
+                // 3. The diagnostic mode is set to open-files only
+                is_deleted
+                    || session.workspaces().for_path(path).is_none()
+                    || session
+                        .global_settings()
+                        .diagnostic_mode()
+                        .is_open_files_only()
+            }
+            Some(AnySystemPath::SystemVirtual(path)) => {
+                self.close_virtual_file(session, path);
 
-                        // In case we preferred the language given by the Client
-                        // over the one detected by the file extension, remove the file
-                        // from the project to handle cases where a user changes the language
-                        // of a file (which results in a didClose and didOpen for the same path but with different languages).
-                        if removed_document.language_id().is_some()
-                            && system_path
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_none()
-                        {
-                            db.project().remove_file(db, file);
-                        }
-
-                        // Restore file and script membership from the saved contents. Discarding
-                        // unsaved script metadata can bring a file back into the project when
-                        // `exclude-scripts` is enabled. Also request synchronization for saved
-                        // metadata changes that were skipped while the editor overlay was present.
-                        self.update_in_databases(session, client);
-                    } else {
-                        // This can only fail when the path is a directory or it doesn't exists but the
-                        // file should exists for this handler in this branch. This is because every
-                        // close call is preceded by an open call, which ensures that the file is
-                        // interned in the lookup table (`Files`).
-                        tracing::warn!("Salsa file does not exists for {}", system_path);
-                    }
-
-                    // For non-virtual files, we clear diagnostics if:
-                    //
-                    // 1. The file does not belong to any workspace e.g., opening a random file from
-                    //    outside the workspace because closing it acts like the file doesn't exists
-                    // 2. The diagnostic mode is set to open-files only
-                    session.workspaces().for_path(system_path).is_none()
-                        || session
-                            .global_settings()
-                            .diagnostic_mode()
-                            .is_open_files_only()
-                }
-                AnySystemPath::SystemVirtual(virtual_path) => {
-                    if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
-                        db.project().close_file(db, virtual_file.file());
-                        virtual_file.close(db);
-                        // Bump the file's revision back to using the file system's revision.
-                        virtual_file.sync(db);
-                    } else {
-                        tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
-                    }
-
-                    // Always clear diagnostics for virtual files, as they don't really exist on disk
-                    // which means closing them is like deleting the file.
-                    true
-                }
+                // Always clear diagnostics for virtual files, as they don't really exist on disk
+                // which means closing them is like deleting the file.
+                true
             }
         };
 
         session.bump_revision();
 
-        Ok(requires_clear_diagnostics)
+        Ok(should_clear_diagnostics)
+    }
+
+    /// Closes a system file and returns whether it was deleted from disk.
+    fn close_system_file(
+        &self,
+        session: &mut Session,
+        client: &Client,
+        system_path: &SystemPath,
+        removed_document: &Document,
+    ) -> bool {
+        let db = session.project_db_mut(self.notebook_or_file_path());
+
+        // The editor can delete the file before closing it and before its watcher
+        // reports the deletion. Check disk state after removing the editor overlay.
+        let is_deleted = db
+            .system()
+            .path_metadata(system_path)
+            .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound);
+
+        if let Some(file) = db.files().try_system(db, system_path) {
+            db.project().close_file(db, file);
+
+            // In case we preferred the language given by the Client
+            // over the one detected by the file extension, remove the file
+            // from the project to handle cases where a user changes the language
+            // of a file (which results in a didClose and didOpen for the same path but with different languages).
+            if removed_document.language_id().is_some()
+                && system_path
+                    .extension()
+                    .and_then(PySourceType::try_from_extension)
+                    .is_none()
+            {
+                db.project().remove_file(db, file);
+            }
+
+            if is_deleted {
+                // A content change leaves missing files in the project index, allowing
+                // workspace diagnostics to report an I/O error until the watcher fires.
+                self.apply_change_in_databases(
+                    session,
+                    client,
+                    ChangeEvent::Deleted {
+                        path: system_path.to_path_buf(),
+                        kind: DeletedKind::File,
+                    },
+                );
+            } else {
+                // Restore file and script membership from the saved contents. Discarding
+                // unsaved script metadata can bring a file back into the project when
+                // `exclude-scripts` is enabled. Also request synchronization for saved
+                // metadata changes that were skipped while the editor overlay was present.
+                self.update_in_databases(session, client);
+            }
+        } else {
+            // This can only fail when the path is a directory or it doesn't exists but the
+            // file should exists for this handler in this branch. This is because every
+            // close call is preceded by an open call, which ensures that the file is
+            // interned in the lookup table (`Files`).
+            tracing::warn!("Salsa file does not exists for {}", system_path);
+        }
+
+        is_deleted
+    }
+
+    fn close_virtual_file(&self, session: &mut Session, virtual_path: &SystemVirtualPath) {
+        let db = session.project_db_mut(self.notebook_or_file_path());
+
+        if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
+            db.project().close_file(db, virtual_file.file());
+            virtual_file.close(db);
+            // Bump the file's revision back to using the file system's revision.
+            virtual_file.sync(db);
+        } else {
+            tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+        }
     }
 }
 

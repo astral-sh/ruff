@@ -117,11 +117,9 @@ struct SarifDriver<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    full_description: Option<SarifMessage<'a>>,
+    full_description: SarifMessage<'a>,
     help: SarifMessage<'a>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    help_uri: Option<String>,
+    help_uri: String,
     id: &'a str,
     properties: SarifProperties<'a>,
     short_description: SarifMessage<'a>,
@@ -150,9 +148,9 @@ impl<'a> From<(&'a str, SarifLevel)> for SarifRule<'a> {
             short_description: SarifMessage {
                 text: rule.message_formats()[0].into(),
             },
-            full_description: rule
-                .explanation()
-                .map(|text| SarifMessage { text: text.into() }),
+            full_description: SarifMessage {
+                text: rule.explanation().into(),
+            },
             help: SarifMessage {
                 text: rule.message_formats()[0].into(),
             },

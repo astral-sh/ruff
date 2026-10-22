@@ -77,6 +77,8 @@ mod builder;
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
+mod expression_truthiness;
+pub(crate) use expression_truthiness::TruthinessAnalyzer;
 #[cfg(test)]
 mod tests;
 
@@ -809,7 +811,23 @@ impl<'db> InferScope<'db> {
     }
 }
 
-/// The type context for a given expression, namely the type annotation
+/// The kind of type context constraint being provided.
+#[derive(
+    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+enum TypeContextKind {
+    /// A direct declared type annotation.
+    #[default]
+    Declared,
+
+    /// The declared upper bound of a type variable.
+    ///
+    /// Note that unlike a declared type, the upper bound of a type variable acts only as a validity
+    /// constraint, and does not provide a preferred specialization during generic call inference.
+    Validity,
+}
+
+/// The type context for a given expression, e.g., the type annotation
 /// in an annotated assignment.
 ///
 /// Knowing the outer type context when inferring an expression can enable
@@ -819,11 +837,26 @@ impl<'db> InferScope<'db> {
 )]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    kind: TypeContextKind,
 }
 
 impl<'db> TypeContext<'db> {
-    pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+    pub(crate) fn declared(annotation: Option<Type<'db>>) -> Self {
+        Self {
+            annotation,
+            kind: TypeContextKind::Declared,
+        }
+    }
+
+    pub(crate) fn validity(annotation: Type<'db>) -> Self {
+        Self {
+            annotation: Some(annotation),
+            kind: TypeContextKind::Validity,
+        }
+    }
+
+    pub(crate) fn is_declared(self) -> bool {
+        matches!(self.kind, TypeContextKind::Declared)
     }
 
     /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -839,9 +872,11 @@ impl<'db> TypeContext<'db> {
     }
 
     fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
-        Self {
-            annotation: self.annotation.map(f),
-        }
+        self.with_annotation(self.annotation.map(f))
+    }
+
+    pub(crate) fn with_annotation(self, annotation: Option<Type<'db>>) -> Self {
+        Self { annotation, ..self }
     }
 
     fn is_typealias(&self) -> bool {
@@ -877,7 +912,7 @@ impl<'db> TypeContext<'db> {
 
 impl<'db> From<Type<'db>> for TypeContext<'db> {
     fn from(annotation: Type<'db>) -> Self {
-        Self::new(Some(annotation))
+        Self::declared(Some(annotation))
     }
 }
 
@@ -1051,6 +1086,11 @@ struct ScopeInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// For function bodies, this type represents the inferred return type, a union of all types inferred
+    /// for the expressions in reachable `return` statements, and possibly `None` if control flow can
+    /// reach the end of the function. This type is `Never` if the function cannot return.
+    return_type: Option<Type<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -1058,6 +1098,7 @@ impl<'db> ScopeInference<'db> {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
+                return_type: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
@@ -1087,6 +1128,10 @@ impl<'db> ScopeInference<'db> {
         }
 
         if let Some(extra) = self.extra.as_deref_mut() {
+            if let Some(return_type) = &mut extra.return_type {
+                *return_type =
+                    return_type.cycle_normalized(db, env, previous_inference.return_type(), cycle);
+            }
             normalize_collection_use_constraints(
                 db,
                 env,
@@ -1096,6 +1141,13 @@ impl<'db> ScopeInference<'db> {
         }
 
         self
+    }
+
+    pub(super) fn return_type(&self) -> Type<'db> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.return_type)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
@@ -1475,7 +1527,7 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
-    /// Input types for failed decorator applications that are checked after inference.
+    /// Input types for decorator applications that need validation after inference.
     deferred_decorator_calls: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
@@ -1913,14 +1965,7 @@ fn widen_comparison_truthiness(
                 .and_then(|overrides| overrides.get(expression))
                 .copied()
                 .unwrap_or_else(|| previous_fallback(*expression));
-            (
-                *expression,
-                if truthiness == previous_truthiness {
-                    truthiness
-                } else {
-                    Truthiness::Ambiguous
-                },
-            )
+            (*expression, truthiness.union(previous_truthiness))
         })
         .collect()
 }
@@ -1963,9 +2008,9 @@ struct ExpressionInferenceExtra<'db> {
     /// `AlwaysFalse`, but its value type must still include objects returned by the first comparison.
     ///
     /// The same distinction matters for `and`/`or`, but their operands have separate expression
-    /// nodes with inferred types. [`crate::reachability::analyze_condition_expression`] can
-    /// reconstruct their condition truthiness by recursively visiting those operands, without
-    /// relying on the compound expression's value type.
+    /// nodes with inferred types. [`TruthinessAnalyzer`] can reconstruct their condition
+    /// truthiness by recursively visiting those operands, without relying on the compound
+    /// expression's value type.
     ///
     /// A comparison chain instead has one `ExprCompare` node with the operands and operators.
     /// In `x < 1 < 0`, neither `x < 1` nor `1 < 0` has its own expression node, so their result

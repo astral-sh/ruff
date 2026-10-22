@@ -181,6 +181,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     [
       "file://<temp_dir>/src :: **",
       "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/venv/<site-packages> :: **",
       "file://<temp_dir>/old :: **"
     ]
     "#);
@@ -219,6 +220,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     [
       "file://<temp_dir>/src :: **",
       "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/venv/<site-packages> :: **",
       "file://<temp_dir>/old :: **"
     ]
     "#);
@@ -231,6 +233,7 @@ fn picks_up_edits_to_unwatched_pth_files() -> Result<()> {
     [
       "file://<temp_dir>/src :: **",
       "file://<temp_dir>/venv :: **",
+      "file://<temp_dir>/venv/<site-packages> :: **",
       "file://<temp_dir>/new :: **"
     ]
     "#);

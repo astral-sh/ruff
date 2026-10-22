@@ -269,8 +269,8 @@ print( 'hello' )
 ````
 
 Any number of code blocks may be contained within a matching pair of `off` and
-`on` HTML comments, and any `off`  comment *without* a matching `on` comment
-will implicitly cover the remaining portion of the document.
+`on` HTML comments. An `off` comment *without* a matching `on` comment covers
+the rest of the document.
 
 The Ruff formatter will also recognize HTML comments from [blacken-docs][],
 `<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
@@ -303,7 +303,7 @@ support needs to be explicitly included by adding it to `types_or`:
 ```yaml title=".pre-commit-config.yaml"
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.9
+    rev: v0.17.2
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
@@ -661,7 +661,7 @@ while the stable formatting breaks _after_ the call or subscript.
 
 ## Sorting imports
 
-Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,
+Currently, the Ruff formatter does not sort imports. To sort imports and format,
 call the Ruff linter and then the formatter:
 
 ```shell

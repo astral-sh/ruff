@@ -318,6 +318,8 @@ class NonCallableMock(Base, Any):
         """
 
     return_value: Any
+    """The value to be returned when the mock is called."""
+
     side_effect: Any
     called: bool
     call_count: int
@@ -1012,14 +1014,14 @@ if sys.version_info >= (3, 13):
     class ThreadingMixin(Base):
         DEFAULT_TIMEOUT: Final[float | None] = None
 
-        def __init__(self, /, *args: Any, timeout: float | None | _SentinelObject = ..., **kwargs: Any) -> None: ...
+        def __init__(self, /, *args: Any, timeout: float | _SentinelObject | None = ..., **kwargs: Any) -> None: ...
         # Same as `NonCallableMock.reset_mock.`
         def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None:
             """
             See :func:`.Mock.reset_mock()`
             """
 
-        def wait_until_called(self, *, timeout: float | None | _SentinelObject = ...) -> None:
+        def wait_until_called(self, *, timeout: float | _SentinelObject | None = ...) -> None:
             """Wait until the mock object is called.
 
             `timeout` - time to wait for in seconds, waits forever otherwise.

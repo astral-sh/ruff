@@ -11,7 +11,7 @@ from typing import TypeAlias, overload
 # At runtime, listing submodules in __all__ without them being imported is
 # valid, and causes them to be included in a star import. See #6523
 
-__all__ = [  # noqa: F822  # Undefined names in __all__
+__all__ = [  # ruff: ignore[undefined-export]  # Undefined names in __all__
     "base64mime",  # pyright: ignore[reportUnsupportedDunderAll]
     "charset",  # pyright: ignore[reportUnsupportedDunderAll]
     "encoders",  # pyright: ignore[reportUnsupportedDunderAll]
@@ -33,7 +33,7 @@ __all__ = [  # noqa: F822  # Undefined names in __all__
 
 # Definitions imported by multiple submodules in typeshed
 _ParamType: TypeAlias = str | tuple[str | None, str | None, str]  # noqa: Y047
-_ParamsType: TypeAlias = str | None | tuple[str, str | None, str]  # noqa: Y047
+_ParamsType: TypeAlias = str | tuple[str, str | None, str] | None  # noqa: Y047
 
 @overload
 def message_from_string(s: str) -> Message[str, str]:

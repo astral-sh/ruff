@@ -138,14 +138,14 @@ class Invalid:
     @lossy_decorator
     def lossy2(self): ...  # error: [invalid-explicit-override]
 
-# TODO: all overrides in this class should cause us to emit *Liskov* violations,
-# but not `@override` violations
+# These members override an inherited name,
+# but violate its Liskov contract.
 class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
-    def foo(self) -> int: ...
+    def foo(self) -> int: ...  # error: [invalid-property-type-override]
     @override
-    def my_property1(self) -> int: ...
+    def my_property1(self) -> int: ...  # error: [invalid-property-type-override]
 
     # Class and static methods can override each other when "bound" signatures match,
     # but here, we deliberately add a new parameter to introduce a Liskov violation
@@ -654,7 +654,7 @@ class Factory:
     def __call__(self, cls: type[Grandparent]) -> Grandparent: ...
 
 class Parent(Grandparent):
-    make = classmethod(Factory())
+    make = classmethod(Factory())  # error: [invalid-attribute-override]
 
 class Child(Parent):
     @classmethod
@@ -968,6 +968,15 @@ class WrappedMethodWithOverrideBranch(BaseProperty):
         def method(self) -> int:
             return 3
 
+class ConditionalMethods(BaseProperty):
+    if coinflip():
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 2
+
+    else:
+        def method(self) -> int:  # error: [missing-override-decorator]
+            return 3
+
 class WrappedInvalidExplicitOverrideWithUndecoratedBranch:
     if coinflip():
         @wrap(BaseProperty.method)
@@ -1031,6 +1040,54 @@ class StubAbstractInterface(ABC):
 
 class StubAbstractImplementation(StubAbstractInterface):
     def method(self) -> int: ...  # error: [missing-override-decorator]
+```
+
+## Missing `@override` decorator on property accessors
+
+We report missing decorators on all property accessors together, even though the accessors share a
+name.
+
+```toml
+[rules]
+missing-override-decorator = "error"
+```
+
+```py
+from typing_extensions import override
+
+class Parent:
+    attr: int
+
+class Child(Parent):
+    @property
+    def attr(self) -> int:  # error: [missing-override-decorator]
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # error: [missing-override-decorator]
+        pass
+```
+
+Decorating or suppressing one accessor does not hide diagnostics on the others.
+
+```py
+class PartiallyDecorated(Parent):
+    @property
+    @override
+    def attr(self) -> int:  # no diagnostic
+        return 1
+
+    @attr.setter
+    def attr(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+    @attr.deleter
+    def attr(self) -> None:  # ty: ignore[missing-override-decorator]
+        pass
 ```
 
 ## Missing `@override` decorator on Python 3.11

@@ -385,10 +385,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.is_rule_enabled(Rule::AmbiguousVariableName) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
-                    if !checker.semantic.current_scope().kind.is_class() {
-                        if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                            flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
-                        }
+                    if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
+                        flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
                 _ => {}
@@ -1321,6 +1319,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryRegularExpression) {
                 ruff::rules::unnecessary_regular_expression(checker, call);
+            }
+            if checker.is_rule_enabled(Rule::UnnecessaryRegularExpressionCompile) {
+                ruff::rules::unnecessary_regular_expression_compile(checker, call);
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);

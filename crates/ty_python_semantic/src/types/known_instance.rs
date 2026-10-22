@@ -222,12 +222,18 @@ pub enum KnownInstanceType<'db> {
     /// The type of `Protocol[T]`, `Protocol[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Protocol` is represented by [`super::SpecialFormType::Protocol`], not this type.
-    SubscriptedProtocol(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Protocol[()]`, which has no type variables and is distinct from
+    /// an unsubscripted `Protocol`.
+    SubscriptedProtocol(Option<GenericContext<'db>>),
 
     /// The type of `Generic[T]`, `Generic[U, S]`, etc -- usually only found in a class's bases list.
     ///
     /// Note that unsubscripted `Generic` is represented by [`super::SpecialFormType::Generic`], not this type.
-    SubscriptedGeneric(GenericContext<'db>),
+    ///
+    /// The context is `None` for `Generic[()]`, which has no type variables and is distinct from an
+    /// unsubscripted `Generic`.
+    SubscriptedGeneric(Option<GenericContext<'db>>),
 
     /// A single instance of `typing.TypeVar`
     TypeVar(TypeVarInstance<'db>),
@@ -308,7 +314,9 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
     match known_instance {
         KnownInstanceType::SubscriptedProtocol(context)
         | KnownInstanceType::SubscriptedGeneric(context) => {
-            walk_generic_context(db, context, visitor);
+            if let Some(context) = context {
+                walk_generic_context(db, context, visitor);
+            }
         }
         KnownInstanceType::TypeVar(typevar) => {
             visitor.visit_type_var_type(db, typevar);
@@ -418,9 +426,18 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Literal),
-            Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
-                .map(Self::Annotated),
+            Self::Annotated(ty) => {
+                // Keep the runtime Annotated object when its wrapped type diverges. The wrapped
+                // type is still nested: TypeOf can make it another runtime Annotated object.
+                let inner = ty.recursive_type_normalized_impl(db, env, div, true);
+                if nested {
+                    inner.map(Self::Annotated)
+                } else {
+                    Some(Self::Annotated(
+                        inner.unwrap_or_else(|| InternedType::new(db, div)),
+                    ))
+                }
+            }
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::TypeGenericAlias),
@@ -600,6 +617,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::GeneralizeLocalTypes(_)
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
             },
@@ -625,6 +643,9 @@ impl<'db> KnownInstanceType<'db> {
                     wrapper.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
+            KnownInstanceType::Field(field) => Type::KnownInstance(KnownInstanceType::Field(
+                field.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )),
             KnownInstanceType::FunctoolsPartial(partial) => {
                 Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -660,7 +681,6 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
             | KnownInstanceType::Deprecated(_)
-            | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
             | KnownInstanceType::ConstraintSetSolution(_)
             | KnownInstanceType::GenericContext(_)
@@ -735,12 +755,45 @@ pub struct FieldInstance<'db> {
     /// The mode selected by Pydantic's `strict` argument.
     #[returns(copy)]
     pub strict: ConfigBoolean,
+
+    /// Whether Pydantic's `frozen` argument makes this field immutable.
+    #[returns(copy)]
+    pub frozen: ConfigBoolean,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let default_type = self
+            .default_type(db)
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        // The converter's input is a callable parameter, so it is contravariant.
+        let converter = self.converter(db).map(|(input_ty, output_ty)| {
+            (
+                input_ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor),
+                output_ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
+        });
+        Self::new(
+            db,
+            default_type,
+            self.init(db),
+            self.kw_only(db),
+            self.alias(db),
+            converter,
+            self.strict(db),
+            self.frozen(db),
+        )
+    }
+
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -782,6 +835,7 @@ impl<'db> FieldInstance<'db> {
             self.alias(db),
             converter,
             self.strict(db),
+            self.frozen(db),
         ))
     }
 }

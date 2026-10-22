@@ -192,7 +192,7 @@ class FieldStorage:
     length: int
     done: int
     list: _list[Any] | None
-    value: None | bytes | _list[Any]
+    value: bytes | _list[Any] | None
     def __init__(
         self,
         fp: IO[Any] | None = None,

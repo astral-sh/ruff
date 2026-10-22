@@ -1,0 +1,18 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: x_cell_tokens
+---
+{
+  "data": [
+    0,
+    0,
+    1,
+    5,
+    1,
+    0,
+    4,
+    1,
+    11,
+    0
+  ]
+}

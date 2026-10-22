@@ -72,13 +72,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/function.md
 57 |     # parameter in a classmethod, and is always passed positionally at runtime,
 58 |     # We therefore understand both `cls` and `__x` here as positional-only; we do not
 59 |     # emit `[invalid-legacy-positional-parameter]` on the method.
-60 |     def __new__(cls, __x: int): ...
-61 | 
-62 | # error: [positional-only-parameter-as-kwarg]
-63 | C(42).method(__x=1)
-64 | # error: [positional-only-parameter-as-kwarg]
-65 | C.class_method(__x="1")
-66 | C.static_method("x", __x=42)  # fine
+60 |     def __new__(cls, __x: int):
+61 |         return super().__new__(cls)
+62 | 
+63 | # error: [positional-only-parameter-as-kwarg]
+64 | C(42).method(__x=1)
+65 | # error: [positional-only-parameter-as-kwarg]
+66 | C.class_method(__x="1")
+67 | C.static_method("x", __x=42)  # fine
 ```
 
 # Diagnostics
@@ -171,9 +172,9 @@ info: A parameter can only be positional-only if it precedes all positional-or-k
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.method`
-  --> src/mdtest_snippet.py:63:14
+  --> src/mdtest_snippet.py:64:14
    |
-63 | C(42).method(__x=1)
+64 | C(42).method(__x=1)
    |              ^^^^^
 info: Method signature here
   --> src/mdtest_snippet.py:49:9
@@ -185,9 +186,9 @@ info: Method signature here
 
 ```
 error[positional-only-parameter-as-kwarg]: Positional-only parameter 2 (`__x`) passed as keyword argument of bound method `C.class_method`
-  --> src/mdtest_snippet.py:65:16
+  --> src/mdtest_snippet.py:66:16
    |
-65 | C.class_method(__x="1")
+66 | C.class_method(__x="1")
    |                ^^^^^^^
 info: Method signature here
   --> src/mdtest_snippet.py:51:9

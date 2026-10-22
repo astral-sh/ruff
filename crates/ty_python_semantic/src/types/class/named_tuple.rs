@@ -9,7 +9,8 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
         KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
+        PropertyInstanceType, SelfTypeVarOrigin, Signature, SubclassOfType, Type, TypeContext,
+        TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
@@ -30,15 +31,18 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     name: &str,
-    instance_ty: Type<'db>,
+    class: ClassType<'db>,
     fields: impl Iterator<Item = NamedTupleField<'db>>,
     inherited_generic_context: Option<GenericContext<'db>>,
 ) -> Option<Type<'db>> {
+    let instance_ty = Type::instance(db, env, class);
+    let origin = SelfTypeVarOrigin::Class(class.class_literal(db));
     match name {
         "__new__" => {
             // __new__(cls, field1, field2, ...) -> Self
             let self_typevar = BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
             );
@@ -96,6 +100,7 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             // _replace(self, *, field1=..., field2=...) -> Self
             let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                 db,
+                origin,
                 instance_ty,
                 BindingContext::Synthetic(env.program(db)),
             ));
@@ -398,6 +403,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                                 db,
                                 env,
                                 &TypeMapping::ReplaceSelf {
+                                    new_origin: SelfTypeVarOrigin::Class(self.into()),
                                     new_upper_bound: instance_ty,
                                 },
                                 TypeContext::default(),
@@ -412,7 +418,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
             db,
             env,
             name,
-            instance_ty,
+            ClassType::NonGeneric(self.into()),
             self.fields(db).iter().cloned(),
             None,
         );
@@ -430,6 +436,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     db,
                     env,
                     &TypeMapping::ReplaceSelf {
+                        new_origin: SelfTypeVarOrigin::Class(self.into()),
                         new_upper_bound: instance_ty,
                     },
                     TypeContext::default(),

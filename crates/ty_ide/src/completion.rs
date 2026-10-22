@@ -27,6 +27,7 @@ use ty_python_semantic::{
     types::{CycleDetector, KnownClass, Type},
 };
 
+use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
 use crate::symbols::QueryPattern;
@@ -1104,32 +1105,14 @@ impl<'m> ContextCursor<'m> {
     }
 
     fn suppress_class_parentheses(&self, model: &SemanticModel<'_>) -> bool {
-        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
-
-        self.covering_node.ancestors().any(|node| match node {
-            ast::AnyNodeRef::StmtAnnAssign(stmt) => {
-                contains(&stmt.annotation)
-                    || (stmt.value.as_deref().is_some_and(contains)
-                        && model.is_type_alias_annotation(&stmt.annotation))
-            }
-            ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
-            ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
-            ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
-            ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
-                type_param.bound.as_deref().is_some_and(contains)
-                    || type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::TypeParamTypeVarTuple(type_param) => {
-                type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::TypeParamParamSpec(type_param) => {
-                type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                handler.type_.as_deref().is_some_and(contains)
-            }
-            _ => false,
-        })
+        is_in_annotation_expression(model, &self.covering_node, self.range)
+            || self.covering_node.ancestors().any(|node| match node {
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                    .type_
+                    .as_deref()
+                    .is_some_and(|expr| expr.range().contains_range(self.range)),
+                _ => false,
+            })
     }
 
     /// Returns true when the tokens indicate that the definition of a new
@@ -2056,7 +2039,7 @@ fn is_type_check_only_module<'db>(
     importing_from: ProgramFile<'db>,
     module: Module<'db>,
 ) -> bool {
-    if !module.is_type_check_only(db) {
+    if !module.is_bundled_typing_stub(db) {
         return false;
     }
 
@@ -9926,7 +9909,10 @@ from .<CURSOR>
 ",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -9966,6 +9952,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -9991,7 +9978,10 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @"import");
+        assert_snapshot!(builder.build().snapshot(), @"
+        import
+        bar
+        ");
     }
 
     #[test]
@@ -10004,6 +9994,7 @@ from .imp<CURSOR>
         assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
+        sub1
         ");
     }
 
@@ -10642,6 +10633,64 @@ collabc<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @"collections.abc");
+    }
+
+    #[test]
+    fn auto_import_namespace_descendants() {
+        let builder = CursorTest::builder()
+            .source("main.py", "NamespaceSymbol<CURSOR>")
+            .source("acme/reports.py", "class NamespaceSymbolLocal: ...")
+            .completion_test_builder()
+            .skip_builtins()
+            .imports()
+            .module_names();
+
+        assert_snapshot!(builder.build().snapshot(), @"NamespaceSymbolLocal :: acme.reports :: from acme.reports import NamespaceSymbolLocal");
+    }
+
+    #[test]
+    fn auto_import_namespace_descendant_but_not_namespace_package() {
+        // TODO: We should in fact suggest the namespace package itself (not just its descendants);
+        // this was merely a scope cut in the original delivery of namespace package support.
+
+        let builder = CursorTest::builder()
+            .source("main.py", "acme<CURSOR>")
+            .source("acme/reports.py", "")
+            .completion_test_builder();
+
+        let completions = builder.build();
+        completions.not_contains("acme").contains("acme.reports");
+    }
+
+    #[test]
+    fn import_statement_completes_split_namespace_children() {
+        let builder = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "from acme import <CURSOR>")
+            .source("acme/reports.py", "")
+            .site_packages("acme/widgets.py", "")
+            .completion_test_builder()
+            .skip_builtins()
+            .imports()
+            .module_names()
+            .skip_auto_import()
+            .skip_dunders();
+
+        assert_snapshot!(builder.build().snapshot(), @"
+        reports :: <no import required> :: <no import edit>
+        widgets :: <no import required> :: <no import edit>
+        ");
+    }
+
+    #[test]
+    fn import_completion_triggers_desperate_module_resolution() {
+        let builder = CursorTest::builder()
+            .source("scripts/main.py", "from package import <CURSOR>")
+            .source("scripts/package/__init__.py", "")
+            .source("scripts/package/child.py", "")
+            .completion_test_builder()
+            .skip_auto_import();
+        builder.build().contains("child");
     }
 
     #[test]

@@ -3,6 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod annotation_expression;
 mod call_hierarchy;
 mod code_action;
 mod completion;

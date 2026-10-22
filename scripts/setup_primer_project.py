@@ -4,7 +4,11 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.analysis]
+# return-type-inference = "always"
+#
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -21,12 +25,19 @@
 # [tool.uv]
 # no-build = true
 # no-binary-package = ["mypy-primer"]
-# build-constraint-dependencies = ["setuptools==84.0.0"]
+# build-constraint-dependencies = [
+#     { requirement = "setuptools==84.0.0", hashes = [
+#         "sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670",
+#         "sha256:f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73",
+#     ] },
+# ]
 # # This is the default for ad hoc use. Historical ecosystem reproduction must
 # # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
 # # revision and project Python version, as shown in the module docstring.
 # # `exclude-newer` still constrains mypy-primer's registry dependencies.
 # exclude-newer = "P7D"
+# require-build-hashes = true
+# preview-features = ["build-dependency-hashes", "missing-exclude-newer-package-lock"]
 #
 # [tool.uv.sources]
 # # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
@@ -88,7 +99,7 @@ class _FormatMap:
 def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
     ty_cmd = project.ty_cmd
     if ty_cmd is None:
-        ty_cmd = "{ty} check {paths}" if project.paths else "{ty} check"
+        ty_cmd = "{ty} check {paths}" if project.paths is not None else "{ty} check"
     assert "{ty}" in ty_cmd
     ty_cmd = ty_cmd.format_map(_FormatMap(ty=ty_binary, paths=project.paths))
     return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
@@ -102,7 +113,7 @@ def clone_project(
     location: str, target_dir: Path, revision: str | None, *, full_history: bool
 ) -> None:
     depth = [] if full_history else ["--depth", "1"]
-    if revision and not full_history:
+    if revision is not None and not full_history:
         # Fetch the requested commit without first downloading the default branch.
         run("git", "init", str(target_dir))
         run("git", "remote", "add", "origin", location, cwd=target_dir)
@@ -112,7 +123,7 @@ def clone_project(
         run("git", "clone", *depth, location, str(target_dir))
         checkout = revision
 
-    if checkout:
+    if checkout is not None:
         run("git", "checkout", checkout, "--", cwd=target_dir)
 
     # Initialize only the selected revision's submodules. Force checkout so that
@@ -195,7 +206,7 @@ def main() -> None:
         install_base += f" --exclude-newer {shlex.quote(args.exclude_newer)}"
 
     # Run custom install command if the project defines one (matching primer's setup())
-    if project.install_cmd:
+    if project.install_cmd is not None:
         assert "{install}" in project.install_cmd
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
@@ -203,7 +214,7 @@ def main() -> None:
         subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
-    if project.deps:
+    if project.deps is not None:
         deps_cmd_parts = shlex.split(install_base) + project.deps
         print(f"Installing dependencies: {', '.join(project.deps)}")
         subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)

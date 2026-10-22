@@ -128,7 +128,7 @@ where
     if let Some(code) = rule.noqa_code() {
         diagnostic.set_secondary_code(SecondaryCode::new(code.to_string()));
     }
-    diagnostic.set_documentation_url(rule.url());
+    diagnostic.set_documentation_url(Some(rule.url()));
 
     diagnostic
 }

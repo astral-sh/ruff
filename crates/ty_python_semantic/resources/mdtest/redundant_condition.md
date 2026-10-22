@@ -100,7 +100,7 @@ help: Did you mean to use `any()`?
 14 +     if any(filtered):  # snapshot: redundant-condition
 15 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 And testing an awaitable without awaiting it:
@@ -1460,7 +1460,7 @@ help: Replace with `wut(...)`
 3 + if wut(...):  # snapshot: redundant-condition
 4 |     pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 
 
 warning[redundant-condition]: Function `wuttt` is always truthy
@@ -1475,7 +1475,7 @@ help: Replace with `await wuttt(...)`
 8 +     if await wuttt(...):  # snapshot: redundant-condition
 9 |         pass
   |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ### Call fixes for overloaded functions
@@ -1511,7 +1511,7 @@ help: Replace with `await asynchronous(...)`
 11 +     if await asynchronous(...):  # snapshot: redundant-condition
 12 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 If an overload returns a non-awaitable value, calling and awaiting the function might be invalid. We
@@ -1543,7 +1543,7 @@ help: Replace with `mixed(...)`
 21 +     if mixed(...):  # snapshot: redundant-condition
 22 |         pass
    |
-note: This is a display-only fix and is likely to be incorrect
+note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
 ```
 
 ### Call fixes for synchronous functions with gradual or `Never` return types
@@ -3137,6 +3137,57 @@ def conditional_branch(value: int, select: bool, enabled: bool):
     # error: [redundant-condition-strict] "Condition `value is not None` is always true"
     if value is not None if select else enabled:
         print(value)
+```
+
+## Uninhabited operands
+
+A comparison or call cannot finish evaluating an operand of type `Never`, even if its result type is
+`bool`. Such expressions do not make an enclosing condition always true or always false.
+
+```py
+from typing import Callable, Never
+
+def comparisons(value, never: Never):
+    if value in never or value:
+        pass
+    if value != never or not value:
+        pass
+
+def calls(never: Never, flag: bool, predicate: Callable[[object], bool]):
+    if predicate(never) or (flag and never):
+        pass
+```
+
+The same applies to a call with a fixed return type, including when `not` tests its result while
+computing a value:
+
+```py
+from typing import Literal
+
+def always_true(value: object) -> Literal[True]:
+    return True
+
+def fixed_return_type(never: Never):
+    if always_true(never):
+        pass
+    negated = not always_true(never)
+```
+
+## Short-circuiting before an uninhabited operand
+
+A condition can still finish by short-circuiting before the uninhabited operand. We report its fixed
+outcome when that is the only way evaluation can finish.
+
+```py
+from typing import Never
+
+def short_circuit(never: Never, flag: bool):
+    # error: [redundant-condition-strict] "Condition `flag or bool(never)` is always true"
+    if flag or bool(never):
+        pass
+    # error: [redundant-condition-strict] "Condition `flag and bool(never)` is always false"
+    if flag and bool(never):
+        pass
 ```
 
 ## Compound conditions with mixed value types

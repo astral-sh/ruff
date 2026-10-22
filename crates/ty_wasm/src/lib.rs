@@ -565,7 +565,7 @@ impl Workspace {
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation: comp
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                 }
             })
             .collect())
@@ -584,6 +584,7 @@ impl Workspace {
             &InlayHintSettings {
                 variable_types: true,
                 call_argument_names: true,
+                return_types: true,
             },
         );
 
@@ -756,7 +757,7 @@ impl Workspace {
                     label: sig.label,
                     documentation: sig
                         .documentation
-                        .map(|docstring| docstring.render_plaintext()),
+                        .map(|docstring| docstring.render(MarkupKind::PlainText)),
                     parameters,
                     active_parameter: sig.active_parameter.and_then(|p| u32::try_from(p).ok()),
                 }
@@ -1633,6 +1634,11 @@ impl System for WasmSystem {
         // The in-memory file system does not support hard links, so canonical paths uniquely
         // identify files.
         Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
+    }
+
+    fn is_file_open(&self, path: &FilePath) -> bool {
+        path.as_system_path()
+            .is_some_and(|path| self.fs.is_file(path))
     }
 
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {

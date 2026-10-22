@@ -695,6 +695,42 @@ class Array(Generic[*Ts]):
 
 ## Functions
 
+### Immediate list arguments
+
+The elements of a list constructed in the call retain their individual positions when inferring a
+variadic return. Elements consumed by an earlier parameter are excluded from the return.
+
+```py
+from typing_extensions import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def tail(head: int, *args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
+    return args
+
+reveal_type(tail(*[1, "two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], Literal[b"three"]]
+reveal_type(tail(*[1]))  # revealed: tuple[()]
+```
+
+### Union splatted arguments
+
+Unpacking a union of tuples with different lengths into a `TypeVarTuple` preserves the minimum
+length of the union members.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def collect(*args: *Ts) -> tuple[*Ts]:
+    return args
+
+def _(values: tuple[int] | tuple[str, bytes]) -> None:
+    # revealed: tuple[int | str | bytes, *tuple[int | str | bytes, ...]]
+    reveal_type(collect(*values))
+```
+
 ### Partials with bound variadic arguments
 
 Binding positional arguments infers a fixed-length type variable tuple. The resulting partial

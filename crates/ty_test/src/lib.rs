@@ -282,9 +282,7 @@ fn run_test(
         .collect();
 
     let settings = ProgramSettings {
-        virtual_environment: python_environment
-            .filter(PythonEnvironment::is_virtual)
-            .map(|environment| environment.sys_prefix().to_path_buf()),
+        python_environment: Ok(python_environment),
         python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,

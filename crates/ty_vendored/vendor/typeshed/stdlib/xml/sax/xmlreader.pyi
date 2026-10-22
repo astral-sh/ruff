@@ -226,6 +226,8 @@ class InputSource:
 _AttrKey = TypeVar("_AttrKey", default=str)
 
 class AttributesImpl(Generic[_AttrKey]):
+    """Implementation of the Attributes interface."""
+
     def __init__(self, attrs: Mapping[_AttrKey, str]) -> None:
         """Non-NS-aware implementation.
 
