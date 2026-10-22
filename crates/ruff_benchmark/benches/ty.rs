@@ -1995,12 +1995,17 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
 /// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
 /// across the cases can produce many tuple alternatives with wide element unions.
 /// Generic variants also require relating specializations when narrowing the captured attributes.
+/// Eight and ten cases expose the steep growth while keeping instrumented runs short.
 fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
     for (name, num_cases, generic) in [
         ("ty_micro[tuple_class_pattern_captures_8]", 8, false),
-        ("ty_micro[tuple_class_pattern_captures]", 16, false),
+        ("ty_micro[tuple_class_pattern_captures_10]", 10, false),
         ("ty_micro[generic_tuple_class_pattern_captures_8]", 8, true),
-        ("ty_micro[generic_tuple_class_pattern_captures]", 16, true),
+        (
+            "ty_micro[generic_tuple_class_pattern_captures_10]",
+            10,
+            true,
+        ),
     ] {
         let type_parameters = if generic { "[T]" } else { "" };
         let type_arguments = if generic { "[int]" } else { "" };
