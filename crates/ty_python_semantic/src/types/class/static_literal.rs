@@ -1710,7 +1710,7 @@ impl<'db> StaticClassLiteral<'db> {
         inherited_generic_context: Option<GenericContext<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        if let Some(member) = django::primary_key_member(db, env, self, specialization, name) {
+        if let Some(member) = django::synthesized_member(db, env, self, specialization, name) {
             return Some(member);
         }
 

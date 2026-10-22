@@ -183,4 +183,24 @@ def _(book: Book, ebook: Ebook):
     reveal_type(ebook.id)  # revealed: str
 ```
 
+## Choices
+
+The `choices` parameter can be used to map the actual stored values for a field to human-readable
+labels. Django adds `get_<field>_display()` methods for fields that have `choices` defined:
+
+```py
+from django.db import models
+
+class Article(models.Model):
+    status = models.CharField(
+        max_length=1,
+        choices=[("D", "Draft"), ("P", "Published")],
+    )
+
+article = Article(status="P")
+
+reveal_type(article.status)  # revealed: str
+reveal_type(article.get_status_display())  # revealed: str
+```
+
 [django-types]: https://github.com/sbdchd/django-types
