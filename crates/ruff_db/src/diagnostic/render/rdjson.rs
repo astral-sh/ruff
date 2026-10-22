@@ -9,6 +9,9 @@ use crate::diagnostic::{ConciseMessage, Diagnostic, DisplayDiagnosticConfig};
 
 use super::{FileResolver, Renderer};
 
+/// Print diagnostics in the JSON format expected by [reviewdog].
+///
+/// [reviewdog]: https://github.com/reviewdog/reviewdog
 pub struct RdjsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,

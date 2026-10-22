@@ -2,6 +2,11 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, render::json::diagn
 
 use super::{FileResolver, Renderer};
 
+/// Print diagnostics in JSON format, one per line.
+///
+/// This prints each diagnostic as a separate JSON object on its own line. See
+/// [`JsonRenderer`](super::JsonRenderer) for an array of all diagnostics.
+/// See <https://jsonlines.org/> for more details.
 pub struct JsonLinesRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,

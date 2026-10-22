@@ -12,6 +12,9 @@ use crate::diagnostic::{
 
 use super::{FileResolver, Renderer};
 
+/// Print diagnostics in JSON format.
+///
+/// Unlike [`JsonLinesRenderer`](super::JsonLinesRenderer), this prints all diagnostics as a JSON array.
 pub struct JsonRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,

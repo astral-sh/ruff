@@ -4,6 +4,9 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
 use super::{FileResolver, Renderer};
 
+/// Print diagnostics in the [Azure Pipelines] format.
+///
+/// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
 pub struct AzureRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
