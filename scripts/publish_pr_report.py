@@ -171,12 +171,13 @@ def render_report(
         contents = (
             f"{contents.rstrip()}\n\n[Download the full report (ZIP)]({report_url})"
         )
+    commit_url = f"https://github.com/{REPOSITORY}/commit/{run['head_sha']}"
     run_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
     return (
         f"{report_marker(report)}\n"
         f"<!-- report-run:{run['id']}:{run['run_attempt']} -->\n\n"
         f"{contents.rstrip()}\n\n"
-        f"[Workflow run]({run_url}) · `{run['head_sha'][:7]}`\n"
+        f"Results for [{run['head_sha'][:7]}]({commit_url}) · [Workflow run]({run_url})\n"
     )
 
 
