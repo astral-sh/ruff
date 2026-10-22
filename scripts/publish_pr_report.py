@@ -258,7 +258,7 @@ def render_report(
                 links.append(f"[{label}]({full_report_url}/{filename})")
         if links:
             contents = f"{contents.rstrip()}\n\n" + " · ".join(links)
-    if full_report is not None:
+    elif full_report is not None:
         report_url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/artifacts/{full_report['id']}"
         contents = (
             f"{contents.rstrip()}\n\n[Download the full report (ZIP)]({report_url})"
