@@ -1,0 +1,71 @@
+name: Publish the weekly ty ecosystem report
+
+on:
+  workflow_call:
+    inputs:
+      html-files:
+        type: string
+        required: true
+    secrets:
+      STS_API_URL:
+        required: true
+
+permissions: {}
+
+jobs:
+  publish:
+    if: >-
+      github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main' &&
+      github.workflow_ref == 'astral-sh/ruff/.github/workflows/ty-ecosystem-report.yaml@refs/heads/main' &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: github-ubuntu-24.04-x86_64-2
+    timeout-minutes: 10
+    environment: automations
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.13.4"
+          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          enable-cache: false
+      - name: Get an artifact download token
+        id: token
+        uses: open-security-tools/ost-simple-sts@9e012247e07c39080fb6a832dbfbcfeacebc19c4
+        with:
+          exchange-url: ${{ secrets.STS_API_URL }}/exchange
+          audience: ${{ secrets.STS_API_URL }}
+          repository: astral-sh/ruff
+          permissions: |
+            actions: read
+      - name: Get report upload credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.REPORTS_REGION }}
+          role-to-assume: ${{ vars.TY_ECOSYSTEM_REPORT_ROLE_ARN }}
+          role-duration-seconds: 900
+          role-session-name: ty-ecosystem-${{ github.run_id }}-${{ github.run_attempt }}
+          unset-current-credentials: true
+      - name: Publish the report
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          HTML_BUCKET: ${{ vars.REPORTS_BUCKET }}
+          HTML_BASE_URL: ${{ vars.REPORTS_URL }}
+          HTML_FILES: ${{ inputs.html-files }}
+        run: >-
+          uv run --script scripts/publish_report.py weekly
+          --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT"
+          --workflow-ref "$WORKFLOW_REF"
+          --html-bucket "$HTML_BUCKET" --html-base-url "$HTML_BASE_URL"
+          --html-files "$HTML_FILES"
