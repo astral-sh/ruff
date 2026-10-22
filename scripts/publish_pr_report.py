@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import logging
 import os
 import re
 import subprocess
@@ -19,6 +20,8 @@ from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+logger = logging.getLogger(__name__)
+
 REPOSITORY = "astral-sh/ruff"
 REPOSITORY_ID = 523043277
 API_ROOT = f"https://api.github.com/repos/{REPOSITORY}"
@@ -27,6 +30,15 @@ BOT_ID = 305554984  # astral-automations-bot
 MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_REPORT_BYTES = 4 * 1024 * 1024
 MAX_REPORT_CHARACTERS = 60_000
+MAX_HTML_ARCHIVE_BYTES = 128 * 1024 * 1024
+MAX_HTML_REPORT_BYTES = 128 * 1024 * 1024
+HTML_REPORT_FILES = {
+    "ty-ecosystem": {
+        "diff.html": "text/html; charset=utf-8",
+        "timing.html": "text/html; charset=utf-8",
+        "diff.json": "application/json",
+    },
+}
 
 
 def report_marker(report: str) -> str:
@@ -151,6 +163,46 @@ def read_report(
         return data.decode("utf-8")
 
 
+def upload_html_report(
+    report: str,
+    artifact: dict,
+    run: dict,
+    pull_request: int,
+    *,
+    bucket: str,
+    base_url: str,
+) -> str:
+    if report not in HTML_REPORT_FILES or not base_url:
+        raise ValueError("HTML report hosting is not configured for this report.")
+    archive = download_artifact(artifact, max_bytes=MAX_HTML_ARCHIVE_BYTES)
+    reports = {
+        filename: read_report(
+            archive, filename, max_bytes=MAX_HTML_REPORT_BYTES
+        ).encode()
+        for filename in HTML_REPORT_FILES[report]
+    }
+    prefix = f"ruff/{pull_request}/{report}/{run['id']}/{run['run_attempt']}"
+    for filename, contents in reports.items():
+        subprocess.run(
+            [
+                "aws",
+                "s3",
+                "cp",
+                "-",
+                f"s3://{bucket}/{prefix}/{filename}",
+                "--content-type",
+                HTML_REPORT_FILES[report][filename],
+                "--cache-control",
+                "public, max-age=3600",
+                "--only-show-errors",
+            ],
+            input=contents,
+            check=True,
+            timeout=120,
+        )
+    return f"{base_url.rstrip('/')}/{prefix}"
+
+
 def render_report(
     report: str,
     contents: str,
@@ -241,7 +293,8 @@ def publish(
     filename: str,
     title: str = "",
     full_report_artifact: str = "",
-    full_report_url: str = "",
+    html_bucket: str = "",
+    html_base_url: str = "",
     stored_comment_id: int | None = None,
     dry_run: bool = False,
 ) -> int | None:
@@ -257,6 +310,20 @@ def publish(
     full_report = (
         find_artifact(run_id, full_report_artifact) if full_report_artifact else None
     )
+    full_report_url = ""
+    if full_report is not None and html_bucket and not dry_run:
+        try:
+            full_report_url = upload_html_report(
+                report,
+                full_report,
+                run,
+                pull_request,
+                bucket=html_bucket,
+                base_url=html_base_url,
+            )
+        except Exception:
+            # An upload failure must not suppress the summary or artifact link.
+            logger.exception("Failed to upload the HTML report.")
     body = render_report(
         report,
         contents,
@@ -300,7 +367,8 @@ def main() -> None:
     parser.add_argument("--filename", required=True)
     parser.add_argument("--title", default="")
     parser.add_argument("--full-report-artifact", default="")
-    parser.add_argument("--full-report-url", default="")
+    parser.add_argument("--html-bucket", default="")
+    parser.add_argument("--html-base-url", default="")
     parser.add_argument("--comment-id-file", dest="comment_id", type=read_comment_id)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -318,7 +386,8 @@ def main() -> None:
         filename=args.filename,
         title=args.title,
         full_report_artifact=args.full_report_artifact,
-        full_report_url=args.full_report_url,
+        html_bucket=args.html_bucket,
+        html_base_url=args.html_base_url,
         stored_comment_id=args.comment_id,
         dry_run=args.dry_run,
     )

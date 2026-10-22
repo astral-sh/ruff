@@ -317,22 +317,8 @@ jobs:
         if: steps.generate-reports.outputs.diff_statistics_exit_code != '0'
         run: exit 1
 
-  upload-report:
-    needs: generate-report
-    if: >-
-      !cancelled() && github.event_name == 'pull_request' &&
-      github.repository == 'astral-sh/ruff' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (needs.generate-report.result == 'success' || needs.generate-report.result == 'failure')
-    uses: astral-sh/ruff/.github/workflows/upload-ty-ecosystem-report.yml@main # zizmor: ignore[unpinned-uses]
-    secrets:
-      STS_API_URL: ${{ secrets.STS_API_URL }}
-    permissions:
-      contents: read
-      id-token: write
-
   publish-report:
-    needs: [generate-report, upload-report]
+    needs: generate-report
     if: >-
       !cancelled() && github.event_name == 'pull_request' &&
       github.repository == 'astral-sh/ruff' &&
@@ -350,4 +336,4 @@ jobs:
       artifact: comment.md
       filename: comment.md
       full-report-artifact: full-report
-      full-report-url: ${{ needs.upload-report.outputs.report-url }}
+      upload-html: true
