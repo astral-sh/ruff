@@ -36,7 +36,7 @@ reveal_type(Strings)  # revealed: GenericAlias
 However, using such a `GenericAlias` instance in a type expression is currently not supported:
 
 ```py
-# error: [invalid-type-form] "Variable `Strings` is not allowed in parameter annotations"
+# error: [invalid-type-form] "Variable `Strings` cannot be used as a type"
 def _(strings: Strings) -> None:
     reveal_type(strings)  # revealed: Unknown
 ```
