@@ -29,7 +29,8 @@ use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarDomain, TypeVarIdentity, TypeVarInstance,
+    TypeVarSet,
 };
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -2513,12 +2514,6 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     inferable: TypeVarSet<'db>,
     pending: ConstraintSet<'db, 'c>,
     types: LegacyTypeMappings<'db>,
-    /// Keep the first supplied parameter list. Argument checking still validates later
-    /// occurrences against the chosen list.
-    ///
-    /// TODO: Combine repeated `ParamSpec` bounds using unions and intersections of parameter lists
-    /// instead of keeping only the first occurrence's contribution.
-    paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
 /// The legacy mapping is usable only if no accepted relation was omitted in its entirety.
@@ -2757,7 +2752,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             inferable: generic_context.inferable_typevars(db),
             pending: ConstraintSet::from_bool(constraints, true),
             types: LegacyTypeMappings::Available(FxHashMap::default()),
-            paramspec_seen: FxHashSet::default(),
         }
     }
 
@@ -2767,7 +2761,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), SpecializationError<'db>> {
-        let set = self.remove_seen_paramspecs(set, &self.paramspec_seen);
         self.infer_from_constraint_set(set)
     }
 
@@ -2882,7 +2875,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             let when =
                 actual.when_constraint_set_assignable_to(db, self.env, formal, self.constraints);
             let analysis = self.analyze_constraint_set(when);
-            self.record_constraint_analysis(&analysis);
+            self.project_for_legacy_fallback(&analysis);
         }
 
         let inference =
@@ -3383,6 +3376,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     None => choose(*variable, None)?,
                 };
+                // Unsupported parameter-list unions can survive in the legacy recovery map.
+                // Keep one list so argument validation reports the incompatible callbacks.
+                let chosen = if variable.domain(db) == TypeVarDomain::ParameterSignature
+                    && let Type::Union(union) = chosen
+                {
+                    *union.elements(db).first()?
+                } else {
+                    chosen
+                };
                 Some((*identity, chosen))
             })
             .collect()
@@ -3460,17 +3462,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn intersect_pending_typevar_constraint(
-        &mut self,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        constraint: ConstraintSet<'db, 'c>,
-    ) {
+    fn intersect_pending_typevar_constraint(&mut self, constraint: ConstraintSet<'db, 'c>) {
         let db = self.db;
-        let identity = bound_typevar.identity(db);
-        // TODO: Remove this guard once repeated `ParamSpec` bounds can be combined.
-        if bound_typevar.is_paramspec(db) && !self.paramspec_seen.insert(identity) {
-            return;
-        }
         self.pending.intersect(db, self.constraints, constraint);
     }
 
@@ -3537,7 +3530,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             ),
             TypeVarVariance::Bivariant => return,
         };
-        self.intersect_pending_typevar_constraint(bound_typevar, constraint);
+        self.intersect_pending_typevar_constraint(constraint);
     }
 
     /// Solves one relation without recording it or changing the legacy type mappings.
@@ -3566,46 +3559,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Ok(Solutions::Unconstrained) => ConstraintSetAnalysis::Unconstrained,
             Ok(Solutions::Constrained(solutions)) => ConstraintSetAnalysis::Constrained(solutions),
             Err(_) => ConstraintSetAnalysis::BudgetExceeded,
-        }
-    }
-
-    /// Record supplied parameter lists independently from the diagnostic recovery mapping.
-    ///
-    /// TODO: Remove this wrapper once repeated `ParamSpec` bounds can be combined.
-    fn record_constraint_analysis(&mut self, analysis: &ConstraintSetAnalysis<'db>) {
-        if let ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(solutions)) = analysis {
-            self.record_paramspecs(
-                &solutions
-                    .iter()
-                    .map(|solution| solution.solved_typevars.as_slice()),
-            );
-        }
-        self.project_for_legacy_fallback(analysis);
-    }
-
-    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
-    fn record_paramspecs<'a>(
-        &mut self,
-        solutions: &(impl Iterator<Item = &'a [TypeVarSolution<'db>]> + Clone),
-    ) where
-        'db: 'a,
-    {
-        for typevar in self
-            .generic_context
-            .variables(self.db)
-            .filter(|typevar| typevar.is_paramspec(self.db))
-        {
-            // Different alternatives can supply different lists. They still belong to the
-            // first argument, so a later argument must not choose between them.
-            if solutions.clone().next().is_some()
-                && solutions.clone().all(|path| {
-                    path.iter().any(|binding| {
-                        binding.bound_typevar.identity(self.db) == typevar.identity(self.db)
-                    })
-                })
-            {
-                self.paramspec_seen.insert(typevar.identity(self.db));
-            }
         }
     }
 
@@ -3669,25 +3622,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
     pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
-        let when = self.remove_seen_paramspecs(when, &self.paramspec_seen);
         self.pending.intersect(self.db, self.constraints, when);
-    }
-
-    /// TODO: Remove this temporary workaround once repeated `ParamSpec` bounds can be combined.
-    fn remove_seen_paramspecs(
-        &self,
-        when: ConstraintSet<'db, 'c>,
-        seen: &FxHashSet<BoundTypeVarIdentity<'db>>,
-    ) -> ConstraintSet<'db, 'c> {
-        // Callable and protocol comparisons can supply several variables at once. Ignore later
-        // occurrences of a ParamSpec without losing the other variables' requirements.
-        let seen = TypeVarSet::from_typevars(
-            self.db,
-            self.generic_context.variables(self.db).filter(|typevar| {
-                seen.contains(&typevar.identity(self.db)) && when.mentions_typevar(*typevar)
-            }),
-        );
-        when.reduce_inferable(self.db, self.env, self.constraints, seen)
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
@@ -3704,7 +3639,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         if let Some(error) = analysis.specialization_error(db, self.env) {
             return Err(error);
         }
-        self.record_constraint_analysis(&analysis);
+        self.project_for_legacy_fallback(&analysis);
         Ok(())
     }
 
@@ -3999,26 +3934,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // Retain every alternative that was not proved unsatisfiable. Solving the
                 // combined TDD here would repeat their potentially expensive path traversals.
                 self.record_constraint_set(combined);
-                // TODO: Remove this bookkeeping once repeated `ParamSpec` bounds can be combined.
-                if accepted.iter().all(|(_, analysis)| {
-                    matches!(
-                        analysis,
-                        ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(_))
-                    )
-                }) {
-                    self.record_paramspecs(
-                        &accepted
-                            .iter()
-                            .filter_map(|(_, analysis)| match analysis {
-                                ConstraintSetAnalysis::Constrained(SolutionPaths::Complete(
-                                    paths,
-                                )) => Some(paths),
-                                _ => None,
-                            })
-                            .flatten()
-                            .map(|solution| solution.solved_typevars.as_slice()),
-                    );
-                }
                 for (_, analysis) in accepted {
                     self.project_for_legacy_fallback(&analysis);
                 }
@@ -4886,7 +4801,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             formal_specialization,
                             base_specialization
                         ) {
-                            let variance = typevar.variance_with_polarity(db, polarity);
+                            let variance =
+                                polarity.compose_thunk(|| specialization_variance(db, typevar));
                             self.infer_map_impl(*formal_ty, *base_ty, variance, visitor)?;
                         }
                         return Ok(());
