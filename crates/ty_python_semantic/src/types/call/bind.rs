@@ -334,7 +334,14 @@ impl<'db> CallableItem<'db> {
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.check_types(db, env, constraints, argument_types, call_expression_tcx);
+                binding.check_types(
+                    db,
+                    env,
+                    constraints,
+                    argument_types,
+                    call_expression_tcx,
+                    mode,
+                );
             }
             CallableItem::Constructor(binding) => {
                 binding.check_types(
@@ -663,6 +670,9 @@ pub(crate) enum CheckTypesMode {
     /// Generic call inference may perform fixpoint iteration in order to unify
     /// type context across call arguments, and so all callable bindings should
     /// remain candidates until the final round is finalized.
+    ///
+    /// Provisional checking mode also uses slightly different solver heuristics to avoid overly
+    /// constraining type context that may be later widened.
     Provisional,
 }
 
@@ -1424,37 +1434,6 @@ impl<'db> Bindings<'db> {
 
         // For intersection elements with at least one successful binding,
         // filter out the failing bindings after deferred constructor checks.
-        for element in &mut self.elements {
-            element.retain_successful(db);
-        }
-
-        self.as_result(db)
-    }
-
-    /// Finalize the bindings after a provisional check, retaining only those that contribute
-    /// to the final call evaluation.
-    pub(crate) fn finalize_argument_inference(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
-        dataclass_field_specifiers: &[Type<'db>],
-    ) -> Result<(), CallErrorKind> {
-        self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers);
-
-        for constructor in self.iter_constructor_items_mut() {
-            if constructor.discard_downstream_constructor(db, env)
-                && let Some(downstream) = constructor.downstream_constructor_mut()
-            {
-                let _ = downstream.finalize_argument_inference(
-                    db,
-                    env,
-                    call_arguments,
-                    dataclass_field_specifiers,
-                );
-            }
-        }
-
         for element in &mut self.elements {
             element.retain_successful(db);
         }
@@ -3894,6 +3873,7 @@ impl<'db> CallableBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -3919,42 +3899,48 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
-        let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
-            .should_retry_after_provisional_arity(&argument_expansions)
-        {
-            // We will retry all overloads after argument expansion.
-            (true, (0..self.overloads.len()).collect())
-        } else {
-            match self.matching_overload_index() {
-                MatchingOverloadIndex::None => {
-                    // If no candidate overloads remain from the arity check, we can stop here. We
-                    // still perform type checking for non-overloaded function to provide better
-                    // user experience.
-                    if let [overload] = self.overloads.as_mut_slice() {
-                        overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        let (should_retry_after_provisional_arity, overloads_for_expansion) =
+            if self.should_retry_after_provisional_arity(&argument_expansions) {
+                // We will retry all overloads after argument expansion.
+                (true, (0..self.overloads.len()).collect())
+            } else {
+                match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => {
+                        // If no candidate overloads remain from the arity check, we can stop here. We
+                        // still perform type checking for non-overloaded function to provide better
+                        // user experience.
+                        if let [overload] = self.overloads.as_mut_slice() {
+                            overload.check_types(
+                                db,
+                                env,
+                                call_arguments.as_ref(),
+                                call_expression_tcx,
+                                mode,
+                            );
+                        }
+                        return;
                     }
-                    return;
+                    MatchingOverloadIndex::Single(index) => {
+                        // If only one candidate overload remains, it is the winning match. Evaluate
+                        // it as a regular (non-overloaded) call.
+                        self.matching_overload_before_type_checking = Some(index);
+                        self.overloads[index].check_types(
+                            db,
+                            env,
+                            call_arguments.as_ref(),
+                            call_expression_tcx,
+                            mode,
+                        );
+                        return;
+                    }
+                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
                 }
-                MatchingOverloadIndex::Single(index) => {
-                    // If only one candidate overload remains, it is the winning match. Evaluate
-                    // it as a regular (non-overloaded) call.
-                    self.matching_overload_before_type_checking = Some(index);
-                    self.overloads[index].check_types(
-                        db,
-                        env,
-                        call_arguments.as_ref(),
-                        call_expression_tcx,
-                    );
-                    return;
-                }
-                MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
-            }
-        };
+            };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx, mode);
         }
 
         tracing::trace!(
@@ -4139,7 +4125,7 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, env, expanded_arguments, call_expression_tcx);
+                    overload.check_types(db, env, expanded_arguments, call_expression_tcx, mode);
                 }
 
                 tracing::trace!(
@@ -5937,6 +5923,7 @@ struct CallInference<'a, 'db> {
     is_constructor: bool,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
+    mode: CheckTypesMode,
 }
 
 impl<'a, 'db> CallInference<'a, 'db> {
@@ -6759,6 +6746,14 @@ impl<'db> CallInference<'_, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> TypeVarInference<'db> {
         let db = self.db;
+        let solve = |bounds: &CandidateTypeVarSolution<'db>| match self.mode {
+            CheckTypesMode::Provisional => {
+                CandidateSolutions::preliminary_solve(db, self.env, constraints, bounds)
+            }
+            CheckTypesMode::Finalize => {
+                CandidateSolutions::default_solve(db, self.env, constraints, bounds)
+            }
+        };
 
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(solution) to override the default
@@ -6796,24 +6791,19 @@ impl<'db> CallInference<'_, 'db> {
             }
 
             // Promotion must preserve unsatisfiable outcomes and the completeness of fallbacks.
-            Some(
-                CandidateSolutions::default_solve(db, self.env, constraints, bounds).map(
-                    |solution| {
-                        let promoted = solution.promote(db, self.env);
+            Some(solve(bounds).map(|solution| {
+                let promoted = solution.promote(db, self.env);
 
-                        // If the TypeVar has an upper bound, only use the promoted type if it
-                        // still satisfies the bound.
-                        if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) =
-                            bound_or_constraints
-                            && !promoted.is_assignable_to(db, self.env, bound)
-                        {
-                            return solution;
-                        }
+                // If the TypeVar has an upper bound, only use the promoted type if it
+                // still satisfies the bound.
+                if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints
+                    && !promoted.is_assignable_to(db, self.env, bound)
+                {
+                    return solution;
+                }
 
-                        promoted
-                    },
-                ),
-            )
+                promoted
+            }))
         };
 
         let preferred_specialization = (!preferred_type_mappings.is_empty()).then(|| {
@@ -6836,7 +6826,9 @@ impl<'db> CallInference<'_, 'db> {
             let preferred_ty = preferred_type_mappings.get(&typevar.identity(db)).copied();
 
             if let Some(bounds) = bounds {
-                let lower = bounds.inference_lower(db, self.env)?;
+                let Some(lower) = bounds.inference_lower(db, self.env) else {
+                    return Some(solve(bounds));
+                };
                 // Transitivity can introduce unsolved typevars into a lower bound. For example,
                 // `dict(m)` with a recursive value type can acquire `dict[str, _VT]` as a bound
                 // on `_VT` through the constructor's `Self`. Check that bound with the proposed
@@ -6847,7 +6839,7 @@ impl<'db> CallInference<'_, 'db> {
                         .apply_optional_specialization(db, preferred_specialization)
                         .is_assignable_to(db, self.env, ty)
                 }) {
-                    return maybe_promote(typevar, bounds);
+                    return Some(maybe_promote(typevar, bounds).unwrap_or_else(|| solve(bounds)));
                 }
             }
 
@@ -8715,6 +8707,7 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
+        mode: CheckTypesMode,
     ) {
         // Each overload is an independent inference problem. Two candidates can contain
         // typevars with the same identity but different specialized bounds, so sharing a
@@ -8751,6 +8744,7 @@ impl<'db> Binding<'db> {
         let inferred = CallInference {
             db,
             env,
+            mode,
             signature: &self.signature,
             arguments,
             argument_matches: &self.argument_matches,

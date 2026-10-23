@@ -229,8 +229,14 @@ impl<'db> ConstructorBinding<'db> {
         call_expression_tcx: TypeContext<'db>,
         mode: CheckTypesMode,
     ) {
-        self.entry
-            .check_types(db, env, constraints, argument_types, call_expression_tcx);
+        self.entry.check_types(
+            db,
+            env,
+            constraints,
+            argument_types,
+            call_expression_tcx,
+            mode,
+        );
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
@@ -281,20 +287,6 @@ impl<'db> ConstructorBinding<'db> {
                     constructor_returns_instance(db, env, class_literal, overload.return_ty)
                 })
         })
-    }
-
-    /// Discards an inactive downstream constructor.
-    pub(super) fn discard_downstream_constructor(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        if self.should_check_downstream(db, env) {
-            true
-        } else {
-            self.downstream_constructor = None;
-            false
-        }
     }
 
     /// Check types for downstream constructors, if any.
