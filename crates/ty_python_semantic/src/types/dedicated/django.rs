@@ -7,6 +7,8 @@ use ty_python_core::{
 };
 
 use crate::place::known_module_symbol;
+use crate::types::call::{Argument, Bindings, CallArguments};
+use crate::types::class::ClassLiteral;
 use crate::types::member::class_member;
 use crate::types::{
     BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass, Parameter,
@@ -24,9 +26,181 @@ fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
         .any(|base| base.is_known(db, KnownClass::DjangoModel))
 }
 
+/// Infer field types for calls to unspecialized Django field constructors.
+///
+/// For example:
+/// ```py
+/// from django.db.models import CharField
+///
+/// reveal_type(CharField())  # CharField[str | int | Combinable, str]
+/// reveal_type(CharField(null=True))  # CharField[str | int | Combinable | None, str | None]
+/// ```
+///
+/// TODO: Remove this once django-stubs uses constructor overloads
+/// to infer these types without the `_pyi_private_{set,get}_type` hints.
+pub(in crate::types) fn infer_field_constructor_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    callable_type: Type<'db>,
+    return_ty: Type<'db>,
+    arguments: &CallArguments<'_, 'db>,
+    bindings: &Bindings<'db>,
+) -> Option<Type<'db>> {
+    let class = callable_type
+        .as_class_literal()
+        .and_then(ClassLiteral::as_static)?;
+    let (returned_class, _) = return_ty.nominal_class(db, env)?.static_class_literal(db)?;
+    if returned_class != class {
+        return None;
+    }
+    infer_field_type(db, env, return_ty, Some(arguments), Some(bindings))
+}
+
+/// Fill uninferred field type arguments from django-stubs' read and write type hints.
+///
+/// See [`infer_field_constructor_type`] for examples.
+///
+/// TODO: Remove this once django-stubs uses constructor overloads
+/// to infer these types without the `_pyi_private_{set,get}_type` hints.
+fn infer_field_type<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    arguments: Option<&CallArguments<'_, 'db>>,
+    bindings: Option<&Bindings<'db>>,
+) -> Option<Type<'db>> {
+    let (class, specialization) = ty.class_specialization(db, env)?;
+    if !specialization
+        .types(db)
+        .iter()
+        .any(|ty| ty.is_unknown() || *ty == Type::any())
+    {
+        return None;
+    }
+
+    let generic_context = specialization.generic_context(db);
+    let mut field_specialization = None;
+    let mut is_foreign_key = false;
+    for (base, specialization) in class
+        .iter_mro(db, Some(generic_context.identity_specialization(db)))
+        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.static_class_literal(db))
+    {
+        if base.is_known(db, KnownClass::DjangoForeignKey) {
+            is_foreign_key = true;
+        }
+        if base.is_known(db, KnownClass::DjangoField) {
+            field_specialization = specialization;
+            break;
+        }
+    }
+    let [set_type, get_type] = field_specialization?.types(db) else {
+        return None;
+    };
+
+    // Defaults such as `Any` do not tell us whether a type argument was inferred. Keep the
+    // constructor's inferred arguments, including `Any`, and only fill missing arguments.
+    // Synthesized automatic primary keys have no constructor call or inferred arguments.
+    let inferred_arguments = match bindings {
+        Some(bindings) => Some(bindings.inferred_constructor_type_arguments(db, env)?),
+        None => None,
+    };
+
+    // ForeignKey's hints use `Any` for the related model. Resolve it from the `to` argument.
+    let related_model = if is_foreign_key {
+        let arguments = arguments?;
+        let target = arguments
+            .iter()
+            .find(|argument| matches!(argument.kind(), Argument::Keyword("to")))
+            .or_else(|| {
+                arguments
+                    .iter()
+                    .find(|argument| {
+                        matches!(argument.kind(), Argument::Positional | Argument::Variadic)
+                    })
+                    .filter(|argument| matches!(argument.kind(), Argument::Positional))
+            })?;
+        Some(target.source_type()?.to_instance_approximation(db, env)?)
+    } else {
+        None
+    };
+
+    let null = arguments.is_some_and(|arguments| {
+        arguments
+            .iter()
+            .find(|argument| matches!(argument.kind(), Argument::Keyword("null")))
+            .is_some_and(|argument| argument.source_type() == Some(Type::bool_literal(true)))
+    });
+
+    // Map through Field's specialization instead of assuming that subclasses use the
+    // same type parameters, in the same order, as Field[_ST, _GT].
+    let mut inferred = vec![None; generic_context.len(db)];
+    for (parameter, name) in [
+        (set_type, "_pyi_private_set_type"),
+        (get_type, "_pyi_private_get_type"),
+    ] {
+        let Some(index) = generic_context
+            .variables(db)
+            .position(|variable| Type::TypeVar(variable) == *parameter)
+        else {
+            continue;
+        };
+        let original = specialization.types(db)[index];
+        if !(original.is_unknown() || original == Type::any())
+            || inferred_arguments
+                .as_ref()
+                .is_some_and(|arguments| arguments[index].is_some())
+        {
+            continue;
+        }
+
+        // Look up `_pyi_private_set_type` or `_pyi_private_get_type` on the field instance.
+        let Some(mut field_type) = ty.member(db, env, name).place.ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        if let Some(related_model) = related_model {
+            let replace_model = |ty: &Type<'db>| {
+                if *ty == Type::any() {
+                    related_model
+                } else {
+                    *ty
+                }
+            };
+            field_type = match field_type {
+                Type::Union(union) => union.map(db, env, replace_model),
+                _ => replace_model(&field_type),
+            };
+        }
+        if null {
+            field_type = UnionType::from_elements(db, env, [field_type, Type::none(db, env)]);
+        }
+        // A custom field may use one type parameter for both reading and writing.
+        // Do not choose arbitrarily if the two hints disagree.
+        if inferred[index].is_some_and(|previous| previous != field_type) {
+            return None;
+        }
+        inferred[index] = Some(field_type);
+    }
+    if inferred.iter().all(Option::is_none) {
+        return None;
+    }
+    let types = inferred
+        .into_iter()
+        .zip(specialization.types(db))
+        .map(|(inferred, original)| inferred.unwrap_or(*original))
+        .collect::<Vec<_>>();
+    Some(Type::instance(
+        db,
+        env,
+        class.apply_specialization(db, |context| context.specialize(db, types)),
+    ))
+}
+
 /// The type of a Django model field, and metadata extracted from the field construction.
 ///
-/// For example, the `isbn` field has type `CharField[str]` and `metadata.primary_key: true`:
+/// For example, the `isbn` field has type `CharField[str | int | Combinable, str]`
+/// and `metadata.primary_key: true`:
 /// ```py
 /// class Book(models.Model):
 ///     isbn = CharField(max_length=13, primary_key=True)
@@ -226,10 +400,11 @@ fn primary_key_member<'db>(
         }
     }
 
-    known_module_symbol(db, env, KnownModule::DjangoDbModelsFields, "AutoField")
+    let auto_field = known_module_symbol(db, env, KnownModule::DjangoDbModelsFields, "AutoField")
         .place
         .ignore_possibly_undefined()?
-        .to_instance_approximation(db, env)
+        .to_instance_approximation(db, env)?;
+    Some(infer_field_type(db, env, auto_field, None, None).unwrap_or(auto_field))
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.
@@ -270,16 +445,17 @@ fn foreign_key_id_member<'db>(
         return None;
     }
 
-    // django-types represents a foreign key declared with `null=True` as
-    // `ForeignKey[Author | None]`, so its `related_model` attribute has type
-    // `type[Author | None]`. Remove `None` from the instance type before looking up `pk`
-    // (or `to_field`) on `Author`. If `null=True`, add `None` to the
-    // resulting ID type: for example, an integer primary key becomes `int | None`.
+    // Read the related model's type through the field descriptor. For `null=True`, remove
+    // `None` before looking up `pk` (or `to_field`), then add it to the resulting ID type.
+    let instance = Type::instance(
+        db,
+        env,
+        class.apply_optional_specialization(db, specialization),
+    );
     let related_model = field_ty
-        .member(db, env, "related_model")
-        .place
-        .ignore_possibly_undefined()?
-        .to_instance_approximation(db, env)?
+        .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
+        .ok()??
+        .return_type
         .filter_union(db, env, |ty| !ty.is_none(db));
     let target_name = field.metadata.to_field.as_deref().unwrap_or("pk");
     let id_ty = related_model

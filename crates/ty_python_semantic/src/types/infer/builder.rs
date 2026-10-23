@@ -63,7 +63,7 @@ use crate::types::class::{
 };
 use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
 use crate::types::context::InferContext;
-use crate::types::dedicated::pydantic;
+use crate::types::dedicated::{django, pydantic};
 use crate::types::diagnostic::{
     self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CYCLIC_TYPE_ALIAS_DEFINITION,
     DYNAMIC_FUNCTION_DECORATOR_RETURN, GeneratorMismatchKind, INEFFECTIVE_FINAL,
@@ -10045,6 +10045,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let return_ty = bindings.return_type(db, env);
+
+        // TODO: Remove this once django-stubs uses constructor overloads to infer field types.
+        let return_ty = django::infer_field_constructor_type(
+            db,
+            env,
+            callable_type,
+            return_ty,
+            &call_arguments,
+            &bindings,
+        )
+        .unwrap_or(return_ty);
+
         let return_ty = match collection_initializer_class {
             Some(collection_class @ (KnownClass::List | KnownClass::Set))
                 if return_ty
