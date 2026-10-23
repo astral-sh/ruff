@@ -248,6 +248,19 @@ impl<'db> CallableSignature<'db> {
         }))
     }
 
+    pub(super) fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads.iter().map(|signature| {
+                signature.freshen_for_owner_specialization(db, env, specialization)
+            }),
+        )
+    }
+
     /// Returns the reduced overloaded signature exposed by a `functools.partial(...)` object.
     pub(crate) fn partially_apply(
         db: &'db dyn Db,
@@ -625,7 +638,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair(db, self, other)
     }
 }
 
@@ -961,7 +974,7 @@ impl<'db> Signature<'db> {
         self
     }
 
-    fn is_paramspec_value(&self) -> bool {
+    pub(super) fn is_paramspec_value(&self) -> bool {
         self.extras
             .as_ref()
             .is_some_and(|extras| extras.is_paramspec_value)
@@ -1056,6 +1069,22 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
         Self::new(Parameters::bottom(), Type::Never)
+    }
+
+    /// Returns whether this is the bottom signature, which is assignable to all other signatures.
+    /// (It accepts all parameter lists, and returns `Never`.)
+    fn is_bottom(&self) -> bool {
+        self.return_ty.is_never()
+            && self.parameters.is_bottom()
+            && self.receiver_constraints().is_none()
+    }
+
+    /// Returns whether this is the top signature, which is assignable from all other signatures.
+    /// (It permits no calls, and has return type `object`.)
+    fn is_top(&self) -> bool {
+        self.return_ty.is_object()
+            && self.parameters.is_top()
+            && self.receiver_constraints().is_none()
     }
 
     /// Returns `true` if `Self` should be hidden from the generic context display.
@@ -1204,6 +1233,39 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::new(env),
         )
+    }
+
+    /// Keep incoming class arguments separate from this method's own type parameters.
+    fn freshen_for_owner_specialization(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        if let Some(generic_context) = self.generic_context
+            && specialization.types(db).iter().any(|ty| {
+                any_over_type(db, env, *ty, false, |ty| {
+                    matches!(ty, Type::TypeVar(typevar)
+                        if generic_context.contains(db, typevar.identity(db))
+                            && specialization.get(db, typevar).is_none())
+                })
+            })
+            && let Some(freshness) = max_typevar_freshness_matching_generic_context(
+                db,
+                specialization.types(db).iter().copied(),
+                generic_context,
+            )
+        {
+            // Accessing `Box[T]` inside `Box.method[T]` must keep the class argument separate
+            // from the projected method's local T. Rename the method's binders before
+            // substituting the class arguments, while those occurrences are distinguishable.
+            self.freshen_bound_typevars(db, env, freshness.increment().value())
+        } else {
+            // Identity substitutions introduce no new occurrences. A different nonce already
+            // distinguishes two occurrences; freshening just because they share a declaration
+            // would introduce unbounded new identities during recursive member projection.
+            self.clone()
+        }
     }
 
     fn max_typevar_freshness_matching_generic_context(
@@ -2700,8 +2762,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
 
-            // source is definitely not overloaded while target is possibly overloaded.
-            ([_], _) => {
+            (_, _) => {
+                // Create separate freshened copies of any typevars introduced by the source
+                // signature, so that each target overload can infer an independent specialization
+                // of them.
+                let overloads = source_overloads.iter().chain(target_overloads);
+                let max_freshness = overloads
+                    .clone()
+                    .filter_map(|signature| signature.generic_context)
+                    .flat_map(|context| {
+                        overloads.clone().filter_map(move |signature| {
+                            signature.max_typevar_freshness_matching_generic_context(db, context)
+                        })
+                    })
+                    .max();
+                self.constraints.signature_typevar_freshness.set(
+                    self.constraints
+                        .signature_typevar_freshness
+                        .get()
+                        .max(max_freshness),
+                );
                 target_overloads
                     .iter()
                     .when_all(db, self.constraints, |target_signature| {
@@ -2712,17 +2792,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-
-            // source is definitely overloaded while target is possibly overloaded.
-            (_, _) => target_overloads
-                .iter()
-                .when_all(db, self.constraints, |target_signature| {
-                    self.check_callable_signature_pair_inner(
-                        db,
-                        source_overloads,
-                        std::slice::from_ref(target_signature),
-                    )
-                }),
         }
     }
 
@@ -2733,6 +2802,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let may_contain_typevars = |signature: &Signature<'db>| {
+            signature.generic_context.is_some()
+                || signature
+                    .receiver_constraints()
+                    .is_some_and(|constraints| constraints.assignability.is_nontrivial())
+                || std::iter::once(signature.return_ty)
+                    .chain(signature.parameters.iter().map(Parameter::annotated_type))
+                    .any(|ty| {
+                        // Aliases and recursive types can hide typevars. Avoid expanding them just
+                        // to decide whether to take a fast path.
+                        any_over_type(db, self.env, ty, false, |ty| {
+                            matches!(
+                                ty,
+                                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+                            )
+                        })
+                    })
+        };
+
+        // Fast path: If the source is the bottom signature or the target is the top signature,
+        // assignability holds no matter what, and we can return without spending the time matching
+        // parameter lists. However, the opposite signature's typevars still need inference
+        // bounds: even `Never ≤ T` or `T ≤ object` can determine an inferred type.
+        if (source.is_bottom() && !may_contain_typevars(target))
+            || (target.is_top() && !may_contain_typevars(source))
+        {
+            return self.always();
+        }
+
         let env = self.env;
         // In lazy comparisons, a captured parameter list refers to typevars owned by the
         // surrounding call inference. Preserve constraints on those variables instead of
@@ -2744,18 +2842,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     || self.typevar_evaluation != TypeVarEvaluation::Lazy
             })
         };
+        let freshen = |signature: &Signature<'db>,
+                       generic_context: GenericContext<'db>,
+                       after: TypeVarNonce| {
+            // Shift the least-fresh local past the reserved range, without adding that entire
+            // range to identities that have already been freshened.
+            let delta = generic_context
+                .variables(db)
+                .map(|typevar| typevar.freshness(db))
+                .min()
+                .map_or(0, |freshness| {
+                    after.increment().value().saturating_sub(freshness.value())
+                });
+            signature.freshen_bound_typevars(db, env, delta)
+        };
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the other signature.
+        let max_freshness = self.constraints.signature_typevar_freshness.get();
         let freshened_source;
-        let source = if signature_context(source) != signature_context(target)
+        let source = if (max_freshness.is_some()
+            || signature_context(source) != signature_context(target))
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
+            && let Some(freshness) = target
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_source = source.freshen_bound_typevars(db, env, delta);
+            freshened_source = freshen(source, generic_context, freshness);
             &freshened_source
         } else {
             source
@@ -2763,11 +2877,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
+            && let Some(freshness) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_target = target.freshen_bound_typevars(db, env, delta);
+            freshened_target = freshen(target, generic_context, freshness);
             &freshened_target
         } else {
             target
@@ -2780,6 +2894,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
+        // Reserve these identities before checking receivers, parameters, or return types, any
+        // of which can recursively compare more signatures using this builder.
+        self.constraints.signature_typevar_freshness.set(
+            signature_inferable
+                .iter(db)
+                .map(|typevar| typevar.freshness(db))
+                .max()
+                .max(max_freshness),
+        );
 
         let inferable = self.inferable.merge(db, signature_inferable);
 
@@ -2794,9 +2917,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
+            // A target that permits no calls imposes no receiver requirements. Still compare
+            // return types so that their constraints contribute to inference.
+            if target.parameters.is_top() {
+                return checker.check_signature_pair_inner(db, source, target);
+            }
+
             source
                 .receiver_constraints_when_satisfied(db, &checker)
                 .and(db, self.constraints, || {
+                    // Once its receiver is eligible, a source accepting every argument list
+                    // accepts every call permitted by the target, regardless of the target's
+                    // receiver restriction. Parameter and return types still contribute
+                    // inference bounds.
+                    if source.parameters.is_bottom() {
+                        return checker.check_signature_pair_inner(db, source, target);
+                    }
+
                     target
                         .receiver_constraints_when_satisfied(db, &checker)
                         .and(db, self.constraints, || {

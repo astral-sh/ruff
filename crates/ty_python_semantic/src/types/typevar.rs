@@ -882,7 +882,7 @@ impl TypeVarNonce {
         )
     }
 
-    fn add(self, delta: u32) -> Self {
+    pub(super) fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -1307,7 +1307,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let env = ProgramEnvironment::from_program(self.binding_context(db).program(db));
         let typevar = self.typevar(db);
-        let bound_or_constraints = f(typevar.bound_or_constraints(db, &env));
+        let original_bound_or_constraints = typevar.bound_or_constraints(db, &env);
+        let bound_or_constraints = f(original_bound_or_constraints);
+        if bound_or_constraints == original_bound_or_constraints {
+            return self;
+        }
         let typevar = TypeVarInstance::new(
             db,
             typevar.identity(db),
@@ -1457,27 +1461,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             TypeMapping::FreshenBoundTypeVars {
                 generic_context,
                 delta,
-            } => {
-                let identity = if self.is_paramspec(db) {
-                    self.identity(db).without_paramspec_attr(db)
-                } else {
-                    self.identity(db)
-                };
-                if generic_context.contains(db, identity) {
-                    Type::TypeVar(self.freshen_with_mapping(
-                        db,
-                        self.freshness(db).add(*delta),
-                        type_mapping,
-                        visitor,
-                    ))
-                } else {
-                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
-                        db,
-                        type_mapping,
-                        visitor,
-                    ))
-                }
-            }
+            } => Type::TypeVar(self.freshen_bound_typevars(db, *generic_context, *delta, visitor)),
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1577,6 +1561,29 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.paramspec_attr(db),
             self.freshness(db),
         )
+    }
+
+    pub(super) fn freshen_bound_typevars(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        };
+        let identity = if self.is_paramspec(db) {
+            self.identity(db).without_paramspec_attr(db)
+        } else {
+            self.identity(db)
+        };
+        if generic_context.contains(db, identity) {
+            self.freshen_with_mapping(db, self.freshness(db).add(delta), &mapping, visitor)
+        } else {
+            self.apply_type_mapping_to_bound_or_constraints(db, &mapping, visitor)
+        }
     }
 
     fn freshen_with_mapping(

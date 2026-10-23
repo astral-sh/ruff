@@ -140,6 +140,41 @@ fn benchmark_constraint_quantification(criterion: &mut Criterion) {
     }
 }
 
+/// Compare bottom sources and top targets against distinct signatures.
+fn benchmark_bottom_and_top_signature_comparisons(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for name in ["bottom", "top"] {
+        let mut code = String::from(
+            "\
+from typing import Any, Callable, Literal
+from ty_extensions import Bottom, Top
+",
+        );
+        for i in 0..128 {
+            let signature = format!("Callable[[Literal[{i}], str, bytes], int]");
+            let (source, target) = if name == "bottom" {
+                ("Bottom[Callable[..., Any]]", signature.as_str())
+            } else {
+                (signature.as_str(), "Top[Callable[..., object]]")
+            };
+            writeln!(
+                &mut code,
+                "\ndef check_{i}(source: {source}) -> None:\n    target: {target} = source"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(&format!("ty_micro[{name}_signature_comparisons]"), |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |Case { db }| assert_eq!(db.check().len(), 0),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -218,6 +253,124 @@ fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     code.push_str("    )\n");
 
     criterion.bench_function("ty_micro[many_upper_bound_callbacks]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Each generic protocol member has several possible specializations, none of which constrain
+/// the protocol's class argument. Avoid enumerating combinations of these independent witnesses.
+fn benchmark_independent_generic_protocol_members(criterion: &mut Criterion) {
+    const NUM_MEMBERS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = String::from(
+        "\
+from typing import Protocol
+
+def factory[T]() -> tuple[T, T]:
+    raise NotImplementedError
+
+type Result = tuple[int, int] | tuple[str, str] | tuple[bytes, bytes] | tuple[None, None]
+
+class Required[R](Protocol):
+    value: R
+",
+    );
+    for i in 0..NUM_MEMBERS {
+        writeln!(
+            &mut code,
+            "    @staticmethod\n    def member{i}() -> Result: ..."
+        )
+        .ok();
+    }
+    code.push_str("\nclass Implementation:\n    value = 1\n");
+    for i in 0..NUM_MEMBERS {
+        writeln!(&mut code, "    member{i} = staticmethod(factory)").ok();
+    }
+    code.push_str(
+        "\n\
+def infer[R](value: Required[R]) -> R:
+    return value.value
+
+infer(Implementation())
+",
+    );
+
+    criterion.bench_function("ty_micro[independent_generic_protocol_members]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// The independent witnesses remain closed when their declared domain is a protocol with generic
+/// methods. Its method-local type variables must not make each witness depend on the others.
+fn benchmark_independent_protocol_bounded_members(criterion: &mut Criterion) {
+    const NUM_MEMBERS: usize = 8;
+
+    setup_rayon();
+
+    let mut code = String::from(
+        "\
+from typing import Protocol
+
+class Item(Protocol):
+    def identity[T](self, value: T) -> T: ...
+
+class Base:
+    def identity[T](self, value: T) -> T:
+        return value
+
+class First(Base): ...
+class Second(Base): ...
+class Third(Base): ...
+class Fourth(Base): ...
+
+def factory[T: Item]() -> tuple[T, T]:
+    raise NotImplementedError
+
+type Result = tuple[First, First] | tuple[Second, Second] | tuple[Third, Third] | tuple[Fourth, Fourth]
+
+class Required[R](Protocol):
+    value: R
+",
+    );
+    for i in 0..NUM_MEMBERS {
+        writeln!(
+            &mut code,
+            "    @staticmethod\n    def member{i}() -> Result: ..."
+        )
+        .ok();
+    }
+    code.push_str("\nclass Implementation:\n    value = 1\n");
+    for i in 0..NUM_MEMBERS {
+        writeln!(&mut code, "    member{i} = staticmethod(factory)").ok();
+    }
+    code.push_str(
+        "\n\
+def infer[R](value: Required[R]) -> R:
+    return value.value
+
+infer(Implementation())
+",
+    );
+
+    criterion.bench_function("ty_micro[independent_protocol_bounded_members]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -719,8 +872,11 @@ criterion_group!(
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
     benchmark_constraint_quantification,
+    benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
     benchmark_many_upper_bound_callbacks,
+    benchmark_independent_generic_protocol_members,
+    benchmark_independent_protocol_bounded_members,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_missing_key_typed_dict_union_copy,

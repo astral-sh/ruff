@@ -98,7 +98,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::{CallableSignature, ConcatenateTail};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -9410,6 +9410,73 @@ impl<'db> Type<'db> {
             self.apply_specialization(db, specialization)
         } else {
             self
+        }
+    }
+
+    /// Freshens a member's method binders to avoid capturing typevars in incoming class arguments.
+    /// Constructor lookup must do this before adding the inherited class generic context.
+    fn freshen_member_for_owner_specialization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        let Some(specialization) = specialization else {
+            return self;
+        };
+        let freshen = |signatures: &CallableSignature<'db>| {
+            signatures.freshen_for_owner_specialization(db, env, specialization)
+        };
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.map_signatures(db, freshen))
+            }
+            Type::Callable(callable) => {
+                Type::Callable(callable.with_signatures(db, freshen(callable.signatures(db))))
+            }
+            Type::BoundMethod(method) => Type::BoundMethod(method.with_func(
+                db,
+                method.func(db).freshen_member_for_owner_specialization(
+                    db,
+                    env,
+                    Some(specialization),
+                ),
+            )),
+            Type::PropertyInstance(property) => {
+                let freshen = |ty: Type<'db>| {
+                    ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+                };
+                Type::PropertyInstance(PropertyInstanceType::new_internal(
+                    db,
+                    property.getter(db).map(freshen),
+                    property.setter(db).map(freshen),
+                    property.deleter(db).map(freshen),
+                    property.instance_class(db),
+                    property.accessor_definitions(db),
+                ))
+            }
+            Type::Union(union) => union.map(db, env, |ty| {
+                ty.freshen_member_for_owner_specialization(db, env, Some(specialization))
+            }),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db, env).preserve_positive_aliases(true);
+                for ty in intersection.positive(db) {
+                    builder.add_positive_in_place(ty.freshen_member_for_owner_specialization(
+                        db,
+                        env,
+                        Some(specialization),
+                    ));
+                }
+                for ty in intersection.negative(db) {
+                    builder.add_negative_in_place(ty.freshen_member_for_owner_specialization(
+                        db,
+                        env,
+                        Some(specialization),
+                    ));
+                }
+                builder.build()
+            }
+            _ => self,
         }
     }
 
