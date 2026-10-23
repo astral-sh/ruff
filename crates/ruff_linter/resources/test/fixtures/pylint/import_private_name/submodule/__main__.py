@@ -57,3 +57,45 @@ from os import _exit as process_exit
 from another_module import _exit as another_exit
 from os import _private_member
 from os import _exit as os_exit, _other_private_member
+
+# PLC2701 exceptions: more underscore-prefixed standard library members are
+# considered public despite their leading underscores.
+from __future__ import _Feature
+from asyncio import _enter_task
+from asyncio import _leave_task
+from asyncio import _register_task
+from asyncio import _unregister_task
+from ctypes import _CFuncPtr
+from sys import _emscripten_info
+from sys import _enablelegacywindowsfsencoding
+from importlib.util import _incompatible_extension_module_restrictions
+from ssl import _create_unverified_context
+from subprocess import _USE_POSIX_SPAWN
+from subprocess import _USE_VFORK
+from sys import _clear_internal_caches
+from sys import _clear_type_cache
+from sys import _current_exceptions
+from sys import _current_frames
+from sys import _stats_clear
+from sys import _stats_dump
+from sys import _stats_off
+from sys import _stats_on
+from ctypes import _CData
+from ctypes import _Pointer
+from ctypes import _SimpleCData
+from sysconfig import _get_preferred_schemes
+from sys import _debugmallocstats
+from sys import _getframe
+from sys import _getframemodulename
+from sys import _is_gil_enabled
+from sys import _is_immortal
+from sys import _is_interned
+from sys import _jit
+from sys import _xoptions
+from logging import _defaultFormatter
+from sys import _base_executable
+from sys.implementation import _multiarch
+
+# PLC2701 errors: standard library members that are not documented.
+from sys import _private_member_again
+from sys import _getframe as frame_getter, _undeclared_private_member
