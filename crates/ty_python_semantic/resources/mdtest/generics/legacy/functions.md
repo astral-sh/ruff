@@ -2777,20 +2777,17 @@ def invalid_constraints(value: Callable[[], Incompatible | str]) -> None:
 
 ## Gradual types in union arms
 
-When matching the caller's `U` against `T | A`, a fully static `A` lets us infer `T` from the part
-of `U` that `A` does not cover: `U & ~A`. We cannot apply this subtraction when `A` contains `Any`,
-because gradual assignability does not treat `Any` as a single fixed type.
-
-Here, `U` is assignable to `tuple[list[Any]]`, so only `str` contributes to the inferred `T`. This
-holds whether `list[Any]` is written inline or wrapped in a lazy alias.
+When matching the caller's `U` against `T | A`, we infer `T` from the part of `U` outside the top
+materialization of `A`: `U & ~Top[A]`.
 
 ```py
 from collections.abc import Callable
-from typing import Any, TypeVar
-from typing_extensions import TypeAliasType
+from typing import Any
+from typing_extensions import TypeAliasType, TypeVar
 
-T = TypeVar("T")
-U = TypeVar("U", bound=tuple[list[int]])
+T = TypeVar("T", default=bytes)
+Unrestricted = TypeVar("Unrestricted")
+Disjoint = TypeVar("Disjoint", bound=int)
 Gradual = TypeAliasType("Gradual", list[Any])
 
 def aliased(value: Callable[[], T | tuple[Gradual]]) -> T:
@@ -2799,9 +2796,43 @@ def aliased(value: Callable[[], T | tuple[Gradual]]) -> T:
 def inline(value: Callable[[], T | tuple[list[Any]]]) -> T:
     raise NotImplementedError
 
+def unrestricted(value: Callable[[], Unrestricted | str]) -> None:
+    # revealed: (Unrestricted@unrestricted & ~tuple[Top[list[Any]]]) | str
+    reveal_type(inline(value))
+
+def disjoint(value: Callable[[], Disjoint | str]) -> None:
+    reveal_type(inline(value))  # revealed: Disjoint@disjoint | str
+```
+
+Here, `U` is assignable to `tuple[list[Any]]`, so only `str` contributes to the inferred `T`. This
+holds whether `list[Any]` is written inline or wrapped in a lazy alias.
+
+```py
+U = TypeVar("U", bound=tuple[list[int]])
+
 def outer(value: Callable[[], U | str]) -> None:
     reveal_type(aliased(value))  # revealed: str
     reveal_type(inline(value))  # revealed: str
+```
+
+Without the separate `str` member, the gradual arm covers the entire caller variable, so we use
+`T`'s default.
+
+```py
+def covered_default(value: Callable[[], U]) -> None:
+    reveal_type(inline(value))  # revealed: bytes
+```
+
+The uncovered portion of the caller's variable must still satisfy the callee's bound.
+
+```py
+Bounded = TypeVar("Bounded", bound=str)
+
+def bounded(value: Callable[[], Bounded | tuple[list[Any]]]) -> Bounded:
+    raise NotImplementedError
+
+def invalid(value: Callable[[], Disjoint | str]) -> None:
+    bounded(value)  # error: [invalid-argument-type]
 ```
 
 ## Gradual overload alternatives remain compatible with other arguments

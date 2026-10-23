@@ -19,8 +19,7 @@ use crate::types::constraints::{
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    DynamicContentMode, TypeCollector, TypeVisitor, any_over_type_expanding_aliases,
-    dynamic_content_impl, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
 use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeVarVariance, UnionType};
 use crate::{Db, Program, ProgramEnvironment};
@@ -1643,11 +1642,11 @@ impl<'db> ConcreteUpperBound<'db> {
             map.add_single_implication(self.into(), derived.into());
         }
 
-        // `U ≤ T | A` implies `U & ~A ≤ T`. In particular, when U is fixed by the caller,
+        // `U ≤ T | A` implies `U & ~Top[A] ≤ T`. In particular, when U is fixed by the caller,
         // the original upper bound cannot select a solution for T. The residual lower bound
         // preserves U without requiring T to accept the part of U already covered by A.
-        // This set-theoretic implication requires static bounds: gradual assignability does
-        // not support moving a union member across the relation by negating it.
+        // Subtracting A's top materialization excludes every materialization of a gradual arm, so
+        // a fully covered U contributes no inference evidence and does not override T's default.
         let Type::Union(union) = self.bound else {
             return;
         };
@@ -1659,20 +1658,18 @@ impl<'db> ConcreteUpperBound<'db> {
             // Wait for substitutions to resolve other type variables in the union. Otherwise,
             // `U ≤ T | V` would produce mutually dependent lower bounds `U & ~V ≤ T` and
             // `U & ~T ≤ V`, which cannot independently select solutions for T and V.
-            // Inspect aliases and lazy structural members for gradual content, while leaving
-            // the inferred variable's own bound and default opaque.
-            if other_elements.clone().any(|other| {
-                any_over_type_expanding_aliases(db, env, *other, Type::is_type_var)
-                    || !dynamic_content_impl(db, env, *other, DynamicContentMode::Materialization)
-                        .is_absent()
-            }) {
+            if other_elements
+                .clone()
+                .any(|other| any_over_type_expanding_aliases(db, env, *other, Type::is_type_var))
+            {
                 continue;
             }
             let residual = IntersectionType::bounded_from_elements(
                 db,
                 env,
-                std::iter::once(Type::TypeVar(self.typevar))
-                    .chain(other_elements.map(|other| other.negate(db, env))),
+                std::iter::once(Type::TypeVar(self.typevar)).chain(
+                    other_elements.map(|other| other.top_materialization(db, env).negate(db, env)),
+                ),
             );
             // `Never ≤ T` supplies no inference evidence and must not override T's default.
             let Some(residual) = residual.filter(|residual| !residual.is_never()) else {
