@@ -7,21 +7,20 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
+use crate::types::constraints::sequents::SequentMap;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{
     AtomicConstraint, Constraint, ConstraintProvenance, UnsatisfiableBound,
 };
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, CandidateSolution,
-    CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
+    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, BoundedSolutionLimits,
+    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
     ConstraintFailureEvidence, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
     SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
-use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, DynamicType, Type, UnionType, any_over_type,
-};
+use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 type ProcessNode<'a, 'db, L, B, R> = dyn Fn(
@@ -55,13 +54,6 @@ type ExploredNodeKey = (
     Box<[(Assignment<AtomicConstraintId>, AtomicConstraintId)]>,
 );
 
-#[derive(Clone, Copy)]
-enum PrefixValidity {
-    /// Assignments before this index have already been checked for a declaration violation.
-    UncheckedFrom(usize),
-    Invalid,
-}
-
 enum Break<B> {
     Limits(B),
     EarlyBreak,
@@ -86,6 +78,8 @@ pub(super) struct SolutionWalker<'db, L> {
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
     limits: L,
+    /// How many rejected paths can be rechecked within the traversal budget.
+    remaining_failed_paths: Option<usize>,
 
     declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 
@@ -98,9 +92,6 @@ pub(super) struct SolutionWalker<'db, L> {
     /// Nodes that we have already checked the satisfiability of.
     node_is_satisfiable_on_path_cache: FxHashMap<ExploredNodeKey, bool>,
 
-    /// Whether an atomic constraint independently violates its typevar's declared upper bound.
-    lower_bound_violates_declaration: FxHashMap<AtomicConstraintId, bool>,
-
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
     /// We will check these solutions against the declared upper bounds (TODO and constraints) of
@@ -108,8 +99,6 @@ pub(super) struct SolutionWalker<'db, L> {
     /// candidate solution for satisfiable paths that do _not_ satisfy the upper bounds and
     /// constraints. Those paths will have a [`validity`][CandidateSolution::validity] of
     /// [`Invalid`][SolutionValidity::Invalid].
-    /// Once a prefix cannot produce a valid solution, we retain only a representative complete
-    /// invalid path below it, rather than enumerating every combination of diagnostic evidence.
     pending: Vec<PendingCandidateSolution<'db>>,
 
     _phantom: PhantomData<&'db ()>,
@@ -140,10 +129,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             inferable,
             inferable_support,
             limits,
+            remaining_failed_paths: None,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
             node_is_satisfiable_on_path_cache: FxHashMap::default(),
-            lower_bound_violates_declaration: FxHashMap::default(),
             pending: Vec::default(),
             _phantom: PhantomData,
         }
@@ -205,16 +194,129 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let validations = all_typevars
             .map(|all_typevars| Validations::from_support(db, env, storage, all_typevars));
         let validations = validations.as_ref();
-        self.visit_node_inner(
-            db,
-            env,
-            storage,
-            path,
-            polarity,
-            node,
-            validations,
-            PrefixValidity::UncheckedFrom(0),
-        )
+        self.remaining_failed_paths = None;
+        if polarity == Polarity::Positive
+            && path.assignments.is_empty()
+            && self.explored_nodes.is_empty()
+            && let Some(validations) = validations
+            && let Some((limits, exceeded)) = self.limits.traversal_budget()
+            && let Some((visits, bounds_per_path)) =
+                self.lower_bound_product_visits(db, env, storage, node, validations, limits)
+        {
+            let Some(extra_visits) = limits.remaining_visits.checked_sub(visits) else {
+                return ControlFlow::Break(exceeded);
+            };
+            self.remaining_failed_paths = Some(extra_visits / bounds_per_path);
+        }
+        self.visit_node_inner(db, env, storage, path, polarity, node, validations)
+    }
+
+    /// Count the work common to every outcome of a product of independent lower bounds. For
+    /// example, `(A ≤ T or B ≤ T) and (C ≤ T or D ≤ T)` has four paths with two bounds apiece.
+    /// Each failure repeats the lower-bound scan when attributing the diagnostic. Together these
+    /// costs bound how many failed paths the budget can accommodate.
+    fn lower_bound_product_visits(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &ConstraintSetStorage<'db>,
+        mut node: NodeId,
+        validations: &Validations<'db>,
+        limits: &BoundedSolutionLimits,
+    ) -> Option<(usize, usize)> {
+        if validations.upper_bounds.len() != 1 || !validations.constrained.is_empty() {
+            return None;
+        }
+        let (typevar, upper) = validations.upper_bounds.first()?;
+        let [upper] = upper.constraints.as_deref()? else {
+            return None;
+        };
+        if !typevar.is_inferable(db, self.inferable)
+            || self.inferable.iter(db).any(|var| var.is_paramspec(db))
+        {
+            return None;
+        }
+
+        let mut atoms = Vec::new();
+        let mut paths = 1usize;
+        let mut visits = 0usize;
+        let mut bounds_per_path = 0usize;
+        // Checking pairs for sequents costs quadratic work in the number of atoms.
+        let max_atoms = limits.remaining_visits.isqrt();
+        while node != ALWAYS_TRUE {
+            if node == ALWAYS_FALSE {
+                return None;
+            }
+            // Each positive edge chooses a bound and continues to the same suffix. The
+            // uncertain edge tries the next alternative in this group.
+            let suffix = storage.interior_node_data(node).if_true;
+            let mut alternatives = 0usize;
+            while node != ALWAYS_FALSE {
+                if node == ALWAYS_TRUE || atoms.len() >= max_atoms {
+                    return None;
+                }
+                let choice = storage.interior_node_data(node);
+                if choice.if_true != suffix || choice.if_false != ALWAYS_FALSE {
+                    return None;
+                }
+                atoms.push(choice.constraint.as_atomic(storage)?);
+                visits = visits.saturating_add(paths);
+                alternatives += 1;
+                node = choice.if_uncertain;
+            }
+            paths = paths.saturating_mul(alternatives);
+            bounds_per_path += 1;
+            node = suffix;
+        }
+
+        // Each terminal consumes one visit plus one visit for every lower bound in the first
+        // scan. A rejected terminal repeats the scan when attributing the declaration failure.
+        let scan_visits = paths.saturating_mul(bounds_per_path);
+        visits = visits.saturating_add(paths).saturating_add(scan_visits);
+        if paths <= 1 || visits.saturating_add(scan_visits) <= limits.remaining_visits {
+            return None;
+        }
+        // Preserve which limit is reached first. Even if every terminal produces a candidate,
+        // the next path over the path limit still has to undergo its initial scan.
+        if paths > limits.remaining_paths
+            && limits
+                .remaining_paths
+                .saturating_add(1)
+                .saturating_mul(bounds_per_path + 1)
+                <= limits.remaining_visits
+        {
+            return None;
+        }
+        if !atoms.iter().all(|&atom| {
+            matches!(storage.atomic_constraint_data(atom), AtomicConstraint::ConcreteLower(lower)
+                if lower.typevar == *typevar
+                    && !any_over_type_expanding_aliases(db, env, lower.bound, Type::is_type_var))
+        }) {
+            return None;
+        }
+
+        // Without any sequent, each choice takes the ordinary edge and the positive constraints
+        // distinguish all visited states. Include the declared bound, which is added at every
+        // terminal, and use the same pair orientation as PathAssignments.
+        atoms.sort_unstable_by_key(|atom| self.source_orders.get_index_of(atom));
+        atoms.push(*upper);
+        for (i, &id) in atoms.iter().enumerate() {
+            let atom = storage.atomic_constraint_data(id);
+            if SequentMap::for_constraint(db, env, atom).is_some_and(|map| !map.sequents.is_empty())
+                || atoms[i + 1..].iter().any(|&other| {
+                    SequentMap::for_constraint_pair(
+                        db,
+                        env,
+                        atom,
+                        storage.atomic_constraint_data(other),
+                    )
+                    .is_some_and(|map| !map.sequents.is_empty())
+                })
+            {
+                return None;
+            }
+        }
+        Some((visits, bounds_per_path))
     }
 
     /// Visit a BDD node and all of its descendants, invoking the `process_satisfied` callback for
@@ -229,7 +331,6 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
-        prefix_validity: PrefixValidity,
     ) -> ControlFlow<L::Break> {
         self.limits.visit_node()?;
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
@@ -283,23 +384,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             return ControlFlow::Continue(());
         }
 
-        // When neither bound contains type variables, an incompatible lower bound cannot be
-        // repaired by adding more lower bounds: their union only grows. Keep walking until we
-        // recover one complete invalid candidate. This preserves relationships and evidence from
-        // the remaining arguments without enumerating all combinations below an invalid prefix.
-        let prefix_validity = match prefix_validity {
-            PrefixValidity::UncheckedFrom(start)
-                if validations.is_some_and(|validations| !validations.upper_bounds.is_empty())
-                    && self.path_violates_declared_bound(db, env, storage, path, start)? =>
-            {
-                PrefixValidity::Invalid
-            }
-            PrefixValidity::UncheckedFrom(_) => {
-                PrefixValidity::UncheckedFrom(path.assignments.len())
-            }
-            PrefixValidity::Invalid => PrefixValidity::Invalid,
-        };
-        let previously_pending = self.pending.len();
+        // At this point we actually have to walk the outgoing edges of this node.
         self.visit_constraint(
             db,
             env,
@@ -308,83 +393,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             polarity,
             node,
             &|this, storage, path, polarity, child| {
-                if matches!(prefix_validity, PrefixValidity::Invalid)
-                    && this.pending.len() > previously_pending
-                {
-                    return ControlFlow::Continue(());
-                }
-                this.visit_node_inner(
-                    db,
-                    env,
-                    storage,
-                    path,
-                    polarity,
-                    child,
-                    validations,
-                    prefix_validity,
-                )
+                this.visit_node_inner(db, env, storage, path, polarity, child, validations)
             },
         )
-    }
-
-    fn path_violates_declared_bound(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-        start: usize,
-    ) -> ControlFlow<L::Break, bool> {
-        for (assignment, _) in path.assignments.iter().skip(start) {
-            self.limits.visit_node()?;
-            let Assignment::Positive(constraint) = assignment else {
-                continue;
-            };
-            let constraint = *constraint;
-            if path.constraint_is_substituted(constraint) {
-                continue;
-            }
-            let violates = self
-                .lower_bound_violates_declaration
-                .entry(constraint)
-                .or_insert_with(|| {
-                    let (typevar, lower) = match storage.atomic_constraint_data(constraint) {
-                        AtomicConstraint::ConcreteLower(lower) => (lower.typevar, lower.bound),
-                        AtomicConstraint::ConcreteEquivalence(bound) => {
-                            (bound.typevar, bound.bound)
-                        }
-                        _ => return false,
-                    };
-                    if !typevar.is_inferable(db, self.inferable) || typevar.is_paramspec(db) {
-                        return false;
-                    }
-                    let Some(upper) = typevar.typevar(db).upper_bound(db, env) else {
-                        return false;
-                    };
-                    // Symbolic bounds can become compatible after later substitutions. Likewise,
-                    // provisional types must be allowed to stabilize before rejecting a branch.
-                    let is_unresolved = |ty: Type<'db>| {
-                        any_over_type_expanding_aliases(db, env, ty, |nested| {
-                            nested.is_type_var()
-                                || nested
-                                    .as_dynamic()
-                                    .is_some_and(DynamicType::is_provisional_marker)
-                        })
-                    };
-                    if is_unresolved(lower) || is_unresolved(upper) {
-                        return false;
-                    }
-                    // This checks the inferred lower directly, without assuming transitivity of
-                    // gradual assignability. Defer nontrivial relations to full path validation.
-                    lower
-                        .when_constraint_set_assignable_to_owned(db, env, upper)
-                        .query(|_, when| when.is_trivially_never_satisfied())
-                });
-            if *violates {
-                return ControlFlow::Continue(true);
-            }
-        }
-        ControlFlow::Continue(false)
     }
 
     fn validate_solutions(
@@ -801,6 +812,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // Inference or mixed lower bounds determine whether a solution is chosen, but validity
         // lower bounds also contribute to that solution.
         for (constraint, source) in path.positive_constraints() {
+            // `lower_bound_product_visits` counts this visit for every bound on an eligible path.
             self.limits.visit_node().map_break(Break::Limits)?;
             if path.constraint_is_substituted(constraint) {
                 continue;
@@ -1664,6 +1676,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         upper_bounds: &Slice<BoundTypeVarInstance<'db>, UpperBound>,
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
     ) -> ControlFlow<L::Break> {
+        if let Some(remaining) = &mut self.remaining_failed_paths
+            && let Some((_, exceeded)) = self.limits.traversal_budget()
+        {
+            let Some(next) = remaining.checked_sub(1) else {
+                return ControlFlow::Break(exceeded);
+            };
+            *remaining = next;
+        }
         let mut violations = FxHashMap::default();
 
         for (bound_typevar, upper_bound) in upper_bounds {
