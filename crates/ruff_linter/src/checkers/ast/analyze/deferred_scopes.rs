@@ -246,7 +246,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if scope.kind.is_function() {
             if checker.is_rule_enabled(Rule::ConditionalGlobalOrNonlocal) {
-                ruff::rules::conditional_global_or_nonlocal(checker, scope_id, scope);
+                ruff::rules::conditional_global_or_nonlocal(checker, scope);
             }
 
             if checker.is_rule_enabled(Rule::NoSelfUse) {

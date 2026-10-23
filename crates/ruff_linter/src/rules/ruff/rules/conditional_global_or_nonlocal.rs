@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
-use ruff_python_semantic::{BindingKind, NodeId, Scope, ScopeId};
+use ruff_python_semantic::{Binding, BindingKind, NodeId, Scope, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
@@ -19,7 +19,8 @@ use crate::codes::Category;
 /// skipped, while using the name on a path that does not pass through that block,
 /// is misleading: it looks like the declaration only affects that block, when in
 /// fact the other path's assignment also targets the global or enclosing
-/// variable.
+/// variable. The same applies to a nested function or comprehension that reads
+/// the name: it sees the global or enclosing variable because of the declaration.
 ///
 /// ## Example
 /// ```python
@@ -47,6 +48,10 @@ use crate::codes::Category;
 ///     else:
 ///         counter = 2
 /// ```
+///
+/// ## References
+/// - [Python documentation: The `global` statement](https://docs.python.org/3/reference/simple_stmts.html#the-global-statement)
+/// - [Python documentation: The `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#the-nonlocal-statement)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
 pub(crate) struct ConditionalGlobalOrNonlocal {
@@ -64,62 +69,59 @@ impl Violation for ConditionalGlobalOrNonlocal {
     }
 }
 
-/// RUF078
-pub(crate) fn conditional_global_or_nonlocal(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
+/// conditional-global-or-nonlocal
+pub(crate) fn conditional_global_or_nonlocal(checker: &Checker, scope: &Scope) {
     let semantic = checker.semantic();
 
     for (name, binding_id) in scope.bindings() {
-        let mut declaration: Option<Declaration> = None;
-        let mut occurrences: Vec<NodeId> = Vec::new();
-
-        // References can resolve into nested scopes; keep only this scope's.
-        for id in scope.shadowed_bindings(binding_id) {
-            let binding = &semantic.bindings[id];
-            let keyword = match binding.kind {
-                BindingKind::Global(_) => Some("global"),
-                BindingKind::Nonlocal(_, _) => Some("nonlocal"),
-                _ => None,
-            };
-            if let Some(keyword) = keyword
-                && let Some(statement) = binding.source
-            {
-                declaration = Some(Declaration {
-                    statement,
-                    name_range: binding.range(),
-                    keyword,
-                });
-            } else {
-                occurrences.extend(binding.source);
-            }
-            for reference_id in binding.references() {
-                let reference = semantic.reference(reference_id);
-                if reference.scope_id() == scope_id
-                    && let Some(node_id) = reference.expression_id()
-                {
-                    occurrences.push(node_id);
-                }
-            }
-        }
-
-        let Some(declaration) = declaration else {
+        // `shadowed_bindings` walks from the newest binding backwards, so `last` is the first
+        // declaration in source order.
+        let Some(declaration) = scope
+            .shadowed_bindings(binding_id)
+            .filter_map(|id| Declaration::from_binding(&semantic.bindings[id]))
+            .last()
+        else {
             continue;
         };
 
-        // `dominates` doesn't model loops; a loop may run zero times, so a use
-        // outside an enclosing loop is reachable without a declaration inside it.
-        // (Searching past the enclosing function would cross into another scope.)
+        // A `with` body always runs, but the semantic model records it as a branch because a
+        // context manager may suppress an exception raised inside it. For the purpose of this
+        // rule, a declaration inside a `with` body is as good as one placed before the `with`.
+        let mut dominator = declaration.statement;
+        while let Some(parent) = semantic.parent_statement_id(dominator)
+            && semantic.statement(parent).is_with_stmt()
+        {
+            dominator = parent;
+        }
+
+        // `dominates` doesn't model loops; a loop may run zero times, so a use outside an
+        // enclosing loop is reachable without a declaration inside it.
         let loop_range = semantic
             .statements(declaration.statement)
-            .take_while(|statement| !statement.is_function_def_stmt())
             .find_map(|statement| {
                 matches!(statement, Stmt::For(_) | Stmt::While(_)).then_some(statement.range())
             });
 
-        let misleading = occurrences.iter().any(|&use_node| {
-            !semantic.dominates(declaration.statement, use_node)
+        let is_misleading = |use_node: NodeId| {
+            !semantic.dominates(dominator, use_node)
                 || loop_range.is_some_and(|range| {
                     !range.contains_range(semantic.statement(use_node).range())
                 })
+        };
+
+        // Uses are the other bindings of the name in this scope (assignments, deletions, and so
+        // on) plus every reference that resolved to one of its bindings, including references
+        // from nested scopes, which read the global or enclosing variable because of the
+        // declaration.
+        let misleading = scope.shadowed_bindings(binding_id).any(|id| {
+            let binding = &semantic.bindings[id];
+            let source = binding
+                .source
+                .filter(|_| Declaration::from_binding(binding).is_none());
+            source
+                .into_iter()
+                .chain(references(semantic, binding))
+                .any(is_misleading)
         });
 
         if misleading {
@@ -134,10 +136,35 @@ pub(crate) fn conditional_global_or_nonlocal(checker: &Checker, scope_id: ScopeI
     }
 }
 
+/// Returns the expression nodes of the references that resolved to `binding`.
+fn references<'a>(
+    semantic: &'a SemanticModel,
+    binding: &'a Binding,
+) -> impl Iterator<Item = NodeId> + 'a {
+    binding
+        .references()
+        .filter_map(|reference_id| semantic.reference(reference_id).expression_id())
+}
+
 struct Declaration {
     /// The `global`/`nonlocal` statement node, used for the dominance check.
     statement: NodeId,
     /// The declared name's range, used as the diagnostic range.
     name_range: TextRange,
     keyword: &'static str,
+}
+
+impl Declaration {
+    fn from_binding(binding: &Binding) -> Option<Self> {
+        let keyword = match binding.kind {
+            BindingKind::Global(_) => "global",
+            BindingKind::Nonlocal(_, _) => "nonlocal",
+            _ => return None,
+        };
+        Some(Self {
+            statement: binding.source?,
+            name_range: binding.range(),
+            keyword,
+        })
+    }
 }

@@ -1,8 +1,8 @@
-# `conditional-global-or-nonlocal` (`RUF078`)
+# `conditional-global-or-nonlocal`
 
 ```toml
 lint.preview = true
-lint.select = ["RUF078"]
+lint.select = ["conditional-global-or-nonlocal"]
 ```
 
 ## Declared in a skippable block, used on another path
@@ -23,7 +23,7 @@ def update(flag):
 ```
 
 ```snapshot
-error[RUF078]: `counter` is declared `global` in a block that may not run on every path, but the declaration applies to the entire function
+error[conditional-global-or-nonlocal]: `counter` is declared `global` in a block that may not run on every path, but the declaration applies to the entire function
  --> src/mdtest_snippet.py:6:16
   |
 6 |         global counter  # snapshot: conditional-global-or-nonlocal
@@ -100,8 +100,8 @@ def run_empty():
     total = 1
 ```
 
-Only the name used on another path is flagged, and a use can be a read or any
-binding form (here, a walrus):
+Only the name used on another path is flagged, and a use can be a read or any binding form (here, a
+walrus):
 
 ```py
 a = b = 0
@@ -116,6 +116,72 @@ def f(flag):
         print(a := 2)
 ```
 
+Declaring the name in every branch does not help: each declaration still applies to the whole
+function, and the first one is reported.
+
+```py
+counter = 0
+
+
+def update(flag):
+    if flag:
+        global counter  # error: [conditional-global-or-nonlocal]
+        counter = 1
+    else:
+        global counter
+        counter = 2
+```
+
+## Used from a nested scope
+
+A nested function, lambda, or comprehension that reads the name is affected by the declaration too:
+without it, `inner` below would fail with a `NameError` when `flag` is false, because `counter` would
+be an unbound local of `update`. With it, `inner` reads the global. So the use is flagged.
+
+```py
+counter = 0
+
+
+def update(flag):
+    if flag:
+        global counter  # error: [conditional-global-or-nonlocal]
+        counter = 1
+
+    def inner():
+        return counter
+
+    return inner
+```
+
+```py
+counter = 0
+
+
+def update(flag):
+    if flag:
+        global counter  # error: [conditional-global-or-nonlocal]
+        counter = 1
+    else:
+        print([counter for _ in range(2)])
+```
+
+A nested scope defined inside the same block is on the same path, so it is not flagged:
+
+```py
+counter = 0
+
+
+def update(flag):
+    if flag:
+        global counter  # no diagnostic
+        counter = 1
+
+        def inner():
+            return counter
+
+        return inner
+```
+
 ## Not flagged
 
 Declared at the top of the function (its scope is already obvious):
@@ -125,7 +191,7 @@ counter = 0
 
 
 def update(flag):
-    global counter
+    global counter  # no diagnostic
     if flag:
         counter = 1
     else:
@@ -140,7 +206,7 @@ counter = 0
 
 def update(flag):
     if flag:
-        global counter
+        global counter  # no diagnostic
         counter = 1
 ```
 
@@ -152,7 +218,7 @@ counter = 0
 
 def update():
     for _ in range(3):
-        global counter
+        global counter  # no diagnostic
         counter = 1
 ```
 
@@ -167,21 +233,23 @@ def update():
     for _ in range(3):
         pass
     else:
-        global counter
+        global counter  # no diagnostic
         counter = 1
 ```
 
-A use in a nested scope is not on a path of this function, so it is not flagged:
+A `with` body always runs, so a declaration inside it is not conditional, even when the name is used
+after the `with`:
 
 ```py
-counter = 0
+import threading
+
+_lock = threading.Lock()
+_instance = None
 
 
-def update(flag):
-    if flag:
-        global counter
-        counter = 1
-
-    def inner():
-        return counter
+def get_instance():
+    with _lock:
+        global _instance  # no diagnostic
+        _instance = object()
+    return _instance
 ```
