@@ -1360,6 +1360,73 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn annotation_union_updates_after_operator_and_base_changes() -> anyhow::Result<()> {
+    let base = r#"class Meta(type):
+    def __or__(self, other: object) -> str: ...
+    def __ror__(self, other: object) -> str: ...
+
+class A(metaclass=Meta): ...
+class B(metaclass=Meta): ...
+class C: ...
+"#;
+    let incompatible = base.replace("other: object", "other: str");
+    let subclass = base.replace("class A(metaclass=Meta)", "class A(B, metaclass=Meta)");
+    let cyclic = subclass.replace("class B(metaclass=Meta)", "class B(A, metaclass=Meta)");
+    let main = "from base import A, B, C\nvalue: A | B | C\n";
+    let observe = |db: &TestDb| -> anyhow::Result<_> {
+        let file = system_path_to_file(db, "/src/main.py")?;
+        let module = parsed_module(db, program_file(db, file).python_file(db)).load(db);
+        let Some(assignment) = module.syntax().body[1].as_ann_assign_stmt() else {
+            anyhow::bail!("expected an annotated assignment");
+        };
+        let scope = global_scope(db, program_file(db, file));
+        let inference = infer_complete_scope_types(db, scope);
+        let mut expression = assignment.annotation.as_ref();
+        let mut prefixes = Vec::new();
+        while let ast::Expr::BinOp(binary) = expression {
+            prefixes.push(
+                inference
+                    .expression_type(expression)
+                    .display(db, &db.program_environment())
+                    .to_string(),
+            );
+            expression = &binary.left;
+        }
+        let config = ruff_db::diagnostic::DisplayDiagnosticConfig::new("ty").color(false);
+        let diagnostics = check_types(db, program_file(db, file))
+            .iter()
+            .map(|diagnostic| diagnostic.display(db, &config).to_string())
+            .collect::<Vec<_>>();
+        Ok((prefixes, diagnostics))
+    };
+    let mut db = setup_db();
+    db.write_file("/src/main.py", main)?;
+    for (source, prefixes, errors) in [
+        (base, Some(["A | B | C", "A | B"]), false),
+        (incompatible.as_str(), Some(["A | B | C", "A | B"]), true),
+        (base, Some(["A | B | C", "A | B"]), false),
+        (subclass.as_str(), Some(["B | C", "B"]), false),
+        (cyclic.as_str(), None, false),
+        (base, Some(["A | B | C", "A | B"]), false),
+    ] {
+        db.write_file("/src/base.pyi", source)?;
+        let observed = observe(&db)?;
+        let mut fresh = setup_db();
+        fresh.write_files([("/src/base.pyi", source), ("/src/main.py", main)])?;
+        assert_eq!(observed, observe(&fresh)?, "{source}");
+        if let Some(prefixes) = prefixes {
+            assert_eq!(observed.0, prefixes, "{source}");
+            assert_eq!(observed.1.len(), usize::from(errors), "{source}");
+        }
+        if errors {
+            assert!(observed.1[0].contains("Unsupported `|` operation"));
+            assert!(observed.1[0].contains("A | B"));
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
