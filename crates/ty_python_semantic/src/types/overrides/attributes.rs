@@ -258,7 +258,18 @@ fn member_contract<'db>(
                     .unwrap_or(read),
             )
         } else {
-            descriptor_write_domain(db, env, own_place.ty, receiver, read)
+            // Method replacements need only satisfy the bound signature, even when reads
+            // expose a function identity (as with static methods). Match assignment checking.
+            descriptor_write_domain(
+                db,
+                env,
+                own_place.ty,
+                receiver,
+                own_place
+                    .ty
+                    .instance_method_contract(db, env, receiver)
+                    .unwrap_or(read),
+            )
         };
         (read, write)
     } else {
@@ -385,6 +396,12 @@ fn attribute_violation<'db>(
             source: source.read,
             target: target.read,
         });
+    }
+    // Method overrides follow callable subtyping (including covariant returns), even
+    // though an instance can explicitly replace a method. Preserve that policy for
+    // callable attribute implementations as well as method definitions.
+    if target.is_method {
+        return None;
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
