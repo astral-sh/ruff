@@ -1158,7 +1158,6 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
-    #[expect(dead_code, reason = "used by the reaching-definition lookup")]
     pub(crate) fn is_deferred_name_load(&self, name: &ast::ExprName) -> bool {
         self.extra.as_deref().is_some_and(|extra| {
             extra
