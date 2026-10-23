@@ -138,8 +138,8 @@ C()()
 _: Callable[..., None] = C()
 ```
 
-The dunder-name heuristic also does not apply to a callable parameterized by a `ParamSpec`, even
-after the `ParamSpec` is specialized:
+An explicitly annotated callable parameterized by a `ParamSpec` remains regular, even after the
+`ParamSpec` is specialized:
 
 ```py
 from collections.abc import Callable
@@ -168,7 +168,65 @@ def check_self(value: Child) -> None:
     result: Child = value[0]
 ```
 
-And of course the same is true if we have only an implicit assignment inside a method:
+### Descriptor binding for annotated callable dunders
+
+An explicitly annotated callable dunder with a positional first parameter is treated as a
+descriptor. This includes annotations that refine methods inherited from a base class. An annotation
+without a class-body value also permits instance storage, so direct access includes both
+possibilities:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import Any
+
+class Operand:
+    def __add__(self, value: Any, /) -> Any: ...
+    def __getitem__(self, value: Any, /) -> Any: ...
+
+class Index(Operand):
+    __add__: Callable[[Index, Any], Index]
+    __getitem__: Callable[[Index, Any], str]
+
+index = Index()
+reveal_type(index.__add__)  # revealed: ((Any, /) -> Index) | ((Index, Any, /) -> Index)
+reveal_type(index + 1)  # revealed: Index
+reveal_type(index[1])  # revealed: str
+```
+
+A callable initialized in the class body binds the receiver on direct instance reads too:
+
+```py
+def add(value: Direct, other: int, /) -> Direct:
+    return value
+
+class Direct:
+    __add__: Callable[[Direct, int], Direct] = add
+
+reveal_type(Direct().__add__)  # revealed: (int, /) -> Direct
+reveal_type(Direct() + 1)  # revealed: Direct
+```
+
+The descriptor heuristic also applies through a type alias:
+
+```py
+type AliasedAdd = Callable[[Aliased, int], Aliased]
+
+class Aliased:
+    __add__: AliasedAdd
+
+reveal_type(Aliased() + 1)  # revealed: Aliased
+```
+
+### Dunder methods attached to instances
+
+Dunder methods assigned to an instance inside a method cannot be called implicitly:
 
 ```py
 from typing import Callable
@@ -186,9 +244,13 @@ _: Callable[..., None] = C()
 
 ## When the dunder is not a method
 
-A dunder can also be a non-method callable:
+A dunder can also be a non-method callable. Using the callable object's concrete type preserves the
+runtime fact that it is not a descriptor. Erasing that fact with a `Callable` annotation is
+necessarily unsound: the dunder heuristic assumes it is a method.
 
 ```py
+from collections.abc import Callable
+
 class SomeCallable:
     def __call__(self, key: int) -> str:
         return str(key)
@@ -196,9 +258,15 @@ class SomeCallable:
 class ClassWithNonMethodDunder:
     __getitem__: SomeCallable = SomeCallable()
 
+class ClassWithCallableAnnotatedDunder:
+    __getitem__: Callable[[int], str] = SomeCallable()
+
 class_with_callable_dunder = ClassWithNonMethodDunder()
 
 reveal_type(class_with_callable_dunder[0])  # revealed: str
+
+# error: [invalid-argument-type]
+ClassWithCallableAnnotatedDunder()[0]
 ```
 
 ## Dunders are looked up using the descriptor protocol

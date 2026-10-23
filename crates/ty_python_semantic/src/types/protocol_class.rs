@@ -1640,9 +1640,35 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
             ty: self.access.materialize_type(db, env, annotation.ty),
             ..annotation
         };
-        Some(self_type.map_or(annotation.ty, |self_type| {
+        let ty = self_type.map_or(annotation.ty, |self_type| {
             annotation.bind_self(db, env, self_type)
-        }))
+        });
+        if self.access.mode == ProtocolMemberAccessMode::Instance
+            && self
+                .access
+                .declaration
+                .qualifiers
+                .contains(TypeQualifiers::CLASS_VAR)
+            && matches!(
+                self.access.declaration.kind,
+                ProtocolMemberKind::Attribute(_)
+            )
+        {
+            // Class-variable callable annotations describe the unbound signature. Resolve their
+            // instance reads with the same descriptor heuristic as the implementation's reads.
+            let receiver = self_type.unwrap_or(Type::unknown());
+            Type::try_call_dunder_get_on_attribute(
+                db,
+                env,
+                Place::declared(ty).with_qualifiers(self.access.declaration.qualifiers),
+                Some(receiver),
+                receiver.to_meta_type(db, env),
+            )
+            .0
+            .ignore_possibly_undefined()
+        } else {
+            Some(ty)
+        }
     }
 }
 
@@ -3654,7 +3680,7 @@ fn proto_interface_cycle_recover<'db>(
     value.cycle_normalized(db, &env, *previous, cycle)
 }
 
-/// Bind `self` unless this is a `Callable[P, R]` dunder, and *also* discard the functionlike-ness
+/// Bind `self` and *also* discard the functionlike-ness
 /// of the callable.
 ///
 /// This additional upcasting is required in order for protocols with `__call__` method
@@ -3671,10 +3697,6 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    if callable.is_dunder_paramspec(db) {
-        return callable.into_regular(db);
-    }
-
     let env = ProgramEnvironment::from_program(program);
     callable
         .with_signatures(

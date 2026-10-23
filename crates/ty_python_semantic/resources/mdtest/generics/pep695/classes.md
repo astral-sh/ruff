@@ -2248,6 +2248,133 @@ class Pair[T, U]:
         reveal_type(other.first)  # revealed: list[T@Pair]
 ```
 
+## Protocols with a callable type variable
+
+Specializing a protocol's `__call__: F` preserves the callable's full signature without binding a
+receiver. The protocol remains assignable to compatible `Callable` types.
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+
+class Wrapper[F: Callable[..., object]](Protocol):
+    __call__: F
+
+def wrap[F: Callable[..., object]](function: F) -> Wrapper[F]:
+    raise NotImplementedError
+
+def format_bytes(value: bytes, *, prefix: str = "") -> str:
+    return prefix + value.hex()
+
+wrapped = wrap(format_bytes)
+reveal_type(wrapped(b"", prefix="0x"))  # revealed: str
+reveal_type(wrapped.__call__(b"", prefix="0x"))  # revealed: str
+callback: Callable[[bytes], str] = wrapped  # no diagnostic
+gradual: Callable[..., object] = wrapped  # no diagnostic
+wrapped(1)  # error: [invalid-argument-type]
+```
+
+The same behavior applies when the protocol is explicitly specialized with a regular callable type.
+
+```py
+def check(wrapper: Wrapper[Callable[[bytes], str]]) -> Callable[[bytes], str]:
+    reveal_type(wrapper(b""))  # revealed: str
+    callback: Callable[..., object] = wrapper  # no diagnostic
+    return wrapper  # no diagnostic
+```
+
+## Generic callable operator attributes
+
+Specializing a callable operator's `ParamSpec` preserves all parameters, including a first parameter
+that could accept the instance. Implicit operator calls therefore still require both arguments:
+
+```py
+from collections.abc import Callable
+
+class Operator[**P]:
+    __add__: Callable[P, str]
+
+def check(operator: Operator[[object, int]]) -> None:
+    reveal_type(operator.__add__)  # revealed: (object, int, /) -> str
+    operator + 1  # error: [unsupported-operator]
+```
+
+The same applies when the entire callable is substituted for a type variable:
+
+```py
+class TypeVarOperator[F: Callable[..., object]]:
+    __add__: F
+
+def as_operator[F: Callable[..., object]](function: F) -> TypeVarOperator[F]:
+    raise NotImplementedError
+
+def add(receiver: object, value: int) -> str:
+    return str(value)
+
+operator = as_operator(add)
+reveal_type(operator.__add__(object(), 1))  # revealed: str
+operator + 1  # error: [unsupported-operator]
+```
+
+## Functions stored in generic instance attributes
+
+Reading a function stored in an attribute declared as `value: T` preserves its arguments and
+function attributes. The function is returned unchanged, just as it is at runtime when stored on an
+instance.
+
+```py
+from types import CodeType
+
+class Holder[T]:
+    value: T
+
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+def format_bytes(value: bytes) -> str:
+    return value.hex()
+
+holder = Holder(format_bytes)
+reveal_type(holder.value(b""))  # revealed: str
+name: str = holder.value.__name__  # no diagnostic
+code: CodeType = holder.value.__code__  # no diagnostic
+holder.value("wrong")  # error: [invalid-argument-type]
+```
+
+An optional callable retains its signature and function attributes after narrowing away `None`:
+
+```py
+from collections.abc import Callable
+
+class OptionalHolder[F: Callable[..., object]]:
+    value: F | None = None
+
+    def __init__(self, value: F) -> None:
+        self.value = value
+
+optional = OptionalHolder(format_bytes)
+if optional.value is not None:
+    reveal_type(optional.value(b""))  # revealed: str
+    name: str = optional.value.__name__  # no diagnostic
+    code: CodeType = optional.value.__code__  # no diagnostic
+    optional.value("wrong")  # error: [invalid-argument-type]
+```
+
+## Generic attributes unioned with descriptors
+
+A union containing an explicit descriptor still invokes that descriptor on instance access:
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 1
+
+class Mixed[T]:
+    value: T | Descriptor = Descriptor()
+
+reveal_type(Mixed[str]().value)  # revealed: str | int
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:

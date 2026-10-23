@@ -1473,28 +1473,6 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         let inherited_generic_context = if policy.no_inherited_generic_context() {
             None
         } else {
@@ -1507,7 +1485,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.is_known(db, KnownClass::Object),
         );
 
-        let mut member = match result {
+        match result {
             ClassMemberResult::Done(result) => result.finalize(db, env),
             ClassMemberResult::TypedDict(module) => typed_dict_class_member(
                 db,
@@ -1517,15 +1495,7 @@ impl<'db> StaticClassLiteral<'db> {
                 policy,
                 name,
             ),
-        };
-
-        // We generally treat dunder attributes with `Callable` types as function-like callables.
-        // See `callables_as_descriptors.md` for more details.
-        if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, env, ty));
         }
-
-        member
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
@@ -1542,28 +1512,6 @@ impl<'db> StaticClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        fn into_dunder_paramspec_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).is_single_paramspec().is_some() =>
-                {
-                    Type::Callable(callable_ty.into_dunder_paramspec(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
         if CodeGeneratorKind::from_class(db, self.into())
             .is_some_and(CodeGeneratorKind::is_dataclass_like)
@@ -1607,13 +1555,46 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        let member = class_member(db, body_scope, name).map_type(|ty| {
-            let ty = if name.starts_with("__") && name.ends_with("__") {
-                into_dunder_paramspec_callable(db, env, ty)
+        let mut member = class_member(db, body_scope, name);
+        let is_dunder = name.starts_with("__") && name.ends_with("__");
+        let is_class_var = member.inner.is_class_var();
+        let is_inferred = matches!(
+            member.inner.place,
+            Place::Defined(DefinedPlace {
+                origin: TypeOrigin::Inferred,
+                ..
+            })
+        );
+
+        // Decide before applying this class's specialization: `Callable[P, R]` and a bare `F`
+        // describe the stored callable's full signature. A concrete receiver in a dunder or
+        // inferred class-body callable instead indicates a method. Ordinary `ClassVar` callables
+        // are promoted on instance access to preserve their declared types for assignment checks.
+        // TODO: An inherited annotation can already be specialized when a subclass supplies a
+        // default. Preserve its original binding behavior in that case too.
+        if !is_class_var
+            && !is_inferred
+            && let Some(ty) = member.ignore_possibly_undefined()
+            && match ty.resolve_type_alias(db) {
+                Type::TypeVar(_) => true,
+                Type::Union(union) => union.elements(db).iter().all(|element| {
+                    let element = element.resolve_type_alias(db);
+                    element.is_type_var() || element.is_none(db)
+                }),
+                _ => false,
+            }
+        {
+            member
+                .inner
+                .qualifiers
+                .insert(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
+        }
+        let member = member.map_type(|ty| {
+            let ty = if is_dunder || is_inferred {
+                ty.into_function_like_callable(db, env, is_dunder)
             } else {
                 ty
             };
-
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
