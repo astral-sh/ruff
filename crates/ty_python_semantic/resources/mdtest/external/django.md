@@ -107,6 +107,34 @@ def _(book: Book):
     reveal_type(book.pages)  # revealed: int | None
 ```
 
+## Field names
+
+The `name` parameter overrides the name of the attribute:
+
+```py
+from django.db import models
+
+class Article(models.Model):
+    views = models.IntegerField(name="view_count")
+
+article = Article(view_count=1)
+
+# TODO: Should not be an error, and the type should be `int`.
+# error: [unresolved-attribute]
+reveal_type(article.view_count)  # revealed: Unknown
+
+# The original field name is not available as an attribute.
+# TODO: Should be an unresolved-attribute error.
+article.views
+
+# This is correct:
+Article(view_count=1)
+
+# Using the original attribute name is incorrect.
+# TODO: Reject the unknown keyword `views`.
+Article(views=1)
+```
+
 ## Primary keys
 
 ### Automatic primary key
@@ -181,6 +209,40 @@ class Ebook(Book):
 def _(book: Book, ebook: Ebook):
     reveal_type(book.id)  # revealed: str
     reveal_type(ebook.id)  # revealed: str
+```
+
+## Choices
+
+The `choices` parameter can be used to map the actual stored values for a field to human-readable
+labels. Django adds `get_<field>_display()` methods for fields that have `choices` defined:
+
+```py
+from django.db import models
+
+class Article(models.Model):
+    status = models.CharField(
+        max_length=1,
+        choices=[("D", "Draft"), ("P", "Published")],
+    )
+    visibility = models.CharField(
+        name="access",
+        max_length=1,
+        choices=[("P", "Public"), ("R", "Private")],
+    )
+
+article = Article(status="P")
+
+reveal_type(article.status)  # revealed: str
+reveal_type(article.get_status_display())  # revealed: str
+```
+
+An explicit `name` determines the names of generated methods, overriding the assignment name:
+
+```py
+reveal_type(article.get_access_display())  # revealed: str
+
+# A `get_<field>_display()` method for the original field name is not available.
+article.get_visibility_display()  # error: [unresolved-attribute]
 ```
 
 [django-types]: https://github.com/sbdchd/django-types

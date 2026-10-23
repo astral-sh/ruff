@@ -1,15 +1,16 @@
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::name::Name;
 use ty_module_resolver::KnownModule;
 use ty_python_core::{
     definition::{Definition, DefinitionKind},
-    use_def_map,
+    place_table, use_def_map,
 };
 
 use crate::place::known_module_symbol;
 use crate::types::member::class_member;
 use crate::types::{
-    ClassBase, KnownClass, Specialization, StaticClassLiteral, Type, binding_type,
-    definition_expression_type,
+    ClassBase, KnownClass, Parameter, Parameters, Signature, Specialization, StaticClassLiteral,
+    Type, binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -31,14 +32,21 @@ fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct Field<'db> {
+    name: Name,
     ty: Type<'db>,
     metadata: FieldMetadata,
 }
 
 impl<'db> Field<'db> {
     /// Create a field by extracting the metadata from its definition.
-    fn from_definition(db: &'db dyn Db, ty: Type<'db>, definition: Definition<'db>) -> Self {
+    fn from_definition(
+        db: &'db dyn Db,
+        name: Name,
+        ty: Type<'db>,
+        definition: Definition<'db>,
+    ) -> Self {
         let mut field = Field {
+            name,
             ty,
             metadata: FieldMetadata::default(),
         };
@@ -58,12 +66,26 @@ impl<'db> Field<'db> {
             return field;
         };
 
+        if let Some(name) = call.arguments.find_keyword("name")
+            && let Some(name) =
+                definition_expression_type(db, definition, &name.value).as_string_literal()
+            && !name.value(db).is_empty()
+        {
+            field.name = Name::new(name.value(db));
+        }
+
         field.metadata.primary_key =
             call.arguments
                 .find_keyword("primary_key")
                 .is_some_and(|primary_key| {
                     definition_expression_type(db, definition, &primary_key.value)
                         == Type::bool_literal(true)
+                });
+        field.metadata.has_choices =
+            call.arguments
+                .find_keyword("choices")
+                .is_some_and(|choices| {
+                    !definition_expression_type(db, definition, &choices.value).is_none(db)
                 });
         field
     }
@@ -73,16 +95,26 @@ impl<'db> Field<'db> {
 #[derive(Debug, Clone, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct FieldMetadata {
     primary_key: bool,
+    has_choices: bool,
 }
 
 /// All fields defined on this Django model (not including base class fields).
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn own_model_fields<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Box<[Field<'db>]> {
     let env = ProgramEnvironment::from_scope(class.body_scope(db));
+    let table = place_table(db, class.body_scope(db));
     use_def_map(db, class.body_scope(db))
         .all_end_of_scope_symbol_bindings()
-        .flat_map(|(_, bindings)| bindings.filter_map(|binding| binding.binding.definition()))
-        .filter_map(|definition| {
+        .flat_map(|(symbol_id, bindings)| {
+            let name = table.symbol(symbol_id).name();
+            bindings.filter_map(move |binding| {
+                binding
+                    .binding
+                    .definition()
+                    .map(|definition| (name, definition))
+            })
+        })
+        .filter_map(|(name, definition)| {
             let field_ty = binding_type(db, definition);
             let is_field = field_ty.nominal_class(db, &env).is_some_and(|class| {
                 class
@@ -93,9 +125,35 @@ fn own_model_fields<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Box
             if !is_field {
                 return None;
             }
-            Some(Field::from_definition(db, field_ty, definition))
+            Some(Field::from_definition(
+                db,
+                name.clone(),
+                field_ty,
+                definition,
+            ))
         })
         .collect()
+}
+
+/// Provides synthesized attributes and methods for Django models.
+pub(in crate::types) fn synthesized_member<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    name: &str,
+) -> Option<Type<'db>> {
+    // A quick filter on the name, so that we can return quickly for almost all attribute names.
+    if !(matches!(name, "id" | "pk") || name.starts_with("get_") && name.ends_with("_display")) {
+        return None;
+    }
+    if !is_model(db, class) {
+        return None;
+    }
+    match name {
+        "id" | "pk" => primary_key_member(db, env, class, specialization, name),
+        _ => display_method(db, env, class, specialization, name),
+    }
 }
 
 /// Synthesize `id` and `pk` attributes for Django models.
@@ -115,17 +173,13 @@ fn own_model_fields<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Box
 ///
 /// # Book().id does not exist; Book().pk has type str.
 /// ```
-pub(in crate::types) fn primary_key_member<'db>(
+fn primary_key_member<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: StaticClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
     name: &str,
 ) -> Option<Type<'db>> {
-    if !matches!(name, "id" | "pk") || !is_model(db, class) {
-        return None;
-    }
-
     // Explicit `id` or `pk` attributes on base classes take precedence over a synthesized
     // attribute on this model.
     if class
@@ -163,4 +217,35 @@ fn own_primary_key<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Opti
         .iter()
         .find(|field| field.metadata.primary_key)
         .map(|field| field.ty)
+}
+
+/// Synthesize `get_<field>_display()` for fields with `choices` defined.
+fn display_method<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let field_name = name.strip_prefix("get_")?.strip_suffix("_display")?;
+    let field = own_model_fields(db, class)
+        .iter()
+        .find(|field| field.name == field_name)?;
+    if !field.metadata.has_choices {
+        return None;
+    }
+
+    // Construct `def get_<field>_display(self: MyModel) -> str`.
+    let self_ty = Type::instance(
+        db,
+        env,
+        class.apply_optional_specialization(db, specialization),
+    );
+    let signature = Signature::new(
+        Parameters::standard([
+            Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty)
+        ]),
+        KnownClass::Str.to_instance(db, env),
+    );
+    Some(Type::function_like_callable(db, signature))
 }
