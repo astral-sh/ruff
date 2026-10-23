@@ -1,14 +1,20 @@
 use crate::Db;
+use crate::diagnostic::format_enumeration;
+use crate::reachability::{ReachabilityConstraintsExtension, is_range_reachable};
 use itertools::{Either, Itertools};
-use ruff_db::{diagnostic::Annotation, source::source_text};
+use ruff_db::{
+    diagnostic::{Annotation, Span},
+    parsed::ParsedModuleRef,
+    source::source_text,
+};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::attribute_assignments;
 use crate::{
-    TypeQualifiers,
+    FxOrderSet, TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, DisplaySettings,
@@ -18,16 +24,17 @@ use crate::{
         binding_type,
         call::Argument,
         class::{
-            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, expanded_class_base_entries,
+            CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
+            classify_method, expanded_class_base_entries, implicit_attribute_names,
         },
         context::InferContext,
         definition_expression_type,
         diagnostic::{
-            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-            DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO,
-            INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE, INVALID_DATACLASS,
-            INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
-            INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
+            ABSTRACT_METHOD_IN_FINAL_CLASS, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+            CYCLIC_CLASS_DEFINITION, DATACLASS_FIELD_ORDER, DUPLICATE_KW_ONLY, FINAL_WITHOUT_VALUE,
+            INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_BASE,
+            INVALID_DATACLASS, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS,
+            INVALID_NAMED_TUPLE, INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
             SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
             report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases,
             report_duplicate_bases, report_inconsistent_generic_bases,
@@ -42,9 +49,9 @@ use crate::{
         },
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
-        generics::enclosing_generic_contexts,
+        generics::{enclosing_generic_contexts, typing_self},
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
-        infer_definition_types,
+        infer_definition_types, inferred_declaration,
         mro::StaticMroErrorKind,
         overrides,
         special_form::TypeQualifier,
@@ -55,7 +62,10 @@ use crate::{
     },
 };
 use ty_python_core::{
-    SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
+    DeclarationsIterator, FileScopeId, SemanticIndex, attribute_scopes,
+    definition::{Definition, DefinitionKind, DefinitionState},
+    scope::ScopeId,
+    semantic_index,
 };
 
 /// Rejects slot layouts that fail while Python constructs the runtime class.
@@ -125,6 +135,262 @@ fn check_class_slots<'db>(
     }
 }
 
+/// Returns the reachable annotated assignments among `declarations`, such as `x: int` in a class
+/// body or `self.x: int = 1` in a method, together with their declared types.
+///
+/// Every method has its own `Self` type variable, so `x: Self` in the class body and
+/// `self.x: Self` in `__init__` would not compare as equivalent. Each `Self` is therefore replaced
+/// with `class_self`, the `Self` type variable of the class body. Replacing it with the instance
+/// type of the class instead would hide a conflict between `x: C` and `self.x: Self`, which differ
+/// for subclasses of `C`.
+fn annotated_declarations<'map, 'db>(
+    context: &'map InferContext<'db, '_>,
+    declarations: DeclarationsIterator<'map, 'db>,
+    class_self: Type<'db>,
+) -> impl Iterator<Item = (Definition<'db>, Type<'db>)> + use<'map, 'db> {
+    let db = context.db();
+    let env = context.program_environment();
+    let predicates = declarations.predicates();
+    let reachability_constraints = declarations.reachability_constraints();
+
+    declarations.filter_map(move |declaration| {
+        let DefinitionState::Defined(definition) = declaration.declaration else {
+            return None;
+        };
+        if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
+            return None;
+        }
+        if reachability_constraints
+            .evaluate(db, predicates, declaration.reachability_constraint)
+            .is_always_false()
+        {
+            return None;
+        }
+        let declared = inferred_declaration(db, definition).declared()?;
+        Some((
+            definition,
+            declared
+                .inner_type()
+                .bind_self_typevars(db, env, class_self),
+        ))
+    })
+}
+
+/// Returns the reachable declarations of attribute `name` in `method_scope_id` that can still be in
+/// effect when the method finishes.
+///
+/// As for other symbols, a later declaration replaces an earlier one, so the two do not conflict:
+///
+/// ```python
+/// def set_value(self) -> None:
+///     self.x: int = 1
+///     self.x: str = ""  # replaces `self.x: int`
+/// ```
+///
+/// The declarations at the end of the method's scope tell us which ones were not replaced.
+/// Their reachability is not used, because a trailing `return` makes the end of the scope
+/// unreachable.
+fn method_exit_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
+    method_scope_id: FileScopeId,
+    name: &str,
+    class_self: Type<'db>,
+) -> Vec<(Definition<'db>, Type<'db>)> {
+    let Some(member) = index
+        .place_table(method_scope_id)
+        .member_id_by_instance_attribute_name(name)
+    else {
+        return Vec::new();
+    };
+    let use_def = index.use_def_map(method_scope_id);
+    let not_replaced: FxHashSet<_> = use_def
+        .end_of_scope_declarations(member.into())
+        .filter_map(|declaration| declaration.declaration.definition())
+        .collect();
+
+    annotated_declarations(
+        context,
+        use_def.reachable_member_declarations(member),
+        class_self,
+    )
+    .filter(|(definition, _)| not_replaced.contains(definition))
+    .collect()
+}
+
+fn method_definition_is_reachable<'db>(
+    db: &'db dyn Db,
+    index: &SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    class_scope_id: FileScopeId,
+    method_scope_id: FileScopeId,
+) -> bool {
+    index
+        .scope(method_scope_id)
+        .node()
+        .as_function()
+        .is_some_and(|function| {
+            is_range_reachable(db, index, class_scope_id, function.node(module).range())
+        })
+}
+
+/// Reports a conflict if the declared types of attribute `name` are not all equivalent.
+///
+/// The earliest declaration's type is the reference type. The diagnostic points at the first
+/// method declaration that disagrees with it, and every other declaration is marked with a
+/// secondary annotation, since the conflict can only be resolved by looking at all of them
+/// together.
+///
+/// When only class-body declarations disagree with the reference type, nothing is reported here.
+/// Those conflicts are reported by the checks for declarations of class-body symbols, and
+/// reporting them here would duplicate those diagnostics.
+fn report_conflicting_attribute_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    name: &str,
+    class_body_declarations: &[(Definition<'db>, Type<'db>)],
+    method_declarations: &[(Definition<'db>, Type<'db>)],
+) {
+    let db = context.db();
+    let env = context.program_environment();
+    let Some(&(_, reference_type)) = class_body_declarations
+        .iter()
+        .chain(method_declarations)
+        .next()
+    else {
+        return;
+    };
+
+    let mut conflicting_types = FxOrderSet::default();
+    for &(_, ty) in class_body_declarations {
+        if !reference_type.is_equivalent_to(db, env, ty) {
+            conflicting_types.insert(ty);
+        }
+    }
+    let mut conflicting_method_declaration = None;
+    for declaration @ &(_, ty) in method_declarations {
+        if !reference_type.is_equivalent_to(db, env, ty) {
+            conflicting_types.insert(ty);
+            conflicting_method_declaration.get_or_insert(declaration);
+        }
+    }
+    let Some(&(conflicting_definition, conflicting_type)) = conflicting_method_declaration else {
+        return;
+    };
+    conflicting_types.insert_before(0, reference_type);
+
+    let Some(builder) = context.report_lint(
+        &CONFLICTING_DECLARATIONS,
+        conflicting_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Conflicting declared types for `{name}`: {}",
+        format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
+    ));
+    diagnostic.set_primary_annotation_message(format_args!(
+        "declared as `{}` here",
+        conflicting_type.display(db, env)
+    ));
+    for &(definition, ty) in class_body_declarations.iter().chain(method_declarations) {
+        if definition == conflicting_definition {
+            continue;
+        }
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, context.module())))
+                .message(format_args!("declared as `{}` here", ty.display(db, env))),
+        );
+    }
+}
+
+/// Reports attributes whose declarations in the class body or in methods disagree with each other.
+///
+/// ```python
+/// class C:
+///     x: int
+///
+///     def __init__(self) -> None:
+///         self.x: str = ""  # error: [conflicting-declarations]
+/// ```
+///
+/// Instance methods (`self.x: int`) and classmethods (`cls.x: int`) declare different attributes,
+/// so they are checked separately. A class-body declaration applies to both and is compared with
+/// each.
+fn check_conflicting_attribute_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    index: &SemanticIndex<'db>,
+) {
+    let db = context.db();
+    let class_body_scope = class.body_scope(db);
+    let attribute_names = implicit_attribute_names(db, class_body_scope);
+    if attribute_names.is_empty() {
+        return;
+    }
+
+    let Some(class_self) = typing_self(db, class_body_scope, None, class.into()) else {
+        return;
+    };
+    let class_self = Type::TypeVar(class_self);
+    let class_scope_id = class_body_scope.file_scope_id(db);
+    let class_table = index.place_table(class_scope_id);
+    let class_use_def = index.use_def_map(class_scope_id);
+
+    // Classifying a method infers its decorators, so it is only done for methods that declare an
+    // attribute, and at most once per method. `None` marks a method that is skipped entirely.
+    let mut method_kinds: FxHashMap<FileScopeId, Option<MethodDecorator>> = FxHashMap::default();
+
+    for name in attribute_names {
+        let class_body_declarations: Vec<_> = class_table
+            .symbol_id(name)
+            .map(|symbol_id| {
+                annotated_declarations(
+                    context,
+                    class_use_def.end_of_scope_symbol_declarations(symbol_id),
+                    class_self,
+                )
+                .collect()
+            })
+            .unwrap_or_default();
+
+        let mut instance_method_declarations = Vec::new();
+        let mut classmethod_declarations = Vec::new();
+        for scope_id in attribute_scopes(db, class_body_scope) {
+            let method_kind = *method_kinds.entry(scope_id).or_insert_with(|| {
+                if method_definition_is_reachable(
+                    db,
+                    index,
+                    context.module(),
+                    class_scope_id,
+                    scope_id,
+                ) {
+                    classify_method(db, index, context.module(), index.scope(scope_id))
+                } else {
+                    None
+                }
+            });
+            let method_declarations = match method_kind {
+                Some(MethodDecorator::None) => &mut instance_method_declarations,
+                Some(MethodDecorator::ClassMethod) => &mut classmethod_declarations,
+                Some(MethodDecorator::StaticMethod) | None => continue,
+            };
+
+            method_declarations.extend(method_exit_declarations(
+                context, index, scope_id, name, class_self,
+            ));
+        }
+
+        for method_declarations in [&instance_method_declarations, &classmethod_declarations] {
+            report_conflicting_attribute_declarations(
+                context,
+                name,
+                &class_body_declarations,
+                method_declarations,
+            );
+        }
+    }
+}
+
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
 /// This needs to be done after most other types in the scope have been inferred, due to the fact
@@ -169,6 +435,8 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     let env = context.program_environment();
+
+    check_conflicting_attribute_declarations(context, class, index);
 
     check_class_slots(context, class, index);
 
