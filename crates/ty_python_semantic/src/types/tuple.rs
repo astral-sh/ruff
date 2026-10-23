@@ -29,6 +29,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::typevar::TypeVarScope;
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
@@ -340,15 +341,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source: TupleType<'db>,
+        source_scope: TypeVarScope<'db>,
         target: TupleType<'db>,
+        target_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match source.tuple(db) {
-            Tuple::Fixed(source) => {
-                self.check_fixed_length_tuple_vs_tuple_spec(db, source, target.tuple(db))
-            }
-            Tuple::Variable(source_spec) => {
-                self.check_variable_length_vs_tuple_spec(db, source_spec, target.tuple(db))
-            }
+            Tuple::Fixed(source) => self.check_fixed_length_tuple_vs_tuple_spec(
+                db,
+                source,
+                source_scope,
+                target.tuple(db),
+                target_scope,
+            ),
+            Tuple::Variable(source_spec) => self.check_variable_length_vs_tuple_spec(
+                db,
+                source_spec,
+                source_scope,
+                target.tuple(db),
+                target_scope,
+            ),
         }
     }
 
@@ -356,7 +367,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source_tuple: &FixedLengthTuple<Type<'db>>,
+        source_scope: TypeVarScope<'db>,
         target_tuple: &TupleSpec<'db>,
+        target_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match target_tuple {
             Tuple::Fixed(target) => {
@@ -381,7 +394,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             self.constraints,
                             |(&source, &target)| {
-                                let constraint_set = self.check_type_pair(db, source, target);
+                                let constraint_set = self.check_type_pair(
+                                    db,
+                                    source,
+                                    source_scope,
+                                    target,
+                                    target_scope,
+                                );
                                 if let Some(context) = self.report_context()
                                     && constraint_set.is_never_satisfied(
                                         db,
@@ -415,7 +434,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(&source_ty) = source_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints =
+                        self.check_type_pair(db, source_ty, source_scope, target_ty, target_scope);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -427,7 +447,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     let Some(&source_ty) = source_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints =
+                        self.check_type_pair(db, source_ty, source_scope, target_ty, target_scope);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -440,7 +461,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     VariableSegment::TypeVarTuple(typevartuple) => {
                         let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied());
                         result.and(db, self.constraints, || {
-                            self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                            self.check_type_pair(
+                                db,
+                                packed,
+                                source_scope,
+                                Type::TypeVar(typevartuple),
+                                target_scope,
+                            )
                         })
                     }
                     VariableSegment::Homogeneous(target_ty) => {
@@ -448,7 +475,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         // variable-length portion of the other tuple.
                         result.and(db, self.constraints, || {
                             source_iter.when_all(db, self.constraints, |&source_ty| {
-                                self.check_type_pair(db, source_ty, target_ty)
+                                self.check_type_pair(
+                                    db,
+                                    source_ty,
+                                    source_scope,
+                                    target_ty,
+                                    target_scope,
+                                )
                             })
                         })
                     }
@@ -461,7 +494,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        source_scope: TypeVarScope<'db>,
         target: &TupleSpec<'db>,
+        target_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match target {
             Tuple::Fixed(target) => {
@@ -491,11 +526,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // relation.
                 let mut result = self.always();
                 let mut target_iter = target.iter_all_elements();
-                for source_ty in source.prenormalized_prefix_elements(db, self, None) {
+                for source_ty in source.prenormalized_prefix_elements(db, self, source_scope, None)
+                {
                     let Some(target_ty) = target_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints =
+                        self.check_type_pair(db, source_ty, source_scope, target_ty, target_scope);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -504,13 +541,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
                 let suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, self, None)
+                    .prenormalized_suffix_elements(db, self, source_scope, None)
                     .collect();
                 for &source_ty in suffix.iter().rev() {
                     let Some(target_ty) = target_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints =
+                        self.check_type_pair(db, source_ty, source_scope, target_ty, target_scope);
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -522,7 +560,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // The gradual segment supplies the remaining elements.
                 result.and(db, self.constraints, || {
                     target_iter.when_all(db, self.constraints, |target_ty| {
-                        self.check_type_pair(db, source_element, target_ty)
+                        self.check_type_pair(
+                            db,
+                            source_element,
+                            source_scope,
+                            target_ty,
+                            target_scope,
+                        )
                     })
                 })
             }
@@ -551,7 +595,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .zip(target.suffix_elements()),
                         )
                         .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
-                            self.check_type_pair(db, source_ty, target_ty)
+                            self.check_type_pair(
+                                db,
+                                source_ty,
+                                source_scope,
+                                target_ty,
+                                target_scope,
+                            )
                         });
                 }
 
@@ -583,7 +633,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .zip(target_suffix),
                         )
                         .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
-                            self.check_type_pair(db, source_ty, target_ty)
+                            self.check_type_pair(
+                                db,
+                                source_ty,
+                                source_scope,
+                                target_ty,
+                                target_scope,
+                            )
                         });
 
                     let packed = Type::tuple(TupleType::new(
@@ -596,7 +652,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ),
                     ));
                     return boundary_constraints.and(db, self.constraints, || {
-                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                        self.check_type_pair(
+                            db,
+                            packed,
+                            source_scope,
+                            Type::TypeVar(typevartuple),
+                            target_scope,
+                        )
                     });
                 }
 
@@ -621,8 +683,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             return self.check_tuple_boundaries(
                                 db,
                                 source,
-                                target,
+                                source_scope,
                                 source_element,
+                                target,
+                                target_scope,
                                 Type::Never,
                             );
                         }
@@ -641,8 +705,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             return self.check_tuple_boundaries(
                                 db,
                                 source,
-                                target,
+                                source_scope,
                                 Type::protocol_with_methods(db, env, []),
+                                target,
+                                target_scope,
                                 target_element,
                             );
                         }
@@ -669,11 +735,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let source_variable = source.variable().element_type(db);
                 let target_variable = target.variable().element_type(db);
                 let source_prenormalize_variable = match source.variable() {
-                    VariableSegment::Homogeneous(Type::Dynamic(_)) => Some(target_variable),
+                    VariableSegment::Homogeneous(Type::Dynamic(_)) => {
+                        Some((target_variable, target_scope))
+                    }
                     _ => None,
                 };
                 let target_prenormalize_variable = match target.variable() {
-                    VariableSegment::Homogeneous(Type::Dynamic(_)) => Some(source_variable),
+                    VariableSegment::Homogeneous(Type::Dynamic(_)) => {
+                        Some((source_variable, source_scope))
+                    }
                     _ => None,
                 };
 
@@ -682,20 +752,30 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // variable-length part.
                 let mut result = self.always();
                 let pairwise = source
-                    .prenormalized_prefix_elements(db, self, source_prenormalize_variable)
+                    .prenormalized_prefix_elements(
+                        db,
+                        self,
+                        source_scope,
+                        source_prenormalize_variable,
+                    )
                     .zip_longest(target.prenormalized_prefix_elements(
                         db,
                         self,
+                        target_scope,
                         target_prenormalize_variable,
                     ));
                 for pair in pairwise {
                     let pair_constraints = match pair {
                         EitherOrBoth::Both(self_ty, other_ty) => {
-                            self.check_type_pair(db, self_ty, other_ty)
+                            self.check_type_pair(db, self_ty, source_scope, other_ty, target_scope)
                         }
-                        EitherOrBoth::Left(self_ty) => {
-                            self.check_type_pair(db, self_ty, target_variable)
-                        }
+                        EitherOrBoth::Left(self_ty) => self.check_type_pair(
+                            db,
+                            self_ty,
+                            source_scope,
+                            target_variable,
+                            target_scope,
+                        ),
                         EitherOrBoth::Right(other_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide, unless the lhs has a dynamic variable-length portion
@@ -706,7 +786,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             {
                                 return self.never();
                             }
-                            self.check_type_pair(db, source_variable, other_ty)
+                            self.check_type_pair(
+                                db,
+                                source_variable,
+                                source_scope,
+                                other_ty,
+                                target_scope,
+                            )
                         }
                     };
                     if result
@@ -718,10 +804,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let source_suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, self, source_prenormalize_variable)
+                    .prenormalized_suffix_elements(
+                        db,
+                        self,
+                        source_scope,
+                        source_prenormalize_variable,
+                    )
                     .collect();
                 let target_suffix: Vec<_> = target
-                    .prenormalized_suffix_elements(db, self, target_prenormalize_variable)
+                    .prenormalized_suffix_elements(
+                        db,
+                        self,
+                        target_scope,
+                        target_prenormalize_variable,
+                    )
                     .collect();
                 let pairwise = source_suffix
                     .iter()
@@ -729,12 +825,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .zip_longest(target_suffix.iter().rev());
                 for pair in pairwise {
                     let pair_constraints = match pair {
-                        EitherOrBoth::Both(&source_ty, &target_ty) => {
-                            self.check_type_pair(db, source_ty, target_ty)
-                        }
-                        EitherOrBoth::Left(&source_ty) => {
-                            self.check_type_pair(db, source_ty, target_variable)
-                        }
+                        EitherOrBoth::Both(&source_ty, &target_ty) => self.check_type_pair(
+                            db,
+                            source_ty,
+                            source_scope,
+                            target_ty,
+                            target_scope,
+                        ),
+                        EitherOrBoth::Left(&source_ty) => self.check_type_pair(
+                            db,
+                            source_ty,
+                            source_scope,
+                            target_variable,
+                            target_scope,
+                        ),
                         EitherOrBoth::Right(&target_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide, unless the lhs has a dynamic variable-length portion
@@ -745,7 +849,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             {
                                 return self.never();
                             }
-                            self.check_type_pair(db, source_variable, target_ty)
+                            self.check_type_pair(
+                                db,
+                                source_variable,
+                                source_scope,
+                                target_ty,
+                                target_scope,
+                            )
                         }
                     };
                     if result
@@ -758,7 +868,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // And lastly, the variable-length portions must satisfy the relation.
                 result.and(db, self.constraints, || {
-                    self.check_type_pair(db, source_variable, target_variable)
+                    self.check_type_pair(
+                        db,
+                        source_variable,
+                        source_scope,
+                        target_variable,
+                        target_scope,
+                    )
                 })
             }
         }
@@ -770,8 +886,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
-        target: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        source_scope: TypeVarScope<'db>,
         source_variable: Type<'db>,
+        target: &VariableLengthTuple<Type<'db>, VariableSegment<'db>>,
+        target_scope: TypeVarScope<'db>,
         target_variable: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         source
@@ -790,11 +908,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // The synthesized protocol stands for an arbitrary pack element. Diagnostics
                     // should describe the original tuple types, not this internal placeholder.
                     return self.without_context_collection(|| {
-                        self.check_type_pair(db, source_variable, target)
+                        self.check_type_pair(
+                            db,
+                            source_variable,
+                            source_scope,
+                            target,
+                            target_scope,
+                        )
                     });
                 }
                 let (source, target) = pair.or(source_variable, target_variable);
-                self.check_type_pair(db, source, target)
+                self.check_type_pair(db, source, source_scope, target, target_scope)
             })
     }
 }
@@ -804,16 +928,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         left: TupleType<'db>,
+        left_scope: TypeVarScope<'db>,
         right: TupleType<'db>,
+        right_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_tuple_spec_pair(db, left.tuple(db), right.tuple(db))
+        self.check_tuple_spec_pair(db, left.tuple(db), left_scope, right.tuple(db), right_scope)
     }
 
     pub(super) fn check_tuple_spec_pair(
         &self,
         db: &'db dyn Db,
         left: &TupleSpec<'db>,
+        left_scope: TypeVarScope<'db>,
         right: &TupleSpec<'db>,
+        right_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // Two tuples with an incompatible number of required elements must always be disjoint.
         let (self_min, self_max) = left.len().size_hint();
@@ -833,7 +961,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
         let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
             let check_element = |(index, (&left, &right))| {
-                let result = self.check_type_pair(db, left, right);
+                let result = self.check_type_pair(db, left, left_scope, right, right_scope);
                 if let Some(context) = self.report_context()
                     && result.is_always_satisfied(db, self.env, self.inferable)
                 {
@@ -2128,15 +2256,17 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         &'a self,
         db: &'db dyn Db,
         checker: &'a TypeRelationChecker<'_, '_, 'db>,
-        variable: Option<Type<'db>>,
+        self_scope: TypeVarScope<'db>,
+        variable: Option<(Type<'db>, TypeVarScope<'db>)>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         // Nested element comparisons must retain the outer recursive comparison's guards.
-        let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
+        let (variable, variable_scope) =
+            variable.unwrap_or_else(|| (self.variable().element_type(db), self_scope));
         self.iter_prefix_elements()
             .chain(self.iter_suffix_elements().take_while(move |element| {
                 checker
                     .as_equivalence_checker()
-                    .check_type_pair(db, *element, variable)
+                    .check_type_pair(db, *element, self_scope, variable, variable_scope)
                     .is_always_satisfied(db, checker.env, TypeVarSet::None)
             }))
     }
@@ -2164,13 +2294,15 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         &'a self,
         db: &'db dyn Db,
         checker: &'a TypeRelationChecker<'_, '_, 'db>,
-        variable: Option<Type<'db>>,
+        self_scope: TypeVarScope<'db>,
+        variable: Option<(Type<'db>, TypeVarScope<'db>)>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
-        let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
+        let (variable, variable_scope) =
+            variable.unwrap_or_else(|| (self.variable().element_type(db), self_scope));
         self.iter_suffix_elements().skip_while(move |element| {
             checker
                 .as_equivalence_checker()
-                .check_type_pair(db, *element, variable)
+                .check_type_pair(db, *element, self_scope, variable, variable_scope)
                 .is_always_satisfied(db, checker.env, TypeVarSet::None)
         })
     }

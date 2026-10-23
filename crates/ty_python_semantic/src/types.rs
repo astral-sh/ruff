@@ -2265,7 +2265,11 @@ struct TypePair<'db> {
     #[returns(copy)]
     first: Type<'db>,
     #[returns(copy)]
+    first_scope: TypeVarScope<'db>,
+    #[returns(copy)]
     second: Type<'db>,
+    #[returns(copy)]
+    second_scope: TypeVarScope<'db>,
 }
 
 // The Salsa heap is tracked separately.

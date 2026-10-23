@@ -27,6 +27,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::typevar::TypeVarScope;
 use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
@@ -717,7 +718,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         source: TypedDictType<'db>,
+        source_scope: TypeVarScope<'db>,
         target: TypedDictType<'db>,
+        target_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         if let TypedDictType::Synthesized(synthesized_target) = target
             && synthesized_target.is_patch(db)
@@ -752,7 +755,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(db, source_item_field.declared_ty, target_ty),
+                    self.check_type_pair(
+                        db,
+                        source_item_field.declared_ty,
+                        source_scope,
+                        target_ty,
+                        target_scope,
+                    ),
                 );
 
                 if result.is_trivially_never_satisfied() {
@@ -779,7 +788,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(
                             db,
                             source_extra_items.declared_ty,
+                            source_scope,
                             target_item_field.declared_ty,
+                            target_scope,
                         ),
                     );
                     if result.is_trivially_never_satisfied() {
@@ -797,7 +808,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.check_type_pair(
                                 db,
                                 source_extra_items.declared_ty,
+                                source_scope,
                                 target_extra_items.declared_ty,
+                                target_scope,
                             ),
                         );
                     }
@@ -856,7 +869,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_type_pair(
                         db,
                         source_item_field.declared_ty,
+                        source_scope,
                         target_item_field.declared_ty,
+                        target_scope,
                     )
                 } else {
                     if source_item_field.is_read_only() {
@@ -878,13 +893,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_type_pair(
                         db,
                         source_item_field.declared_ty,
+                        source_scope,
                         target_item_field.declared_ty,
+                        target_scope,
                     )
                     .and(db, self.constraints, || {
                         self.check_type_pair(
                             db,
                             target_item_field.declared_ty,
+                            target_scope,
                             source_item_field.declared_ty,
+                            source_scope,
                         )
                     })
                 }
@@ -898,7 +917,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(
                             db,
                             source_item_field.declared_ty,
+                            source_scope,
                             target_item_field.declared_ty,
+                            target_scope,
                         )
                     } else {
                         match source_openness.effective_extra_items() {
@@ -907,7 +928,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             Some(source_extra_items) => self.check_type_pair(
                                 db,
                                 source_extra_items.declared_ty,
+                                source_scope,
                                 target_item_field.declared_ty,
+                                target_scope,
                             ),
                         }
                     }
@@ -944,13 +967,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(
                             db,
                             source_item_field.declared_ty,
+                            source_scope,
                             target_item_field.declared_ty,
+                            target_scope,
                         )
                         .and(db, self.constraints, || {
                             self.check_type_pair(
                                 db,
                                 target_item_field.declared_ty,
+                                target_scope,
                                 source_item_field.declared_ty,
+                                source_scope,
                             )
                         })
                     } else {
@@ -964,13 +991,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(
                             db,
                             source_extra_items.declared_ty,
+                            source_scope,
                             target_item_field.declared_ty,
+                            target_scope,
                         )
                         .and(db, self.constraints, || {
                             self.check_type_pair(
                                 db,
                                 target_item_field.declared_ty,
+                                target_scope,
                                 source_extra_items.declared_ty,
+                                source_scope,
                             )
                         })
                     }
@@ -1019,13 +1050,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     self.check_type_pair(
                         db,
                         source_extra_items.declared_ty,
+                        source_scope,
                         target_extra_items.declared_ty,
+                        target_scope,
                     )
                     .and(db, self.constraints, || {
                         self.check_type_pair(
                             db,
                             target_extra_items.declared_ty,
+                            target_scope,
                             source_extra_items.declared_ty,
+                            source_scope,
                         )
                     }),
                 );
@@ -1040,13 +1075,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.check_type_pair(
                                 db,
                                 source_item_field.declared_ty,
+                                source_scope,
                                 target_extra_items.declared_ty,
+                                target_scope,
                             )
                             .and(db, self.constraints, || {
                                 self.check_type_pair(
                                     db,
                                     target_extra_items.declared_ty,
+                                    target_scope,
                                     source_item_field.declared_ty,
+                                    source_scope,
                                 )
                             }),
                         );
@@ -1066,7 +1105,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         self.check_type_pair(
                             db,
                             source_extra_items.declared_ty,
+                            source_scope,
                             target_extra_items.declared_ty,
+                            target_scope,
                         ),
                     );
                 }
@@ -1078,7 +1119,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.check_type_pair(
                                 db,
                                 source_item_field.declared_ty,
+                                target_scope,
                                 target_extra_items.declared_ty,
+                                source_scope,
                             ),
                         );
                     }
@@ -1154,7 +1197,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         left: TypedDictType<'db>,
+        left_scope: TypeVarScope<'db>,
         right: TypedDictType<'db>,
+        right_scope: TypeVarScope<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let left_items = left.items(db);
         let right_items = right.items(db);
@@ -1197,13 +1242,17 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                 .check_type_pair(
                                     db,
                                     left_field.declared_ty,
+                                    left_scope,
                                     right_field.declared_ty,
+                                    right_scope,
                                 )
                                 .and(db, self.constraints, || {
                                     relation_checker.check_type_pair(
                                         db,
                                         right_field.declared_ty,
+                                        right_scope,
                                         left_field.declared_ty,
+                                        left_scope,
                                     )
                                 })
                         },
@@ -1218,7 +1267,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             checker.check_type_pair(
                                 db,
                                 left_field.declared_ty,
+                                left_scope,
                                 right_field.declared_ty,
+                                right_scope,
                             )
                         },
                     )
@@ -1232,14 +1283,22 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                             checker.check_type_pair(
                                 db,
                                 right_field.declared_ty,
+                                right_scope,
                                 left_field.declared_ty,
+                                left_scope,
                             )
                         },
                     )
                     .negate(db, self.constraints)
                 } else {
                     // Condition 4 above.
-                    self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                    self.check_type_pair(
+                        db,
+                        left_field.declared_ty,
+                        left_scope,
+                        right_field.declared_ty,
+                        right_scope,
+                    )
                 };
                 if let Some(context) = self.report_context()
                     && result.is_always_satisfied(db, self.env, self.inferable)
@@ -1257,87 +1316,143 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             left_items
                 .iter()
                 .filter(|(name, field)| field.is_required() && !right_items.contains_key(*name))
-                .map(|(_, field)| (field, right.openness(db)))
+                .map(|(_, field)| (field, left_scope, right.openness(db), right_scope))
                 .chain(
                     right_items
                         .iter()
                         .filter(|(name, field)| {
                             field.is_required() && !left_items.contains_key(*name)
                         })
-                        .map(|(_, field)| (field, left.openness(db))),
+                        .map(|(_, field)| (field, right_scope, left.openness(db), left_scope)),
                 )
-                .when_any(db, self.constraints, |(required_field, other_openness)| {
-                    let check_read_only_extra_items = |extra_items_ty| {
-                        if required_field.is_read_only() {
-                            self.check_type_pair(db, required_field.declared_ty, extra_items_ty)
-                        } else {
-                            self.as_relation_checker(TypeRelation::Assignability)
-                                .check_type_pair(db, required_field.declared_ty, extra_items_ty)
-                                .negate(db, self.constraints)
-                        }
-                    };
+                .when_any(
+                    db,
+                    self.constraints,
+                    |(required_field, field_scope, other_openness, other_scope)| {
+                        let check_read_only_extra_items = |extra_items_ty| {
+                            if required_field.is_read_only() {
+                                self.check_type_pair(
+                                    db,
+                                    required_field.declared_ty,
+                                    field_scope,
+                                    extra_items_ty,
+                                    other_scope,
+                                )
+                            } else {
+                                self.as_relation_checker(TypeRelation::Assignability)
+                                    .check_type_pair(
+                                        db,
+                                        required_field.declared_ty,
+                                        field_scope,
+                                        extra_items_ty,
+                                        other_scope,
+                                    )
+                                    .negate(db, self.constraints)
+                            }
+                        };
 
-                    match other_openness {
-                        TypedDictOpenness::Closed => self.always(),
-                        TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
-                            self.always()
+                        match other_openness {
+                            TypedDictOpenness::Closed => self.always(),
+                            TypedDictOpenness::Extra(extra_items)
+                                if !extra_items.is_read_only() =>
+                            {
+                                self.always()
+                            }
+                            TypedDictOpenness::ImplicitlyOpen => {
+                                check_read_only_extra_items(Type::object())
+                            }
+                            TypedDictOpenness::Extra(extra_items) => {
+                                check_read_only_extra_items(extra_items.declared_ty)
+                            }
                         }
-                        TypedDictOpenness::ImplicitlyOpen => {
-                            check_read_only_extra_items(Type::object())
-                        }
-                        TypedDictOpenness::Extra(extra_items) => {
-                            check_read_only_extra_items(extra_items.declared_ty)
-                        }
-                    }
-                })
+                    },
+                )
         });
 
         let unshared_fields_disjoint = required_fields_disjoint.or(db, self.constraints, || {
             left_items
                 .iter()
-                .map(|(name, field)| (name, field, right_items, right.openness(db)))
-                .chain(
-                    right_items
-                        .iter()
-                        .map(|(name, field)| (name, field, left_items, left.openness(db))),
-                )
-                .filter_map(|(name, field, other_items, other_openness)| {
-                    if field.is_required() || other_items.contains_key(name) {
-                        return None;
-                    }
-                    match other_openness {
-                        TypedDictOpenness::Closed if !field.is_read_only() => Some((field, None)),
-                        TypedDictOpenness::Extra(extra_items)
-                            if !field.is_read_only() || !extra_items.is_read_only() =>
-                        {
-                            Some((field, Some(extra_items)))
-                        }
-                        TypedDictOpenness::ImplicitlyOpen
-                        | TypedDictOpenness::Closed
-                        | TypedDictOpenness::Extra(_) => None,
-                    }
+                .map(|(name, field)| {
+                    (
+                        name,
+                        field,
+                        left_scope,
+                        right_items,
+                        right.openness(db),
+                        right_scope,
+                    )
                 })
-                .when_any(db, self.constraints, |(field, extra_items)| {
-                    let Some(extra_items) = extra_items else {
+                .chain(right_items.iter().map(|(name, field)| {
+                    (
+                        name,
+                        field,
+                        right_scope,
+                        left_items,
+                        left.openness(db),
+                        left_scope,
+                    )
+                }))
+                .filter_map(
+                    |(name, field, field_scope, other_items, other_openness, other_scope)| {
+                        if field.is_required() || other_items.contains_key(name) {
+                            return None;
+                        }
+                        match other_openness {
+                            TypedDictOpenness::Closed if !field.is_read_only() => {
+                                Some((field, field_scope, None))
+                            }
+                            TypedDictOpenness::Extra(extra_items)
+                                if !field.is_read_only() || !extra_items.is_read_only() =>
+                            {
+                                Some((field, field_scope, Some((extra_items, other_scope))))
+                            }
+                            TypedDictOpenness::ImplicitlyOpen
+                            | TypedDictOpenness::Closed
+                            | TypedDictOpenness::Extra(_) => None,
+                        }
+                    },
+                )
+                .when_any(db, self.constraints, |(field, field_scope, extra_items)| {
+                    let Some((extra_items, extra_scope)) = extra_items else {
                         return self.always();
                     };
                     let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
                     if field.is_read_only() {
                         relation_checker
-                            .check_type_pair(db, extra_items.declared_ty, field.declared_ty)
+                            .check_type_pair(
+                                db,
+                                extra_items.declared_ty,
+                                extra_scope,
+                                field.declared_ty,
+                                field_scope,
+                            )
                             .negate(db, self.constraints)
                     } else if extra_items.is_read_only() {
                         relation_checker
-                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .check_type_pair(
+                                db,
+                                field.declared_ty,
+                                field_scope,
+                                extra_items.declared_ty,
+                                extra_scope,
+                            )
                             .negate(db, self.constraints)
                     } else {
                         relation_checker
-                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .check_type_pair(
+                                db,
+                                field.declared_ty,
+                                field_scope,
+                                extra_items.declared_ty,
+                                extra_scope,
+                            )
                             .and(db, self.constraints, || {
                                 relation_checker.check_type_pair(
                                     db,
                                     extra_items.declared_ty,
+                                    extra_scope,
                                     field.declared_ty,
+                                    field_scope,
                                 )
                             })
                             .negate(db, self.constraints)
@@ -1361,12 +1476,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     if !left_extra.is_read_only() && !right_extra.is_read_only() =>
                 {
                     relation_checker
-                        .check_type_pair(db, left_extra.declared_ty, right_extra.declared_ty)
+                        .check_type_pair(
+                            db,
+                            left_extra.declared_ty,
+                            left_scope,
+                            right_extra.declared_ty,
+                            right_scope,
+                        )
                         .and(db, self.constraints, || {
                             relation_checker.check_type_pair(
                                 db,
                                 right_extra.declared_ty,
+                                right_scope,
                                 left_extra.declared_ty,
+                                left_scope,
                             )
                         })
                         .negate(db, self.constraints)
@@ -1375,6 +1498,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 | (other, TypedDictOpenness::Extra(mutable_extra))
                     if !mutable_extra.is_read_only() =>
                 {
+                    let (mutable_scope, other_scope) =
+                        if matches!(left_openness, TypedDictOpenness::Extra(_)) {
+                            (left_scope, right_scope)
+                        } else {
+                            (right_scope, left_scope)
+                        };
                     other.effective_extra_items().map_or_else(
                         || self.always(),
                         |other_extra| {
@@ -1382,7 +1511,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                 .check_type_pair(
                                     db,
                                     mutable_extra.declared_ty,
+                                    mutable_scope,
                                     other_extra.declared_ty,
+                                    other_scope,
                                 )
                                 .negate(db, self.constraints)
                         },
