@@ -1060,6 +1060,7 @@ mod tests {
         	unmatched-suppression-comment (RUF104),
         	rule-codes-in-suppression-comments (RUF106),
         	unnecessary-regular-expression-compile,
+        	conditional-global-or-nonlocal,
         ]
 
         Removed in preview:
