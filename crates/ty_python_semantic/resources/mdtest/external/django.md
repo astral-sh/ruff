@@ -254,18 +254,28 @@ class Author(models.Model):
 
 class Book(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE)
-    editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
+    editor = models.ForeignKey(to=Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
 
 def _(book: Book):
-    # TODO: Should be `Author`.
-    reveal_type(book.author)  # revealed: Unknown
-    # TODO: Should be `int`.
-    reveal_type(book.author_id)  # revealed: Any
+    reveal_type(book.author)  # revealed: Author
+    reveal_type(book.author_id)  # revealed: int
 
-    # TODO: Should be `Author | None`.
-    reveal_type(book.editor)  # revealed: Unknown
-    # TODO: Should be `int | None`.
-    reveal_type(book.editor_id)  # revealed: Any | None
+    reveal_type(book.editor)  # revealed: Author | None
+    reveal_type(book.editor_id)  # revealed: int | None
+```
+
+The stubs accept related model instances and expressions as input. `null=True` also allows `None`:
+
+```py
+def _(book: Book, author: Author):
+    book.author = author
+    book.author = models.F("editor")
+    book.editor = author
+    book.editor = None
+
+    book.author = None  # error: [invalid-assignment]
+    book.author = 123  # error: [invalid-assignment]
+    book.editor = book  # error: [invalid-assignment]
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
@@ -306,11 +316,9 @@ class Review(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
 
 def _(review: Review):
-    # TODO: Should be `Book`.
-    reveal_type(review.book)  # revealed: Unknown
+    reveal_type(review.book)  # revealed: Book
 
-    # TODO: Should be `str`.
-    reveal_type(review.book_id)  # revealed: Any
+    reveal_type(review.book_id)  # revealed: str
 ```
 
 ### Explicit target field
@@ -329,12 +337,9 @@ class Review(models.Model):
     book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE)
 
 def _(review: Review):
-    # TODO: Should be `Book`.
-    reveal_type(review.book)  # revealed: Unknown
+    reveal_type(review.book)  # revealed: Book
 
-    # TODO: Should not be an error, and the type should be `str`.
-    # error: [unresolved-attribute]
-    reveal_type(review.book_id)  # revealed: Unknown
+    reveal_type(review.book_id)  # revealed: str
 ```
 
 ## Choices

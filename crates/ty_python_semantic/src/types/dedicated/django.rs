@@ -74,14 +74,14 @@ fn infer_field_type<'db>(
 
     let generic_context = specialization.generic_context(db);
     let mut field_specialization = None;
+    let mut is_foreign_key = false;
     for (base, specialization) in class
         .iter_mro(db, Some(generic_context.identity_specialization(db)))
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.static_class_literal(db))
     {
-        // Related fields need their target model, which these hints do not describe.
         if base.is_known(db, KnownClass::DjangoForeignKey) {
-            return None;
+            is_foreign_key = true;
         }
         if base.is_known(db, KnownClass::DjangoField) {
             field_specialization = specialization;
@@ -90,6 +90,25 @@ fn infer_field_type<'db>(
     }
     let [set_type, get_type] = field_specialization?.types(db) else {
         return None;
+    };
+
+    // ForeignKey's hints use `Any` for the related model. Resolve it from the `to` argument.
+    let related_model = if is_foreign_key {
+        let arguments = arguments?;
+        let target = arguments
+            .iter()
+            .find(|argument| matches!(argument.kind(), Argument::Keyword("to")))
+            .or_else(|| {
+                arguments
+                    .iter()
+                    .find(|argument| {
+                        matches!(argument.kind(), Argument::Positional | Argument::Variadic)
+                    })
+                    .filter(|argument| matches!(argument.kind(), Argument::Positional))
+            })?;
+        Some(target.source_type()?.to_instance_approximation(db, env)?)
+    } else {
+        None
     };
 
     let null = arguments.is_some_and(|arguments| {
@@ -121,6 +140,19 @@ fn infer_field_type<'db>(
         else {
             continue;
         };
+        if let Some(related_model) = related_model {
+            let replace_model = |ty: &Type<'db>| {
+                if *ty == Type::any() {
+                    related_model
+                } else {
+                    *ty
+                }
+            };
+            field_type = match field_type {
+                Type::Union(union) => union.map(db, env, replace_model),
+                _ => replace_model(&field_type),
+            };
+        }
         if null {
             field_type = UnionType::from_elements(db, env, [field_type, Type::none(db, env)]);
         }
@@ -394,16 +426,17 @@ fn foreign_key_id_member<'db>(
         return None;
     }
 
-    // django-types represents a foreign key declared with `null=True` as
-    // `ForeignKey[Author | None]`, so its `related_model` attribute has type
-    // `type[Author | None]`. Remove `None` from the instance type before looking up `pk`
-    // (or `to_field`) on `Author`. If `null=True`, add `None` to the
-    // resulting ID type: for example, an integer primary key becomes `int | None`.
+    // Read the related model's type through the field descriptor. For `null=True`, remove
+    // `None` before looking up `pk` (or `to_field`), then add it to the resulting ID type.
+    let instance = Type::instance(
+        db,
+        env,
+        class.apply_optional_specialization(db, specialization),
+    );
     let related_model = field_ty
-        .member(db, env, "related_model")
-        .place
-        .ignore_possibly_undefined()?
-        .to_instance_approximation(db, env)?
+        .try_call_dunder_get(db, env, Some(instance), instance.to_meta_type(db, env))
+        .ok()??
+        .return_type
         .filter_union(db, env, |ty| !ty.is_none(db));
     let target_name = field.metadata.to_field.as_deref().unwrap_or("pk");
     let id_ty = related_model
