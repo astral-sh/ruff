@@ -2337,16 +2337,23 @@ def inspect(
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Number` cannot be used as a type
  --> src/mdtest_snippet.py:6:17
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
   |                 ^^^^^^
+info: `Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> src/mdtest_snippet.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
-An expression that evaluates to a class does not automatically define a type alias:
+An expression that evaluates to a class does not automatically define a type alias. The diagnostic
+explains why its original definition is invalid as a type expression:
 
 ```py
 Called = type(1)
@@ -2357,11 +2364,17 @@ def inspect(called: Called):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Called` cannot be used as a type
   --> src/mdtest_snippet.py:18:21
    |
 18 | def inspect(called: Called):
    |                     ^^^^^^
+info: `Called` is not a valid type alias
+info: Function calls are not allowed in type alias definitions
+  --> src/mdtest_snippet.py:15:10
+   |
+15 | Called = type(1)
+   |          ^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -2469,11 +2482,45 @@ def inspect_forwarded(forwarded: ForwardedClass):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `ForwardedClass` cannot be used as a type
  --> src/main.py:4:34
   |
 4 | def inspect_forwarded(forwarded: ForwardedClass):
   |                                  ^^^^^^^^^^^^^^
+info: `ForwardedClass` is not a valid type alias
+info: Function calls are not allowed in type alias definitions
+ --> dependencies/values.py:3:17
+  |
+3 | ComputedClass = (lambda: int)()
+  |                 ^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+Quoted attribute references name the attribute used in the annotation, while the explanation points
+to its original definition:
+
+`quoted.py`:
+
+```py
+import values
+
+# snapshot: invalid-type-form
+def inspect_quoted(attribute: "values.Number"): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable `values.Number` cannot be used as a type
+ --> src/quoted.py:4:32
+  |
+4 | def inspect_quoted(attribute: "values.Number"): ...
+  |                                ^^^^^^^^^^^^^
+info: `values.Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> dependencies/values.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
@@ -2503,6 +2550,39 @@ def inspect_classes(
     local_attribute: AttributeClass,  # error: [invalid-type-form]
 ):
     reveal_type(local_attribute)  # revealed: Unknown
+```
+
+## Suppressions on alias definitions
+
+The assignment below is valid runtime code; the error belongs to the use of `Number` as a type.
+
+We explain the error by inferring the assignment's right-hand side as a type expression at its
+original source location. The resulting diagnostics are attached as notes on the error at the use,
+not reported as separate errors on the assignment. This inference must bypass the assignment's
+suppression: the test checks that the ignore remains unused and that the explanation is still shown.
+
+```py
+# error: [unused-ignore-comment]
+Number = 1 + 2  # ty: ignore[invalid-type-form]
+
+# snapshot: invalid-type-form
+def inspect(value: Number): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable `Number` cannot be used as a type
+ --> src/mdtest_snippet.py:5:20
+  |
+5 | def inspect(value: Number): ...
+  |                    ^^^^^^
+info: `Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> src/mdtest_snippet.py:2:10
+  |
+2 | Number = 1 + 2  # ty: ignore[invalid-type-form]
+  |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 ## Disabled invalid implicit alias diagnostics

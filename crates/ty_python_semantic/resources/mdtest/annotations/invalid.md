@@ -139,17 +139,17 @@ class Mat:
         return 42
 
 def invalid_binary_operators(
-    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in type annotation"
-    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in type annotation"
-    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in type annotation"
-    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in type annotation"
-    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in type annotation"
-    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in type annotation"
-    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in type annotation"
-    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in type annotation"
-    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
-    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
-    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
+    a: "1" + "2",  # error: [invalid-type-form] "Invalid binary operator `+` in a parameter annotation"
+    b: 3 - 5.0,  # error: [invalid-type-form] "Invalid binary operator `-` in a parameter annotation"
+    c: 4 * -2,  # error: [invalid-type-form] "Invalid binary operator `*` in a parameter annotation"
+    d: Mat(4) @ Mat(2),  # error: [invalid-type-form] "Invalid binary operator `@` in a parameter annotation"
+    e: 10 / 2,  # error: [invalid-type-form] "Invalid binary operator `/` in a parameter annotation"
+    f: 10 % 3,  # error: [invalid-type-form] "Invalid binary operator `%` in a parameter annotation"
+    g: 2**-0.5,  # error: [invalid-type-form] "Invalid binary operator `**` in a parameter annotation"
+    h: 10 // 3,  # error: [invalid-type-form] "Invalid binary operator `//` in a parameter annotation"
+    i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in a parameter annotation"
+    j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in a parameter annotation"
+    k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     l: 5 & 3,
@@ -1274,7 +1274,7 @@ class C:
 ```
 
 ```snapshot
-error[invalid-type-form]: List literals are not allowed in this context in a type alias value
+error[invalid-type-form]: List literals are not allowed in this context in a type alias definition
  --> src/mdtest_snippet.py:6:21
   |
 6 |     type Alias[T] = [int]  # snapshot: invalid-type-form

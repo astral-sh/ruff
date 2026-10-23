@@ -157,6 +157,30 @@ pub(super) struct LegacyTypeAliasInference<'db> {
     pub(super) legacy_aliases: Box<[Definition<'db>]>,
 }
 
+/// Explain why an ordinary assignment's right-hand side is not a valid type expression.
+///
+/// These diagnostics are attached to errors at references to the value. They are inferred
+/// separately so unchecked dependencies and local suppressions do not hide the explanation.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _| TypeCheckDiagnostics::default(),
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn non_alias_type_expression_diagnostics<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypeCheckDiagnostics {
+    let program_file = definition.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let Some(value) = definition.kind(db).value(&module) else {
+        return TypeCheckDiagnostics::default();
+    };
+    let env = ProgramEnvironment::from_file(program_file);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_non_alias_type_expression_diagnostics(definition, value)
+}
+
 bitflags::bitflags! {
     /// Metadata for expressions inferred as type expressions.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -2485,7 +2509,7 @@ impl InferenceFlags {
         } else if self.contains(InferenceFlags::IN_PARAMETER_ANNOTATION) {
             "parameter annotation"
         } else if self.contains(InferenceFlags::IN_TYPE_ALIAS) {
-            "type alias value"
+            "type alias definition"
         } else {
             "type expression"
         }

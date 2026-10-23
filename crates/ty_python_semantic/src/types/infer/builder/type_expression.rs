@@ -1,9 +1,9 @@
 use itertools::Either;
-use ruff_db::diagnostic::Annotation;
+use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
@@ -23,6 +23,7 @@ use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
     CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
     infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
+    non_alias_type_expression_diagnostics,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -34,9 +35,9 @@ use ty_python_core::scope::ScopeKind;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
-    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
-    TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    binding_type, todo_type,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeCheckDiagnostics,
+    TypeContext, TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
+    UnionType, any_over_type, binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -128,6 +129,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let reference = self.infer_type_expression_reference(value);
         self.context.defuse();
         reference
+    }
+
+    /// Infer an ordinary assignment's right-hand side as a type expression to explain
+    /// why its value cannot be used as a type.
+    ///
+    /// For example, `Number = type(1)` is valid at runtime, but using `Number` as a type
+    /// is invalid because the right-hand side is a call. The caller attaches the returned
+    /// `invalid-type-form` diagnostics as subdiagnostics at that reference. Collect them
+    /// even when the defining file is unchecked or suppresses diagnostics.
+    pub(in crate::types::infer) fn finish_non_alias_type_expression_diagnostics(
+        mut self,
+        definition: Definition<'db>,
+        value: &ast::Expr,
+    ) -> TypeCheckDiagnostics {
+        self.context.collect_type_expression_diagnostics();
+        self.finish_legacy_type_alias(definition, value)
+            .context
+            .diagnostics
     }
 
     pub(in crate::types::infer) fn finish_legacy_type_alias(
@@ -292,18 +311,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return Type::unknown();
         }
         report_missing_type_arguments(&self.context, ty, annotation);
-        let result_ty =
-            result.unwrap_or_else(|error| {
-                if error.invalid_expressions.iter().any(|invalid| {
-                    matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_))
-                }) {
+        let result_ty = result.unwrap_or_else(|error| {
+            let causes = self.find_non_alias_diagnostics(ty, definition);
+            for invalid in error.invalid_expressions {
+                if matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_)) {
                     self.store_type_expression_flags(
                         annotation,
                         TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE,
                     );
                 }
-                error.into_fallback_type(&self.context, annotation, self.inference_flags())
-            });
+                let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) else {
+                    continue;
+                };
+                let reason = invalid.reason(db, env, self.inference_flags());
+                let diagnostic = if let Some(causes) = causes {
+                    let mut diagnostic = builder
+                        .with_message_override(
+                            Self::invalid_variable_type_expression_message(annotation),
+                            &Self::invalid_type_alias_message(annotation),
+                        )
+                        .into_diagnostic(reason);
+                    Self::add_non_alias_diagnostics(&mut diagnostic, causes);
+                    diagnostic::add_type_expression_reference_link(diagnostic)
+                } else {
+                    builder.into_diagnostic(reason)
+                };
+                invalid.add_subdiagnostics(db, env, diagnostic, annotation);
+            }
+            error.fallback_type
+        });
         self.check_type_variable_scope(annotation, result_ty)
     }
 
@@ -319,16 +355,62 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && definition
                 .is_some_and(|definition| non_alias_assignment(self.db(), definition, ty).is_some())
         {
-            self.report_invalid_type_expression(
-                reference,
-                format_args!(
-                    "Variable is not allowed in {}s",
-                    self.type_expression_context()
-                ),
-            );
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, reference) {
+                let causes = self.find_non_alias_diagnostics(ty, definition);
+                let mut diagnostic = builder
+                    .into_diagnostic(Self::invalid_variable_type_expression_message(reference));
+                if let Some(causes) = causes {
+                    diagnostic.info(Self::invalid_type_alias_message(reference));
+                    Self::add_non_alias_diagnostics(&mut diagnostic, causes);
+                }
+                diagnostic::add_type_expression_reference_link(diagnostic);
+            }
             return true;
         }
         false
+    }
+
+    fn invalid_variable_type_expression_message(reference: &ast::Expr) -> String {
+        UnqualifiedName::from_expr(reference).map_or_else(
+            || "Variable cannot be used as a type".to_owned(),
+            |name| format!("Variable `{name}` cannot be used as a type"),
+        )
+    }
+
+    fn invalid_type_alias_message(reference: &ast::Expr) -> String {
+        UnqualifiedName::from_expr(reference).map_or_else(
+            || "This variable is not a valid type alias".to_owned(),
+            |name| format!("`{name}` is not a valid type alias"),
+        )
+    }
+
+    /// Find diagnostics explaining why the referenced assignment is not a valid type alias.
+    fn find_non_alias_diagnostics(
+        &self,
+        ty: Type<'db>,
+        definition: Option<Definition<'db>>,
+    ) -> Option<&'db TypeCheckDiagnostics> {
+        // Explain the original definition once, without recursively expanding errors from
+        // other variables mentioned in its right-hand side.
+        if self.context.is_type_expression_explanation()
+            || !self.context.is_lint_enabled(&INVALID_TYPE_FORM)
+        {
+            return None;
+        }
+        let definition = non_alias_assignment(self.db(), definition?, ty)?;
+        let causes = non_alias_type_expression_diagnostics(self.db(), definition);
+        (!causes.is_empty()).then_some(causes)
+    }
+
+    /// Attach the errors from the invalid definition as notes at the use site.
+    fn add_non_alias_diagnostics(diagnostic: &mut Diagnostic, causes: &TypeCheckDiagnostics) {
+        for cause in causes {
+            let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, cause.headline_message());
+            for annotation in cause.annotations() {
+                sub.annotate(annotation.clone());
+            }
+            diagnostic.sub(sub);
+        }
     }
 
     /// Infer the type of a type expression without storing the result.
@@ -640,8 +722,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
-                                "Invalid binary operator `{}` in type annotation",
-                                op.as_str()
+                                "Invalid binary operator `{}` in a {}",
+                                op.as_str(),
+                                self.type_expression_context()
                             ),
                         );
                         Type::unknown()
