@@ -10053,6 +10053,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             callable_type,
             return_ty,
             &call_arguments,
+            &bindings,
         )
         .unwrap_or(return_ty);
 

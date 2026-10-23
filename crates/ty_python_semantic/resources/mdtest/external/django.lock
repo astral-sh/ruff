@@ -28,29 +28,21 @@ wheels = [
 [[package]]
 name = "django-stubs"
 version = "6.1.2"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/typeddjango/django-stubs.git?rev=f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa#f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa" }
 dependencies = [
     { name = "django" },
     { name = "django-stubs-ext" },
     { name = "types-pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/56/d0/00a9af43bf65ee54706e29b1c41b3a00d7a97157fbf97ed3038dcc73d584/django_stubs-6.1.2.tar.gz", hash = "sha256:d62b15fa5cbae79b1922d015e1454d299959d230221dadb23f65c749480b97ec", size = 295860, upload-time = "2026-10-05T06:47:17.595Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/36/206be00ba6aaf21c72cf61fd38cee492c7dcf51eac72fd61a9f7ddd0f916/django_stubs-6.1.2-py3-none-any.whl", hash = "sha256:ffb6e74f54b8c1f9b2f3bc4852c5abbaa2324b2a7cb1c51854c5f95abe67165c", size = 559846, upload-time = "2026-10-05T06:47:15.889Z" },
-]
 
 [[package]]
 name = "django-stubs-ext"
 version = "6.1.2"
-source = { registry = "https://pypi.org/simple" }
+source = { git = "https://github.com/typeddjango/django-stubs.git?subdirectory=ext&rev=f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa#f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa" }
 dependencies = [
     { name = "django" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/62/de532d58736d671b9ac0c0467909a9429758ae579d636e868ce74519566b/django_stubs_ext-6.1.2.tar.gz", hash = "sha256:2142da7fffbbe897ccecf9b4c97e09ea1a2e9291760b0a824b4c402b375ce6f9", size = 7221, upload-time = "2026-10-05T06:46:43.717Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/bb/393c3c1e24aaf37d62918ea50f3ea22e30d5f3162fc62f4c3bf3275e5ed3/django_stubs_ext-6.1.2-py3-none-any.whl", hash = "sha256:7334e687ab6dc78a6c3da90ab1ccb0e412efd827ea11de8d3f85adbad948abb1", size = 10850, upload-time = "2026-10-05T06:46:42.647Z" },
 ]
 
 [[package]]
@@ -62,7 +54,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "django-stubs", specifier = "==6.1.2" }]
+requires-dist = [{ name = "django-stubs", git = "https://github.com/typeddjango/django-stubs.git?rev=f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa" }]
 
 [[package]]
 name = "sqlparse"

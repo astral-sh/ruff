@@ -404,6 +404,24 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Specialization<'db>> {
+        let (_, class_specialization) = self
+            .constructed_instance_type()
+            .class_specialization(db, env)?;
+        let types = self.inferred_class_type_arguments(db, env)?;
+        Some(
+            class_specialization
+                .generic_context(db)
+                .specialize_partial(db, types)
+                .apply_optional_specialization(db, Some(class_specialization)),
+        )
+    }
+
+    /// Combine class type arguments inferred by the constructor methods, before applying defaults.
+    pub(super) fn inferred_class_type_arguments(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Vec<Option<Type<'db>>>> {
         let constructed_instance_type = self.constructed_instance_type();
         // This will be `None` if we're constructing a non-generic class. If we're constructing a
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
@@ -539,11 +557,7 @@ impl<'db> ConstructorBinding<'db> {
             }
         }
 
-        combined.map(|types| {
-            class_context
-                .specialize_partial(db, types)
-                .apply_optional_specialization(db, Some(class_specialization))
-        })
+        combined
     }
 
     /// Compute the explicit return type from a `__new__` or metaclass `__call__`.

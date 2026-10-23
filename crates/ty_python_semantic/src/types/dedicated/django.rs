@@ -7,7 +7,7 @@ use ty_python_core::{
 };
 
 use crate::place::known_module_symbol;
-use crate::types::call::{Argument, CallArguments};
+use crate::types::call::{Argument, Bindings, CallArguments};
 use crate::types::class::ClassLiteral;
 use crate::types::member::class_member;
 use crate::types::{
@@ -44,6 +44,7 @@ pub(in crate::types) fn infer_field_constructor_type<'db>(
     callable_type: Type<'db>,
     return_ty: Type<'db>,
     arguments: &CallArguments<'_, 'db>,
+    bindings: &Bindings<'db>,
 ) -> Option<Type<'db>> {
     let class = callable_type
         .as_class_literal()
@@ -52,7 +53,7 @@ pub(in crate::types) fn infer_field_constructor_type<'db>(
     if returned_class != class {
         return None;
     }
-    infer_field_type(db, env, return_ty, Some(arguments))
+    infer_field_type(db, env, return_ty, Some(arguments), Some(bindings))
 }
 
 /// Fill uninferred field type arguments from django-stubs' read and write type hints.
@@ -66,9 +67,14 @@ fn infer_field_type<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     arguments: Option<&CallArguments<'_, 'db>>,
+    bindings: Option<&Bindings<'db>>,
 ) -> Option<Type<'db>> {
     let (class, specialization) = ty.class_specialization(db, env)?;
-    if !specialization.types(db).iter().any(Type::is_unknown) {
+    if !specialization
+        .types(db)
+        .iter()
+        .any(|ty| ty.is_unknown() || *ty == Type::any())
+    {
         return None;
     }
 
@@ -90,6 +96,14 @@ fn infer_field_type<'db>(
     }
     let [set_type, get_type] = field_specialization?.types(db) else {
         return None;
+    };
+
+    // Defaults such as `Any` do not tell us whether a type argument was inferred. Keep the
+    // constructor's inferred arguments, including `Any`, and only fill missing arguments.
+    // Synthesized automatic primary keys have no constructor call or inferred arguments.
+    let inferred_arguments = match bindings {
+        Some(bindings) => Some(bindings.inferred_constructor_type_arguments(db, env)?),
+        None => None,
     };
 
     // ForeignKey's hints use `Any` for the related model. Resolve it from the `to` argument.
@@ -131,7 +145,12 @@ fn infer_field_type<'db>(
         else {
             continue;
         };
-        if !specialization.types(db)[index].is_unknown() {
+        let original = specialization.types(db)[index];
+        if !(original.is_unknown() || original == Type::any())
+            || inferred_arguments
+                .as_ref()
+                .is_some_and(|arguments| arguments[index].is_some())
+        {
             continue;
         }
 
@@ -385,7 +404,7 @@ fn primary_key_member<'db>(
         .place
         .ignore_possibly_undefined()?
         .to_instance_approximation(db, env)?;
-    Some(infer_field_type(db, env, auto_field, None).unwrap_or(auto_field))
+    Some(infer_field_type(db, env, auto_field, None, None).unwrap_or(auto_field))
 }
 
 /// Find a field constructed with `primary_key=True` in this class body.

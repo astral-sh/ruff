@@ -8,7 +8,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["django-stubs==6.1.2"]
+dependencies = ["django-stubs @ git+https://github.com/typeddjango/django-stubs.git@f27f3a4d8d4f06567bc5ae99a0b6f5f3c36bd9aa"]
 ```
 
 ## Basic model
@@ -130,6 +130,7 @@ def _(book: Book):
 
     book.available = True
     book.pages = 180
+    book.extra = []
 
     book.available = 123  # error: [invalid-assignment]
     book.pages = "123"  # error: [invalid-assignment]

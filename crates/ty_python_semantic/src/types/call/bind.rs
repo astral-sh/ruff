@@ -1507,6 +1507,19 @@ impl<'db> Bindings<'db> {
         )
     }
 
+    /// Return type arguments inferred by a single constructor call, in the constructed class's
+    /// generic-context order. Uninferred arguments are `None`, even when their type parameters have
+    /// defaults such as `Any`.
+    pub(crate) fn inferred_constructor_type_arguments(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Vec<Option<Type<'db>>>> {
+        self.single_item()?
+            .as_constructor()?
+            .inferred_class_type_arguments(db, env)
+    }
+
     /// Returns the inferred type for the argument at the specified index.
     pub(crate) fn type_for_argument<'a>(
         &'a self,
