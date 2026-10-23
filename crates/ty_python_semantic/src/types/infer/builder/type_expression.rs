@@ -708,8 +708,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
-                                "Invalid binary operator `{}` in type annotation",
-                                op.as_str()
+                                "Invalid binary operator `{}` in a {}",
+                                op.as_str(),
+                                self.type_expression_context()
                             ),
                         );
                         Type::unknown()
