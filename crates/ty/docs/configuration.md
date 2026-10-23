@@ -201,6 +201,39 @@ inference.
 
 ---
 
+### `strict-dictionary-inference`
+
+Whether to infer unions for heterogeneous dictionary literal keys and values.
+
+When enabled, `{"a": 1, "b": "two"}` is inferred as `dict[str, int | str]`.
+When disabled, it is inferred as `dict[str, Unknown]`. Keys and values are
+considered independently: homogeneous keys or values still retain their type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictDictionaryInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    strict-dictionary-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    strict-dictionary-inference = false
+    ```
+
+---
+
 ### `strict-equality-semantics`
 
 Configure ty's behavior regarding type inference and narrowing of equality
@@ -346,6 +379,70 @@ Defaults to `false`.
     [analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true
+    ```
+
+---
+
+### `strict-list-inference`
+
+Whether to infer a union of element types for heterogeneous list literals.
+
+When enabled, `[1, "a"]` is inferred as `list[int | str]`. When disabled,
+it is inferred as `list[Unknown]`. Homogeneous lists still retain their element type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictListInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    strict-list-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    strict-list-inference = false
+    ```
+
+---
+
+### `strict-set-inference`
+
+Whether to infer a union of element types for heterogeneous set literals.
+
+When enabled, `{1, "a"}` is inferred as `set[int | str]`. When disabled,
+it is inferred as `set[Unknown]`. Homogeneous sets still retain their element type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictSetInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    strict-set-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    strict-set-inference = false
     ```
 
 ---
@@ -919,6 +1016,45 @@ inference.
 
 ---
 
+#### `strict-dictionary-inference`
+
+Whether to infer unions for heterogeneous dictionary literal keys and values.
+
+When enabled, `{"a": 1, "b": "two"}` is inferred as `dict[str, int | str]`.
+When disabled, it is inferred as `dict[str, Unknown]`. Keys and values are
+considered independently: homogeneous keys or values still retain their type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictDictionaryInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    strict-dictionary-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    strict-dictionary-inference = false
+    ```
+
+---
+
 #### `strict-equality-semantics`
 
 Configure ty's behavior regarding type inference and narrowing of equality
@@ -1076,6 +1212,82 @@ Defaults to `false`.
     [overrides.analysis]
     # Use the top materialization when narrowing to an unspecialized generic class
     strict-generic-narrowing = true
+    ```
+
+---
+
+#### `strict-list-inference`
+
+Whether to infer a union of element types for heterogeneous list literals.
+
+When enabled, `[1, "a"]` is inferred as `list[int | str]`. When disabled,
+it is inferred as `list[Unknown]`. Homogeneous lists still retain their element type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictListInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    strict-list-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    strict-list-inference = false
+    ```
+
+---
+
+#### `strict-set-inference`
+
+Whether to infer a union of element types for heterogeneous set literals.
+
+When enabled, `{1, "a"}` is inferred as `set[int | str]`. When disabled,
+it is inferred as `set[Unknown]`. Homogeneous sets still retain their element type.
+Expected types from annotations and function parameters take precedence over this setting.
+
+This corresponds to Pyright's `strictSetInference` option, but defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    strict-set-inference = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    strict-set-inference = false
     ```
 
 ---

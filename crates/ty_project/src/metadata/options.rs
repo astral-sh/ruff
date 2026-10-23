@@ -1589,6 +1589,49 @@ pub struct AnalysisOptions {
     )]
     pub return_type_inference: Option<ReturnTypeInference>,
 
+    /// Whether to infer a union of element types for heterogeneous list literals.
+    ///
+    /// When enabled, `[1, "a"]` is inferred as `list[int | str]`. When disabled,
+    /// it is inferred as `list[Unknown]`. Homogeneous lists still retain their element type.
+    /// Expected types from annotations and function parameters take precedence over this setting.
+    ///
+    /// This corresponds to Pyright's `strictListInference` option, but defaults to `true`.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = "strict-list-inference = false"
+    )]
+    pub strict_list_inference: Option<bool>,
+
+    /// Whether to infer unions for heterogeneous dictionary literal keys and values.
+    ///
+    /// When enabled, `{"a": 1, "b": "two"}` is inferred as `dict[str, int | str]`.
+    /// When disabled, it is inferred as `dict[str, Unknown]`. Keys and values are
+    /// considered independently: homogeneous keys or values still retain their type.
+    /// Expected types from annotations and function parameters take precedence over this setting.
+    ///
+    /// This corresponds to Pyright's `strictDictionaryInference` option, but defaults to `true`.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = "strict-dictionary-inference = false"
+    )]
+    pub strict_dictionary_inference: Option<bool>,
+
+    /// Whether to infer a union of element types for heterogeneous set literals.
+    ///
+    /// When enabled, `{1, "a"}` is inferred as `set[int | str]`. When disabled,
+    /// it is inferred as `set[Unknown]`. Homogeneous sets still retain their element type.
+    /// Expected types from annotations and function parameters take precedence over this setting.
+    ///
+    /// This corresponds to Pyright's `strictSetInference` option, but defaults to `true`.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = "strict-set-inference = false"
+    )]
+    pub strict_set_inference: Option<bool>,
+
     /// Whether ty should use strict narrowing for unspecialized generic classes in
     /// `isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
     ///
@@ -1782,6 +1825,9 @@ impl AnalysisOptions {
     ) -> AnalysisSettings {
         let Self {
             return_type_inference,
+            strict_list_inference,
+            strict_dictionary_inference,
+            strict_set_inference,
             strict_generic_narrowing,
             strict_equality_semantics,
             respect_type_ignore_comments,
@@ -1791,6 +1837,9 @@ impl AnalysisOptions {
 
         let AnalysisSettings {
             return_type_inference: return_type_inference_default,
+            strict_list_inference: strict_list_inference_default,
+            strict_dictionary_inference: strict_dictionary_inference_default,
+            strict_set_inference: strict_set_inference_default,
             strict_generic_narrowing: strict_generic_narrowing_default,
             strict_equality_semantics: strict_equality_semantics_default,
             respect_type_ignore_comments: respect_type_ignore_default,
@@ -1822,6 +1871,10 @@ impl AnalysisOptions {
 
         AnalysisSettings {
             return_type_inference: return_type_inference.unwrap_or(return_type_inference_default),
+            strict_list_inference: strict_list_inference.unwrap_or(strict_list_inference_default),
+            strict_dictionary_inference: strict_dictionary_inference
+                .unwrap_or(strict_dictionary_inference_default),
+            strict_set_inference: strict_set_inference.unwrap_or(strict_set_inference_default),
             strict_generic_narrowing: strict_generic_narrowing
                 .unwrap_or(strict_generic_narrowing_default),
             strict_equality_semantics: strict_equality_semantics

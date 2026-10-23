@@ -167,6 +167,12 @@ pub(crate) struct Environment {
 pub(crate) struct Analysis {
     pub(crate) return_type_inference: Option<ReturnTypeInference>,
 
+    pub(crate) strict_list_inference: Option<bool>,
+
+    pub(crate) strict_dictionary_inference: Option<bool>,
+
+    pub(crate) strict_set_inference: Option<bool>,
+
     /// Whether narrowing with generic classes uses the top materialization.
     pub(crate) strict_generic_narrowing: Option<bool>,
 
