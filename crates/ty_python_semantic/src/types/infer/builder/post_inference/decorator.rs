@@ -3,7 +3,7 @@ use ty_python_core::definition::Definition;
 
 use crate::types::call::{CallArguments, CallError};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::report_invalid_runtime_checkable;
+use crate::types::diagnostic::{ClassMatches, report_bad_argument_to_protocol_function};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_definition_types;
 
@@ -27,11 +27,14 @@ pub(crate) fn check_decorator_calls<'db>(
         if decorator_ty
             .as_function_literal()
             .is_some_and(|function| function.is_known(db, KnownFunction::RuntimeCheckable))
-            && let Some(class) = input_ty.as_class_literal()
+            && let Some(argument) = ClassMatches::find_non_protocol_classes(db, env, input_ty)
         {
-            if !class.is_protocol(db) {
-                report_invalid_runtime_checkable(context, decorator, class);
-            }
+            report_bad_argument_to_protocol_function(
+                context,
+                decorator,
+                KnownFunction::RuntimeCheckable,
+                &argument,
+            );
             continue;
         }
 

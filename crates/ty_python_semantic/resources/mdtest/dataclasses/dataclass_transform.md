@@ -2037,7 +2037,8 @@ reveal_type(replace(p, name="Bob"))  # revealed: Person
 ## Calling decorator function directly with a class argument
 
 When a function decorated with `@dataclass_transform()` is called directly with a class argument
-(not used as a decorator), it should return the class with the dataclass transformation applied.
+(not used as a decorator), ty treats the returned class as having the dataclass transformation
+applied.
 
 ### Basic case
 
@@ -2056,6 +2057,24 @@ B = my_dataclass(A)
 reveal_type(B)  # revealed: <class 'A'>
 
 B(1)
+```
+
+### Class-valued return annotation
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+def my_dataclass(cls: type) -> type:
+    return cls
+
+class A:
+    x: int
+
+B = my_dataclass(A)
+reveal_type(B)  # revealed: <class 'A'>
+B(1)  # no diagnostic
+B()  # error: [missing-argument]
 ```
 
 ### Function with additional parameters
