@@ -7,6 +7,7 @@ use ruff_benchmark::real_world_projects::{
 };
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use itertools::Itertools;
 use ty_project::metadata::python_version::SupportedPythonVersion;
 
 mod ty_shared;
@@ -230,51 +231,28 @@ fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     });
 }
 
-/// Each union member contributes two lower-bound alternatives that violate `D`'s gradual bound.
-/// Recovering an invalid candidate must not enumerate their exponential cross product.
+/// Matching a tuple against `T | tuple[T]` makes either the tuple or its element a lower bound
+/// for `T`. Both violate the declared bound, and each union member doubles the number of paths.
 fn benchmark_incompatible_lower_bound_alternatives(criterion: &mut Criterion) {
     setup_rayon();
 
     for members in [4, 8, 12] {
-        let mut code = String::from(
+        let union = (0..members)
+            .map(|i| format!("tuple[Literal[{i}]]"))
+            .join(" | ");
+        let code = format!(
             "from collections.abc import Callable
-from typing import Any, Generic, Protocol, TypeVar, overload
+from typing import Any, Literal, overload
 
-Q = TypeVar('Q')
-class DType(Generic[Q]): ...
-
-ItemT = TypeVar('ItemT')
-class Scalar(Generic[ItemT]):
-    @property
-    def dtype(self) -> DType[Any]:
-        raise NotImplementedError
-
-D_co = TypeVar('D_co', bound=DType[Any], covariant=True)
-class HasDType(Protocol[D_co]):
-    @property
-    def dtype(self) -> D_co: ...
-
-D = TypeVar('D', bound=DType[Any])
 @overload
-def full(dtype: Callable[[], D | HasDType[D]]) -> None: ...
+def consume[T: list[Any]](make: Callable[[], T | tuple[T]]) -> None: ...
 @overload
-def full(dtype: object) -> None: ...
-def full(dtype: object) -> None: ...
+def consume(make: object) -> None: ...
+def consume(make: object) -> None: ...
 
+def check(make: Callable[[], {union}]) -> None:
+    consume(make)
 ",
-        );
-        for i in 0..members {
-            writeln!(&mut code, "class Scalar{i}(Scalar[int]): ...").ok();
-        }
-        code.push_str("\nMembers = ");
-        for i in 0..members {
-            if i > 0 {
-                code.push_str(" | ");
-            }
-            write!(&mut code, "Scalar{i}").ok();
-        }
-        code.push_str(
-            "\n\ndef check(dtype: Callable[[], type[Members]]) -> None:\n    full(dtype)\n",
         );
 
         criterion.bench_function(
