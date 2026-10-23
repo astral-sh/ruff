@@ -440,6 +440,7 @@ def consume(callback: Callable[[], tuple[tuple[T] | T, T]]) -> T:
     return callback()[1]
 
 def check(callback: Callable[[], tuple[tuple[object], list[Any]]]) -> None:
+    # TODO: Reject this call because the callback's second tuple element, `list[Any]`, is unhashable.
     reveal_type(consume(callback))  # revealed: object
 ```
 
