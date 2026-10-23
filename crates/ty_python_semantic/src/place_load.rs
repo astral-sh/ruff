@@ -117,6 +117,7 @@ impl<'db, 'a> PlaceLoadResolver<'db, 'a> {
         ResolvedPlaceLoad {
             place,
             deprecation_target: deprecation_target.unwrap_or(place),
+            crosses_scope_declaration: self.procedure.crosses_scope_declaration,
             constraint_keys: self.procedure.into_constraints(),
         }
     }
@@ -230,6 +231,8 @@ pub(crate) struct ResolvedPlaceLoad<'db> {
     pub(crate) deprecation_target: PlaceAndQualifiers<'db>,
     /// Constraint keys accumulated for expression-level narrowing.
     pub(crate) constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+    /// Whether resolution followed a `global` or `nonlocal` declaration.
+    pub(crate) crosses_scope_declaration: bool,
 }
 
 /// Selects the binding state used for a place load's own scope.
@@ -526,8 +529,8 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             file: scope.program_file(db),
             mode,
         };
-        let crosses_scope_declaration =
-            context.symbol_has_scope_declaration(PlaceExprRef::from(place_expr));
+        let crosses_scope_declaration = context
+            .symbol_has_scope_declaration(scope.file_scope_id(db), PlaceExprRef::from(place_expr));
         Self {
             context,
             place_expr,
@@ -612,6 +615,13 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
             let forwards_to_global = is_lexically_visible
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
+            let forwards_to_nonlocal = is_lexically_visible
+                && enclosing_place
+                    .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_nonlocal));
+            let has_scope_declaration = (forwards_to_global || forwards_to_nonlocal)
+                && self
+                    .context
+                    .symbol_has_scope_declaration(enclosing_file_scope, place_expr);
             let root_place_was_reassigned = || {
                 enclosing_place_table
                     .parents(place_expr)
@@ -635,8 +645,11 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                         }
                     }
                     EnclosingSnapshotResult::FoundBindings(bindings) => {
-                        if forwards_to_global {
+                        if has_scope_declaration {
                             self.crosses_scope_declaration = true;
+                        }
+
+                        if forwards_to_global {
                             return (
                                 PlaceLoadResolutionNode::ImplicitClassBodySource(Some(
                                     ForwardedGlobalSnapshot {
@@ -690,13 +703,15 @@ impl<'db, 'ast> PlaceLoadResolutionProcedure<'db, 'ast> {
                 continue;
             };
 
-            if forwards_to_global {
+            if has_scope_declaration {
                 self.crosses_scope_declaration = true;
+            }
+
+            if forwards_to_global {
                 return (PlaceLoadResolutionNode::ImplicitClassBodySource(None), None);
             }
             // Keep walking across `nonlocal` declarations until reaching the owning scope.
-            if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
-                self.crosses_scope_declaration = true;
+            if forwards_to_nonlocal {
                 continue;
             }
             if !(enclosing_place.is_bound() || enclosing_place.is_declared()) {
@@ -1087,17 +1102,31 @@ struct PlaceLoadResolutionContext<'db, 'ast> {
 }
 
 impl<'db> PlaceLoadResolutionContext<'db, '_> {
-    fn symbol_has_scope_declaration(self, place_expr: PlaceExprRef) -> bool {
+    fn symbol_has_scope_declaration(
+        self,
+        file_scope: FileScopeId,
+        place_expr: PlaceExprRef,
+    ) -> bool {
         let Some(symbol) = place_expr.as_symbol() else {
             return false;
         };
-        let scope = self.scope.file_scope_id(self.db);
-        let table = self.index.place_table(scope);
-        let Some(symbol_id) = table.symbol_id(symbol.name()) else {
-            return false;
-        };
-        let symbol = table.symbol(symbol_id);
-        symbol.is_global() || symbol.is_nonlocal()
+
+        for (id, _) in self.index.ancestor_scopes(file_scope) {
+            let table = self.index.place_table(id);
+            let Some(symbol_id) = table.symbol_id(symbol.name()) else {
+                return false;
+            };
+            let symbol = table.symbol(symbol_id);
+            if !symbol.is_global() && !symbol.is_nonlocal() {
+                return false;
+            }
+
+            if symbol.has_scope_declaration() {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn is_class_body_scope(self) -> bool {
