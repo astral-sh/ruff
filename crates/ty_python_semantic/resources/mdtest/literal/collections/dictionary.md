@@ -210,6 +210,55 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
+## Keys with an `Any` value type
+
+When a dictionary declares its values as `Any`, a literal key has that type even if its value is
+known from the initializer.
+
+```py
+from typing import Any
+
+payload: dict[str, Any] = {"current": {"number": 3, "base": {}}}
+current = payload["current"]
+reveal_type(current)  # revealed: Any
+reveal_type(payload["current"]["number"])  # revealed: Any
+{**current["base"]}  # no diagnostic
+```
+
+An unpacked keyword has the same type as a direct read of the key.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def read(*, current: T) -> T:
+    return current
+
+reveal_type(read(**payload))  # revealed: Any
+```
+
+A later assignment also respects the value type. An explicit type check can still narrow the key.
+
+```py
+payload["current"] = 1
+reveal_type(payload["current"])  # revealed: Any
+if isinstance(payload["current"], str):
+    reveal_type(payload["current"])  # revealed: Any & str
+    reveal_type(read(**payload))  # revealed: Any & str
+```
+
+The same rule applies to a dictionary inside another collection.
+
+```py
+rows: list[dict[str, Any]] = [{"count": 1}, {**{"count": 2}}]
+reveal_type(rows[0]["count"])  # revealed: Any
+reveal_type(rows[1]["count"])  # revealed: Any
+
+dynamic_rows: list[Any] = [{"count": 1}]
+reveal_type(dynamic_rows[0]["count"])  # revealed: Any
+```
+
 ## Key narrowing through dictionary unpacking
 
 Unpacking a dictionary literal preserves its key bindings. Later entries replace earlier entries,

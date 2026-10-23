@@ -184,7 +184,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
-        let result = self.infer_subscript_load_impl(value_ty, subscript)?;
+        let mut result = self.infer_subscript_load_impl(value_ty, subscript);
+        if !value_ty.is_unknown()
+            && let Some(expr) = PlaceExpr::try_from_expr(subscript)
+        {
+            let (Ok(item_ty) | Err(item_ty)) = &mut result;
+            let declared_ty = self.fixed_subscript_binding_type(*item_ty);
+            let (place, keys) =
+                self.infer_place_load(expr, ast::ExprRef::Subscript(subscript), declared_ty);
+            *item_ty = if let Place::Defined(DefinedPlace {
+                ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = place.place
+            {
+                ty
+            } else {
+                self.narrow_expr_with_applicable_constraints(
+                    subscript,
+                    *item_ty,
+                    &keys,
+                    declared_ty,
+                )
+            };
+        }
+        let result = result?;
         if let ast::Expr::Dict(dict) = subscript.value.as_ref()
             && let Some((_, values)) =
                 dict_literal_key_value_types(self.db(), self.program_environment(), dict, |expr| {
@@ -213,35 +237,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = subscript;
 
         self.store_typed_dict_key_expected_type(slice, value_ty);
-
-        let mut constraint_keys = vec![];
-
-        // If `value` is a valid reference, we attempt type narrowing by assignment.
-        if !value_ty.is_unknown() {
-            if let Some(expr) = PlaceExpr::try_from_expr(subscript) {
-                let (place, keys) = self.infer_place_load(expr, ast::ExprRef::Subscript(subscript));
-                constraint_keys.extend(keys);
-                if let Place::Defined(DefinedPlace {
-                    ty,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) = place.place
-                {
-                    // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
-                    // (to store the expression type and to report errors).
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    return self
-                        .infer_subscript_expression_types(
-                            subscript,
-                            value_ty,
-                            slice_ty,
-                            ExprContext::Load,
-                        )
-                        .map(|_| ty)
-                        .map_err(|_| ty);
-                }
-            }
-        }
 
         let tuple_generic_alias = |tuple: TupleType<'db>| Type::from(tuple.to_class_type(db));
 
@@ -496,14 +491,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
         self.infer_subscript_expression_types(subscript, value_ty, slice_ty, ExprContext::Load)
-            .map(|ty| self.narrow_expr_with_applicable_constraints(subscript, ty, &constraint_keys))
-            .map_err(|recovery_ty| {
-                self.narrow_expr_with_applicable_constraints(
-                    subscript,
-                    recovery_ty,
-                    &constraint_keys,
-                )
-            })
     }
 
     pub(super) fn infer_explicit_class_specialization(

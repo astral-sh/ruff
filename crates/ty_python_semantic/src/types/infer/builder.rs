@@ -1808,6 +1808,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             env,
             prior_bindings,
             self.reachability_cache(),
+            None,
         )
         .place
         .with_qualifiers(TypeQualifiers::empty())
@@ -2744,6 +2745,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 env,
                 bindings,
                 self.reachability_cache(),
+                None,
             )
             .place
             .raw_type() else {
@@ -9066,12 +9068,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let keyword = argument.as_variadic()?;
 
-        if !argument_type
-            .as_nominal_instance()?
-            .has_known_class(db, KnownClass::Dict)
-        {
+        let [_, value_ty] = argument_type
+            .known_specialization(db, env, KnownClass::Dict)?
+            .types(db)
+        else {
             return None;
-        }
+        };
 
         let definition_key = |definition: Definition<'_>| {
             let key = match definition.kind(db) {
@@ -9089,6 +9091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Collect the types of each distinct key.
+        let declared_item_ty = self.fixed_subscript_binding_type(*value_ty);
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
         for bindings in
             use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
@@ -9096,8 +9099,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let place = place_from_bindings_with_reachability_cache(
                 db,
                 env,
-                bindings.clone(),
+                bindings,
                 self.reachability_cache(),
+                declared_item_ty,
             );
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;
@@ -10316,6 +10320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expr: PlaceExprRef,
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
+        declared_binding_ty: Option<Type<'db>>,
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -10366,7 +10371,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         match binding.binding {
                             DefinitionState::Defined(definition)
-                                if !is_discarded_dict_key_assignment(db, definition) =>
+                                if declared_binding_ty.is_none()
+                                    && !is_discarded_dict_key_assignment(db, definition) =>
                             {
                                 let mut binding_ty = binding_type(db, definition);
                                 if definition.kind(db).is_loop_header() {
@@ -10687,7 +10693,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let expr = PlaceExpr::from_expr_name(name_node);
 
-        let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node));
+        let (resolved, _) = self.infer_place_load(expr, ast::ExprRef::Name(name_node), None);
         let definition = match resolved.place {
             Place::Defined(place) => place.provenance.definition(),
             Place::Undefined => None,
@@ -10715,6 +10721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         place_expr: PlaceExpr,
         expr_ref: ast::ExprRef,
+        declared_binding_ty: Option<Type<'db>>,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let env = self.program_environment();
         let mode = if self.is_deferred() && self.in_string_annotation() {
@@ -10750,6 +10757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             resolution.place_expr(),
                             source,
                             narrowing_constraints,
+                            declared_binding_ty,
                         )
                     });
                     if place.place.is_definitely_bound() {
@@ -10791,6 +10799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         place_expr: PlaceExprRef,
         source: PlaceLoadSource<'db>,
         narrowing_constraints: &[(FileScopeId, ConstraintKey)],
+        declared_binding_ty: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         let db = self.db();
         let env = self.program_environment();
@@ -10803,6 +10812,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     env,
                     bindings,
                     self.reachability_cache(),
+                    declared_binding_ty,
                 )
                 .place;
 
@@ -10821,7 +10831,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 id,
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::AllReachable,
-            ),
+            )
+            .map_type(|ty| declared_binding_ty.unwrap_or(ty)),
             PlaceLoadSourceKind::Implicit(implicit) => match implicit {
                 ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
                     .map_or_else(
@@ -10856,7 +10867,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             place
         } else {
             place.map_type(|ty| {
-                self.narrow_place_with_applicable_constraints(place_expr, ty, narrowing_constraints)
+                self.narrow_place_with_applicable_constraints(
+                    place_expr,
+                    ty,
+                    narrowing_constraints,
+                    declared_binding_ty,
+                )
             })
         }
     }
@@ -10896,6 +10912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         env,
                         use_def.bindings_at_use(use_id),
                         self.reachability_cache(),
+                        None,
                     )
                     .place
                 }
@@ -10905,6 +10922,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         env,
                         use_def.reachable_bindings(place_id),
                         self.reachability_cache(),
+                        None,
                     )
                     .place
                 }
@@ -11026,19 +11044,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// An item declared as `Any` keeps that type across assignments. Predicates such as
+    /// `isinstance(items[0], str)` can still narrow it from `Any`.
+    fn fixed_subscript_binding_type(&self, item_ty: Type<'db>) -> Option<Type<'db>> {
+        (item_ty.resolve_type_alias(self.db()) == Type::any()).then_some(item_ty)
+    }
+
     fn narrow_expr_with_applicable_constraints<'r>(
         &mut self,
         target: impl Into<ast::ExprRef<'r>>,
         target_ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
+        declared_binding_ty: Option<Type<'db>>,
     ) -> Type<'db> {
         let target = target.into();
-
         if let Some(place_expr) = PlaceExpr::try_from_expr(target) {
             self.narrow_place_with_applicable_constraints(
                 PlaceExprRef::from(&place_expr),
                 target_ty,
                 constraint_keys,
+                declared_binding_ty,
             )
         } else {
             target_ty
@@ -11127,7 +11152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
             let (resolved, keys) =
-                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute));
+                self.infer_place_load(place_expr, ast::ExprRef::Attribute(attribute), None);
             constraint_keys.extend(keys);
             if let Place::Defined(
                 place @ DefinedPlace {
@@ -11154,7 +11179,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 error.fallback_member(db)
             });
         let fallback_place = member_lookup.member(db).map_type(|ty| {
-            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys)
+            self.narrow_expr_with_applicable_constraints(attribute, ty, &constraint_keys, None)
         });
 
         // An augmented assignment also loads its target, but its write validation reports this
