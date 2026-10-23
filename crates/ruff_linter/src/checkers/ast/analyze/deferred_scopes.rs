@@ -165,12 +165,14 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                             && !binding.is_nonlocal()
                             && !binding.is_global()
                             && !checker.settings().dummy_variable_rgx.is_match(name)
+                            // semi-standard names read from frame locals at runtime by some tools
                             && !matches!(
                                 name,
-                                "__tracebackhide__"
-                                    | "__traceback_info__"
-                                    | "__traceback_supplement__"
-                                    | "__debuggerskip__"
+                                "__tracebackhide__" // used by pytest, IPython
+                                    | "__traceback_hide__" // used by Django, Sentry, Werkzeug
+                                    | "__traceback_info__" // used by Zope
+                                    | "__traceback_supplement__" // used by Zope
+                                    | "__debuggerskip__" // used by IPython debugger
                             )
                         {
                             return Some((name, binding));
