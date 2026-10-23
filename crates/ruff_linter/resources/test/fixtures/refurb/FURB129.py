@@ -114,3 +114,41 @@ with open("file.txt") as fp:
         )  # 5
     ):
         ...
+
+
+# https://github.com/astral-sh/ruff/issues/29640
+# Unsafe: these operations share the file position with direct iteration.
+def file_operations(fp: io.TextIOBase):
+    for line in fp.readlines():
+        if line.startswith("legacy_"):
+            fp.seek(0, 2)
+            fp.write(line.removeprefix("legacy_"))
+
+    for line in fp.readlines():
+        fp.read(1)
+
+    for line in fp.readlines():
+        print(fp.tell())
+
+    for line in fp.readlines():
+        fp.truncate()
+
+    for line in fp.readlines():
+        fp.close()
+
+    # Operations in comprehension elements and filters are also unsafe.
+    a = [fp.readline() for line in fp.readlines()]
+    b = {fp.tell() for line in fp.readlines()}
+    c = {line: fp.write(line) for line in fp.readlines()}
+    d = [line for line in fp.readlines() if fp.seek(0)]
+    e = (fp.read(1) for line in fp.readlines())
+
+
+# Safe: unrelated file operations and queries that do not depend on the position.
+def unrelated_operations(fp: io.TextIOBase, other: io.TextIOBase):
+    for line in fp.readlines():
+        other.seek(0)
+        print(fp.readable())
+
+    a = [other.readline() for line in fp.readlines()]
+    b = [line for line in fp.readlines() if fp.readable()]
