@@ -3,7 +3,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSe
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_source_file::LineRanges;
@@ -305,16 +305,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     annotation,
                     self.inference_flags(),
                     |error, diagnostic| {
-                        if self.add_non_alias_diagnostics(diagnostic, ty, definition)
+                        if self.add_non_alias_diagnostics(diagnostic, ty, definition, annotation)
                             && matches!(error, InvalidTypeExpression::InvalidType(ty, _)
                                 if !matches!(ty, Type::FunctionLiteral(_) | Type::ModuleLiteral(_)))
                         {
                             // The explanation identifies an invalid definition, regardless of
                             // the value's type. Preserve more specific type-expression errors.
-                            diagnostic.set_headline_message(format_args!(
-                                "Variable is not allowed in {}s",
-                                self.type_expression_context()
-                            ));
+                            diagnostic.set_headline_message(
+                                self.invalid_variable_type_expression_message(annotation),
+                            );
                         }
                     },
                 )
@@ -335,16 +334,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .is_some_and(|definition| non_alias_assignment(self.db(), definition, ty).is_some())
         {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, reference) {
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Variable is not allowed in {}s",
-                    self.type_expression_context()
-                ));
-                self.add_non_alias_diagnostics(&mut diagnostic, ty, definition);
+                let mut diagnostic = builder
+                    .into_diagnostic(self.invalid_variable_type_expression_message(reference));
+                self.add_non_alias_diagnostics(&mut diagnostic, ty, definition, reference);
                 diagnostic::add_type_expression_reference_link(diagnostic);
             }
             return true;
         }
         false
+    }
+
+    fn invalid_variable_type_expression_message(&self, reference: &ast::Expr) -> String {
+        let variable = UnqualifiedName::from_expr(reference).map_or_else(
+            || "Variable".to_owned(),
+            |name| format!("Variable `{name}`"),
+        );
+        format!(
+            "{variable} is not allowed in {}s",
+            self.type_expression_context()
+        )
     }
 
     /// Attach explanations from the invalid definition, returning whether any were added.
@@ -353,6 +361,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         diagnostic: &mut Diagnostic,
         ty: Type<'db>,
         definition: Option<Definition<'db>>,
+        reference: &ast::Expr,
     ) -> bool {
         // Explain the original definition once, without recursively expanding errors from
         // other variables mentioned in its right-hand side.
@@ -367,6 +376,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let causes = non_alias_type_expression_diagnostics(self.db(), definition);
         if causes.is_empty() {
             return false;
+        }
+        if let Some(name) = UnqualifiedName::from_expr(reference) {
+            diagnostic.info(format_args!("`{name}` is not a valid type alias"));
+        } else {
+            diagnostic.info("This variable is not a valid type alias");
         }
         for cause in causes {
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, cause.headline_message());
