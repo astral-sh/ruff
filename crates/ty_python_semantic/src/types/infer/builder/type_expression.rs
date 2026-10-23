@@ -312,7 +312,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             // The explanation identifies an invalid definition, regardless of
                             // the value's type. Preserve more specific type-expression errors.
                             diagnostic.set_headline_message(
-                                self.invalid_variable_type_expression_message(annotation),
+                                Self::invalid_variable_type_expression_message(annotation),
                             );
                         }
                     },
@@ -335,7 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, reference) {
                 let mut diagnostic = builder
-                    .into_diagnostic(self.invalid_variable_type_expression_message(reference));
+                    .into_diagnostic(Self::invalid_variable_type_expression_message(reference));
                 self.add_non_alias_diagnostics(&mut diagnostic, ty, definition, reference);
                 diagnostic::add_type_expression_reference_link(diagnostic);
             }
@@ -344,14 +344,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         false
     }
 
-    fn invalid_variable_type_expression_message(&self, reference: &ast::Expr) -> String {
-        let variable = UnqualifiedName::from_expr(reference).map_or_else(
-            || "Variable".to_owned(),
-            |name| format!("Variable `{name}`"),
-        );
-        format!(
-            "{variable} is not allowed in {}s",
-            self.type_expression_context()
+    fn invalid_variable_type_expression_message(reference: &ast::Expr) -> String {
+        UnqualifiedName::from_expr(reference).map_or_else(
+            || "Variable cannot be used as a type".to_owned(),
+            |name| format!("Variable `{name}` cannot be used as a type"),
         )
     }
 

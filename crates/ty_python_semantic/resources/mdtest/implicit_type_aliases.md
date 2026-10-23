@@ -2322,7 +2322,7 @@ def inspect(
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable `Number` is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Number` cannot be used as a type
  --> src/mdtest_snippet.py:6:17
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
@@ -2347,7 +2347,7 @@ def inspect(called: Called):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable `Called` is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Called` cannot be used as a type
   --> src/mdtest_snippet.py:14:21
    |
 14 | def inspect(called: Called):
@@ -2467,7 +2467,7 @@ def inspect_forwarded(forwarded: ForwardedClass):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable `ForwardedClass` is not allowed in parameter annotations
+error[invalid-type-form]: Variable `ForwardedClass` cannot be used as a type
  --> src/main.py:4:34
   |
 4 | def inspect_forwarded(forwarded: ForwardedClass):
@@ -2495,7 +2495,7 @@ def inspect_quoted(attribute: "values.Number"): ...
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable `values.Number` is not allowed in parameter annotations
+error[invalid-type-form]: Variable `values.Number` cannot be used as a type
  --> src/quoted.py:4:32
   |
 4 | def inspect_quoted(attribute: "values.Number"): ...
@@ -2560,7 +2560,7 @@ def inspect(value: Number): ...
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable `Number` is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Number` cannot be used as a type
  --> src/mdtest_snippet.py:5:20
   |
 5 | def inspect(value: Number): ...
