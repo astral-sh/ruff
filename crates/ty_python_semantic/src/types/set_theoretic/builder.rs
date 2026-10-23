@@ -53,7 +53,7 @@ use crate::types::{
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
     StringLiteralType, SubclassOfType, Type, TypePair, TypeVarBoundOrConstraints, UnionType,
 };
-use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
+use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, Program, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
@@ -565,6 +565,26 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+
+/// A completed union construction together with the policy under which it was normalized.
+///
+/// This is separate from `UnionType`: structural substitutions and cycle recovery can
+/// produce unions that are not normalized under ordinary union-construction rules.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+pub(crate) struct NormalizedUnion<'db> {
+    ty: Type<'db>,
+    program: Program<'db>,
+    unpack_aliases: bool,
+    cycle_recovery: bool,
+    recursively_defined: RecursivelyDefined,
+}
+
+impl<'db> NormalizedUnion<'db> {
+    pub(crate) fn ty(self) -> Type<'db> {
+        self.ty
+    }
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -651,6 +671,79 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    /// Add a completed construction, reusing its normalization when the policies match.
+    ///
+    /// A nonempty builder must also compare its existing members with the incoming union.
+    pub(crate) fn add_normalized(mut self, union: NormalizedUnion<'db>) -> Self {
+        if !self.elements.is_empty()
+            || self.env.program(self.db) != union.program
+            || self.unpack_aliases != union.unpack_aliases
+            || self.cycle_recovery != union.cycle_recovery
+            || self.recursively_defined != union.recursively_defined
+        {
+            return self.add(union.ty);
+        }
+        match union.ty {
+            Type::Never => {}
+            Type::Union(union) => {
+                for &ty in union.elements(self.db) {
+                    self.push_normalized(ty);
+                }
+                self.inherit_union_recursion(union.recursively_defined(self.db), &mut vec![]);
+            }
+            ty => self.push_normalized(ty),
+        }
+        self
+    }
+
+    /// Reconstruct the literal groups emitted contiguously by `try_build`.
+    fn push_normalized(&mut self, ty: Type<'db>) {
+        let Type::LiteralValue(literal) = ty else {
+            self.elements.push(UnionElement::Type(ty));
+            return;
+        };
+        let promotable = literal.is_promotable();
+        let element = match (self.elements.last_mut(), literal.kind()) {
+            (Some(UnionElement::IntLiterals(values)), LiteralValueTypeKind::Int(value)) => {
+                values.insert(value.as_i64(), promotable);
+                return;
+            }
+            (Some(UnionElement::StringLiterals(values)), LiteralValueTypeKind::String(value)) => {
+                values.insert(value, promotable);
+                return;
+            }
+            (Some(UnionElement::BytesLiterals(values)), LiteralValueTypeKind::Bytes(value)) => {
+                values.insert(value, promotable);
+                return;
+            }
+            (
+                Some(UnionElement::EnumLiterals {
+                    enum_class,
+                    literals,
+                }),
+                LiteralValueTypeKind::Enum(value),
+            ) if *enum_class == value.enum_class(self.db) => {
+                literals.insert(value, promotable);
+                return;
+            }
+            (_, LiteralValueTypeKind::Int(value)) => {
+                UnionElement::IntLiterals(FxOrderMap::from_iter([(value.as_i64(), promotable)]))
+            }
+            (_, LiteralValueTypeKind::String(value)) => {
+                UnionElement::StringLiterals(FxOrderMap::from_iter([(value, promotable)]))
+            }
+            (_, LiteralValueTypeKind::Bytes(value)) => {
+                UnionElement::BytesLiterals(FxOrderMap::from_iter([(value, promotable)]))
+            }
+            (_, LiteralValueTypeKind::Enum(value)) => UnionElement::EnumLiterals {
+                enum_class: value.enum_class(self.db),
+                literals: FxOrderMap::from_iter([(value, promotable)]),
+            },
+            _ => UnionElement::Type(ty),
+        };
+        self.elements.push(element);
+    }
+
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
         self
@@ -706,6 +799,30 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    fn inherit_union_recursion(
+        &mut self,
+        recursively_defined: RecursivelyDefined,
+        seen_aliases: &mut Vec<Type<'db>>,
+    ) {
+        self.recursively_defined = self.recursively_defined.or(recursively_defined);
+        if self.cycle_recovery && self.recursively_defined.is_yes() {
+            let literals: usize = self
+                .elements
+                .iter()
+                .map(|element| match element {
+                    UnionElement::IntLiterals(literals) => literals.len(),
+                    UnionElement::StringLiterals(literals) => literals.len(),
+                    UnionElement::BytesLiterals(literals) => literals.len(),
+                    UnionElement::EnumLiterals { literals, .. } => literals.len(),
+                    UnionElement::Type(_) => 0,
+                })
+                .sum();
+            if literals >= MAX_RECURSIVE_UNION_LITERALS {
+                self.widen_literal_types(seen_aliases);
+            }
+        }
+    }
+
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         self.add_in_place(ty);
@@ -739,20 +856,7 @@ impl<'db> UnionBuilder<'db> {
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
                 }
-                self.recursively_defined =
-                    self.recursively_defined.or(union.recursively_defined(db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
-                    let literals = self.elements.iter().fold(0, |acc, elem| match elem {
-                        UnionElement::IntLiterals(literals) => acc + literals.len(),
-                        UnionElement::StringLiterals(literals) => acc + literals.len(),
-                        UnionElement::BytesLiterals(literals) => acc + literals.len(),
-                        UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
-                        UnionElement::Type(_) => acc,
-                    });
-                    if should_widen(literals, self.recursively_defined) {
-                        self.widen_literal_types(seen_aliases);
-                    }
-                }
+                self.inherit_union_recursion(union.recursively_defined(db), seen_aliases);
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
@@ -1208,6 +1312,21 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn build(self) -> Type<'db> {
         self.try_build().unwrap_or(Type::Never)
+    }
+
+    /// Retain the construction policy so the result can be extended without renormalizing it.
+    pub(crate) fn build_normalized(self) -> NormalizedUnion<'db> {
+        let program = self.env.program(self.db);
+        let unpack_aliases = self.unpack_aliases;
+        let cycle_recovery = self.cycle_recovery;
+        let recursively_defined = self.recursively_defined;
+        NormalizedUnion {
+            ty: self.build(),
+            program,
+            unpack_aliases,
+            cycle_recovery,
+            recursively_defined,
+        }
     }
 
     pub(crate) fn try_build(self) -> Option<Type<'db>> {
@@ -2581,14 +2700,28 @@ mod tests {
             (Type::bool_literal(true), Type::bool_literal(false)),
         ] {
             for (first, second) in [(left, right), (right, left)] {
-                let union = UnionBuilder::new(db, &env)
+                let normalized = UnionBuilder::new(db, &env)
                     .cycle_recovery(true)
                     .add(first)
                     .add(second)
-                    .build()
-                    .expect_union();
+                    .build_normalized();
+                let union = normalized.ty().expect_union();
                 assert!(union.elements(db).contains(&left));
                 assert!(union.elements(db).contains(&right));
+                assert_eq!(
+                    UnionBuilder::new(db, &env)
+                        .cycle_recovery(true)
+                        .add_normalized(normalized)
+                        .build(),
+                    normalized.ty()
+                );
+                // Reusing the result outside cycle recovery must simplify redundant members.
+                assert_eq!(
+                    UnionBuilder::new(db, &env)
+                        .add_normalized(normalized)
+                        .build(),
+                    UnionType::from_elements(db, &env, [first, second])
+                );
             }
         }
     }
@@ -2783,6 +2916,17 @@ mod tests {
         assert_eq!(union.map(&db, &env, |ty| *ty), unpacked);
         assert_eq!(union.try_map(&db, &env, |ty| Some(*ty)), Some(unpacked));
         assert_eq!(union.map_leave_aliases(&db, &env, |ty| *ty), union_ty);
+        let normalized = UnionBuilder::new(&db, &env)
+            .unpack_aliases(false)
+            .add(alias)
+            .add(str_instance)
+            .build_normalized();
+        assert_eq!(
+            UnionBuilder::new(&db, &env)
+                .add_normalized(normalized)
+                .build(),
+            unpacked
+        );
     }
 
     #[test]
