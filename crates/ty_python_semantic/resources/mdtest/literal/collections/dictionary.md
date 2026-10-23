@@ -210,7 +210,7 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
-## Keys with an `Any` value type
+## Keys with gradual value types
 
 When a dictionary declares its values as `Any`, a literal key has that type even if its value is
 known from the initializer.
@@ -246,6 +246,22 @@ reveal_type(payload["current"])  # revealed: Any
 if isinstance(payload["current"], str):
     reveal_type(payload["current"])  # revealed: Any & str
     reveal_type(read(**payload))  # revealed: Any & str
+```
+
+A key also preserves a gradual type nested inside a container. As with an annotated name, assigning
+a `list[int]` to a key of type `list[Any]` keeps the declared element type:
+
+```py
+def check(numbers: list[int]):
+    value: list[Any] = numbers
+    reveal_type(value)  # revealed: list[Any]
+
+    items: dict[str, list[Any]] = {"current": numbers}
+    reveal_type(items["current"])  # revealed: list[Any]
+    reveal_type(read(**items))  # revealed: list[Any]
+
+    items["current"] = numbers
+    reveal_type(items["current"])  # revealed: list[Any]
 ```
 
 The same rule applies to a dictionary inside another collection.
@@ -520,8 +536,9 @@ def loop_carried_value(c: C, repeat: bool) -> int:
 
 ## Rejected annotations in stubs
 
-Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
-the type obtained by normal member lookup:
+Annotation-only declarations in stubs are also bindings. A rejected annotation falls back to the
+type obtained by normal member lookup. An ellipsis placeholder also preserves the declared item
+type:
 
 `stub.pyi`:
 
@@ -532,9 +549,9 @@ x["a"]: int
 reveal_type(x["a"])  # revealed: object
 
 x["b"] = ...
-reveal_type(x["b"])  # revealed: Unknown
+reveal_type(x["b"])  # revealed: object
 
 # error: [invalid-type-form]
 x["c"]: int = ...
-reveal_type(x["c"])  # revealed: Unknown
+reveal_type(x["c"])  # revealed: object
 ```

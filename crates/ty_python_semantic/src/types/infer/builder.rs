@@ -208,12 +208,6 @@ impl<'db> DeclaredAndInferredType<'db> {
     }
 }
 
-fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
-    // Dataclass field specifiers carry metadata in the inferred RHS type; replacing it with the
-    // declared field type would lose settings like `init=False`.
-    matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
-}
-
 /// We currently store one dataclass field-specifiers inline, because that covers standard
 /// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
@@ -1917,24 +1911,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let declared_type = declared_ty.inner_type();
                 if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
                 {
-                    // TODO We currently can't distinguish here between "no declared type" and
-                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                    // but use inferred type if there is no declared type.
-                    // Keep the inferred value while a cyclic annotation is unresolved. For
-                    // `str: "str" = ""`, that value lets the next iteration reject the annotation
-                    // instead of leaving both the annotation and the binding divergent.
-                    if !should_preserve_inferred_binding_type(inferred_ty)
-                        && !matches!(
-                            declared_type,
-                            Type::Dynamic(DynamicType::Unknown) | Type::Divergent(_)
-                        )
-                        && declared_type.is_assignable_to(db, env, inferred_ty)
-                    {
-                        (declared_ty, declared_type)
-                    } else {
-                        (declared_ty, inferred_ty)
-                    }
+                    (
+                        declared_ty,
+                        declared_type.narrowed_by_assignment(db, env, inferred_ty),
+                    )
                 } else {
                     self.discard_dict_key_assignments_for(definition);
 
@@ -9091,7 +9071,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Collect the types of each distinct key.
-        let declared_item_ty = self.fixed_subscript_binding_type(*value_ty);
         let mut elements: Vec<(&str, Type<'db>)> = Vec::new();
         for bindings in
             use_def.multi_bindings_at_use(keyword.scoped_use_id(db, self.program_file()))
@@ -9101,7 +9080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 env,
                 bindings,
                 self.reachability_cache(),
-                declared_item_ty,
+                Some(*value_ty),
             );
             let Some(key) = place.first_definition.and_then(definition_key) else {
                 continue;
@@ -10371,10 +10350,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         match binding.binding {
                             DefinitionState::Defined(definition)
-                                if declared_binding_ty.is_none()
-                                    && !is_discarded_dict_key_assignment(db, definition) =>
+                                if !is_discarded_dict_key_assignment(db, definition) =>
                             {
                                 let mut binding_ty = binding_type(db, definition);
+                                if let Some(declared) = declared_binding_ty {
+                                    binding_ty =
+                                        declared.narrowed_by_assignment(db, env, binding_ty);
+                                }
                                 if definition.kind(db).is_loop_header() {
                                     let fallback_ty = self.loop_header_fallback_type(
                                         definition,
@@ -10832,7 +10814,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 RequiresExplicitReExport::No,
                 ConsideredDefinitions::AllReachable,
             )
-            .map_type(|ty| declared_binding_ty.unwrap_or(ty)),
+            .map_type(|ty| {
+                declared_binding_ty
+                    .map_or(ty, |declared| declared.narrowed_by_assignment(db, env, ty))
+            }),
             PlaceLoadSourceKind::Implicit(implicit) => match implicit {
                 ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
                     .map_or_else(
@@ -11042,12 +11027,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ExprContext::Invalid => Type::unknown(),
         }
-    }
-
-    /// An item declared as `Any` keeps that type across assignments. Predicates such as
-    /// `isinstance(items[0], str)` can still narrow it from `Any`.
-    fn fixed_subscript_binding_type(&self, item_ty: Type<'db>) -> Option<Type<'db>> {
-        (item_ty.resolve_type_alias(self.db()) == Type::any()).then_some(item_ty)
     }
 
     fn narrow_expr_with_applicable_constraints<'r>(

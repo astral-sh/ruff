@@ -2446,6 +2446,34 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Keep the declared type when it and the assigned value are mutually assignable.
+    /// For example, assigning a `list[int]` to a `list[Any]` preserves the annotation,
+    /// while assigning an `int` to an `int | str` narrows the binding to `int`.
+    pub(crate) fn narrowed_by_assignment(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        assigned: Self,
+    ) -> Self {
+        match (self, assigned) {
+            // TODO: Distinguish a missing declaration from an explicitly unknown one. Only the
+            // former should fall back to the assigned type.
+            (Type::Dynamic(DynamicType::Unknown), _) => assigned,
+            // For `str: "str" = ""`, the RHS lets the next fixpoint iteration reject the
+            // annotation instead of leaving both the annotation and the binding divergent.
+            (Type::Divergent(_), _) => assigned,
+            // Dataclass field specifiers carry metadata such as `init=False` in the RHS type.
+            (_, Type::KnownInstance(KnownInstanceType::Field(_))) => assigned,
+            _ if self == assigned
+                || (self.is_assignable_to(db, env, assigned)
+                    && assigned.is_assignable_to(db, env, self)) =>
+            {
+                self
+            }
+            _ => assigned,
+        }
+    }
+
     /// Checks whether the visited type contents contain no dynamic types.
     ///
     /// This is not a complete test for semantic staticness: the visitor skips original function

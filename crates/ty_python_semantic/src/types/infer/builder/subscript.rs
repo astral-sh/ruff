@@ -189,7 +189,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let Some(expr) = PlaceExpr::try_from_expr(subscript)
         {
             let (Ok(item_ty) | Err(item_ty)) = &mut result;
-            let declared_ty = self.fixed_subscript_binding_type(*item_ty);
+            let declared_ty = Some(*item_ty);
             let (place, keys) =
                 self.infer_place_load(expr, ast::ExprRef::Subscript(subscript), declared_ty);
             *item_ty = if let Place::Defined(DefinedPlace {

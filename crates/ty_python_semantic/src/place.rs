@@ -802,7 +802,7 @@ pub(super) fn place_from_bindings<'db>(
     )
 }
 
-/// If `declared_binding_ty` is supplied, narrow that type with the predicates on each binding.
+/// If supplied, narrow the declared type by each assignment before applying predicates.
 pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -1991,7 +1991,10 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let binding_ty = declared_binding_ty.unwrap_or_else(|| binding_type(db, binding));
+            let mut binding_ty = binding_type(db, binding);
+            if let Some(declared) = declared_binding_ty {
+                binding_ty = declared.narrowed_by_assignment(db, env, binding_ty);
+            }
             let narrowed = match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,
