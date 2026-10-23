@@ -3368,8 +3368,12 @@ name = "ruff_index"
 version = "0.0.19"
 dependencies = [
  "get-size2",
+ "itertools 0.15.0",
+ "quickcheck",
+ "quickcheck_macros",
  "ruff_macros",
  "salsa",
+ "smallvec",
  "static_assertions",
 ]
 

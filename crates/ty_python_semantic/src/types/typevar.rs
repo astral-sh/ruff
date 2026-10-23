@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
+use ruff_index::SalsaIdSet;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
@@ -894,7 +895,7 @@ impl TypeVarNonce {
 #[derive(Debug)]
 struct TypeVarNonceGeneratorInner<'db> {
     next: TypeVarNonce,
-    seen: FxHashSet<GenericContext<'db>>,
+    seen: SalsaIdSet<GenericContext<'db>>,
     enclosing: FxHashSet<BindingContext<'db>>,
 }
 
@@ -913,7 +914,7 @@ impl Default for TypeVarNonceGenerator<'_> {
         Self {
             inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
                 next: TypeVarNonce::FIRST,
-                seen: FxHashSet::default(),
+                seen: SalsaIdSet::default(),
                 enclosing: FxHashSet::default(),
             })),
         }
