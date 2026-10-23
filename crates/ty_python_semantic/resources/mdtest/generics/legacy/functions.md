@@ -2726,6 +2726,28 @@ def outer(value: Callable[[], U | str], variables: list[U], strings: list[str]) 
     reveal_type(helper(value, strings, variables))  # revealed: tuple[str, U@outer]
 ```
 
+## Forwarding unions of invariant containers
+
+Passing a union of `list[U]` and `list[U | str]` to the same annotation with an inferred `T`
+preserves `U`: choosing `T = U` makes the two annotations identical.
+
+```py
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def inner(value: Callable[[], list[T] | list[T | str]]) -> T:
+    raise NotImplementedError
+
+def outer(value: Callable[[], list[U] | list[U | str]]) -> None:
+    reveal_type(inner(value))  # revealed: U@outer
+
+def invalid(value: Callable[[], list[U] | list[U | str] | int]) -> None:
+    inner(value)  # error: [invalid-argument-type]
+```
+
 ## Bounds and constraints with fixed outer union members
 
 In a union annotation like `T | int`, the concrete part (`int` here) can accept part of the caller's
@@ -4355,7 +4377,7 @@ def make_sink(mapping: Callable[[], V | Invariant[V] | Covariant[V]]) -> Callabl
     return lambda value: None
 
 def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
-    # revealed: list[V@wrapped_returns | Covariant[V@wrapped_returns] | Invariant[V@wrapped_returns]]
+    # revealed: list[Invariant[V@wrapped_returns] | V@wrapped_returns | Covariant[V@wrapped_returns]]
     reveal_type(make_list(lambda: mapping))
     reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
