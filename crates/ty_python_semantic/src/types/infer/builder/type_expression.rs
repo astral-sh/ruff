@@ -311,35 +311,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return Type::unknown();
         }
         report_missing_type_arguments(&self.context, ty, annotation);
-        let result_ty =
-            result.unwrap_or_else(|error| {
-                if error.invalid_expressions.iter().any(|invalid| {
-                    matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_))
-                }) {
+        let result_ty = result.unwrap_or_else(|error| {
+            let causes = self.find_non_alias_diagnostics(ty, definition);
+            for invalid in error.invalid_expressions {
+                if matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_)) {
                     self.store_type_expression_flags(
                         annotation,
                         TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE,
                     );
                 }
-                let causes = self.find_non_alias_diagnostics(ty, definition);
-                let message_override = causes.map(|_| {
-                    (
-                        Self::invalid_variable_type_expression_message(annotation),
-                        Self::invalid_type_alias_message(annotation),
-                    )
-                });
-                error.into_fallback_type_with(
-                    &self.context,
-                    annotation,
-                    self.inference_flags(),
-                    message_override.as_ref(),
-                    |diagnostic| {
-                        if let Some(causes) = causes {
-                            Self::add_non_alias_diagnostics(diagnostic, causes);
-                        }
-                    },
-                )
-            });
+                let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) else {
+                    continue;
+                };
+                let reason = invalid.reason(db, env, self.inference_flags());
+                let diagnostic = if let Some(causes) = causes {
+                    let mut diagnostic = builder
+                        .with_message_override(
+                            Self::invalid_variable_type_expression_message(annotation),
+                            &Self::invalid_type_alias_message(annotation),
+                        )
+                        .into_diagnostic(reason);
+                    Self::add_non_alias_diagnostics(&mut diagnostic, causes);
+                    diagnostic::add_type_expression_reference_link(diagnostic)
+                } else {
+                    builder.into_diagnostic(reason)
+                };
+                invalid.add_subdiagnostics(db, env, diagnostic, annotation);
+            }
+            error.fallback_type
+        });
         self.check_type_variable_scope(annotation, result_ty)
     }
 
@@ -362,9 +362,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if let Some(causes) = causes {
                     diagnostic.info(Self::invalid_type_alias_message(reference));
                     Self::add_non_alias_diagnostics(&mut diagnostic, causes);
-                } else {
-                    diagnostic::add_type_expression_reference_link(diagnostic);
                 }
+                diagnostic::add_type_expression_reference_link(diagnostic);
             }
             return true;
         }
@@ -403,7 +402,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         (!causes.is_empty()).then_some(causes)
     }
 
-    /// Attach explanations from the invalid definition and a link to valid type expressions.
+    /// Attach the errors from the invalid definition as notes at the use site.
     fn add_non_alias_diagnostics(diagnostic: &mut Diagnostic, causes: &TypeCheckDiagnostics) {
         for cause in causes {
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, cause.headline_message());
@@ -412,7 +411,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             diagnostic.sub(sub);
         }
-        diagnostic::add_type_expression_reference_link(diagnostic);
     }
 
     /// Infer the type of a type expression without storing the result.

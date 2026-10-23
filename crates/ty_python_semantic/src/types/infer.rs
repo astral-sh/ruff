@@ -176,18 +176,9 @@ pub(super) fn non_alias_type_expression_diagnostics<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return TypeCheckDiagnostics::default();
     };
-    let index = semantic_index(db, program_file);
     let env = ProgramEnvironment::from_file(program_file);
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .finish_non_alias_type_expression_diagnostics(definition, value)
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_non_alias_type_expression_diagnostics(definition, value)
 }
 
 bitflags::bitflags! {

@@ -78,7 +78,7 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
-    AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
+    AttributeAccessMethod, INVALID_AWAIT, report_bad_attribute_access_call,
     report_bad_dunder_get_call, report_bad_import_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -11790,38 +11790,6 @@ impl<'db> TypeAndQualifiers<'db> {
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
     invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression<'db>; 1]>,
-}
-
-impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type_with(
-        self,
-        context: &InferContext,
-        node: &impl Ranged,
-        flags: InferenceFlags,
-        message_override: Option<&(String, String)>,
-        annotate: impl Fn(&mut Diagnostic),
-    ) -> Type<'db> {
-        let db = context.db();
-        let InvalidTypeExpressionError {
-            fallback_type,
-            invalid_expressions,
-        } = self;
-        let env = context.program_environment();
-        for error in invalid_expressions {
-            let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
-                continue;
-            };
-            let builder = if let Some((message, info)) = message_override {
-                builder.with_message_override(message.clone(), info)
-            } else {
-                builder
-            };
-            let mut diagnostic = builder.into_diagnostic(error.reason(db, env, flags));
-            annotate(&mut diagnostic);
-            error.add_subdiagnostics(db, env, diagnostic, node);
-        }
-        fallback_type
-    }
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts

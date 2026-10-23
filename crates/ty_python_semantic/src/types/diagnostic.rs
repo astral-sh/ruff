@@ -56,7 +56,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::{self, Formatter};
-use std::ops::DerefMut;
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, SearchPath, file_to_module,
     resolve_real_shadowable_module,
@@ -3771,9 +3770,9 @@ pub(crate) fn report_invalid_match_args_type<T: Ranged>(
     ));
 }
 
-pub(crate) fn add_type_expression_reference_link<D: DerefMut<Target = Diagnostic>>(
-    mut diag: D,
-) -> D {
+pub(crate) fn add_type_expression_reference_link<'db, 'env>(
+    mut diag: LintDiagnosticGuard<'db, 'env>,
+) -> LintDiagnosticGuard<'db, 'env> {
     diag.info("See the following page for a reference on valid type expressions:");
     diag.info(
         "https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions",

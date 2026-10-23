@@ -250,12 +250,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
         let diagnostics = self.diagnostics.get_mut();
         if self.diagnostic_mode == DiagnosticMode::TypeExpressionExplanation {
+            let invalid_type_form = DiagnosticId::Lint(INVALID_TYPE_FORM.name());
             diagnostics.extend_diagnostics(
                 (&other.diagnostics)
                     .into_iter()
-                    .filter(|diagnostic| {
-                        diagnostic.id() == DiagnosticId::Lint(LintId::of(&INVALID_TYPE_FORM).name())
-                    })
+                    .filter(|diagnostic| diagnostic.id() == invalid_type_form)
                     .cloned(),
             );
         } else {
