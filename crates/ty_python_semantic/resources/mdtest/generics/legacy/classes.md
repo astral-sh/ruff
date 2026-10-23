@@ -960,6 +960,29 @@ def value(factory: type[Box[T]]) -> T:
 reveal_type(value(Box))  # revealed: int
 ```
 
+## Aliases of unsubscripted generic classes
+
+An implicit alias preserves the generic class object. A PEP 613 alias uses the class's default
+specialization, including when that alias is assigned to another name:
+
+```py
+from typing_extensions import Generic, TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+
+class Box(Generic[T]): ...
+
+BoxAlias = Box
+DefaultBox: TypeAlias = Box
+ForwardedDefault = DefaultBox
+
+def inspect(generic: BoxAlias[int], default: DefaultBox):
+    reveal_type(generic)  # revealed: Box[int]
+    reveal_type(default)  # revealed: Box[str]
+
+def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
