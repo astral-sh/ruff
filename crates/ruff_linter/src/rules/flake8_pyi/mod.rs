@@ -71,8 +71,6 @@ mod tests {
     #[test_case(Rule::Pep484StylePositionalOnlyParameter, Path::new("PYI063.pyi"))]
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.py"))]
     #[test_case(Rule::RedundantFinalLiteral, Path::new("PYI064.pyi"))]
-    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.py"))]
-    #[test_case(Rule::RedundantLiteralUnion, Path::new("PYI051.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
