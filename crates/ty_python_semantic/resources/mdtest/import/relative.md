@@ -269,6 +269,81 @@ X: int = 42
 from .parser import X  # error: [unresolved-import]
 ```
 
+## Overlapping search roots, outer root first
+
+When both search roots give a file an importable module name, relative imports use the name from the
+deepest root.
+
+```toml
+[environment]
+extra-paths = ["/src", "/src/nested"]
+```
+
+`nested/package/utils.py`:
+
+```py
+```
+
+`nested/package/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+## Overlapping search roots, inner root first
+
+The deepest root still determines the module name when it appears before the outer root in the
+search path list.
+
+```toml
+[environment]
+extra-paths = ["/src/nested", "/src"]
+```
+
+`nested/package/utils.py`:
+
+```py
+```
+
+`nested/package/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'package.utils'>
+```
+
+## Shadowed module name under the deepest root
+
+The file `/src/nested/module.py` is importable as `nested.module`. The name `module`, derived from
+the deeper root `/src/nested`, resolves to `/src/module.py` instead because `/src` is searched
+first. Relative imports therefore use `nested.module`, derived from `/src`.
+
+```toml
+[environment]
+extra-paths = ["/src", "/src/nested"]
+```
+
+`module.py`:
+
+```py
+```
+
+`nested/utils.py`:
+
+```py
+```
+
+`nested/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils)  # revealed: <module 'nested.utils'>
+```
+
 ## Relative imports in `site-packages`
 
 Relative imports in `site-packages` are correctly resolved even when the `site-packages` search path
@@ -300,4 +375,43 @@ from .a import A as A
 
 ```py
 class A: ...
+```
+
+## Relative imports in a nested editable install
+
+The editable source root is nested inside the project, and the outer directory has the same name as
+the installed package. The editable root exposes `pkg` as a top-level package, so `module.py` has
+the name `pkg.module`, and its relative import finds `pkg.utils`.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4371>.
+
+```toml
+[environment]
+python = "/.venv"
+python-version = "3.13"
+```
+
+`/.venv/<path-to-site-packages>/pkg.pth`:
+
+```pth
+/src/pkg/src
+```
+
+`pkg/src/pkg/__init__.py`:
+
+```py
+```
+
+`pkg/src/pkg/utils.py`:
+
+```py
+value: int = 42
+```
+
+`pkg/src/pkg/module.py`:
+
+```py
+from . import utils
+
+reveal_type(utils.value)  # revealed: int
 ```
