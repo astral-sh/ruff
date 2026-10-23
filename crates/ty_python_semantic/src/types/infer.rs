@@ -353,6 +353,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     legacy_aliases: Box<[Definition<'db>]>,
@@ -1025,6 +1026,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 
@@ -1050,6 +1054,15 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
+    #[expect(dead_code, reason = "used by the reaching-definition lookup")]
+    pub(crate) fn is_deferred_name_load(&self, name: &ast::ExprName) -> bool {
+        self.extra.as_deref().is_some_and(|extra| {
+            extra
+                .deferred_name_loads
+                .contains(&ast::ExprRef::Name(name).into())
+        })
+    }
+
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
@@ -1441,6 +1454,8 @@ enum DefinitionInferenceExtra<'db> {
 
     StringAnnotations(FrozenSet<ExpressionNodeKey>),
 
+    DeferredNameLoads(FrozenSet<ExpressionNodeKey>),
+
     DiscardsDictKeyAssignments,
 
     Other(Box<OtherDefinitionInferenceExtra<'db>>),
@@ -1463,6 +1478,9 @@ struct OtherDefinitionInferenceExtra<'db> {
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
+
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
@@ -1547,6 +1565,10 @@ impl<'db> DefinitionInferenceExtra<'db> {
             },
             Self::StringAnnotations(string_annotations) => OtherDefinitionInferenceExtra {
                 string_annotations,
+                ..OtherDefinitionInferenceExtra::default()
+            },
+            Self::DeferredNameLoads(deferred_name_loads) => OtherDefinitionInferenceExtra {
+                deferred_name_loads,
                 ..OtherDefinitionInferenceExtra::default()
             },
             Self::DiscardsDictKeyAssignments => OtherDefinitionInferenceExtra {
@@ -1970,6 +1992,9 @@ struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
+
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -2223,6 +2248,9 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
+
+    /// Name loads inferred as deferred.
+    deferred_name_loads: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
