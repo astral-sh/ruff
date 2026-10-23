@@ -36,7 +36,7 @@ paths:
       - '^unexpected key "queue" for "concurrency" section\.'
       # actionlint doesn't yet recognize the reusable workflow's own revision context.
       - 'property "workflow_(repository|sha)" is not defined in object type'
-  ".github/workflows/{ty-ecosystem-report,ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
+  ".github/workflows/{ty-ecosystem-analyzer,memory_report,sync_typeshed}.yaml":
     ignore:
       # actionlint doesn't yet support the cache-mode feature.
       # The schema hook validates it.
