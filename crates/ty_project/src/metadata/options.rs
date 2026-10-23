@@ -12,7 +12,7 @@ use ruff_db::RustDoc;
 #[cfg(feature = "junit")]
 use ruff_db::diagnostic::render::JunitRenderer;
 use ruff_db::diagnostic::render::{
-    ConciseRenderer, FileResolver, FullRenderer, GithubRenderer, GitlabRenderer, Renderer,
+    ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer, Renderer, SarifRenderer,
 };
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span, SubDiagnostic,
@@ -1467,6 +1467,10 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics as a [SARIF] report.
+    ///
+    /// [SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
+    Sarif,
 }
 
 impl OutputFormat {
@@ -1482,17 +1486,25 @@ impl OutputFormat {
     /// Display diagnostics in this output format.
     pub fn display<'a>(
         self,
-        resolver: &'a dyn FileResolver,
+        db: &'a dyn Db,
         config: &'a DisplayDiagnosticConfig,
         diagnostics: &'a [Diagnostic],
     ) -> impl Display + use<'a> {
+        let resolver: &dyn ruff_db::Db = db;
         fmt::from_fn(move |f| match self {
-            Self::Full => FullRenderer::new(resolver, config).render(f, diagnostics),
-            Self::Concise => ConciseRenderer::new(resolver, config).render(f, diagnostics),
-            Self::Gitlab => GitlabRenderer::new(resolver, config).render(f, diagnostics),
-            Self::Github => GithubRenderer::new(resolver, config).render(f, diagnostics),
+            Self::Full => FullRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Concise => ConciseRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Gitlab => GitlabRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Github => GithubRenderer::new(&resolver, config).render(f, diagnostics),
             #[cfg(feature = "junit")]
-            Self::Junit => JunitRenderer::new(resolver, config).render(f, diagnostics),
+            Self::Junit => JunitRenderer::new(&resolver, config).render(f, diagnostics),
+            Self::Sarif => SarifRenderer::new(
+                &resolver,
+                config,
+                db.lint_registry().rule_metadata(),
+                ruff_db::program_version().unwrap_or("Unknown"),
+            )
+            .render(f, diagnostics),
         })
     }
 }
@@ -1528,7 +1540,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise | github | gitlab | junit",
+        value_type = "full | concise | github | gitlab | junit | sarif",
         example = r#"
             output-format = "concise"
         "#
@@ -2282,19 +2294,14 @@ pub struct ToSettingsError {
 
 impl ToSettingsError {
     pub(crate) fn pretty<'a>(&'a self, db: &'a dyn Db) -> impl fmt::Display + use<'a> {
-        let db: &dyn ruff_db::Db = db;
-
         fmt::from_fn(move |f| {
             let display_config = DisplayDiagnosticConfig::new("ty").color(self.color);
 
             write!(
                 f,
                 "{}",
-                self.output_format.display(
-                    &db,
-                    &display_config,
-                    &[self.diagnostic.to_diagnostic()]
-                )
+                self.output_format
+                    .display(db, &display_config, &[self.diagnostic.to_diagnostic()])
             )
         })
     }

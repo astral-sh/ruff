@@ -47,6 +47,7 @@ supports-hyperlinks = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, optional = true }
+url = { workspace = true, optional = true }
 which = { workspace = true, optional = true }
 zip = { workspace = true }
 
@@ -57,7 +58,7 @@ etcetera = { workspace = true, optional = true }
 web-time = { workspace = true, default-features = false }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["filters"] }
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
 tempfile = { workspace = true }
 
 [features]
@@ -68,6 +69,7 @@ serde = [
     "camino/serde1",
     "dep:serde",
     "dep:serde_json",
+    "dep:url",
     "ruff_diagnostics/serde",
 ]
 # Exposes testing utilities.

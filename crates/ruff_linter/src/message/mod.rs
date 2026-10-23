@@ -5,14 +5,16 @@ use std::path::Path;
 
 use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
+use strum::IntoEnumIterator;
 
 use ruff_db::diagnostic::render::{
     AzureRenderer, ConciseRenderer, FullRenderer, GithubRenderer, GitlabRenderer,
     JsonLinesRenderer, JsonRenderer, JunitRenderer, PylintRenderer, RdjsonRenderer, Renderer,
+    SarifRenderer,
 };
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, FileResolver, Input, LintName,
-    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    RuleMetadata, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -20,14 +22,14 @@ pub(crate) use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub(crate) use sarif::SarifEmitter;
 
 use crate::Fix;
-use crate::registry::Rule;
+use crate::registry::{Linter, Rule, RuleNamespace, RuleSet};
+use crate::rule_selector::PreviewOptions;
+use crate::settings::DEFAULT_SELECTORS;
 use crate::settings::types::OutputFormat;
 
 mod grouped;
-mod sarif;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -168,6 +170,36 @@ impl FileResolver for EmitterContext<'_> {
     }
 }
 
+fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
+    // Describe the defaults before configuration overrides such as preview.
+    let default_rules = DEFAULT_SELECTORS
+        .iter()
+        .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+        .collect::<RuleSet>();
+
+    Rule::iter()
+        .map(|rule| {
+            let name = LintName::of(rule.into());
+            let linter = rule.noqa_code().and_then(|code| {
+                Linter::parse_code(&code.to_string()).map(|(linter, _)| linter.name())
+            });
+
+            (
+                name,
+                RuleMetadata {
+                    name,
+                    summary: rule.message_formats()[0],
+                    description: rule.explanation().into(),
+                    help_url: rule.url(),
+                    linter,
+                    default_severity: Some(Severity::Error),
+                    enabled_by_default: default_rules.contains(rule),
+                },
+            )
+        })
+        .collect()
+}
+
 /// Display format for [`Diagnostic`]s.
 ///
 /// The emitter serializes a slice of [`Diagnostic`]s and writes them to a [`Write`].
@@ -223,9 +255,8 @@ pub fn render_diagnostics(
             .with_prefer_rule_codes(config.is_prefer_rule_codes_enabled())
             .emit(writer, diagnostics, context)
             .map_err(std::io::Error::other),
-        OutputFormat::Sarif => SarifEmitter::new(config)
-            .emit(writer, diagnostics, context)
-            .map_err(std::io::Error::other),
+        OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
+            .write(writer, diagnostics),
     }
 }
 

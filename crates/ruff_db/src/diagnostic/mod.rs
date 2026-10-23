@@ -504,20 +504,8 @@ impl Diagnostic {
         )
     }
 
-    /// Computes the end source location for the message.
-    ///
-    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
-    /// or if the span has no range.
-    pub fn ruff_end_location(&self) -> Option<LineColumn> {
-        Some(
-            self.ruff_source_file()?
-                .to_source_code()
-                .line_column(self.range()?.end()),
-        )
-    }
-
     /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn ruff_source_file(&self) -> Option<&SourceFile> {
+    fn ruff_source_file(&self) -> Option<&SourceFile> {
         self.primary_span_ref()?.as_ruff_file()
     }
 
@@ -1416,6 +1404,25 @@ pub enum HyperlinkMode {
     Always,
     /// Never emit hyperlinks.
     Never,
+}
+
+/// Descriptive information about a lint rule, independent of any particular diagnostic.
+#[derive(Clone, Debug)]
+pub struct RuleMetadata {
+    /// The canonical name of the rule.
+    pub name: LintName,
+    /// A short description of what the rule detects.
+    pub summary: &'static str,
+    /// The rule's full documentation.
+    pub description: Cow<'static, str>,
+    /// The URL of the rule's documentation.
+    pub help_url: String,
+    /// The linter that defines the rule, if applicable.
+    pub linter: Option<&'static str>,
+    /// The rule's severity before configuration overrides, if one is declared.
+    pub default_severity: Option<Severity>,
+    /// Whether the rule is enabled by default.
+    pub enabled_by_default: bool,
 }
 
 /// Configuration for rendering diagnostics.
