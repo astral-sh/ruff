@@ -21,8 +21,8 @@ use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db, Program,
@@ -1543,7 +1543,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 }
                 result
             })
-            .or(db, self.constraints, check_expanded_source);
+            .or(db, self.constraints, check_expanded_source)
+            .or(db, self.constraints, || {
+                let has_exclusions = |element: Type<'db>| {
+                    matches!(element, Type::Intersection(intersection) if !intersection.negative(db).is_empty())
+                };
+                if !self.is_eager_assignability()
+                    || !elements.iter().copied().any(has_exclusions)
+                {
+                    return self.never();
+                }
+
+                // A gradual union can cover the source collectively even when no arm does:
+                // `U` is assignable to `(U & ~Top[A]) | A`. Materializing the covering arm A
+                // gives `(U & ~Top[A]) | Top[A]`, which simplifies to `U | Top[A]`: Top[A]
+                // restores the part excluded from U. Leave intersections with exclusions intact.
+                // Keep type-variable domains unchanged, since they describe the specializations
+                // allowed in this relation.
+                let materialization_visitor = ApplyTypeMappingVisitor {
+                    materialize_typevar_bounds_and_defaults: false,
+                    ..self.materialization_visitor.for_new_materialization_root()
+                };
+                let materialized = UnionType::from_elements(
+                    db,
+                    self.env,
+                    elements.iter().copied().map(|element| {
+                        if has_exclusions(element) {
+                            element
+                        } else {
+                            element.materialize(db, MaterializationKind::Top, &materialization_visitor)
+                        }
+                    }),
+                );
+                if materialized == target {
+                    return self.never();
+                }
+                self.without_context_collection(|| self.check_type_pair(db, source, materialized))
+            });
 
         if context_tree.is_some()
             && !elements_context.is_empty()

@@ -1613,13 +1613,14 @@ def uncovered[T: str, U: int | bytes]() -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
-Moving an arm across the relation by negating it requires static types. Even `Any` inside a generic
-class prevents an upper bound from supplying this residual evidence.
+For a gradual arm, we subtract its top materialization: `U & ~Top[A] ≤ T`. This preserves the
+portion of `U` that the gradual arm cannot accept.
 
 ```py
 def nested_gradual[T, U]() -> None:
     constraints = ConstraintSet.upper_bound(U, T | list[Any]) & ConstraintSet.lower_bound(str, T)
-    reveal_type(constraints.solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=str]]
+    # revealed: tuple[Solution[T=(U@nested_gradual & ~Top[list[Any]]) | str]]
+    reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
 ### Substitution exceeding the derivation budget
