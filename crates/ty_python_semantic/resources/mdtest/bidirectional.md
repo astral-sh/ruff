@@ -507,14 +507,14 @@ x5: dict[str, int] = {**42}
 ### Collection unions
 
 When a collection literal is inferred against a union type context, the union is narrowed to the
-first compatible element, with inference attempts performed in source-order.
+compatible alternatives.
 
 ```py
 from collections.abc import Mapping, Sequence
 from typing import Literal
 
 x1: list[int | str] | list[int | None] = [1, 2, 3]
-reveal_type(x1)  # revealed: list[int | str]
+reveal_type(x1)  # revealed: list[int | str] | list[int | None]
 
 x2: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
 reveal_type(x2)  # revealed: list[int]
@@ -548,6 +548,20 @@ x9: NestedOp[str] = {"$in": ["a", "b"]}
 reveal_type(x9)  # revealed: dict[Literal["$in", "$nin"], list[str]]
 ```
 
+Reversing the union retains the same alternatives. Set and dictionary literals also retain every
+compatible specialization:
+
+```py
+reversed_lists: list[int | None] | list[int | str] = [1, 2, 3]
+reveal_type(reversed_lists)  # revealed: list[int | None] | list[int | str]
+
+sets: set[int | str] | set[int | None] = {1}
+reveal_type(sets)  # revealed: set[int | str] | set[int | None]
+
+dicts: dict[str, int | str] | dict[str, int | None] = {"key": 1}
+reveal_type(dicts)  # revealed: dict[str, int | str] | dict[str, int | None]
+```
+
 Tuple literals perform narrowing similarly.
 
 ```py
@@ -557,6 +571,41 @@ def _(key: str):
 
     x11: tuple[int, list[int]] | tuple[str, list[str]] = (key, [])
     reveal_type(x11)  # revealed: tuple[str, list[str]]
+```
+
+Matching tuple alternatives retain the relationship between their elements:
+
+```py
+pair: tuple[list[int], list[str]] | tuple[list[str], list[int]] = ([], [])
+reveal_type(pair)  # revealed: tuple[list[int], list[str]] | tuple[list[str], list[int]]
+```
+
+### Diagnostics with collection union context
+
+When only one alternative matches, diagnostics use that context to infer lambda parameters:
+
+```py
+from collections.abc import Callable
+
+type IntCallback = Callable[[int], object]
+type StrCallback = Callable[[str], object]
+
+# error: [unresolved-attribute]
+one_list: list[IntCallback] | str = [lambda value: value.missing()]
+
+# error: [unresolved-attribute]
+one_tuple: tuple[IntCallback] | str = (lambda value: value.missing(),)
+```
+
+With several matching alternatives, diagnostics are reported once, without type context:
+
+```py
+lists: list[int] | list[str] = [missing]  # error: [unresolved-reference]
+tuples: tuple[list[int]] | tuple[list[str]] = ([missing],)  # error: [unresolved-reference]
+
+# TODO: Both parameter types lack `missing`, but their contextual diagnostics are discarded.
+callbacks: list[IntCallback] | list[StrCallback] = [lambda value: value.missing()]  # no diagnostic
+callback_tuple: tuple[IntCallback] | tuple[StrCallback] = (lambda value: value.missing(),)  # no diagnostic
 ```
 
 ### Binary operations
@@ -602,6 +651,16 @@ reveal_type(x1)  # revealed: set[int | str]
 
 x2: dict[int | str, int | str] = {str(i): i for i in range(3)}
 reveal_type(x2)  # revealed: dict[int | str, int | str]
+```
+
+Comprehensions retain every compatible alternative from a union context:
+
+```py
+lists: list[int | str] | list[int | None] = [i for i in range(3)]
+reveal_type(lists)  # revealed: list[int | str] | list[int | None]
+
+dicts: dict[str, int | str] | dict[str, int | None] = {str(i): i for i in range(3)}
+reveal_type(dicts)  # revealed: dict[str, int | str] | dict[str, int | None]
 ```
 
 ## Tuple expressions
@@ -1653,8 +1712,8 @@ reveal_type(explicit_factory())  # revealed: list[ExplicitFactory]
 
 ## Narrow union declared type for generic calls
 
-When a generic call is checked against a union declared type, the union is narrowed to the first
-compatible element:
+When a generic call is checked against a union declared type, each compatible element contributes to
+the inferred result:
 
 ```py
 from typing import reveal_type, Any, Callable, TypedDict
@@ -1776,14 +1835,13 @@ def _(a: int, b: str, c: int | str):
     reveal_type(x10)  # revealed: int | str | None
 ```
 
-This applies to built-in collection constructors as well, mirroring the behavior of collection
-literals:
+This applies to built-in collection constructors as well:
 
 ```py
 from typing import Mapping, Sequence
 
 x1: list[int | str] | list[int | None] = list((1, 2, 3))
-reveal_type(x1)  # revealed: list[int | str]
+reveal_type(x1)  # revealed: list[int | str] | list[int | None]
 
 x2: Sequence[int | str] | Sequence[int | None] = list((1, 2, 3))
 reveal_type(x2)  # revealed: list[int]
@@ -1807,6 +1865,41 @@ reveal_type(x7)  # revealed: list[int | None]
 
 x8: EitherList = list(("1", "2", "3"))
 reveal_type(x8)  # revealed: list[int | str]
+```
+
+## Argument diagnostics with one matching context
+
+When only one union alternative matches the call, argument diagnostics use that type context:
+
+```py
+from collections.abc import Callable
+
+def f[T](callback: Callable[[T], object]) -> list[T]:
+    raise NotImplementedError
+
+# error: [unresolved-attribute]
+result: list[int] | str = f(lambda value: value.upper())
+```
+
+## Argument diagnostics with several matching contexts
+
+When several alternatives match, argument diagnostics are reported once, without type context:
+
+```py
+from collections.abc import Callable
+
+def f[T](callback: Callable[[T], object]) -> list[T]:
+    raise NotImplementedError
+
+# error: [unresolved-reference] "Name `missing` used when not defined"
+result: list[int] | list[float] = f(lambda value: missing)
+```
+
+This currently misses errors that depend on the type context:
+
+```py
+# TODO: Neither `int` nor `float` has an `upper` method.
+result: list[int] | list[float] = f(lambda value: value.upper())  # no diagnostic
 ```
 
 ## Literal union context for generic calls
@@ -2129,7 +2222,8 @@ def from_or(values: list[str] | None) -> None:
         reveal_type(value)  # revealed: str
 
 def constructor_fallback(values: list[int] | None) -> None:
-    reveal_type(values or list())  # revealed: list[int]
+    # TODO: Empty constructors should receive context from the other operand, as literals do.
+    reveal_type(values or list())  # revealed: list[int] | list[Unknown]
 
 def from_and(values: list[str]) -> None:
     reveal_type(values and [])  # revealed: list[str]
@@ -2498,10 +2592,7 @@ def _(td: TD):
     # revealed: TD
     x = reveal_type(f(td, reveal_type({"x": 1})))  # revealed: TD
 
-    # TODO: Generic call narrowing on `reveal_type` happens to choose
-    # the `dict` constraint here instead of `TD`, failing to narrow the
-    # dictionary literal.
-    x = f(td, reveal_type({"x": 1}))  # revealed: dict[str, int]
+    x = f(td, reveal_type({"x": 1}))  # revealed: TD | dict[str, int]
     reveal_type(x)  # revealed: TD | dict[str, int]
 ```
 
