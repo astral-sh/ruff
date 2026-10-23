@@ -1626,6 +1626,10 @@ fn ascii_identifier_prefix_len(bytes: &[u8]) -> usize {
 /// hash for the keywords only; other identifiers can collide and need a full-word
 /// comparison.
 ///
+/// `phf::Map` uses `SipHash` and a displacement table to find each candidate's slot.
+/// With the same length and first-byte filters, `phf` 0.11.3 took 12–21% longer
+/// to lex the NumPy and Pydantic benchmark files on Apple Silicon.
+///
 /// To add, remove, or rename a keyword, update `KEYWORDS` in the generator, then run:
 ///
 /// ```text
