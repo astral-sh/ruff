@@ -2543,13 +2543,12 @@ def inspect_classes(
 
 ## Suppressions on alias definitions
 
-An ignore on an ordinary assignment remains unused and does not hide the explanation when its value
-is used as a type.
+The assignment below is valid runtime code; the error belongs to the use of `Number` as a type.
 
-We generate that explanation by inferring the assignment's right-hand side as a type expression at
-its original source location. This test guards against that inference applying the assignment's
-ignore or marking it as used: the error belongs to the annotation, even though its explanation
-points back to the assignment.
+We explain the error by inferring the assignment's right-hand side as a type expression at its
+original source location. The resulting diagnostics are attached as notes on the error at the use,
+not reported as separate errors on the assignment. This inference must bypass the assignment's
+suppression: the test checks that the ignore remains unused and that the explanation is still shown.
 
 ```py
 # error: [unused-ignore-comment]
