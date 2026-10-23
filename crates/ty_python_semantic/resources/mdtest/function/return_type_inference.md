@@ -954,6 +954,36 @@ def expanding(x):
 reveal_type(expanding(5))  # revealed: tuple[Divergent, Divergent]
 ```
 
+### Returning a recursive lambda
+
+A regression test for a cycle panic:
+
+```py
+def recursive_lambda():
+    return lambda: recursive_lambda()
+
+reveal_type(recursive_lambda())  # revealed: () -> Divergent
+```
+
+### Recursive instance attributes
+
+Inferring an attribute assigned from a method's return type must converge even when neither method
+is called outside the class. Adding an external call changes the inference cycle and hides this
+regression.
+
+```py
+class Tree:
+    def build(self):
+        root = None
+        # error: [truthiness-test-of-none-union]
+        if self.root:
+            root = [self.root]
+        return (root,)  # no diagnostic
+
+    def update(self):
+        (self.root,) = self.build()  # no diagnostic
+```
+
 ### Mutual recursion
 
 Functions that mutually depend on each others' return values can also be analyzed:

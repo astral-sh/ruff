@@ -567,6 +567,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
             | InferenceRegion::FunctionDecorators(_)
+            | InferenceRegion::FunctionReturnType(_)
             | InferenceRegion::Scope(_, _) => None,
         })
     }
@@ -1107,6 +1108,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match self.region {
             InferenceRegion::Statement(statement) => self.infer_region_statement(statement),
             InferenceRegion::Scope(scope, tcx) => self.infer_region_scope(scope, tcx),
+            InferenceRegion::FunctionReturnType(scope) => {
+                self.infer_function_returns(
+                    scope.node(self.db()).expect_function().node(self.module()),
+                );
+            }
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
             InferenceRegion::FunctionDecorators(definition) => {
                 self.infer_region_function_decorators(definition);
@@ -12452,29 +12458,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the return type of a function body based on the types of
     /// expressions in reachable `return` statements.
-    fn inferred_return_type(&self) -> Option<Type<'db>> {
-        if !self.settings().return_type_inference.is_active() {
-            return None;
-        }
-
+    pub(super) fn finish_return_type(mut self) -> Type<'db> {
+        self.infer_region();
         let db = self.db();
-        let function = self.scope().node(db).as_function()?.node(self.module());
-
-        // We never infer types for functions with an explicit return type annotation
-        if function.returns.is_some() {
-            return None;
-        }
-
-        // TODO: Support return type inference for async functions and generators
-        if function.is_async
-            || self
-                .scope()
-                .file_scope_id(db)
-                .is_generator_function(self.index)
-        {
-            return None;
-        }
-
         let env = self.program_environment();
         let mut return_type = UnionBuilder::new(db, env);
 
@@ -12496,12 +12482,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_type = return_type.add(Type::none(db, env));
         }
 
-        Some(return_type.build())
+        let return_type = return_type.build();
+        // Full scope inference reports diagnostics; callers of this query only need the type.
+        let _ = self.context.finish();
+        return_type
     }
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
-        let return_type = self.inferred_return_type();
 
         let Self {
             implicit_aliases,
@@ -12548,8 +12536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty()
-            || !qualifiers.is_empty()
-            || return_type.is_some())
+            || !qualifiers.is_empty())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
@@ -12561,7 +12548,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
-                return_type,
             })
         });
 

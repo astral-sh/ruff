@@ -65,7 +65,11 @@ use ty_python_core::{
     scope::NodeWithScopeRef,
 };
 
-use ruff_python_ast::{self as ast, find_node::covering_node};
+use ruff_python_ast::{
+    self as ast,
+    find_node::covering_node,
+    statement_visitor::{StatementVisitor, walk_stmt},
+};
 use ruff_text_size::Ranged;
 
 fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
@@ -213,6 +217,32 @@ impl<'db> ExpectedReturnType<'db> {
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
+    pub(super) fn infer_function_returns(&mut self, function: &'ast ast::StmtFunctionDef) {
+        struct ReturnStmtVisitor<'builder, 'db, 'ast>(
+            &'builder mut TypeInferenceBuilder<'db, 'ast>,
+        );
+
+        impl<'ast> StatementVisitor<'ast> for ReturnStmtVisitor<'_, '_, 'ast> {
+            fn visit_stmt(&mut self, statement: &'ast ast::Stmt) {
+                match statement {
+                    ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_) => {}
+                    ast::Stmt::Return(return_statement) => {
+                        if self.0.context.is_range_reachable(return_statement.range()) {
+                            // Keep return inference in this query's cycle. A standalone
+                            // statement can normalize `tuple[None | list[Divergent]]` to
+                            // `tuple[Divergent]` before unpacking establishes the recursive
+                            // attribute type, losing the structure needed for convergence.
+                            self.0.infer_return_statement(return_statement);
+                        }
+                    }
+                    _ => walk_stmt(self, statement),
+                }
+            }
+        }
+
+        ReturnStmtVisitor(self).visit_body(&function.body);
+    }
+
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         let env = self.program_environment();
         let db = self.db();

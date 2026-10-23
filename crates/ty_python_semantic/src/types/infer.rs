@@ -503,6 +503,40 @@ pub(crate) fn infer_complete_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
 }
 
+/// Infer an unannotated function's return type without checking its entire body.
+///
+/// Return expressions pull in their reaching definitions and collection constraints through
+/// the usual inference queries. Reachability determines which returns contribute and whether
+/// control can fall through to an implicit `None`. Body diagnostics remain the responsibility
+/// of scope inference.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, scope: ScopeId<'db>| {
+        let env = ProgramEnvironment::from_scope(scope);
+        result.cycle_normalized(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(super) fn infer_function_return_type<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Type<'db> {
+    let program_file = scope.program_file(db);
+    let python_file = program_file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    let index = semantic_index(db, program_file);
+    let env = ProgramEnvironment::from_scope(scope);
+
+    TypeInferenceBuilder::new(
+        db,
+        &env,
+        InferenceRegion::FunctionReturnType(scope),
+        python_file.file(db),
+        program_file,
+        index,
+        &module,
+    )
+    .finish_return_type()
+}
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.
@@ -1035,6 +1069,8 @@ pub(crate) enum InferenceRegion<'db> {
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
     Scope(ScopeId<'db>, TypeContext<'db>),
+    /// Infer only the returns of a function body.
+    FunctionReturnType(ScopeId<'db>),
 }
 
 impl<'db> InferenceRegion<'db> {
@@ -1046,7 +1082,7 @@ impl<'db> InferenceRegion<'db> {
             | InferenceRegion::FunctionDecorators(definition)
             | InferenceRegion::FunctionDefaults(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
-            InferenceRegion::Scope(scope, _) => scope,
+            InferenceRegion::Scope(scope, _) | InferenceRegion::FunctionReturnType(scope) => scope,
         }
     }
 }
@@ -1086,11 +1122,6 @@ struct ScopeInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
-
-    /// For function bodies, this type represents the inferred return type, a union of all types inferred
-    /// for the expressions in reachable `return` statements, and possibly `None` if control flow can
-    /// reach the end of the function. This type is `Never` if the function cannot return.
-    return_type: Option<Type<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -1098,7 +1129,6 @@ impl<'db> ScopeInference<'db> {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
-                return_type: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
@@ -1128,10 +1158,6 @@ impl<'db> ScopeInference<'db> {
         }
 
         if let Some(extra) = self.extra.as_deref_mut() {
-            if let Some(return_type) = &mut extra.return_type {
-                *return_type =
-                    return_type.cycle_normalized(db, env, previous_inference.return_type(), cycle);
-            }
             normalize_collection_use_constraints(
                 db,
                 env,
@@ -1141,13 +1167,6 @@ impl<'db> ScopeInference<'db> {
         }
 
         self
-    }
-
-    pub(super) fn return_type(&self) -> Type<'db> {
-        self.extra
-            .as_deref()
-            .and_then(|extra| extra.return_type)
-            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {
@@ -2345,6 +2364,25 @@ impl<'db> StatementInferenceInner<'db> {
         }
 
         if let Some(extra) = self.extra.as_deref_mut() {
+            // Return summaries can participate in a cycle independently of their expression
+            // types. Normalize them too so a returned recursive callable cannot keep growing
+            // even after the corresponding expression type has converged.
+            for returned in &mut extra.return_types_and_ranges {
+                returned.ty = if let Some(previous_returned) =
+                    previous_inference.extra.as_deref().and_then(|extra| {
+                        extra
+                            .return_types_and_ranges
+                            .iter()
+                            .find(|previous| previous.range == returned.range)
+                    }) {
+                    returned
+                        .ty
+                        .cycle_normalized(db, env, previous_returned.ty, cycle)
+                } else {
+                    returned.ty.recursive_type_normalized(db, env, cycle)
+                };
+            }
+
             normalize_collection_use_constraints(
                 db,
                 env,
