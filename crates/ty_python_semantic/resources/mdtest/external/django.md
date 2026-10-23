@@ -211,6 +211,95 @@ def _(book: Book, ebook: Ebook):
     reveal_type(ebook.id)  # revealed: str
 ```
 
+## Foreign key IDs
+
+### Automatic primary key
+
+A `ForeignKey` field `author` can be used to access the referenced `Author` instance via `.author`.
+It also creates an `.author_id` attribute which contains that instance's primary-key value:
+
+```py
+from django.db import models
+
+class Author(models.Model):
+    pass
+
+class Book(models.Model):
+    author = models.ForeignKey(Author, on_delete=models.CASCADE)
+    editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
+
+def _(book: Book):
+    reveal_type(book.author)  # revealed: Author
+    reveal_type(book.author_id)  # revealed: int
+
+    reveal_type(book.editor)  # revealed: Author | None
+    reveal_type(book.editor_id)  # revealed: int | None
+```
+
+A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
+source model name followed by `_set`. The `related_name` parameter overrides this name:
+
+```py
+def _(author: Author):
+    # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
+    # error: [unresolved-attribute]
+    reveal_type(author.book_set.all())  # revealed: Unknown
+
+    # TODO: Should not be an error, and the type should be `QuerySet[Book]`.
+    # error: [unresolved-attribute]
+    reveal_type(author.edited_books.all())  # revealed: Unknown
+```
+
+Setting `related_name="+"` disables the reverse accessor:
+
+```py
+class Review(models.Model):
+    reviewer = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="+")
+
+def _(author: Author):
+    author.review_set  # error: [unresolved-attribute]
+```
+
+### Custom primary key
+
+The type of `<field>_id` follows the related model's primary key, which need not be an integer:
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    isbn = models.CharField(max_length=13, primary_key=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE)
+
+def _(review: Review):
+    reveal_type(review.book)  # revealed: Book
+
+    reveal_type(review.book_id)  # revealed: str
+```
+
+### Explicit target field
+
+With `to_field`, `<field>_id` contains the value of that field instead of the primary key. In the
+following example, the foreign key refers to the `isbn` field, not to `Book`'s primary key (`id`):
+
+```py
+from django.db import models
+
+class Book(models.Model):
+    id = models.IntegerField(primary_key=True)
+    isbn = models.CharField(max_length=13, unique=True)
+
+class Review(models.Model):
+    book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE)
+
+def _(review: Review):
+    reveal_type(review.book)  # revealed: Book
+
+    reveal_type(review.book_id)  # revealed: str
+```
+
 ## Choices
 
 The `choices` parameter can be used to map the actual stored values for a field to human-readable
