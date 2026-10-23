@@ -166,6 +166,7 @@ pub enum KnownClass {
     DjangoModel,
     DjangoField,
     DjangoDateField,
+    DjangoForeignKey,
     // Pydantic
     PydanticBaseModel,
     PydanticBaseSettings,
@@ -295,6 +296,7 @@ impl KnownClass {
             | Self::DjangoModel
             | Self::DjangoField
             | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -435,6 +437,7 @@ impl KnownClass {
             | Self::DjangoModel
             | Self::DjangoField
             | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -565,6 +568,7 @@ impl KnownClass {
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
             | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -687,6 +691,7 @@ impl KnownClass {
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
             | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
@@ -809,6 +814,7 @@ impl KnownClass {
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
             | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -943,6 +949,7 @@ impl KnownClass {
             | Self::DjangoModel
             | Self::DjangoField
             | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1066,6 +1073,7 @@ impl KnownClass {
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
             | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -1201,6 +1209,7 @@ impl KnownClass {
             Self::DjangoModel => "Model",
             Self::DjangoField => "Field",
             Self::DjangoDateField => "DateField",
+            Self::DjangoForeignKey => "ForeignKey",
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
@@ -1640,6 +1649,7 @@ impl KnownClass {
             Self::UnittestTestCase => KnownModule::UnittestCase,
             Self::DjangoModel => KnownModule::DjangoDbModelsBase,
             Self::DjangoField | Self::DjangoDateField => KnownModule::DjangoDbModelsFields,
+            Self::DjangoForeignKey => KnownModule::DjangoDbModelsFieldsRelated,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
             Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
@@ -1765,6 +1775,7 @@ impl KnownClass {
             | Self::DjangoModel
             | Self::DjangoField
             | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1871,6 +1882,7 @@ impl KnownClass {
             "NotImplementedType" => &[Self::NotImplementedType],
             "Field" => &[Self::Field, Self::DjangoField],
             "DateField" => &[Self::DjangoDateField],
+            "ForeignKey" => &[Self::DjangoForeignKey],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
@@ -1999,6 +2011,7 @@ impl KnownClass {
             | Self::DjangoModel
             | Self::DjangoField
             | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict

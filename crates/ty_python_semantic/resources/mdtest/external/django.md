@@ -230,14 +230,10 @@ class Book(models.Model):
 
 def _(book: Book):
     reveal_type(book.author)  # revealed: Author
-    # TODO: Should not be an error, and the type should be `int`.
-    # error: [unresolved-attribute]
-    reveal_type(book.author_id)  # revealed: Unknown
+    reveal_type(book.author_id)  # revealed: int
 
     reveal_type(book.editor)  # revealed: Author | None
-    # TODO: Should not be an error, and the type should be `int | None`.
-    # error: [unresolved-attribute]
-    reveal_type(book.editor_id)  # revealed: Unknown
+    reveal_type(book.editor_id)  # revealed: int | None
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
@@ -280,9 +276,7 @@ class Review(models.Model):
 def _(review: Review):
     reveal_type(review.book)  # revealed: Book
 
-    # TODO: Should not be an error, and the type should be `str`.
-    # error: [unresolved-attribute]
-    reveal_type(review.book_id)  # revealed: Unknown
+    reveal_type(review.book_id)  # revealed: str
 ```
 
 ### Explicit target field
@@ -303,9 +297,7 @@ class Review(models.Model):
 def _(review: Review):
     reveal_type(review.book)  # revealed: Book
 
-    # TODO: Should not be an error, and the type should be `str`.
-    # error: [unresolved-attribute]
-    reveal_type(review.book_id)  # revealed: Unknown
+    reveal_type(review.book_id)  # revealed: str
 ```
 
 ## Choices
