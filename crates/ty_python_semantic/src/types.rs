@@ -11798,7 +11798,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
         context: &InferContext,
         node: &impl Ranged,
         flags: InferenceFlags,
-        annotate: impl Fn(&mut Diagnostic),
+        annotate: impl Fn(InvalidTypeExpression<'db>, &mut Diagnostic),
     ) -> Type<'db> {
         let db = context.db();
         let InvalidTypeExpressionError {
@@ -11811,7 +11811,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
                 continue;
             };
             let mut diagnostic = builder.into_diagnostic(error.reason(db, env, flags));
-            annotate(&mut diagnostic);
+            annotate(error, &mut diagnostic);
             error.add_subdiagnostics(db, env, diagnostic, node);
         }
         fallback_type

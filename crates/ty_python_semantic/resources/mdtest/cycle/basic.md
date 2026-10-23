@@ -410,8 +410,8 @@ annotations and preserve the class binding, so constructor calls can still be ch
 ```pyi
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable is not allowed in parameter annotations"
+# error: [invalid-type-form] "Variable is not allowed in return type annotations"
 def identity(value: annotation) -> annotation: ...
 
 @identity
@@ -467,8 +467,8 @@ on the decorated class.
 from dataclasses import dataclass
 from typing_extensions import reveal_type
 
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
-# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+# error: [invalid-type-form] "Variable is not allowed in parameter annotations"
+# error: [invalid-type-form] "Variable is not allowed in return type annotations"
 def identity(value: annotation) -> annotation: ...
 
 @dataclass

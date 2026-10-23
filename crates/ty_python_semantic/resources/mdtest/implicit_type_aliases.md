@@ -2541,7 +2541,7 @@ def ignored(value: Number):  # ty: ignore[invalid-type-form]
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable of type `Literal[3]` is not allowed in a parameter annotation
+error[invalid-type-form]: Variable is not allowed in parameter annotations
  --> src/mdtest_snippet.py:5:20
   |
 5 | def inspect(value: Number): ...

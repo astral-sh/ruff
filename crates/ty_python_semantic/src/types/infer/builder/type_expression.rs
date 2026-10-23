@@ -325,7 +325,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &self.context,
                     annotation,
                     self.inference_flags(),
-                    |diagnostic| self.add_non_alias_diagnostics(diagnostic, ty, definition),
+                    |error, diagnostic| {
+                        if self.add_non_alias_diagnostics(diagnostic, ty, definition)
+                            && matches!(error, InvalidTypeExpression::InvalidType(ty, _)
+                                if !matches!(ty, Type::FunctionLiteral(_) | Type::ModuleLiteral(_)))
+                        {
+                            // The explanation identifies an invalid definition, regardless of
+                            // the value's type. Preserve more specific type-expression errors.
+                            diagnostic.set_headline_message(format_args!(
+                                "Variable is not allowed in {}s",
+                                self.type_expression_context()
+                            ));
+                        }
+                    },
                 )
             });
         self.check_type_variable_scope(annotation, result_ty)
@@ -356,29 +368,35 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         false
     }
 
+    /// Attach explanations from the invalid definition, returning whether any were added.
     fn add_non_alias_diagnostics(
         &self,
         diagnostic: &mut Diagnostic,
         ty: Type<'db>,
         definition: Option<Definition<'db>>,
-    ) {
+    ) -> bool {
         // Explain the original definition once, without recursively expanding errors from
         // other variables mentioned in its right-hand side.
         if self.context.is_type_expression_explanation() {
-            return;
+            return false;
         }
         let Some(definition) =
             definition.and_then(|definition| non_alias_assignment(self.db(), definition, ty))
         else {
-            return;
+            return false;
         };
-        for cause in non_alias_type_expression_diagnostics(self.db(), definition) {
+        let causes = non_alias_type_expression_diagnostics(self.db(), definition);
+        if causes.is_empty() {
+            return false;
+        }
+        for cause in causes {
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, cause.headline_message());
             for annotation in cause.annotations() {
                 sub.annotate(annotation.clone());
             }
             diagnostic.sub(sub);
         }
+        true
     }
 
     /// Infer the type of a type expression without storing the result.
