@@ -2348,6 +2348,8 @@ info: Invalid binary operator `+` in a type alias definition
   |
 1 | Number = 1 + 2
   |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 An expression that evaluates to a class does not automatically define a type alias. The diagnostic
@@ -2519,6 +2521,8 @@ info: Invalid binary operator `+` in a type alias definition
   |
 1 | Number = 1 + 2
   |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 The same restriction applies to direct imports, module attributes, and local assignments:
@@ -2577,6 +2581,8 @@ info: Invalid binary operator `+` in a type alias definition
   |
 2 | Number = 1 + 2  # ty: ignore[invalid-type-form]
   |          ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 ## Disabled invalid implicit alias diagnostics

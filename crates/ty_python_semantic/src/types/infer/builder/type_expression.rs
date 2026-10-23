@@ -357,8 +357,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, reference) {
                 let mut diagnostic = builder
                     .into_diagnostic(Self::invalid_variable_type_expression_message(reference));
-                self.add_non_alias_diagnostics(&mut diagnostic, ty, definition, reference);
-                diagnostic::add_type_expression_reference_link(diagnostic);
+                if !self.add_non_alias_diagnostics(&mut diagnostic, ty, definition, reference) {
+                    diagnostic::add_type_expression_reference_link(diagnostic);
+                }
             }
             return true;
         }
@@ -372,7 +373,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
-    /// Attach explanations from the invalid definition, returning whether any were added.
+    /// Attach explanations from the invalid definition and a link to valid type expressions,
+    /// returning whether any explanations were added.
     fn add_non_alias_diagnostics(
         &self,
         diagnostic: &mut Diagnostic,
@@ -406,6 +408,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             diagnostic.sub(sub);
         }
+        diagnostic::add_type_expression_reference_link(diagnostic);
         true
     }
 
