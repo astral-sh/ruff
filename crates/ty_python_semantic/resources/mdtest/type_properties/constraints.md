@@ -1851,6 +1851,38 @@ def legacy_valid_alternative(target: T) -> None:
     reveal_type((valid | invalid).solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=list[int]]]
 ```
 
+### Collecting solutions within the traversal budget
+
+Matching `Wrapped[X]` against `T | tuple[T] | Wrapped[T]` can contribute `Wrapped[X]`, `tuple[X]`,
+or `X` as a lower bound for `T`. When `X` is an integer literal, the two tuple types satisfy the
+bound `T: tuple[Any]`. When `X` is itself a one-element tuple, all three choices satisfy the bound.
+
+```py
+from typing import Any, Literal
+from ty_extensions._internal import is_constraint_set_assignable_to
+
+type Wrapped[X] = tuple[tuple[X]]
+type Common = (
+    Wrapped[Literal[0]]
+    | Wrapped[Literal[1]]
+    | Wrapped[Literal[2]]
+    | Wrapped[tuple[Literal[3]]]
+    | Wrapped[tuple[Literal[4]]]
+    | Wrapped[tuple[Literal[5]]]
+)
+
+def check[T: tuple[Any]]() -> None:
+    fits = is_constraint_set_assignable_to(Common | Wrapped[tuple[Literal[6]]], T | tuple[T] | Wrapped[T])
+    reveal_type(len(fits.solutions(inferable=tuple[T])))  # revealed: Literal[648]
+
+    over = is_constraint_set_assignable_to(Common | Wrapped[Literal[6]], T | tuple[T] | Wrapped[T])
+    reveal_type(over.solutions(inferable=tuple[T]))  # revealed: Unknown
+```
+
+Both inputs have seven union members. The first yields `2³ × 3⁴ = 648` solutions. Removing one tuple
+layer from the last member leaves more rejected paths to check for diagnostic recovery. That extra
+work exceeds the budget.
+
 ### Joint inference
 
 When both variables are inferable, the solver can specialize them together.

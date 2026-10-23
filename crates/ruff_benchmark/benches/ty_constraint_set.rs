@@ -271,7 +271,7 @@ fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
 fn benchmark_incompatible_lower_bound_alternatives(criterion: &mut Criterion) {
     setup_rayon();
 
-    for members in [4, 8, 12] {
+    for members in [4, 8, 11, 12] {
         let union = (0..members)
             .map(|i| format!("tuple[Literal[{i}]]"))
             .join(" | ");
@@ -303,7 +303,7 @@ def check(make: Callable[[], {union}]) -> None:
     }
 }
 
-/// Check each compatible lower bound once, rather than rescanning the growing valid prefix.
+/// A long conjunction with only two solutions fits within the traversal budget.
 fn benchmark_long_valid_bound_prefix(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -317,8 +317,7 @@ def check[T: tuple[Any]]() -> None:
               | ConstraintSet.lower_bound(tuple[Literal[-2]], T))
 ",
     );
-    // Allocate the choice first so traversal reaches it after the compatible prefix. The
-    // disjunction prevents the conjunction fast path from bypassing prefix validation.
+    // Allocate the choice first so traversal reaches it after the 64 shared lower bounds.
     for i in 0..64 {
         writeln!(
             &mut code,

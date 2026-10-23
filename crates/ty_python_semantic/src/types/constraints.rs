@@ -3557,6 +3557,10 @@ pub(crate) struct CandidateSolution<'db> {
 trait SolutionLimits {
     type Break;
 
+    fn traversal_budget(&self) -> Option<(&BoundedSolutionLimits, Self::Break)> {
+        None
+    }
+
     fn visit_node(&mut self) -> ControlFlow<Self::Break> {
         ControlFlow::Continue(())
     }
@@ -3579,6 +3583,10 @@ struct BoundedSolutionLimits {
 
 impl SolutionLimits for BoundedSolutionLimits {
     type Break = ProjectionError;
+
+    fn traversal_budget(&self) -> Option<(&BoundedSolutionLimits, Self::Break)> {
+        Some((self, ProjectionError::TraversalBudgetExceeded))
+    }
 
     fn visit_node(&mut self) -> ControlFlow<Self::Break> {
         let Some(remaining) = self.remaining_visits.checked_sub(1) else {
