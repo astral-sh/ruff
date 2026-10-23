@@ -256,6 +256,7 @@ from django.db import models
 
 class Article(models.Model):
     published = models.DateField()
+    updated = models.DateTimeField()
     reviewed = models.DateField(null=True)
 
 def _(article: Article):
@@ -265,6 +266,22 @@ def _(article: Article):
     # Date fields with `null=True` do not generate these methods.
     article.get_next_by_reviewed()  # error: [unresolved-attribute]
     article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+```
+
+`DateTimeField` also generates these methods:
+
+```py
+def _(article: Article):
+    reveal_type(article.get_next_by_updated())  # revealed: Article
+    reveal_type(article.get_previous_by_updated())  # revealed: Article
+```
+
+Keyword arguments filter the candidate instances:
+
+```py
+def _(article: Article):
+    reveal_type(article.get_next_by_published(published__year=2026))  # revealed: Article
+    reveal_type(article.get_previous_by_published(published__year=2026))  # revealed: Article
 ```
 
 These methods return `Self`, so when invoked on subclasses, we get back instances of the subclass:

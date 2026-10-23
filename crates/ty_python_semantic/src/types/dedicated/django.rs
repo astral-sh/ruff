@@ -284,7 +284,7 @@ fn date_navigation_method<'db>(
         return None;
     }
 
-    // Construct `def get_{next,previous}_by_<field>(self: Self, **kwargs: Any) -> Self`.
+    // Construct `def get_{next,previous}_by_<field>(self: Self, /, **kwargs: Any) -> Self`.
     let self_typevar = BoundTypeVarInstance::synthetic_self(
         db,
         SelfTypeVarOrigin::Class(class.into()),
@@ -300,7 +300,7 @@ fn date_navigation_method<'db>(
     let signature = Signature::new_generic(
         Some(generic_context),
         Parameters::standard([
-            Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty),
+            Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(self_ty),
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(Type::any()),
         ]),
