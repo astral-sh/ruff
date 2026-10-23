@@ -7779,28 +7779,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_elt_expression: &mut dyn FnMut(&mut Self, ArgExpr<'db, 'expr>) -> Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let db = self.db();
-        let env = self.program_environment();
-        let Some(narrowed_tys) = tcx.narrow_targets(db, env) else {
-            return self.infer_collection_literal_impl(
+        self.infer_collection_with_union_context(tcx, |builder, tcx| {
+            builder.infer_collection_literal_impl(
                 collection_class,
                 collection_expr,
                 elts,
                 infer_elt_expression,
                 tcx,
-            );
+            )
+        })
+    }
+
+    fn infer_collection_with_union_context(
+        &mut self,
+        tcx: TypeContext<'db>,
+        mut infer: impl FnMut(&mut Self, TypeContext<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let Some(narrowed_tys) = tcx.narrow_targets(db, env) else {
+            return infer(self, tcx);
         };
 
         let teardown_expression_cache = self.setup_expression_cache();
         let mut try_narrow = |narrowed_ty| {
             let mut speculative_builder = self.speculate();
 
-            // Attempt to infer the collection literal using the narrowed type context.
-            let inferred_ty = speculative_builder.infer_collection_literal_impl(
-                collection_class,
-                collection_expr,
-                elts,
-                infer_elt_expression,
+            let inferred_ty = infer(
+                &mut speculative_builder,
                 tcx.with_annotation(Some(narrowed_ty)),
             )?;
 
@@ -7824,13 +7830,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.extend(builder);
                 ty
             } else {
-                self.infer_collection_literal_impl(
-                    collection_class,
-                    collection_expr,
-                    elts,
-                    infer_elt_expression,
-                    TypeContext::default(),
-                );
+                infer(self, TypeContext::default());
                 self.union_expected_types(&builder.expected_types);
                 UnionType::from_elements(
                     db,
@@ -7847,15 +7847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.teardown_expression_cache();
         }
 
-        result.or_else(|| {
-            self.infer_collection_literal_impl(
-                collection_class,
-                collection_expr,
-                elts,
-                infer_elt_expression,
-                tcx,
-            )
-        })
+        result.or_else(|| infer(self, tcx))
     }
 
     // Infer the type of a collection literal expression.
@@ -8476,26 +8468,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Return a specialization of the collection class (list, dict, set) based on the type context and the inferred
-    /// element / key-value types from the comprehension expression.
+    /// Infer each collection specialization in its own comprehension scope so its elements receive
+    /// the matching type context.
     fn infer_comprehension_specialization<const N: usize>(
         &mut self,
         collection_class: KnownClass,
         collection_expr: ast::ExprRef<'_>,
         elements: [Option<&ast::Expr>; N],
-        inference: &ScopeInference<'db>,
+        scope: ScopeId<'db>,
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
-        let mut infer_element_ty =
-            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
+        self.infer_collection_with_union_context(tcx, |builder, narrowed_tcx| {
+            let inference = infer_scope_types(builder.db(), scope, narrowed_tcx);
+            builder.extend_scope(inference);
 
-        self.infer_collection_literal(
-            collection_class,
-            Some(collection_expr),
-            &[elements],
-            &mut infer_element_ty,
-            tcx,
-        )
+            builder.infer_collection_literal_impl(
+                collection_class,
+                Some(collection_expr),
+                &[elements],
+                &mut |_builder, (_, elt, _)| inference.expression_type(elt),
+                narrowed_tcx,
+            )
+        })
     }
 
     fn infer_list_comprehension_expression(
@@ -8520,14 +8514,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
             KnownClass::List,
             listcomp.into(),
             [Some(elt)],
-            inference,
+            scope,
             tcx,
         )
         .unwrap_or_else(|| {
@@ -8561,14 +8553,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
             KnownClass::Set,
             setcomp.into(),
             [Some(elt)],
-            inference,
+            scope,
             tcx,
         )
         .unwrap_or_else(|| {
@@ -8603,14 +8593,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
             dictcomp.into(),
             [key.as_deref(), Some(value)],
-            inference,
+            scope,
             tcx,
         )
         .unwrap_or_else(|| {

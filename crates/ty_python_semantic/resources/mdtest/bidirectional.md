@@ -663,6 +663,23 @@ dicts: dict[str, int | str] | dict[str, int | None] = {str(i): i for i in range(
 reveal_type(dicts)  # revealed: dict[str, int | str] | dict[str, int | None]
 ```
 
+Each alternative supplies its own context to the comprehension's elements:
+
+```py
+from typing import NotRequired, TypedDict
+
+class A(TypedDict):
+    value: int
+    a: NotRequired[str]
+
+class B(TypedDict):
+    value: int
+    b: NotRequired[str]
+
+items: list[A] | list[B] = [{"value": 1} for _ in range(3)]  # no diagnostic
+mapping: dict[str, A] | dict[str, B] = {"item": {"value": 1} for _ in range(3)}  # no diagnostic
+```
+
 ## Tuple expressions
 
 ```py
