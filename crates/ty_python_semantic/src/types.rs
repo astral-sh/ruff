@@ -11798,7 +11798,8 @@ impl<'db> InvalidTypeExpressionError<'db> {
         context: &InferContext,
         node: &impl Ranged,
         flags: InferenceFlags,
-        annotate: impl Fn(InvalidTypeExpression<'db>, &mut Diagnostic),
+        message_override: Option<(String, String)>,
+        annotate: impl Fn(&mut Diagnostic),
     ) -> Type<'db> {
         let db = context.db();
         let InvalidTypeExpressionError {
@@ -11810,8 +11811,13 @@ impl<'db> InvalidTypeExpressionError<'db> {
             let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
                 continue;
             };
+            let builder = if let Some((message, info)) = &message_override {
+                builder.with_message_override(message.clone(), info)
+            } else {
+                builder
+            };
             let mut diagnostic = builder.into_diagnostic(error.reason(db, env, flags));
-            annotate(error, &mut diagnostic);
+            annotate(&mut diagnostic);
             error.add_subdiagnostics(db, env, diagnostic, node);
         }
         fallback_type

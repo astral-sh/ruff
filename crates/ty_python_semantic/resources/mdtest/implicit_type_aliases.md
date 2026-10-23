@@ -2365,15 +2365,15 @@ def inspect(called: Called):
 
 ```snapshot
 error[invalid-type-form]: Variable `Called` cannot be used as a type
-  --> src/mdtest_snippet.py:14:21
+  --> src/mdtest_snippet.py:18:21
    |
 18 | def inspect(called: Called):
    |                     ^^^^^^
 info: `Called` is not a valid type alias
 info: Function calls are not allowed in type alias definitions
-  --> src/mdtest_snippet.py:11:10
+  --> src/mdtest_snippet.py:15:10
    |
-11 | Called = type(1)
+15 | Called = type(1)
    |          ^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

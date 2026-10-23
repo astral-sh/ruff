@@ -321,20 +321,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE,
                     );
                 }
+                let causes = self.find_non_alias_diagnostics(ty, definition);
+                let message_override = causes.map(|_| {
+                    (
+                        Self::invalid_variable_type_expression_message(annotation),
+                        Self::invalid_type_alias_message(annotation),
+                    )
+                });
                 error.into_fallback_type_with(
                     &self.context,
                     annotation,
                     self.inference_flags(),
-                    |error, diagnostic| {
-                        if self.add_non_alias_diagnostics(diagnostic, ty, definition, annotation)
-                            && matches!(error, InvalidTypeExpression::InvalidType(ty, _)
-                                if !matches!(ty, Type::FunctionLiteral(_) | Type::ModuleLiteral(_)))
-                        {
-                            // The explanation identifies an invalid definition, regardless of
-                            // the value's type. Preserve more specific type-expression errors.
-                            diagnostic.set_headline_message(
-                                Self::invalid_variable_type_expression_message(annotation),
-                            );
+                    message_override,
+                    |diagnostic| {
+                        if let Some(causes) = causes {
+                            Self::add_non_alias_diagnostics(diagnostic, causes);
                         }
                     },
                 )
@@ -355,9 +356,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .is_some_and(|definition| non_alias_assignment(self.db(), definition, ty).is_some())
         {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, reference) {
+                let causes = self.find_non_alias_diagnostics(ty, definition);
                 let mut diagnostic = builder
                     .into_diagnostic(Self::invalid_variable_type_expression_message(reference));
-                if !self.add_non_alias_diagnostics(&mut diagnostic, ty, definition, reference) {
+                if let Some(causes) = causes {
+                    diagnostic.info(Self::invalid_type_alias_message(reference));
+                    Self::add_non_alias_diagnostics(&mut diagnostic, causes);
+                } else {
                     diagnostic::add_type_expression_reference_link(diagnostic);
                 }
             }
@@ -373,34 +378,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
-    /// Attach explanations from the invalid definition and a link to valid type expressions,
-    /// returning whether any explanations were added.
-    fn add_non_alias_diagnostics(
+    fn invalid_type_alias_message(reference: &ast::Expr) -> String {
+        UnqualifiedName::from_expr(reference).map_or_else(
+            || "This variable is not a valid type alias".to_owned(),
+            |name| format!("`{name}` is not a valid type alias"),
+        )
+    }
+
+    /// Find diagnostics explaining why the referenced assignment is not a valid type alias.
+    fn find_non_alias_diagnostics(
         &self,
-        diagnostic: &mut Diagnostic,
         ty: Type<'db>,
         definition: Option<Definition<'db>>,
-        reference: &ast::Expr,
-    ) -> bool {
+    ) -> Option<&'db TypeCheckDiagnostics> {
         // Explain the original definition once, without recursively expanding errors from
         // other variables mentioned in its right-hand side.
-        if self.context.is_type_expression_explanation() {
-            return false;
+        if self.context.is_type_expression_explanation()
+            || !self.context.is_lint_enabled(&INVALID_TYPE_FORM)
+        {
+            return None;
         }
-        let Some(definition) =
-            definition.and_then(|definition| non_alias_assignment(self.db(), definition, ty))
-        else {
-            return false;
-        };
+        let definition = non_alias_assignment(self.db(), definition?, ty)?;
         let causes = non_alias_type_expression_diagnostics(self.db(), definition);
-        if causes.is_empty() {
-            return false;
-        }
-        if let Some(name) = UnqualifiedName::from_expr(reference) {
-            diagnostic.info(format_args!("`{name}` is not a valid type alias"));
-        } else {
-            diagnostic.info("This variable is not a valid type alias");
-        }
+        (!causes.is_empty()).then_some(causes)
+    }
+
+    /// Attach explanations from the invalid definition and a link to valid type expressions.
+    fn add_non_alias_diagnostics(diagnostic: &mut Diagnostic, causes: &TypeCheckDiagnostics) {
         for cause in causes {
             let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, cause.headline_message());
             for annotation in cause.annotations() {
@@ -409,7 +413,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             diagnostic.sub(sub);
         }
         diagnostic::add_type_expression_reference_link(diagnostic);
-        true
     }
 
     /// Infer the type of a type expression without storing the result.
