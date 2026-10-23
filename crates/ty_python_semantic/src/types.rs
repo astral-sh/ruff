@@ -3800,6 +3800,38 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Normalize a component of the outermost recursive constructor, preserving independent
+    /// union alternatives. For example, `list[int | Divergent]` retains `int`, while
+    /// `list[int | list[Divergent]]` becomes `list[int | Divergent]`.
+    ///
+    /// Each alternative still uses strict nested normalization: a union must not hide a cycle
+    /// marker from the cutoff beneath a second constructor. Intersections remain atomic because
+    /// their components, unlike union alternatives, do not describe independent possibilities.
+    fn recursive_type_normalized_component(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+    ) -> Self {
+        let Type::Union(union) = self else {
+            return self
+                .recursive_type_normalized_impl(db, env, div, true)
+                .unwrap_or(div);
+        };
+        let mut builder = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .cycle_recovery(true)
+            .or_recursively_defined(union.recursively_defined(db));
+        for element in union.elements(db) {
+            builder.add_in_place(
+                element
+                    .recursive_type_normalized_impl(db, env, div, true)
+                    .unwrap_or(div),
+            );
+        }
+        builder.build()
+    }
+
     /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
     /// When `nested` is true, propagate `None`. That is, if the type contains a `Divergent` type, the return value of this method is `None` (so we can use the `?` operator).
     /// When `nested` is false, create a type containing `Divergent` types instead of propagating `None` (we should use `unwrap_or(Divergent)`).
@@ -3812,7 +3844,10 @@ impl<'db> Type<'db> {
     /// ]
     /// => tuple[Divergent, Literal[1]]
     /// ```
-    /// Generic nominal types such as `list[T]` and `tuple[T]` should send `nested=true` for `T`. This is necessary for normalization.
+    /// Generic nominal types such as `list[T]` and `tuple[T]` normalize `T` using
+    /// `recursive_type_normalized_component` at the outermost constructor, or send `nested=true`
+    /// when already nested. This preserves independent union alternatives without allowing
+    /// constructor depth to grow indefinitely.
     /// Structural types such as union and intersection do not need to send `nested=true` for element types; that is, types that are "flat" from the perspective of recursive types. `T | U` should send `nested` as is for `T`, `U`.
     /// For other types, the decision depends on whether they are interpreted as nominal or structural.
     /// For example, `KnownInstanceType::UnionType` should simply send `nested` as is.

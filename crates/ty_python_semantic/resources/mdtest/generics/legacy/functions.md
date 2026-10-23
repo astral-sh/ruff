@@ -4384,6 +4384,106 @@ def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
 
+## Recursive class objects passed to generic functions
+
+Inference converges when a loop repeatedly wraps a class's instance type in `list`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def nest(cls: type[T]) -> type[list[T]]:
+    raise NotImplementedError
+
+def wrap(paths: list[int]):
+    cls = int
+    for _ in paths:
+        cls = nest(cls)
+    reveal_type(cls)  # revealed: <class 'int'> | type[list[int | Divergent]]
+```
+
+## Element types across generic calls in loops
+
+Updating a collection while iterating through a generic wrapper preserves its element type, so
+invalid attribute access is still rejected.
+
+```py
+from collections.abc import Iterable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Indexed(Generic[T]):
+    def __init__(self, items: Iterable[T]) -> None: ...
+    def __iter__(self) -> "Indexed[T]":
+        raise NotImplementedError
+
+    def __next__(self) -> tuple[int, T]:
+        raise NotImplementedError
+
+class Item:
+    pass
+
+class Container:
+    items: list[Item]
+
+def visit_constructor(container: Container):
+    while True:
+        for _, item in Indexed(container.items):
+            container.items = item.items  # error: [unresolved-attribute]
+            break
+```
+
+The same check applies when a generic function combines two collections into an iterator of pairs.
+Both arguments contribute to the item type, which is preserved through both return-type layers.
+
+```py
+from collections.abc import Iterator
+
+def paired(left: Iterable[T], right: Iterable[T]) -> Iterator[tuple[T, T]]:
+    raise NotImplementedError
+
+def visit_function(container: Container):
+    while True:
+        for item, _ in paired(container.items, container.items):
+            container.items = item.items  # error: [unresolved-attribute]
+            break
+```
+
+## String comparisons across generic calls in loops
+
+Updating the dictionary feeds the loop's inferred types back into iteration. The accumulated string
+can be empty or nonempty, so both branches remain reachable.
+
+```toml
+[analysis]
+strict-equality-semantics = true
+```
+
+```py
+from collections.abc import Iterable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def first(value: Iterable[T]) -> T:
+    raise NotImplementedError
+
+def update():
+    values = {"a": ""}
+    for key in values:
+        value = key
+        result = ""
+        while value:
+            if result == "":  # no diagnostic
+                result = value
+            else:
+                result = value + result
+            value = first(value)
+        values[key] = result
+```
+
 ## Generic property setters implementing protocols
 
 These deliberately contrived setters could use `object` and `int` directly instead of method-scoped

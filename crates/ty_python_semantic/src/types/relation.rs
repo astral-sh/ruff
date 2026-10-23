@@ -1,8 +1,10 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::cell::RefCell;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
+use ty_python_core::definition::Definition;
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
@@ -10,22 +12,27 @@ use crate::types::constraints::{
     ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
     OptionConstraintsExtension, OwnedConstraintSet,
 };
-use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
+use crate::types::cyclic::{ActiveRecursionDetector, HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::generics::walk_specialization_types;
+use crate::types::protocol_class::walk_protocol_instance_interface;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
+use crate::types::variance::{TypeVarVariance, VarianceInferable};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
+    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
+    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
+    UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, FxOrderSet,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -1788,6 +1795,151 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         Some(self.check_type_pair(db, Type::TypeVar(source), target))
     }
 
+    /// Preserve recursive evidence for variables nested in the other side of an assignability
+    /// constraint. A bare cycle marker is compatible with any shape, but accepting it without
+    /// bounds would lose the evidence needed for inference to converge.
+    fn constrain_divergent(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // TODO: Once https://github.com/astral-sh/ruff/pull/28307 lands, reuse its gradual-type
+        // descent here: specialize the opposite type's variables to the same cycle marker, then
+        // let ordinary relation checking collect bounds and handle variance and recursion.
+        // This should replace `Occurrences`; `type[T]` still needs care because substituting
+        // a cycle marker for `T` collapses the whole type to that marker.
+        struct Occurrences<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            typevars: RefCell<FxOrderSet<BoundTypeVarInstance<'db>>>,
+            visited: TypeCollector<'db>,
+            active: ActiveRecursionDetector<TypeIdentity<'db>>,
+            active_protocols: ActiveRecursionDetector<Definition<'db>>,
+        }
+
+        impl<'db> TypeVisitor<'db> for Occurrences<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                _typevar: BoundTypeVarInstance<'db>,
+            ) {
+                // Generic-context declarations and their bounds are not occurrences.
+            }
+
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                let visit_members = || {
+                    walk_protocol_instance_interface(
+                        db,
+                        protocol.interface(db),
+                        Type::ProtocolInstance(protocol),
+                        self,
+                    );
+                };
+                if let Some(definition) = protocol
+                    .class_origin(db)
+                    .and_then(|class| class.definition(db))
+                {
+                    self.active_protocols
+                        .visit(&definition, || {}, visit_members);
+                } else {
+                    visit_members();
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if let Type::TypeVar(typevar) = ty {
+                    self.typevars.borrow_mut().insert(typevar);
+                    return;
+                }
+
+                // Recursive definitions can change their arguments without changing their
+                // identity. Inspect those arguments even when the body is already active.
+                let arguments = match ty {
+                    Type::TypeAlias(alias) => alias.specialization(db),
+                    Type::Recursive(recursive) => recursive.arguments(db),
+                    Type::ProtocolInstance(protocol) => protocol
+                        .class_origin(db)
+                        .and_then(|class| class.static_class_literal(db))
+                        .and_then(|(_, specialization)| specialization),
+                    Type::TypedDict(typed_dict) => typed_dict
+                        .defining_class()
+                        .and_then(|class| class.static_class_literal(db))
+                        .and_then(|(_, specialization)| specialization),
+                    _ => None,
+                };
+                if let Some(arguments) = arguments {
+                    walk_specialization_types(db, arguments, self);
+                }
+                if matches!(ty, Type::ProtocolInstance(_)) {
+                    walk_type_with_recursion_guard(db, ty, self, &self.visited);
+                    return;
+                }
+                self.active.visit(
+                    &ty.to_type_identity(db),
+                    || {},
+                    || walk_type_with_recursion_guard(db, ty, self, &self.visited),
+                );
+            }
+        }
+
+        let (marker, other, polarity) = if source.is_divergent() {
+            (source, target, TypeVarVariance::Covariant)
+        } else {
+            (target, source, TypeVarVariance::Contravariant)
+        };
+        let visitor = Occurrences {
+            env: self.env,
+            typevars: RefCell::default(),
+            visited: TypeCollector::default(),
+            active: ActiveRecursionDetector::default(),
+            active_protocols: ActiveRecursionDetector::default(),
+        };
+        visitor.visit_type(db, other);
+        visitor
+            .typevars
+            .into_inner()
+            .into_iter()
+            .when_all(db, self.constraints, |typevar| {
+                // A ParamSpec's bounds must be parameter signatures, not value types.
+                if typevar.domain(db) == TypeVarDomain::ParameterSignature {
+                    return self.always();
+                }
+                let variance = polarity.compose(
+                    other
+                        .variance_of(db, self.env, typevar.identity(db))
+                        .evaluate(db),
+                );
+                let constrain = match variance {
+                    TypeVarVariance::Covariant => ConstraintSet::constrain_typevar_lower_bound,
+                    TypeVarVariance::Contravariant => ConstraintSet::constrain_typevar_upper_bound,
+                    TypeVarVariance::Invariant => {
+                        ConstraintSet::constrain_typevar_equivalence_bound
+                    }
+                    TypeVarVariance::Bivariant => return self.always(),
+                };
+                constrain(
+                    db,
+                    self.env,
+                    self.constraints,
+                    self.provenance,
+                    typevar,
+                    marker,
+                )
+            })
+    }
+
     /// Return a constraint set indicating the conditions under which `self.relation` holds between `source` and `target`.
     pub(super) fn check_type_pair(
         &self,
@@ -1853,6 +2005,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     bound_typevar,
                     lower,
                 );
+            }
+
+            if self.relation.is_assignability() && (source.is_divergent() || target.is_divergent())
+            {
+                return self.constrain_divergent(db, source, target);
             }
         }
 

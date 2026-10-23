@@ -534,7 +534,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "list[Divergent]"
+        "list[Divergent | None]"
     );
 
     let recursive_tuple = Type::heterogeneous_tuple(
@@ -570,7 +570,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "tuple[Divergent, str]"
+        "tuple[int | Divergent, str]"
     );
 
     let recursive_dict = KnownClass::Dict.to_specialized_instance(
@@ -606,7 +606,7 @@ fn divergent_type() {
         normalized
             .display(db, &db.program_environment())
             .to_string(),
-        "dict[str, Divergent]"
+        "dict[str, int | Divergent]"
     );
 
     let union = UnionType::from_elements(db, &env, [div, KnownClass::Int.to_instance(db, &env)]);
@@ -1138,16 +1138,17 @@ type H[T] = G[T]
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let rec_int_list = get_type_alias(&db, "RecursiveIntList");
+    // Eager expansion follows raw alias values for cycle detection, without specialization.
     assert_eq!(
         rec_int_list
             .expand_eagerly(&db, &db.program_environment())
             .display(&db, &db.program_environment())
             .to_string(),
-        "list[Divergent]",
+        "list[T@RecursiveList | Divergent]",
     );
 
     let itself = get_type_alias(&db, "Itself");

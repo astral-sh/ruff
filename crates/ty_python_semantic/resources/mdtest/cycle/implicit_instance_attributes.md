@@ -48,7 +48,7 @@ class Slotted:
         self.data = {"a": self.data["a"]}
 
 # not a great type, but we do know that it's a dictionary with string keys!
-reveal_type(Slotted().data)  # revealed: dict[str, Unknown] | dict[str, Divergent]
+reveal_type(Slotted().data)  # revealed: dict[str, Unknown] | dict[str, Unknown | Divergent]
 ```
 
 ## Slots storing their own descriptors
@@ -91,7 +91,7 @@ class C:
         while isinstance(self.value, list):
             self.value = [self.value]
 
-reveal_type(C().value)  # revealed: list[int] | list[Divergent]
+reveal_type(C().value)  # revealed: list[int] | list[list[int] | Divergent]
 ```
 
 ## Concatenating recursively growing tuples

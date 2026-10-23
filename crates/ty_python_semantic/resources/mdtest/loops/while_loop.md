@@ -900,14 +900,14 @@ def wrap(initial: int):
     value = initial
     while keep(value):
         value = (value,)
-    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+    reveal_type(value)  # revealed: int | tuple[int | Divergent] | tuple[int | tuple[int | Divergent]]
 
 def wrap_indirectly(initial: int):
     value = initial
     while keep(value):
         box = [(value,)]
         value = box[0]
-    reveal_type(value)  # revealed: int | tuple[Divergent] | tuple[int | tuple[Divergent]]
+    reveal_type(value)  # revealed: int | tuple[int | Divergent] | tuple[int | tuple[int | Divergent]]
 ```
 
 Bound methods also preserve recursive structure in their receivers during cyclic inference.
