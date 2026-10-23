@@ -262,9 +262,22 @@ def _(article: Article):
     reveal_type(article.get_next_by_published())  # revealed: Article
     reveal_type(article.get_previous_by_published())  # revealed: Article
 
-    # Nullable date fields do not generate these methods.
+    # Date fields with `null=True` do not generate these methods.
     article.get_next_by_reviewed()  # error: [unresolved-attribute]
     article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+```
+
+These methods return `Self`, so when invoked on subclasses, we get back instances of the subclass:
+
+```py
+class NewsArticle(Article):
+    pass
+
+def _(article: NewsArticle):
+    reveal_type(article.get_next_by_published())  # revealed: NewsArticle
+    reveal_type(article.get_previous_by_published())  # revealed: NewsArticle
+    reveal_type(Article.get_next_by_published(article))  # revealed: NewsArticle
+    reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
 ```
 
 [django-types]: https://github.com/sbdchd/django-types

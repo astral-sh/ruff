@@ -9,9 +9,9 @@ use ty_python_core::{
 use crate::place::known_module_symbol;
 use crate::types::member::class_member;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassBase, KnownClass, Parameter, Parameters,
-    SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, binding_type,
-    definition_expression_type,
+    BindingContext, BoundTypeVarInstance, ClassBase, GenericContext, KnownClass, Parameter,
+    Parameters, SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type,
+    binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -285,7 +285,7 @@ fn date_navigation_method<'db>(
     }
 
     // Construct `def get_{next,previous}_by_<field>(self: Self, **kwargs: Any) -> Self`.
-    let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+    let self_typevar = BoundTypeVarInstance::synthetic_self(
         db,
         SelfTypeVarOrigin::Class(class.into()),
         Type::instance(
@@ -294,8 +294,11 @@ fn date_navigation_method<'db>(
             class.apply_optional_specialization(db, specialization),
         ),
         BindingContext::Synthetic(env.program(db)),
-    ));
-    let signature = Signature::new(
+    );
+    let self_ty = Type::TypeVar(self_typevar);
+    let generic_context = GenericContext::from_typevar_instances(db, env, [self_typevar]);
+    let signature = Signature::new_generic(
+        Some(generic_context),
         Parameters::standard([
             Parameter::positional_or_keyword(Name::new_static("self")).with_annotated_type(self_ty),
             Parameter::keyword_variadic(Name::new_static("kwargs"))
