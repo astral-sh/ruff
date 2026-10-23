@@ -37,10 +37,12 @@ pub use self::dedicated::pytest::{
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+pub use self::infer::ReachingDefinitionsByExpression;
 pub(crate) use self::infer::{
     InferredDeclaration, TruthinessAnalyzer, TypeContext, infer_complete_scope_types,
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    reaching_definitions_for_scope, scope_for_complete_type_inference,
 };
 use self::infer::{
     implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,

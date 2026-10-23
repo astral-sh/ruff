@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use compact_str::CompactString;
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath};
@@ -29,17 +31,18 @@ use crate::place_load::{
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
-    is_discarded_dict_key_assignment,
+    CycleDetector, ProgramEnvironment, ReachingDefinitionsByExpression, SpecialFormType, Type,
+    TypeQualifiers, binding_type, infer_complete_scope_types, infer_definition_types,
+    inferred_declaration, is_discarded_dict_key_assignment, reaching_definitions_for_scope,
+    scope_for_complete_type_inference,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
-use ty_python_core::scope::{FileScopeId, Scope};
+use ty_python_core::scope::{FileScopeId, Scope, ScopeId};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
+use ty_python_core::{BindingWithConstraintsIterator, ExpressionNodeKey, Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -461,6 +464,41 @@ impl<'db> SemanticModel<'db> {
         self.scope(node)
             .into_iter()
             .flat_map(move |scope| index.ancestor_scopes(scope))
+    }
+
+    /// Returns the definitions that may reach a name expression.
+    ///
+    /// Pass a `cache` to reuse reaching definitions across calls for names
+    /// within the same scope. Without a cache, reaching definitions are
+    /// computed afresh for the entire scope on each call.
+    ///
+    /// Returns `None` if inference did not visit the name (e.g., `factory` in the invalid
+    /// string annotation `x: "factory()"`).
+    #[allow(dead_code, reason = "awaiting IDE integration")]
+    pub fn reaching_definitions<'cache>(
+        &self,
+        name: &ast::ExprName,
+        cache: Option<&'cache mut FxHashMap<ScopeId<'db>, ReachingDefinitionsByExpression<'db>>>,
+    ) -> Option<Cow<'cache, DefinitionResolution<'db>>> {
+        let scope = self
+            .scope(name.into())?
+            .to_scope_id(self.db(), self.program_file());
+
+        let key: ExpressionNodeKey = ast::ExprRef::Name(name).into();
+
+        let Some(cache) = cache else {
+            return reaching_definitions_for_scope(self.db(), scope)
+                .remove(&key)
+                .map(Cow::Owned);
+        };
+
+        let scope = scope_for_complete_type_inference(self.db(), scope);
+
+        cache
+            .entry(scope)
+            .or_insert_with(|| reaching_definitions_for_scope(self.db(), scope))
+            .get(&key)
+            .map(Cow::Borrowed)
     }
 
     /// Returns the first local definition created by `covering_node`, if any.
