@@ -8928,18 +8928,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = if_expression;
 
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
+        let test_bool = test_ty.try_bool(db, env);
+        let test_truthiness = match &test_bool {
+            Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
+            Err(err) => err.fallback_truthiness(),
+        };
         let (body_ty, orelse_ty) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
             && !is_nonempty_collection_literal_with_empty_peer(body, orelse)
         {
-            // Infer the peer branch first so the body can use its type as context.
-            let orelse_ty = self.infer_expression(orelse, tcx);
-            let body_ty = self.infer_expression_with_collection_literal_peer_context(
-                body,
-                tcx,
-                Some(orelse_ty),
-            );
-            (body_ty, orelse_ty)
+            if matches!(test_truthiness, Truthiness::Ambiguous)
+                && AnyNodeRef::from(body.as_ref()).kind()
+                    == AnyNodeRef::from(orelse.as_ref()).kind()
+            {
+                self.infer_if_collection_literal_branches(body, orelse, tcx)
+            } else {
+                // Infer the peer branch first so the body can use its type as context.
+                let orelse_ty = self.infer_expression(orelse, tcx);
+                let body_ty = self.infer_expression_with_collection_literal_peer_context(
+                    body,
+                    tcx,
+                    Some(orelse_ty),
+                );
+                (body_ty, orelse_ty)
+            }
         } else {
             let body_ty = self.infer_expression(body, tcx);
             let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
@@ -8950,14 +8962,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (body_ty, orelse_ty)
         };
 
-        let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
-            Err(err) => {
-                err.report_diagnostic(&self.context, &**test);
-                err.fallback_truthiness()
-            }
-        };
-
+        if let Err(err) = test_bool {
+            err.report_diagnostic(&self.context, &**test);
+        }
         self.check_condition_redundancy(test, test_ty);
 
         match test_truthiness {
@@ -8966,6 +8973,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
             Truthiness::Uninhabited => Type::Never,
         }
+    }
+
+    fn infer_if_collection_literal_branches(
+        &mut self,
+        body: &ast::Expr,
+        orelse: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> (Type<'db>, Type<'db>) {
+        let teardown_expression_cache = self.setup_expression_cache();
+        let mut speculative_orelse = self.speculate();
+        let provisional_orelse_ty = speculative_orelse.infer_expression(orelse, tcx);
+        let body_ty = self.infer_expression_with_collection_literal_peer_context(
+            body,
+            tcx,
+            Some(provisional_orelse_ty),
+        );
+        let orelse_ty = if body_ty == provisional_orelse_ty {
+            self.extend(speculative_orelse);
+            provisional_orelse_ty
+        } else {
+            // Both branches construct fresh collections. If the body widens their common
+            // element type, infer the other branch against it before retaining its results.
+            self.infer_expression_with_collection_literal_peer_context(orelse, tcx, Some(body_ty))
+        };
+        if teardown_expression_cache {
+            self.teardown_expression_cache();
+        }
+        (body_ty, orelse_ty)
     }
 
     fn infer_lambda_body(&mut self, lambda_expression: &ast::ExprLambda, tcx: TypeContext<'db>) {

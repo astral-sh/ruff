@@ -84,12 +84,18 @@ types. A list in one branch and a dictionary in the other produce a union of the
 from typing import Any
 from ty_extensions._internal import Unknown
 
-def _(flag: bool, unknown: list[Unknown], gradual: list[Any]):
+def _(flag: bool, unknown: list[Unknown], gradual: list[Any], existing: list[int]):
     reveal_type([] if flag else [])  # revealed: list[Unknown]
     reveal_type({} if flag else {})  # revealed: dict[Unknown, Unknown]
     reveal_type(["x"] if flag else unknown)  # revealed: list[Unknown]
     reveal_type(["x"] if flag else gradual)  # revealed: list[Any]
-    reveal_type(["x"] if flag else [1])  # revealed: list[int | str] | list[int]
+    reveal_type(["x"] if flag else [1])  # revealed: list[int | str]
+    reversed = [1] if flag else ["x"]
+    reveal_type(reversed)  # revealed: list[str | int]
+    reversed.append(2)  # no diagnostic
+    reveal_type(["x"] if flag else existing)  # revealed: list[int | str] | list[int]
+    reveal_type({"key": 1} if flag else {2: "value"})  # revealed: dict[int | str, str | int]
+    invalid = [1] if flag else [missing]  # error: [unresolved-reference]
     reveal_type(["x"] if flag else {})  # revealed: list[str] | dict[Unknown, Unknown]
 ```
 
@@ -112,6 +118,9 @@ def _(flag: bool):
     result = [(skipped := "after")] if False else []
     reveal_type(result)  # revealed: list[str]
     reveal_type(skipped)  # revealed: Literal["before"]
+
+    reachable = ["x"] if False else [1]
+    reveal_type(reachable)  # revealed: list[int]
 ```
 
 ## Statically known compound conditions
