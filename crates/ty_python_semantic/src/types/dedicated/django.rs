@@ -9,9 +9,8 @@ use ty_python_core::{
 use crate::place::known_module_symbol;
 use crate::types::member::class_member;
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, ClassBase, KnownClass, Parameter, Parameters,
-    SelfTypeVarOrigin, Signature, Specialization, StaticClassLiteral, Type, binding_type,
-    definition_expression_type,
+    ClassBase, KnownClass, Parameter, Parameters, Signature, Specialization, StaticClassLiteral,
+    Type, binding_type, definition_expression_type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -66,6 +65,14 @@ impl<'db> Field<'db> {
         let Some(call) = value.as_call_expr() else {
             return field;
         };
+
+        if let Some(name) = call.arguments.find_keyword("name")
+            && let Some(name) =
+                definition_expression_type(db, definition, &name.value).as_string_literal()
+            && !name.value(db).is_empty()
+        {
+            field.name = Name::new(name.value(db));
+        }
 
         field.metadata.primary_key =
             call.arguments
