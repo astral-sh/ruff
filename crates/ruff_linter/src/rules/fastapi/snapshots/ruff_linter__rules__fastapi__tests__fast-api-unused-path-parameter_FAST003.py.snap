@@ -486,5 +486,23 @@ help: Add `thing_id` to function signature
 370 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...
 371 + async def read_thing_init_and_call_instance_default(thing_id, query: str = Depends(InitAndCallQuery())): ...
+372 |
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `other_id` appears in route path, but not in `read_thing_annotated_alias_missing` signature
+   --> FAST003.py:384:19
+    |
+383 | # Error: ThingDep does not declare `other_id`
+384 | @app.get("/things/{other_id}")
+    |                   ^^^^^^^^^^
+385 | async def read_thing_annotated_alias_missing(other: ThingDep): ...
+    |
+help: Add `other_id` to function signature
+    |
+384 | @app.get("/things/{other_id}")
+    - async def read_thing_annotated_alias_missing(other: ThingDep): ...
+385 + async def read_thing_annotated_alias_missing(other: ThingDep, other_id): ...
+386 |
     |
 note: This is an unsafe fix and may change runtime behavior
