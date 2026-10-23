@@ -1,4 +1,10 @@
-use crate::types::generics::specialization_variance;
+use smallvec::SmallVec;
+
+use crate::types::constraints::projection::SolutionBudget;
+use crate::types::constraints::{
+    ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
+};
+use crate::types::generics::{Specialization, specialization_variance};
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::contains_growing_type;
 use crate::types::{
@@ -119,12 +125,41 @@ fn base_top_intersection<'db>(
     let mut types = subclass_specialization.types(db).to_vec();
     let mut changed = false;
 
+    // The direct mapping needs distinct, bare subclass variables or identical fixed arguments.
+    // Other arguments require solving all the base constraints together.
+    let mut seen = SmallVec::<[_; 4]>::new();
+    if inherited_specialization
+        .types(db)
+        .iter()
+        .zip(base_specialization.types(db))
+        .any(|(ty, base_type)| {
+            if let Type::TypeVar(typevar) = ty {
+                let identity = typevar.identity(db);
+                if seen.contains(&identity) {
+                    return true;
+                }
+                seen.push(identity);
+                false
+            } else {
+                ty != base_type
+                    || subclass_context.variables(db).any(|typevar| {
+                        ty.references_typevar(db, env, typevar.typevar(db).identity(db))
+                    })
+            }
+        })
+    {
+        return exact_base_intersection(db, env, base, subclass, inherited_specialization);
+    }
+
     for ((base_typevar, base_type), inherited_type) in base_specialization
         .generic_context(db)
         .variables(db)
         .zip(base_specialization.types(db))
         .zip(inherited_specialization.types(db))
     {
+        if !matches!(inherited_type, Type::TypeVar(_)) && inherited_type == base_type {
+            continue;
+        }
         let Type::TypeVar(subclass_typevar) = *inherited_type else {
             return None;
         };
@@ -196,6 +231,91 @@ fn base_top_intersection<'db>(
             specialized
         },
     ))
+}
+
+/// Simplify a complex base specialization only when the base fixes subclass arguments exactly.
+fn exact_base_intersection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    base: Type<'db>,
+    subclass: Type<'db>,
+    inherited: Specialization<'db>,
+) -> Option<GenericIntersection<'db>> {
+    let (base_class, _) = base.class_specialization(db, env)?;
+    let (subclass_class, subclass_specialization) = subclass.class_specialization(db, env)?;
+    if subclass_specialization.materialization_kind(db) != Some(MaterializationKind::Top) {
+        return None;
+    }
+
+    let context = subclass_specialization.generic_context(db);
+    // A variable from the subclass's context can also appear in the surrounding base type. It
+    // is fixed there, so it cannot simultaneously be treated as an inferable subclass argument.
+    if context
+        .variables(db)
+        .any(|typevar| base.references_typevar(db, env, typevar.typevar(db).identity(db)))
+    {
+        return None;
+    }
+    let inherited_base = Type::instance(
+        db,
+        env,
+        base_class.apply_optional_specialization(db, Some(inherited)),
+    );
+    if contains_growing_type(db, env, inherited_base) {
+        return Some(GenericIntersection::Recursive);
+    }
+    let constraints = ConstraintSetBuilder::new();
+    let solutions = inherited_base
+        .when_constraint_set_subtype_of(db, env, base, &constraints)
+        .solutions_with(
+            db,
+            env,
+            context.inferable_typevars(db),
+            SolutionBudget::default(),
+            |_, bounds| {
+                bounds
+                    .as_exact(db, env)
+                    .map_or(PathBoundSolution::Unsolved, PathBoundSolution::Solved)
+            },
+        )
+        .ok()?;
+    let Solutions::Constrained(SolutionPaths::Complete(solutions)) = solutions else {
+        return None;
+    };
+    let [solution] = solutions.as_slice() else {
+        return None;
+    };
+    let mut types = subclass_specialization.types(db).to_vec();
+    let mut changed = false;
+    for binding in &solution.solved_typevars {
+        let index = context
+            .variables(db)
+            .position(|typevar| typevar == binding.bound_typevar)?;
+        if !types[index].is_non_divergent_dynamic()
+            || context.variables(db).any(|typevar| {
+                binding
+                    .solution
+                    .references_typevar(db, env, typevar.typevar(db).identity(db))
+            })
+        {
+            return None;
+        }
+        types[index] = binding.solution;
+        changed = true;
+    }
+    if !changed {
+        return None;
+    }
+
+    let specialization = context.specialize(db, types);
+    let specialized = Type::instance(
+        db,
+        env,
+        subclass_class.apply_optional_specialization(db, Some(specialization)),
+    )
+    .top_materialization(db, env);
+    (specialized.is_subtype_of(db, env, base) && specialized.is_subtype_of(db, env, subclass))
+        .then_some(GenericIntersection::Simplified(specialized))
 }
 
 /// Intersect two specializations of the same generic class if `general` only differs from
