@@ -2711,6 +2711,8 @@ watermelon
                                     description: format!("Documentation for `{name}`.").into(),
                                     help_url: format!("https://ty.dev/rules#{name}"),
                                     linter: Some("example"),
+                                    default_severity: Some(Severity::Error),
+                                    enabled_by_default: true,
                                 },
                             )
                         })

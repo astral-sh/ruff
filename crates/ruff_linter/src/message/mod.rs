@@ -24,7 +24,9 @@ use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::Fix;
-use crate::registry::{Linter, Rule, RuleNamespace};
+use crate::registry::{Linter, Rule, RuleNamespace, RuleSet};
+use crate::rule_selector::PreviewOptions;
+use crate::settings::DEFAULT_SELECTORS;
 use crate::settings::types::OutputFormat;
 
 mod grouped;
@@ -169,6 +171,12 @@ impl FileResolver for EmitterContext<'_> {
 }
 
 fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
+    // Describe the defaults before configuration overrides such as preview.
+    let default_rules = DEFAULT_SELECTORS
+        .iter()
+        .flat_map(|selector| selector.rules(&PreviewOptions::default()))
+        .collect::<RuleSet>();
+
     Rule::iter()
         .map(|rule| {
             let name = LintName::of(rule.into());
@@ -184,6 +192,8 @@ fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
                     description: rule.explanation().into(),
                     help_url: rule.url(),
                     linter,
+                    default_severity: Some(Severity::Error),
+                    enabled_by_default: default_rules.contains(rule),
                 },
             )
         })

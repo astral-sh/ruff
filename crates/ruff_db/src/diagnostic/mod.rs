@@ -1419,6 +1419,10 @@ pub struct RuleMetadata {
     pub help_url: String,
     /// The linter that defines the rule, if applicable.
     pub linter: Option<&'static str>,
+    /// The rule's severity before configuration overrides, if one is declared.
+    pub default_severity: Option<Severity>,
+    /// Whether the rule is enabled by default.
+    pub enabled_by_default: bool,
 }
 
 /// Configuration for rendering diagnostics.

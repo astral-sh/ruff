@@ -773,6 +773,10 @@ fn sarif_diagnostics() -> anyhow::Result<()> {
         (
             "ty.toml",
             r#"
+            [rules]
+            division-by-zero = "warn"
+            unused-ignore-comment = "error"
+
             [[overrides]]
             include = ["a.py"]
 
@@ -781,7 +785,13 @@ fn sarif_diagnostics() -> anyhow::Result<()> {
             "#,
         ),
         ("a.py", "print(x)"),
-        ("b.py", "print(x)"),
+        (
+            "b.py",
+            r#"
+            print(x)
+            1 / 0  # ty: ignore[unresolved-reference]
+            "#,
+        ),
     ])?
     .with_filter(
         r#"("fullDescription": \{\s*"text": ")[^\n]*(")"#,
@@ -842,6 +852,74 @@ fn sarif_diagnostics() -> anyhow::Result<()> {
                 "text": "Name `x` used when not defined"
               },
               "ruleId": "unresolved-reference"
+            },
+            {
+              "level": "warning",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 6,
+                      "endLine": 3,
+                      "startColumn": 1,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Cannot divide object of type `Literal[1]` by zero"
+              },
+              "ruleId": "division-by-zero"
+            },
+            {
+              "fixes": [
+                {
+                  "artifactChanges": [
+                    {
+                      "artifactLocation": {
+                        "uri": "file://<temp_dir>/b.py"
+                      },
+                      "replacements": [
+                        {
+                          "deletedRegion": {
+                            "endColumn": 42,
+                            "endLine": 3,
+                            "startColumn": 6,
+                            "startLine": 3
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "description": {
+                    "text": "Remove the unused suppression comment"
+                  }
+                }
+              ],
+              "level": "error",
+              "locations": [
+                {
+                  "physicalLocation": {
+                    "artifactLocation": {
+                      "uri": "file://<temp_dir>/b.py"
+                    },
+                    "region": {
+                      "endColumn": 42,
+                      "endLine": 3,
+                      "startColumn": 8,
+                      "startLine": 3
+                    }
+                  }
+                }
+              ],
+              "message": {
+                "text": "Unused `ty: ignore` directive"
+              },
+              "ruleId": "unused-ignore-comment"
             }
           ],
           "tool": {
@@ -850,6 +928,32 @@ fn sarif_diagnostics() -> anyhow::Result<()> {
               "name": "ty",
               "rules": [
                 {
+                  "defaultConfiguration": {
+                    "enabled": false
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects division by zero"
+                  },
+                  "helpUri": "https://ty.dev/rules#division-by-zero",
+                  "id": "division-by-zero",
+                  "properties": {
+                    "id": "division-by-zero",
+                    "kind": null,
+                    "name": "division-by-zero",
+                    "problem.severity": "warning"
+                  },
+                  "shortDescription": {
+                    "text": "detects division by zero"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "error"
+                  },
                   "fullDescription": {
                     "text": "[DESCRIPTION]"
                   },
@@ -866,6 +970,29 @@ fn sarif_diagnostics() -> anyhow::Result<()> {
                   },
                   "shortDescription": {
                     "text": "detects references to names that are not defined"
+                  }
+                },
+                {
+                  "defaultConfiguration": {
+                    "enabled": true,
+                    "level": "warning"
+                  },
+                  "fullDescription": {
+                    "text": "[DESCRIPTION]"
+                  },
+                  "help": {
+                    "text": "detects unused `ty: ignore` comments"
+                  },
+                  "helpUri": "https://ty.dev/rules#unused-ignore-comment",
+                  "id": "unused-ignore-comment",
+                  "properties": {
+                    "id": "unused-ignore-comment",
+                    "kind": null,
+                    "name": "unused-ignore-comment",
+                    "problem.severity": "error"
+                  },
+                  "shortDescription": {
+                    "text": "detects unused `ty: ignore` comments"
                   }
                 }
               ],

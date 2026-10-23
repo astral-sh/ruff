@@ -150,6 +150,10 @@ expression: value
           "name": "ty",
           "rules": [
             {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
               "fullDescription": {
                 "text": "Documentation for `unused-import`."
               },
@@ -169,6 +173,10 @@ expression: value
               }
             },
             {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
               "fullDescription": {
                 "text": "Documentation for `undefined-name`."
               },
@@ -188,6 +196,10 @@ expression: value
               }
             },
             {
+              "defaultConfiguration": {
+                "enabled": true,
+                "level": "error"
+              },
               "fullDescription": {
                 "text": "Documentation for `unused-variable`."
               },

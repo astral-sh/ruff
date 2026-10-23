@@ -496,6 +496,8 @@ impl LintRegistry {
                         description: lint.documentation().into(),
                         help_url: lint.documentation_url(),
                         linter: None,
+                        default_severity: Severity::try_from(lint.default_level()).ok(),
+                        enabled_by_default: !lint.default_level().is_ignore(),
                     },
                 )
             })

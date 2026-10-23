@@ -52,7 +52,8 @@ impl Renderer for SarifRenderer<'_> {
         for result in &results {
             if let Some(name) = result.lint_name {
                 // A rule's severity can differ between files. Keep one descriptor per rule,
-                // using its highest reported severity; each result retains its own level.
+                // using its highest reported severity for GitHub's `problem.severity`;
+                // each result retains its own level.
                 unique_rules
                     .entry((name, result.rule_id.as_str()))
                     .and_modify(|level: &mut SarifLevel| *level = (*level).max(result.level))
@@ -125,6 +126,7 @@ struct SarifDriver<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
+    default_configuration: SarifReportingConfiguration,
     full_description: SarifMessage<'a>,
     help: SarifMessage<'a>,
     help_uri: &'a str,
@@ -137,6 +139,10 @@ impl<'a> SarifRule<'a> {
     fn new(code: &'a str, level: SarifLevel, metadata: &'a RuleMetadata) -> Self {
         Self {
             id: code,
+            default_configuration: SarifReportingConfiguration {
+                enabled: metadata.enabled_by_default,
+                level: metadata.default_severity.map(SarifLevel::from),
+            },
             short_description: SarifMessage {
                 text: Cow::Borrowed(metadata.summary),
             },
@@ -161,6 +167,13 @@ impl<'a> SarifRule<'a> {
             },
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SarifReportingConfiguration {
+    enabled: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    level: Option<SarifLevel>,
 }
 
 #[derive(Debug)]
