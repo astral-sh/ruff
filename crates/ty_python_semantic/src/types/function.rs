@@ -69,7 +69,7 @@ use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
 use crate::types::generics::{
-    GenericContext, Specialization, typing_self, walk_specialization_types,
+    GenericContext, Specialization, enclosing_typevar_scope, typing_self, walk_specialization_types,
 };
 use crate::types::infer::{
     infer_complete_scope_types, infer_definition_types, nearest_enclosing_class,
@@ -562,6 +562,11 @@ impl<'db> OverloadLiteral<'db> {
             Type::Callable(callable) => {
                 Either::Left(callable.signatures(db).overloads.iter().cloned())
             }
+            // A function literal can include earlier overloads. Select this definition's
+            // signature while retaining the type mappings applied to its captured typevars.
+            Type::FunctionLiteral(function) => Either::Right(std::iter::once(
+                function.last_definition_signature(db).clone(),
+            )),
             _ => Either::Right(std::iter::once(self.signature(db))),
         }
     }
@@ -1793,17 +1798,33 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
-        else {
+        let class_definition = index.class_definition_of_method(scope.file_scope_id(db));
+        let infer_return = || {
+            let mut inferred = infer_complete_scope_types(db, scope).return_type();
+            if let Some(scope) = enclosing_typevar_scope(db, index, scope.file_scope_id(db)) {
+                for context in self
+                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
+                    .generic_context
+                    .into_iter()
+                    .chain(
+                        class_definition
+                            .and_then(|definition| original_class_type(db, definition))
+                            .and_then(|class| class.generic_context(db)),
+                    )
+                {
+                    inferred = inferred.abstract_typevars(db, &env, context, scope);
+                }
+            }
+            inferred
+        };
+        let Some(class_definition) = class_definition else {
             // For free functions, we simply use the type inferred from the function body.
-            return infer_complete_scope_types(db, scope)
-                .return_type()
-                .apply_type_mapping(
-                    db,
-                    &env,
-                    &TypeMapping::GeneralizeLocalTypes(scope),
-                    TypeContext::default(),
-                );
+            return infer_return().apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::GeneralizeLocalTypes(scope),
+                TypeContext::default(),
+            );
         };
         if self
             .literal(db)
@@ -1831,7 +1852,7 @@ impl<'db> FunctionType<'db> {
             return Type::unknown();
         }
 
-        let mut return_type = infer_complete_scope_types(db, scope).return_type();
+        let mut return_type = infer_return();
         if let Some(inherited) = self.inherited_return_annotation(db) {
             return_type = inherited;
         } else if !self.has_known_decorator(db, FunctionDecorators::FINAL)

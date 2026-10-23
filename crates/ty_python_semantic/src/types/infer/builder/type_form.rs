@@ -64,9 +64,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
+        let ty = self.infer_type_expression_no_store(expression);
         Some(TypeFormType::from_type_expression(
-            self.db(),
-            self.infer_type_expression_no_store(expression),
+            db,
+            self.resolve_lexical_type(ty),
         ))
     }
 
@@ -142,9 +143,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && arguments.keywords.is_empty()
             && !matches!(argument, ast::Expr::Starred(_))
         {
+            let containing_scope = self.scope().file_scope_id(self.db());
             return TypeFormType::from_type_expression(
                 self.db(),
-                self.infer_type_expression(argument),
+                self.infer_and_resolve_type_expression(argument, Some(containing_scope)),
             );
         }
 

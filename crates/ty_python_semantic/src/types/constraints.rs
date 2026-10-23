@@ -1059,7 +1059,6 @@ struct ConstraintSetStorage<'db> {
     /// difference binders of the same generic context. Those are tracked relative to the current
     /// constraint set solve being performed, so this is where we keep track of the next nonce
     /// value.
-    #[expect(unused, reason = "XXX")]
     next_typevar_scope_nonce: u16,
 
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
@@ -1268,7 +1267,6 @@ impl<'db> ConstraintSetBuilder<'db> {
         ConstraintSet::from_node(self, node, source_order)
     }
 
-    #[expect(dead_code, reason = "XXX")]
     pub(crate) fn inferable_scope(
         &self,
         db: &'db dyn Db,

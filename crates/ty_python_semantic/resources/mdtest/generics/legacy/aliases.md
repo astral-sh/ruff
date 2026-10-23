@@ -153,3 +153,41 @@ TrueLiteral = TypeAliasType("TrueLiteral", Literal[True])
 def f(x: Minus[Boolean, TrueLiteral]):
     reveal_type(x)  # revealed: Literal[False]
 ```
+
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+def outer(value: T) -> T:
+    Captured = TypeAliasType("Captured", T)
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # no diagnostic
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+U = TypeVar("U")
+
+def generic_outer(value: T) -> tuple[T, int]:
+    Pair = TypeAliasType("Pair", tuple[T, U], type_params=(U,))
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # no diagnostic
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # no diagnostic
+```

@@ -69,7 +69,9 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
 use crate::types::typed_dict::TypedDictOpenness;
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarKind, TypeVarNonceGenerator, TypeVarScope, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -894,6 +896,52 @@ impl<'db> Bindings<'db> {
         };
         self.apply_generic_context_in_place(db, generic_context);
         self
+    }
+
+    /// Resolves each call candidate in an inferable frame under the call site's lexical scope.
+    pub(crate) fn resolve_typevars(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        parent: Option<TypeVarScope<'db>>,
+    ) -> Self {
+        let constraints = ConstraintSetBuilder::new();
+        self.resolve_typevars_in_place(db, env, &constraints, parent);
+        self
+    }
+
+    fn resolve_typevars_in_place(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        parent: Option<TypeVarScope<'db>>,
+    ) {
+        for item in self.iter_callable_items_mut() {
+            for overload in &mut item.callable_mut().overloads {
+                let Some(context) = overload.signature.generic_context else {
+                    continue;
+                };
+                let scope = constraints.inferable_scope(db, context, parent);
+                overload.receiver_scope = Some(scope);
+                overload.signature = overload.signature.resolve_typevars(db, env, scope);
+                if let Some(context) = overload.constructor_context {
+                    overload.set_constructor_context(
+                        db,
+                        context.with_instance_type(
+                            context.instance_type().resolve_typevars(db, env, scope),
+                        ),
+                    );
+                }
+                overload.return_ty = overload.initial_return_type(db);
+            }
+            if let Some(downstream) = item
+                .as_constructor_mut()
+                .and_then(ConstructorBinding::downstream_constructor_mut)
+            {
+                downstream.resolve_typevars_in_place(db, env, constraints, parent);
+            }
+        }
     }
 
     pub(crate) fn with_enclosing_binding_contexts(
@@ -4340,6 +4388,8 @@ impl<'db> CallableBinding<'db> {
             .iter()
             .map(|&index| {
                 let overload = &self.overloads[index];
+                let arguments =
+                    arguments.resolve_receiver_typevars(db, env, overload.receiver_scope);
                 let slots = overload
                     .argument_matches
                     .iter()
@@ -8097,6 +8147,9 @@ pub(crate) struct Binding<'db> {
     /// Constructor metadata used to normalize the declared return type before type checking.
     constructor_context: Option<ConstructorContext<'db>>,
 
+    /// The call's scope for resolving the synthetic receiver alongside this signature.
+    receiver_scope: Option<TypeVarScope<'db>>,
+
     /// The inferable typevars in this signature.
     inferable_typevars: TypeVarSet<'db>,
 
@@ -8188,6 +8241,7 @@ impl<'db> Binding<'db> {
             signature_type,
             return_ty,
             constructor_context: None,
+            receiver_scope: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
             is_partial_application: false,
@@ -8691,6 +8745,8 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
+        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_scope);
+        let arguments = arguments.as_ref();
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
@@ -8726,6 +8782,9 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
+        let arguments = arguments.resolve_receiver_typevars(db, env, self.receiver_scope);
+        let arguments = arguments.as_ref();
+
         // Each overload is an independent inference problem. Two candidates can contain
         // typevars with the same identity but different specialized bounds, so sharing a
         // builder would make the second candidate reuse the first candidate's bounds.

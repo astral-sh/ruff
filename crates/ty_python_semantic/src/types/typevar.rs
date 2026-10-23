@@ -1488,9 +1488,12 @@ impl<'db> BoundTypeVarInstance<'db> {
                     self.identity(db)
                 };
                 if generic_context.contains(db, identity) {
-                    Type::TypeVar(self.freshen_with_mapping(
+                    Type::TypeVar(self.apply_type_mapping_to_bounds_and_default(
                         db,
-                        self.freshness(db).add(*delta),
+                        BoundTypeVarIdentity {
+                            freshness: self.freshness(db).add(*delta),
+                            ..self.identity(db)
+                        },
                         type_mapping,
                         visitor,
                     ))
@@ -1502,7 +1505,23 @@ impl<'db> BoundTypeVarInstance<'db> {
                     ))
                 }
             }
-            TypeMapping::ResolveTypeVars(scope) => Type::TypeVar(self.resolve(db, *scope)),
+            TypeMapping::ResolveTypeVars(scope) => {
+                visitor.visit(db, Type::TypeVar(self), type_mapping, || {
+                    let resolved = if scope.generic_context(db).contains(db, self.identity(db)) {
+                        self.resolve(db, *scope)
+                    } else {
+                        self
+                    };
+                    // Bounds and defaults can mention this frame's typevars even when the
+                    // typevar itself belongs to another frame or has already been resolved.
+                    Type::TypeVar(self.apply_type_mapping_to_bounds_and_default(
+                        db,
+                        resolved.identity(db),
+                        type_mapping,
+                        visitor,
+                    ))
+                })
+            }
             TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
@@ -1602,21 +1621,16 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
-    fn freshen_with_mapping(
+    fn apply_type_mapping_to_bounds_and_default(
         self,
         db: &'db dyn Db,
-        nonce: TypeVarNonce,
+        identity: BoundTypeVarIdentity<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let typevar = self.typevar(db);
         let bound_or_constraints = typevar.bound_or_constraints(db, visitor.env);
         let default = self.default_type(db);
-        let identity = BoundTypeVarIdentity {
-            freshness: nonce,
-            ..self.identity(db)
-        };
-
         if bound_or_constraints.is_none() && default.is_none() {
             return Self::new_internal(db, typevar, identity);
         }
@@ -1910,7 +1924,7 @@ pub struct TypeVarScope<'db> {
     #[returns(copy)]
     generic_context: GenericContext<'db>,
     #[returns(copy)]
-    parent: Option<TypeVarScope<'db>>,
+    pub(crate) parent: Option<TypeVarScope<'db>>,
 }
 
 // The Salsa heap is tracked separately.

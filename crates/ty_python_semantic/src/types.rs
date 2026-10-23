@@ -386,6 +386,16 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
 }
 
 /// Infer the type of a declaration, returning `Rejected` if it is not valid.
+///
+/// Use this to inspect the declared type of a variable or parameter. The type of its annotation
+/// expression is an input to declaration inference, and can differ from the declaration's type.
+/// For example, in `def f[T](value: T): ...`, the annotation expression retains an unresolved `T`
+/// for the generic signature, while the parameter declaration resolves `T` to the function body's
+/// non-inferable lexical occurrence. Read the declaration when comparing its type with a use of
+/// `value` in the body.
+///
+/// To inspect the value assigned by a definition, use [`binding_type`] instead; that type can be
+/// narrower than the declared type.
 pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -397,6 +407,9 @@ pub(crate) fn inferred_declaration<'db>(
 /// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
+///
+/// An annotation expression's type may contain unresolved typevars for a generic signature.
+/// Use [`inferred_declaration`] to read the declared type of the annotated variable or parameter.
 ///
 /// ## Panics
 /// If the expression is absent from the semantic index for the definition's file.
@@ -417,6 +430,8 @@ fn definition_expression_type<'db>(
 /// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
 /// but not the scope of nodes parsed from its contents: those nodes are absent from the semantic
 /// index. This helper lets the caller supply the enclosing annotation's scope for such nodes.
+/// It still returns the expression's type; use [`inferred_declaration`] for the declared type of
+/// an annotated variable or parameter.
 fn definition_expression_type_in_scope<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -9719,6 +9734,61 @@ impl<'db> Type<'db> {
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
     }
 
+    /// Resolves unresolved occurrences of the typevars bound by `scope`.
+    /// Already-resolved occurrences and typevars belonging to other contexts are unchanged.
+    pub(crate) fn resolve_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        scope: TypeVarScope<'db>,
+    ) -> Self {
+        self.apply_type_mapping(
+            db,
+            env,
+            &TypeMapping::ResolveTypeVars(scope),
+            TypeContext::default(),
+        )
+    }
+
+    /// Restores `context`'s occurrences in `scope` to unresolved typevars.
+    ///
+    /// This is used during return type inference in a generic function. If the return type that we
+    /// infer in the function's body mentions any of its typevars, those will be resolved to the
+    /// body's non-inferable occurrences of those typevars. They should be unresolved in the
+    /// function's signature.
+    ///
+    /// Inferred attributes likewise need unresolved class typevars so that accessing the member
+    /// on a specialized instance can substitute its type arguments. Captured typevars from an
+    /// enclosing function retain their resolved bindings.
+    pub(crate) fn abstract_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: GenericContext<'db>,
+        scope: TypeVarScope<'db>,
+    ) -> Self {
+        let resolved = GenericContext::from_typevar_instances(
+            db,
+            env,
+            context
+                .variables(db)
+                .map(|typevar| typevar.resolve(db, scope)),
+        );
+        self.apply_specialization(
+            db,
+            Specialization::new(
+                db,
+                resolved,
+                context
+                    .variables(db)
+                    .map(Type::TypeVar)
+                    .collect::<Box<[_]>>(),
+                None,
+                None,
+            ),
+        )
+    }
+
     fn apply_type_mapping<'a>(
         self,
         db: &'db dyn Db,
@@ -11524,7 +11594,7 @@ pub enum TypeMapping<'a, 'db> {
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
-    /// Resolves typevars against a particular scope
+    /// Resolves unresolved typevars bound by this scope's generic context.
     ResolveTypeVars(TypeVarScope<'db>),
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
@@ -11578,17 +11648,20 @@ impl<'db> TypeMapping<'_, 'db> {
     fn update_signature_generic_context(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         context: GenericContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<GenericContext<'db>> {
+        let env = visitor.env;
         match self {
-            TypeMapping::FreshenBoundTypeVars { .. } => {
+            TypeMapping::FreshenBoundTypeVars { .. } | TypeMapping::ResolveTypeVars(_) => {
+                // A default can refer back to this signature, so keep the enclosing
+                // traversal's recursion guard when mapping its generic context.
                 Some(GenericContext::from_typevar_instances(
                     db,
                     env,
                     context.variables(db).map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
-                            .apply_type_mapping(db, env, self, TypeContext::default())
+                            .apply_type_mapping_impl(db, self, TypeContext::default(), visitor)
                             .as_typevar()
                             .unwrap_or(bound_typevar)
                     }),
@@ -11633,7 +11706,6 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
-            | TypeMapping::ResolveTypeVars(_)
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {

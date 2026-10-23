@@ -65,7 +65,6 @@ pub(crate) fn enclosing_generic_contexts<'db>(
 /// Returns a [`TypeVarScope`] that can be used to resolve any typevars that appear lexically in
 /// the given scope. This is called when resolving typevars that appear in the body of a generic
 /// class or function, so all generic contexts in the scope are considered non-inferable.
-#[expect(dead_code, reason = "XXX")]
 pub(crate) fn enclosing_typevar_scope<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,

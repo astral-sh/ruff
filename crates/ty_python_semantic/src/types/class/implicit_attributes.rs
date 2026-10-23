@@ -10,6 +10,7 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
+        generics::{GenericContext, enclosing_typevar_scope},
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
         member::Member,
@@ -109,10 +110,28 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> ImplicitAttribute<'db> {
-        let ControlFlow::Continue(result) =
+        let ControlFlow::Continue(mut result) =
             Self::implicit_attribute_impl(db, attribute, |binding| {
                 ControlFlow::<Infallible, _>::Continue(implicit_attribute_binding_type(db, binding))
             });
+        // Inferred attribute types come from method bodies, where class typevars already
+        // have fixed lexical bindings. Publishing those occurrences would prevent instance
+        // specialization from replacing them, leaving `T` on a `Box[int]` instance.
+        // Captures from enclosing functions must remain fixed; only the class's own typevars
+        // belong to its member templates.
+        result.member = result.member.map_type(|ty| {
+            let class_scope = attribute.class_body_scope(db);
+            let index = semantic_index(db, class_scope.program_file(db));
+            if let Some(context) = GenericContext::of_node(db, class_scope.node(db), index)
+                && let Some(scope) =
+                    enclosing_typevar_scope(db, index, class_scope.file_scope_id(db))
+            {
+                let env = ProgramEnvironment::from_scope(class_scope);
+                ty.abstract_typevars(db, &env, context, scope)
+            } else {
+                ty
+            }
+        });
         result
     }
 

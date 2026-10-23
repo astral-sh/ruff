@@ -435,6 +435,7 @@ impl<'db> RecursiveType<'db> {
             | TypeMapping::ApplySpecializationWithMaterialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
+            | TypeMapping::ResolveTypeVars(_)
             | TypeMapping::BindSelf(_)
             | TypeMapping::ReplaceSelf { .. } => {
                 // These mappings substitute free variables, which are captured by the alias's

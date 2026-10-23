@@ -779,6 +779,50 @@ reveal_type(tail(*[1], *["two", b"three"]))  # revealed: tuple[Literal["two"], L
 reveal_type(tail(*[1]))  # revealed: tuple[()]
 ```
 
+### Fixed boundaries in starred variadic parameters
+
+A fixed trailing type in a starred parameter is excluded from the inferred pack, including when the
+arguments come from an unpacked tuple.
+
+```py
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def bounded(head: int, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+    raise NotImplementedError
+
+def check(suffix: tuple[bool, str]) -> None:
+    # revealed: tuple[bool]
+    reveal_type(bounded(1, *suffix))
+```
+
+### Starred variadic methods on specialized classes
+
+TODO: Specializing a class currently loses fixed suffix boundaries in its methods' starred
+parameters. Both unpacked tuples and direct arguments can then infer the wrong pack.
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class C(Generic[T]):
+    def f(self, marker: T, *rest: *tuple[*Ts, str]) -> tuple[*Ts]:
+        raise NotImplementedError
+
+def check(c: C[int], suffix: tuple[bool, str]) -> None:
+    # TODO: Should reveal `tuple[bool]`.
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, *suffix))
+
+    # TODO: Should reveal `tuple[bool, bool]` without an argument error.
+    # error: [invalid-argument-type]
+    # revealed: tuple[bool, str]
+    reveal_type(c.f(1, suffix[0], suffix[0], suffix[1]))
+```
+
 ### Union splatted arguments
 
 Unpacking a union of tuples with different lengths into a `TypeVarTuple` preserves the minimum
