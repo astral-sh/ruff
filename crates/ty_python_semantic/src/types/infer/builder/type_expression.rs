@@ -332,7 +332,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &self.context,
                     annotation,
                     self.inference_flags(),
-                    message_override,
+                    message_override.as_ref(),
                     |diagnostic| {
                         if let Some(causes) = causes {
                             Self::add_non_alias_diagnostics(diagnostic, causes);

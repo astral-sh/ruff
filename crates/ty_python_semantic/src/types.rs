@@ -11798,7 +11798,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
         context: &InferContext,
         node: &impl Ranged,
         flags: InferenceFlags,
-        message_override: Option<(String, String)>,
+        message_override: Option<&(String, String)>,
         annotate: impl Fn(&mut Diagnostic),
     ) -> Type<'db> {
         let db = context.db();
@@ -11811,7 +11811,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
                 continue;
             };
-            let builder = if let Some((message, info)) = &message_override {
+            let builder = if let Some((message, info)) = message_override {
                 builder.with_message_override(message.clone(), info)
             } else {
                 builder
