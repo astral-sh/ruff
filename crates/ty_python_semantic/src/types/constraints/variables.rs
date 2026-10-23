@@ -458,15 +458,36 @@ impl<'db> AtomicConstraint<'db> {
         self
     }
 
-    pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
+    /// Detect self-relations that hold for every specialization, such as `T & X ≤ T` or
+    /// `T ≤ T | X`. Propagation can introduce these even though the constraint constructors
+    /// discard them. Retaining them as inference evidence can produce a self-referential solution.
+    pub(super) fn is_trivial_self_relation(self, db: &'db dyn Db) -> bool {
+        let is_same_typevar = |typevar: BoundTypeVarInstance<'db>, bound: Type<'db>| {
+            bound
+                .as_typevar()
+                .is_some_and(|bound| typevar.is_same_typevar_as(db, bound))
+        };
         match self {
             AtomicConstraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
             AtomicConstraint::TypeVarEquivalence(this) => {
                 this.left.is_same_typevar_as(db, this.right)
             }
-            AtomicConstraint::ConcreteLower(_)
-            | AtomicConstraint::ConcreteUpper(_)
-            | AtomicConstraint::ConcreteEquivalence(_) => false,
+            AtomicConstraint::ConcreteLower(this) => match this.bound {
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|element| is_same_typevar(this.typevar, element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteUpper(this) => match this.bound {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| is_same_typevar(this.typevar, *element)),
+                bound => is_same_typevar(this.typevar, bound),
+            },
+            AtomicConstraint::ConcreteEquivalence(this) => {
+                is_same_typevar(this.typevar, this.bound)
+            }
         }
     }
 

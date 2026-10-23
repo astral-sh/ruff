@@ -1145,7 +1145,7 @@ impl PathAssignments {
         fuel_cost: u16,
     ) {
         let constraint = storage.atomic_constraint_data(post);
-        if constraint.is_reflexive_typevar_relation(db) {
+        if constraint.is_trivial_self_relation(db) {
             return;
         }
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
@@ -1175,7 +1175,7 @@ impl PathAssignments {
         fuel_cost: u16,
     ) {
         let constraint = storage.atomic_constraint_data(post);
-        if constraint.is_reflexive_typevar_relation(db) {
+        if constraint.is_trivial_self_relation(db) {
             return;
         }
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
