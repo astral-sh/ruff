@@ -1339,7 +1339,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -1372,9 +1372,9 @@ reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 
 ### `_replace` methods from different classes
 
-The `_replace` methods of different named tuples retain different return types even when their
-fields match. A union of these methods cannot promise to return only one of the classes, regardless
-of branch order:
+The `_replace` methods of different named tuples have distinct `Self` bounds even when their fields
+match. A union of these methods should not promise to return only one of the classes, regardless of
+branch order:
 
 ```py
 from typing import Callable, NamedTuple
@@ -1386,12 +1386,12 @@ class B(NamedTuple):
     x: int
 
 def choose(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
-    return A._replace if flag else B._replace
+    # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
+    return A._replace if flag else B._replace  # no diagnostic
 
 def reversed_order(flag: bool) -> Callable[..., A]:
-    # error: [invalid-return-type]
-    return B._replace if flag else A._replace
+    # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
+    return B._replace if flag else A._replace  # no diagnostic
 
 def either_class(flag: bool) -> Callable[..., A | B]:
     return A._replace if flag else B._replace  # no diagnostic
@@ -1404,8 +1404,33 @@ DynamicA = NamedTuple("DynamicA", [("x", int)])
 DynamicB = NamedTuple("DynamicB", [("x", int)])
 
 def choose_dynamic(flag: bool) -> Callable[..., DynamicA]:
-    # error: [invalid-return-type]
-    return DynamicA._replace if flag else DynamicB._replace
+    # TODO: Report [invalid-return-type] (https://github.com/astral-sh/ty/issues/3114).
+    return DynamicA._replace if flag else DynamicB._replace  # no diagnostic
+```
+
+### Fields annotated with `Self`
+
+The generated constructor and replacement methods use the same inferable `Self` for their receiver
+and field annotations.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import NamedTuple, Self
+
+class Node(NamedTuple):
+    parent: Self | None = None
+
+class Child(Node): ...
+
+reveal_type(Node(Node()))  # revealed: Node
+reveal_type(Child(Child()))  # revealed: Child
+reveal_type(Child()._replace(parent=Child()))  # revealed: Child
+reveal_type(Child().__replace__(parent=Child()))  # revealed: Child
+Child()._replace(parent=1)  # error: [invalid-argument-type]
 ```
 
 ## `collections.namedtuple`
@@ -1495,7 +1520,7 @@ reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: (self: Self, *, name: Any = ..., age: Any = ...) -> Self
+reveal_type(Person._replace)  # revealed: [Self](self: Self, *, name: Any = ..., age: Any = ...) -> Self
 
 # _make creates instances from an iterable.
 reveal_type(Person._make(["Alice", 30]))  # revealed: Person
@@ -1574,7 +1599,7 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
+reveal_type(Point._replace)  # revealed: [Self](self: Self, *, x: int = ..., y: int = ...) -> Self
 
 # Point is assignable to NamedTuple.
 static_assert(is_assignable_to(Point, NamedTuple))
