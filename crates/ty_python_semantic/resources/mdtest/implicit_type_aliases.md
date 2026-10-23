@@ -2327,7 +2327,7 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
   |                 ^^^^^^
-info: Invalid binary operator `+` in type annotation
+info: Invalid binary operator `+` in a type alias definition
  --> src/mdtest_snippet.py:1:10
   |
 1 | Number = 1 + 2
@@ -2351,7 +2351,7 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
    |
 14 | def inspect(called: Called):
    |                     ^^^^^^
-info: Function calls are not allowed in type alias values
+info: Function calls are not allowed in type alias definitions
   --> src/mdtest_snippet.py:11:10
    |
 11 | Called = type(1)
@@ -2470,7 +2470,7 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
   |
 4 | def inspect_forwarded(forwarded: ForwardedClass):
   |                                  ^^^^^^^^^^^^^^
-info: Function calls are not allowed in type alias values
+info: Function calls are not allowed in type alias definitions
  --> dependencies/values.py:3:17
   |
 3 | ComputedClass = (lambda: int)()
@@ -2539,7 +2539,7 @@ error[invalid-type-form]: Variable is not allowed in parameter annotations
   |
 5 | def inspect(value: Number): ...
   |                    ^^^^^^
-info: Invalid binary operator `+` in type annotation
+info: Invalid binary operator `+` in a type alias definition
  --> src/mdtest_snippet.py:2:10
   |
 2 | Number = 1 + 2  # ty: ignore[invalid-type-form]

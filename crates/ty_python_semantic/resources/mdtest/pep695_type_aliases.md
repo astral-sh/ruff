@@ -135,23 +135,23 @@ appear at the top level of a PEP 695 alias definition:
 from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
 from dataclasses import InitVar
 
-# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias definitions"
 type Bad1 = ClassVar[str]
-# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias definitions"
 type Bad2 = ClassVar
-# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias definitions"
 type Bad3 = Final[int]
-# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias definitions"
 type Bad4 = Final
-# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type alias definitions"
 type Bad5 = Required[int]
-# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type alias definitions"
 type Bad6 = NotRequired[int]
-# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type alias definitions"
 type Bad7 = ReadOnly[int]
-# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias definitions"
 type Bad8 = InitVar[int]
-# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias definitions"
 type Bad9 = InitVar
 ```
 

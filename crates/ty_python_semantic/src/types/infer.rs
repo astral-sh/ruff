@@ -2538,7 +2538,7 @@ impl InferenceFlags {
         } else if self.contains(InferenceFlags::IN_PARAMETER_ANNOTATION) {
             "parameter annotation"
         } else if self.contains(InferenceFlags::IN_TYPE_ALIAS) {
-            "type alias value"
+            "type alias definition"
         } else {
             "type expression"
         }

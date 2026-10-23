@@ -1081,7 +1081,7 @@ differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-f
 ```
 
 ```snapshot
-error[invalid-type-form]: `Unpack` is not allowed in type alias values
+error[invalid-type-form]: `Unpack` is not allowed in type alias definitions
   --> src/mdtest_snippet.py:14:30
    |
 14 | differently_bad: TypeAlias = Unpack[tuple[int, ...]]  # snapshot: invalid-type-form
