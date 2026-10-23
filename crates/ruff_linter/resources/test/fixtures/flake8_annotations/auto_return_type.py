@@ -325,3 +325,39 @@ class Class:
 # Test case: function that raises other exceptions should still get NoReturn
 def func():
     raise ValueError
+
+
+# Test cases for context managers that swallow exceptions: the function returns `None`, even
+# though every statement in the `with` body raises
+def func():
+    import pytest
+
+    with pytest.raises(ValueError):
+        raise ValueError
+
+
+def func():
+    import contextlib
+
+    with contextlib.suppress(ValueError):
+        raise ValueError
+
+
+class Class:
+    def method(self):
+        with self.assertRaises(ValueError):
+            raise ValueError
+
+
+# The `return` is also conditional, since the exception can be swallowed before it runs
+def func():
+    import contextlib
+
+    with contextlib.suppress(ValueError):
+        return 1
+
+
+# Test case: a context manager that isn't known to swallow exceptions still gets NoReturn
+def func():
+    with open("file") as f:
+        raise ValueError(f)
