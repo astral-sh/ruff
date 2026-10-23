@@ -554,6 +554,25 @@ alias_func()  # error: [deprecated] "Use other_func instead"
 AliasClass()  # error: [deprecated] "Use OtherType instead"
 ```
 
+## Conditional definitions shadowing builtins
+
+A reference to a conditionally defined deprecated function still warns when another path falls back
+to a builtin of the same name.
+
+```py
+from typing_extensions import deprecated
+
+def flag() -> bool:
+    return True
+
+if flag():
+    @deprecated("old len")
+    def len() -> int:
+        return 0
+
+ref = len  # error: [deprecated] "old len"
+```
+
 ## Names in annotations
 
 Each reference to a deprecated class produces one warning, including references through aliases and
