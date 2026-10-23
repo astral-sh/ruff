@@ -138,7 +138,7 @@ where
     diagnostic
 }
 
-impl FileResolver for EmitterContext<'_> {
+impl FileResolver for RenderContext<'_> {
     fn path(&self, _file: File) -> &str {
         unimplemented!("Expected a Ruff file for rendering a Ruff diagnostic");
     }
@@ -201,11 +201,11 @@ fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
 }
 
 /// Context used while rendering diagnostics.
-pub struct EmitterContext<'a> {
+pub struct RenderContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
 }
 
-impl<'a> EmitterContext<'a> {
+impl<'a> RenderContext<'a> {
     pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
         Self { notebook_indexes }
     }
@@ -215,7 +215,7 @@ pub fn render_diagnostics(
     writer: &mut dyn Write,
     format: OutputFormat,
     config: &DisplayDiagnosticConfig,
-    context: &EmitterContext<'_>,
+    context: &RenderContext<'_>,
     diagnostics: &[Diagnostic],
 ) -> std::io::Result<()> {
     match format {

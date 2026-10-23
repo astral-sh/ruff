@@ -226,7 +226,7 @@ mod test {
 
     use ruff_db::diagnostic::DisplayDiagnosticConfig;
     use ruff_db::diagnostic::render::{ConciseRenderer, Renderer};
-    use ruff_linter::message::EmitterContext;
+    use ruff_linter::message::RenderContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
@@ -281,7 +281,7 @@ mod test {
         .unwrap();
 
         let config = DisplayDiagnosticConfig::new("ruff").hide_severity(true);
-        let messages = ConciseRenderer::new(&EmitterContext::new(&FxHashMap::default()), &config)
+        let messages = ConciseRenderer::new(&RenderContext::new(&FxHashMap::default()), &config)
             .display(&diagnostics.inner)
             .to_string();
 

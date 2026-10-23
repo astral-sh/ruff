@@ -14,7 +14,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
-use ruff_linter::message::{EmitterContext, render_diagnostics};
+use ruff_linter::message::{RenderContext, render_diagnostics};
 use ruff_linter::notify_user;
 use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::flags::{self};
@@ -239,7 +239,7 @@ impl Printer {
             return Ok(());
         }
 
-        let context = EmitterContext::new(&diagnostics.notebook_indexes);
+        let context = RenderContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         let config = DisplayDiagnosticConfig::new("ruff")
@@ -427,7 +427,7 @@ impl Printer {
                 writeln!(writer)?;
             }
 
-            let context = EmitterContext::new(&diagnostics.notebook_indexes);
+            let context = RenderContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview.is_enabled())
                 .prefer_rule_codes(prefer_rule_codes)

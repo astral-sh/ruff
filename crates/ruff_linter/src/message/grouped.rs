@@ -223,13 +223,13 @@ mod tests {
     use ruff_diagnostics::Applicability;
 
     use crate::message::tests::{create_diagnostics, create_syntax_error_diagnostics};
-    use crate::message::{EmitterContext, GroupedRenderer};
+    use crate::message::{GroupedRenderer, RenderContext};
 
     #[test]
     fn default() {
         assert_snapshot!(
             GroupedRenderer::new(
-                &EmitterContext::new(&FxHashMap::default()),
+                &RenderContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff"),
             )
             .display(&create_diagnostics())
@@ -240,7 +240,7 @@ mod tests {
     fn syntax_errors() {
         assert_snapshot!(
             GroupedRenderer::new(
-                &EmitterContext::new(&FxHashMap::default()),
+                &RenderContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff"),
             )
             .display(&create_syntax_error_diagnostics())
@@ -251,7 +251,7 @@ mod tests {
     fn fix_status() {
         assert_snapshot!(
             GroupedRenderer::new(
-                &EmitterContext::new(&FxHashMap::default()),
+                &RenderContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff").with_show_fix_status(true),
             )
             .display(&create_diagnostics())
@@ -262,7 +262,7 @@ mod tests {
     fn fix_status_unsafe() {
         assert_snapshot!(
             GroupedRenderer::new(
-                &EmitterContext::new(&FxHashMap::default()),
+                &RenderContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff")
                     .with_show_fix_status(true)
                     .with_fix_applicability(Applicability::Unsafe),
