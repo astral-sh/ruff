@@ -832,6 +832,37 @@ def j(x: Container1.Item, y: Container2.Item) -> None:
     a: Container1.Item = y
 ```
 
+## Capturing an enclosing type parameter
+
+An alias defined inside a generic function refers to that function's type parameter.
+
+```py
+def outer[T](value: T) -> T:
+    type Captured = T
+
+    def identity(other: Captured) -> Captured:
+        return other
+
+    return identity(value)  # no diagnostic
+```
+
+The alias can also have its own parameters. Specializing them preserves the captured parameter.
+
+```py
+def generic_outer[T](value: T) -> tuple[T, int]:
+    type Pair[U] = tuple[T, U]
+
+    def integers(other: Pair[int]) -> Pair[int]:
+        return other
+
+    def strings(other: Pair[str]) -> Pair[str]:
+        return other
+
+    strings((value, "text"))  # no diagnostic
+    integers((value, "text"))  # error: [invalid-argument-type]
+    return integers((value, 1))  # no diagnostic
+```
+
 ## Default type parameter after `TypeVarTuple`
 
 A `TypeVar` with a default cannot follow a `TypeVarTuple` in a type alias. Its default would make it
