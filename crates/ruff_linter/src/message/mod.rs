@@ -18,7 +18,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::files::File;
 
-pub(crate) use grouped::GroupedEmitter;
+pub(crate) use grouped::GroupedRenderer;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
@@ -231,7 +231,7 @@ pub fn render_diagnostics(
         OutputFormat::Pylint => PylintRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Rdjson => RdjsonRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Azure => AzureRenderer::new(context, config).write(writer, diagnostics),
-        OutputFormat::Grouped => GroupedEmitter::new(context, config).write(writer, diagnostics),
+        OutputFormat::Grouped => GroupedRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
             .write(writer, diagnostics),
     }

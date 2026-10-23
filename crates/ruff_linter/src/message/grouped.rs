@@ -12,18 +12,18 @@ use ruff_source_file::{LineColumn, OneIndexed};
 
 use crate::fs::relativize_path;
 
-pub(crate) struct GroupedEmitter<'a> {
+pub(crate) struct GroupedRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
-impl<'a> GroupedEmitter<'a> {
+impl<'a> GroupedRenderer<'a> {
     pub(crate) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl Renderer for GroupedEmitter<'_> {
+impl Renderer for GroupedRenderer<'_> {
     fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for (filename, messages) in group_diagnostics_by_filename(diagnostics) {
             // Compute the maximum number of digits in the row and column, for messages in
@@ -223,12 +223,12 @@ mod tests {
     use ruff_diagnostics::Applicability;
 
     use crate::message::tests::{create_diagnostics, create_syntax_error_diagnostics};
-    use crate::message::{EmitterContext, GroupedEmitter};
+    use crate::message::{EmitterContext, GroupedRenderer};
 
     #[test]
     fn default() {
         assert_snapshot!(
-            GroupedEmitter::new(
+            GroupedRenderer::new(
                 &EmitterContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff"),
             )
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn syntax_errors() {
         assert_snapshot!(
-            GroupedEmitter::new(
+            GroupedRenderer::new(
                 &EmitterContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff"),
             )
@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn fix_status() {
         assert_snapshot!(
-            GroupedEmitter::new(
+            GroupedRenderer::new(
                 &EmitterContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff").with_show_fix_status(true),
             )
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn fix_status_unsafe() {
         assert_snapshot!(
-            GroupedEmitter::new(
+            GroupedRenderer::new(
                 &EmitterContext::new(&FxHashMap::default()),
                 &DisplayDiagnosticConfig::new("ruff")
                     .with_show_fix_status(true)
