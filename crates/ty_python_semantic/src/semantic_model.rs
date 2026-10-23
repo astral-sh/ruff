@@ -16,7 +16,7 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
-use crate::place::definitions::DefinitionResolution;
+use crate::place::definitions::{DefinitionResolution, reaching_definitions};
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
     builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
@@ -461,6 +461,30 @@ impl<'db> SemanticModel<'db> {
         self.scope(node)
             .into_iter()
             .flat_map(move |scope| index.ancestor_scopes(scope))
+    }
+
+    /// Returns the definitions that may reach a name load.
+    ///
+    /// Returns `None` when the name is not an indexed use or its scope is unavailable.
+    pub fn reaching_definitions(&self, name: &ast::ExprName) -> Option<DefinitionResolution<'db>> {
+        let scope = self.scope(name.into())?.to_scope_id(self.db, self.file);
+        let index = semantic_index(self.db, self.file);
+        let expression = ast::ExprRef::Name(name);
+
+        if self.in_string_annotation_expr.is_none() {
+            index.try_expression_use_id(expression)?;
+        }
+
+        let mode = if self.in_string_annotation_expr.is_some() {
+            PlaceLoadMode::StringAnnotation
+        } else if infer_complete_scope_types(self.db, scope)
+            .is_deferred_place_load(expression.into())
+        {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(expression)
+        };
+        Some(reaching_definitions(self.db, index, scope, name, mode))
     }
 
     /// Returns the first local definition created by `covering_node`, if any.

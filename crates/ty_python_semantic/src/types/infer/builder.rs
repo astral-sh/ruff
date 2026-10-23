@@ -38,11 +38,12 @@ use crate::place::{
     DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
     loop_header_reachability, module_type_implicit_global_declaration,
     module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
-    place_from_declarations_with_reachability_cache, typing_extensions_symbol,
+    place_from_declarations_with_reachability_cache,
 };
 use crate::place_load::{
     PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
     PlaceLoadResolutionStep, PlaceLoadSource, evaluate_place_load_source, resolve_place_load,
+    unimported_reveal_type_fallback,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -10869,7 +10870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_undefined_reveal(&self.context, name);
         }
 
-        typing_extensions_symbol(self.db(), self.program_environment(), "reveal_type")
+        unimported_reveal_type_fallback(self.db(), self.program_environment(), expr_ref)
     }
 
     /// Returns whether any tracked place-expression prefix has a definite or possible binding in

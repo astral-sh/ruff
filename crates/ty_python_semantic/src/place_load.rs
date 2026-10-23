@@ -99,7 +99,7 @@ use crate::place::{
     ConsideredDefinitions, Definedness, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     builtins_module_scope, class_body_implicit_symbol, explicit_global_symbol,
     implicit_builtins_symbol, module_type_implicit_global_symbol, place_by_id, place_from_bindings,
-    place_from_bindings_with_reachability_cache,
+    place_from_bindings_with_reachability_cache, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityEvaluationCache;
 use crate::types::{ProgramEnvironment, original_class_type};
@@ -184,6 +184,22 @@ pub(crate) fn evaluate_place_load_source<'db>(
                 }
             }
         },
+    }
+}
+
+/// Returns the implicit type-checking fallback for an unimported `reveal_type`.
+pub(crate) fn unimported_reveal_type_fallback<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: ast::ExprRef<'_>,
+) -> PlaceAndQualifiers<'db> {
+    if expression
+        .as_name_expr()
+        .is_some_and(|name| name.id == "reveal_type")
+    {
+        typing_extensions_symbol(db, env, "reveal_type")
+    } else {
+        Place::Undefined.into()
     }
 }
 
@@ -491,6 +507,9 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
             let forwards_to_global = is_lexical_enclosing_scope
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
+            let forwards_to_nonlocal = is_lexical_enclosing_scope
+                && enclosing_place
+                    .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_nonlocal));
             let root_place_was_reassigned = || {
                 enclosing_place_table
                     .parents(place_expr)
@@ -526,6 +545,9 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                                 None,
                             );
                         }
+
+                        // A snapshot can also contain a binding declared `nonlocal`.
+                        self.crosses_scope_declaration |= forwards_to_nonlocal;
 
                         return (
                             Self::node_after_enclosing_scope(enclosing_scope.kind()),
@@ -574,7 +596,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                 return (PlaceLoadResolutionNode::ImplicitClassBodySource(None), None);
             }
             // Keep walking across `nonlocal` declarations until reaching the owning scope.
-            if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+            if forwards_to_nonlocal {
                 self.crosses_scope_declaration = true;
                 continue;
             }
@@ -657,6 +679,11 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         } else {
             PlaceLoadResolutionNode::Failure(PlaceLoadFailure::UnboundFree)
         }
+    }
+
+    /// Returns whether the lookup has followed a `global` or `nonlocal` declaration.
+    pub(crate) fn crosses_scope_declaration(&self) -> bool {
+        self.crosses_scope_declaration
     }
 
     pub(crate) fn narrowing_constraints_for(

@@ -1104,7 +1104,6 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
-    #[expect(dead_code, reason = "used by the reaching-definition lookup")]
     pub(crate) fn is_deferred_place_load(&self, expression: ExpressionNodeKey) -> bool {
         self.extra
             .as_deref()

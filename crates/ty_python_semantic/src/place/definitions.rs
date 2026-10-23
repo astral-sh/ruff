@@ -1,16 +1,70 @@
+use ruff_python_ast::{self as ast, ExprRef};
 use smallvec::SmallVec;
+use ty_python_core::SemanticIndex;
 use ty_python_core::definition::{Definition, DefinitionState};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{BindingWithConstraintsIterator, global_scope, place_table, use_def_map};
 
 use crate::Db;
 use crate::place::{
-    Place, builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol,
-    module_type_implicit_global_symbol,
+    Place, PlaceAndQualifiers, builtins_module_scope, class_body_implicit_symbol,
+    implicit_builtins_symbol, module_type_implicit_global_symbol,
 };
-use crate::place_load::{ImplicitPlaceLoad, PlaceLoadSource, PlaceLoadSourceKind};
+use crate::place_load::{
+    ImplicitPlaceLoad, PlaceLoadFailure, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSource,
+    PlaceLoadSourceKind, evaluate_place_load_source, resolve_place_load,
+    unimported_reveal_type_fallback,
+};
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::ProgramEnvironment;
+
+/// Resolves a name using the same ordered sources as type inference.
+pub(crate) fn reaching_definitions<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    scope: ScopeId<'db>,
+    name: &ast::ExprName,
+    mode: PlaceLoadMode<'_>,
+) -> DefinitionResolution<'db> {
+    let env = ProgramEnvironment::from_scope(scope);
+    let mut load = resolve_place_load(db, index, scope, PlaceExpr::from_expr_name(name), mode);
+    let mut resolution = DefinitionResolution::new();
+    let mut place = PlaceAndQualifiers::from(Place::Undefined);
+    let mut failure = None;
+
+    for step in load.by_ref() {
+        match step {
+            PlaceLoadResolutionStep::Source(source) => {
+                resolution.add_source(db, &env, scope, &source);
+                place = place.or_fall_back_to(db, &env, || {
+                    evaluate_place_load_source(db, &env, scope, source, None)
+                });
+                if place.place.is_definitely_bound() {
+                    break;
+                }
+            }
+            PlaceLoadResolutionStep::MemberResolutionCondition(_) => break,
+            PlaceLoadResolutionStep::Exhausted(exhaustion_failure) => {
+                failure = Some(exhaustion_failure);
+                break;
+            }
+        }
+    }
+
+    resolution.crosses_scope_declaration = load.crosses_scope_declaration();
+
+    // A possibly unbound `reveal_type` can fall back to ty's implicit helper. There is no
+    // explicit source binding for that fallback, so it makes the resolution incomplete.
+    if failure == Some(PlaceLoadFailure::NotFound)
+        && !place.place.is_definitely_bound()
+        && !unimported_reveal_type_fallback(db, &env, ExprRef::Name(name)).is_undefined()
+    {
+        resolution.is_complete = false;
+    }
+
+    resolution
+}
 
 /// The definitions that may bind a name and information about the resolution.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -18,14 +72,14 @@ pub struct DefinitionResolution<'db> {
     /// Definitions that may bind the name.
     definitions: SmallVec<[Definition<'db>; 2]>,
     /// Whether lookup crosses a `global` or `nonlocal` declaration.
-    pub(crate) crosses_scope_declaration: bool,
+    crosses_scope_declaration: bool,
     /// Whether the definitions include a source definition for every possible binding.
-    pub(crate) is_complete: bool,
+    is_complete: bool,
 }
 
 #[allow(dead_code, reason = "awaiting IDE integration")]
 impl<'db> DefinitionResolution<'db> {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         Self {
             definitions: SmallVec::new(),
             crosses_scope_declaration: false,
@@ -124,7 +178,7 @@ impl<'db> DefinitionResolution<'db> {
         }
     }
 
-    pub(crate) fn add_source(
+    fn add_source(
         &mut self,
         db: &'db dyn Db,
         environment: &ProgramEnvironment<'db>,
