@@ -1913,6 +1913,23 @@ info: Type variable defined here
   |       ^^^^^^
 ```
 
+## Widening a lower bound to a hashable type
+
+The first tuple element can contribute `object` as a lower bound for `T`. Its union with the second
+element's `list[Any]` is `object`, which satisfies the `Hashable` bound.
+
+```py
+from collections.abc import Callable, Hashable
+from typing import Any
+
+def consume[T: Hashable](callback: Callable[[], tuple[tuple[T] | T, T]]) -> T:
+    return callback()[1]
+
+def check(callback: Callable[[], tuple[tuple[object], list[Any]]]) -> None:
+    # TODO: Reject this call because the callback's second tuple element, `list[Any]`, is unhashable.
+    reveal_type(consume(callback))  # revealed: object
+```
+
 ## Inferring a bound from a caller's type variable
 
 An argument whose type is fixed by an enclosing function must satisfy the callee's bound for every
@@ -2501,6 +2518,52 @@ def _(x: int, y: str, a: list[int], b: list[str]) -> None:
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
     reveal_type(g(x, y, a, b))  # revealed: int | str
+```
+
+## Diagnostic recovery preserves gradual evidence
+
+The middle tuple element can match either `U` or `tuple[U]`. In both cases the last element
+contributes an incompatible `int` for `T`. The diagnostic also includes the `Any` inferred from the
+first element's `list[Any]`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def consume[T: list[Any], U](producer: Callable[[], tuple[list[T], U | tuple[U], T]]) -> None: ...
+def check(callback: Callable[[], tuple[list[Any], tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `Any | int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery reports the shared lower bound
+
+Matching the first element against `T | tuple[T]` contributes either `tuple[str]` or `str`. The
+diagnostic reports the `int` from the second element, which violates the bound in both cases.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def consume[T: list[Any]](callback: Callable[[], tuple[T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery preserves independent type-variable evidence
+
+Both choices for the middle element violate `T`'s bound once the last `int` is included. The
+diagnostic identifies the violation in the first tuple element, where `U` is inferred as `bytes`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def consume[T: list[Any], U: list[Any]](producer: Callable[[], tuple[U, T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[bytes, tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `bytes` does not satisfy upper bound `list[Any]` of type variable `U`"
+    consume(callback)
 ```
 
 ## Diagnostic recovery with outer typevars
