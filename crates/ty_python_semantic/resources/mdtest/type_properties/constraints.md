@@ -1829,6 +1829,28 @@ def legacy_bounded_upper_bound(source: BoundedS, target: T) -> None:
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
+### Valid alternatives after a declared-bound violation
+
+With `T` bounded by `list[Any]`, the `list[int]` alternative still yields a solution when the `int`
+and `str` alternatives fail.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def valid_alternative[T: list[Any]]() -> None:
+    valid = ConstraintSet.lower_bound(list[int], T)
+    invalid = ConstraintSet.lower_bound(int, T) | ConstraintSet.lower_bound(str, T)
+    reveal_type((valid | invalid).solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=list[int]]]
+
+T = TypeVar("T", bound=list[Any])
+
+def legacy_valid_alternative(target: T) -> None:
+    valid = ConstraintSet.lower_bound(list[int], T)
+    invalid = ConstraintSet.lower_bound(int, T) | ConstraintSet.lower_bound(str, T)
+    reveal_type((valid | invalid).solutions(inferable=tuple[T]))  # revealed: tuple[Solution[T=list[int]]]
+```
+
 ### Joint inference
 
 When both variables are inferable, the solver can specialize them together.
@@ -1847,6 +1869,68 @@ T = TypeVar("T", bound=str)
 def legacy_joint(source: S, target: T) -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
     reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
+```
+
+### Joint inference through nested lower bounds
+
+The lower bound `tuple[U]` satisfies `T`'s declared bound `tuple[int | str]` when `U` is `int` or
+`str`. Rejecting `U = bytes` preserves both valid pairs of bindings.
+
+```py
+from typing import TypeVar
+from ty_extensions._internal import ConstraintSet
+
+def symbolic_lower[T: tuple[int | str], U]() -> None:
+    choices = ConstraintSet.equality(U, str) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+    constraints = choices & ConstraintSet.lower_bound(tuple[U], T)
+    # revealed: tuple[Solution[U=str, T=tuple[str]], Solution[U=int, T=tuple[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+
+T = TypeVar("T", bound=tuple[int | str])
+U = TypeVar("U")
+
+def legacy_symbolic_lower(source: U, target: T) -> None:
+    choices = ConstraintSet.equality(U, str) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+    constraints = choices & ConstraintSet.lower_bound(tuple[U], T)
+    # revealed: tuple[Solution[U=str, T=tuple[str]], Solution[U=int, T=tuple[int]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Joint inference through `Self` bounds
+
+The bound of `Self` is the enclosing class, including its type arguments. For the covariant
+`Box[U]`, the lower bound `Box[int]` satisfies that declaration when `U` is `int` or `object`, but
+not when `U` is `bytes`. Checking the bound before specializing `U` would lose valid solutions.
+
+```py
+from typing import Generic, Self, TypeVar
+from ty_extensions._internal import ConstraintSet
+
+class Box[U]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+    def check(self) -> None:
+        choices = ConstraintSet.equality(U, object) | ConstraintSet.equality(U, int) | ConstraintSet.equality(U, bytes)
+        constraints = choices & ConstraintSet.lower_bound(Box[int], Self)
+        # revealed: tuple[Solution[U=object, Self=Box[int]], Solution[U=int, Self=Box[int]]]
+        reveal_type(constraints.solutions(inferable=tuple[Self, U]))
+```
+
+The legacy class declares `U_co` covariant.
+
+```py
+U_co = TypeVar("U_co", covariant=True)
+
+class LegacyBox(Generic[U_co]):
+    def get(self) -> U_co:
+        raise NotImplementedError
+
+    def check(self) -> None:
+        choices = ConstraintSet.equality(U_co, object) | ConstraintSet.equality(U_co, int) | ConstraintSet.equality(U_co, bytes)
+        constraints = choices & ConstraintSet.lower_bound(LegacyBox[int], Self)
+        # revealed: tuple[Solution[U_co=object, Self=LegacyBox[int]], Solution[U_co=int, Self=LegacyBox[int]]]
+        reveal_type(constraints.solutions(inferable=tuple[Self, U_co]))
 ```
 
 ## Existential quantification

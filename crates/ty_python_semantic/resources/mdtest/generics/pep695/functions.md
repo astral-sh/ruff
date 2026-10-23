@@ -2503,6 +2503,37 @@ def _(x: int, y: str, a: list[int], b: list[str]) -> None:
     reveal_type(g(x, y, a, b))  # revealed: int | str
 ```
 
+## Diagnostic recovery preserves gradual evidence
+
+The middle tuple element can match either `U` or `tuple[U]`. In both cases the last element
+contributes an incompatible `int` for `T`. The diagnostic also includes the `Any` inferred from the
+first element's `list[Any]`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def consume[T: list[Any], U](producer: Callable[[], tuple[list[T], U | tuple[U], T]]) -> None: ...
+def check(callback: Callable[[], tuple[list[Any], tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `Any | int` does not satisfy upper bound `list[Any]` of type variable `T`"
+    consume(callback)
+```
+
+## Diagnostic recovery preserves independent type-variable evidence
+
+Both choices for the middle element violate `T`'s bound once the last `int` is included. The
+diagnostic identifies the violation in the first tuple element, where `U` is inferred as `bytes`.
+
+```py
+from collections.abc import Callable
+from typing import Any
+
+def consume[T: list[Any], U: list[Any]](producer: Callable[[], tuple[U, T | tuple[T], T]]) -> None: ...
+def check(callback: Callable[[], tuple[bytes, tuple[str], int]]) -> None:
+    # error: [invalid-argument-type] "Argument type `bytes` does not satisfy upper bound `list[Any]` of type variable `U`"
+    consume(callback)
+```
+
 ## Diagnostic recovery with outer typevars
 
 If a failed argument relation involves an outer bounded type variable, we report the incompatible
