@@ -1599,7 +1599,6 @@ impl TestServerBuilder {
     }
 
     /// Set custom client capabilities (overrides any previously set capabilities)
-    #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
         self
