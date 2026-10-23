@@ -245,4 +245,56 @@ reveal_type(article.get_access_display())  # revealed: str
 article.get_visibility_display()  # error: [unresolved-attribute]
 ```
 
+## Date navigation
+
+Django adds `get_next_by_<field>()` and `get_previous_by_<field>()` methods for date fields that do
+not have `null=True`. These methods return the next/previous instance of the corresponding model
+when ordered by that specific date field:
+
+```py
+from django.db import models
+
+class Article(models.Model):
+    published = models.DateField()
+    updated = models.DateTimeField()
+    reviewed = models.DateField(null=True)
+
+def _(article: Article):
+    reveal_type(article.get_next_by_published())  # revealed: Article
+    reveal_type(article.get_previous_by_published())  # revealed: Article
+
+    # Date fields with `null=True` do not generate these methods.
+    article.get_next_by_reviewed()  # error: [unresolved-attribute]
+    article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+```
+
+`DateTimeField` also generates these methods:
+
+```py
+def _(article: Article):
+    reveal_type(article.get_next_by_updated())  # revealed: Article
+    reveal_type(article.get_previous_by_updated())  # revealed: Article
+```
+
+Keyword arguments filter the candidate instances:
+
+```py
+def _(article: Article):
+    reveal_type(article.get_next_by_published(published__year=2026))  # revealed: Article
+    reveal_type(article.get_previous_by_published(published__year=2026))  # revealed: Article
+```
+
+These methods return `Self`, so when invoked on subclasses, we get back instances of the subclass:
+
+```py
+class NewsArticle(Article):
+    pass
+
+def _(article: NewsArticle):
+    reveal_type(article.get_next_by_published())  # revealed: NewsArticle
+    reveal_type(article.get_previous_by_published())  # revealed: NewsArticle
+    reveal_type(Article.get_next_by_published(article))  # revealed: NewsArticle
+    reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
+```
+
 [django-types]: https://github.com/sbdchd/django-types
