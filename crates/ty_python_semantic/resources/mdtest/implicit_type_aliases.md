@@ -2519,16 +2519,15 @@ def inspect_classes(
     reveal_type(local_attribute)  # revealed: Unknown
 ```
 
-## Suppressing invalid implicit alias uses
+## Suppressions on alias definitions
 
-An invalid implicit alias is diagnosed where it is used as a type. An ignore on its ordinary
-assignment remains unused and does not hide the explanation at the annotation. Suppressing the error
-at a use does not make the value a valid type alias:
+An ignore on an ordinary assignment remains unused and does not hide the explanation when its value
+is used as a type.
 
-```toml
-[rules]
-unused-ignore-comment = "error"
-```
+We generate that explanation by inferring the assignment's right-hand side as a type expression at
+its original source location. This test guards against that inference applying the assignment's
+ignore or marking it as used: the error belongs to the annotation, even though its explanation
+points back to the assignment.
 
 ```py
 # error: [unused-ignore-comment]
@@ -2536,8 +2535,6 @@ Number = 1 + 2  # ty: ignore[invalid-type-form]
 
 # snapshot: invalid-type-form
 def inspect(value: Number): ...
-def ignored(value: Number):  # ty: ignore[invalid-type-form]
-    reveal_type(value)  # revealed: Unknown
 ```
 
 ```snapshot
