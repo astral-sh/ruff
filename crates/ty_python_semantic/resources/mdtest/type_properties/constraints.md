@@ -1623,6 +1623,26 @@ def nested_gradual[T, U]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[T]))
 ```
 
+Propagating the residual through `T = U` can produce `T & ~str ≤ T`. This tautology contributes no
+inference evidence: the solution remains `U`, rather than the self-referential `U | (T & ~str)`.
+
+```py
+def propagated_residual[T, U]() -> None:
+    constraints = ConstraintSet.range(U, T, U) & ConstraintSet.upper_bound(T, U | str)
+    # revealed: tuple[Solution[T=U@propagated_residual]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
+The dual tautology, `T ≤ T | V`, also contributes no evidence. Here, `T = U` satisfies both upper
+bounds without leaving a reference to `T` in its own solution.
+
+```py
+def propagated_union[T, U, V]() -> None:
+    constraints = ConstraintSet.upper_bound(T, U) & ConstraintSet.upper_bound(U, T | V)
+    # revealed: tuple[Solution[T=U@propagated_union]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
+```
+
 ### Substitution exceeding the derivation budget
 
 If substituting an exact type into a deeply nested bound exceeds the derivation budget, the original
