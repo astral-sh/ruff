@@ -393,7 +393,39 @@ def check_receiver(restricted: Restricted, allowed: Allowed) -> None:
     invalid: Callable[[int], str] = restricted.method  # error: [invalid-assignment]
 ```
 
+An unrestricted callable accepting every argument list also satisfies a target with a restricted
+receiver. Return types and the source's own receiver restriction still have to match.
+
+```py
+from ty_extensions._internal import RegularCallableTypeOf
+
+class Target:
+    def method(self: "AllowedTarget", value: int) -> str:
+        return ""
+
+class AllowedTarget(Target): ...
+
+def accepts_target(callback: RegularCallableTypeOf[Target().method]) -> None: ...
+def returns_str(*args: object, **kwargs: object) -> str:
+    return ""
+
+def returns_int(*args: object, **kwargs: object) -> int:
+    return 0
+
+accepts_target(returns_str)  # no diagnostic
+accepts_target(returns_int)  # error: [invalid-argument-type]
+
+def check_source_receiver(restricted: Restricted, allowed: Allowed) -> None:
+    accepts_target(allowed.method)  # no diagnostic
+    accepts_target(restricted.method)  # error: [invalid-argument-type]
+```
+
 ## Top callable assignability
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 Every callable is assignable to the top callable, which permits no calls and has return type
 `object`. A narrower return type or a parameter list that permits calls still imposes requirements.
@@ -413,18 +445,32 @@ def check(positional: Callable[[int], str], keyword_only: Required) -> None:
 ```
 
 A receiver restriction does not prevent assignment to the top callable, since it permits no calls.
-The restriction still applies when assigning to a callable that permits calls.
+This also holds for methods with aliased return types or unused type parameters. The restriction
+still applies when assigning to a callable that permits calls.
 
 ```py
+type Result = str
+
 class Restricted:
     def method(self: "Allowed") -> str:
+        return ""
+
+    def aliased(self: "Allowed") -> Result:
+        return ""
+
+    def generic[T](self: "Allowed") -> str:
         return ""
 
 class Allowed(Restricted): ...
 
 def check_receiver(restricted: Restricted) -> None:
     valid: Top[Callable[..., object]] = restricted.method  # no diagnostic
+    aliased: Top[Callable[..., object]] = restricted.aliased  # no diagnostic
+    generic: Top[Callable[..., object]] = restricted.generic  # no diagnostic
+
     invalid: Callable[[], str] = restricted.method  # error: [invalid-assignment]
+    invalid_alias: Callable[[], str] = restricted.aliased  # error: [invalid-assignment]
+    invalid_generic: Callable[[], str] = restricted.generic  # error: [invalid-assignment]
 ```
 
 ## `ParamSpec` specializations

@@ -346,6 +346,25 @@ reveal_type(wrap(accepts_top))
 value: str = wrap(accepts_top)[0]  # error: [invalid-assignment]
 ```
 
+Ignoring a source receiver restriction still preserves return-type inference.
+
+```py
+from typing import Generic
+
+class Restricted(Generic[T]):
+    def method(self: "Allowed[T]") -> T:
+        raise NotImplementedError
+
+class Allowed(Restricted[T]): ...
+
+def infer(callback: Top[Callable[..., T]]) -> list[T]:
+    return []
+
+def check(restricted: Restricted[int]) -> None:
+    # revealed: list[int]
+    reveal_type(infer(restricted.method))
+```
+
 ## Union without intersection does not consider budget
 
 A single union upper bound remains precise even when it has more alternatives than the solution

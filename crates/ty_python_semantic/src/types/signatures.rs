@@ -2839,9 +2839,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
+            // A target that permits no calls imposes no receiver requirements. Still compare
+            // return types so that their constraints contribute to inference.
+            if target.parameters.is_top() {
+                return checker.check_signature_pair_inner(db, source, target);
+            }
+
             source
                 .receiver_constraints_when_satisfied(db, &checker)
                 .and(db, self.constraints, || {
+                    // Once its receiver is eligible, a source accepting every argument list
+                    // accepts every call permitted by the target, regardless of the target's
+                    // receiver restriction. Parameter and return types still contribute
+                    // inference bounds.
+                    if source.parameters.is_bottom() {
+                        return checker.check_signature_pair_inner(db, source, target);
+                    }
+
                     target
                         .receiver_constraints_when_satisfied(db, &checker)
                         .and(db, self.constraints, || {

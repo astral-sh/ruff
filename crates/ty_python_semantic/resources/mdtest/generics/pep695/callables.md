@@ -434,6 +434,23 @@ reveal_type(wrap(accepts_top))
 value: str = wrap(accepts_top)[0]  # error: [invalid-assignment]
 ```
 
+Ignoring a source receiver restriction still preserves return-type inference.
+
+```py
+class Restricted[T]:
+    def method(self: "Allowed[T]") -> T:
+        raise NotImplementedError
+
+class Allowed[T](Restricted[T]): ...
+
+def infer[T](callback: Top[Callable[..., T]]) -> list[T]:
+    return []
+
+def check(restricted: Restricted[int]) -> None:
+    # revealed: list[int]
+    reveal_type(infer(restricted.method))
+```
+
 ## Intersecting inferred union upper bounds
 
 Multiple callable arguments can infer multiple union upper bounds for the same type variable. We
