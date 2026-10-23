@@ -4415,6 +4415,84 @@ obj = object()
 obj.non_existing = 1  # error: [unresolved-attribute]
 ```
 
+Typeshed annotates some metadata attributes (`__module__`, `__doc__`, `__annotations__`) as if they
+were normal writable instance attributes (e.g. `__module__: str`), but `object` itself does not
+provide any instance attribute storage and does not allow writes to these attributes. We therefore
+reject assignments to these attributes on values typed as `object`, even when the assigned value
+matches the annotation:
+
+```py
+def set_module(obj: object):
+    obj.__module__ = "custom"  # error: [invalid-assignment] "Cannot assign to attribute `__module__` on type `object`"
+
+def set_class(obj: object):
+    obj.__class__ = object  # error: [invalid-assignment]
+```
+
+A subclass can expose this metadata as a read-only property. Passing it to a function that accepts
+`object` is valid; the invalid operation is the write inside the function.
+
+```py
+class ReadOnly:
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnly())  # no diagnostic
+```
+
+Ordinary subclasses provide instance dictionaries, so they can still write inherited metadata. Class
+attributes remain writable as well:
+
+```py
+class Writable: ...
+
+def set_writable_metadata(obj: Writable):
+    obj.__module__ = "custom"  # no diagnostic
+    obj.__class__ = Writable  # no diagnostic
+
+Writable.__module__ = "custom"  # no diagnostic
+```
+
+`NewType` preserves the storage limitations of its underlying type:
+
+```py
+from typing import NewType
+
+WrappedObject = NewType("WrappedObject", object)
+
+def set_wrapped_module(obj: WrappedObject):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+```
+
+### Setting metadata attributes on `Callable`
+
+`Callable` does not guarantee writable metadata either: a callable object can expose `__module__` as
+a read-only property.
+
+```py
+from typing import Callable
+
+def set_module(obj: Callable[[], None]):
+    obj.__module__ = "custom"  # error: [invalid-assignment]
+
+class ReadOnlyCallable:
+    def __call__(self) -> None: ...
+    @property
+    def __module__(self) -> str:  # no diagnostic
+        return "custom"
+
+set_module(ReadOnlyCallable())  # no diagnostic
+```
+
+Function objects do provide writable metadata:
+
+```py
+def function() -> None: ...
+
+function.__module__ = "custom"  # no diagnostic
+```
+
 ### Setting attributes on `Never` / `Any`
 
 Setting attributes on `Never` itself should be allowed (even though it has a `__setattr__` attribute
