@@ -19,10 +19,10 @@ use crate::types::diagnostic::{
     report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
-use crate::types::infer::implicit_alias::non_alias_assignment;
+use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
-    CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
-    implicit_alias_definition, implicit_alias_parameters, infer_implicit_alias_type,
+    CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
+    infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -40,7 +40,7 @@ use crate::types::{
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
-enum ImplicitAliasReference<'db> {
+enum LegacyTypeAliasReference<'db> {
     Alias(Type<'db>, Option<GenericContext<'db>>),
     /// The definition is invalid as a type alias, and its use has been rejected.
     Invalid,
@@ -50,29 +50,29 @@ enum ImplicitAliasReference<'db> {
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    fn implicit_alias_reference(
+    fn legacy_type_alias_reference(
         &mut self,
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
         reference: &ast::Expr,
-    ) -> ImplicitAliasReference<'db> {
+    ) -> LegacyTypeAliasReference<'db> {
         let db = self.db();
         let Some(alias_definition) =
-            definition.and_then(|definition| implicit_alias_definition(db, definition))
+            definition.and_then(|definition| legacy_type_alias_definition(db, definition))
         else {
-            return ImplicitAliasReference::ValueFallback;
+            return LegacyTypeAliasReference::ValueFallback;
         };
         let definition = alias_definition.definition;
-        let parameters = implicit_alias_parameters(db, definition);
-        let inference = infer_implicit_alias_type(db, definition, parameters);
+        let parameters = legacy_type_alias_parameters(db, definition);
+        let inference = infer_legacy_type_alias(db, definition, parameters);
         // Preserve cycle errors even when recovery removes every recursive reference. Both
         // runtime-value inference and enclosing aliases need the fallback type to converge.
         let ty = inference.ty.unwrap_or_else(|error| error.fallback_type);
 
         // An ordinary assignment whose value is not a valid type expression remains a
         // variable. Keep recursive recovery types, which can preserve useful structure even
-        // when part of an alias is invalid, and validate explicit aliases at their definitions.
-        if !alias_definition.is_explicit
+        // when part of an alias is invalid, and validate PEP 613 aliases at their definitions.
+        if alias_definition.is_implicit
             && inference.ty.is_ok()
             && inference.context.has_invalid_type_form
             && !any_over_type(db, self.program_environment(), ty, false, |ty| {
@@ -84,9 +84,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // independently of the resulting `Literal[3]` value. Generic subscriptions with
             // invalid arguments, such as `list[1]`, can still recover as `list[Unknown]`.
             return if self.reject_non_alias_reference(value_ty, Some(definition), reference) {
-                ImplicitAliasReference::Invalid
+                LegacyTypeAliasReference::Invalid
             } else {
-                ImplicitAliasReference::ValueFallback
+                LegacyTypeAliasReference::ValueFallback
             };
         }
         if inference.context.has_invalid_type_form {
@@ -97,16 +97,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if definition.program_file(db) == self.program_file()
             && self.context.should_collect_diagnostics()
         {
-            self.implicit_aliases.insert(definition);
+            self.legacy_aliases.insert(definition);
         }
-        ImplicitAliasReference::Alias(ty, parameters)
+        LegacyTypeAliasReference::Alias(ty, parameters)
     }
 
     /// Infer the value type and optional source definition for an assignment such as
     /// `Forwarded = Items` or `Forwarded = module.Items`. The caller uses the definition to
     /// preserve the referenced alias's type parameters.
     ///
-    /// `implicit_alias_definition` first tries `forwarding_alias_definition`. For a simple name,
+    /// `legacy_type_alias_definition` first tries `forwarding_alias_definition`. For a simple name,
     /// that lookup follows bindings without inferring their values, avoiding recursive alias
     /// cycles. When it cannot identify an alias, this method uses normal expression inference
     /// to account for conditional bindings, fallback scopes, and locally narrowed attributes.
@@ -130,11 +130,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         reference
     }
 
-    pub(in crate::types::infer) fn finish_implicit_alias_type(
+    pub(in crate::types::infer) fn finish_legacy_type_alias(
         mut self,
         definition: Definition<'db>,
         value: &ast::Expr,
-    ) -> ImplicitAliasInference<'db> {
+    ) -> LegacyTypeAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
         let ty = self.infer_type_expression(value);
@@ -161,10 +161,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             Ok(ty)
         };
-        ImplicitAliasInference {
+        LegacyTypeAliasInference {
             ty,
             context: self.context.finish(),
-            implicit_aliases: self.implicit_aliases.into_iter().collect(),
+            legacy_aliases: self.legacy_aliases.into_iter().collect(),
         }
     }
 
@@ -263,15 +263,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        match self.implicit_alias_reference(ty, definition, annotation) {
-            ImplicitAliasReference::Alias(alias, parameters) => {
+        match self.legacy_type_alias_reference(ty, definition, annotation) {
+            LegacyTypeAliasReference::Alias(alias, parameters) => {
                 let specialization =
                     parameters.map(|params| params.default_specialization(db, None));
                 let ty = alias.apply_optional_specialization(db, specialization);
                 return self.check_type_variable_scope(annotation, ty);
             }
-            ImplicitAliasReference::Invalid => return Type::unknown(),
-            ImplicitAliasReference::ValueFallback => {}
+            LegacyTypeAliasReference::Invalid => return Type::unknown(),
+            LegacyTypeAliasReference::ValueFallback => {}
         }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
@@ -1342,8 +1342,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
-        let alias_reference = self.implicit_alias_reference(value_ty, definition, &subscript.value);
-        if let ImplicitAliasReference::Alias(alias, parameters) = alias_reference
+        let alias_reference =
+            self.legacy_type_alias_reference(value_ty, definition, &subscript.value);
+        if let LegacyTypeAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
             let db = self.db();
@@ -1358,7 +1359,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 },
             );
         }
-        if matches!(alias_reference, ImplicitAliasReference::Invalid)
+        if matches!(alias_reference, LegacyTypeAliasReference::Invalid)
             || self.reject_non_alias_reference(value_ty, definition, &subscript.value)
         {
             if !self.in_string_annotation() {
@@ -1786,7 +1787,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Infer the type of an explicitly specialized generic type alias (implicit or PEP 613).
+    /// Infer the type of an explicitly specialized generic legacy type alias.
     pub(crate) fn infer_explicit_type_alias_specialization(
         &mut self,
         subscript: &ast::ExprSubscript,

@@ -1,4 +1,5 @@
-//! Definitions and parameters of implicit type aliases.
+//! Definitions and type parameters of legacy type aliases. These include implicit aliases
+//! (`Alias = int`) and PEP 613 aliases (`Alias: TypeAlias = int`).
 
 use itertools::Itertools;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
@@ -32,18 +33,18 @@ use super::builder::TypeInferenceBuilder;
 
 /// An eligible alias definition and its declaration style, independent of the defining AST.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ImplicitAliasDefinition<'db> {
+pub(super) struct LegacyTypeAliasDefinition<'db> {
     pub(super) definition: Definition<'db>,
-    /// True for a PEP 613 declaration (`Alias: TypeAlias = ...`), false for an unannotated
-    /// assignment. An explicit declaration remains an alias even if its right-hand side is
-    /// invalid; an unannotated assignment can instead be treated as a variable.
+    /// True for an implicit alias and false for a PEP 613 declaration. If the right-hand side
+    /// is invalid, we may treat an unannotated assignment as a variable. A PEP 613 declaration
+    /// still declares an alias.
     ///
-    /// This describes the resolved `definition`: `B = A` inherits `true` when `A` is declared
+    /// This describes the resolved `definition`. For `B = A`, the flag is false when `A` is declared
     /// with `TypeAlias`. PEP 695 `type` statements are handled separately.
-    pub(super) is_explicit: bool,
+    pub(super) is_implicit: bool,
 }
 
-/// Resolve a definition as a possible implicit or PEP 613 type alias.
+/// Resolve a definition as a possible legacy type alias.
 ///
 /// Resolve imports and implicit forwarding assignments to the underlying alias definition.
 /// Return `None` in these cases:
@@ -61,10 +62,10 @@ pub(super) struct ImplicitAliasDefinition<'db> {
 ///
 /// This query keeps callers independent of the defining file's AST.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_alias_definition<'db>(
+pub(super) fn legacy_type_alias_definition<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> Option<ImplicitAliasDefinition<'db>> {
+) -> Option<LegacyTypeAliasDefinition<'db>> {
     let definition = resolve_imported_definition(db, definition)?;
 
     let module;
@@ -99,22 +100,22 @@ pub(super) fn implicit_alias_definition<'db>(
     if let Some(annotation) = annotation {
         return crate::types::definition_expression_type(db, definition, annotation)
             .is_typealias_special_form()
-            .then_some(ImplicitAliasDefinition {
+            .then_some(LegacyTypeAliasDefinition {
                 definition,
-                is_explicit: true,
+                is_implicit: false,
             });
     }
     if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
         // For `Items = list[T]; Forwarded = Items`, reuse Items's definition, including
         // its parameters and recursive identity. Do this before inspecting its value:
         // `A: TypeAlias = list; B = A` must retain A's default specialization even though
-        // A's runtime value is the generic `list` class. Explicit declarations instead
-        // interpret their own right-hand side as a normal type expression.
+        // A's runtime value is the generic `list` class. PEP 613 declarations interpret
+        // their own right-hand side as a normal type expression.
         let resolve_alias = |target| {
             if target == definition {
                 return None;
             }
-            implicit_alias_definition(db, target)
+            legacy_type_alias_definition(db, target)
         };
 
         // Resolve straightforward forwarding without inferring the runtime value, which
@@ -151,9 +152,9 @@ pub(super) fn implicit_alias_definition<'db>(
             return None;
         }
     }
-    Some(ImplicitAliasDefinition {
+    Some(LegacyTypeAliasDefinition {
         definition,
-        is_explicit: false,
+        is_implicit: true,
     })
 }
 
@@ -379,7 +380,7 @@ fn unique_forwarding_target<'db>(
     Ok(target)
 }
 
-/// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
+/// Collect the formal type parameters of a legacy type alias from its right-hand side.
 ///
 /// Resolve legacy type-variable references, including those inside string annotations, and bind
 /// them to `definition` in order of first appearance, without duplicates. For example,
@@ -387,21 +388,21 @@ fn unique_forwarding_target<'db>(
 /// reference. Literal values and `Annotated` metadata do not contribute parameters.
 ///
 /// This collects parameters before the alias's type has been inferred, so
-/// [`infer_implicit_alias_type`](super::infer_implicit_alias_type) can seed a generic
+/// [`infer_legacy_type_alias`](super::infer_legacy_type_alias) can seed a generic
 /// recursive reference. References to the alias itself are skipped when resolving type variables.
 /// Return `None` when no parameters are found; a query cycle also provisionally returns `None`.
 /// This can seed a separate non-generic alias query while parameter discovery is incomplete.
 /// Parameters are part of the alias query's key: discovering them later selects a generic
 /// constructor rather than reusing that provisional non-generic value.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(in crate::types) fn implicit_alias_parameters<'db>(
+pub(in crate::types) fn legacy_type_alias_parameters<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<GenericContext<'db>> {
     let file = definition.program_file(db);
     let parsed = parsed_module(db, file.python_file(db)).load(db);
     let value = definition.kind(db).value(&parsed)?;
-    let mut collector = ImplicitAliasLegacyTypeVarCollector {
+    let mut collector = LegacyTypeVarCollector {
         db,
         alias_definition: definition,
         index: semantic_index(db, file),
@@ -418,7 +419,7 @@ pub(in crate::types) fn implicit_alias_parameters<'db>(
     })
 }
 
-struct ImplicitAliasLegacyTypeVarCollector<'a, 'db> {
+struct LegacyTypeVarCollector<'a, 'db> {
     db: &'db dyn Db,
     alias_definition: Definition<'db>,
     index: &'a ty_python_core::SemanticIndex<'db>,
@@ -426,7 +427,7 @@ struct ImplicitAliasLegacyTypeVarCollector<'a, 'db> {
     variables: FxOrderSet<BoundTypeVarInstance<'db>>,
 }
 
-impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
+impl<'db> LegacyTypeVarCollector<'_, 'db> {
     fn expression_type(&self, expression: &ast::Expr) -> Option<Type<'db>> {
         let db = self.db;
         let file = self.alias_definition.program_file(db);
@@ -455,7 +456,7 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
                 // its runtime value here can also re-enter parameter discovery before recursive
                 // aliases have stable generic contexts.
                 (definition != self.alias_definition
-                    && implicit_alias_definition(db, definition).is_none())
+                    && legacy_type_alias_definition(db, definition).is_none())
                 .then(|| binding_type(db, definition))
             }
             ast::Expr::Attribute(attribute) => self
@@ -485,7 +486,7 @@ impl<'db> ImplicitAliasLegacyTypeVarCollector<'_, 'db> {
     }
 }
 
-impl<'ast> Visitor<'ast> for ImplicitAliasLegacyTypeVarCollector<'_, '_> {
+impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_, '_> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         if let ast::Expr::StringLiteral(string) = expr
             && let Some(string_literal) = string.as_single_part_string()

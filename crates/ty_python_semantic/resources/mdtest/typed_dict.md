@@ -3098,7 +3098,7 @@ def invalid_default(mapping: OptionalValue) -> None:
 ```
 
 For a required field, the default cannot contribute to the result. This also holds when the field
-type is an explicit type alias:
+type is a PEP 695 alias:
 
 ```py
 type ValueAlias = Value

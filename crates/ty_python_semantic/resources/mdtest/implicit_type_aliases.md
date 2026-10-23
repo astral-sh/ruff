@@ -1,7 +1,8 @@
 # Implicit type aliases
 
 Implicit type aliases are the earliest form of type alias, introduced in PEP 484. They have no
-special marker, just an ordinary assignment statement.
+special marker, just an ordinary assignment statement. Implicit aliases and PEP 613 aliases declared
+with `typing.TypeAlias` are collectively called legacy type aliases.
 
 ## Basic
 
@@ -642,8 +643,8 @@ class Derived2(GenericBaseAlias[int]):
 
 ### Forwarding aliases
 
-Forwarding a generic alias preserves its type parameters and defaults. A forwarded class or special
-form still accepts the same type arguments.
+Forwarding a generic alias with an unannotated assignment preserves its type parameters and
+defaults. A forwarded class or special form still accepts the same type arguments.
 
 ```py
 from typing_extensions import Annotated, TypeVar, Union
@@ -1711,12 +1712,12 @@ U = TypeVar("U")
 class Pair(Generic[T, U]): ...
 
 PairAlias = Pair[T, U]
-PairAliasExplicit: TypeAlias = Pair[T, U]
+Pep613Pair: TypeAlias = Pair[T, U]
 
 def implicit(x: type[PairAlias[int, str]]):
     reveal_type(x)  # revealed: type[Pair[int, str]]
 
-def pep_613(x: type[PairAliasExplicit[int, str]]):
+def pep_613(x: type[Pep613Pair[int, str]]):
     reveal_type(x)  # revealed: type[Pair[int, str]]
 
 def uppercase_type(x: Type[PairAlias[int, str]]):
@@ -2720,10 +2721,10 @@ python-version = "3.12"
 from collections.abc import Callable
 
 Implicit = tuple[Callable[[int], int], "Implicit | None"]
-type Explicit = tuple[Callable[[int], int], Explicit | None]
+type Pep695 = tuple[Callable[[int], int], Pep695 | None]
 
 implicit: Implicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
-explicit: Explicit = (lambda value: reveal_type(value) or value, None)  # revealed: int
+pep695: Pep695 = (lambda value: reveal_type(value) or value, None)  # revealed: int
 ```
 
 ### Recursive aliases in union contexts
@@ -2740,10 +2741,10 @@ a nested dictionary. Implicit aliases and PEP 695 aliases accept the same values
 
 ```py
 Value = str | dict[str, "Value | None"]
-type ExplicitValue = str | dict[str, ExplicitValue | None]
+type Pep695Value = str | dict[str, Pep695Value | None]
 
 implicit: dict[str, Value | None] = {"input": {"location": "file"}}
-explicit: dict[str, ExplicitValue | None] = {"input": {"location": "file"}}
+pep695: dict[str, Pep695Value | None] = {"input": {"location": "file"}}
 
 invalid: dict[str, Value | None] = {"input": {"location": 1}}  # error: [invalid-assignment]
 ```
@@ -2755,13 +2756,13 @@ comprehensions, even when that value type includes a recursive alias and `None`.
 
 ```py
 Value = str | list["Value | None"]
-type ExplicitValue = str | list[ExplicitValue | None]
+type Pep695Value = str | list[Pep695Value | None]
 
 def implicit(data: dict[str, Value | None], values: list[Value | None]):
     data["fields"] = ["name"]
     data["filtered"] = [value for value in values if value is not None]
 
-def explicit(data: dict[str, ExplicitValue | None], values: list[ExplicitValue | None]):
+def pep695(data: dict[str, Pep695Value | None], values: list[Pep695Value | None]):
     data["fields"] = ["name"]
     data["filtered"] = [value for value in values if value is not None]
 ```
@@ -2773,14 +2774,14 @@ be placed in a dictionary whose values have that alias type.
 
 ```py
 Value = str | list["Value | None"] | dict[str, "Value | None"]
-type ExplicitValue = str | list[ExplicitValue | None] | dict[str, ExplicitValue | None]
+type Pep695Value = str | list[Pep695Value | None] | dict[str, Pep695Value | None]
 
 def implicit(value: Value | None) -> Value | None:
     if isinstance(value, list):
         return None
     return {"items": value}
 
-def explicit(value: ExplicitValue | None) -> ExplicitValue | None:
+def pep695(value: Pep695Value | None) -> Pep695Value | None:
     if isinstance(value, list):
         return None
     return {"items": value}
@@ -2788,24 +2789,24 @@ def explicit(value: ExplicitValue | None) -> ExplicitValue | None:
 
 ### String variables are not recursive aliases
 
-A string assignment remains a runtime value even when its contents describe a recursive type. An
-explicit `TypeAlias` annotation permits a quoted alias definition.
+A string assignment remains a runtime value even when its contents describe a recursive type. A PEP
+613 alias can use a quoted type expression as its right-hand side.
 
 ```py
 from typing import TypeAlias
 
 PlainString = "list[int]"
 RecursiveString = "list[RecursiveString]"
-Explicit: TypeAlias = "list[Explicit]"
+QuotedList: TypeAlias = "list[QuotedList]"
 
 def inspect(
     plain: PlainString,  # error: [invalid-type-form]
     recursive: RecursiveString,  # error: [invalid-type-form]
-    explicit: Explicit,
+    alias: QuotedList,
 ):
     reveal_type(plain)  # revealed: Unknown
     reveal_type(recursive)  # revealed: Unknown
-    reveal_type(explicit)  # revealed: Explicit
+    reveal_type(alias)  # revealed: QuotedList
 ```
 
 ### Invalid cycles
@@ -3001,17 +3002,17 @@ from typing import TypeVar, Union
 T = TypeVar("T")
 Tree = Union[int, "Node[T]"]
 Node = tuple[T, "Tree[T]", "Node[T] | None"]
-type ExplicitTree[T] = int | ExplicitNode[T]
-type ExplicitNode[T] = tuple[T, ExplicitTree[T], ExplicitNode[T] | None]
+type Pep695Tree[T] = int | Pep695Node[T]
+type Pep695Node[T] = tuple[T, Pep695Tree[T], Pep695Node[T] | None]
 
-def inspect(value: Tree[int], explicit: ExplicitTree[int]):
+def inspect(value: Tree[int], pep695: Pep695Tree[int]):
     reveal_type(value)  # revealed: Tree[int]
-    reveal_type(explicit)  # revealed: int | tuple[int, ExplicitTree[int], ExplicitNode[int] | None]
+    reveal_type(pep695)  # revealed: int | tuple[int, Pep695Tree[int], Pep695Node[int] | None]
 
 valid: Tree[str] = ("leaf", 1, None)
 invalid: Tree[str] = (1, 1, None)  # error: [invalid-assignment]
-explicit_valid: ExplicitTree[str] = ("leaf", 1, None)
-explicit_invalid: ExplicitTree[str] = (1, 1, None)  # error: [invalid-assignment]
+pep695_valid: Pep695Tree[str] = ("leaf", 1, None)
+pep695_invalid: Pep695Tree[str] = (1, 1, None)  # error: [invalid-assignment]
 ```
 
 ### Three mutually recursive generic aliases
@@ -3076,8 +3077,8 @@ python-version = "3.12"
 ```
 
 A tuple can reach the same alias both directly and through another alias. Both paths preserve the
-leaf type, including when they return to the outer tuple. The aliases describe the same types as
-their explicit counterparts.
+leaf type, including when they return to the outer tuple. The implicit aliases describe the same
+types as their PEP 695 counterparts.
 
 ```py
 from ty_extensions import static_assert
@@ -3087,13 +3088,13 @@ Root = tuple[int, "Branch | None", "Shared | None"]
 Branch = tuple["Shared | None"]
 Shared = tuple["Root | None", "Branch | None"]
 
-type ExplicitRoot = tuple[int, ExplicitBranch | None, ExplicitShared | None]
-type ExplicitBranch = tuple[ExplicitShared | None]
-type ExplicitShared = tuple[ExplicitRoot | None, ExplicitBranch | None]
+type Pep695Root = tuple[int, Pep695Branch | None, Pep695Shared | None]
+type Pep695Branch = tuple[Pep695Shared | None]
+type Pep695Shared = tuple[Pep695Root | None, Pep695Branch | None]
 
-static_assert(is_equivalent_to(Root, ExplicitRoot))
-static_assert(is_equivalent_to(Branch, ExplicitBranch))
-static_assert(is_equivalent_to(Shared, ExplicitShared))
+static_assert(is_equivalent_to(Root, Pep695Root))
+static_assert(is_equivalent_to(Branch, Pep695Branch))
+static_assert(is_equivalent_to(Shared, Pep695Shared))
 
 def inspect(root: Root):
     reveal_type(root[0])  # revealed: int

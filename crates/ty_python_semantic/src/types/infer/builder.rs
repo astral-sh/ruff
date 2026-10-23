@@ -365,7 +365,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     called_functions: FxIndexSet<FunctionType<'db>>,
 
     /// Aliases whose type-expression diagnostics are collected once during file checking.
-    implicit_aliases: FxIndexSet<Definition<'db>>,
+    legacy_aliases: FxIndexSet<Definition<'db>>,
 
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
@@ -528,7 +528,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
-            implicit_aliases: FxIndexSet::default(),
+            legacy_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
@@ -654,8 +654,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 DefinitionInferenceExtra::Undecorated(_)
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
                 DefinitionInferenceExtra::Other(extra) => {
-                    self.implicit_aliases
-                        .extend(extra.implicit_aliases.iter().copied());
+                    self.legacy_aliases
+                        .extend(extra.legacy_aliases.iter().copied());
                     self.comparison_truthiness
                         .extend(extra.comparison_truthiness.iter().copied());
                     self.called_functions
@@ -707,8 +707,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(extra) = &inference.extra {
-            self.implicit_aliases
-                .extend(extra.implicit_aliases.iter().copied());
+            self.legacy_aliases
+                .extend(extra.legacy_aliases.iter().copied());
             self.comparison_truthiness
                 .extend(extra.comparison_truthiness.iter().copied());
             self.called_functions
@@ -766,8 +766,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
-            self.implicit_aliases
-                .extend(extra.implicit_aliases.iter().copied());
+            self.legacy_aliases
+                .extend(extra.legacy_aliases.iter().copied());
             self.comparison_truthiness
                 .extend(extra.comparison_truthiness.iter().copied());
             self.context.extend(&extra.context);
@@ -809,8 +809,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_cycle_recovery(inference.cycle_recovery);
         self.called_functions
             .extend(inference.called_functions.iter().copied());
-        self.implicit_aliases
-            .extend(inference.implicit_aliases.iter().copied());
+        self.legacy_aliases
+            .extend(inference.legacy_aliases.iter().copied());
         self.string_annotations
             .extend(inference.string_annotations.iter().copied());
         self.expected_types
@@ -847,8 +847,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(inference.expressions.iter());
 
         if let Some(extra) = &inference.extra {
-            self.implicit_aliases
-                .extend(extra.implicit_aliases.iter().copied());
+            self.legacy_aliases
+                .extend(extra.legacy_aliases.iter().copied());
             self.context.extend(&extra.context);
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
@@ -1267,7 +1267,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .file_expression_type(assignment.annotation(self.module()))
                                 .is_typealias_special_form() =>
                     {
-                        self.implicit_aliases.insert(definition);
+                        self.legacy_aliases.insert(definition);
                     }
                     _ => {}
                 }
@@ -12091,7 +12091,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Consume the results already collected by this builder without compacting them.
     fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             expressions,
             comparison_truthiness,
@@ -12136,7 +12136,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         FullExpressionCacheEntry {
-            implicit_aliases,
+            legacy_aliases,
             expressions,
             comparison_truthiness,
             type_expression_flags,
@@ -12156,7 +12156,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             expressions,
             comparison_truthiness,
@@ -12191,7 +12191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let context = context.finish();
 
-        let extra = (!implicit_aliases.is_empty()
+        let extra = (!legacy_aliases.is_empty()
             || !context.is_empty()
             || !comparison_truthiness.is_empty()
             || !string_annotations.is_empty()
@@ -12207,7 +12207,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints.shrink_to_fit();
             return_types_and_ranges.shrink_to_fit();
             Box::new(StatementInferenceInnerExtra {
-                implicit_aliases: implicit_aliases.into_iter().collect(),
+                legacy_aliases: legacy_aliases.into_iter().collect(),
                 comparison_truthiness: FrozenMap::from(comparison_truthiness),
                 string_annotations: FrozenSet::from(string_annotations),
                 expected_types: FrozenMap::from(expected_types),
@@ -12276,7 +12276,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             expressions,
             comparison_truthiness: _,
@@ -12306,7 +12306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let context = context.finish();
 
         FunctionDecoratorInference {
-            implicit_aliases: implicit_aliases.into_iter().collect(),
+            legacy_aliases: legacy_aliases.into_iter().collect(),
             expression_types: FrozenMap::from(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
@@ -12329,7 +12329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn finish_inferred_definition(self, definition: Definition<'db>) -> DefinitionInference<'db> {
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             expressions,
             comparison_truthiness,
@@ -12363,7 +12363,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let context = context.finish();
 
         let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
-            + usize::from(!implicit_aliases.is_empty())
+            + usize::from(!legacy_aliases.is_empty())
             + usize::from(!comparison_truthiness.is_empty())
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
@@ -12420,7 +12420,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, undecorated_type) => {
                 collection_use_constraints.shrink_to_fit();
                 let extra = OtherDefinitionInferenceExtra {
-                    implicit_aliases: implicit_aliases.into_iter().collect(),
+                    legacy_aliases: legacy_aliases.into_iter().collect(),
                     comparison_truthiness: FrozenMap::from(comparison_truthiness),
                     string_annotations: FrozenSet::from(string_annotations),
                     expected_types: FrozenMap::from(expected_types),
@@ -12527,7 +12527,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_type = self.inferred_return_type();
 
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             string_annotations,
             expected_types,
@@ -12564,7 +12564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let context = context.finish();
 
-        let extra = (!implicit_aliases.is_empty()
+        let extra = (!legacy_aliases.is_empty()
             || !string_annotations.is_empty()
             || !expected_types.is_empty()
             || !context.is_empty()
@@ -12576,7 +12576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         .then(|| {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
-                implicit_aliases: implicit_aliases.into_iter().collect(),
+                legacy_aliases: legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(string_annotations),
                 qualifiers: FrozenMap::from(qualifiers),
                 expected_types: FrozenMap::from(expected_types),
@@ -12618,7 +12618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // These fields are type inference results, but do not affect the inference of a given
             // expression.
-            implicit_aliases: _,
+            legacy_aliases: _,
             context: _,
             collection_use_constraints: _,
             expressions: _,
@@ -12681,7 +12681,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
-            implicit_aliases,
+            legacy_aliases,
             context,
             expressions,
             comparison_truthiness,
@@ -12735,7 +12735,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.type_expression_flags
             .extend(type_expression_flags.iter());
         self.called_functions.extend(called_functions);
-        self.implicit_aliases.extend(implicit_aliases);
+        self.legacy_aliases.extend(legacy_aliases);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings
@@ -12853,7 +12853,7 @@ enum ExpressionCacheEntry<'db> {
 /// Unlike [`ExpressionInference`], this type is short-lived, and avoids the cost of compaction
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
-    implicit_aliases: FxIndexSet<Definition<'db>>,
+    legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
@@ -12884,7 +12884,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
     }
 
     fn has_extra(&self) -> bool {
-        !self.implicit_aliases.is_empty()
+        !self.legacy_aliases.is_empty()
             || !self.string_annotations.is_empty()
             || !self.comparison_truthiness.is_empty()
             || !self.type_expression_flags.is_empty()
@@ -12913,7 +12913,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             self.collection_use_constraints.shrink_to_fit();
             self.context.diagnostics.shrink_to_fit();
             Box::new(ExpressionInferenceExtra {
-                implicit_aliases: self.implicit_aliases.into_iter().collect(),
+                legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
                 expected_types: FrozenMap::from(self.expected_types),

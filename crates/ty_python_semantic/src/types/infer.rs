@@ -75,9 +75,9 @@ use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
-mod implicit_alias;
-use implicit_alias::implicit_alias_definition;
-pub(super) use implicit_alias::implicit_alias_parameters;
+mod legacy_type_alias;
+use legacy_type_alias::legacy_type_alias_definition;
+pub(super) use legacy_type_alias::legacy_type_alias_parameters;
 mod comparisons;
 mod expression_truthiness;
 pub(crate) use expression_truthiness::TruthinessAnalyzer;
@@ -85,7 +85,7 @@ pub(crate) use expression_truthiness::TruthinessAnalyzer;
 mod tests;
 
 /// The inferred alias type, or a cycle error retaining a type for recovery.
-pub(super) type ImplicitAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
+pub(super) type LegacyTypeAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
 
 /// An alias that reaches itself through aliases and unions without a containing type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -94,7 +94,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     fallback_type: Type<'db>,
 }
 
-/// Infer the type denoted by an implicit or PEP 613 alias independently of its runtime value.
+/// Infer the type denoted by a legacy type alias independently of its runtime value.
 ///
 /// The generic parameters are part of the query key and are used by Salsa's cycle callbacks.
 /// `cycle_initial` uses them to construct `μa. a` with an identity specialization (for example,
@@ -110,13 +110,13 @@ pub(super) struct CyclicTypeAliasError<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
-        ImplicitAliasInference {
+        LegacyTypeAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
             context: InferContextResult::default(),
-            implicit_aliases: Box::default(),
+            legacy_aliases: Box::default(),
         }
     },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+    cycle_fn=|db, cycle: &salsa::Cycle, _: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
         result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
             fallback_type: recover(error.fallback_type),
@@ -125,24 +125,24 @@ pub(super) struct CyclicTypeAliasError<'db> {
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(super) fn infer_implicit_alias_type<'db>(
+pub(super) fn infer_legacy_type_alias<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     _parameters: Option<crate::types::GenericContext<'db>>,
-) -> ImplicitAliasInference<'db> {
+) -> LegacyTypeAliasInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let Some(value) = definition.kind(db).value(&module) else {
-        return ImplicitAliasInference {
+        return LegacyTypeAliasInference {
             ty: Ok(Type::unknown()),
             context: InferContextResult::default(),
-            implicit_aliases: Box::default(),
+            legacy_aliases: Box::default(),
         };
     };
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
-        .finish_implicit_alias_type(definition, value)
+        .finish_legacy_type_alias(definition, value)
 }
 
 /// The type and diagnostics inferred from an alias's right-hand side.
@@ -151,10 +151,10 @@ pub(super) fn infer_implicit_alias_type<'db>(
 /// checking collects each referenced alias once, so recursive aliases cannot accumulate each
 /// other's diagnostics during fixed-point iteration.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ImplicitAliasInference<'db> {
-    pub(super) ty: ImplicitAliasResult<'db>,
+pub(super) struct LegacyTypeAliasInference<'db> {
+    pub(super) ty: LegacyTypeAliasResult<'db>,
     pub(super) context: InferContextResult,
-    pub(super) implicit_aliases: Box<[Definition<'db>]>,
+    pub(super) legacy_aliases: Box<[Definition<'db>]>,
 }
 
 bitflags::bitflags! {
@@ -330,7 +330,7 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
-    implicit_aliases: Box<[Definition<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
     known_decorators: FunctionDecorators,
     /// Whether any decorator is unrecognized, or decorator inference is incomplete.
     has_unknown_decorators: bool,
@@ -359,8 +359,8 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.called_functions
     }
 
-    fn implicit_aliases(&self) -> &[Definition<'db>] {
-        &self.implicit_aliases
+    fn legacy_aliases(&self) -> &[Definition<'db>] {
+        &self.legacy_aliases
     }
 
     pub(super) fn known_decorators(&self) -> FunctionDecorators {
@@ -1046,7 +1046,7 @@ pub(crate) struct ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ScopeInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
-    implicit_aliases: Box<[Definition<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1138,10 +1138,10 @@ impl<'db> ScopeInference<'db> {
             .map(|extra| &extra.context.diagnostics)
     }
 
-    pub(crate) fn implicit_aliases(&self) -> &[Definition<'db>] {
+    pub(crate) fn legacy_aliases(&self) -> &[Definition<'db>] {
         self.extra
             .as_deref()
-            .map_or(&[], |extra| &extra.implicit_aliases)
+            .map_or(&[], |extra| &extra.legacy_aliases)
     }
 
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
@@ -1481,7 +1481,7 @@ struct DeferredAndUndecorated<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
-    implicit_aliases: Box<[Definition<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
 
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
@@ -1981,7 +1981,7 @@ pub(crate) struct ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
-    implicit_aliases: Box<[Definition<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -2231,7 +2231,7 @@ pub(crate) struct StatementInferenceInner<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct StatementInferenceInnerExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
-    implicit_aliases: Box<[Definition<'db>]>,
+    legacy_aliases: Box<[Definition<'db>]>,
 
     /// Condition truthiness retained for checks performed by the enclosing suite.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.

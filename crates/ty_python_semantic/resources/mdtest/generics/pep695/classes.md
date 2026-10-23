@@ -324,8 +324,8 @@ reveal_type(value(Box))  # revealed: int
 
 ## Aliases of unsubscripted generic classes
 
-A plain assignment preserves the generic class object. An explicit type alias instead uses the
-class's default specialization, including when that alias is assigned to another name:
+An implicit alias preserves the generic class object. A PEP 613 alias uses the class's default
+specialization, including when that alias is assigned to another name:
 
 ```py
 from typing import TypeAlias

@@ -169,9 +169,9 @@ def f() -> None:
 
 ## `Self`
 
-`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
-body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
-type expression.
+`Self` is not allowed in a PEP 695 type alias value, even when the alias is defined in a class body.
+Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's type
+expression.
 
 TODO: Reject `Self` in alias type-parameter bounds and defaults.
 
