@@ -463,21 +463,22 @@ fn has_unittest_test_methods<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> 
         })
 }
 
+/// Returns whether `file_name` matches pytest's default test file patterns, `test_*.py` and
+/// `*_test.py`.
+pub fn is_default_pytest_test_file_name(file_name: &str) -> bool {
+    file_name
+        .strip_suffix(".py")
+        .is_some_and(|stem| stem.starts_with("test_") || stem.ends_with("_test"))
+}
+
 fn is_default_pytest_test_file(db: &dyn Db, file: ProgramFile<'_>) -> bool {
-    let Some(file_name) = file
+    let has_test_file_name = file
         .file(db)
         .path(db)
         .as_system_path()
         .and_then(|path| path.file_name())
-    else {
-        return false;
-    };
-
-    let Some(stem) = file_name.strip_suffix(".py") else {
-        return false;
-    };
-
-    if !(stem.starts_with("test_") || stem.ends_with("_test")) {
+        .is_some_and(is_default_pytest_test_file_name);
+    if !has_test_file_name {
         return false;
     }
 
@@ -510,7 +511,10 @@ mod tests {
     use ty_python_core::definition::{Definition, DefinitionKind};
     use ty_python_core::semantic_index;
 
-    use super::{PytestTestKind, pytest_test_for_binding, pytest_tests_in_file};
+    use super::{
+        PytestTestKind, is_default_pytest_test_file_name, pytest_test_for_binding,
+        pytest_tests_in_file,
+    };
     use crate::Db;
     use crate::db::tests::{TestDb, TestDbBuilder};
 
