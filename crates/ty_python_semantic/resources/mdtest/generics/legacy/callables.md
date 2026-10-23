@@ -682,6 +682,46 @@ def _() -> None:
     reveal_type(infer_pair(swap))  # revealed: Result[tuple[int, str]] & Result[tuple[str, int]]
 ```
 
+## Returning callables with generic overloads
+
+Matching the generic overload's return type to `A` also lets us infer `A` as the argument type of
+the returned callable, even though another overload accepts only the narrower `B`.
+
+```py
+from typing import Callable, TypeVar, overload
+
+class A: ...
+class B(A): ...
+
+T = TypeVar("T")
+S = TypeVar("S", bound=A)
+
+def wrap(fn: Callable[[T], A]) -> Callable[[T], A]:
+    return fn
+
+@overload
+def f(value: B) -> B: ...
+@overload
+def f(value: S) -> S: ...
+def f(value: A) -> A:
+    return value
+
+wrapped = wrap(f)
+reveal_type(wrapped)  # revealed: (A, /) -> A
+wrapped(A())  # no diagnostic
+```
+
+The generic overload of `sum` accepts iterables of arbitrary integers, even though its first
+overload only accepts iterables of booleans and certain integer literals. Wrapping it preserves this
+behavior:
+
+```py
+def wrap_sum(fn: Callable[[T], int]) -> Callable[[T], int]:
+    return fn
+
+stage: Callable[[list[int]], int] = wrap_sum(sum)  # no diagnostic
+```
+
 ## Combining inferred and declared upper bounds
 
 The declared upper bound participates in selecting the inferred upper-bound solution. Even though
@@ -877,7 +917,7 @@ def consume(value: A | B) -> None: ...
 ```
 
 If we pass both the callback and the consumer to a generic function, we can solve `T` (and thus also
-`R`) to either `A` or `B`. This should allow us to infer `A & B` as the return type.
+`R`) to either `A` or `B`. This allows us to infer `A & B` as the return type.
 
 ```py
 R = TypeVar("R")
@@ -885,11 +925,7 @@ R = TypeVar("R")
 def infer_result(callback: Callable[[T], R], consumer: Callable[[T], None]) -> R:
     raise NotImplementedError
 
-# Eager subtype checking cannot yet infer callback-local type variables, so `identity`
-# wrongly fails revalidation against both `Callable[[A], A]` and `Callable[[B], B]`, so
-# we fall back to `A | B` instead of `A & B`.
-# TODO: revealed: A & B
-reveal_type(infer_result(identity, consume))  # revealed: A | B
+reveal_type(infer_result(identity, consume))  # revealed: A & B
 ```
 
 If we additionally supply a value, that selects the specific consumer overload that accepts it. The
