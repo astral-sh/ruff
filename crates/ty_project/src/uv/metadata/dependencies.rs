@@ -26,10 +26,18 @@ impl UvMetadata {
                 continue;
             }
 
+            // A package resolved as editable may be installed non-editably (for example, with
+            // `uv sync --no-editable`) or not installed. Its source path only identifies imports
+            // when the package is installed as editable.
             let editable_path = node
                 .source
                 .as_ref()
-                .and_then(|source| source.editable.clone());
+                .and_then(|source| source.editable.clone())
+                .filter(|_| {
+                    self.installed_packages
+                        .get(id)
+                        .is_some_and(|package| package.editable)
+                });
             if let Some(path) = &editable_path
                 && !path.is_absolute()
             {
@@ -206,6 +214,18 @@ impl UvMetadata {
             return Err(DependencyMetadataError::MissingProjects);
         }
 
+        // Packages may remain installed after their declarations are removed, or may have been
+        // installed outside uv. Keep them for module ownership checks; installation alone does
+        // not make them declared dependencies.
+        for (id, package) in &self.installed_packages {
+            distributions
+                .entry(id.clone())
+                .or_insert_with(|| DependencyDistribution {
+                    name: package.name.clone(),
+                    editable_path: None,
+                });
+        }
+
         let mut module_owners: BTreeMap<ModuleName, Box<[CharStr]>> = BTreeMap::new();
         for (module, owners) in &self.module_owners {
             let Some(module) = ModuleName::new(module) else {
@@ -213,25 +233,12 @@ impl UvMetadata {
             };
             let owners = owners
                 .iter()
-                .filter(|owner| distributions.contains_key(&owner.package_id))
+                .filter(|owner| self.installed_packages.contains_key(&owner.package_id))
                 .map(|owner| owner.package_id.clone())
                 .collect::<BTreeSet<_>>();
             // Keep an empty entry when all owners are unknown. Omitting the entry would allow a
             // caller to use a known parent module's owner for this child module.
             module_owners.insert(module, owners.into_iter().collect());
-        }
-
-        if module_owners.values().all(|owners| owners.is_empty())
-            && !distributions
-                .values()
-                .any(|distribution| distribution.editable_path.is_some())
-            // Check for a package outside the workspace. A dependency-free virtual workspace
-            // has no modules to attribute, so its empty ownership map is valid.
-            && distributions
-                .keys()
-                .any(|id| !self.members.iter().any(|member| member.id == *id))
-        {
-            return Err(DependencyMetadataError::MissingModuleOwnership);
         }
 
         projects.sort_by(|left, right| left.path.cmp(&right.path));
@@ -277,8 +284,6 @@ pub(crate) enum DependencyMetadataError {
     DuplicateMemberPath(SystemPathBuf),
     #[error("no workspace project information is available in uv metadata")]
     MissingProjects,
-    #[error("uv metadata has no module ownership or editable source paths")]
-    MissingModuleOwnership,
     #[error("uv did not provide a Python environment")]
     MissingEnvironment,
     #[error("could not read uv's Python environment `{path}`: {message}")]
@@ -315,9 +320,7 @@ impl DependencyMetadataError {
             self.to_string(),
         ));
         match self {
-            Self::MissingModuleOwnership
-            | Self::MissingEnvironment
-            | Self::MissingSelectedEnvironment
+            Self::MissingEnvironment | Self::MissingSelectedEnvironment
                 if kind == DependencyProjectKind::Project =>
             {
                 diagnostic.sub(SubDiagnostic::new(
@@ -362,6 +365,13 @@ mod tests {
         json!({
             "schema": {"version": "preview"},
             "workspace_root": absolute("/app"),
+            "environment": {
+                "root": absolute("/app/.venv"),
+                "packages": {
+                    "direct": {"name": "a-different-distribution-name", "editable": false},
+                    "indirect": {"name": "indirect", "editable": false}
+                }
+            },
             "workspace": {"id": "workspace"},
             "members": [{"id": "member", "name": "app", "path": absolute("/app")}],
             "module_owners": {
@@ -421,6 +431,9 @@ mod tests {
         system
             .memory_file_system()
             .write_file_all(absolute("/app/pyproject.toml"), "[tool.uv.workspace]")?;
+        if let Some(root) = metadata["environment"]["root"].as_str() {
+            system.memory_file_system().create_directory_all(root)?;
+        }
         let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, &system)?;
         Ok(metadata.dependency_metadata()?)
     }
@@ -439,6 +452,20 @@ mod tests {
 
     fn ids<const N: usize>(ids: [&str; N]) -> BTreeSet<CharStr> {
         ids.into_iter().map(CharStr::from).collect()
+    }
+
+    #[test]
+    fn empty_installed_dependency_inventory_is_authoritative() -> anyhow::Result<()> {
+        let mut input = metadata();
+        input["environment"]["packages"] = json!({});
+        let metadata = extract(&input)?;
+        assert!(
+            metadata
+                .module_owners
+                .values()
+                .all(|owners| owners.is_empty())
+        );
+        Ok(())
     }
 
     #[test]
@@ -548,6 +575,7 @@ mod tests {
         input["module_owners"] = json!({});
         input["resolution"]["direct"]["source"] =
             json!({"editable": absolute("/editable-package")});
+        input["environment"]["packages"]["direct"]["editable"] = json!(true);
         let metadata = extract(&input)?;
 
         assert!(metadata.module_owners.is_empty());
@@ -558,6 +586,13 @@ mod tests {
                 .and_then(|distribution| distribution.editable_path.as_deref()),
             Some(absolute("/editable-package").as_path())
         );
+
+        // A non-editable installation supersedes the editable source in the resolution.
+        input["environment"]["packages"]["direct"]["editable"] = json!(false);
+        assert_eq!(extract(&input)?.distributions["direct"].editable_path, None);
+
+        input["environment"]["packages"] = json!({});
+        assert_eq!(extract(&input)?.distributions["direct"].editable_path, None);
 
         Ok(())
     }
@@ -649,18 +684,12 @@ mod tests {
         let mut missing_projects = metadata();
         missing_projects["workspace"] = json!(null);
         missing_projects["members"] = json!([]);
-        let mut missing_owners = metadata();
-        missing_owners["module_owners"] = json!({});
 
         for (input, expected) in [
             (missing_graph, "resolution node `workspace` is missing"),
             (
                 missing_projects,
                 "no workspace project information is available in uv metadata",
-            ),
-            (
-                missing_owners,
-                "uv metadata has no module ownership or editable source paths",
             ),
         ] {
             let error = extract(&input)

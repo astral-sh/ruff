@@ -910,6 +910,21 @@ mod tests {
                 .is_lint_named("missing-direct-dependency")
         );
 
+        // Removing the declaration and resolution node does not uninstall the package.
+        let mut unmanaged_metadata = indirect_metadata;
+        unmanaged_metadata["resolution"] = json!({
+            "script+test": {"kind": "script", "dependencies": []}
+        });
+        apply_dependency_metadata(&mut db, file, &unmanaged_metadata)?;
+        let diagnostics = db.check_file(file);
+        assert_eq!(diagnostics.len(), 1);
+        assert!(
+            diagnostics[0]
+                .id()
+                .is_lint_named("missing-direct-dependency")
+        );
+        assert!(diagnostics[0].headline_message().contains("leaf"));
+
         Ok(())
     }
 
@@ -917,7 +932,14 @@ mod tests {
         json!({
             "schema": {"version": "preview"},
             "workspace_root": root.as_str(),
-            "environment": {"root": root.join(".venv"), "python": {"version": "3.13.5"}},
+            "environment": {
+                "root": root.join(".venv"),
+                "python": {"version": "3.13.5"},
+                "packages": {
+                    "parent": {"name": "parent", "editable": false},
+                    "leaf": {"name": "leaf", "editable": false}
+                }
+            },
             "script": {"path": path.as_str(), "id": "script+test"},
             "resolution": {
                 "script+test": {

@@ -20,6 +20,7 @@ pub(crate) struct UvMetadata {
     workspace_root: SystemPathBuf,
     members: Box<[WorkspaceMember]>,
     environment: Option<SystemPathBuf>,
+    installed_packages: BTreeMap<CharStr, InstalledPackage>,
     schema: Schema,
     workspace: Option<NodeReference>,
     script: Option<PathNodeReference>,
@@ -53,13 +54,19 @@ impl UvMetadata {
 
         let workspace_root = existing_directory(metadata.workspace_root, "workspace root", system)?;
 
-        let environment = match metadata.environment {
-            Some(environment) => Some(existing_directory(
-                environment.root,
-                "environment root",
-                system,
-            )?),
-            None => None,
+        let (environment, installed_packages) = match metadata.environment {
+            Some(environment) => (
+                Some(existing_directory(
+                    environment.root,
+                    "environment root",
+                    system,
+                )?),
+                environment
+                    .packages
+                    .ok_or(UvMetadataError::MissingPackageInventory)?
+                    .0,
+            ),
+            None => (None, BTreeMap::new()),
         };
 
         let mut module_owners = metadata.module_owners;
@@ -76,6 +83,7 @@ impl UvMetadata {
             workspace_root,
             members: metadata.members,
             environment,
+            installed_packages,
             schema: metadata.schema,
             workspace: metadata.workspace,
             script: metadata.script,
@@ -113,6 +121,9 @@ pub(crate) enum UvMetadataError {
 
     #[error("invalid `uv workspace metadata` JSON: {0}")]
     InvalidMetadata(serde_json::Error),
+
+    #[error("uv metadata is missing the installed package inventory; upgrade to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
+    MissingPackageInventory,
 
     #[error("non-Unicode {description} returned by `uv workspace metadata`: `{path}`", path = path.display())]
     NonUnicodePath {
@@ -175,7 +186,7 @@ fn existing_directory(
 /// See uv's [schema documentation] and [serialization types] for the upstream format.
 ///
 /// [schema documentation]: https://docs.astral.sh/uv/reference/internals/metadata/#schema
-/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-resolver/src/lock/export/metadata.rs
+/// [serialization types]: https://github.com/astral-sh/uv/blob/main/crates/uv-lock/src/lock/export/metadata.rs
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     workspace_root: PathBuf,
@@ -201,6 +212,26 @@ struct ModuleMetadata {
 #[derive(Deserialize)]
 struct WorkspaceEnvironment {
     root: PathBuf,
+    // An optional field lets us provide an upgrade message for older uv versions.
+    packages: Option<InstalledPackages>,
+}
+
+#[derive(Deserialize)]
+#[serde(transparent)]
+struct InstalledPackages(
+    #[serde(deserialize_with = "string_interner::deserialize_map")]
+    BTreeMap<CharStr, InstalledPackage>,
+);
+
+/// The installed package's name and editability, used for import ownership.
+///
+/// For editable installs, source roots come from the resolution: the installed package's `path`
+/// points to distribution metadata instead of source code.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
+struct InstalledPackage {
+    #[serde(deserialize_with = "string_interner::deserialize")]
+    name: CharStr,
+    editable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, get_size2::GetSize)]
@@ -305,6 +336,29 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn environment_requires_package_inventory() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        system.memory_file_system().create_directory_all("/app")?;
+
+        for environment in [
+            json!({"root": "/app"}),
+            json!({"root": "/app", "packages": null}),
+        ] {
+            let metadata = json!({
+                "schema": {"version": "preview"},
+                "workspace_root": "/app",
+                "environment": environment,
+            });
+            assert_matches!(
+                UvMetadata::from_metadata(&serde_json::to_vec(&metadata)?, &system),
+                Err(UvMetadataError::MissingPackageInventory)
+            );
+        }
+
+        Ok(())
+    }
+
     fn assert_shared(expected: &CharStr, actual: &CharStr) {
         assert_eq!(actual, expected);
         assert!(expected.is_heap_allocated());
@@ -323,6 +377,10 @@ mod tests {
         let input = serde_json::to_vec(&json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
+            "environment": {
+                "root": root,
+                "packages": {(dependency_id): {"name": name, "editable": false}}
+            },
             "members": [{"id": member_id, "name": "app", "path": root}],
             "resolution": {
                 (member_id): {
@@ -345,12 +403,18 @@ mod tests {
             .module_owners
             .get_key_value(name)
             .context("expected module ownership")?;
+        let (installed_id, package) = metadata
+            .installed_packages
+            .get_key_value(dependency_id)
+            .context("expected an installed dependency")?;
 
         assert_shared(
             dependency_key,
             &metadata.resolution[member_id].dependencies[0].id,
         );
         assert_shared(dependency_key, &owners[0].package_id);
+        assert_shared(dependency_key, installed_id);
+        assert_shared(module_name, &package.name);
 
         let dependencies = metadata.dependency_metadata()?;
         assert_shared(
@@ -380,6 +444,7 @@ mod tests {
                 "workspace_root": "/app",
                 "environment": {
                     "root": "/env",
+                    "packages": {},
                     "python": { "version": "3.13.5" }
                 },
                 "schema": { "version": schema },
