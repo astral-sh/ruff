@@ -9,9 +9,14 @@ use crate::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 use ordermap::OrderMap;
 use pep440_rs::VersionSpecifiers;
 use ruff_db::RustDoc;
+#[cfg(feature = "junit")]
+use ruff_db::diagnostic::render::JunitRenderer;
+use ruff_db::diagnostic::render::{
+    ConciseRenderer, FileResolver, FullRenderer, GithubRenderer, GitlabRenderer, Renderer,
+};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, Severity,
-    Span, SubDiagnostic, SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span, SubDiagnostic,
+    SubDiagnosticSeverity,
 };
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
@@ -1473,18 +1478,22 @@ impl OutputFormat {
     pub const fn is_human_readable(&self) -> bool {
         matches!(self, OutputFormat::Full | OutputFormat::Concise)
     }
-}
 
-impl From<OutputFormat> for DiagnosticFormat {
-    fn from(value: OutputFormat) -> Self {
-        match value {
-            OutputFormat::Full => Self::Full,
-            OutputFormat::Concise => Self::Concise,
-            OutputFormat::Gitlab => Self::Gitlab,
-            OutputFormat::Github => Self::Github,
+    /// Display diagnostics in this output format.
+    pub fn display<'a>(
+        self,
+        resolver: &'a dyn FileResolver,
+        config: &'a DisplayDiagnosticConfig,
+        diagnostics: &'a [Diagnostic],
+    ) -> impl Display + use<'a> {
+        fmt::from_fn(move |f| match self {
+            Self::Full => FullRenderer::new(resolver, config).render(f, diagnostics),
+            Self::Concise => ConciseRenderer::new(resolver, config).render(f, diagnostics),
+            Self::Gitlab => GitlabRenderer::new(resolver, config).render(f, diagnostics),
+            Self::Github => GithubRenderer::new(resolver, config).render(f, diagnostics),
             #[cfg(feature = "junit")]
-            OutputFormat::Junit => Self::Junit,
-        }
+            Self::Junit => JunitRenderer::new(resolver, config).render(f, diagnostics),
+        })
     }
 }
 
@@ -2276,16 +2285,16 @@ impl ToSettingsError {
         let db: &dyn ruff_db::Db = db;
 
         fmt::from_fn(move |f| {
-            let display_config = DisplayDiagnosticConfig::new("ty")
-                .format(self.output_format.into())
-                .color(self.color);
+            let display_config = DisplayDiagnosticConfig::new("ty").color(self.color);
 
             write!(
                 f,
                 "{}",
-                self.diagnostic
-                    .to_diagnostic()
-                    .display(&db, &display_config)
+                self.output_format.display(
+                    &db,
+                    &display_config,
+                    &[self.diagnostic.to_diagnostic()]
+                )
             )
         })
     }

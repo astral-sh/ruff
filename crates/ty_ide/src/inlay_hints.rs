@@ -852,8 +852,8 @@ mod tests {
     use itertools::Itertools;
     use ruff_db::{
         diagnostic::{
-            Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-            LintName, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+            Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity,
+            Span, SubDiagnostic, SubDiagnosticSeverity,
         },
         files::{File, FileRange, system_path_to_file},
         source::source_text,
@@ -1406,10 +1406,7 @@ Source with applied edits:
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let diag = diagnostic.into_diagnostic();
             let config =

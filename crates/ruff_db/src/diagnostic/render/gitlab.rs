@@ -9,25 +9,21 @@ use serde::{Serialize, Serializer, ser::SerializeSeq};
 
 use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
-use super::FileResolver;
+use super::{FileResolver, Renderer};
 
-pub(super) struct GitlabRenderer<'a> {
+pub struct GitlabRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GitlabRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
 }
 
-impl GitlabRenderer<'_> {
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for GitlabRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         write!(
             f,
             "{}",
@@ -184,9 +180,8 @@ fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) 
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     const FINGERPRINT_FILTERS: [(&str, &str); 1] = [(
