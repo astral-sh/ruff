@@ -1504,6 +1504,18 @@ impl TypeCheckDiagnostics {
         self.diagnostics.push(diagnostic);
     }
 
+    pub(super) fn len(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    pub(super) fn deduplicate_since(&mut self, count: usize) {
+        for index in (count..self.diagnostics.len()).rev() {
+            if self.diagnostics[count..index].contains(&self.diagnostics[index]) {
+                self.diagnostics.remove(index);
+            }
+        }
+    }
+
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions.extend(&other.used_suppressions);

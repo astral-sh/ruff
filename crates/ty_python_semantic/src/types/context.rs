@@ -239,6 +239,14 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    pub(super) fn diagnostic_count(&self) -> usize {
+        self.diagnostics.borrow().len()
+    }
+
+    pub(super) fn deduplicate_diagnostics_since(&self, count: usize) {
+        self.diagnostics.borrow_mut().deduplicate_since(count);
+    }
+
     /// Whether diagnostics inferred separately for a referenced alias should be collected.
     pub(super) fn should_collect_diagnostics(&self) -> bool {
         !self.diagnostics_suppressed

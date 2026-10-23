@@ -9991,6 +9991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
         let revealed_type = self.revealed_type_for_call(&inferred);
+        let has_multiple_attempts = !inferred.rest.is_empty();
         let mut bindings = inferred.into_bindings();
 
         self.report_deprecated_call(
@@ -10007,6 +10008,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.check_type_observations(&bindings, revealed_type, call_expression);
 
+        let diagnostic_count = has_multiple_attempts.then(|| self.context.diagnostic_count());
         for binding in bindings.iter_flat_mut() {
             let binding_type = binding.callable_type;
             for (_, overload) in binding.matching_overloads_mut() {
@@ -10046,6 +10048,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => {}
                 }
             }
+        }
+        if let Some(diagnostic_count) = diagnostic_count {
+            self.context.deduplicate_diagnostics_since(diagnostic_count);
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an

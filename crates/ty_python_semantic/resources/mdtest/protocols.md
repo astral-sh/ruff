@@ -508,6 +508,16 @@ runtime_checkable_extensions(cls=NotAProtocol)  # error: [invalid-argument-type]
 runtime_checkable(P)  # no diagnostic
 ```
 
+The restriction is reported once even when multiple union members accept the call:
+
+```py
+class Left: ...
+class Right: ...
+class Both(Left, Right): ...
+
+invalid: type[Left] | type[Right] = runtime_checkable(Both)  # error: [invalid-argument-type]
+```
+
 ## `runtime_checkable` in stub files
 
 In a stub file, a class can inherit from `Protocol` through an alias defined later in the file:
