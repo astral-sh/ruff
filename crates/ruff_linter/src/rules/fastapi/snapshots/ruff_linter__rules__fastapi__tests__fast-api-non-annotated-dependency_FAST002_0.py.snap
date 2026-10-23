@@ -287,3 +287,39 @@ FAST002 FastAPI dependency without `Annotated`
    |
 help: Replace with `typing.Annotated`
 info: Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.
+
+FAST002 [*] FastAPI dependency without `Annotated`
+   --> FAST002_0.py:109:14
+    |
+108 | @app.get("/test5")
+109 | def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `typing.Annotated`
+    |
+14  | from pydantic import BaseModel
+15  + from typing import Annotated
+16  |
+--------------------------------------------------------------------------------
+109 | @app.get("/test5")
+    - def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
+110 + def handler5(d: Annotated[str, Depends(get_one)], e: str = Depends(get_two)): ...
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+FAST002 [*] FastAPI dependency without `Annotated`
+   --> FAST002_0.py:109:41
+    |
+108 | @app.get("/test5")
+109 | def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
+    |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+help: Replace with `typing.Annotated`
+    |
+14  | from pydantic import BaseModel
+15  + from typing import Annotated
+16  |
+--------------------------------------------------------------------------------
+109 | @app.get("/test5")
+    - def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
+110 + def handler5(d: str = Depends(get_one), e: Annotated[str, Depends(get_two)]): ...
+    |
+note: This is an unsafe fix and may change runtime behavior
