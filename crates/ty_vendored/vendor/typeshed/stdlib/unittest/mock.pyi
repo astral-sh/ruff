@@ -233,26 +233,26 @@ class NonCallableMock(Base, Any):
         """Filter the output of `dir(mock)` to only useful members."""
 
     def assert_called_with(self, *args: Any, **kwargs: Any) -> None:
-        """assert that the last call was made with the specified arguments.
+        """Assert that the last call was made with the specified arguments.
 
         Raises an AssertionError if the args and keyword args passed in are
         different to the last call to the mock.
         """
 
     def assert_not_called(self) -> None:
-        """assert that the mock was never called."""
+        """Assert that the mock was never called."""
 
     def assert_called_once_with(self, *args: Any, **kwargs: Any) -> None:
-        """assert that the mock was called exactly once and that call was
+        """Assert that the mock was called exactly once and that call was
         with the specified arguments.
         """
 
     def _format_mock_failure_message(self, args: Any, kwargs: Any, action: str = "call") -> str: ...
     def assert_called(self) -> None:
-        """assert that the mock was called at least once"""
+        """Assert that the mock was called at least once."""
 
     def assert_called_once(self) -> None:
-        """assert that the mock was called only once."""
+        """Assert that the mock was called only once."""
 
     def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None:
         """Restore the mock object to its initial state."""
@@ -271,7 +271,7 @@ class NonCallableMock(Base, Any):
         """
 
     def assert_any_call(self, *args: Any, **kwargs: Any) -> None:
-        """assert the mock has been called with the specified arguments.
+        """Assert the mock has been called with the specified arguments.
 
         The assert passes if the mock has *ever* been called, unlike
         `assert_called_with` and `assert_called_once_with` that only pass if
@@ -279,7 +279,7 @@ class NonCallableMock(Base, Any):
         """
 
     def assert_has_calls(self, calls: Sequence[_Call], any_order: bool = False) -> None:
-        """assert the mock has been called with the specified calls.
+        """Assert the mock has been called with the specified calls.
         The `mock_calls` list is checked for the calls.
 
         If `any_order` is False (the default) then the calls must be
@@ -318,6 +318,8 @@ class NonCallableMock(Base, Any):
         """
 
     return_value: Any
+    """The value to be returned when the mock is called."""
+
     side_effect: Any
     called: bool
     call_count: int
@@ -550,7 +552,7 @@ class _patch_dict:
     values: Any
     clear: Any
     def __init__(self, in_dict: Any, values: Any = (), clear: Any = False, **kwargs: Any) -> None: ...
-    def __call__(self, f: Any) -> Any: ...
+    def __call__(self, f: _F) -> _F: ...
     def __enter__(self) -> Any:
         """Patch the dict."""
 
@@ -1012,14 +1014,14 @@ if sys.version_info >= (3, 13):
     class ThreadingMixin(Base):
         DEFAULT_TIMEOUT: Final[float | None] = None
 
-        def __init__(self, /, *args: Any, timeout: float | None | _SentinelObject = ..., **kwargs: Any) -> None: ...
+        def __init__(self, /, *args: Any, timeout: float | _SentinelObject | None = ..., **kwargs: Any) -> None: ...
         # Same as `NonCallableMock.reset_mock.`
         def reset_mock(self, visited: Any = None, *, return_value: bool = False, side_effect: bool = False) -> None:
             """
             See :func:`.Mock.reset_mock()`
             """
 
-        def wait_until_called(self, *, timeout: float | None | _SentinelObject = ...) -> None:
+        def wait_until_called(self, *, timeout: float | _SentinelObject | None = ...) -> None:
             """Wait until the mock object is called.
 
             `timeout` - time to wait for in seconds, waits forever otherwise.

@@ -38,13 +38,11 @@ warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the 
    |
 12 |         e = 56  # error: [ambiguous-protocol-member]
    |         ^^^^^^ Consider adding an annotation, e.g. `e: int = ...`
-   |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/mdtest_snippet.py:4:7
   |
 4 | class Foo(Protocol):
   |       ^^^^^^^^^^^^^ `Foo` declared as a protocol here
-  |
 info: No declarations found for `e` in the body of `Foo` or any of its superclasses
 
 ```

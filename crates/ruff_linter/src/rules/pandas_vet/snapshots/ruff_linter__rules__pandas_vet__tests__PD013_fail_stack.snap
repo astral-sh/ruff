@@ -8,4 +8,3 @@ PD013 `.melt` is preferred to `.stack`; provides same functionality
 3 | x = pd.DataFrame()
 4 | y = x.stack(level=-1, dropna=True)
   |     ^^^^^^^
-  |

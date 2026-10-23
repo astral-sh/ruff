@@ -2,8 +2,8 @@
 
 ## Conditional local override of builtin
 
-If a builtin name is conditionally shadowed by a local variable, a name lookup should union the
-builtin type with the conditionally-defined type:
+If a builtin name is conditionally shadowed by a local variable, the function's binding scope
+terminates name resolution. The name can be unbound, but it cannot refer to the builtin:
 
 ```py
 def _(flag: bool) -> None:
@@ -11,8 +11,10 @@ def _(flag: bool) -> None:
         abs = 1
         chr: int = 1
 
-    reveal_type(abs)  # revealed: Literal[1] | (def abs[_T](x: SupportsAbs[_T], /) -> _T)
-    reveal_type(chr)  # revealed: Literal[1] | (def chr(i: SupportsIndex, /) -> str)
+    # error: [possibly-unresolved-reference]
+    reveal_type(abs)  # revealed: Literal[1]
+    # error: [possibly-unresolved-reference]
+    reveal_type(chr)  # revealed: Literal[1]
 ```
 
 ## Conditionally global override of builtin

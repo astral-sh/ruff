@@ -6,6 +6,7 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_builtin_or_provider;
 use crate::{FixAvailability, Violation};
 
@@ -49,7 +50,7 @@ use crate::{FixAvailability, Violation};
 /// The fix is always unsafe because the variable in scope that matches the
 /// task ID may not be the Airflow task object that produced the `XCom` value.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.11")]
+#[violation_metadata(preview_since = "0.15.11", category = Category::Complexity)]
 pub(crate) struct AirflowXcomPullInTemplateString {
     task_id: String,
 }
@@ -114,7 +115,12 @@ pub(crate) fn xcom_pull_in_template_string(checker: &Checker, call: &ast::ExprCa
 
             // If the task_id matches a variable in scope, provide an unsafe fix
             // replacing the template string with `<variable>.output`.
-            if checker.semantic().lookup_symbol(&task_id).is_some() {
+            if checker
+                .semantic()
+                .lookup_symbol(&task_id)
+                .binding_id()
+                .is_some_and(|binding_id| !checker.semantic().binding(binding_id).kind.is_builtin())
+            {
                 diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                     format!("{task_id}.output"),
                     arg_value.range(),

@@ -103,7 +103,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     });
 }
 
-pub(crate) fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
+fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
     match expr {
         Expr::Name(name) => Some(name),
         Expr::Call(ExprCall { func, .. }) => get_name_expr(func),

@@ -118,7 +118,6 @@ B905 [*] `zip()` without an explicit `strict=` parameter
 33 | # Error
 34 | zip(*lot_of_iterators)
    | ^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Add explicit value for parameter `strict=`
    |
 33 | # Error

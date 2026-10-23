@@ -1,12 +1,117 @@
-use rustc_hash::FxHashSet;
-
-use ruff_python_ast as ast;
-
 use crate::Db;
+use crate::ProgramEnvironment;
+use rustc_hash::FxHashSet;
+use std::cell::Cell;
+
+use ruff_python_ast::{self as ast};
+
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use crate::types::newtype::{NewType, walk_newtype_base};
 use crate::types::tuple::TupleSpec;
-use crate::types::typevar::BoundTypeVarIdentity;
-use crate::types::visitor::any_over_type;
-use crate::types::{Type, UnionBuilder};
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, walk_type_var_bounds};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::{
+    IntersectionType, KnownInstanceType, RecursiveType, Type, TypeAliasType, UnionBuilder,
+};
+
+/// Return whether the outer type may be a tuple, without searching nested arguments or members.
+/// A recursion cutoff conservatively counts as a possible tuple.
+fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+    struct TupleShapeVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        recursion_guard: TypeCollector<'db>,
+        active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
+        may_be_tuple: Cell<bool>,
+    }
+
+    impl<'db> TupleShapeVisitor<'_, 'db> {
+        fn visit_guarded(&self, db: &'db dyn Db, ty: Type<'db>, visit: impl FnOnce()) {
+            self.active_types.visit(
+                &ty.to_type_identity(db),
+                || self.may_be_tuple.set(true),
+                visit,
+            );
+        }
+    }
+
+    impl<'db> TypeVisitor<'db> for TupleShapeVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.may_be_tuple.get() {
+                return;
+            }
+
+            if ty.tuple_instance_spec(db, self.env).is_some() {
+                self.may_be_tuple.set(true);
+                return;
+            }
+
+            if matches!(
+                ty,
+                Type::Union(_)
+                    | Type::Intersection(_)
+                    | Type::TypeAlias(_)
+                    | Type::Recursive(_)
+                    | Type::NewTypeInstance(_)
+                    | Type::TypeVar(_)
+            ) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        fn visit_intersection_type(&self, db: &'db dyn Db, intersection: IntersectionType<'db>) {
+            for element in intersection.iter_positive(db) {
+                self.visit_type(db, element);
+            }
+        }
+
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            self.visit_guarded(db, Type::TypeAlias(alias), || {
+                self.visit_type(db, alias.value_type(db));
+            });
+        }
+
+        fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+            self.visit_guarded(db, Type::Recursive(recursive), || {
+                self.visit_type(db, recursive.unfold(db, self.env).into_type());
+            });
+        }
+
+        fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+            self.visit_guarded(db, Type::NewTypeInstance(newtype), || {
+                walk_newtype_base(db, newtype, self);
+            });
+        }
+
+        fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+            self.visit_guarded(
+                db,
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)),
+                || {
+                    if let Some(bounds) = typevar.bound_or_constraints(db, self.env) {
+                        walk_type_var_bounds(db, bounds, self);
+                    }
+                },
+            );
+        }
+    }
+
+    let visitor = TupleShapeVisitor {
+        env,
+        recursion_guard: TypeCollector::default(),
+        active_types: ActiveRecursionDetector::default(),
+        may_be_tuple: Cell::new(false),
+    };
+    visitor.visit_type(db, ty);
+    visitor.may_be_tuple.get()
+}
 
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
 #[derive(Default)]
@@ -24,24 +129,25 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     pub(crate) fn record_inferred_expression_type(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::is_promotable_tuple_literal(db, expression, ty) {
-            self.record_unpromotable_type(db, typevar_identity, ty);
+        if !Self::allows_expression(db, env, Some(expression), ty) {
+            self.blocked_typevars.insert(typevar_identity);
         }
     }
 
-    /// Records that a typevar is ineligible for tuple size promotion if the given type contains
-    /// a tuple type.
+    /// Block tuple size promotion if this type variable is assigned a possible tuple type.
     pub(crate) fn record_unpromotable_type(
         &mut self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(db, ty, true, |ty| ty.tuple_instance_spec(db).is_some()) {
+        if !Self::allows_expression(db, env, None, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -52,11 +158,37 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         !self.blocked_typevars.contains(&typevar_identity)
     }
 
+    /// Reports whether an inferred collection element allows tuple size promotion. Tuple types
+    /// from annotations or nonliteral expressions keep their shape.
+    ///
+    /// For `items = [(1,), (2, 3)]`, both tuple literals are eligible, so their differing lengths
+    /// may be widened to `tuple[int, ...]`. With `pair = (2, 3)` followed by
+    /// `items = [(1,), pair]`, the nonliteral `pair` blocks promotion for the collection.
+    ///
+    /// The supplied `ty` should already have undergone literal promotion, so `(2, 3)` has the
+    /// homogeneous type `tuple[int, int]` when checking its eligibility.
+    /// If no source expression is available, any tuple type blocks tuple-size promotion.
+    pub(crate) fn allows_expression(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: Option<&ast::Expr>,
+        ty: Type<'db>,
+    ) -> bool {
+        expression
+            .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
+            || !may_be_tuple(db, env, ty)
+    }
+
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the
     /// empty tuple (and hence is eligible for tuple size promotion).
-    fn is_promotable_tuple_literal(db: &'db dyn Db, expression: &ast::Expr, ty: Type<'db>) -> bool {
+    fn is_promotable_tuple_literal(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+    ) -> bool {
         matches!(expression, ast::Expr::Tuple(tuple) if !tuple.iter().any(ast::Expr::is_starred_expr))
-            && TupleSizePromotionCandidate::from_type(db, ty).is_some()
+            && TupleSizePromotionCandidate::from_type(db, env, ty).is_some()
     }
 }
 
@@ -72,7 +204,7 @@ enum TupleSizePromotionCandidate<'db> {
 impl<'db> TupleSizePromotionCandidate<'db> {
     /// Returns an eligible candidate if the given type represents one (i.e., it is a
     /// fixed-length homogeneous tuple or the empty tuple).
-    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
         let tuple_spec = ty.exact_tuple_instance_spec(db)?;
         let TupleSpec::Fixed(tuple) = tuple_spec.as_ref() else {
             return None;
@@ -84,7 +216,7 @@ impl<'db> TupleSizePromotionCandidate<'db> {
         };
 
         elements
-            .all(|element| element.is_equivalent_to(db, element_type))
+            .all(|element| element.is_equivalent_to(db, env, element_type))
             .then_some(Self::Homogeneous {
                 element_type,
                 length: tuple.len(),
@@ -122,20 +254,21 @@ impl<'db> HomogeneousTupleUnionGroup<'db> {
 /// candidates for tuple size promotion, and another for groups of homogeneous tuple elements that are.
 fn partition_tuple_union_elements<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     elements: impl IntoIterator<Item = Type<'db>>,
 ) -> (Vec<Type<'db>>, Vec<HomogeneousTupleUnionGroup<'db>>) {
     let mut other_union_elements = Vec::new();
     let mut tuple_groups: Vec<HomogeneousTupleUnionGroup<'db>> = Vec::new();
 
     for element in elements {
-        match TupleSizePromotionCandidate::from_type(db, element) {
+        match TupleSizePromotionCandidate::from_type(db, env, element) {
             Some(TupleSizePromotionCandidate::Homogeneous {
                 element_type,
                 length,
             }) => {
                 if let Some(group) = tuple_groups
                     .iter_mut()
-                    .find(|group| group.element_type.is_equivalent_to(db, element_type))
+                    .find(|group| group.element_type.is_equivalent_to(db, env, element_type))
                 {
                     group.add(element, length);
                 } else {
@@ -175,21 +308,25 @@ impl<'db> Type<'db> {
     /// reveal_type(languages)  # revealed: dict[str, tuple[str, ...]]
     /// ```
     ///
-    pub(crate) fn promote_tuple_size_in_union(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn promote_tuple_size_in_union(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
         let Type::Union(union) = self else {
             return self;
         };
 
         let (other_union_elements, tuple_groups) =
-            partition_tuple_union_elements(db, union.elements(db).iter().copied());
+            partition_tuple_union_elements(db, env, union.elements(db).iter().copied());
 
         if !tuple_groups.iter().any(|group| group.has_multiple_lengths) {
             return self;
         }
 
-        let mut builder = UnionBuilder::new(db)
+        let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
-            .recursively_defined(union.recursively_defined(db));
+            .or_recursively_defined(union.recursively_defined(db));
 
         for element in other_union_elements {
             builder = builder.add(element);
@@ -197,7 +334,7 @@ impl<'db> Type<'db> {
 
         for group in tuple_groups {
             if group.has_multiple_lengths {
-                builder = builder.add(Type::homogeneous_tuple(db, group.element_type));
+                builder = builder.add(Type::homogeneous_tuple(db, env, group.element_type));
             } else {
                 for element in group.original_tuple_types {
                     builder = builder.add(element);

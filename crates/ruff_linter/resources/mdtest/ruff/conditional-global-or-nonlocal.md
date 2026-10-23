@@ -1,8 +1,8 @@
-# `conditional-global-or-nonlocal` (`RUF077`)
+# `conditional-global-or-nonlocal` (`RUF078`)
 
 ```toml
 lint.preview = true
-lint.select = ["RUF077"]
+lint.select = ["RUF078"]
 ```
 
 ## Declared in a skippable block, used on another path
@@ -23,12 +23,11 @@ def update(flag):
 ```
 
 ```snapshot
-error[RUF077]: `counter` is declared `global` in a block that may not run on every path, but the declaration applies to the entire function
+error[RUF078]: `counter` is declared `global` in a block that may not run on every path, but the declaration applies to the entire function
  --> src/mdtest_snippet.py:6:16
   |
 6 |         global counter  # snapshot: conditional-global-or-nonlocal
   |                ^^^^^^^
-  |
 ```
 
 `nonlocal` behaves the same way:

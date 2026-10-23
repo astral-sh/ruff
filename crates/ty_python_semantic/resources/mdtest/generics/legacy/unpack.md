@@ -1,0 +1,262 @@
+# Legacy `typing.Unpack`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+`Unpack[Ts]` is the legacy spelling of `*Ts`. The shared semantics of type variable tuples are
+covered in `../pep695/typevartuple.md`; this file checks the distinct syntax paths used by `Unpack`.
+
+## Generic specialization
+
+`Unpack` can introduce a type variable tuple in a legacy generic declaration. An unpacked fixed
+tuple can also provide multiple type arguments when specializing the generic.
+
+```py
+from typing import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+class Array(Generic[Unpack[Ts]]):
+    value: tuple[Unpack[Ts]]
+
+reveal_type(Array[()]().value)  # revealed: tuple[()]
+reveal_type(Array[int, str]().value)  # revealed: tuple[int, str]
+reveal_type(Array[Unpack[tuple[int, str]]]().value)  # revealed: tuple[int, str]
+```
+
+## Variadic parameter inference
+
+An unpacked type variable tuple used for `*args` preserves the number and types of positional
+arguments.
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
+    reveal_type(args)  # revealed: tuple[*Ts@collect]
+    raise NotImplementedError
+
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+```
+
+The legacy spelling must also preserve argument-derived types when a surrounding assignment expects
+an incompatible return type.
+
+```py
+inferred = collect(1)
+reveal_type(inferred)  # revealed: tuple[Literal[1]]
+# error: [invalid-assignment]
+indirect: tuple[str] = inferred
+# error: [invalid-assignment]
+direct: tuple[str] = collect(1)
+```
+
+## Callable parameters
+
+`Unpack` expands a type variable tuple into a callable's positional parameter list. The same tuple
+can describe the arguments forwarded to that callable.
+
+```py
+from typing import Callable, TypeVar, TypeVarTuple, Unpack
+
+R = TypeVar("R")
+Ts = TypeVarTuple("Ts")
+
+def invoke(
+    callback: Callable[[Unpack[Ts]], R],
+    *args: Unpack[Ts],
+) -> R:
+    raise NotImplementedError
+
+def format_value(value: int, label: str, /) -> str:
+    return f"{label}: {value}"
+
+reveal_type(invoke(format_value, 1, "value"))  # revealed: str
+# TODO: Validate arguments matched to the variadic parameter against the `TypeVarTuple` inferred
+# from the callback.
+reveal_type(invoke(format_value, 1))  # revealed: str
+```
+
+## Forwarding a `ParamSpec` through an unpacked type variable tuple
+
+A callable that forwards a parameter specification can itself be passed, with its arguments, to a
+callable whose positional parameters are described by an unpacked type variable tuple.
+
+```py
+from typing import Callable, ParamSpec, TypeVarTuple, Unpack
+
+P = ParamSpec("P")
+Ts = TypeVarTuple("Ts")
+
+def invoke(callback: Callable[[Unpack[Ts]], None], *args: Unpack[Ts]) -> None: ...
+def forward(callback: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def one_arg(value: int) -> None: ...
+
+invoke(forward, one_arg, 1)
+```
+
+## Type aliases
+
+A legacy alias can use `Unpack[Ts]` and accept either individual types or an unpacked tuple type.
+
+```py
+from typing import TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+Alias = tuple[int, Unpack[Ts]]
+
+def f(
+    fixed: Alias[str, bool],
+    unbounded: Alias[Unpack[tuple[str, ...]]],
+) -> None:
+    reveal_type(fixed)  # revealed: tuple[int, str, bool]
+    reveal_type(unbounded)  # revealed: tuple[int, *tuple[str, ...]]
+```
+
+## Unsupported union unpacking
+
+Unpacking a type variable tuple into `Union` is currently not supported. The rejected union recovers
+to `object` both on its own and inside another generic specialization. Runtime element access also
+recovers to `object`.
+
+```py
+from typing import TypeVarTuple, Union, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+# TODO: shouldn't error
+# error: [invalid-type-form]
+def reject_union(value: Union[Unpack[Ts]]) -> None:
+    # TODO: should reveal `Union[*Ts]` representation
+    reveal_type(value)  # revealed: object
+
+# error: [invalid-type-form] "Unpacking a `TypeVarTuple` in `Union` is not supported"
+def reject_nested_union(value: list[Union[Unpack[Ts], None]]) -> None:
+    reveal_type(value)  # revealed: list[object]
+
+def element_types(values: tuple[Unpack[Ts]]) -> None:
+    # TODO: should reveal `Union[*Ts]` representation
+    reveal_type(values[0])  # revealed: object
+
+    for value in values:
+        # TODO: should reveal `Union[*Ts]` representation
+        reveal_type(value)  # revealed: object
+```
+
+## Invalid unpack operand nested in a union
+
+Although `Unpack[int]` is valid Python syntax, its non-tuple operand should report an ordinary
+diagnostic when the union appears inside a generic specialization.
+
+```py
+from typing import Union, Unpack
+
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+def invalid_operand(value: list[Union[Unpack[int], None]]) -> None:
+    reveal_type(value)  # revealed: list[tuple[Unknown, ...] | None]
+```
+
+## Invalid unpack contexts still infer the operand
+
+An invalid unpack context should not suppress runtime errors from its operand. String annotations do
+not execute their contents, so unresolved names inside an invalid string annotation remain silent.
+
+```py
+from typing import Unpack
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+# error: [unresolved-reference] "Name `Missing` used when not defined"
+def invalid_context(value: Unpack[Missing]) -> None: ...
+
+# error: [invalid-type-form] "`Unpack` is not allowed in parameter annotations"
+def invalid_stringified_context(value: "Unpack[Missing]") -> None: ...
+```
+
+## Concrete and nested tuple unpacking
+
+`Unpack` can expand a concrete tuple annotation for `*args`, including a nested unbounded tuple.
+
+```py
+from typing import Unpack
+
+def accept(
+    *args: Unpack[tuple[bool, Unpack[tuple[str, ...]], bytes]],
+) -> None: ...
+
+accept(True, "phase", "status", b"ok")
+accept(True, b"ok")
+accept(True, 1, b"bad")  # error: [invalid-argument-type]
+```
+
+## Defaults
+
+A type variable tuple default can use `Unpack`, and an explicit specialization overrides it.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+class WithDefault(Generic[Unpack[Ts]]):
+    value: tuple[Unpack[Ts]]
+
+reveal_type(WithDefault().value)  # revealed: tuple[int, str]
+reveal_type(WithDefault[bool, bytes]().value)  # revealed: tuple[bool, bytes]
+```
+
+## Validation
+
+`Unpack` requires a tuple operand, and a tuple specialization can contain only one variadic unpack.
+
+```py
+from typing import Generic, TypeVar, TypeVarTuple, Unpack
+
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Xs = TypeVarTuple("Xs")
+Ys = TypeVarTuple("Ys")
+
+class Pair(Generic[Unpack[Ts], U]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class MultipleUnpack(Generic[Unpack[Xs], Unpack[Ys]]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class StarThenUnpack(Generic[*Xs, Unpack[Ys]]): ...
+
+# error: [invalid-generic-class] "Only one `TypeVarTuple` parameter is allowed in a `Generic` subscription"
+class UnpackThenStar(Generic[Unpack[Xs], *Ys]): ...
+
+def invalid(
+    # error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+    non_tuple: Pair[Unpack[int], str],
+    # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+    multiple: tuple[Unpack[Ts], Unpack[tuple[str, ...]]],
+) -> None:
+    reveal_type(non_tuple)  # revealed: Pair[*tuple[Unknown, ...], str]
+
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+def invalid_vararg(*args: Unpack[int]) -> None:
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
+
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+def invalid_stringified_vararg(*args: "Unpack[int]") -> None:
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
+
+# error: [invalid-type-form] "`Unpack` cannot be nested"
+def nested(*args: Unpack[Unpack[tuple[int, ...]]]) -> None: ...
+
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a parameter annotation"
+def nested_bare_typevartuple(*args: Unpack[tuple[Ts]]) -> None: ...
+```

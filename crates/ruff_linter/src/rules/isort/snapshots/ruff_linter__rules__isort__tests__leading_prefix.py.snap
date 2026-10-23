@@ -44,5 +44,4 @@ I001 Import block is un-sorted or un-formatted
 12 | x = 1; \
 13 | import os
    | ^^^^^^^^^
-   |
 help: Organize imports

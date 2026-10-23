@@ -37,7 +37,7 @@ type foo = type
 type foo = match
 type foo = case
 
-# multine definitions
+# multiline definitions
 type \
 	X = int
 type X \

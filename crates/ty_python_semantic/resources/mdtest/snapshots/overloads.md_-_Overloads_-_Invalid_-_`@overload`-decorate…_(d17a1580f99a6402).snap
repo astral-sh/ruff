@@ -55,7 +55,6 @@ warning[useless-overload-body]: Useless body for `@overload`-decorated function 
    |
 23 |     return x  # error: [useless-overload-body]
    |     ^^^^^^^^ This statement will never be executed
-   |
 info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
 
@@ -67,7 +66,6 @@ warning[useless-overload-body]: Useless body for `@overload`-decorated function 
    |
 29 |     print("oh no, a string")  # error: [useless-overload-body]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^ This statement will never be executed
-   |
 info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
 help: Consider replacing this function body with `...` or `pass`
 

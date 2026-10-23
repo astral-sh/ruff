@@ -57,7 +57,6 @@ error[invalid-named-tuple]: NamedTuple class `C` cannot use multiple inheritance
   |
 4 | class C(NamedTuple, object):
   |                     ^^^^^^
-  |
 
 ```
 
@@ -67,7 +66,6 @@ error[invalid-named-tuple]: NamedTuple class `D` cannot use multiple inheritance
    |
 10 |     int,  # error: [invalid-named-tuple]
    |     ^^^
-   |
 
 ```
 
@@ -77,6 +75,5 @@ error[invalid-named-tuple]: NamedTuple class `E` cannot use multiple inheritance
    |
 17 | class E(NamedTuple, Protocol): ...
    |                     ^^^^^^^^
-   |
 
 ```

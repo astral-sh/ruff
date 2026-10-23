@@ -40,7 +40,6 @@ Q002 [*] Single quote docstring found but double quotes preferred
 8 |
 9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
   |                             ^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Replace single quotes docstring with double quotes
   |
 8 |

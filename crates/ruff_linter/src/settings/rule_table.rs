@@ -36,7 +36,7 @@ impl RuleTable {
 
     /// Returns whether violations of the given rule should be fixed.
     #[inline]
-    pub const fn should_fix(&self, rule: Rule) -> bool {
+    pub(crate) const fn should_fix(&self, rule: Rule) -> bool {
         self.should_fix.contains(rule)
     }
 

@@ -10,6 +10,172 @@ For references, see:
 - <https://docs.python.org/3/reference/datamodel.html#object.__contains__>
 - <https://snarky.ca/unravelling-membership-testing/>
 
+## Inline list and set literals
+
+An immediately consumed list or set literal preserves its elements' values for membership tests.
+This lets us determine whether a literal value is present or absent.
+
+```py
+reveal_type("a" in ["a", "b"])  # revealed: Literal[True]
+reveal_type("c" in ["a", "b"])  # revealed: Literal[False]
+reveal_type("a" not in ["a", "b"])  # revealed: Literal[False]
+reveal_type("c" not in ["a", "b"])  # revealed: Literal[True]
+
+reveal_type("a" in {"a", "b"})  # revealed: Literal[True]
+reveal_type("c" in {"a", "b"})  # revealed: Literal[False]
+reveal_type("a" not in {"a", "b"})  # revealed: Literal[False]
+reveal_type("c" not in {"a", "b"})  # revealed: Literal[True]
+```
+
+Membership uses runtime equality, including equality between integer and boolean values. Duplicate
+set elements do not change membership, and an empty list cannot contain any value.
+
+```py
+reveal_type(1 in [True])  # revealed: Literal[True]
+reveal_type(True in {1, 1})  # revealed: Literal[True]
+reveal_type(b"a" in {b"a", b"b"})  # revealed: Literal[True]
+reveal_type("a" in [])  # revealed: Literal[False]
+reveal_type("a" not in [])  # revealed: Literal[True]
+```
+
+## Inline elements with inferred literal types
+
+Elements can have known literal values without using literal syntax. A function returning a literal
+type provides the same membership information as the corresponding literal expression.
+
+```py
+from typing import Literal
+
+def first() -> Literal["a"]:
+    return "a"
+
+second = "b"
+reveal_type("a" in [first(), second])  # revealed: Literal[True]
+reveal_type("c" in [first(), second])  # revealed: Literal[False]
+reveal_type("b" in {first(), second})  # revealed: Literal[True]
+reveal_type("c" in {first(), second})  # revealed: Literal[False]
+```
+
+An element with a union type contributes only one of its possible values. Neither alternative is
+guaranteed to be present, but a value outside the union is definitely absent.
+
+```py
+def uncertain_element(value: Literal["a", "b"]):
+    reveal_type("a" in [value])  # revealed: bool
+    reveal_type("c" in [value])  # revealed: Literal[False]
+    reveal_type("a" in {value})  # revealed: bool
+    reveal_type("c" in {value})  # revealed: Literal[False]
+
+def unknown_element(value: str):
+    reveal_type("a" in [value])  # revealed: bool
+    reveal_type("a" in {value})  # revealed: bool
+```
+
+An unknown element does not prevent a later known element from establishing membership.
+
+```py
+def known_element(value: str):
+    reveal_type("a" in [value, "a"])  # revealed: Literal[True]
+    reveal_type("a" not in [value, "a"])  # revealed: Literal[False]
+    reveal_type("a" in {value, "a"})  # revealed: Literal[True]
+    reveal_type("a" not in {value, "a"})  # revealed: Literal[False]
+```
+
+## Inline enum members
+
+An inline set of enum members also has known membership.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+reveal_type(Color.RED in {Color.RED})  # revealed: Literal[True]
+reveal_type(Color.BLUE in {Color.RED})  # revealed: Literal[False]
+```
+
+## Unpacked inline list elements
+
+Unpacking a fixed-length tuple or another inline list preserves the known elements. Unpacking a list
+of unknown length does not guarantee that any value is present.
+
+```py
+reveal_type("a" in [*("a", "b")])  # revealed: Literal[True]
+reveal_type("c" not in [*["a", "b"]])  # revealed: Literal[True]
+
+def unpack_unknown(values: list[str]):
+    reveal_type("a" in [*values])  # revealed: bool
+```
+
+## Stored mutable containers
+
+A stored list or set can be empty or contain only some of the values permitted by its element type.
+A literal element type alone therefore does not establish membership.
+
+```py
+from typing import Literal
+
+def stored(values: list[Literal["a", "b"]], keys: set[Literal["a", "b"]]):
+    reveal_type("a" in values)  # revealed: bool
+    reveal_type("a" not in values)  # revealed: bool
+    reveal_type("a" in keys)  # revealed: bool
+    reveal_type("a" not in keys)  # revealed: bool
+```
+
+## Inline containers with custom equality
+
+Lists and sets test their elements using identity or equality. A custom equality method with a known
+result can therefore establish membership. We assume that equal objects have equal hashes.
+
+```py
+from typing import Literal, overload
+
+class EqualValue:
+    @overload
+    def __eq__(self, other: "EqualValue") -> Literal[True]: ...
+    @overload
+    def __eq__(self, other: object) -> bool: ...
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, EqualValue)
+
+    def __hash__(self) -> int:
+        return 0
+
+reveal_type(EqualValue() in [EqualValue()])  # revealed: Literal[True]
+reveal_type(EqualValue() not in [EqualValue()])  # revealed: Literal[False]
+reveal_type(EqualValue() in {EqualValue()})  # revealed: Literal[True]
+reveal_type(EqualValue() not in {EqualValue()})  # revealed: Literal[False]
+```
+
+Identity also counts as a match, even when equality always returns false. The equality result alone
+therefore cannot establish that a custom object is absent.
+
+```py
+class NeverEqual:
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+value = NeverEqual()
+reveal_type(value in [value])  # revealed: bool
+```
+
+## Inline membership in comparison chains
+
+The following comparison receives the actual list type of the shared operand, so its reflected
+method can accept the list even when the preceding membership test has a known result.
+
+```py
+from typing import Literal
+
+class LargerThanList:
+    def __gt__(self, other: list[str]) -> Literal[True]:
+        return True
+
+reveal_type("a" in ["a"] < LargerThanList())  # revealed: Literal[True]
+```
+
 ## Implements `__contains__`
 
 Classes can support membership tests by implementing the `__contains__` method:
@@ -122,6 +288,111 @@ reveal_type(42 in AlwaysFalse())  # revealed: Literal[False]
 reveal_type(42 not in AlwaysFalse())  # revealed: Literal[True]
 ```
 
+## Required and optional `TypedDict` keys
+
+A required key is always present, while an optional key may or may not be present.
+
+```py
+from typing_extensions import NotRequired, TypedDict
+
+class Items(TypedDict):
+    required: int
+    optional: NotRequired[int]
+
+def membership(items: Items) -> None:
+    reveal_type("required" in items)  # revealed: Literal[True]
+    reveal_type("required" not in items)  # revealed: Literal[False]
+    reveal_type("optional" in items)  # revealed: bool
+    reveal_type("optional" not in items)  # revealed: bool
+```
+
+## Absent keys in closed `TypedDict`s
+
+A closed `TypedDict` cannot contain an undeclared key or an optional key whose value type is
+uninhabited. Declaring `extra_items=Never` closes a `TypedDict` in the same way as `closed=True`.
+
+```py
+from typing_extensions import Never, NotRequired, TypedDict
+
+class Closed(TypedDict, closed=True):
+    present: int
+    impossible: NotRequired[Never]
+
+class ClosedByExtraItems(TypedDict, extra_items=Never):
+    present: int
+
+def closed_membership(closed: Closed, closed_by_extra_items: ClosedByExtraItems) -> None:
+    reveal_type("missing" in closed)  # revealed: Literal[False]
+    reveal_type("missing" not in closed)  # revealed: Literal[True]
+    reveal_type("impossible" in closed)  # revealed: Literal[False]
+    reveal_type("impossible" not in closed)  # revealed: Literal[True]
+    reveal_type("missing" in closed_by_extra_items)  # revealed: Literal[False]
+    reveal_type("missing" not in closed_by_extra_items)  # revealed: Literal[True]
+```
+
+## Undeclared keys in open `TypedDict`s
+
+Open `TypedDict`s and `TypedDict`s with nonempty extra items may contain keys that their schemas do
+not declare.
+
+```py
+from typing_extensions import TypedDict
+
+class Open(TypedDict):
+    present: int
+
+class ExtraItems(TypedDict, extra_items=int):
+    present: int
+
+def open_membership(open_items: Open, extra_items: ExtraItems) -> None:
+    reveal_type("missing" in open_items)  # revealed: bool
+    reveal_type("missing" not in open_items)  # revealed: bool
+    reveal_type("missing" in extra_items)  # revealed: bool
+    reveal_type("missing" not in extra_items)  # revealed: bool
+```
+
+## `TypedDict` membership with unions and non-literal keys
+
+Membership remains ambiguous when either the key or the `TypedDict` can vary between a present and
+an absent alternative. A key missing from every closed alternative is always absent.
+
+```py
+from typing_extensions import Literal, TypedDict
+
+class Left(TypedDict, closed=True):
+    left: int
+
+class Right(TypedDict, closed=True):
+    right: int
+
+def union_membership(
+    left: Left,
+    either: Left | Right,
+    literal_key: Literal["left", "missing"],
+    unknown_key: str,
+) -> None:
+    reveal_type("missing" in either)  # revealed: Literal[False]
+    reveal_type("missing" not in either)  # revealed: Literal[True]
+    reveal_type("left" in either)  # revealed: bool
+    reveal_type(literal_key in left)  # revealed: bool
+    reveal_type(unknown_key in left)  # revealed: bool
+```
+
+## Functional closed `TypedDict` membership
+
+Functional `TypedDict` definitions expose the same key-presence information as class-based
+definitions.
+
+```py
+from typing_extensions import TypedDict
+
+Closed = TypedDict("Closed", {"present": int}, closed=True)
+
+def functional_membership(closed: Closed) -> None:
+    reveal_type("present" in closed)  # revealed: Literal[True]
+    reveal_type("missing" in closed)  # revealed: Literal[False]
+```
+
 ## No Fallback for `__contains__`
 
 If `__contains__` is implemented, checking membership of a type it doesn't accept is an error; it
@@ -226,7 +497,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 9 | 10 in WithContains()
   | ^^^^^^^^^^^^^^^^^^^^
-  |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 
@@ -241,6 +511,5 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
    |
 11 | 10 not in WithContains()
    | ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: `__bool__` on `NotBoolable` must be callable
 ```

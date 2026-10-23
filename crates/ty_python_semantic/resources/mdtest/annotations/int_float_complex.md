@@ -40,12 +40,20 @@ def assigns_float_to_int(x: float):
     y: int = x
 ```
 
-Unlike other type checkers, we choose not to obfuscate this special case by displaying `int | float`
-as just `float`; we display the actual type:
+Ty displays these numeric-tower unions using the canonical spellings `float` and `complex`. Exact
+runtime instances are displayed as `float*` and `complex*` to preserve the distinction. The starred
+spellings are only used in type displays; use `ty_extensions.JustFloat` or `JustComplex` to write
+the exact types in annotations.
 
 ```py
 def f(x: float):
-    reveal_type(x)  # revealed: int | float
+    reveal_type(x)  # revealed: float
+
+def returns_float() -> float:
+    return 1
+
+reveal_type(returns_float())  # revealed: float
+reveal_type(1.0)  # revealed: float*
 ```
 
 ## complex
@@ -86,7 +94,32 @@ def assigns_complex(x: complex):
     z: float = x
 
 def f(x: complex):
-    reveal_type(x)  # revealed: int | float | complex
+    reveal_type(x)  # revealed: complex
+
+reveal_type(1j)  # revealed: complex*
+```
+
+## Shadowed numeric builtins
+
+Canonical numeric names remain qualified when a module defines a class with the same name:
+
+```py
+import builtins
+
+class float: ...
+class complex: ...
+
+def reveal_shadowed_names(
+    x: builtins.float | float,
+    y: builtins.complex | complex,
+):
+    reveal_type(x)  # revealed: builtins.float | mdtest_snippet.float
+    reveal_type(y)  # revealed: builtins.complex | mdtest_snippet.complex
+
+def takes_custom_float(x: float): ...
+def pass_builtin_float(x: builtins.float):
+    # error: [invalid-argument-type] "Argument to function `takes_custom_float` is incorrect: Expected `mdtest_snippet.float`, found `builtins.float`"
+    takes_custom_float(x)
 ```
 
 ## Narrowing
@@ -99,14 +132,14 @@ from typing_extensions import assert_type
 from ty_extensions import JustFloat
 
 def f(x: complex):
-    reveal_type(x)  # revealed: int | float | complex
+    reveal_type(x)  # revealed: complex
 
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     elif isinstance(x, float):
-        reveal_type(x)  # revealed: float
+        reveal_type(x)  # revealed: float*
     else:
-        reveal_type(x)  # revealed: complex
+        reveal_type(x)  # revealed: complex*
 
     assert isinstance(x, float)
     assert_type(x, JustFloat)

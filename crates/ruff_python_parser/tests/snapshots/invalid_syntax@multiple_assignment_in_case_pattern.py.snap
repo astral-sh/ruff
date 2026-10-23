@@ -819,4 +819,3 @@ Module(
  9 |     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
 10 |     case x as x: ...  # MatchAs
    |               ^ Syntax Error: multiple assignments to name `x` in pattern
-   |

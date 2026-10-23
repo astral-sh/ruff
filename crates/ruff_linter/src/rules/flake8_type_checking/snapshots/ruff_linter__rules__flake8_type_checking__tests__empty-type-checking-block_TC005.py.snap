@@ -7,7 +7,6 @@ TC005 [*] Found empty type-checking block
 3 | if TYPE_CHECKING:
 4 |     pass  # TC005
   |     ^^^^
-  |
 help: Delete empty type-checking block
   |
 2 |

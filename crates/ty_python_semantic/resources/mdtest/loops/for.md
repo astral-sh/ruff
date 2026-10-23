@@ -66,6 +66,45 @@ for from_count in range(count):
 reveal_type(from_count)  # revealed: int
 ```
 
+Narrowing established by a non-empty loop remains available after the loop.
+
+```py
+def narrowing_after_non_empty_range(value: int | None) -> None:
+    for _ in range(1):
+        if value is None:
+            return
+
+    reveal_type(value)  # revealed: int
+```
+
+The same narrowing is preserved at module scope.
+
+```py
+def get_value() -> int | None:
+    return None
+
+module_value = get_value()
+
+for _ in range(1):
+    if module_value is None:
+        raise RuntimeError
+
+reveal_type(module_value)  # revealed: int
+```
+
+It also works in a class body.
+
+```py
+class Example:
+    value = get_value()
+
+    for _ in range(1):
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
 The emptiness refinement is independent of the order in which range values are assigned:
 
 ```py
@@ -84,27 +123,6 @@ def non_empty_first(flag: bool) -> None:
 
     if value:
         reveal_type(value)  # revealed: range
-```
-
-Empty ranges all compare equal, but non-empty ranges with the same type refinement may contain
-different values:
-
-```py
-empty_left = range(0)
-empty_right = range(1, 1)
-
-if empty_left == empty_right:
-    reveal_type(empty_left)  # revealed: range
-else:
-    reveal_type(empty_left)  # revealed: Never
-
-non_empty_left = range(1)
-non_empty_right = range(2)
-
-if non_empty_left == non_empty_right:
-    reveal_type(non_empty_left)  # revealed: range
-else:
-    reveal_type(non_empty_left)  # revealed: range
 ```
 
 ## With shadowed `range`
@@ -231,7 +249,7 @@ reveal_type(x)  # revealed: int
 for x in {"foo": 1}:
     pass
 
-reveal_type(x)  # revealed: str
+reveal_type(x)  # revealed: Literal["foo"]
 
 for x in "a":
     pass
@@ -344,6 +362,91 @@ async def _():
     reveal_type(x)
 ```
 
+## With literal dictionary
+
+Iterating over a dictionary literal preserves literal key types. Its key, value, and item views also
+preserve literal types because the dictionary cannot be mutated through those views.
+
+```py
+for key in {"a": 1, "b": 2}:
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for key in {"a": 1, "b": 2}.keys():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for value in {"a": 1, "b": 2}.values():
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+for key, value in {"a": 1, "b": 2}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+Storing the view in a variable retains these types:
+
+```py
+values = {"a": 1, "b": 2}.values()
+reveal_type(values)  # revealed: dict_values[Literal["a", "b"], Literal[1, 2]]
+```
+
+Comprehensions use the same precise types for their iteration targets:
+
+```py
+[reveal_type(key) for key in {"a": 1, "b": 2}]  # revealed: Literal["a", "b"]
+[reveal_type(value) for value in {1: "a", 2: "b"}.values()]  # revealed: Literal["a", "b"]
+```
+
+This also applies when the target is an attribute or a tuple of names:
+
+```py
+from typing import Literal
+
+class C:
+    key: Literal["a", "b"]
+
+c = C()
+[None for c.key in {"a": 1, "b": 2}]  # no diagnostic
+[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # no diagnostic
+
+for number, letter in {(1, "a"): 0, (2, "b"): 0}:
+    reveal_type(number)  # revealed: Literal[1, 2]
+    reveal_type(letter)  # revealed: Literal["a", "b"]
+```
+
+Nested mutable containers still permit mutation:
+
+```py
+for values in {"a": [1]}.values():
+    reveal_type(values)  # revealed: list[int]
+    values.append(2)  # no diagnostic
+```
+
+## With unpacked literal dictionary
+
+Unpacking another dictionary literal preserves its literal keys and values. Unpacking an arbitrary
+mapping uses that mapping's key and value types.
+
+```py
+for key, value in {"a": 1, **{"b": 2}}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def _(mapping: dict[str, int]):
+    for key, value in {"a": 1, **mapping}.items():
+        reveal_type(key)  # revealed: str
+        reveal_type(value)  # revealed: int
+```
+
+Repeated keys do not imply a fixed iteration length. Values from overwritten entries may still be
+included in the inferred union:
+
+```py
+for value in {**{1: "a"}, 1: "b"}.values():
+    reveal_type(value)  # revealed: Literal["a", "b"]
+
+(key,) = {1: "a", 1: "b"}  # no diagnostic
+```
+
 ## With non-callable iterator
 
 ```py
@@ -369,7 +472,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |
 9 |     for x in NotIterable():
   |              ^^^^^^^^^^^^^
-  |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
 ```
 
@@ -387,7 +489,6 @@ error[not-iterable]: Object of type `Literal[123]` is not iterable
   |
 2 | for x in nonsense:  # snapshot: not-iterable
   |          ^^^^^^^^
-  |
 info: It doesn't have an `__iter__` method or a `__getitem__` method
 ```
 
@@ -409,7 +510,6 @@ error[not-iterable]: Object of type `NotIterable` is not iterable
   |
 6 | for x in NotIterable():  # snapshot: not-iterable
   |          ^^^^^^^^^^^^^
-  |
 info: Its `__iter__` attribute has type `None`, which is not callable
 ```
 
@@ -598,7 +698,6 @@ error[not-iterable]: Object of type `Test | Literal[42]` may not be iterable
    |
 13 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
 info: `Literal[42]` does not implement `__iter__`
 ```
@@ -631,7 +730,6 @@ error[not-iterable]: Object of type `Test | Test2` may not be iterable
    |
 16 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
 info: element `Test2` of union `Test | Test2` is not assignable to `Iterable[Unknown]`
 info: └── type `Test2` is not assignable to protocol `Iterable[Unknown]`
@@ -672,7 +770,6 @@ error[not-iterable]: Object of type `Test | NotIter` may not be iterable
    |
 15 |     for x in iterable:
    |              ^^^^^^^^
-   |
 info: Its `__iter__` attribute (with type `(bound method Test.__iter__() -> TestIter) | int`) may not be callable
 ```
 
@@ -706,14 +803,13 @@ def _(x: Sequence[int], y: object):
         reveal_type(item)  # revealed: int
 
     if isinstance(y, list):
-        reveal_type(y)  # revealed: Top[list[Unknown]]
+        reveal_type(y)  # revealed: list[Unknown]
         for item in y:
-            reveal_type(item)  # revealed: object
+            reveal_type(item)  # revealed: Unknown
 
     if isinstance(x, list):
-        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        reveal_type(x)  # revealed: list[int]
         for item in x:
-            # int & object simplifies to int
             reveal_type(item)  # revealed: int
 ```
 
@@ -915,11 +1011,11 @@ error[not-iterable]: Object of type `Iterable` is not iterable
    |
 10 | for x in Iterable():
    |          ^^^^^^^^^^
-   |
 info: Its `__iter__` method has an invalid signature
 info: type `Iterable` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature `def __iter__(self): ...`
 ```
 
@@ -941,7 +1037,6 @@ error[not-iterable]: Object of type `Bad` is not iterable
   |
 6 | for x in Bad():
   |          ^^^^^
-  |
 info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
 ```
 
@@ -992,7 +1087,6 @@ error[not-iterable]: Object of type `Iterable1` is not iterable
    |
 17 | for x in Iterable1():
    |          ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -1000,6 +1094,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `extra_arg`
+help: Parameter `extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1015,7 +1110,6 @@ error[not-iterable]: Object of type `Iterable2` is not iterable
    |
 20 | for y in Iterable2():
    |          ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
 ```
 
@@ -1047,7 +1141,6 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
    |
 16 |     for x in Iterable():
    |              ^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1107,7 +1200,6 @@ error[not-iterable]: Object of type `Iterable` may not be iterable
    |
 15 |     for x in Iterable():
    |              ^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method or a `__getitem__` method
 ```
 
@@ -1128,7 +1220,6 @@ error[not-iterable]: Object of type `Bad` is not iterable
   |
 5 | for x in Bad():
   |          ^^^^^
-  |
 info: It has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
 ```
 
@@ -1167,7 +1258,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 22 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `CustomCallable`, which is not callable
 ```
@@ -1185,7 +1275,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 26 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
 ```
@@ -1210,7 +1299,6 @@ error[not-iterable]: Object of type `Iterable` is not iterable
   |
 8 | for x in Iterable():
   |          ^^^^^^^^^^
-  |
 info: It has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1266,11 +1354,11 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 16 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method may have an invalid signature
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
 info:     └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
 info: Expected signature for `__iter__` is `def __iter__(self): ...`
 ```
@@ -1296,7 +1384,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 27 |     for x in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
 ```
 
@@ -1340,7 +1427,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 28 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator1`, which may have an invalid `__next__` method
 info: type `Iterable1` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -1348,6 +1434,7 @@ info:     └── incompatible return types: `Iterator1` is not assignable to 
 info:         └── type `Iterator1` is not assignable to protocol `Iterator[Unknown]`
 info:             └── protocol member `__next__` is incompatible
 info:                 └── unexpected extra parameter `invalid_extra_arg`
+help: Parameter `invalid_extra_arg` must have a default value
 info: Expected signature for `__next__` is `def __next__(self): ...`
 ```
 
@@ -1364,7 +1451,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 31 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that may not be callable
 info: type `Iterable2` is not assignable to protocol `Iterable[Unknown]`
 info: └── protocol member `__iter__` is incompatible
@@ -1406,7 +1492,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 20 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable1.__getitem__(item: int) -> str) | None`, which is not callable
 ```
@@ -1423,7 +1508,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 24 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1472,7 +1556,6 @@ error[not-iterable]: Object of type `Iterable1` may not be iterable
    |
 31 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
 ```
 
@@ -1488,7 +1571,6 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
    |
 35 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-   |
 info: It may not have an `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 ```
@@ -1531,7 +1613,8 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown, reveal_mro
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, TypeOf, is_assignable_to, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
@@ -1581,12 +1664,10 @@ simplify to `Never`, leaving only the iterable parts.
 ```py
 def f[T: tuple[int, ...] | int](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        reveal_type(x)  # revealed: T@f & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
-            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`.
+            # The `int` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1598,13 +1679,10 @@ constraint, those parts should also simplify to `Never`.
 ```py
 def g[T: tuple[int, ...] | list[str]](x: T):
     if isinstance(x, tuple):
-        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        reveal_type(x)  # revealed: T@g & tuple[int, ...]
         for item in x:
-            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
-            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
-            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
-            # `tuple[int, ...] | Never` = `tuple[int, ...]`
-            # so iterating gives `int`, NOT `int | str`.
+            # The `list[str]` alternative in the TypeVar bound is disjoint from `tuple`. The
+            # remaining `tuple[int, ...]` alternative supplies the narrowed specialization.
             reveal_type(item)  # revealed: int
 ```
 
@@ -1765,6 +1843,28 @@ for _ in iterable():
 x
 ```
 
+### Deletions in nested loops reach the outer loop
+
+A deletion followed by `continue` in an inner loop can remain visible after a later `break`. The
+variable can be unbound on the next outer iteration, even when exhausting the inner loop returns
+from the function.
+
+```py
+def f(flags: list[bool]):
+    x = 0
+    for _ in flags:
+        x  # error: [possibly-unresolved-reference]
+        for stop in flags:
+            if stop:
+                break
+            x = 0
+            del x
+            continue
+        else:
+            return
+        x  # error: [possibly-unresolved-reference]
+```
+
 ### Bindings in a loop are possibly-unbound after the loop
 
 ```py
@@ -1795,6 +1895,23 @@ x = 0
 for _ in range(1_000_000):
     x, y = x + 1, None
     reveal_type(x)  # revealed: int
+```
+
+### Unpacking alongside a recursively growing value
+
+The first element remains precise even when its sibling's type grows on each loop iteration. Reading
+each literal element independently preserves that information during cycle recovery.
+
+```py
+x = 0
+for _ in range(10):
+    first, x = (1, (x,))
+    reveal_type(first)  # revealed: Literal[1]
+
+x = 0
+for _ in range(10):
+    first, x = [1, (x,)]
+    reveal_type(first)  # revealed: Literal[1]
 ```
 
 ### Avoid oscillations
@@ -1975,7 +2092,7 @@ for _ in range(1_000_000):
         break
     node = node.next
 reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: Node | None
+reveal_type(node.next)  # revealed: None | Node
 ```
 
 ### Nested collection cycles do not panic
@@ -2025,7 +2142,10 @@ def _():
             nonlocal y  # error: [invalid-syntax] "name `y` is used prior to nonlocal declaration"
 ```
 
-### Loop header definitions don't shadow member bindings
+### Rebinding an object before an unconditional `break`
+
+Rebinding an object followed by an unconditional `break` does not affect its members at the start of
+the loop, because the new object never reaches another iteration.
 
 ```py
 class C:
@@ -2046,4 +2166,62 @@ for _ in range(1):
     reveal_type(d[0])  # revealed: Literal[1]
     d = []
     break
+```
+
+### Rebinding an object resets attribute narrowing across iterations
+
+The first iteration sees the initial object; later iterations see a replacement narrowed at the end
+of the previous iteration. A replacement's attribute initially has the full declared union.
+
+```py
+class Box:
+    value: int | str | None
+
+def example(box: Box):
+    assert isinstance(box.value, int)
+    reveal_type(box.value)  # revealed: int
+
+    for _ in range(2):
+        # The first iteration sees int; subsequent iterations see str.
+        reveal_type(box.value)  # revealed: int | str
+
+        box = Box()
+        reveal_type(box.value)  # revealed: int | str | None
+
+        assert isinstance(box.value, str)
+
+    # The loop is non-empty, so the current value has been narrowed to str.
+    reveal_type(box.value)  # revealed: str
+```
+
+### Boolean attribute narrowing after rebinding
+
+The loop body can observe either the initial object or a replacement from a previous iteration. A
+guard on the initial object therefore does not narrow `box.value` throughout the loop.
+
+```py
+class Box:
+    value: bool
+
+def f(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: bool
+        box = replacement
+```
+
+Narrowing established on a replacement object also reaches the next iteration. If each replacement
+has `value` narrowed to `False`, the loop body keeps that narrowing.
+
+```py
+def narrowed_replacement(box: Box, replacement: Box):
+    if box.value:
+        return
+
+    for _ in range(2):
+        reveal_type(box.value)  # revealed: Literal[False]
+        box = replacement
+        assert not box.value
 ```

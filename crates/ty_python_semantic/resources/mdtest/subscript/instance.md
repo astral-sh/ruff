@@ -15,7 +15,6 @@ error[not-subscriptable]: Cannot subscript object of type `NotSubscriptable` wit
   |
 4 | a = NotSubscriptable()[0]
   |     ^^^^^^^^^^^^^^^^^^^^^
-  |
 ```
 
 ## `__getitem__` not callable

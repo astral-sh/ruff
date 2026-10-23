@@ -1,0 +1,149 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:24:12
+   |
+22 | cr_ok = f'\\r'
+23 |
+24 | sub = 'sub ␚'
+   |            ^
+25 | sub = f'sub ␚'
+   |
+help: Replace with escape sequence
+   |
+23 |
+   - sub = 'sub '
+24 + sub = 'sub \x1a'
+25 | sub = f'sub '
+   |
+
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:25:13
+   |
+24 | sub = 'sub ␚'
+25 | sub = f'sub ␚'
+   |             ^
+26 |
+27 | sub_ok = '\x1a'
+   |
+help: Replace with escape sequence
+   |
+24 | sub = 'sub '
+   - sub = f'sub '
+25 + sub = f'sub \x1a'
+26 |
+   |
+
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:55:25
+   |
+53 | zwsp_after_multicharacter_grapheme_cluster = f"ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+54 |
+55 | nested_fstrings = f'␈{f'␚{f'␛'}'}'
+   |                         ^
+56 |
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+   |
+help: Replace with escape sequence
+   |
+54 |
+   - nested_fstrings = f'␈{f'{f'␛'}'}'
+55 + nested_fstrings = f'␈{f'\x1a{f'␛'}'}'
+56 |
+   |
+
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:58:12
+   |
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+58 | x = f"""}}a␚b"""
+   |            ^
+59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
+60 | x = f"""}}a␛b"""
+   |
+help: Replace with escape sequence
+   |
+57 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998106
+   - x = f"""}}ab"""
+58 + x = f"""}}a\x1ab"""
+59 | # https://github.com/astral-sh/ruff/issues/7455#issuecomment-1741998256
+   |
+
+PLE2512 Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:64:12
+   |
+63 | # https://github.com/astral-sh/ruff/issues/13294
+64 | print(r"""␈␚␛␀​
+   |            ^
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2512 Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:66:13
+   |
+64 | print(r"""␈␚␛␀​
+65 | """)
+66 | print(fr"""␈␚␛␀​
+   |             ^
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |
+help: Replace with escape sequence
+
+PLE2512 Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:68:13
+   |
+66 | print(fr"""␈␚␛␀​
+67 | """)
+68 | print(Rf"""␈␚␛␀​
+   |             ^
+69 | """)
+   |
+help: Replace with escape sequence
+
+PLE2512 Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:73:9
+   |
+71 | # https://github.com/astral-sh/ruff/issues/18815
+72 | b = "\␈"
+73 | sub = "\␚"
+   |         ^
+74 | esc = "\␛"
+75 | zwsp = "\​"
+   |
+help: Replace with escape sequence
+
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:80:25
+   |
+78 | # tstrings
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+   |                         ^
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |
+help: Replace with escape sequence
+   |
+79 | esc = t'esc esc ␛'
+   - nested_tstrings = t'␈{t'{t'␛'}'}'
+80 + nested_tstrings = t'␈{t'\x1a{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'{t'␛'}'}'
+   |
+
+PLE2512 [*] Invalid unescaped character SUB, use "\x1a" instead
+  --> invalid_characters.py:81:26
+   |
+79 | esc = t'esc esc ␛'
+80 | nested_tstrings = t'␈{t'␚{t'␛'}'}'
+81 | nested_ftstrings = t'␈{f'␚{t'␛'}'}'
+   |                          ^
+help: Replace with escape sequence
+   |
+80 | nested_tstrings = t'␈{t'{t'␛'}'}'
+   - nested_ftstrings = t'␈{f'{t'␛'}'}'
+81 + nested_ftstrings = t'␈{f'\x1a{t'␛'}'}'
+82 |
+   |

@@ -2,15 +2,21 @@
 
 The full tests for these features are in `generics/legacy/variables.md`.
 
-<!-- snapshot-diagnostics -->
-
 ## Must have a name
 
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar()
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `name` parameter of `TypeVar` is required.
+ --> src/mdtest_snippet.py:4:5
+  |
+4 | T = TypeVar()
+  |     ^^^^^^^^^
 ```
 
 ## Name can't be given more than once
@@ -18,8 +24,16 @@ T = TypeVar()
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", name="T")
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `name` parameter of `TypeVar` can only be provided once.
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", name="T")
+  |                  ^^^^^^^^
 ```
 
 ## Must be directly assigned to a variable
@@ -31,11 +45,26 @@ T = TypeVar("T", name="T")
 from typing import TypeVar
 
 T = TypeVar("T")
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 U: TypeVar = TypeVar("U")
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 tuple_with_typevar = ("foo", TypeVar("W"))
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple variable assignment
+ --> src/mdtest_snippet.py:5:14
+  |
+5 | U: TypeVar = TypeVar("U")
+  |              ^^^^^^^^^^^^
+
+
+error[invalid-legacy-type-variable]: A `TypeVar` definition must be a simple variable assignment
+ --> src/mdtest_snippet.py:8:30
+  |
+8 | tuple_with_typevar = ("foo", TypeVar("W"))
+  |                              ^^^^^^^^^^^^
 ```
 
 ## `TypeVar` parameter must match variable name
@@ -45,8 +74,16 @@ tuple_with_typevar = ("foo", TypeVar("W"))
 ```py
 from typing import TypeVar
 
-# error: [mismatched-type-name]
+# snapshot: mismatched-type-name
 T = TypeVar("Q")
+```
+
+```snapshot
+warning[mismatched-type-name]: The name passed to `TypeVar` must match the variable it is assigned to
+ --> src/mdtest_snippet.py:4:13
+  |
+4 | T = TypeVar("Q")
+  |             ^^^ Expected "T", got "Q"
 ```
 
 ## Must not be redefined
@@ -56,8 +93,20 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T")
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: Cannot redefine `T` as a type variable
+ --> src/mdtest_snippet.py:6:1
+  |
+3 | T = TypeVar("T")
+  | - Previously defined here
+4 |
+5 | # snapshot: invalid-legacy-type-variable
+6 | T = TypeVar("T")
+  | ^
 ```
 
 ## No variadic arguments
@@ -67,63 +116,26 @@ from typing import TypeVar
 
 types = (int, str)
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", *types)
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 S = TypeVar("S", **{"bound": int})
 ```
 
-## Cannot have only one constraint
+```snapshot
+error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
+ --> src/mdtest_snippet.py:6:18
+  |
+6 | T = TypeVar("T", *types)
+  |                  ^^^^^^
 
-> `TypeVar` supports constraining parametric types to a fixed set of possible types...There should
-> be at least two constraints, if any; specifying a single constraint is disallowed.
 
-```py
-from typing import TypeVar
-
-# error: [invalid-legacy-type-variable]
-T = TypeVar("T", int)
-```
-
-## Cannot have both bound and constraint
-
-```py
-from typing import TypeVar
-
-# error: [invalid-legacy-type-variable]
-T = TypeVar("T", int, str, bound=bytes)
-```
-
-## Cannot be both covariant and contravariant
-
-> To facilitate the declaration of container types where covariant or contravariant type checking is
-> acceptable, type variables accept keyword arguments `covariant=True` or `contravariant=True`. At
-> most one of these may be passed.
-
-```py
-from typing import TypeVar
-
-# error: [invalid-legacy-type-variable]
-T = TypeVar("T", covariant=True, contravariant=True)
-```
-
-## Boolean parameters must be unambiguous
-
-```py
-from typing_extensions import TypeVar
-
-def cond() -> bool:
-    return True
-
-# error: [invalid-legacy-type-variable]
-T = TypeVar("T", covariant=cond())
-
-# error: [invalid-legacy-type-variable]
-U = TypeVar("U", contravariant=cond())
-
-# error: [invalid-legacy-type-variable]
-V = TypeVar("V", infer_variance=cond())
+error[invalid-legacy-type-variable]: Starred arguments are not supported in `TypeVar` creation
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | S = TypeVar("S", **{"bound": int})
+  |                  ^^^^^^^^^^^^^^^^
 ```
 
 ## Invalid keyword arguments
@@ -131,8 +143,16 @@ V = TypeVar("V", infer_variance=cond())
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", invalid_keyword=True)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: Unknown keyword argument `invalid_keyword` in `TypeVar` creation
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", invalid_keyword=True)
+  |                  ^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Invalid feature for this Python version
@@ -145,6 +165,14 @@ python-version = "3.10"
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable]
+# snapshot: invalid-legacy-type-variable
 T = TypeVar("T", default=int)
+```
+
+```snapshot
+error[invalid-legacy-type-variable]: The `default` parameter of `typing.TypeVar` was added in Python 3.13
+ --> src/mdtest_snippet.py:4:18
+  |
+4 | T = TypeVar("T", default=int)
+  |                  ^^^^^^^^^^^
 ```

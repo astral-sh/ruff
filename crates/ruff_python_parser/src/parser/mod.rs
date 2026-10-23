@@ -3,19 +3,23 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+    Alias, AtomicNodeIndex, ElifElseClause, Expr, Int, IpyEscapeKind, Keyword, Mod, ModExpression,
+    ModModule, ParameterWithDefault, Stmt, StringFlags,
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
+use crate::parser::scratch_buffer::ScratchBuffer;
 use crate::string::InterpolatedStringKind;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
@@ -30,9 +34,28 @@ mod options;
 mod pattern;
 mod progress;
 mod recovery;
+mod scratch_buffer;
 mod statement;
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Default)]
+struct NameInterner {
+    names: HashSet<Name, FxBuildHasher>,
+}
+
+impl NameInterner {
+    /// Returns an inline name directly, or a shared clone of a heap-allocated name.
+    fn intern(&mut self, text: &str) -> Name {
+        if let Some(name) = Name::new_inline(text) {
+            return name;
+        }
+
+        self.names
+            .get_or_insert_with(text, |text| Name::new_heap(text))
+            .clone()
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -40,6 +63,12 @@ pub(crate) struct Parser<'src> {
 
     /// Token source for the parser that skips over any non-trivia token.
     tokens: TokenSource<'src>,
+
+    /// Deduplicates the backing allocations for repeated names that do not fit inline.
+    name_interner: NameInterner,
+
+    /// Reusable storage for names that need to be constructed by the parser.
+    name_buffer: String,
 
     /// Stores all the syntax errors found during the parsing.
     errors: Vec<ParseError>,
@@ -63,11 +92,27 @@ pub(crate) struct Parser<'src> {
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
 
-    /// Current parser recursion depth remaining before the depth limit is exceeded.
-    depth_remaining: u16,
+    /// Number of active recursive statement, expression, and pattern parsing operations.
+    #[cfg(feature = "stacker")]
+    recursion_depth: usize,
 
-    /// Maximum lexer nesting depth before postfix calls and subscripts should stop recursing.
-    max_nesting_depth: u32,
+    /// Reusable, nesting-safe scratch storage for expression lists.
+    expr_scratch: ScratchBuffer<Expr>,
+
+    /// Reusable, nesting-safe scratch storage for call keywords.
+    keyword_scratch: ScratchBuffer<Keyword>,
+
+    /// Reusable, nesting-safe scratch storage for function and lambda parameters.
+    parameter_scratch: ScratchBuffer<ParameterWithDefault>,
+
+    /// Reusable, nesting-safe scratch storage for statement lists.
+    stmt_scratch: ScratchBuffer<Stmt>,
+
+    /// Reusable scratch storage for import aliases.
+    alias_scratch: ScratchBuffer<Alias>,
+
+    /// Reusable, nesting-safe scratch storage for `elif` and `else` clauses.
+    elif_else_scratch: ScratchBuffer<ElifElseClause>,
 }
 
 impl<'src> Parser<'src> {
@@ -83,8 +128,6 @@ impl<'src> Parser<'src> {
         options: ParseOptions,
     ) -> Self {
         let tokens = TokenSource::from_source(source, options.mode, start_offset);
-        let depth_remaining = options.max_recursion_depth;
-        let max_nesting_depth = u32::from(options.max_recursion_depth.saturating_sub(2));
 
         Parser {
             options,
@@ -92,53 +135,31 @@ impl<'src> Parser<'src> {
             errors: Vec::new(),
             unsupported_syntax_errors: Vec::new(),
             tokens,
+            name_interner: NameInterner::default(),
+            name_buffer: String::new(),
             recovery_context: RecoveryContext::empty(),
             prev_token_end: TextSize::new(0),
             start_offset,
+            #[cfg(feature = "stacker")]
+            recursion_depth: 0,
             current_token_id: TokenId::default(),
-            depth_remaining,
-            max_nesting_depth,
-        }
-    }
-
-    /// Runs `f` if the recursive parser depth limit has not been hit.
-    ///
-    /// # Note
-    ///
-    /// This recursion guard is a temporary fix for #22930.
-    #[must_use]
-    #[inline]
-    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
-        if self.depth_remaining == 0 {
-            return None;
-        }
-
-        self.depth_remaining -= 1;
-        let result = f(self);
-        self.depth_remaining += 1;
-        Some(result)
-    }
-
-    #[cold]
-    #[inline(never)]
-    fn report_recursion_limit_exceeded<R: Ranged>(&mut self, ranged: R) {
-        self.add_error(ParseErrorType::RecursionLimitExceeded, ranged);
-        // Skip to end-of-file so outer parser frames unwind quickly and our
-        // `ParserProgress` infinite-loop guards don't fire when they see the
-        // same `(` / `[` etc. that this frame failed to consume.
-        while self.current_token_kind() != TokenKind::EndOfFile {
-            self.bump_any();
+            expr_scratch: ScratchBuffer::with_capacity(16),
+            keyword_scratch: ScratchBuffer::new(),
+            parameter_scratch: ScratchBuffer::new(),
+            stmt_scratch: ScratchBuffer::with_capacity(32),
+            alias_scratch: ScratchBuffer::new(),
+            elif_else_scratch: ScratchBuffer::new(),
         }
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].
     pub(crate) fn parse(mut self) -> Parsed<Mod> {
-        let syntax = match self.options.mode {
+        let syntax = self.maybe_grow_stack(|parser| match parser.options.mode {
             Mode::Expression | Mode::ParenthesizedExpression => {
-                Mod::Expression(self.parse_single_expression())
+                Mod::Expression(parser.parse_single_expression())
             }
-            Mode::Module | Mode::Ipython => Mod::Module(self.parse_module()),
-        };
+            Mode::Module | Mode::Ipython => Mod::Module(parser.parse_module()),
+        });
 
         self.finish(syntax)
     }
@@ -207,7 +228,6 @@ impl<'src> Parser<'src> {
             TokenKind::EndOfFile,
             "Parser should be at the end of the file."
         );
-
         // TODO consider re-integrating lexical error handling into the parser?
         let parse_errors = self.errors;
         let (tokens, lex_errors) = self.tokens.finish();
@@ -336,16 +356,19 @@ impl<'src> Parser<'src> {
 
     /// Moves the parser to the next token.
     fn do_bump(&mut self, kind: TokenKind) {
-        if !matches!(
-            self.current_token_kind(),
+        if match self.current_token_kind() {
             // TODO explore including everything up to the dedent as part of the body.
-            TokenKind::Dedent
+            TokenKind::Dedent => false,
+
             // Don't include newlines in the body
-            | TokenKind::Newline
+            TokenKind::Newline => false,
+
             // TODO(micha): Including the semi feels more correct but it isn't compatible with lalrpop and breaks the
             // formatters semicolon detection. Exclude it for now
-            | TokenKind::Semi
-        ) {
+            TokenKind::Semi => false,
+
+            _ => true,
+        } {
             self.prev_token_end = self.current_token_range().end();
         }
 
@@ -392,14 +415,28 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    fn bump_name(&mut self) -> Name {
+    fn bump_identifier(&mut self) -> Name {
         let text = self.current_token_text();
-        let name = if !self.tokens.current_flags().is_non_ascii_name() {
-            Name::new(text)
+        let name = if !self.tokens.current_flags().is_non_ascii_identifier() {
+            self.intern_name(text)
         } else {
-            normalize_name(text)
+            self.intern_normalized_name(text)
         };
-        self.bump(TokenKind::Name);
+        self.bump(TokenKind::Identifier);
+        name
+    }
+
+    fn intern_name(&mut self, text: &str) -> Name {
+        self.name_interner.intern(text)
+    }
+
+    fn intern_normalized_name(&mut self, text: &str) -> Name {
+        let snapshot = self.name_buffer.len();
+        self.name_buffer.extend(text.nfkc());
+
+        let name = self.name_interner.intern(&self.name_buffer[snapshot..]);
+
+        self.name_buffer.truncate(snapshot);
         name
     }
 
@@ -555,15 +592,15 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Bumps the soft keyword token as a `Name` token.
+    /// Bumps the soft keyword token as an `Identifier` token.
     ///
     /// # Panics
     ///
     /// If the current token is not a soft keyword.
-    pub(crate) fn bump_soft_keyword_as_name(&mut self) {
+    fn bump_soft_keyword_as_identifier(&mut self) {
         assert!(self.at_soft_keyword());
 
-        self.do_bump(TokenKind::Name);
+        self.do_bump(TokenKind::Identifier);
     }
 
     /// Consume the current token if it is of the given kind. Returns `true` if it matches, `false`
@@ -665,6 +702,7 @@ impl<'src> Parser<'src> {
         mut parse_element: impl FnMut(&mut Parser<'src>),
     ) {
         let mut progress = ParserProgress::default();
+        let mut unexpected_indents = 0;
 
         let saved_context = self.recovery_context;
         self.recovery_context = self
@@ -674,7 +712,12 @@ impl<'src> Parser<'src> {
         loop {
             progress.assert_progressing(self);
 
-            if recovery_context_kind.is_list_element(self) {
+            if 0 < unexpected_indents && self.at(TokenKind::Dedent) {
+                // Ignore this `Dedent` like we ignored the `Indent`, avoiding extra errors from
+                // being imbalanced
+                unexpected_indents -= 1;
+                self.bump(TokenKind::Dedent);
+            } else if recovery_context_kind.is_list_element(self) {
                 parse_element(self);
             } else if recovery_context_kind.is_regular_list_terminator(self) {
                 break;
@@ -692,6 +735,14 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
+                if matches!(
+                    recovery_context_kind,
+                    RecoveryContextKind::ModuleStatements | RecoveryContextKind::BlockStatements
+                ) && self.at(TokenKind::Indent)
+                {
+                    // For this invalid `Indent`, ensure the matching `Dedent` gets consumed as well
+                    unexpected_indents += 1;
+                }
                 self.bump_any();
             }
         }
@@ -896,17 +947,59 @@ impl<'src> Parser<'src> {
     }
 }
 
+#[cfg(feature = "stacker")]
+impl Parser<'_> {
+    // Stack probes access thread-local state, so avoid them while recursive parser calls remain
+    // shallow. `STACK_RED_ZONE` must cover the stack used before the first deferred probe.
+    const STACK_RED_ZONE: usize = 100 * 1024;
+    const STACK_SIZE: usize = 1024 * 1024;
+    const MAX_UNCHECKED_RECURSION_DEPTH: usize = 20;
+
+    #[inline]
+    fn maybe_grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        stacker::maybe_grow(Self::STACK_RED_ZONE, Self::STACK_SIZE, || f(self))
+    }
+
+    /// Grows the stack for recursive parser calls only after shallow nesting is exceeded.
+    #[inline]
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.recursion_depth += 1;
+
+        let result = if self.recursion_depth > Self::MAX_UNCHECKED_RECURSION_DEPTH {
+            self.grow_stack(f)
+        } else {
+            f(self)
+        };
+
+        self.recursion_depth -= 1;
+        result
+    }
+
+    #[cold]
+    fn grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        self.maybe_grow_stack(f)
+    }
+}
+
+#[cfg(not(feature = "stacker"))]
+impl Parser<'_> {
+    #[inline]
+    fn maybe_grow_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        f(self)
+    }
+
+    #[inline]
+    fn with_recursion<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
+        f(self)
+    }
+}
+
 fn strip_underscores(text: &str) -> Cow<'_, str> {
     if text.as_bytes().contains(&b'_') {
         Cow::Owned(text.chars().filter(|&c| c != '_').collect())
     } else {
         Cow::Borrowed(text)
     }
-}
-
-#[cold]
-fn normalize_name(text: &str) -> Name {
-    text.nfkc().collect::<Name>()
 }
 
 #[derive(Copy, Clone)]
@@ -1150,24 +1243,26 @@ enum RecoveryContextKind {
 impl RecoveryContextKind {
     /// Returns `true` if a trailing comma is allowed in the current context.
     const fn allow_trailing_comma(self) -> bool {
-        matches!(
-            self,
+        match self {
             RecoveryContextKind::Slices
-                | RecoveryContextKind::TupleElements(_)
-                | RecoveryContextKind::SetElements
-                | RecoveryContextKind::ListElements
-                | RecoveryContextKind::DictElements
-                | RecoveryContextKind::Arguments
-                | RecoveryContextKind::MatchPatternMapping
-                | RecoveryContextKind::SequenceMatchPattern(_)
-                | RecoveryContextKind::MatchPatternClassArguments
-                // Only allow a trailing comma if the with item itself is parenthesized
-                | RecoveryContextKind::WithItems(WithItemKind::Parenthesized)
-                | RecoveryContextKind::Parameters(_)
-                | RecoveryContextKind::TypeParams
-                | RecoveryContextKind::DeleteTargets
-                | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes)
-        )
+            | RecoveryContextKind::TupleElements(_)
+            | RecoveryContextKind::SetElements
+            | RecoveryContextKind::ListElements
+            | RecoveryContextKind::DictElements
+            | RecoveryContextKind::Arguments
+            | RecoveryContextKind::MatchPatternMapping
+            | RecoveryContextKind::SequenceMatchPattern(_)
+            | RecoveryContextKind::MatchPatternClassArguments
+            | RecoveryContextKind::Parameters(_)
+            | RecoveryContextKind::TypeParams
+            | RecoveryContextKind::DeleteTargets
+            | RecoveryContextKind::ImportFromAsNames(Parenthesized::Yes) => true,
+
+            // Only allow a trailing comma if the with item itself is parenthesized
+            RecoveryContextKind::WithItems(WithItemKind::Parenthesized) => true,
+
+            _ => false,
+        }
     }
 
     /// Returns `true` if the parser is at a token that terminates the list as per the context.
@@ -1382,19 +1477,16 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => p.at(TokenKind::Except),
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.at_type_param(),
-            RecoveryContextKind::ImportNames => p.at_name_or_soft_keyword(),
+            RecoveryContextKind::ImportNames => p.at_identifier_or_soft_keyword(),
             RecoveryContextKind::ImportFromAsNames(_) => {
-                p.at(TokenKind::Star) || p.at_name_or_soft_keyword()
+                p.at(TokenKind::Star) || p.at_identifier_or_soft_keyword()
             }
             RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
             RecoveryContextKind::ListElements
             | RecoveryContextKind::SetElements
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => {
-                // `+` doesn't start any pattern but is here for better error recovery.
-                p.at(TokenKind::Plus) || p.at_pattern_start()
-            }
+            RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
             RecoveryContextKind::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.
@@ -1403,12 +1495,12 @@ impl RecoveryContextKind {
             RecoveryContextKind::MatchPatternClassArguments => p.at_pattern_start(),
             RecoveryContextKind::Arguments => p.at_expr(),
             RecoveryContextKind::DeleteTargets => p.at_expr(),
-            RecoveryContextKind::Identifiers => p.at_name_or_soft_keyword(),
+            RecoveryContextKind::Identifiers => p.at_identifier_or_soft_keyword(),
             RecoveryContextKind::Parameters(_) => {
                 matches!(
                     p.current_token_kind(),
                     TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
-                ) || p.at_name_or_soft_keyword()
+                ) || p.at_identifier_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
             RecoveryContextKind::InterpolatedStringElements(elements_kind) => match elements_kind {

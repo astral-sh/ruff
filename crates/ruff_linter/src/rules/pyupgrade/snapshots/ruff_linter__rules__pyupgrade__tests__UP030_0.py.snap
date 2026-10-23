@@ -486,7 +486,6 @@ UP030 [*] Use implicit references for positional format fields
 64 |
 65 | "{{{0}}}".format(123)
    | ^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove explicit positional indices
    |
 64 |

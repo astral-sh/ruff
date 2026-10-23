@@ -75,4 +75,3 @@ Module(
 2 |
 3 | x + y
   |      ^ Syntax Error: unexpected EOF while parsing
-  |

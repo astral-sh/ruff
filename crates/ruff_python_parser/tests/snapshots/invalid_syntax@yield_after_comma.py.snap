@@ -87,4 +87,3 @@ Module(
   |
 1 | def f(): 1, yield 1
   |             ^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |

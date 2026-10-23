@@ -234,4 +234,3 @@ Module(
 5 | (*x := 1)
 6 | ([x, y] := [1, 2])
   |  ^^^^^^ Syntax Error: Assignment expression target must be an identifier
-  |

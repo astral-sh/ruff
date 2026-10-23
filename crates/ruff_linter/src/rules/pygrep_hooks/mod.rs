@@ -11,7 +11,6 @@ mod tests {
     use crate::registry::Rule;
 
     use crate::settings::LinterSettings;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
@@ -23,7 +22,7 @@ mod tests {
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_3.py"))]
     #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pygrep_hooks").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
@@ -34,23 +33,13 @@ mod tests {
 
     #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+        let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
 
         assert_diagnostics_diff!(
             snapshot,
             Path::new("pygrep_hooks").join(path).as_path(),
-            &LinterSettings {
-                preview: PreviewMode::Disabled,
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..LinterSettings::for_rule(rule_code)
-            }
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings::for_rule(rule_code).with_preview_mode()
         );
         Ok(())
     }

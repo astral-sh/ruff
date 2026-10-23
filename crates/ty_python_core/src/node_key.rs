@@ -3,12 +3,15 @@ use ruff_python_ast::{HasNodeIndex, NodeIndex};
 use crate::ast_node_ref::AstNodeRef;
 
 /// Compact key for a node for use in a hash map.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 pub struct NodeKey(NodeIndex);
 
 impl NodeKey {
+    /// Returns the index of the AST node.
+    pub fn index(self) -> NodeIndex {
+        self.0
+    }
+
     pub fn from_node<N>(node: N) -> Self
     where
         N: HasNodeIndex,
@@ -16,7 +19,7 @@ impl NodeKey {
         NodeKey(node.node_index().load())
     }
 
-    pub fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
+    pub(crate) fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
         NodeKey(node_ref.index())
     }
 }

@@ -92,4 +92,3 @@ Module(
 2 | # before 3.9, only emit the parse error, not the unsupported syntax error
 3 | lst[x:=1:-1]
   |     ^^^^ Syntax Error: Unparenthesized named expression cannot be used here
-  |

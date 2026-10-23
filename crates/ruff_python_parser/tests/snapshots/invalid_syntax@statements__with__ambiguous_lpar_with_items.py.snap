@@ -1869,7 +1869,6 @@ Module(
 31 | with (item as f1) as f2: ...
 32 | with (item1 as f, item2 := 0): ...
    |                   ^^^^^^^^^^ Syntax Error: Unparenthesized named expression cannot be used here
-   |
 
 
 ## Unsupported Syntax Errors

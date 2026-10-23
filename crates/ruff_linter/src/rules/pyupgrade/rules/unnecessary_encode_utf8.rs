@@ -8,30 +8,35 @@ use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, pad, remove_argument};
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
-/// Checks for unnecessary calls to `encode` as UTF-8.
+/// Checks for unnecessary calls to `encode` as UTF-8 and unnecessary explicit
+/// UTF-8 encoding arguments.
 ///
 /// ## Why is this bad?
-/// UTF-8 is the default encoding in Python, so there is no need to call
-/// `encode` when UTF-8 is the desired encoding. Instead, use a bytes literal.
+/// UTF-8 is the default encoding in Python, so there is no need to pass an
+/// explicit UTF-8 encoding to `encode`. For ASCII literals, use a bytes literal
+/// instead; for other strings, omit the explicit encoding argument.
 ///
 /// ## Example
 /// ```python
 /// "foo".encode("utf-8")
+/// "unicode text©".encode(encoding="utf-8")
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// b"foo"
+/// "unicode text©".encode()
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `str.encode`](https://docs.python.org/3/library/stdtypes.html#str.encode)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Complexity)]
 pub(crate) struct UnnecessaryEncodeUTF8 {
     reason: Reason,
 }
@@ -133,7 +138,7 @@ fn replace_with_bytes_literal(locator: &Locator, call: &ast::ExprCall, tokens: &
                 let _ = write!(
                     &mut replacement,
                     "b{}",
-                    &string.trim_start_matches('u').trim_start_matches('U')
+                    string.trim_start_matches('u').trim_start_matches('U')
                 );
             }
             _ => {

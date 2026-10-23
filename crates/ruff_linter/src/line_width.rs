@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthChar;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_text_size::TextSize;
+use ruff_python_trivia::{find_trailing_pragma_offset, tab_offset};
 
 /// The length of a line of text that is considered too long.
 ///
@@ -20,15 +20,11 @@ pub struct LineLength(NonZeroU16);
 
 impl LineLength {
     /// Maximum allowed value for a valid [`LineLength`]
-    pub const MAX: u16 = u16::MAX;
+    const MAX: u16 = u16::MAX;
 
     /// Return the numeric value for this [`LineLength`]
     pub fn value(&self) -> u16 {
         self.0.get()
-    }
-
-    pub fn text_len(&self) -> TextSize {
-        TextSize::from(u32::from(self.value()))
     }
 }
 
@@ -183,12 +179,12 @@ impl Ord for LineWidthBuilder {
 }
 
 impl LineWidthBuilder {
-    pub fn get(&self) -> usize {
+    pub(crate) fn get(&self) -> usize {
         self.width
     }
 
     /// Creates a new `LineWidth` with the given tab size.
-    pub fn new(tab_size: IndentWidth) -> Self {
+    pub(crate) fn new(tab_size: IndentWidth) -> Self {
         LineWidthBuilder {
             width: 0,
             column: 0,
@@ -201,7 +197,7 @@ impl LineWidthBuilder {
         for c in chars {
             match c {
                 '\t' => {
-                    let tab_offset = tab_size - (self.column % tab_size);
+                    let tab_offset = tab_offset(self.column, tab_size);
                     self.width += tab_offset;
                     self.column += tab_offset;
                 }
@@ -220,13 +216,13 @@ impl LineWidthBuilder {
 
     /// Adds the given text to the line width.
     #[must_use]
-    pub fn add_str(self, text: &str) -> Self {
+    pub(crate) fn add_str(self, text: &str) -> Self {
         self.update(text.chars())
     }
 
     /// Adds the given character to the line width.
     #[must_use]
-    pub fn add_char(self, c: char) -> Self {
+    pub(crate) fn add_char(self, c: char) -> Self {
         self.update(std::iter::once(c))
     }
 
@@ -236,10 +232,38 @@ impl LineWidthBuilder {
     /// The width and column should be the same for the corresponding text.
     /// Currently, this is only used to add spaces.
     #[must_use]
-    pub fn add_width(mut self, width: usize) -> Self {
+    pub(crate) fn add_width(mut self, width: usize) -> Self {
         self.width += width;
         self.column += width;
         self
+    }
+
+    /// Adds the width of a trailing comment, including the standard two-space separator that
+    /// precedes it. Pragma suffixes are excluded per [`find_trailing_pragma_offset`], while
+    /// any preceding non-pragma comment text still contributes to the width.
+    ///
+    /// Pragma comments are excluded so that adding one to a line never affects whether the line
+    /// is considered to fit, consistent with how `line-too-long` (E501) measures lines. For
+    /// example, counting a `# noqa` comment towards an import's width could cause isort to wrap
+    /// an import that otherwise fits on one line, moving the pragma to a position where it no
+    /// longer applies to the import statement:
+    ///
+    /// ```python
+    /// from module import (
+    ///     member,  # noqa: PLC0415
+    /// )
+    /// ```
+    #[must_use]
+    pub(crate) fn add_comment(self, comment: &str) -> Self {
+        let counted = match find_trailing_pragma_offset(comment) {
+            Some(offset) => comment[..offset].trim_end(),
+            None => comment,
+        };
+        if counted.is_empty() {
+            self
+        } else {
+            self.add_width(2).add_str(counted)
+        }
     }
 }
 

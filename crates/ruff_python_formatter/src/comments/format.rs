@@ -3,15 +3,14 @@ use std::borrow::Cow;
 use ruff_formatter::{FormatError, FormatOptions, SourceCode, format_args, write};
 use ruff_python_ast::{AnyNodeRef, NodeKind, PySourceType};
 use ruff_python_trivia::{
-    CommentLinePosition, find_trailing_pragma_offset, is_pragma_comment, lines_after,
-    lines_after_ignoring_trivia, lines_before,
+    CommentLinePosition, find_trailing_pragma_offset, lines_after, lines_after_ignoring_trivia,
+    lines_before,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange};
 
 use crate::comments::SourceComment;
 use crate::context::NodeLevel;
 use crate::prelude::*;
-use crate::preview::is_trailing_pragma_in_comment_width_enabled;
 use crate::statement::suite::should_insert_blank_line_after_class_in_stub_file;
 
 /// Formats the leading comments of a node.
@@ -361,7 +360,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
 /// * Black normalization of `SourceComment`.
 /// * Line suffix with reserved width for the final, normalized content.
 /// * Expands parent node.
-pub(crate) const fn trailing_end_of_line_comment(
+const fn trailing_end_of_line_comment(
     comment: &SourceComment,
 ) -> FormatTrailingEndOfLineComment<'_> {
     FormatTrailingEndOfLineComment { comment }
@@ -378,18 +377,11 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
-        // Don't reserve width for pragma comments. In preview, comments
-        // containing a trailing pragma (e.g., `# comment # noqa: F401`) only
-        // reserve width for the non-pragma prefix.
-        let non_pragma_comment_part = if is_trailing_pragma_in_comment_width_enabled(f.context()) {
-            match find_trailing_pragma_offset(&normalized_comment) {
-                Some(offset) => normalized_comment[..offset].trim_end(),
-                None => &normalized_comment,
-            }
-        } else if is_pragma_comment(&normalized_comment) {
-            ""
-        } else {
-            &normalized_comment
+        // Don't reserve width for pragma comments. Comments containing a trailing pragma
+        // (e.g., `# comment # noqa: F401`) only reserve width for the non-pragma prefix.
+        let non_pragma_comment_part = match find_trailing_pragma_offset(&normalized_comment) {
+            Some(offset) => normalized_comment[..offset].trim_end(),
+            None => &normalized_comment,
         };
 
         let reserved_width = if non_pragma_comment_part.is_empty() {
@@ -428,7 +420,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 ///   unnecessary allocations.
 /// * If the content is modified then make as few allocations as possible and use
 ///   a dynamic text element at the original slice's start position.
-pub(crate) const fn format_normalized_comment(
+const fn format_normalized_comment(
     comment: Cow<'_, str>,
     range: TextRange,
 ) -> FormatNormalizedComment<'_> {
@@ -509,7 +501,7 @@ fn normalize_comment<'a>(
             Ok(Cow::Owned(std::format!("# {}", &content["\u{A0}".len()..])))
         }
     } else {
-        Ok(Cow::Owned(std::format!("# {}", content.trim_start())))
+        Ok(Cow::Owned(std::format!("# {content}")))
     }
 }
 

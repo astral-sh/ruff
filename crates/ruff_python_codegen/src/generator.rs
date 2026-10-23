@@ -245,7 +245,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_stmt(&mut self, ast: &Stmt) {
+    fn unparse_stmt(&mut self, ast: &Stmt) {
         macro_rules! statement {
             ($body:block) => {{
                 self.newline();
@@ -881,7 +881,7 @@ impl<'a> Generator<'a> {
         self.p("]");
     }
 
-    pub(crate) fn unparse_type_param(&mut self, ast: &TypeParam) {
+    fn unparse_type_param(&mut self, ast: &TypeParam) {
         match ast {
             TypeParam::TypeVar(TypeParamTypeVar {
                 name,
@@ -918,7 +918,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_expr(&mut self, ast: &Expr, level: u8) {
+    fn unparse_expr(&mut self, ast: &Expr, level: u8) {
         macro_rules! opprec {
             ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
@@ -1166,17 +1166,11 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::MAX);
                 });
             }
-            Expr::Compare(ast::ExprCompare {
-                left,
-                ops,
-                comparators,
-                range: _,
-                node_index: _,
-            }) => {
+            Expr::Compare(compare) => {
                 group_if!(precedence::CMP, {
                     let new_lvl = precedence::CMP + 1;
-                    self.unparse_expr(left, new_lvl);
-                    for (op, cmp) in ops.iter().zip(comparators) {
+                    self.unparse_expr(compare.first_operand(), new_lvl);
+                    for (_, op, cmp) in compare.iter() {
                         let op = match op {
                             CmpOp::Eq => " == ",
                             CmpOp::NotEq => " != ",
@@ -1197,7 +1191,7 @@ impl<'a> Generator<'a> {
             Expr::Call(ast::ExprCall {
                 func,
                 arguments,
-                range: _,
+                range_start: _,
                 node_index: _,
             }) => {
                 self.unparse_expr(func, precedence::MAX);
@@ -1376,7 +1370,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    pub(crate) fn unparse_singleton(&mut self, singleton: Singleton) {
+    fn unparse_singleton(&mut self, singleton: Singleton) {
         match singleton {
             Singleton::None => self.p("None"),
             Singleton::True => self.p("True"),
@@ -1465,10 +1459,10 @@ impl<'a> Generator<'a> {
         for f_string_part in value {
             self.p_delim(&mut first, " ");
             match f_string_part {
-                ast::FStringPart::Literal(string_literal) => {
+                ast::FStringPartRef::Literal(string_literal) => {
                     self.unparse_string_literal(string_literal);
                 }
-                ast::FStringPart::FString(f_string) => {
+                ast::FStringPartRef::FString(f_string) => {
                     self.unparse_interpolated_string(&f_string.elements, f_string.flags.into());
                 }
             }

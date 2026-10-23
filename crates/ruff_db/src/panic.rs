@@ -152,7 +152,7 @@ where
         // Try to get the backtrace and location from our custom panic hook.
         // The custom panic hook only runs once when `panic!` is called (or similar). It doesn't
         // run when the panic is propagated with `std::panic::resume_unwind`. The panic hook
-        // is also not called when the panic is raised with `std::panic::resum_unwind` as is the
+        // is also not called when the panic is raised with `std::panic::resume_unwind` as is the
         // case for salsa unwinds (see the ignored test below).
         // Because of that, always take the payload from `catch_unwind` because it may have been transformed
         // by an inner `std::panic::catch_unwind` handlers and only use the information
@@ -183,10 +183,11 @@ mod tests {
     fn no_backtrace_for_salsa_cancelled() {
         #[salsa::input]
         struct Input {
+            #[returns(copy)]
             value: u32,
         }
 
-        #[salsa::tracked]
+        #[salsa::tracked(returns(copy))]
         fn test_query(db: &dyn Database, input: Input) -> u32 {
             loop {
                 // This should throw a cancelled error

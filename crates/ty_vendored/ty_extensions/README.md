@@ -1,2 +1,2 @@
-The `build.rs` copies the `ty_extensions.pyi` file in this directory into
-the `vendor/typeshed/stdlib` directory.
+The `build.rs` packages the stubs in this directory as the vendored
+`ty_extensions` package under `vendor/typeshed/stdlib`.

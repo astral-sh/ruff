@@ -46,7 +46,7 @@ fn is_identifier_continuation(c: char) -> bool {
 /// identifier is defined in a class definition, it will be mangled prior to
 /// code generation.
 ///
-/// See: <https://docs.python.org/3.5/reference/expressions.html?highlight=mangling#index-5>.
+/// See: <https://docs.python.org/3/reference/expressions.html#private-name-mangling>.
 pub fn is_mangled_private(id: &str) -> bool {
     id.starts_with("__") && !id.ends_with("__")
 }

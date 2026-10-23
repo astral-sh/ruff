@@ -27,13 +27,13 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-pub fn main() -> ExitCode {
+fn main() -> ExitCode {
     // Enabled ANSI colors on Windows 10.
     #[cfg(windows)]
     assert!(colored::control::set_virtual_terminal(true).is_ok());
 
     let args = wild::args_os();
-    let args = match argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX)
+    let args = match ruff_command_line::expand_args(args)
         .context("Failed to read CLI arguments from files")
     {
         Ok(args) => args,

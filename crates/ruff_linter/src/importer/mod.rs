@@ -17,8 +17,9 @@ use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
-use ruff_python_trivia::textwrap::indent;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
@@ -65,28 +66,39 @@ impl<'a> Importer<'a> {
         self.type_checking_blocks.push(type_checking_block);
     }
 
-    /// Add an import statement to import the given module.
+    /// Add an import statement to import the given module, with an explicit `lazy` keyword if requested.
     ///
     /// If there are no existing imports, the new import will be added at the top
     /// of the file. If there are future imports, the new import will be added
     /// after the last future import. Otherwise, it will be added after the most
     /// recent top-level import statement.
-    pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
-        let required_import = import.to_string();
+    pub(crate) fn add_import(&self, import: &NameImport, at: TextSize, is_lazy: bool) -> Edit {
+        let required_import = if is_lazy {
+            format!("lazy {import}")
+        } else {
+            import.to_string()
+        };
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
-            // Check if there are any future imports that we need to respect
-            if let Some(last_future_import) = self.find_last_future_import() {
-                // Insert after the last future import
-                Insertion::end_of_statement(last_future_import, self.source, self.stylist)
-                    .into_edit(&required_import)
-            } else {
-                // Insert at the start of the file.
-                Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
-                    .into_edit(&required_import)
-            }
+            self.add_at_start(&required_import)
+        }
+    }
+
+    /// Add an existing import statement to the start of the file.
+    pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
+        let range = TextRange::new(import.start(), self.source.line_end(import.end()));
+        self.add_at_start(self.source[range].trim_whitespace())
+    }
+
+    fn add_at_start(&self, text: &str) -> Edit {
+        if let Some(last_future_import) = self.find_last_future_import() {
+            Insertion::end_of_statement(last_future_import, self.source, self.stylist)
+                .into_edit(text)
+        } else {
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
+                .into_edit(text)
         }
     }
 
@@ -412,6 +424,7 @@ impl<'a> Importer<'a> {
                                 symbol.module.to_string(),
                             )),
                             at,
+                            false,
                         );
                         Ok((
                             import_edit,
@@ -435,6 +448,7 @@ impl<'a> Importer<'a> {
                                 symbol.member.to_string(),
                             )),
                             at,
+                            false,
                         );
                         Ok((import_edit, symbol.member.to_string()))
                     } else {
@@ -476,8 +490,8 @@ impl<'a> Importer<'a> {
     /// Add the given member to an existing `Stmt::ImportFrom` statement.
     fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
         let mut statement = match_statement(&self.source[stmt.range()])?;
-        let import_from = match_import_from(&mut statement)?;
-        let aliases = match_aliases(import_from)?;
+        let (_, names, _) = match_import_from(&mut statement)?;
+        let aliases = match_aliases(names)?;
         aliases.push(cst::ImportAlias {
             name: cst::NameOrAttribute::N(Box::new(cst::Name {
                 value: member,
@@ -555,7 +569,7 @@ impl<'a> Importer<'a> {
         ));
         // Note that `TextSize::default` should ensure that the import is added at the very
         // beginning of the file via `Insertion::start_of_file`.
-        self.add_import(import, TextSize::default())
+        self.add_import(import, TextSize::default(), false)
     }
 }
 

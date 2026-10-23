@@ -162,7 +162,7 @@ impl SourceComment {
     }
 
     /// Returns a nice debug representation that prints the source code for every comment (and not just the range).
-    pub(crate) fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
+    fn debug<'a>(&'a self, source_code: SourceCode<'a>) -> DebugComment<'a> {
         DebugComment::new(self, source_code)
     }
 

@@ -582,7 +582,6 @@ PT009 [*] Use a regular `assert` instead of unittest-style `failIfEqual`
 93 |     def test_fail_if_equal(self):
 94 |         self.failIfEqual(1, 2)  # Error
    |         ^^^^^^^^^^^^^^^^
-   |
 help: Replace `failIfEqual(...)` with `assert ...`
    |
 93 |     def test_fail_if_equal(self):

@@ -79,4 +79,3 @@ Module(
 4 | # Unparenthesized named expression is allowed.
 5 | x := 1
   |   ^^ Syntax Error: Expected a statement
-  |

@@ -222,3 +222,12 @@ _ = (
     "abc"
     "def"
 ) + "ghi"
+
+
+# https://github.com/astral-sh/ruff/issues/26541
+x = (
+    "A"  # Complains about this: +
+    + " broken"
+    + " line"
+    + " string."
+)

@@ -28,4 +28,3 @@ TD001 Invalid TODO tag: `XXX`
 8 | # FIXME (evanrittenhouse): this is not fine
 9 | # foo # XXX: this isn't fine either
   |         ^^^
-  |

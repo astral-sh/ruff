@@ -48,7 +48,7 @@ from a import foo
 reveal_type(foo)  # revealed: Unknown
 ```
 
-## No implicit shadowing
+## Imported annotations do not constrain local assignments
 
 `b.py`:
 
@@ -59,7 +59,8 @@ x: int
 ```py
 from b import x
 
-x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
+x = "foo"
+reveal_type(x)  # revealed: Literal["foo"]
 ```
 
 ## Import cycle
@@ -67,7 +68,7 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]"
 `a.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class A: ...
 
@@ -82,7 +83,7 @@ reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'objec
 `b.py`:
 
 ```py
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 from a import A
 
 class B(A): ...

@@ -211,7 +211,7 @@ def normalize(localename: _str) -> _str:
     """
 
 if sys.version_info < (3, 13):
-    @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
+    @deprecated("Deprecated; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
     def resetlocale(category: int = ...) -> None:
         """Sets the locale for category to the default setting.
 

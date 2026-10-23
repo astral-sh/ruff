@@ -421,4 +421,3 @@ Module(
 20 | # Unparenthesized named expression is not allowed
 21 | x, y := 2, z
    |      ^^ Syntax Error: Expected `,`, found `:=`
-   |

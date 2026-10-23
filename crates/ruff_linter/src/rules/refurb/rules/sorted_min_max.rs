@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Number;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -8,6 +9,7 @@ use crate::Fix;
 use crate::FixAvailability;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `sorted()` to retrieve the minimum or maximum value in
@@ -52,7 +54,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.2")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Complexity)]
 pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }
@@ -187,14 +189,17 @@ pub(crate) fn sorted_min_max(checker: &Checker, subscript: &ast::ExprSubscript) 
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix({
+            // Preserve any parentheses around the argument. Some expressions are
+            // only valid as a call argument when parenthesized (e.g., `yield`),
+            // so slicing the bare node would produce invalid syntax.
+            let list_expr = checker.locator().slice(
+                parenthesized_range(list_expr.into(), arguments.into(), checker.tokens())
+                    .unwrap_or(list_expr.range()),
+            );
             let replacement = if let Some(key) = key_keyword_expr {
-                format!(
-                    "{min_max}({}, {})",
-                    checker.locator().slice(list_expr),
-                    checker.locator().slice(key),
-                )
+                format!("{min_max}({list_expr}, {})", checker.locator().slice(key))
             } else {
-                format!("{min_max}({})", checker.locator().slice(list_expr))
+                format!("{min_max}({list_expr})")
             };
 
             let replacement = Edit::range_replacement(replacement, subscript.range());

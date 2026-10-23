@@ -3,7 +3,6 @@ use crate::server::{Action, ConnectionSender, SendRequest};
 use crate::server::{Event, MainLoopSender};
 use lsp_server::{ErrorCode, Message, Notification, RequestId, ResponseError};
 use serde_json::Value;
-use std::any::TypeId;
 use std::fmt::Display;
 
 #[derive(Debug, Clone)]
@@ -75,6 +74,26 @@ impl Client {
             .unwrap();
     }
 
+    /// Attempts to queue a request without blocking the main loop.
+    ///
+    /// Returns `false` if the main-loop queue is full or disconnected.
+    pub(crate) fn try_send_deferred_request<R>(
+        &self,
+        params: R::Params,
+        response_handler: impl FnOnce(&Client, R::Result) + Send + 'static,
+    ) -> bool
+    where
+        R: lsp_types::Request,
+    {
+        self.main_loop_sender
+            .try_send(Event::Action(Action::SendRequest(SendRequest {
+                method: R::METHOD.to_string(),
+                params: serde_json::to_value(params).expect("Params to be serializable"),
+                response_handler: ClientResponseHandler::for_request::<R>(response_handler),
+            })))
+            .is_ok()
+    }
+
     pub(crate) fn send_request_raw(&self, session: &Session, request: SendRequest) {
         let id = session
             .request_queue()
@@ -115,11 +134,26 @@ impl Client {
         }
     }
 
+    /// Attempts to send a notification without waiting for the client channel.
+    ///
+    /// Returns whether the notification was queued.
+    pub(crate) fn try_send_notification<N>(&self, params: N::Params) -> bool
+    where
+        N: lsp_types::Notification,
+    {
+        self.client_sender
+            .try_send(lsp_server::Message::Notification(Notification::new(
+                N::METHOD.to_string(),
+                params,
+            )))
+            .is_ok()
+    }
+
     /// Sends a notification without any parameters to the client.
     ///
     /// This is useful for notifications that don't require any data.
     #[expect(dead_code)]
-    pub(crate) fn send_notification_no_params(&self, method: &str) {
+    fn send_notification_no_params(&self, method: &str) {
         if let Err(err) =
             self.client_sender
                 .send(lsp_server::Message::Notification(Notification::new(
@@ -159,8 +193,7 @@ impl Client {
     pub(crate) fn respond_err(&self, id: RequestId, error: lsp_server::ResponseError) {
         let response = lsp_server::Response {
             id,
-            result: None,
-            error: Some(error),
+            response_result: Err(error),
         };
 
         self.main_loop_sender
@@ -196,6 +229,21 @@ impl Client {
         self.show_message(message, lsp_types::MessageType::Error);
     }
 
+    /// Sends a notification of partial result progress to the client, via a `$/progress`
+    /// notification.
+    pub(crate) fn send_partial_result<R>(
+        &self,
+        token: lsp_types::ProgressToken,
+        partial_result: R::PartialResult,
+    ) where
+        R: lsp_types::RequestWithPartialResults,
+    {
+        self.send_notification::<lsp_types::ProgressNotification>(lsp_types::ProgressParams {
+            token,
+            value: serde_json::to_value(partial_result).expect("Partial result to be serializable"),
+        });
+    }
+
     /// Re-queues this request after a salsa cancellation for a retry.
     ///
     /// The main loop will skip the retry if the client cancelled the request in the  meantime.
@@ -226,8 +274,7 @@ impl Client {
                 .client_sender
                 .send(Message::Response(lsp_server::Response {
                     id,
-                    result: None,
-                    error: Some(error),
+                    response_result: Err(error),
                 }))
             {
                 tracing::error!(
@@ -240,21 +287,29 @@ impl Client {
 
 /// Type erased handler for client responses.
 #[expect(clippy::type_complexity)]
-pub(crate) struct ClientResponseHandler(Box<dyn FnOnce(&Client, lsp_server::Response) + Send>);
+pub(crate) struct ClientResponseHandler(
+    Box<dyn FnOnce(&Client, &mut Session, lsp_server::Response) + Send>,
+);
 
 impl ClientResponseHandler {
+    pub(crate) fn new(
+        handler: impl FnOnce(&Client, &mut Session, lsp_server::Response) + Send + 'static,
+    ) -> Self {
+        Self(Box::new(handler))
+    }
+
     fn for_request<R>(response_handler: impl FnOnce(&Client, R::Result) + Send + 'static) -> Self
     where
         R: lsp_types::Request,
     {
-        Self(Box::new(
-            move |client: &Client, response: lsp_server::Response| {
+        Self::new(
+            move |client: &Client, _session: &mut Session, response: lsp_server::Response| {
                 let _span =
                     tracing::debug_span!("client_response", id=%response.id, method = %R::METHOD)
                         .entered();
 
-                match (response.error, response.result) {
-                    (Some(err), _) => {
+                match response.response_result {
+                    Err(err) => {
                         tracing::error!(
                             "Got an error from the client (code {code}, method {method}): {message}",
                             code = err.code,
@@ -262,7 +317,7 @@ impl ClientResponseHandler {
                             method = R::METHOD
                         );
                     }
-                    (None, Some(response)) => match serde_json::from_value(response) {
+                    Ok(response) => match serde_json::from_value(response) {
                         Ok(response) => response_handler(client, response),
                         Err(error) => {
                             tracing::error!(
@@ -271,28 +326,18 @@ impl ClientResponseHandler {
                             );
                         }
                     },
-                    (None, None) => {
-                        if TypeId::of::<R::Result>() == TypeId::of::<()>() {
-                            // We can't call `response_handler(())` directly here, but
-                            // since we _know_ the type expected is `()`, we can use
-                            // `from_value(Value::Null)`. `R::Result` implements `DeserializeOwned`,
-                            // so this branch works in the general case but we'll only
-                            // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
-                            response_handler(client, serde_json::from_value(Value::Null).unwrap());
-                        } else {
-                            tracing::error!(
-                                "Invalid client response: did not contain a result or error (method={method})",
-                                method = R::METHOD
-                            );
-                        }
-                    }
                 }
             },
-        ))
+        )
     }
 
-    pub(crate) fn handle_response(self, client: &Client, response: lsp_server::Response) {
+    pub(crate) fn handle_response(
+        self,
+        client: &Client,
+        session: &mut Session,
+        response: lsp_server::Response,
+    ) {
         let handler = self.0;
-        handler(client, response);
+        handler(client, session, response);
     }
 }

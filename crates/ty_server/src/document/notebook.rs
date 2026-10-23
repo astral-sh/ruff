@@ -40,7 +40,7 @@ struct NotebookCell {
 }
 
 impl NotebookDocument {
-    pub fn new(
+    pub(crate) fn new(
         uri: lsp_types::Uri,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
@@ -72,7 +72,7 @@ impl NotebookDocument {
         let cells = self
             .cells
             .iter()
-            .map(|cell| {
+            .filter_map(|cell| {
                 let cell_text =
                     if let Ok(document) = index.document(&DocumentKey::from_uri(&cell.uri)) {
                         if let Some(text_document) = document.as_text() {
@@ -89,23 +89,30 @@ impl NotebookDocument {
 
                 let source = ruff_notebook::SourceValue::String(cell_text);
                 match cell.kind {
-                    NotebookCellKind::Code => ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
-                        execution_count: cell
-                            .execution_summary
-                            .as_ref()
-                            .map(|summary| i64::from(summary.execution_order)),
-                        id: None,
-                        metadata: CellMetadata::default(),
-                        outputs: vec![],
-                        source,
-                    }),
+                    NotebookCellKind::Code => {
+                        Some(ruff_notebook::Cell::Code(ruff_notebook::CodeCell {
+                            execution_count: cell
+                                .execution_summary
+                                .as_ref()
+                                .map(|summary| i64::from(summary.execution_order)),
+                            id: None,
+                            metadata: CellMetadata::default(),
+                            outputs: vec![],
+                            source,
+                        }))
+                    }
                     NotebookCellKind::Markup => {
-                        ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
+                        Some(ruff_notebook::Cell::Markdown(ruff_notebook::MarkdownCell {
                             attachments: None,
                             id: None,
                             metadata: CellMetadata::default(),
                             source,
-                        })
+                        }))
+                    }
+                    NotebookCellKind::Custom(_) => {
+                        // Ignore unsupported cell kinds. This arm should never be reached unless a
+                        // client sends a value which is not mentioned/supported in the LSP.
+                        None
                     }
                 }
             })
@@ -117,8 +124,12 @@ impl NotebookDocument {
             nbformat_minor: 5,
         };
 
-        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false)
-            .unwrap_or_else(|err| panic!("Server notebook document could not be converted to ty's notebook document format: {err}"))
+        ruff_notebook::Notebook::from_raw_notebook(raw_notebook, false).unwrap_or_else(|err| {
+            panic!(
+                "Server notebook document could not be converted to ty's \
+                notebook document format: {err}"
+            )
+        })
     }
 
     pub(crate) fn update(
@@ -190,7 +201,7 @@ impl NotebookDocument {
 }
 
 impl NotebookCell {
-    pub(crate) fn new(cell: lsp_types::NotebookCell) -> Self {
+    fn new(cell: lsp_types::NotebookCell) -> Self {
         Self {
             uri: cell.document,
             kind: cell.kind,

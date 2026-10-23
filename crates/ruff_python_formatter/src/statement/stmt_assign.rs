@@ -1332,7 +1332,7 @@ pub(super) fn has_target_own_parentheses(target: &Expr, context: &PyFormatContex
     matches!(target, Expr::Tuple(_)) || has_own_parentheses(target, context).is_some()
 }
 
-pub(super) fn should_parenthesize_target(target: &Expr, context: &PyFormatContext) -> bool {
+fn should_parenthesize_target(target: &Expr, context: &PyFormatContext) -> bool {
     !(has_target_own_parentheses(target, context)
         || is_attribute_with_parenthesized_value(target, context))
 }

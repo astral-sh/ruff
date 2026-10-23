@@ -158,7 +158,7 @@ finally:
 try:
     pass
 
-except ZeroDivisonError:
+except ZeroDivisionError:
     pass
 
 else:

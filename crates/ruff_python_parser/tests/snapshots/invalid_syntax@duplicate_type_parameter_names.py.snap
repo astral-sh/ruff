@@ -671,4 +671,3 @@ Module(
 6 | def f[T, *T](): ...    # star is still duplicate
 7 | def f[T, **T](): ...   # as is double star
   |          ^^^ Syntax Error: duplicate type parameter
-  |

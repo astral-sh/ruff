@@ -1,21 +1,60 @@
+use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::{Docstring, DocstringFragment};
-use crate::goto::{Definitions, GotoTarget, docstring_for_call_definition, find_goto_target};
+use crate::goto::{
+    Definitions, GotoTarget, docstring_for_call_definition, find_goto_target, find_goto_target_impl,
+};
 use crate::{Db, MarkupKind, RangedValue};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_text_size::{Ranged, TextSize};
-use std::fmt;
-use std::fmt::Formatter;
+use ruff_python_ast::find_node::covering_node;
+use ruff_text_size::{Ranged, TextRange, TextSize};
+use std::fmt::{self, Display};
+use ty_python_core::ProgramFile;
+use ty_python_semantic::ProgramEnvironment;
 use ty_python_semantic::types::ide_support::{resolved_call_signature, typed_dict_key_hover};
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeAliasType, TypeVarVariance};
+use ty_python_semantic::types::{KnownInstanceType, SpecialFormType, Type, TypeVarVariance};
 
-use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
+use ty_python_semantic::{SemanticModel, TypeQualifiers};
 
-pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
-    let parsed = parsed_module(db, file).load(db);
+pub fn hover<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    offset: TextSize,
+) -> Option<RangedValue<Hover<'db>>> {
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &parsed, offset)?;
+
+    if let Some((special_form, range)) = annotation_operator(
+        &model,
+        parsed.syntax().into(),
+        &goto_target,
+        offset,
+        AnnotationContext::Source,
+    ) && let Some(docstring) = Definitions::from_ty(
+        db,
+        &model.program_environment(),
+        Type::SpecialForm(special_form),
+    )
+    .and_then(|definitions| definitions.docstring(db))
+    {
+        let ty = Type::SpecialForm(special_form);
+        return Some(RangedValue {
+            range: FileRange::new(file.file(db), range),
+            value: Hover {
+                program_file: file,
+                contents: vec![
+                    HoverContent::Type {
+                        ty,
+                        variance: None,
+                        qualifiers: TypeQualifiers::empty(),
+                    },
+                    HoverContent::Docstring(docstring),
+                ],
+            },
+        });
+    }
 
     if let GotoTarget::Expression(expr) = goto_target {
         if expr.is_literal_expr() {
@@ -23,6 +62,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
+    let env = model.program_environment();
     let keyword_argument = keyword_argument_hover_contents(db, &model, &goto_target);
 
     let typed_dict_key = match &goto_target {
@@ -78,7 +118,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+        tracing::debug!("Inferred type of covering node is {}", ty.display(db, &env));
         let qualifiers = goto_target.type_qualifiers(&model);
         let inferred_type_hover_content = match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
@@ -95,17 +135,21 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                     },
                 )
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(alias))
-            | Type::TypeAlias(alias) => {
-                let value_ty = alias.value_type(db);
-
-                alias_docstring = Definitions::from_ty(db, ty)
+            ty if let Some(declaration) = ty.display_alias_declaration(db, &env) => {
+                alias_docstring = Definitions::from_ty(db, &env, ty)
                     .and_then(|def| def.docstring(db))
-                    .or_else(|| {
-                        Definitions::from_ty(db, value_ty).and_then(|def| def.docstring(db))
+                    .or_else(|| match ty {
+                        Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                            Definitions::from_ty(db, &env, alias.value_type(db))
+                                .and_then(|def| def.docstring(db))
+                        }
+                        _ => None,
                     });
 
-                HoverContent::TypeAlias { alias, qualifiers }
+                HoverContent::TypeAlias {
+                    declaration: declaration.to_string(),
+                    qualifiers,
+                }
             }
             Type::TypeVar(typevar) => HoverContent::Type {
                 ty,
@@ -133,9 +177,75 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     }
 
     Some(RangedValue {
-        range: FileRange::new(file, goto_target.range()),
-        value: Hover { contents },
+        range: FileRange::new(file.file(db), goto_target.range()),
+        value: Hover {
+            program_file: file,
+            contents,
+        },
     })
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AnnotationContext {
+    Source,
+    StringAnnotation,
+}
+
+/// Returns the special form and source range for the operator at `target` if it is `~`, `&`, or `|`
+/// in a location recognized by [`is_in_annotation_expression`]. When `target` is a string
+/// annotation, `offset` identifies the operator within it.
+fn annotation_operator(
+    model: &SemanticModel<'_>,
+    syntax: ast::AnyNodeRef<'_>,
+    target: &GotoTarget<'_>,
+    offset: TextSize,
+    context: AnnotationContext,
+) -> Option<(SpecialFormType, TextRange)> {
+    let (special_form, range) = match target {
+        GotoTarget::UnaryOp {
+            expression,
+            operator_range,
+        } if expression.op == ast::UnaryOp::Invert => (SpecialFormType::Not, *operator_range),
+        GotoTarget::BinOp {
+            expression,
+            operator_range,
+        } => match expression.op {
+            ast::Operator::BitAnd => (SpecialFormType::Intersection, *operator_range),
+            ast::Operator::BitOr => (SpecialFormType::Union, *operator_range),
+            _ => return None,
+        },
+        GotoTarget::Expression(ast::ExprRef::StringLiteral(string_expr))
+        | GotoTarget::StringAnnotationSubexpr { string_expr, .. } => {
+            if matches!(context, AnnotationContext::Source)
+                && !is_in_annotation_expression(
+                    model,
+                    &covering_node(syntax, string_expr.range()),
+                    string_expr.range(),
+                )
+            {
+                return None;
+            }
+            let (parsed, submodel) = model.enter_string_annotation(string_expr)?;
+            let subtarget =
+                find_goto_target_impl(&submodel, parsed.tokens(), parsed.syntax().into(), offset)?;
+            return annotation_operator(
+                &submodel,
+                parsed.syntax().into(),
+                &subtarget,
+                offset,
+                AnnotationContext::StringAnnotation,
+            );
+        }
+        _ => return None,
+    };
+
+    if matches!(context, AnnotationContext::StringAnnotation)
+        || is_in_annotation_expression(model, &covering_node(syntax, range), range)
+    {
+        Some((special_form, range))
+    } else {
+        None
+    }
 }
 
 fn keyword_argument_hover_contents<'db>(
@@ -214,17 +324,27 @@ fn documentation_for_parameter(docstring: &Docstring, name: &str) -> Option<Docs
 }
 
 pub struct Hover<'db> {
+    program_file: ProgramFile<'db>,
     contents: Vec<HoverContent<'db>>,
 }
 
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
-        DisplayHover {
-            db,
-            hover: self,
-            kind,
-        }
+    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
+        std::fmt::from_fn(move |f| {
+            let mut first = true;
+            let env = ProgramEnvironment::from_file(self.program_file);
+            for content in &self.contents {
+                if !first {
+                    kind.horizontal_line().fmt(f)?;
+                }
+
+                content.display(db, &env, kind).fmt(f)?;
+                first = false;
+            }
+
+            Ok(())
+        })
     }
 
     fn iter(&self) -> std::slice::Iter<'_, HoverContent<'db>> {
@@ -250,28 +370,6 @@ impl<'a, 'db> IntoIterator for &'a Hover<'db> {
     }
 }
 
-pub struct DisplayHover<'db, 'a> {
-    db: &'db dyn Db,
-    hover: &'a Hover<'db>,
-    kind: MarkupKind,
-}
-
-impl fmt::Display for DisplayHover<'_, '_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut first = true;
-        for content in &self.hover.contents {
-            if !first {
-                self.kind.horizontal_line().fmt(f)?;
-            }
-
-            content.display(self.db, self.kind).fmt(f)?;
-            first = false;
-        }
-
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum HoverContent<'db> {
     Signature(String),
@@ -285,8 +383,8 @@ pub enum HoverContent<'db> {
         qualifiers: TypeQualifiers,
     },
     TypeAlias {
-        // The type alias being hovered
-        alias: TypeAliasType<'db>,
+        // The declaration of the type alias being hovered
+        declaration: String,
         // The type's qualifiers
         qualifiers: TypeQualifiers,
     },
@@ -300,9 +398,15 @@ pub enum HoverContent<'db> {
 }
 
 impl<'db> HoverContent<'db> {
-    fn display(&self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHoverContent<'_, 'db> {
+    fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        kind: MarkupKind,
+    ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
             db,
+            env,
             content: self,
             kind,
         }
@@ -311,17 +415,17 @@ impl<'db> HoverContent<'db> {
 
 pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
 }
 
 impl<'db> DisplayHoverContent<'_, 'db> {
     fn ty_string_and_syntax(&self, ty: &Type<'db>) -> (String, &'static str) {
+        let db = self.db;
         // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
         // render poorly with python syntax-highlighting but well as xml
-        let ty_string = ty
-            .display_with(self.db, DisplaySettings::default().multiline())
-            .to_string();
+        let ty_string = ty.display(db, self.env).multiline().to_string();
         let syntax = if ty_string.starts_with('<') {
             "xml"
         } else {
@@ -373,9 +477,11 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
                     .fmt(f)
             }
-            HoverContent::TypeAlias { alias, qualifiers } => {
+            HoverContent::TypeAlias {
+                declaration,
+                qualifiers,
+            } => {
                 let qualifier_suffix = create_qualifier_suffix(*qualifiers);
-                let declaration = alias.display_declaration(self.db);
 
                 self.kind
                     .fenced_code_block(format!("{declaration}{qualifier_suffix}"), "python")
@@ -453,8 +559,36 @@ mod tests {
           | ^- Cursor offset
           | |
           | source
-          |
         ");
+    }
+
+    #[test]
+    fn hover_dynamic_class_with_markdown_fence() {
+        let test = hover_test(
+            r#"
+        Injected = type("name\n```\n![image](https://example.invalid/)\n```", (), {})
+        value = Injected()
+        value<CURSOR>
+        "#,
+        );
+
+        let rendered = hover(
+            &test.db,
+            test.program_file(test.cursor.file),
+            test.cursor.offset,
+        )
+        .map(|hover| {
+            (
+                hover.display(&test.db, MarkupKind::PlainText).to_string(),
+                hover.display(&test.db, MarkupKind::Markdown).to_string(),
+            )
+        });
+
+        let code = "name\n```\n![image](https://example.invalid/)\n```";
+        assert_eq!(
+            rendered,
+            Some((code.to_string(), format!("````python\n{code}\n````")))
+        );
     }
 
     #[test]
@@ -494,11 +628,14 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        This is such a great func!!
+
+        ## Arguments
+        **a**<HB>
+        first for a reason
+
+        **b**<HB>
+        coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:11:1
@@ -508,7 +645,6 @@ mod tests {
            | |    |
            | |    Cursor offset
            | source
-           |
         ");
     }
 
@@ -547,11 +683,14 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        This is such a great func!!
+
+        ## Arguments
+        **a**<HB>
+        first for a reason
+
+        **b**<HB>
+        coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:5
@@ -561,7 +700,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         ");
     }
 
@@ -611,7 +749,6 @@ mod tests {
            | |   |
            | |   Cursor offset
            | source
-           |
         "#);
     }
 
@@ -673,7 +810,6 @@ mod tests {
            | |    |
            | |    Cursor offset
            | source
-           |
         ");
     }
 
@@ -733,7 +869,6 @@ mod tests {
           |       |    |
           |       |    Cursor offset
           |       source
-          |
         ");
     }
 
@@ -787,7 +922,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         ");
     }
 
@@ -841,7 +975,6 @@ mod tests {
           |           |    |
           |           |    Cursor offset
           |           source
-          |
         ");
     }
 
@@ -902,7 +1035,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         ");
     }
 
@@ -940,7 +1072,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -988,7 +1119,6 @@ mod tests {
            |     |    |
            |     |    Cursor offset
            |     source
-           |
         "#);
     }
 
@@ -1018,7 +1148,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1056,7 +1185,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1104,7 +1232,6 @@ mod tests {
            |     |  |
            |     |  Cursor offset
            |     source
-           |
         ");
     }
 
@@ -1150,7 +1277,6 @@ mod tests {
            |     |  |
            |     |  Cursor offset
            |     source
-           |
         "#);
     }
 
@@ -1196,11 +1322,10 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -1238,11 +1363,10 @@ mod tests {
           --> main.py:12:5
            |
         12 | x = S(1)
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -1275,7 +1399,6 @@ mod tests {
           |     |   |
           |     |   Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1308,7 +1431,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1349,7 +1471,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1395,7 +1516,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1440,7 +1560,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1481,7 +1600,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -1522,7 +1640,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -1577,11 +1694,14 @@ mod tests {
         ) -> Unknown
         ```
         ---
-        This is such a great func!!<HB>
-        <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        This is such a great func!!
+
+        ## Arguments
+        **a**<HB>
+        first for a reason
+
+        **b**<HB>
+        coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:25:3
@@ -1591,7 +1711,6 @@ mod tests {
            |   |    |
            |   |    Cursor offset
            |   source
-           |
         ");
     }
 
@@ -1635,7 +1754,6 @@ mod tests {
            |          ||
            |          |Cursor offset
            |          source
-           |
         ");
     }
 
@@ -1676,7 +1794,6 @@ mod tests {
           |            |        |
           |            |        Cursor offset
           |            source
-          |
         "#);
 
         let literal_string = hover_test(
@@ -1716,7 +1833,6 @@ mod tests {
           |            |        |
           |            |        Cursor offset
           |            source
-          |
         "#);
     }
 
@@ -1762,7 +1878,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1802,7 +1917,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1851,7 +1965,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1908,7 +2021,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -1961,7 +2073,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2013,7 +2124,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2066,7 +2176,6 @@ mod tests {
            | ||
            | |Cursor offset
            | source
-           |
         ");
     }
 
@@ -2101,11 +2210,10 @@ mod tests {
           --> main.py:14:5
            |
         14 | foo.a
-           |     -
+           |     ^
            |     |
            |     source
            |     Cursor offset
-           |
         ");
     }
 
@@ -2139,7 +2247,6 @@ mod tests {
           | ^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -2167,7 +2274,6 @@ mod tests {
           |     |       |
           |     |       Cursor offset
           |     source
-          |
         ");
     }
 
@@ -2207,7 +2313,6 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2249,7 +2354,6 @@ mod tests {
            |      ^^^^^- Cursor offset
            |      |
            |      source
-           |
         ");
     }
 
@@ -2279,7 +2383,6 @@ mod tests {
           |      ||
           |      |Cursor offset
           |      source
-          |
         ");
     }
 
@@ -2319,7 +2422,6 @@ mod tests {
            |      ||
            |      |Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2359,7 +2461,6 @@ mod tests {
            |      | |
            |      | Cursor offset
            |      source
-           |
         ");
     }
 
@@ -2409,7 +2510,6 @@ mod tests {
            |        |   |
            |        |   Cursor offset
            |        source
-           |
         ");
     }
 
@@ -2456,7 +2556,6 @@ mod tests {
            |        |   |
            |        |   Cursor offset
            |        source
-           |
         ");
     }
 
@@ -2493,7 +2592,6 @@ mod tests {
            |         | |
            |         | Cursor offset
            |         source
-           |
         ");
     }
 
@@ -2526,7 +2624,6 @@ mod tests {
           |          ||
           |          |Cursor offset
           |          source
-          |
         ");
     }
 
@@ -2566,7 +2663,6 @@ mod tests {
            | ^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -2601,7 +2697,6 @@ mod tests {
           |     |    |
           |     |    Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2636,10 +2731,10 @@ mod tests {
           |            |   |
           |            |   Cursor offset
           |            source
-          |
         "#);
     }
 
+    // Hovering over a union operator in a string annotation shows the Union documentation.
     #[test]
     fn hover_string_annotation3() {
         let test = hover_test(
@@ -2651,7 +2746,30 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @r#"
+        <special-form 'typing.Union'>
+        ---------------------------------------------
+        Represent a union type
+
+        E.g. for int | str
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'typing.Union'>
+        ```
+        ---
+        Represent a union type<HB>
+        <HB>
+        E.g. for int | str
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:10
+          |
+        2 | a: "None | MyClass" = 1
+          |          ^- Cursor offset
+          |          |
+          |          source
+        "#);
     }
 
     #[test]
@@ -2684,7 +2802,6 @@ mod tests {
           |            ^^^^^^^- Cursor offset
           |            |
           |            source
-          |
         "#);
     }
 
@@ -2747,7 +2864,6 @@ mod tests {
           |     |   |
           |     |   Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2777,7 +2893,6 @@ mod tests {
           |               ||
           |               |Cursor offset
           |               source
-          |
         "#);
     }
 
@@ -2804,7 +2919,6 @@ mod tests {
           |      ||
           |      |Cursor offset
           |      source
-          |
         "#);
     }
 
@@ -2831,7 +2945,6 @@ mod tests {
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -2866,7 +2979,6 @@ mod tests {
           |           | |
           |           | Cursor offset
           |           source
-          |
         "#);
     }
 
@@ -2901,7 +3013,6 @@ mod tests {
           |                 | |
           |                 | Cursor offset
           |                 source
-          |
         "#);
     }
 
@@ -2936,7 +3047,6 @@ mod tests {
           |                          | |
           |                          | Cursor offset
           |                          source
-          |
         "#);
     }
 
@@ -2971,7 +3081,6 @@ mod tests {
           |                   | |
           |                   | Cursor offset
           |                   source
-          |
         "#);
     }
 
@@ -3006,7 +3115,6 @@ mod tests {
           |           | |
           |           | Cursor offset
           |           source
-          |
         "#);
     }
 
@@ -3036,7 +3144,6 @@ mod tests {
           |             |  |
           |             |  Cursor offset
           |             source
-          |
         "#);
     }
 
@@ -3071,7 +3178,6 @@ mod tests {
           |                               | |
           |                               | Cursor offset
           |                               source
-          |
         "#);
     }
 
@@ -3129,7 +3235,6 @@ def ab(a: str): ...
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3175,7 +3280,6 @@ def bar() -> None:
           | | |
           | | Cursor offset
           | source
-          |
         ");
     }
 
@@ -3233,7 +3337,6 @@ def ab(a: str):
           | ||
           | |Cursor offset
           | source
-          |
         "#);
     }
 
@@ -3297,7 +3400,6 @@ def ab(a: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3355,7 +3457,6 @@ def ab(a: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3425,7 +3526,6 @@ def ab(a: int, *, c: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3495,7 +3595,6 @@ def ab(a: int, *, c: int):
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -3557,7 +3656,6 @@ def ab(a: int, *, c: int):
            | ^^^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -3607,7 +3705,6 @@ def ab(a: int, *, c: int):
            | ^^^- Cursor offset
            | |
            | source
-           |
         ");
     }
 
@@ -3658,7 +3755,6 @@ def ab(a: int, *, c: int):
           | | |
           | | Cursor offset
           | source
-          |
         ");
     }
 
@@ -3693,7 +3789,6 @@ def outer():
           |                ^- Cursor offset
           |                |
           |                source
-          |
         "#);
     }
 
@@ -3746,7 +3841,6 @@ def function():
           |            |      |
           |            |      Cursor offset
           |            source
-          |
         "#);
     }
 
@@ -3807,7 +3901,6 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
         ");
     }
 
@@ -3851,7 +3944,6 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
         ");
     }
 
@@ -3880,11 +3972,11 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"
-        str
+        assert_snapshot!(test.hover(), @r#"
+        Literal["a", "b"]
         ---------------------------------------------
         ```python
-        str
+        Literal["a", "b"]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3895,8 +3987,7 @@ def function():
           |                 ||
           |                 |Cursor offset
           |                 source
-          |
-        ");
+        "#);
     }
 
     #[test]
@@ -3951,7 +4042,6 @@ def function():
            |                 ||
            |                 |Cursor offset
            |                 source
-           |
         ");
     }
 
@@ -3987,7 +4077,6 @@ def function():
            |              | |
            |              | Cursor offset
            |              source
-           |
         ");
     }
 
@@ -4034,7 +4123,6 @@ def function():
           |             ||
           |             |Cursor offset
           |             source
-          |
         ");
     }
 
@@ -4061,7 +4149,6 @@ def function():
           |                                     ||
           |                                     |Cursor offset
           |                                     source
-          |
         ");
     }
 
@@ -4074,7 +4161,22 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.hover(), @"Hover provided no content");
+        assert_snapshot!(test.hover(), @"
+        AB@Alias2 (contravariant)
+        ---------------------------------------------
+        ```python
+        AB@Alias2 (contravariant)
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:15
+          |
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^-
+          |               ||
+          |               |Cursor offset
+          |               source
+        ");
     }
 
     #[test]
@@ -4103,7 +4205,6 @@ def function():
           |                                           ||
           |                                           |Cursor offset
           |                                           source
-          |
         ");
     }
 
@@ -4127,10 +4228,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        AB@Alias3 (covariant)
         ---------------------------------------------
         ```python
-        @Todo
+        AB@Alias3 (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4141,7 +4242,6 @@ def function():
           |                                      ||
           |                                      |Cursor offset
           |                                      source
-          |
         ");
     }
 
@@ -4192,7 +4292,6 @@ def function():
           |        | |
           |        | Cursor offset
           |        source
-          |
         ");
     }
 
@@ -4249,7 +4348,6 @@ def function():
           |                                  ^- Cursor offset
           |                                  |
           |                                  source
-          |
         ");
     }
 
@@ -4263,10 +4361,10 @@ def function():
 
         // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @"
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ---------------------------------------------
         ```python
-        P@Alias (bivariant)
+        P@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4276,7 +4374,6 @@ def function():
           |                                         ^- Cursor offset
           |                                         |
           |                                         source
-          |
         ");
     }
 
@@ -4289,10 +4386,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        @Todo
+        Ts@Alias (covariant)
         ---------------------------------------------
         ```python
-        @Todo
+        Ts@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -4302,7 +4399,6 @@ def function():
           |                               ^^- Cursor offset
           |                               |
           |                               source
-          |
         ");
     }
 
@@ -4341,7 +4437,6 @@ def function():
           | ^^^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4389,7 +4484,6 @@ def function():
           | ^^^^^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4435,7 +4529,6 @@ def function():
           |   ^^^^- Cursor offset
           |   |
           |   source
-          |
         ");
     }
 
@@ -4483,7 +4576,6 @@ def function():
           |   ^^^^- Cursor offset
           |   |
           |   source
-          |
         ");
     }
 
@@ -4523,7 +4615,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4563,7 +4654,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4606,7 +4696,6 @@ def function():
            |   ^- Cursor offset
            |   |
            |   source
-           |
         ");
     }
 
@@ -4647,7 +4736,6 @@ def function():
           |              ^- Cursor offset
           |              |
           |              source
-          |
         ");
     }
 
@@ -4691,7 +4779,6 @@ def function():
            |   ^- Cursor offset
            |   |
            |   source
-           |
         ");
     }
 
@@ -4721,7 +4808,6 @@ def function():
           |              ^- Cursor offset
           |              |
           |              source
-          |
         ");
     }
 
@@ -4749,7 +4835,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -4778,7 +4863,6 @@ def function():
           |       ^- Cursor offset
           |       |
           |       source
-          |
         ");
     }
 
@@ -4810,7 +4894,6 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
-          |
         ");
     }
 
@@ -4842,7 +4925,6 @@ def function():
           |           ^- Cursor offset
           |           |
           |           source
-          |
         ");
     }
 
@@ -4876,7 +4958,6 @@ def function():
            |               ^- Cursor offset
            |               |
            |               source
-           |
         ");
     }
 
@@ -4943,7 +5024,6 @@ def function():
           |       |       |
           |       |       Cursor offset
           |       source
-          |
         ");
     }
 
@@ -5112,7 +5192,6 @@ def function():
            |        |  |
            |        |  Cursor offset
            |        source
-           |
         "#);
     }
 
@@ -5150,7 +5229,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5180,7 +5258,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5210,7 +5287,6 @@ def function():
           | ||
           | |Cursor offset
           | source
-          |
         ");
     }
 
@@ -5256,7 +5332,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5294,7 +5369,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         "#);
     }
 
@@ -5323,7 +5397,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5358,7 +5431,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5393,7 +5465,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5429,7 +5500,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5466,7 +5536,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5504,7 +5573,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5533,7 +5601,6 @@ def function():
           |     ||
           |     |Cursor offset
           |     source
-          |
         ");
     }
 
@@ -5561,7 +5628,6 @@ def function():
           |                 ^- Cursor offset
           |                 |
           |                 source
-          |
         ");
 
         let test = hover_test(
@@ -5586,7 +5652,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
 
         let test = hover_test(
@@ -5611,7 +5676,6 @@ def function():
           |                     ^- Cursor offset
           |                     |
           |                     source
-          |
         ");
 
         let test = hover_test(
@@ -5636,7 +5700,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
     }
 
@@ -5663,7 +5726,6 @@ def function():
           |               ^- Cursor offset
           |               |
           |               source
-          |
         ");
 
         let test = hover_test(
@@ -5687,7 +5749,6 @@ def function():
           |                       ^- Cursor offset
           |                       |
           |                       source
-          |
         ");
 
         let test = hover_test(
@@ -5711,7 +5772,6 @@ def function():
           |                   ^- Cursor offset
           |                   |
           |                   source
-          |
         ");
 
         let test = hover_test(
@@ -5735,7 +5795,6 @@ def function():
           |                         ^- Cursor offset
           |                         |
           |                         source
-          |
         ");
     }
 
@@ -5761,7 +5820,6 @@ def function():
           |           ^- Cursor offset
           |           |
           |           source
-          |
         ");
 
         let test = hover_test(
@@ -5784,7 +5842,6 @@ def function():
           |                     ^- Cursor offset
           |                     |
           |                     source
-          |
         ");
 
         let test = hover_test(
@@ -5807,7 +5864,6 @@ def function():
           |            ^- Cursor offset
           |            |
           |            source
-          |
         ");
 
         let test = hover_test(
@@ -5830,7 +5886,6 @@ def function():
           |                       ^- Cursor offset
           |                       |
           |                       source
-          |
         ");
     }
 
@@ -5856,7 +5911,156 @@ def function():
           |      ^^^- Cursor offset
           |      |
           |      source
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_annotation() {
+        let test = hover_test(
+            r#"
+        Tree = int | list["Tree"]
+        def consume(value: Tr<CURSOR>ee): ...
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = int | list[Tree]
+        ---------------------------------------------
+        ```python
+        Tree = int | list[Tree]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:20
           |
+        3 | def consume(value: Tree): ...
+          |                    ^^-^
+          |                    | |
+          |                    | Cursor offset
+          |                    source
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_value() {
+        let test = hover_test(
+            r#"
+        Tree = int | list["Tree"]
+        def consume(value: Tree):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = int | list[Tree]
+        ---------------------------------------------
+        ```python
+        Tree = int | list[Tree]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:5
+          |
+        4 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_generic() {
+        let test = hover_test(
+            r#"
+        from typing import TypeVar
+        T = TypeVar("T")
+        Tree = T | list["Tree[T]"]
+        def consume(value: Tree[int]):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = T | list[Tree[T]]
+        ---------------------------------------------
+        ```python
+        Tree = T | list[Tree[T]]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_growing() {
+        let test = hover_test(
+            r#"
+        from typing import TypeVar
+        T = TypeVar("T")
+        Tree = T | list["Tree[list[T]]"]
+        def consume(value: Tree[int]):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = T | list[Tree[list[T]]]
+        ---------------------------------------------
+        ```python
+        Tree = T | list[Tree[list[T]]]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
+        ");
+    }
+
+    #[test]
+    fn hover_implicit_recursive_alias_docstring() {
+        let test = hover_test(
+            r#"
+        class Link[T]:
+            """A linked value."""
+        Tree = Link["Tree"]
+        def consume(value: Tree):
+            <CURSOR>value
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"
+        Tree = Link[Tree]
+        ---------------------------------------------
+        A linked value.
+
+        ---------------------------------------------
+        ```python
+        Tree = Link[Tree]
+        ```
+        ---
+        A linked value.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:6:5
+          |
+        6 |     value
+          |     -^^^^
+          |     |
+          |     source
+          |     Cursor offset
         ");
     }
 
@@ -5893,7 +6097,6 @@ def function():
           |      ^^^^^^^- Cursor offset
           |      |
           |      source
-          |
         ");
 
         let test = hover_test(
@@ -5918,7 +6121,6 @@ def function():
           |    |  |
           |    |  Cursor offset
           |    source
-          |
         ");
     }
 
@@ -5949,7 +6151,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
 
         let test = hover_test(
@@ -5977,7 +6178,6 @@ def function():
           |                    ^- Cursor offset
           |                    |
           |                    source
-          |
         ");
 
         let test = hover_test(
@@ -6005,7 +6205,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
 
         let test = hover_test(
@@ -6033,7 +6232,6 @@ def function():
           |                      ^- Cursor offset
           |                      |
           |                      source
-          |
         ");
     }
 
@@ -6061,11 +6259,200 @@ def function():
          --> main.py:2:12
           |
         2 | result = 5 + 3
-          |            -
+          |            ^
           |            |
           |            source
           |            Cursor offset
+        ");
+    }
+
+    // An intersection operator in a quoted PEP 613 type alias value shows the Intersection documentation.
+    #[test]
+    fn hover_intersection_in_type_alias() {
+        let test = hover_test(
+            r#"
+from typing import TypeAlias
+Alias: TypeAlias = "int <CURSOR>& str"
+"#,
+        );
+        assert_snapshot!(test.hover(), @r#"
+        <special-form 'ty_extensions.Intersection'>
+        ---------------------------------------------
+        `Intersection[T1, T2, ..., Tn]`, also spelled as `T1 & T2 & ... & Tn`, represents an intersection
+        type: the set of all objects that inhabit all of the types `T1`, `T2`, ..., `Tn`.
+
+        For any two fully static types `T1` and `T2`, `Intersection[T1, T2]` is a subtype of both `T1` and
+        `T2`. For any type `T3` that is a subtype of both `T1` and `T2`, `Intersection[T1, T2]` is a
+        supertype of `T3`.
+
+        In the following example, although neither `P` nor `Q` is a subtype of the other, an instance of `S`
+        inhabits `Intersection[P, Q]` because `S` inherits from both `P` and `Q`:
+
+        ```python
+        class P: ...
+        class Q: ...
+        class S(P, Q): ...
+
+        s: Intersection[P, Q] = S()
+        ```
+
+        In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax
+        when displaying intersection types. Note that either spelling will fail in runtime contexts or in
+        cases where an annotation expression could be evaluated.
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'ty_extensions.Intersection'>
+        ```
+        ---
+        `Intersection[T1, T2, ..., Tn]`, also spelled as `T1 & T2 & ... & Tn`, represents an intersection<HB>
+        type: the set of all objects that inhabit all of the types `T1`, `T2`, ..., `Tn`.<HB>
+        <HB>
+        For any two fully static types `T1` and `T2`, `Intersection[T1, T2]` is a subtype of both `T1` and<HB>
+        `T2`. For any type `T3` that is a subtype of both `T1` and `T2`, `Intersection[T1, T2]` is a<HB>
+        supertype of `T3`.<HB>
+        <HB>
+        In the following example, although neither `P` nor `Q` is a subtype of the other, an instance of `S`<HB>
+        inhabits `Intersection[P, Q]` because `S` inherits from both `P` and `Q`:<HB>
+        <HB>
+        ```python
+        class P: ...
+        class Q: ...
+        class S(P, Q): ...
+
+        s: Intersection[P, Q] = S()
+        ```<HB>
+        <HB>
+        In type expressions, ty supports the experimental spelling `T1 & T2`, and also uses this syntax<HB>
+        when displaying intersection types. Note that either spelling will fail in runtime contexts or in<HB>
+        cases where an annotation expression could be evaluated.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:25
           |
+        3 | Alias: TypeAlias = "int & str"
+          |                         ^
+          |                         |
+          |                         source
+          |                         Cursor offset
+        "#);
+    }
+
+    // A union operator in a type parameter default shows the Union documentation.
+    #[test]
+    fn hover_union_in_type_parameter_default() {
+        let test = hover_test("class C[T = int <CURSOR>| str]: ...");
+        assert_snapshot!(test.hover(), @"
+        <special-form 'typing.Union'>
+        ---------------------------------------------
+        Represent a union type
+
+        E.g. for int | str
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'typing.Union'>
+        ```
+        ---
+        Represent a union type<HB>
+        <HB>
+        E.g. for int | str
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:1:17
+          |
+        1 | class C[T = int | str]: ...
+          |                 ^
+          |                 |
+          |                 source
+          |                 Cursor offset
+        ");
+    }
+
+    // A negation operator nested in two string annotations shows the Not documentation.
+    #[test]
+    fn hover_negation_in_string_type_alias() {
+        let test = hover_test("type Alias = \"'<CURSOR>~int'\"");
+        assert_snapshot!(test.hover(), @r#"
+        <special-form 'ty_extensions.Not'>
+        ---------------------------------------------
+        `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
+
+        In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
+        negation types. Note that either spelling will fail in runtime contexts or in cases where an
+        annotation expression could be evaluated.
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'ty_extensions.Not'>
+        ```
+        ---
+        `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
+        <HB>
+        In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
+        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
+        annotation expression could be evaluated.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:1:16
+          |
+        1 | type Alias = "'~int'"
+          |                ^
+          |                |
+          |                source
+          |                Cursor offset
+        "#);
+    }
+
+    // An operator in a parameter default shows its normal operation method.
+    #[test]
+    fn hover_operator_in_parameter_default() {
+        let test = hover_test("def f(x: int = 1 <CURSOR>& 2): ...");
+        let rendered = test.hover();
+        assert!(rendered.contains("__and__"), "{rendered}");
+    }
+
+    // A locally defined `TypeAlias` name does not mark an assignment as a type alias.
+    #[test]
+    fn hover_operator_in_annotated_assignment_value() {
+        let test = hover_test("TypeAlias = int\nvalue: TypeAlias = 1 <CURSOR>| 2");
+        let rendered = test.hover();
+        assert!(rendered.contains("__or__"), "{rendered}");
+    }
+
+    // The plain-text and Markdown hovers show the special form and its documentation, with a range
+    // covering the operator.
+    #[test]
+    fn hover_negation_operator_presentation() {
+        let test = hover_test("def f(x: <CURSOR>~int): ...");
+        assert_snapshot!(test.hover(), @"
+        <special-form 'ty_extensions.Not'>
+        ---------------------------------------------
+        `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.
+
+        In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying
+        negation types. Note that either spelling will fail in runtime contexts or in cases where an
+        annotation expression could be evaluated.
+
+        ---------------------------------------------
+        ```xml
+        <special-form 'ty_extensions.Not'>
+        ```
+        ---
+        `Not[T]`, also spelled as `~T`, represents the set of all objects that do not inhabit the type `T`.<HB>
+        <HB>
+        In type expressions, ty supports the experimental spelling `~T`, and also uses it when displaying<HB>
+        negation types. Note that either spelling will fail in runtime contexts or in cases where an<HB>
+        annotation expression could be evaluated.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:1:10
+          |
+        1 | def f(x: ~int): ...
+          |          ^
+          |          |
+          |          source
+          |          Cursor offset
         ");
     }
 
@@ -6105,11 +6492,10 @@ def function():
           --> main.py:15:8
            |
         15 | Test() + Test()
-           |        -
+           |        ^
            |        |
            |        source
            |        Cursor offset
-           |
         ");
     }
 
@@ -6146,7 +6532,6 @@ def function():
            |       ^- Cursor offset
            |       |
            |       source
-           |
         ");
     }
 
@@ -6159,13 +6544,13 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        int | float
+        float
         ---------------------------------------------
         Convert a string or number to a floating-point number, if possible.
 
         ---------------------------------------------
         ```python
-        int | float
+        float
         ```
         ---
         Convert a string or number to a floating-point number, if possible.
@@ -6177,8 +6562,62 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
-          |
         ");
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def f(x: builtins.float | float):
+                x<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_selected_signature() {
+        let test = hover_test(
+            r#"
+            import builtins
+            from typing import overload
+
+            class float: ...
+
+            @overload
+            def choose(value: builtins.float | float) -> None: ...
+            @overload
+            def choose(value: str) -> None: ...
+            def choose(value: object) -> None: ...
+
+            choose<CURSOR>(1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_shadowed_numeric_builtin_in_keyword_parameter() {
+        let test = hover_test(
+            r#"
+            import builtins
+
+            class float: ...
+
+            def choose(*, value: builtins.float | float) -> None: ...
+
+            choose(value<CURSOR>=1.0)
+            "#,
+        );
+
+        assert_snapshot!(test.hover());
     }
 
     #[test]
@@ -6241,7 +6680,6 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
-          |
         ");
 
         let test = hover_test(
@@ -6266,7 +6704,6 @@ def function():
           | ^- Cursor offset
           | |
           | source
-          |
         ");
     }
 
@@ -6292,7 +6729,6 @@ def function():
           |      ^^^- Cursor offset
           |      |
           |      source
-          |
         ");
 
         let test = hover_test(
@@ -6315,7 +6751,6 @@ def function():
           |                             ^^^- Cursor offset
           |                             |
           |                             source
-          |
         ");
     }
 
@@ -6345,7 +6780,6 @@ def function():
           |                  ^- Cursor offset
           |                  |
           |                  source
-          |
         ");
 
         let test = hover_test(
@@ -6369,7 +6803,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
 
         let test = hover_test(
@@ -6396,7 +6829,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
 
         let test = hover_test(
@@ -6420,7 +6852,6 @@ def function():
           |             ^- Cursor offset
           |             |
           |             source
-          |
         ");
     }
 
@@ -6460,7 +6891,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6500,7 +6930,6 @@ def function():
           |       |  |
           |       |  Cursor offset
           |       source
-          |
         ");
     }
 
@@ -6540,7 +6969,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6580,7 +7008,6 @@ def function():
           |              |  |
           |              |  Cursor offset
           |              source
-          |
         ");
     }
 
@@ -6619,7 +7046,6 @@ def function():
           |       |  |
           |       |  Cursor offset
           |       source
-          |
         ");
     }
 
@@ -6658,7 +7084,6 @@ def function():
           |                     |  |
           |                     |  Cursor offset
           |                     source
-          |
         ");
     }
 
@@ -6697,7 +7122,6 @@ def function():
           |     |  |
           |     |  Cursor offset
           |     source
-          |
         ");
     }
 
@@ -6741,7 +7165,6 @@ def function():
           |    ^- Cursor offset
           |    |
           |    source
-          |
         ");
     }
 
@@ -6769,7 +7192,6 @@ def function():
           | |    |
           | |    Cursor offset
           | source
-          |
         ");
     }
 
@@ -6823,7 +7245,6 @@ class CoolType(str):
           |        ^- Cursor offset
           |        |
           |        source
-          |
         ");
     }
 
@@ -6859,7 +7280,6 @@ type U<CURSOR> = MyType
           |      ^- Cursor offset
           |      |
           |      source
-          |
         ");
     }
 
@@ -6909,7 +7329,6 @@ type U<CURSOR> = MyType
           |    |  |
           |    |  Cursor offset
           |    source
-          |
         ");
     }
 
@@ -6958,7 +7377,6 @@ type U<CURSOR> = MyType
           |                     ^^^^^- Cursor offset
           |                     |
           |                     source
-          |
         ");
     }
 
@@ -7005,7 +7423,6 @@ type U<CURSOR> = MyType
            |    ^^^^- Cursor offset
            |    |
            |    source
-           |
         ");
     }
 
@@ -7013,7 +7430,11 @@ type U<CURSOR> = MyType
         fn hover(&self) -> String {
             use std::fmt::Write;
 
-            let Some(hover) = hover(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(hover) = hover(
+                &self.db,
+                self.program_file(self.cursor.file),
+                self.cursor.offset,
+            ) else {
                 return "Hover provided no content".to_string();
             };
 

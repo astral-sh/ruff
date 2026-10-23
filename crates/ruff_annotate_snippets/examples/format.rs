@@ -1,4 +1,4 @@
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use annotate_snippets::{AnnotationKind, Level, Renderer, Snippet, renderer::DecorStyle};
 
 fn main() {
     let source = r#") -> Option<String> {
@@ -23,22 +23,26 @@ fn main() {
             _ => continue,
         }
     }"#;
-    let message = Level::Error.title("mismatched types").id("E0308").snippet(
-        Snippet::source(source)
-            .line_start(51)
-            .origin("src/format.rs")
-            .annotation(
-                Level::Warning
-                    .span(5..19)
-                    .label("expected `Option<String>` because of return type"),
-            )
-            .annotation(
-                Level::Error
-                    .span(26..724)
-                    .label("expected enum `std::option::Option`"),
-            ),
-    );
+    let report = &[Level::ERROR
+        .primary_title("mismatched types")
+        .id("E0308")
+        .element(
+            Snippet::source(source)
+                .line_start(51)
+                .path("src/format.rs")
+                .fold(false)
+                .annotation(
+                    AnnotationKind::Context
+                        .span(5..19)
+                        .label("expected `Option<String>` because of return type"),
+                )
+                .annotation(
+                    AnnotationKind::Primary
+                        .span(26..724)
+                        .label("expected enum `std::option::Option`"),
+                ),
+        )];
 
-    let renderer = Renderer::styled();
-    anstream::println!("{}", renderer.render(message));
+    let renderer = Renderer::styled().decor_style(DecorStyle::Unicode);
+    anstream::println!("{}", renderer.render(report));
 }

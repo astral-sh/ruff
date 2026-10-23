@@ -115,4 +115,3 @@ Module(
 1 | if True: pass if False: pass
 2 | if True: pass; if False: pass
   |                ^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
-  |

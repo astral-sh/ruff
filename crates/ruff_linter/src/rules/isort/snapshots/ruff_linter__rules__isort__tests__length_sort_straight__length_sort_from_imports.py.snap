@@ -8,7 +8,6 @@ I001 [*] Import block is un-sorted or un-formatted
 2 | | from short import b
 3 | | from loooooooooooooooooooooog import c
   | |______________________________________^
-  |
 help: Organize imports
   |
 1 + from loooooooooooooooooooooog import c

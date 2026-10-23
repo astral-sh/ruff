@@ -35,14 +35,12 @@ error[invalid-argument-type]: Invalid argument to `get_protocol_members`
   |
 5 | get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
-  |
 info: Only protocol classes can be passed to `get_protocol_members`
 info: `NotAProtocol` is declared here, but it is not a protocol class:
  --> src/mdtest_snippet.py:3:7
   |
 3 | class NotAProtocol: ...
   |       ^^^^^^^^^^^^
-  |
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
 
@@ -54,14 +52,12 @@ error[invalid-argument-type]: Invalid argument to `get_protocol_members`
   |
 9 | get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
-  |
 info: Only protocol classes can be passed to `get_protocol_members`
 info: `AlsoNotAProtocol` is declared here, but it is not a protocol class:
  --> src/mdtest_snippet.py:7:7
   |
 7 | class AlsoNotAProtocol(NotAProtocol, object): ...
   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 info: A class is only a protocol class if it directly inherits from `typing.Protocol` or `typing_extensions.Protocol`
 info: See https://typing.python.org/en/latest/spec/protocol.html#
 

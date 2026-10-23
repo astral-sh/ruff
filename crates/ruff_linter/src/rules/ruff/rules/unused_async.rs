@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::function_type::is_stub;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 use crate::rules::fastapi::rules::is_fastapi_route;
 
@@ -18,7 +19,11 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 /// ## Why is this bad?
 /// Declaring a function `async` when it's not is usually a mistake, and will artificially limit the
 /// contexts where that function may be called. In some cases, labeling a function `async` is
-/// semantically meaningful (e.g. with the trio library).
+/// semantically meaningful. For example, an async test or callback may need to run in an async
+/// execution context, even if it only uses a `ContextVar`.
+///
+/// If the async context is intentional, add an actual await expression, such as
+/// `await asyncio.sleep(0)`, or disable this rule for the function.
 ///
 /// ## Example
 /// ```python
@@ -32,7 +37,7 @@ use crate::rules::fastapi::rules::is_fastapi_route;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.0")]
+#[violation_metadata(preview_since = "v0.4.0", category = Category::Pedantic)]
 pub(crate) struct UnusedAsync {
     name: String,
 }

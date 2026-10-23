@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use lsp_types::DefinitionRequest;
 use lsp_types::{DefinitionParams, DefinitionResponse, Uri};
 use ty_ide::goto_definition;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{
@@ -36,20 +36,20 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
         };
 
-        let Some(ranged) = goto_definition(db, file, offset) else {
+        let Some(ranged) = goto_definition(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

@@ -47,7 +47,6 @@ RUF047 [*] Empty `else` clause
 21 | / else:
 22 | |     pass
    | |________^
-   |
 help: Remove the `else` clause
    |
 20 |     pass

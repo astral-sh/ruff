@@ -265,7 +265,7 @@ def ndpointer(dtype=None, ndim=None, shape=None, flags=None):
     Returns
     -------
     klass : ndpointer type object
-        A type object, which is an ``_ndtpr`` instance containing
+        A type object, which is an ``_ndptr`` instance containing
         dtype, ndim, shape and flags information.
 
     Raises

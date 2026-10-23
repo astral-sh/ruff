@@ -71,4 +71,3 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | [*x for x in y]
   |  ^^ Syntax Error: Cannot use iterable unpacking in a list comprehension on Python 3.14 (syntax was added in Python 3.15)
-  |

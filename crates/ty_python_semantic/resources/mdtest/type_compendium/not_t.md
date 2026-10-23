@@ -13,7 +13,8 @@ in `T`.
 `~T` is disjoint from `T`:
 
 ```pyi
-from ty_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
 
 class T: ...
 class S(T): ...
@@ -28,7 +29,8 @@ Together, `T` and `~T` describe the set of all values. So the union of both type
 `object`:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class T: ...
 
@@ -40,7 +42,8 @@ static_assert(is_equivalent_to(T | ~T, object))
 If `S <: T`, then `~T <: ~S`:, similar to how negation in logic reverses the order of `<=`:
 
 ```pyi
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class T: ...
 class S(T): ...
@@ -54,7 +57,8 @@ static_assert(is_subtype_of(~T, ~S))
 Assignability relationships are similarly reversed:
 
 ```pyi
-from ty_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
 from typing import Any
 
 class T: ...
@@ -73,7 +77,8 @@ static_assert(is_assignable_to(~(Any & S), ~(Any & T)))
 If two types `P` and `Q` are disjoint, then `P` must be a subtype of `~Q`, and vice versa:
 
 ```pyi
-from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of, is_disjoint_from
 from typing import final
 
 @final
@@ -94,7 +99,8 @@ Given two unrelated types `P` and `Q`, we can demonstrate De-Morgan's laws in th
 set-theoretic types:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 class P: ...
 class Q: ...
@@ -118,7 +124,8 @@ static_assert(is_equivalent_to(~(P & Q), ~P | ~Q))
 two gradual types are equivalent:
 
 ```pyi
-from ty_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(~Any, Any))

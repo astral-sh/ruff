@@ -33,7 +33,6 @@ error[unresolved-import]: Cannot resolve imported module `a.foo`
   |
 2 | import a.foo  # error: [unresolved-import] "Cannot resolve imported module `a.foo`"
   |        ^^^^^
-  |
 info: Searched in the following paths during module resolution:
 info:   1. /src (first-party code)
 info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
@@ -47,7 +46,6 @@ error[unresolved-import]: Cannot resolve imported module `b.foo`
   |
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
-  |
 info: Searched in the following paths during module resolution:
 info:   1. /src (first-party code)
 info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)

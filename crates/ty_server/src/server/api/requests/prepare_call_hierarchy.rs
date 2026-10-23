@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::CallHierarchyPrepareRequest;
 use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Uri};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::document::{PositionExt, ToRangeExt as _};
@@ -44,20 +44,20 @@ impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
         };
 
-        let Some(items) = ty_ide::prepare_call_hierarchy(db, file, offset) else {
+        let Some(items) = ty_ide::prepare_call_hierarchy(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

@@ -25,4 +25,3 @@ invalid-syntax: assignment expression within a comprehension cannot be used in a
 4 | class C:
 5 |     [(x := y) for y in range(3)]
   |       ^^^^^^
-  |

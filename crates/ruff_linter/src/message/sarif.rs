@@ -21,12 +21,12 @@ use crate::registry::{Linter, RuleNamespace};
 /// Static Analysis Results Interchange Format (SARIF) is a standard format
 /// for static analysis results. For full specification, see:
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-pub struct SarifEmitter<'a> {
+pub(crate) struct SarifEmitter<'a> {
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> SarifEmitter<'a> {
-    pub fn new(config: &'a DisplayDiagnosticConfig) -> Self {
+    pub(crate) fn new(config: &'a DisplayDiagnosticConfig) -> Self {
         Self { config }
     }
 }
@@ -117,11 +117,9 @@ struct SarifDriver<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    full_description: Option<SarifMessage<'a>>,
+    full_description: SarifMessage<'a>,
     help: SarifMessage<'a>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    help_uri: Option<String>,
+    help_uri: String,
     id: &'a str,
     properties: SarifProperties<'a>,
     short_description: SarifMessage<'a>,
@@ -136,7 +134,7 @@ impl<'a> From<(&'a str, SarifLevel)> for SarifRule<'a> {
             Some((linter, suffix)) => {
                 let rule = linter
                     .all_rules()
-                    .find(|rule| rule.noqa_code().suffix() == suffix)
+                    .find(|rule| rule.noqa_code().is_some_and(|code| code.suffix() == suffix))
                     .expect("Expected a valid noqa code corresponding to a rule");
                 (Some(linter.name()), rule)
             }
@@ -150,9 +148,9 @@ impl<'a> From<(&'a str, SarifLevel)> for SarifRule<'a> {
             short_description: SarifMessage {
                 text: rule.message_formats()[0].into(),
             },
-            full_description: rule
-                .explanation()
-                .map(|text| SarifMessage { text: text.into() }),
+            full_description: SarifMessage {
+                text: rule.explanation().into(),
+            },
             help: SarifMessage {
                 text: rule.message_formats()[0].into(),
             },
@@ -194,7 +192,11 @@ impl Serialize for RuleCode<'_> {
 impl<'a> RuleCode<'a> {
     fn from_diagnostic(code: &'a Diagnostic, config: &'a DisplayDiagnosticConfig) -> Self {
         match code.secondary_code() {
-            Some(diagnostic) if !config.preview_enabled() => Self::SecondaryCode(diagnostic),
+            Some(diagnostic)
+                if !config.preview_enabled() || config.is_prefer_rule_codes_enabled() =>
+            {
+                Self::SecondaryCode(diagnostic)
+            }
             _ => Self::LintId(code.id().as_str()),
         }
     }
@@ -380,12 +382,12 @@ impl<'a> SarifResult<'a> {
     #[allow(clippy::unnecessary_wraps)]
     fn uri(diagnostic: &Diagnostic) -> Result<String> {
         let path = normalize_path(&*diagnostic.expect_ruff_filename());
-        #[cfg(not(target_arch = "wasm32"))]
-        return url::Url::from_file_path(&path)
-            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
-            .map(|u| u.to_string());
-        #[cfg(target_arch = "wasm32")]
-        return Ok(format!("file://{}", path.display()));
+        cfg_select! {
+            target_arch = "wasm32" => Ok(format!("file://{}", path.display())),
+            _ => url::Url::from_file_path(&path)
+                .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
+                .map(|url| url.to_string()),
+        }
     }
 
     fn from_message(

@@ -27,4 +27,3 @@ invalid-syntax: Starred expression cannot be used here
 7 | def func():
 8 |     yield *x
   |           ^^
-  |

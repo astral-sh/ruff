@@ -4,7 +4,7 @@ This section provides a detailed overview of the features provided by the Ruff L
 
 ## Diagnostic Highlighting
 
-Provide diagnostics for your Python code in real-time.
+The server provides diagnostics for your Python code in real time.
 
 <img
 src="https://astral.sh/static/GIF/v0.4.5/violation_hx.gif"
@@ -27,8 +27,7 @@ alt="Editing a `pyproject.toml` configuration file in VS Code"
 
 ## Formatting
 
-Provide code formatting for your Python code. The server can format an entire document or a specific
-range of lines.
+The server can format an entire Python document or a specific range of lines.
 
 The VS Code extension provides the `Ruff: Format Document` command to format an entire document.
 In VS Code, the range formatting can be triggered by selecting a range of lines, right-clicking, and
@@ -41,9 +40,6 @@ alt="Formatting a document in VS Code"
 
 ### Markdown code blocks
 
-*This feature is currently only available in
-[preview mode](https://docs.astral.sh/ruff/preview/#preview).*
-
 The Ruff formatter can also format Python code blocks in Markdown files.
 The Ruff VS Code extension provides the `Format Document` command for
 Markdown files, which will then format the code blocks with the same settings
@@ -54,15 +50,6 @@ to use Ruff formatting in addition to another Markdown formatting extension,
 then you will need to set one as the default in VS Code, and manually run
 the `Format Document With...` (or `Ruff: Format document`) command to run any
 other formatters separately.
-
-To enable preview mode for formatting in VS Code, add the following to your
-`settings.json`:
-
-```json
-{
-  "ruff.format.preview": true,
-}
-```
 
 To set Ruff as the default formatter for Markdown files in VS Code, add the
 following to your `settings.json`:
@@ -132,8 +119,8 @@ how fix safety works.
 
 ## Hover
 
-The server can provide the rule documentation when focusing over a NoQA code in the comment.
-Focusing is usually hovering with a mouse, but can also be triggered with a shortcut.
+The server can provide rule documentation when you focus on a NoQA code in a comment. You can
+usually do this by hovering with a mouse or using a keyboard shortcut.
 
 <img
 src="https://astral.sh/static/GIF/v0.4.5/hover_vscode.gif"

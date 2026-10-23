@@ -40,6 +40,5 @@ error[invalid-context-manager]: Object of type `GoodManager | BadManager` cannot
    |
 16 |     with context_expr as f:
    |          ^^^^^^^^^^^^
-   |
 
 ```

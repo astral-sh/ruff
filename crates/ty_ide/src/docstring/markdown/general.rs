@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::debug_assert_matches;
 
 use ruff_text_size::TextSize;
 
@@ -191,13 +192,18 @@ fn render_with_indentation_mode(
             match directive {
                 // Special directives that should be plaintext
                 Some(
-                    "attention" | "caution" | "danger" | "error" | "hint" | "important" | "note"
-                    | "tip" | "warning" | "admonition" | "versionadded" | "version-added"
-                    | "versionchanged" | "version-changed" | "version-deprecated" | "deprecated"
-                    | "version-removed" | "versionremoved",
+                    directive @ ("attention" | "caution" | "danger" | "error" | "hint"
+                    | "important" | "note" | "tip" | "warning" | "admonition"
+                    | "versionadded" | "version-added" | "versionchanged"
+                    | "version-changed" | "version-deprecated" | "deprecated"
+                    | "version-removed" | "versionremoved"),
                 ) => {
+                    // A directive starts a new block and cannot continue a
+                    // pending hyperlink from the previous line.
+                    renderer.flush_pending_link();
+
                     // Map version directives to human-readable phrases (matching Sphinx output)
-                    let pretty_directive = match directive.unwrap() {
+                    let pretty_directive = match directive {
                         "versionadded" | "version-added" => Cow::Borrowed("Added in version"),
                         "versionchanged" | "version-changed" => Cow::Borrowed("Changed in version"),
                         "deprecated" | "version-deprecated" => {
@@ -245,7 +251,16 @@ fn render_with_indentation_mode(
             continue;
         }
 
-        renderer.render_line(rendered_line);
+        let is_indented_markdown_code =
+            matches!(leading_indentation, LeadingIndentation::MarkdownSyntax)
+                && line_indent >= TextSize::from(4)
+                && !renderer.inline.has_pending_link();
+
+        renderer.render_line(
+            rendered_line,
+            line_indent.to_usize(),
+            !is_indented_markdown_code,
+        );
     }
     renderer.finish_document();
 }
@@ -263,6 +278,7 @@ enum LeadingIndentation {
 struct Renderer<'source, 'output> {
     line_prefix: LinePrefix,
     block_state: BlockState<'source>,
+    inline: inline::Renderer,
     output: &'output mut String,
 }
 
@@ -271,6 +287,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
         Self {
             line_prefix: LinePrefix::default(),
             block_state: BlockState::default(),
+            inline: inline::Renderer::default(),
             output,
         }
     }
@@ -289,11 +306,17 @@ impl<'source, 'output> Renderer<'source, 'output> {
 
     /// Flushes content buffered for the current line.
     fn flush_pending_line(&mut self) {
+        self.inline.flush_pending_link(self.output);
         self.line_prefix.emit(self.output);
     }
 
+    /// Flushes a wrapped hyperlink candidate.
+    fn flush_pending_link(&mut self) {
+        self.inline.flush_pending_link(self.output);
+    }
+
     fn finish_rest_literal(&mut self) {
-        debug_assert!(matches!(self.block_state, BlockState::RestLiteral { .. }));
+        debug_assert_matches!(self.block_state, BlockState::RestLiteral { .. });
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(FENCE);
@@ -322,7 +345,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
     }
 
     fn finish_doctest(&mut self) {
-        debug_assert!(matches!(self.block_state, BlockState::Doctest));
+        debug_assert_matches!(self.block_state, BlockState::Doctest);
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(FENCE);
@@ -335,18 +358,18 @@ impl<'source, 'output> Renderer<'source, 'output> {
     }
 
     fn finish_markdown_fence(&mut self, line: &str) {
-        debug_assert!(matches!(self.block_state, BlockState::MarkdownFence(_)));
+        debug_assert_matches!(self.block_state, BlockState::MarkdownFence(_));
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(line);
     }
 
-    fn render_line(&mut self, line: &str) {
-        self.flush_pending_line();
+    fn render_line(&mut self, line: &str, source_indentation: usize, render_rst_links: bool) {
         if self.block_state.is_code() {
+            self.flush_pending_line();
             self.output.push_str(line);
         } else {
-            inline::render_line(self.output, line);
+            self.render_inline(line, source_indentation, render_rst_links);
         }
     }
 
@@ -363,6 +386,21 @@ impl<'source, 'output> Renderer<'source, 'output> {
                 self.output.push_str(fence.marker());
             }
         }
+    }
+
+    fn render_inline(&mut self, text: &str, source_indentation: usize, render_rst_links: bool) {
+        let line = inline::Line {
+            rendered_prefix: &self.line_prefix.rendered,
+            source_indentation,
+            text,
+        };
+        if render_rst_links {
+            self.inline.render_line(self.output, line);
+        } else {
+            self.inline
+                .render_line_without_link_conversion(self.output, line);
+        }
+        self.line_prefix.rendered.clear();
     }
 }
 
@@ -424,7 +462,7 @@ impl LinePrefix {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 enum BlockState<'a> {
     #[default]
     Prose,

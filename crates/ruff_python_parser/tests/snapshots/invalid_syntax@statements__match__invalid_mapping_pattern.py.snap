@@ -646,4 +646,3 @@ Module(
 22 | match subject:
 23 |     case {Foo(a as b): 1}: ...
    |           ^^^^^^^^^^^ Syntax Error: Invalid mapping pattern key
-   |

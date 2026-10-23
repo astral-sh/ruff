@@ -29,7 +29,6 @@ error[PLW0717]: Try clause contains too many statements (6 > 5)
   |
 2 | try:
   | ^^^
-  |
 ```
 
 ## Context managers

@@ -37,7 +37,6 @@ error[invalid-overload]: Overloads for function `func` must be followed by a non
   |
 5 | def func(x: int) -> int: ...
   |     ^^^^
-  |
 info: Attempting to call `func` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted:
 info:  - in stub files
@@ -54,7 +53,6 @@ error[invalid-overload]: Overloads for function `method` must be followed by a n
    |
 12 |     def method(self, x: int) -> int: ...
    |         ^^^^^^
-   |
 info: Attempting to call `method` will raise `TypeError` at runtime
 info: Overloaded functions without implementations are only permitted:
 info:  - in stub files

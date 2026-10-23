@@ -425,7 +425,7 @@ Formatted once:
 Formatted twice:
 ---
 {reformatted}---"#,
-            options = &DisplayPyOptions(options),
+            options = DisplayPyOptions(options),
             reformatted = reformatted.as_code(),
         );
     }

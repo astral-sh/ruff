@@ -3,6 +3,13 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
+use insta::assert_snapshot;
+#[cfg(feature = "test-uv")]
+use insta::internals::SettingsBindDropGuard;
+use ruff_db::Db as _;
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
+};
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -10,16 +17,17 @@ use ruff_db::system::{
     file_time_now,
 };
 use ruff_python_ast::PythonVersion;
-use ruff_ranged_value::RangedValue;
-use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
-use ty_project::metadata::options::{
-    EnvironmentOptions, Options, ProjectOptionsOverrides, SrcOptions,
-};
+use ruff_python_trivia::textwrap::dedent;
+use ruff_ranged_value::{RangedValue, ValueSource};
+use ty_module_resolver::{Module, ModuleName};
+use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::python_version::SupportedPythonVersion;
 use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
+#[cfg(unix)]
+use ty_project::watch::watch_paths;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
-use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UvWorkspace};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
 
@@ -28,10 +36,23 @@ struct TestCase {
     watcher: Option<ProjectWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<ChangeEvent>>,
     _user_config_directory_override: UserConfigDirectoryOverrideGuard,
+    #[cfg(feature = "test-uv")]
+    snapshot_settings: Option<SettingsBindDropGuard>,
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
     root_dir: SystemPathBuf,
+}
+
+fn resolve_module_confident<'db>(
+    db: &'db ProjectDatabase,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    ty_module_resolver::resolve_module_confident(
+        db,
+        db.project().program(db).resolver_environment(db),
+        module_name,
+    )
 }
 
 impl TestCase {
@@ -43,8 +64,50 @@ impl TestCase {
         &self.root_dir
     }
 
+    fn write_virtual_environment(
+        &self,
+        path: impl AsRef<SystemPath>,
+        python_version: PythonVersion,
+    ) -> anyhow::Result<()> {
+        write_virtual_environment(self.root_path(), path, python_version)
+    }
+
     fn db(&self) -> &ProjectDatabase {
         &self.db
+    }
+
+    /// Starts file-watching and waits until the watcher is ready to deliver events.
+    /// Panics if the test is already watching.
+    fn start_watching(&mut self) -> anyhow::Result<()> {
+        assert!(self.watcher.is_none(), "File watcher is already running");
+
+        let (sender, receiver) = crossbeam::channel::unbounded();
+        let watcher = directory_watcher(move |events| sender.send(events).unwrap())
+            .with_context(|| "Failed to create directory watcher")?;
+        let watcher = ProjectWatcher::new(watcher, &mut self.db);
+        assert!(!watcher.has_errored_paths());
+        self.watcher = Some(watcher);
+        self.changes_receiver = receiver;
+
+        // Write a sentinel file to confirm the watcher is live and delivering events.
+        // This
+        // 1. ensures the watcher is working well, and not e.g. backed up with events unrelated to the current test
+        // 2. flushes events that are unrelated to the current test
+        let sentinel_path = self.db.system().current_directory().join(".watcher_ready");
+        std::fs::write(sentinel_path.as_std_path(), "ready")?;
+
+        self.try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_secs(30))
+            .expect(
+                "Watcher failed to deliver sentinel event within 30s \
+                 — file watching may not be operational",
+            );
+
+        // Clean up the sentinel file and drain its deletion event.
+        let _ = std::fs::remove_file(sentinel_path.as_std_path());
+        let _ = self
+            .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
+
+        Ok(())
     }
 
     /// Stops file-watching and returns the collected change events.
@@ -90,7 +153,7 @@ impl TestCase {
         let watcher = self
             .watcher
             .take()
-            .expect("Cannot call `stop_watch` more than once");
+            .expect("Cannot call `stop_watch` without a running watcher");
 
         let start = Instant::now();
         let mut all_events = Vec::new();
@@ -142,7 +205,7 @@ impl TestCase {
         let watcher = self
             .watcher
             .as_ref()
-            .expect("Cannot call `try_take_watch_changes` after `stop_watch`");
+            .expect("Cannot call `try_take_watch_changes` without a running watcher");
 
         let start = Instant::now();
         let mut all_events = Vec::new();
@@ -179,12 +242,17 @@ impl TestCase {
         Ok(all_events)
     }
 
-    fn apply_changes(
-        &mut self,
-        changes: &[ChangeEvent],
-        project_options_overrides: Option<&ProjectOptionsOverrides>,
-    ) -> ChangeResult {
-        self.db.apply_changes(changes, project_options_overrides)
+    fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
+        let result = self.db.apply_changes(changes);
+
+        if !changes.is_empty()
+            && let Some(watcher) = &mut self.watcher
+        {
+            watcher.update(&mut self.db);
+            assert!(!watcher.has_errored_paths());
+        }
+
+        result
     }
 
     fn update_options(&mut self, options: Options) -> anyhow::Result<()> {
@@ -199,12 +267,7 @@ impl TestCase {
         .context("Failed to write configuration")?;
 
         let changes = self.take_watch_changes(event_for_file("pyproject.toml"));
-        self.apply_changes(&changes, None);
-
-        if let Some(watcher) = &mut self.watcher {
-            watcher.update(&self.db);
-            assert!(!watcher.has_errored_paths());
-        }
+        self.apply_changes(&changes);
 
         Ok(())
     }
@@ -253,6 +316,15 @@ impl TestCase {
         names.sort();
         names
     }
+
+    fn render_diagnostics(&self, diagnostics: &[Diagnostic]) -> String {
+        DisplayDiagnostics::new(
+            self.db(),
+            &DisplayDiagnosticConfig::new("ty").format(DiagnosticFormat::Concise),
+            diagnostics,
+        )
+        .to_string()
+    }
 }
 
 trait MatchEvent {
@@ -277,15 +349,28 @@ trait Setup {
 }
 
 struct SetupContext<'a> {
-    system: &'a OsSystem,
+    system: &'a TestSystem,
     root_path: &'a SystemPath,
     options: Option<Options>,
+    config_file_override: Option<SystemPathBuf>,
+    override_options: Option<Options>,
+    fallback_options: Option<Options>,
     included_paths: Option<Vec<SystemPathBuf>>,
+    allow_invalid_settings: bool,
+    watch: bool,
 }
 
 impl<'a> SetupContext<'a> {
-    fn system(&self) -> &'a OsSystem {
+    fn system(&self) -> &'a TestSystem {
         self.system
+    }
+
+    fn os_system(&self) -> &'a OsSystem {
+        self.system()
+            .system()
+            .as_any()
+            .downcast_ref::<OsSystem>()
+            .expect("Expected an OS system for file-watching tests")
     }
 
     fn join_project_path(&self, relative: impl AsRef<SystemPath>) -> SystemPathBuf {
@@ -311,7 +396,7 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_project_path(relative_path);
-        Self::write_file_impl(absolute_path, content)
+        write_file(absolute_path, &dedent(content))
     }
 
     fn write_file(
@@ -321,31 +406,45 @@ impl<'a> SetupContext<'a> {
     ) -> anyhow::Result<()> {
         let relative_path = relative_path.as_ref();
         let absolute_path = self.join_root_path(relative_path);
-        Self::write_file_impl(absolute_path, content)
+        write_file(absolute_path, content)
     }
 
-    fn write_file_impl(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
-        let path = path.as_ref();
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create parent directory for file `{path}`"))?;
-        }
-
-        let mut file = std::fs::File::create(path.as_std_path())
-            .with_context(|| format!("Failed to open file `{path}`"))?;
-        file.write_all(content.as_bytes())
-            .with_context(|| format!("Failed to write to file `{path}`"))?;
-        file.sync_data()?;
-
-        Ok(())
+    fn write_virtual_environment(
+        &self,
+        path: impl AsRef<SystemPath>,
+        python_version: PythonVersion,
+    ) -> anyhow::Result<()> {
+        write_virtual_environment(self.root_path(), path, python_version)
     }
 
     fn set_options(&mut self, options: Options) {
         self.options = Some(options);
     }
 
+    fn allow_invalid_settings(&mut self) {
+        self.allow_invalid_settings = true;
+    }
+
+    fn set_config_file_override(&mut self, path: impl AsRef<SystemPath>) {
+        self.config_file_override = Some(self.join_project_path(path));
+    }
+
+    fn set_override_options(&mut self, options: Options) {
+        self.override_options = Some(options);
+    }
+
+    fn set_fallback_options(&mut self, options: Options) {
+        self.fallback_options = Some(options);
+    }
+
     fn set_included_paths(&mut self, paths: Vec<SystemPathBuf>) {
         self.included_paths = Some(paths);
+    }
+
+    /// Controls whether setup starts watching. Defaults to true.
+    /// When false, call [`TestCase::start_watching`] after preparing the filesystem.
+    fn set_watch(&mut self, watch: bool) {
+        self.watch = watch;
     }
 }
 
@@ -375,6 +474,14 @@ fn setup<F>(setup_files: F) -> anyhow::Result<TestCase>
 where
     F: Setup,
 {
+    setup_with_system(setup_files, |_| {})
+}
+
+fn setup_with_system<F, C>(setup_files: F, configure_system: C) -> anyhow::Result<TestCase>
+where
+    F: Setup,
+    C: FnOnce(&TestSystem),
+{
     let temp_dir = tempfile::tempdir()?;
 
     let root_path = SystemPath::from_std_path(temp_dir.path()).ok_or_else(|| {
@@ -401,21 +508,38 @@ where
     // Keep file-watching tests independent from the shell and user config that run the test binary.
     let os_system = OsSystem::new(&project_path);
     let user_config_directory_override = os_system.with_user_config_directory(None);
-    let system = TestSystem::new(os_system.clone());
-    isolate_environment(&system);
+    let system = TestSystem::new(os_system);
+    system.clear_env_vars();
+    configure_system(&system);
 
     let mut setup_context = SetupContext {
-        system: &os_system,
+        system: &system,
         root_path: &root_path,
         options: None,
+        config_file_override: None,
+        override_options: None,
+        fallback_options: None,
         included_paths: None,
+        allow_invalid_settings: false,
+        watch: true,
     };
 
     setup_files
         .setup(&mut setup_context)
         .context("Failed to setup test files")?;
 
-    if let Some(options) = setup_context.options {
+    let SetupContext {
+        options,
+        config_file_override,
+        override_options,
+        fallback_options,
+        included_paths,
+        allow_invalid_settings,
+        watch,
+        ..
+    } = setup_context;
+
+    if let Some(options) = options {
         std::fs::write(
             project_path.join("pyproject.toml").as_std_path(),
             toml::to_string(&PyProject {
@@ -427,13 +551,26 @@ where
         .context("Failed to write configuration")?;
     }
 
-    let included_paths = setup_context.included_paths;
-
-    let mut project = ProjectMetadata::discover(&project_path, &system)?;
+    let mut project = if let Some(config_file_override) = config_file_override {
+        ProjectMetadata::from_config_file(config_file_override, &project_path, &system)?
+    } else {
+        ProjectMetadata::discover(&project_path, &system)?
+    };
+    if let Some(fallback_options) = fallback_options {
+        project.set_fallback_options(fallback_options);
+    }
     project.apply_configuration_files(&system)?;
+    if let Some(override_options) = override_options {
+        project.set_override_options(override_options);
+    }
+    if project.use_uv().workspace_discovery_enabled() {
+        let workspace = UvWorkspace::discover(&project_path, &system);
+        project.apply_uv_workspace(&system, workspace)?;
+    }
 
     // We need a chance to create the directories here.
-    if let Some(environment) = project.options().environment.as_ref() {
+    let merged_options = project.to_merged_options();
+    if let Some(environment) = merged_options.options().environment.as_ref() {
         for path in environment
             .extra_paths
             .as_deref()
@@ -446,63 +583,88 @@ where
         }
     }
 
-    let mut db = ProjectDatabase::fallible(project, system)?;
+    let mut db = if allow_invalid_settings {
+        ProjectDatabase::use_defaults(project, system)
+    } else {
+        ProjectDatabase::fallible(project, system)?
+    };
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);
     }
 
-    let (sender, receiver) = crossbeam::channel::unbounded();
-    let watcher = directory_watcher(move |events| sender.send(events).unwrap())
-        .with_context(|| "Failed to create directory watcher")?;
-
-    let watcher = ProjectWatcher::new(watcher, &db);
-    assert!(!watcher.has_errored_paths());
-
-    let test_case = TestCase {
+    let mut test_case = TestCase {
         db,
-        changes_receiver: receiver,
-        watcher: Some(watcher),
+        changes_receiver: crossbeam::channel::never(),
+        watcher: None,
         _user_config_directory_override: user_config_directory_override,
+        #[cfg(feature = "test-uv")]
+        snapshot_settings: None,
         _temp_dir: temp_dir,
         root_dir: root_path,
     };
 
-    // Write a sentinel file to confirm the watcher is live and delivering events.
-    // This
-    // 1. ensures the watcher is working well, and not e.g. backed up with events unrelated to the current test
-    // 2. flushes events that are unrelated to the current test
-    let sentinel_path = project_path.join(".watcher_ready");
-    std::fs::write(sentinel_path.as_std_path(), "ready")?;
-
-    test_case
-        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_secs(30))
-        .expect(
-            "Watcher failed to deliver sentinel event within 30s \
-             — file watching may not be operational",
-        );
-
-    // Clean up the sentinel file and drain its deletion event.
-    let _ = std::fs::remove_file(sentinel_path.as_std_path());
-    let _ = test_case
-        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
+    if watch {
+        test_case.start_watching()?;
+    }
 
     Ok(test_case)
 }
 
-fn isolate_environment(system: &TestSystem) {
-    for name in [
-        EnvVars::VIRTUAL_ENV,
-        EnvVars::CONDA_PREFIX,
-        EnvVars::CONDA_DEFAULT_ENV,
-        EnvVars::CONDA_ROOT,
-        EnvVars::PYTHONPATH,
-    ] {
-        system.remove_env_var(name);
+/// Creates or updates a mock virtual environment, resolving relative paths against the test root.
+fn write_virtual_environment(
+    root: &SystemPath,
+    path: impl AsRef<SystemPath>,
+    python_version: PythonVersion,
+) -> anyhow::Result<()> {
+    let environment = root.join(path);
+    let python_home = root.join("base/bin");
+    write_file(python_home.join("python"), "")?;
+    write_file(
+        environment.join(if cfg!(windows) {
+            "Scripts/python.exe"
+        } else {
+            "bin/python"
+        }),
+        "",
+    )?;
+    let site_packages = if cfg!(windows) {
+        environment.join("Lib/site-packages")
+    } else {
+        environment.join(format!("lib/python{python_version}/site-packages"))
+    };
+    std::fs::create_dir_all(site_packages)?;
+    let pyvenv_cfg = environment.join("pyvenv.cfg");
+    let pyvenv_cfg_contents = format!(
+        r"
+        home = {python_home}
+        version = {python_version}
+        "
+    );
+    if pyvenv_cfg.as_std_path().try_exists()? {
+        update_file(pyvenv_cfg, &pyvenv_cfg_contents)
+    } else {
+        write_file(pyvenv_cfg, &dedent(&pyvenv_cfg_contents))
     }
 }
 
-/// Updates the content of a file and ensures that the last modified file time is updated.
+fn write_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
+    let path = path.as_ref();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create parent directory for file `{path}`"))?;
+    }
+
+    let mut file = std::fs::File::create(path.as_std_path())
+        .with_context(|| format!("Failed to open file `{path}`"))?;
+    file.write_all(content.as_bytes())
+        .with_context(|| format!("Failed to write to file `{path}`"))?;
+    file.sync_data()?;
+
+    Ok(())
+}
+
+/// Dedents and updates a file's content, ensuring that its last modified time changes.
 fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()> {
     let path = path.as_ref().as_std_path();
 
@@ -514,7 +676,7 @@ fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()
         .write(true)
         .truncate(true)
         .open(path)?;
-    file.write_all(content.as_bytes())?;
+    file.write_all(dedent(content).as_bytes())?;
 
     loop {
         file.sync_all()?;
@@ -545,7 +707,7 @@ fn new_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let foo = case.system_file(&foo_path).expect("foo.py to exist.");
 
@@ -583,7 +745,7 @@ fn new_directory_with_python_files() -> anyhow::Result<()> {
         )
     });
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let init = case.system_file(&init_path).expect("__init__.py to exist");
     let module = case.system_file(&module_path).expect("module.py to exist");
@@ -613,7 +775,7 @@ fn new_non_python_file_is_not_indexed() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("README.md"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&readme_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -635,7 +797,7 @@ fn new_ignored_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&foo_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -662,7 +824,7 @@ fn new_file_in_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bad.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&bad_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -688,7 +850,7 @@ fn new_file_in_parent_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bad.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&bad_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -713,7 +875,7 @@ fn new_ignore_file_in_ignored_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file(".gitignore"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&nested_ignore_path).is_ok());
     case.assert_indexed_project_files([bar_file]);
@@ -732,7 +894,7 @@ fn ignore_file_change_reloads_files_not_project_metadata() -> anyhow::Result<()>
     update_file(case.project_path(".ignore"), "")?;
 
     let changes = case.stop_watch(event_for_file(".ignore"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(!result.project_changed());
     case.assert_indexed_project_files([bar, foo]);
@@ -796,7 +958,7 @@ fn new_non_project_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("black.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(case.system_file(&black_path).is_ok());
 
@@ -837,7 +999,7 @@ fn new_files_with_explicit_included_paths() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("test2.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let sub_a_file = case.system_file(&sub_a_path).expect("sub/a.py to exist");
 
@@ -882,7 +1044,7 @@ fn new_file_in_included_out_of_project_directory() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("script2.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let src_a_file = case.system_file(&src_a).unwrap();
     let outside_b_file = case.system_file(&outside_b_path).unwrap();
@@ -909,10 +1071,160 @@ fn changed_file() -> anyhow::Result<()> {
 
     assert!(!changes.is_empty());
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
     case.assert_indexed_project_files([foo]);
+
+    Ok(())
+}
+
+#[test]
+fn scripts_to_synchronize_after_file_and_directory_changes() -> anyhow::Result<()> {
+    let script = dedent(
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        ",
+    );
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("existing.py", &script)?;
+        context.write_project_file("edited.py", "")?;
+        context.write_file("new/script.py", &script)
+    })?;
+    let edited = case.project_path("edited.py");
+    assert_eq!(
+        case.db().project().script_files(case.db()).iter().count(),
+        1
+    );
+
+    update_file(&edited, &script)?;
+
+    let changes = case.take_watch_changes(event_for_file("edited.py"));
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes.scripts_to_synchronize(case.db()),
+        vec![case.system_file(&edited)?]
+    );
+
+    std::fs::rename(
+        case.root_path().join("new").as_std_path(),
+        case.project_path("new").as_std_path(),
+    )?;
+    let mut changes = case.take_watch_changes(event_for_file("new"));
+    update_file(&edited, "")?;
+    changes.extend(case.stop_watch(event_for_file("edited.py")));
+
+    // Directory discovery also includes unchanged scripts, but `edited.py` no longer
+    // contains a PEP 723 script metadata block.
+    let changes = case.apply_changes(&changes);
+    assert_eq!(
+        changes
+            .scripts_to_synchronize(case.db())
+            .into_iter()
+            .collect::<HashSet<_>>(),
+        HashSet::from([
+            case.system_file(case.project_path("existing.py"))?,
+            case.system_file(case.project_path("new/script.py"))?,
+        ])
+    );
+
+    Ok(())
+}
+
+#[test]
+fn script_exclusion_tracks_file_creation_and_metadata_edits() -> anyhow::Result<()> {
+    let mut case = setup([(
+        "ty.toml",
+        r"
+        [src]
+        exclude-scripts = true
+        ",
+    )])?;
+    let path = case.project_path("script.py");
+    let script = r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ";
+    assert_eq!(case.db().check().as_slice(), &[]);
+
+    std::fs::write(path.as_std_path(), dedent(script).as_ref())?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    let changes = case.apply_changes(&changes);
+    assert!(changes.scripts_to_synchronize(case.db()).is_empty());
+    let file = case.system_file(&path)?;
+    assert_eq!(case.db().check().as_slice(), &[]);
+    assert_eq!(case.db().check_file(file).as_slice(), &[]);
+
+    update_file(&path, "missing\n")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+
+    update_file(&path, script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_eq!(case.db().check().as_slice(), &[]);
+    assert_eq!(case.db().check_file(file).as_slice(), &[]);
+
+    Ok(())
+}
+
+#[test]
+fn explicitly_included_file_remains_checked_when_becoming_a_script() -> anyhow::Result<()> {
+    let mut case = setup([
+        (
+            "ty.toml",
+            r"
+            [src]
+            exclude-scripts = true
+            ",
+        ),
+        ("script.py", "missing\n"),
+    ])?;
+    let path = case.project_path("script.py");
+    let file = case.system_file(&path)?;
+    case.db
+        .project()
+        .set_included_paths(&mut case.db, vec![path.clone()]);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:1:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+
+    update_file(
+        &path,
+        r"
+        # /// script
+        # dependencies = []
+        # ///
+        missing
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"script.py:5:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(file)),
+        @"script.py:5:1: error[unresolved-reference] Name `missing` used when not defined"
+    );
 
     Ok(())
 }
@@ -933,7 +1245,7 @@ fn deleted_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_none());
@@ -966,7 +1278,7 @@ fn move_file_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
     case.assert_indexed_project_files([]);
@@ -993,7 +1305,7 @@ fn move_file_to_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let foo_in_project = case.system_file(&foo_in_project)?;
 
@@ -1018,7 +1330,7 @@ fn rename_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("bar.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(!foo.exists(case.db()));
 
@@ -1057,7 +1369,7 @@ fn directory_moved_to_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     let init_file = case
         .system_file(sub_new_path.join("__init__.py"))
@@ -1106,7 +1418,7 @@ fn directory_moved_to_trash() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // `import sub.a` should no longer resolve
     assert!(
@@ -1157,7 +1469,7 @@ fn directory_renamed() -> anyhow::Result<()> {
     // Linux and windows only emit an event for the newly created root directory, but not for every new component.
     let changes = case.stop_watch(event_for_file("sub"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // `import sub.a` should no longer resolve
     assert!(
@@ -1218,7 +1530,7 @@ fn directory_deleted() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("sub"));
 
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
     assert!(!result.project_changed());
 
     // `import sub.a` should no longer resolve
@@ -1261,7 +1573,7 @@ fn search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("a.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
     case.assert_indexed_project_files([case.system_file(case.project_path("bar.py")).unwrap()]);
@@ -1292,7 +1604,7 @@ fn add_search_path() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("a.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()).is_some());
 
@@ -1335,17 +1647,261 @@ fn remove_search_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn script_dependency_changes() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "script.py",
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # [tool.ty.environment]
+            # extra-paths = ["../dependencies"]
+            # ///
+            from dependency import value
+            result: int = value
+            "#,
+        )
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+    assert_eq!(case.db().check().as_slice(), &[]);
+
+    update_file(&dependency, "value = 'wrong'")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @r#"script.py:8:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+    );
+    Ok(())
+}
+
+#[test]
+fn shared_script_search_paths_remain_watched_until_unused() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        let script = r#"
+        # /// script
+        # requires-python = ">=3.12"
+        # [tool.ty.environment]
+        # extra-paths = ["../dependencies"]
+        # ///
+        "#;
+        context.write_project_file("first.py", script)?;
+        context.write_project_file("second.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+
+    update_file(case.project_path("first.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("first.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 2")?;
+    let changes = case.take_watch_changes(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit while the search path is shared: {changes:?}"
+    );
+
+    update_file(case.project_path("second.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("second.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 3")?;
+
+    // Neither script uses this path now, so edits to it should no longer produce watch events.
+    let changes = case.try_stop_watch(event_for_file("dependency.py"), Duration::from_millis(100));
+
+    assert_eq!(changes, Err(vec![]));
+    Ok(())
+}
+
+#[test]
+fn restoring_script_metadata_rewatches_search_path() -> anyhow::Result<()> {
+    let script = r#"
+    # /// script
+    # requires-python = ">=3.12"
+    # [tool.ty.environment]
+    # extra-paths = ["../dependencies"]
+    # ///
+    "#;
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/dependency.py", "value = 1")?;
+        context.write_project_file("script.py", script)
+    })?;
+    let dependency = case.root_path().join("dependencies/dependency.py");
+
+    // Removing the script block removes its extra search path from the project.
+    update_file(case.project_path("script.py"), "")?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    // Restoring the script re-registers its search path.
+    update_file(case.project_path("script.py"), script)?;
+    let changes = case.take_watch_changes(event_for_file("script.py"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 2")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit after restoring the script's search path: {changes:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn nested_search_path_picks_up_missed_dependency_edit() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("dependencies/pkg/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "main.py",
+            r"
+            from pkg.dependency import value
+            result: int = value
+            ",
+        )?;
+        context.write_project_file(
+            "pyproject.toml",
+            r#"
+            [tool.ty.environment]
+            extra-paths = ["../dependencies"]
+            "#,
+        )
+    })?;
+    let dependency = case.root_path().join("dependencies/pkg/dependency.py");
+
+    // The first check caches the dependency through the parent search path.
+    assert_eq!(case.db().check().as_slice(), &[]);
+
+    // Stop watching the parent before editing the dependency, so ty misses that file event.
+    update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    update_file(&dependency, "value = 'wrong'")?;
+
+    // The new search path is nested inside the former watch. Registering it must refresh
+    // known files beneath it, even though that exact directory was never watched before.
+    update_file(
+        case.project_path("pyproject.toml"),
+        r#"
+        [tool.ty.environment]
+        extra-paths = ["../dependencies/pkg"]
+        "#,
+    )?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // Import relative to the new search path and check that ty sees the missed edit.
+    update_file(
+        case.project_path("main.py"),
+        r"
+        from dependency import value
+        result: int = value
+        ",
+    )?;
+    let changes = case.take_watch_changes(event_for_file("main.py"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @r#"main.py:3:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+    );
+    Ok(())
+}
+
+#[test]
+fn pth_edit_while_unwatched_watches_new_search_path() -> anyhow::Result<()> {
+    let site_packages = if cfg!(windows) {
+        "venv/Lib/site-packages"
+    } else {
+        "venv/lib/python3.12/site-packages"
+    };
+    let project_config = r#"
+    [tool.ty.environment]
+    python = "../venv"
+    "#;
+    let mut case = setup(|context: &mut SetupContext| {
+        let python_home = context.join_root_path("base/bin");
+        context.write_file("base/bin/python", "")?;
+        context.write_file(
+            "venv/pyvenv.cfg",
+            &format!(
+                r"home = {python_home}
+version = 3.12
+"
+            ),
+        )?;
+        context.write_file(
+            format!("{site_packages}/dependency.pth"),
+            context.join_root_path("old").as_str(),
+        )?;
+        context.write_file("old/dependency.py", "value = 1")?;
+        context.write_file("new/dependency.py", "value = 1")?;
+        context.write_project_file(
+            "main.py",
+            r"
+            from dependency import value
+            result: int = value
+            ",
+        )?;
+        context.write_project_file("pyproject.toml", project_config)
+    })?;
+
+    // The initial import resolves through `old`, as named by `dependency.pth`.
+    assert_eq!(case.db().check().as_slice(), &[]);
+
+    // Stop watching the virtual environment before changing its `.pth` file.
+    update_file(case.project_path("pyproject.toml"), "[tool.ty]\n")?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // This edit has no watcher event, so the cached `.pth` contents still name `old`.
+    let new = case.root_path().join("new");
+    update_file(
+        case.root_path().join(site_packages).join("dependency.pth"),
+        new.as_str(),
+    )?;
+
+    // Restoring the environment initially sees the cached `old` path. Rewatching
+    // `site-packages` must refresh `.pth` and register `new` in the same update.
+    update_file(case.project_path("pyproject.toml"), project_config)?;
+    let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+    case.apply_changes(&changes);
+
+    // Receiving this edit proves that `new` is now watched.
+    let dependency = new.join("dependency.py");
+    update_file(&dependency, "value = 2")?;
+    let changes = case.stop_watch(event_for_file("dependency.py"));
+    assert!(
+        changes
+            .iter()
+            .any(|event| matches!(event, ChangeEvent::Changed { path, .. } if path == &dependency)),
+        "expected an edit at the new search path: {changes:?}"
+    );
+    Ok(())
+}
+
+#[test]
 fn change_python_version_and_platform() -> anyhow::Result<()> {
     let mut case = setup(|context: &mut SetupContext| {
-        // `sys.last_exc` is a Python 3.12 only feature
         // `os.getegid()` is Unix only
         context.write_project_file(
             "bar.py",
-            r#"
-import sys
-import os
-print(sys.last_exc, os.getegid())
-"#,
+            r"
+            import sys
+            import os
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            os.getegid()
+            ",
         )?;
         context.set_options(Options {
             environment: Some(EnvironmentOptions {
@@ -1361,17 +1917,12 @@ print(sys.last_exc, os.getegid())
         Ok(())
     })?;
 
-    let diagnostics = case.db.check();
-
-    assert_eq!(diagnostics.len(), 2);
-    assert_eq!(
-        diagnostics[0].primary_message(),
-        "Module `sys` has no member `last_exc`"
-    );
-    assert_eq!(
-        diagnostics[1].primary_message(),
-        "Module `os` has no member `getegid`"
-    );
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"
+    bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`
+    bar.py:7:1: error[unresolved-attribute] Module `os` has no member `getegid`
+    ");
 
     // Change the python version
     case.update_options(Options {
@@ -1386,9 +1937,287 @@ print(sys.last_exc, os.getegid())
     })
     .expect("Search path settings to be valid");
 
-    let diagnostics = case.db.check();
-    assert!(diagnostics.is_empty());
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"bar.py:6:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[12]]`"
+    );
 
+    Ok(())
+}
+
+#[test]
+fn recreating_default_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context
+            .write_virtual_environment(context.join_project_path(".venv"), PythonVersion::PY311)?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+
+    let environment = case.project_path(".venv");
+
+    // Without `.venv`, ty uses its default Python version.
+    std::fs::remove_dir_all(&environment)?;
+    let changes = case.take_watch_changes(event_for_file(".venv"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
+    );
+
+    case.write_virtual_environment(&environment, PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file(".venv"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn repairing_default_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context
+            .write_virtual_environment(context.join_project_path(".venv"), PythonVersion::PY311)?;
+        // Without `home`, the environment cannot be selected at startup.
+        context.write_project_file(
+            ".venv/pyvenv.cfg",
+            r"
+            version = 3.11
+            ",
+        )?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
+    );
+
+    // Write a valid `pyvenv.cfg`.
+    case.write_virtual_environment(case.project_path(".venv"), PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn creating_site_packages_after_metadata_updates_inferred_python_version() -> anyhow::Result<()> {
+    let library = if cfg!(windows) { "Lib" } else { "lib" };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_file("base/bin/python", "")?;
+        std::fs::create_dir(context.join_project_path(".venv"))?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+
+    // uv writes pyvenv.cfg before creating site-packages. Process these in separate batches.
+    let python_home = case.root_path().join("base/bin");
+    write_file(
+        case.project_path(".venv/pyvenv.cfg"),
+        &dedent(&format!(
+            r"
+            home = {python_home}
+            version = 3.11
+            "
+        )),
+    )?;
+    let changes = case.take_watch_changes(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
+    );
+
+    let library = case.project_path(".venv").join(library);
+    let site_packages = library.join(if cfg!(windows) {
+        "site-packages"
+    } else {
+        "python3.11/site-packages"
+    });
+    std::fs::create_dir_all(site_packages)?;
+    // Watchers may report the library directory, its descendants, or both.
+    let changes = case.stop_watch(|change: &ChangeEvent| {
+        matches!(change, ChangeEvent::Created { path, .. } if path.starts_with(&library))
+    });
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn moving_configured_interpreter_parent_into_project_updates_inferred_python_version()
+-> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "envs/env/Scripts/python.exe"
+    } else {
+        "envs/env/bin/python"
+    };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.allow_invalid_settings();
+        context.write_virtual_environment("unwatched/env", PythonVersion::PY311)?;
+        context.write_project_file(
+            "pyproject.toml",
+            &format!(
+                r#"
+                [tool.ty.environment]
+                python = "./{python}"
+                "#
+            ),
+        )?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
+    );
+
+    // Moving the parent can produce a single directory event for the whole environment.
+    std::fs::rename(
+        case.root_path().join("unwatched"),
+        case.project_path("envs"),
+    )?;
+    let changes = case.stop_watch(event_for_file("envs"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn repairing_activated_environment_updates_inferred_python_version() -> anyhow::Result<()> {
+    let mut case = setup_with_system(
+        |context: &mut SetupContext| {
+            context.allow_invalid_settings();
+            context.write_virtual_environment(
+                context.join_project_path("active-env"),
+                PythonVersion::PY311,
+            )?;
+            context.write_project_file(
+                "active-env/pyvenv.cfg",
+                r"
+                version = 3.11
+                ",
+            )?;
+            context.write_project_file(
+                "main.py",
+                r"
+                import sys
+                from typing_extensions import reveal_type
+
+                reveal_type(sys.version_info[:2])
+                ",
+            )
+        },
+        |system| {
+            system.set_env_var(
+                EnvVars::VIRTUAL_ENV,
+                system.current_directory().join("active-env").as_str(),
+            );
+        },
+    )?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
+    );
+
+    case.write_virtual_environment(case.project_path("active-env"), PythonVersion::PY311)?;
+    let changes = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+    Ok(())
+}
+
+#[test]
+fn external_interpreter_changes_update_inferred_python_version() -> anyhow::Result<()> {
+    let python = if cfg!(windows) {
+        "environment/Scripts/python.exe"
+    } else {
+        "environment/bin/python"
+    };
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_virtual_environment("environment", PythonVersion::PY311)?;
+        context.write_project_file(
+            "main.py",
+            r"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.version_info[:2])
+            ",
+        )?;
+        context.write_project_file(
+            "pyproject.toml",
+            &format!(
+                r#"
+                [tool.ty.environment]
+                python = "../{python}"
+                "#
+            ),
+        )
+    })?;
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[11]]`"
+    );
+
+    case.write_virtual_environment("environment", PythonVersion::PY312)?;
+    let events = case.stop_watch(event_for_file("pyvenv.cfg"));
+    case.apply_changes(&events);
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[12]]`"
+    );
     Ok(())
 }
 
@@ -1419,15 +2248,9 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
         Ok(())
     })?;
 
-    let diagnostics = case.db.check();
-
-    assert_eq!(diagnostics.len(), 1);
-    assert_eq!(
-        diagnostics[0].primary_message(),
-        format!(
-            "Ignoring unsupported inferred Python version `3.{unsupported_minor}`; ty will use Python {} instead.",
-            PythonVersion::latest_ty()
-        )
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check()),
+        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead."
     );
 
     std::fs::rename(
@@ -1440,11 +2263,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
     // manually reloads the options instead of exercising the file-watching path for that rename.
     case.update_options(Options::default())?;
 
-    let diagnostics = case.db.check();
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check().as_slice(), &[]);
 
     Ok(())
 }
@@ -1496,7 +2315,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("VERSIONS"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert!(resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()).is_some());
 
@@ -1550,7 +2369,7 @@ fn hard_links_in_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("foo.py"));
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), foo).as_str(), "print('Version 2')");
 
@@ -1621,7 +2440,7 @@ fn hard_links_to_target_outside_project() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(ChangeEvent::is_changed);
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     assert_eq!(source_text(case.db(), bar).as_str(), "print('Version 2')");
 
@@ -1660,7 +2479,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("foo.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             foo.permissions(case.db()),
@@ -1740,7 +2559,7 @@ mod unix {
 
         let changes = case.take_watch_changes(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_file).as_str(),
@@ -1753,7 +2572,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_file).as_str(),
@@ -1821,7 +2640,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         // The file watcher is guaranteed to emit one event for the changed file, but it isn't specified
         // if the event is emitted for the "original" or linked path because both paths are watched.
@@ -1850,7 +2669,75 @@ mod unix {
             bar_baz_text = bar_baz_text.as_str()
         );
 
-        case.assert_indexed_project_files([patched_bar_baz_file]);
+        if cfg!(target_os = "linux") {
+            // Known bug: the index depends on which path notify reports. Discovery skips symlinked
+            // directories, so initially only `project/patched/bar/baz.py` is indexed. Resolving
+            // `bar.baz` creates a separate `File` for `project/bar/baz.py`, outside the index.
+            //
+            // notify uses different watcher backends across operating systems. On Linux, it follows
+            // the symlink and registers both directory paths. Inotify returns the same watch
+            // descriptor for both, and notify retains the last registered path. The recursive walk
+            // doesn't sort directory entries, so filesystem iteration order determines which path
+            // wins. That order can differ between filesystems and runs, even on the same OS.
+            //
+            // An event for the original path updates its `File` and leaves the index unchanged.
+            // An event for the symlinked path updates that `File` and adds it to the index, leaving
+            // both paths indexed but the original `File`'s revision stale. Accept either path (or
+            // both) until indexing agrees with discovery regardless of the reported path.
+            let files = case.db().project().files(case.db());
+            assert!(
+                files.contains(patched_bar_baz_file) || files.contains(baz_file),
+                "Expected the project to contain the original or symlinked file"
+            );
+        } else {
+            case.assert_indexed_project_files([patched_bar_baz_file]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn symlinked_site_packages_outside_environment() -> anyhow::Result<()> {
+        let mut case = setup(|context: &mut SetupContext| {
+            context.write_virtual_environment("environment", PythonVersion::PY312)?;
+            let environment_site_packages =
+                context.join_root_path("environment/lib/python3.12/site-packages");
+            let shared_site_packages = context.join_root_path("shared-site-packages");
+            std::fs::rename(&environment_site_packages, &shared_site_packages)?;
+            std::os::unix::fs::symlink(&shared_site_packages, &environment_site_packages)?;
+            context.write_file("shared-site-packages/dependency.py", "value: int = 1")?;
+            context.write_project_file(
+                "ty.toml",
+                r#"
+                [environment]
+                python = "../environment"
+                "#,
+            )?;
+            context.write_project_file(
+                "main.py",
+                r"
+                from dependency import value
+
+                result: int = value
+                ",
+            )
+        })?;
+        assert_eq!(case.db().check(), []);
+
+        let environment = case.root_path().join("environment");
+        let site_packages = case.root_path().join("shared-site-packages");
+        // The target is outside the environment and needs its own watch.
+        assert_eq!(
+            watch_paths(case.db(), case.db().project()).paths(),
+            [case.project_path(""), environment, site_packages.clone()]
+        );
+
+        update_file(site_packages.join("dependency.py"), "value: str = ''")?;
+        let changes = case.stop_watch(event_for_file("dependency.py"));
+        case.apply_changes(&changes);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"main.py:4:15: error[invalid-assignment] Object of type `str` is not assignable to `int`"
+        );
         Ok(())
     }
 
@@ -1935,7 +2822,7 @@ mod unix {
 
         let changes = case.stop_watch(event_for_file("baz.py"));
 
-        case.apply_changes(&changes, None);
+        case.apply_changes(&changes);
 
         assert_eq!(
             source_text(case.db(), baz_original_file).as_str(),
@@ -1973,7 +2860,7 @@ fn active_project_config_change_reloads_project() -> anyhow::Result<()> {
     )?;
 
     let changes = case.stop_watch(event_for_file("pyproject.toml"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(result.project_changed());
 
@@ -1993,7 +2880,7 @@ fn nested_project_config_change_is_cheap_if_active_project_unchanged() -> anyhow
     std::fs::write(nested_pyproject.as_std_path(), "[tool.ty]\n")?;
 
     let changes = case.stop_watch(event_for_file("pyproject.toml"));
-    let result = case.apply_changes(&changes, None);
+    let result = case.apply_changes(&changes);
 
     assert!(!result.project_changed());
     assert_eq!(case.db().project().root(case.db()), &*project_root);
@@ -2033,7 +2920,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(ChangeEvent::is_deleted);
 
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // It should now pick up the outer project.
     assert_eq!(case.db().project().root(case.db()), case.root_path());
@@ -2071,7 +2958,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
         _config_dir_override = Some(
             context
-                .system()
+                .os_system()
                 .with_user_config_directory(Some(config_directory)),
         );
 
@@ -2081,12 +2968,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     // Enable division-by-zero in the user configuration with warning severity
     update_file(
@@ -2097,15 +2979,93 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
         "#,
     )?;
 
+    let changes = case.take_watch_changes(event_for_file("ty.toml"));
+
+    case.apply_changes(&changes);
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
+    );
+
+    // Removing the option from the user configuration must not retain the old warning level.
+    update_file(case.root_path().join("home/.config/ty/ty.toml"), "")?;
+
     let changes = case.stop_watch(event_for_file("ty.toml"));
+    case.apply_changes(&changes);
 
-    case.apply_changes(&changes, None);
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
-    let diagnostics = case.db().check_file(foo);
+    Ok(())
+}
 
-    assert!(
-        diagnostics.len() == 1,
-        "Expected exactly one diagnostic but got: {diagnostics:#?}"
+#[test]
+fn project_reload_preserves_override_options() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("foo.py", "prin('hello')")?;
+        context.set_options(Options::default());
+        context.set_override_options(Options::from_toml_str(
+            r#"
+            [rules]
+            unresolved-reference = "ignore"
+            "#,
+            ValueSource::Cli,
+        )?);
+        Ok(())
+    })?;
+
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
+
+    case.update_options(Options::from_toml_str(
+        r#"
+        [terminal]
+        error-on-warning = false
+        "#,
+        ValueSource::Cli,
+    )?)?;
+
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
+
+    Ok(())
+}
+
+#[test]
+fn project_reload_preserves_fallback_options() -> anyhow::Result<()> {
+    let mut case = setup(|context: &mut SetupContext| {
+        context.write_project_file("foo.py", "a = 10 / 0")?;
+        context.set_options(Options::default());
+        context.set_fallback_options(Options::from_toml_str(
+            r#"
+            [rules]
+            division-by-zero = "warn"
+            "#,
+            ValueSource::Editor,
+        )?);
+        Ok(())
+    })?;
+
+    let foo = case
+        .system_file(case.project_path("foo.py"))
+        .expect("foo.py to exist");
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
+    );
+
+    case.update_options(Options::from_toml_str(
+        r#"
+        [terminal]
+        error-on-warning = false
+        "#,
+        ValueSource::Cli,
+    )?)?;
+
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
     );
 
     Ok(())
@@ -2134,6 +3094,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
             division-by-zero = "ignore"
             "#,
         )?;
+        context.set_config_file_override("ty-override.toml");
 
         Ok(())
     })?;
@@ -2141,12 +3102,7 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
     let foo = case
         .system_file(case.project_path("foo.py"))
         .expect("foo.py to exist");
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.is_empty(),
-        "Expected no diagnostics but got: {diagnostics:#?}"
-    );
+    assert_eq!(case.db().check_file(foo).as_slice(), &[]);
 
     // Enable division-by-zero in the explicitly specified configuration with warning severity
     update_file(
@@ -2159,19 +3115,11 @@ fn changes_to_config_file_override() -> anyhow::Result<()> {
 
     let changes = case.stop_watch(event_for_file("ty-override.toml"));
 
-    case.apply_changes(
-        &changes,
-        Some(&ProjectOptionsOverrides::new(
-            Some(case.project_path("ty-override.toml")),
-            Options::default(),
-        )),
-    );
+    case.apply_changes(&changes);
 
-    let diagnostics = case.db().check_file(foo);
-
-    assert!(
-        diagnostics.len() == 1,
-        "Expected exactly one diagnostic but got: {diagnostics:#?}"
+    assert_snapshot!(
+        case.render_diagnostics(&case.db().check_file(foo)),
+        @"foo.py:1:5: warning[division-by-zero] Cannot divide object of type `Literal[10]` by zero"
     );
 
     Ok(())
@@ -2230,7 +3178,7 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     .context("Failed to rename `temp.py` to `Lib.py`")?;
 
     let changes = case.stop_watch(event_for_file("Lib.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     // Resolving `lib` should now fail but `Lib` should now succeed
     assert_eq!(
@@ -2253,16 +3201,16 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2284,7 +3232,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
         ("bar/wazoo.py", ""),
     ])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2294,9 +3242,9 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2310,20 +3258,20 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.take_watch_changes(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
     std::fs::remove_file(case.project_path("bar/wazoo.py").as_std_path())?;
     let changes = case.stop_watch(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2338,7 +3286,7 @@ fn submodule_cache_invalidation_created_then_deleted() -> anyhow::Result<()> {
 fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", ""), ("bar/__init__.py", ""), ("bar/foo.py", "")])?;
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"bar.foo",
     );
@@ -2347,9 +3295,9 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     std::fs::write(case.project_path("bar/wazoo.py").as_std_path(), "")?;
     let changes = case.take_watch_changes(event_for_file("wazoo.py"));
-    case.apply_changes(&changes, None);
+    case.apply_changes(&changes);
 
-    insta::assert_snapshot!(
+    assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
         @"
     bar.foo
@@ -2358,4 +3306,1271 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
     );
 
     Ok(())
+}
+
+#[cfg(feature = "test-uv")]
+mod uv_metadata {
+    use std::time::Duration;
+
+    use anyhow::Context;
+    use insta::assert_snapshot;
+    use ruff_db::Db as _;
+    use ruff_db::files::File;
+    use ruff_db::system::{Command, System, SystemPath};
+    use ty_module_resolver::system_module_search_paths;
+    use ty_project::{Db, ScriptEnvironmentAvailability, UseUv, UvSyncChanges, uv_test_env_vars};
+    use ty_python_semantic::Db as _;
+    use ty_static::EnvVars;
+
+    use super::{
+        ChangeEvent, Setup, SetupContext, TestCase, event_for_file, setup_with_system, update_file,
+        write_file,
+    };
+
+    const MANIFEST: &str = r#"
+    [project]
+    name = "example"
+    version = "0.1.0"
+    requires-python = ">=3.8"
+    "#;
+
+    #[test]
+    fn project_refresh_applies_settings_despite_uv_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("main.py", "value: int = 'wrong'\n"),
+            ],
+        )?;
+        let project = case.db().project();
+        let program_settings = project.program_settings(case.db()).clone();
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"main.py:1:14: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+        );
+
+        // uv rejects this setting, but ty must still apply its rule configuration.
+        update_file_and_wait_for_uv_sync(
+            &mut case,
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.uv]
+            package = "invalid"
+
+            [tool.ty.rules]
+            invalid-assignment = "ignore"
+            "#,
+        )?;
+        let diagnostics = case.db().check();
+        assert_snapshot!(
+            case.render_diagnostics(&diagnostics),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: pyproject.toml"
+        );
+        assert_eq!(project.program_settings(case.db()), &program_settings);
+
+        // If ordinary discovery also fails, keep the last applied settings and warning.
+        update_file_and_wait_for_uv_sync(&mut case, "pyproject.toml", "[project\n")?;
+        assert_eq!(case.db().check(), diagnostics);
+
+        update_file_and_wait_for_uv_sync(
+            &mut case,
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.ty.rules]
+            invalid-assignment = "ignore"
+            "#,
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// A creation event for `pyproject.toml` must retry uv discovery and clear its initial
+    /// error, even when `--config-file` bypasses ty's normal configuration discovery.
+    #[test]
+    fn creating_pyproject_toml_with_config_override_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            context.write_project_file("main.py", "value = 1\n")?;
+            // With --config-file, ty ignores pyproject.toml for configuration, but uv still needs it.
+            context.write_project_file("ty-override.toml", "")?;
+            context.set_config_file_override("ty-override.toml");
+            // Create the environment first so adding the manifest is enough for metadata to load.
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )
+        })?;
+        let diagnostics = case.db().check();
+        assert_snapshot!(
+            case.render_diagnostics(&diagnostics),
+            @"warning[uv-metadata] Failed to load uv metadata: No `pyproject.toml` found in current directory or any parent directory"
+        );
+
+        std::fs::write(case.project_path("pyproject.toml").as_std_path(), MANIFEST)?;
+        let events = case.take_watch_changes(event_for_file("pyproject.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// A change event for the member's `pyproject.toml` after removing `[tool.ty]` makes ty
+    /// use the enclosing workspace as its root, bringing `workspace.py` into the checked files.
+    ///
+    /// ```text
+    /// <temp_dir>/                 # uv workspace root
+    /// |-- pyproject.toml          # members = ["project"]
+    /// |-- workspace.py            # contains an invalid assignment
+    /// `-- project/                # initial ty project root
+    ///     `-- pyproject.toml      # contains [tool.ty]
+    /// ```
+    #[test]
+    fn removing_tool_ty_section_checks_workspace_files() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [tool.ty]
+                    "#,
+                ),
+                ("../workspace.py", "value: int = 'wrong'\n"),
+            ],
+        )?;
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Removing the member's ty configuration lets ty use the enclosing workspace as its root.
+        update_file_and_wait_for_uv_sync(&mut case, "pyproject.toml", MANIFEST)?;
+        assert_eq!(case.db().project().root(case.db()), case.root_path());
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"<temp_dir>/workspace.py:1:14: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+        );
+        Ok(())
+    }
+
+    /// Turn `project/member` into a workspace member before starting the watcher, then run
+    /// `uv lock`. The resulting change events for `uv.lock`, outside ty's root, must make ty
+    /// recognize that the new member imports `example` without declaring a dependency on it.
+    ///
+    /// ```text
+    /// <temp_dir>/                 # uv workspace root
+    /// |-- pyproject.toml          # initially lists only "project"
+    /// |-- uv.lock                 # updated by uv lock
+    /// `-- project/                # ty project root, fixed by ty.toml
+    ///     |-- ty.toml
+    ///     |-- pyproject.toml      # package "example"
+    ///     |-- src/example/__init__.py
+    ///     `-- member/
+    ///         |-- main.py         # imports example
+    ///         `-- pyproject.toml  # added during the test
+    /// ```
+    #[test]
+    fn updating_workspace_lockfile_outside_project_checks_new_member_dependencies()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv_with(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project"]
+                    "#,
+                ),
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("src/example/__init__.py", ""),
+                ("member/main.py", "import example\n"),
+                (
+                    "ty.toml",
+                    r#"
+                    [rules]
+                    missing-direct-dependency = "warn"
+                    "#,
+                ),
+            ],
+            |context| {
+                context.set_watch(false);
+                Ok(())
+            },
+        )?;
+        // The member's ty.toml keeps the workspace lockfile outside ty's project root.
+        assert_eq!(
+            case.db().project().root(case.db()),
+            case.root_path().join("project").as_path()
+        );
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Turn the existing directory into a member with its own dependency declarations.
+        // Its import now needs a dependency on `example`, which was previously its own package.
+        std::fs::write(
+            case.project_path("member/pyproject.toml"),
+            r#"
+            [project]
+            name = "member"
+            version = "0.1.0"
+            "#,
+        )?;
+        update_file(
+            case.root_path().join("pyproject.toml"),
+            r#"
+            [tool.uv.workspace]
+            members = ["project", "project/member"]
+            "#,
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Observe uv's lockfile update without recording the preparatory manifest changes.
+        case.start_watching()?;
+        run_uv(&case, &["lock", "--offline"])?;
+        let changed = case.take_watch_changes(event_for_file("uv.lock"));
+        apply_changes_and_synchronize_project(&mut case, &changed)?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"member/main.py:1:8: warning[missing-direct-dependency] Import of `example` requires a direct dependency on `example`"
+        );
+        Ok(())
+    }
+
+    /// A change event for the nested member's `pyproject.toml` must refresh uv metadata,
+    /// even though that manifest does not configure ty. Removing its dependency makes the
+    /// unchanged import warn.
+    ///
+    /// ```text
+    /// project/                    # ty project and uv workspace root
+    /// |-- ty.toml                 # enables missing-direct-dependency
+    /// |-- pyproject.toml          # package "example", members = ["member"]
+    /// |-- src/example/__init__.py
+    /// `-- member/
+    ///     |-- pyproject.toml      # declares the dependency removed by the test
+    ///     `-- main.py             # imports example
+    /// ```
+    #[test]
+    fn removing_dependency_from_nested_pyproject_toml_reports_missing_dependency()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+
+                    [tool.uv.workspace]
+                    members = ["member"]
+                    "#,
+                ),
+                ("src/example/__init__.py", ""),
+                (
+                    "member/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "member"
+                    version = "0.1.0"
+                    dependencies = ["example"]
+
+                    [tool.uv.sources]
+                    example = { workspace = true }
+                    "#,
+                ),
+                ("member/main.py", "import example\n"),
+                (
+                    "ty.toml",
+                    r#"
+                    [rules]
+                    missing-direct-dependency = "warn"
+                    "#,
+                ),
+            ],
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // This nested manifest is not ty configuration. Refresh uv metadata to notice that
+        // the member no longer declares the package imported by its unchanged Python file.
+        update_file_and_wait_for_uv_sync(
+            &mut case,
+            "member/pyproject.toml",
+            r#"
+            [project]
+            name = "member"
+            version = "0.1.0"
+            "#,
+        )?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"member/main.py:1:8: warning[missing-direct-dependency] Import of `example` requires a direct dependency on `example`"
+        );
+        Ok(())
+    }
+
+    /// Moving a Python file out of the project clears its diagnostic without refreshing uv
+    /// metadata, even when the file is edited immediately before the move.
+    #[test]
+    fn editing_then_moving_a_file_out_does_not_request_uv_metadata() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                ("module.py", "x: int = 'invalid'"),
+            ],
+        )?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"module.py:1:10: error[invalid-assignment] Object of type `Literal["invalid"]` is not assignable to `int`"#
+        );
+
+        // Keep the assignment invalid so the diagnostic only clears when the file is removed.
+        update_file(case.project_path("module.py"), "x: int = 'still invalid'\n")?;
+        std::fs::rename(
+            case.project_path("module.py"),
+            case.root_path().join("module.py"),
+        )?;
+        // Wait for the move; the preceding edit alone is not enough to clear the diagnostic.
+        let changes = case.stop_watch(|event: &ChangeEvent| {
+            event.is_deleted() && event.file_name() == Some("module.py")
+        });
+        assert!(
+            case.apply_changes(&changes).project_sync_path().is_none(),
+            "{changes:?}"
+        );
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Creating a package directory inside a dependency's source directory does not refresh
+    /// uv metadata when that directory is outside `src.include`.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// |-- project/                # ty project and uv workspace root
+    /// |   |-- pyproject.toml
+    /// |   |-- ty.toml             # includes src; adds ../dependency/src as a search path
+    /// |   `-- src/main.py
+    /// `-- dependency/src/         # module search path
+    ///     `-- package/            # created during the test
+    /// ```
+    #[test]
+    fn creating_directory_in_excluded_search_path_does_not_request_uv_metadata()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                ("pyproject.toml", MANIFEST),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../dependency/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", ""),
+                ("../dependency/src/.keep", ""),
+            ],
+        )?;
+
+        // Changes within a search path outside `src.include` do not affect dependency projects.
+        std::fs::create_dir(case.root_path().join("dependency/src/package"))?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        assert!(case.apply_changes(&created).project_sync_path().is_none());
+        Ok(())
+    }
+
+    /// The library member is outside ty's `src.include`, but its source directory is a
+    /// search path. Removing it produces deletion events for directories and their contents;
+    /// processing that batch must refresh uv metadata and report the broken dependency.
+    ///
+    /// ```text
+    /// <temp_dir>/                 # uv workspace root
+    /// |-- pyproject.toml          # members = ["project", "packages/*"]
+    /// |-- project/                # ty project root
+    /// |   |-- pyproject.toml      # depends on the workspace member "library"
+    /// |   |-- ty.toml             # includes src; adds ../packages/library/src as a search path
+    /// |   `-- src/main.py
+    /// `-- packages/library/       # deleted during the test
+    ///     |-- pyproject.toml
+    ///     `-- src/library/__init__.py
+    /// ```
+    #[test]
+    fn deleting_excluded_workspace_dependency_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "../pyproject.toml",
+                    r#"
+                    [tool.uv.workspace]
+                    members = ["project", "packages/*"]
+                    "#,
+                ),
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["library"]
+
+                    [tool.uv.sources]
+                    library = { workspace = true }
+                    "#,
+                ),
+                (
+                    "ty.toml",
+                    r#"
+                    [environment]
+                    extra-paths = ["../packages/library/src"]
+
+                    [src]
+                    include = ["src"]
+                    "#,
+                ),
+                ("src/main.py", ""),
+                (
+                    "../packages/library/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "library"
+                    version = "0.1.0"
+
+                    # Use uv's bundled backend so setup works offline with an empty cache.
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../packages/library/src/library/__init__.py", ""),
+            ],
+        )?;
+        let library = case.root_path().join("packages/library");
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Although `src.include` excludes the member, its source directory is a search path,
+        // so removing it must refresh uv metadata. Use deletion because on Windows the watch
+        // on `library/src` holds a directory handle that prevents renaming `library`.
+        std::fs::remove_dir_all(&library).context("Failed to delete the workspace dependency")?;
+        let changes = case.take_watch_changes(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Deleted { path, .. } if path.starts_with(&library))
+        });
+        apply_changes_and_synchronize_project(&mut case, &changes)?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"<temp_dir>/pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+        Ok(())
+    }
+
+    /// Moving a missing member into the workspace clears the uv error, even when the member
+    /// is outside the paths selected by `ty check src`.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// |-- incoming/               # moved to project/package
+    /// |   `-- pyproject.toml      # valid member manifest
+    /// `-- project/                # ty project and uv workspace root
+    ///     |-- pyproject.toml      # requires the member at package/, initially missing
+    ///     |-- .venv/
+    ///     `-- src/main.py         # src is the only path selected for checking
+    /// ```
+    #[test]
+    fn moving_missing_member_into_workspace_outside_checked_paths_clears_uv_error()
+    -> anyhow::Result<()> {
+        let mut case = setup_uv_with_system(UseUv::On, |context: &mut SetupContext| {
+            // Create the environment before declaring the member that is still missing.
+            run_uv_with_system(
+                context.system(),
+                context.project_path(),
+                &["venv", "--offline"],
+            )?;
+            context.write_project_file(
+                "pyproject.toml",
+                r#"
+                [project]
+                name = "example"
+                version = "0.1.0"
+                requires-python = ">=3.8"
+                dependencies = ["member"]
+
+                [tool.uv.sources]
+                member = { workspace = true }
+
+                [tool.uv.workspace]
+                members = ["package"]
+                "#,
+            )?;
+            context.write_project_file("src/main.py", "")?;
+            context.write_project_file(
+                "../incoming/pyproject.toml",
+                r#"
+                [project]
+                name = "member"
+                version = "0.1.0"
+
+                [tool.uv]
+                package = false
+                "#,
+            )?;
+            // Restrict checked files, as with `ty check src`, without excluding workspace members.
+            context.set_included_paths(vec![context.join_project_path("src")]);
+            Ok(())
+        })?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+
+        // Move the complete member into place without editing either manifest.
+        std::fs::rename(
+            case.root_path().join("incoming"),
+            case.project_path("package"),
+        )?;
+        let created = case.take_watch_changes(event_for_file("package"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Moving an explicitly listed member out of the workspace reports that uv cannot load
+    /// the missing member.
+    ///
+    /// ```text
+    /// <temp_dir>/
+    /// `-- project/                # ty project and uv workspace root
+    ///     |-- pyproject.toml      # requires the member at packages/member/
+    ///     |-- .venv/
+    ///     `-- packages/member/    # moved to <temp_dir>/member
+    ///         `-- pyproject.toml  # valid member manifest
+    /// ```
+    #[test]
+    fn moving_required_member_out_reports_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["member"]
+
+                    [tool.uv.sources]
+                    member = { workspace = true }
+
+                    [tool.uv.workspace]
+                    members = ["packages/member"]
+                    "#,
+                ),
+                (
+                    "packages/member/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "member"
+                    version = "0.1.0"
+
+                    [tool.uv]
+                    package = false
+                    "#,
+                ),
+            ],
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // The workspace still requires this member after its directory is moved away.
+        std::fs::rename(
+            case.project_path("packages/member"),
+            case.root_path().join("member"),
+        )?;
+        let deleted = case.take_watch_changes(event_for_file("member"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to build `example @ file://<temp_dir>/project`"
+        );
+        Ok(())
+    }
+
+    /// Creating `.python-version` refreshes workspace membership to include a newly added member.
+    #[test]
+    fn creating_python_version_file_refreshes_workspace_members() -> anyhow::Result<()> {
+        let mut case = setup_uv_with(
+            UseUv::On,
+            &[("pyproject.toml", MANIFEST), ("main.py", "")],
+            |context| {
+                context.set_watch(false);
+                Ok(())
+            },
+        )?;
+        let file = case.system_file(case.project_path("main.py"))?;
+        let project_root = case.project_path("");
+        let member = case.project_path("member");
+        assert_eq!(
+            case.db()
+                .dependency_metadata(file)
+                .context("missing uv metadata")?
+                .projects
+                .len(),
+            1
+        );
+
+        // Leave a valid member out of the cached metadata before starting the watcher.
+        // Changing `.python-version` need not change an existing venv; the new member makes
+        // the refresh observable instead.
+        write_file(
+            member.join("pyproject.toml"),
+            r#"
+            [project]
+            name = "member"
+            version = "0.1.0"
+            "#,
+        )?;
+        update_file(
+            case.project_path("pyproject.toml"),
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.uv.workspace]
+            members = ["member"]
+            "#,
+        )?;
+        case.start_watching()?;
+
+        // Accept the existing Python 3 interpreter so the test needs no additional installation.
+        std::fs::write(case.project_path(".python-version"), "3\n")?;
+        let events = case.take_watch_changes(event_for_file(".python-version"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(
+            case.db()
+                .dependency_metadata(file)
+                .context("missing uv metadata")?
+                .projects
+                .iter()
+                .map(|project| project.path.as_path())
+                .collect::<Vec<_>>(),
+            [project_root.as_path(), member.as_path()]
+        );
+        Ok(())
+    }
+
+    /// Creating `uv.toml` refreshes workspace membership to include a newly added member.
+    #[test]
+    fn creating_uv_toml_refreshes_workspace_members() -> anyhow::Result<()> {
+        let mut case = setup_uv_with(
+            UseUv::On,
+            &[("pyproject.toml", MANIFEST), ("main.py", "")],
+            |context| {
+                context.set_watch(false);
+                Ok(())
+            },
+        )?;
+        let file = case.system_file(case.project_path("main.py"))?;
+        let project_root = case.project_path("");
+        let member = case.project_path("member");
+        assert_eq!(
+            case.db()
+                .dependency_metadata(file)
+                .context("missing uv metadata")?
+                .projects
+                .len(),
+            1
+        );
+
+        // Leave metadata stale so observing the new member proves that the uv.toml event
+        // caused a refresh. Prepare the manifests before starting the watcher.
+        write_file(
+            member.join("pyproject.toml"),
+            r#"
+            [project]
+            name = "member"
+            version = "0.1.0"
+            "#,
+        )?;
+        update_file(
+            case.project_path("pyproject.toml"),
+            r#"
+            [project]
+            name = "example"
+            version = "0.1.0"
+            requires-python = ">=3.8"
+
+            [tool.uv.workspace]
+            members = ["member"]
+            "#,
+        )?;
+        case.start_watching()?;
+
+        std::fs::write(case.project_path("uv.toml"), "offline = true\n")?;
+        let events = case.take_watch_changes(event_for_file("uv.toml"));
+        apply_changes_and_synchronize_project(&mut case, &events)?;
+        assert_eq!(
+            case.db()
+                .dependency_metadata(file)
+                .context("missing uv metadata")?
+                .projects
+                .iter()
+                .map(|project| project.path.as_path())
+                .collect::<Vec<_>>(),
+            [project_root.as_path(), member.as_path()]
+        );
+        Ok(())
+    }
+
+    /// `uv lock` creates `uv.lock`, but its creation event must not request metadata when
+    /// ty's uv integration is disabled.
+    #[test]
+    fn creating_lockfile_does_not_request_uv_metadata_when_uv_is_disabled() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::Off, &[("pyproject.toml", MANIFEST)])?;
+        run_uv(&case, &["lock", "--offline"])?;
+
+        let events = case.take_watch_changes(event_for_file("uv.lock"));
+        assert!(case.apply_changes(&events).project_sync_path().is_none());
+        Ok(())
+    }
+
+    /// Deleting the selected environment reports a missing-environment warning. Recreating
+    /// it with `uv venv` clears that warning.
+    #[test]
+    fn recreating_selected_environment_clears_uv_error() -> anyhow::Result<()> {
+        let mut case = setup_uv(UseUv::On, &[("pyproject.toml", MANIFEST)])?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        // Check the warning while the environment is missing, before recreating it.
+        std::fs::remove_dir_all(case.project_path(".venv").as_std_path())?;
+
+        let deleted = case.take_watch_changes(event_for_file(".venv"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        let diagnostics = case.db().check();
+        assert_snapshot!(
+            case.render_diagnostics(&diagnostics),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv did not provide a Python environment"
+        );
+
+        run_uv(&case, &["venv", "--offline"])?;
+        let created = case.take_watch_changes(event_for_file(".venv"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Installing the dependency with `uv pip install` clears the unresolved-import diagnostic
+    /// and uv metadata warning without changing the project's manifest or lockfile.
+    #[test]
+    fn uv_pip_install_clears_import_and_metadata_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+
+                    [project.optional-dependencies]
+                    extra = ["dependency"]
+
+                    [tool.uv.sources]
+                    dependency = { path = "../dependency" }
+                    "#,
+                ),
+                ("main.py", "import dependency\n"),
+                (
+                    "../dependency/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "dependency"
+                    version = "0.1.0"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../dependency/src/dependency/__init__.py", ""),
+            ],
+        )?;
+        // The optional dependency is resolved but not installed by setup's `uv sync`.
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
+        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
+        ");
+
+        // Installing a local package changes the environment without editing the project's
+        // manifest or lockfile. uv's bundled build backend keeps the test offline.
+        run_uv(&case, &["pip", "install", "--offline", "../dependency"])?;
+        let created = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
+        apply_changes_and_synchronize_project(&mut case, &created)?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+        Ok(())
+    }
+
+    /// Uninstalling the dependency with `uv pip uninstall` reports an unresolved-import
+    /// diagnostic and uv metadata warning without changing the project's manifest or lockfile.
+    #[test]
+    fn uv_pip_uninstall_reports_import_and_metadata_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::On,
+            &[
+                (
+                    "pyproject.toml",
+                    r#"
+                    [project]
+                    name = "example"
+                    version = "0.1.0"
+                    requires-python = ">=3.8"
+                    dependencies = ["dependency"]
+
+                    [tool.uv.sources]
+                    dependency = { path = "../dependency" }
+                    "#,
+                ),
+                ("main.py", "import dependency\n"),
+                (
+                    "../dependency/pyproject.toml",
+                    r#"
+                    [project]
+                    name = "dependency"
+                    version = "0.1.0"
+
+                    [build-system]
+                    requires = ["uv_build"]
+                    build-backend = "uv_build"
+                    "#,
+                ),
+                ("../dependency/src/dependency/__init__.py", ""),
+            ],
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        // Setup installs the dependency before watching starts. Uninstalling it removes its
+        // `.dist-info` directory without changing the project's manifest or lockfile.
+        run_uv(&case, &["pip", "uninstall", "--offline", "dependency"])?;
+        let deleted = case.take_watch_changes(event_for_file("dependency-0.1.0.dist-info"));
+        apply_changes_and_synchronize_project(&mut case, &deleted)?;
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @"
+        main.py:1:8: error[unresolved-import] Cannot resolve imported module `dependency`
+        pyproject.toml: warning[uv-metadata] Failed to load uv dependency metadata: uv metadata has no module ownership or editable source paths
+        ");
+        Ok(())
+    }
+
+    #[test]
+    fn unchanged_script_environment_is_reused_after_source_edits() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = []
+                # ///
+                value = 1
+                "#,
+            )],
+        )?;
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        assert!(!update_and_synchronize_script(
+            &mut case,
+            r#"
+
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = []
+            # ///
+            value = 2
+            "#,
+        )?);
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn metadata_changes_resynchronize_the_script_environment() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = []
+                # ///
+                from attrs import define
+                "#,
+            )],
+        )?;
+
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `attrs`"
+        );
+
+        update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+
+        // Apply the package creation reported by the watcher after uv finishes writing it.
+        let changes = case.stop_watch(|event: &ChangeEvent| {
+            matches!(event, ChangeEvent::Created { path, .. }
+                if path.file_name() == Some("attrs")
+                    && path.parent().is_some_and(|parent| parent.file_name() == Some("site-packages")))
+        });
+        case.apply_changes(&changes);
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn ordinary_files_becoming_scripts_initialize_their_environments() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[("script.py", "from attrs import define\n")],
+        )?;
+
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:1:6: error[unresolved-import] Cannot resolve imported module `attrs`"
+        );
+
+        update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn corrected_script_dependencies_replace_initialization_errors() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[(
+                "script.py",
+                r#"
+                # /// script
+                # requires-python = ">=3.12"
+                # dependencies = ["not a valid requirement ???"]
+                # ///
+                value = 1
+                "#,
+            )],
+        )?;
+
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:2:1: error[uv-metadata] Failed to load uv metadata: TOML parse error at line 2, column 17"
+        );
+
+        update_and_synchronize_script(
+            &mut case,
+            r#"
+            # /// script
+            # requires-python = ">=3.12"
+            # dependencies = ["attrs==25.4.0"]
+            # ///
+            from attrs import define
+            "#,
+        )?;
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn script_pth_adds_watched_search_path() -> anyhow::Result<()> {
+        let mut case = setup_uv(
+            UseUv::Scripts,
+            &[
+                (
+                    "script.py",
+                    r#"
+                    # /// script
+                    # dependencies = []
+                    # requires-python = ">=3.12"
+                    # ///
+                    from dependency import value
+                    result: int = value
+                    "#,
+                ),
+                ("../dependencies/dependency.py", "value = 1"),
+            ],
+        )?;
+        let db = case.db();
+        let script = case.system_file(case.project_path("script.py"))?;
+        let environment = db.program_file(script).program(db).resolver_environment(db);
+        let site_packages = system_module_search_paths(db, environment)
+            .find(|path| path.file_name() == Some("site-packages"))
+            .context("script environment has no site-packages")?
+            .to_path_buf();
+        let pth = site_packages.join("dependency.pth");
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:6:6: error[unresolved-import] Cannot resolve imported module `dependency`"
+        );
+
+        let dependencies = case.root_path().join("dependencies");
+        std::fs::write(pth.as_std_path(), dependencies.as_str())?;
+        let changes = case.take_watch_changes(event_for_file("dependency.pth"));
+        case.apply_changes(&changes);
+
+        assert_eq!(case.db().check().as_slice(), &[]);
+
+        let dependency = dependencies.join("dependency.py");
+        update_file(&dependency, "value = 'wrong'")?;
+        let changes = case.stop_watch(event_for_file("dependency.py"));
+        case.apply_changes(&changes);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @r#"script.py:7:15: error[invalid-assignment] Object of type `Literal["wrong"]` is not assignable to `int`"#
+        );
+        Ok(())
+    }
+
+    /// Runs uv in the test's project directory with its configured executable and environment.
+    fn run_uv(case: &TestCase, args: &[&str]) -> anyhow::Result<()> {
+        run_uv_with_system(case.db().system(), &case.project_path(""), args)
+    }
+
+    /// Runs uv in `directory` with the system's configured executable and environment.
+    /// Returns an error if uv fails.
+    fn run_uv_with_system(
+        system: &dyn System,
+        directory: &SystemPath,
+        args: &[&str],
+    ) -> anyhow::Result<()> {
+        let mut command = Command::new(system.env_var(EnvVars::UV)?);
+        command.current_dir(directory).args(args.iter().copied());
+        let output = system.run_command(command)?;
+        anyhow::ensure!(
+            output.status.success(),
+            "uv {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        Ok(())
+    }
+
+    /// Writes the fixture files and creates a watched project with the selected uv mode.
+    /// Installs project dependencies for `UseUv::On` and synchronizes discovered scripts.
+    fn setup_uv(use_uv: UseUv, files: &[(&str, &str)]) -> anyhow::Result<TestCase> {
+        setup_uv_with(use_uv, files, |_| Ok(()))
+    }
+
+    /// Like [`setup_uv`], but calls `prepare` after writing the files and before running uv.
+    fn setup_uv_with(
+        use_uv: UseUv,
+        files: &[(&str, &str)],
+        prepare: impl FnOnce(&mut SetupContext) -> anyhow::Result<()>,
+    ) -> anyhow::Result<TestCase> {
+        let mut case = setup_uv_with_system(use_uv, |context: &mut SetupContext| {
+            for (path, content) in files {
+                context.write_project_file(path, content)?;
+            }
+            prepare(context)?;
+            if use_uv == UseUv::On {
+                run_uv_with_system(
+                    context.system(),
+                    context.project_path(),
+                    &["sync", "--offline"],
+                )?;
+            }
+            Ok(())
+        })?;
+        let scripts: Vec<_> = case.db().project().script_files(case.db()).iter().collect();
+        synchronize_scripts(&mut case, &scripts)?;
+        Ok(case)
+    }
+
+    /// Creates a project with the selected uv mode and test command environment.
+    /// Lets the test control Python environment creation and synchronization.
+    /// Installs snapshot filters for temporary paths and platform-specific uv output.
+    fn setup_uv_with_system(use_uv: UseUv, setup_files: impl Setup) -> anyhow::Result<TestCase> {
+        let mut case = setup_with_system(setup_files, |system| {
+            // TestSystem disables executable lookup so tests don't discover the host's Python.
+            // These tests require uv, so resolve it using the wrapped OS system.
+            let uv = system
+                .system()
+                .which("uv")
+                .expect("uv must be installed for uv file-watching tests");
+            system.set_env_vars(uv_test_env_vars());
+            system.set_env_var(
+                EnvVars::TY_UV,
+                match use_uv {
+                    UseUv::Off => "0",
+                    UseUv::Scripts => "scripts",
+                    UseUv::On => "1",
+                },
+            );
+            system.set_env_var(EnvVars::UV, uv.as_str());
+        })?;
+
+        let mut settings = insta::Settings::clone_current();
+        // File URLs use forward slashes and include a slash before Windows drive letters.
+        settings.add_filter(
+            &format!(
+                "file:///?{}",
+                regex::escape(&case.root_path().as_str().replace('\\', "/"))
+            ),
+            "file://<temp_dir>",
+        );
+        settings.add_filter(&regex::escape(case.root_path().as_str()), "<temp_dir>");
+        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(r"exit code: (\d+)", "exit status: $1");
+        case.snapshot_settings = Some(settings.bind_to_scope());
+        Ok(case)
+    }
+
+    /// Updates an existing file, waits for its watcher event, and completes any resulting
+    /// uv project synchronization.
+    /// Relative paths are resolved against the current project root.
+    fn update_file_and_wait_for_uv_sync(
+        case: &mut TestCase,
+        path: impl AsRef<SystemPath>,
+        source: &str,
+    ) -> anyhow::Result<()> {
+        let path = case.project_path(path);
+        update_file(&path, source)?;
+        let file_name = path.file_name().context("Expected a file name")?;
+        let changes = case.take_watch_changes(event_for_file(file_name));
+        apply_changes_and_synchronize_project(case, &changes)
+    }
+
+    /// Applies watcher events, requests any resulting uv project refresh, and waits for
+    /// pending uv synchronizations to finish.
+    fn apply_changes_and_synchronize_project(
+        case: &mut TestCase,
+        changes: &[ChangeEvent],
+    ) -> anyhow::Result<()> {
+        let changes = case.apply_changes(changes);
+
+        if let Some(project_path) = changes.project_sync_path() {
+            case.db()
+                .uv_environments()
+                .request_project_sync(case.db(), project_path, &|_, _| None);
+        }
+
+        wait_for_synchronizations(case)?;
+        Ok(())
+    }
+
+    fn update_and_synchronize_script(case: &mut TestCase, source: &str) -> anyhow::Result<bool> {
+        update_file(case.project_path("script.py"), source)?;
+        let changes = case.take_watch_changes(event_for_file("script.py"));
+        let changes = case.apply_changes(&changes);
+        let scripts = changes.scripts_to_synchronize(case.db());
+        let changes = synchronize_scripts(case, &scripts)?;
+        Ok(!changes.scripts.is_empty())
+    }
+
+    fn synchronize_scripts(case: &mut TestCase, scripts: &[File]) -> anyhow::Result<UvSyncChanges> {
+        let environments = case.db().uv_environments().clone();
+        for &file in scripts {
+            environments.request_sync(
+                &mut case.db,
+                file,
+                ScriptEnvironmentAvailability::Pending,
+                &|_, _| None,
+            );
+        }
+
+        wait_for_synchronizations(case)
+    }
+
+    fn wait_for_synchronizations(case: &mut TestCase) -> anyhow::Result<UvSyncChanges> {
+        let environments = case.db().uv_environments().clone();
+        let wakeups = environments.sync_wakeups();
+        let mut changes = UvSyncChanges::default();
+        while environments.has_pending_synchronizations() {
+            wakeups
+                .recv_timeout(Duration::from_secs(30))
+                .context("uv synchronization did not finish")?;
+            let completed = environments.poll_sync(&mut case.db);
+            changes.scripts.extend(completed.scripts);
+            changes.project = completed.project.or(changes.project);
+        }
+
+        if !changes.is_empty()
+            && let Some(watcher) = &mut case.watcher
+        {
+            watcher.update(&mut case.db);
+            assert!(!watcher.has_errored_paths());
+        }
+
+        Ok(changes)
+    }
 }

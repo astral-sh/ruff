@@ -21,6 +21,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::ImportShadowedByLoopVar,
         Rule::InvalidFirstArgumentNameForClassMethod,
         Rule::InvalidFirstArgumentNameForMethod,
+        Rule::MethodReceiverDefault,
         Rule::MutableClassDefault,
         Rule::MutableDataclassDefault,
         Rule::NoSelfUse,
@@ -273,6 +274,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 Rule::InvalidFirstArgumentNameForMethod,
             ]) {
                 pep8_naming::rules::invalid_first_argument_name(checker, scope);
+            }
+
+            if checker.is_rule_enabled(Rule::MethodReceiverDefault) {
+                ruff::rules::method_receiver_default(checker, scope);
             }
         }
     }

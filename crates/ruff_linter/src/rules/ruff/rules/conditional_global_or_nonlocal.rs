@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `global` and `nonlocal` declarations placed inside a block that
@@ -47,7 +48,7 @@ use crate::checkers::ast::Checker;
 ///         counter = 2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
 pub(crate) struct ConditionalGlobalOrNonlocal {
     name: String,
     keyword: &'static str,
@@ -63,7 +64,7 @@ impl Violation for ConditionalGlobalOrNonlocal {
     }
 }
 
-/// RUF077
+/// RUF078
 pub(crate) fn conditional_global_or_nonlocal(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let semantic = checker.semantic();
 

@@ -97,11 +97,11 @@ impl VerbosityLevel {
         }
     }
 
-    pub(crate) const fn is_trace(self) -> bool {
+    const fn is_trace(self) -> bool {
         matches!(self, VerbosityLevel::Trace)
     }
 
-    pub(crate) const fn is_extra_verbose(self) -> bool {
+    const fn is_extra_verbose(self) -> bool {
         matches!(self, VerbosityLevel::ExtraVerbose)
     }
 }

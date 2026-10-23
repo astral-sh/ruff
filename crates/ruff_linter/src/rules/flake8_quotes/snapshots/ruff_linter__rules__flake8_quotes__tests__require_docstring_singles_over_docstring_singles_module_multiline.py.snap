@@ -33,7 +33,6 @@ Q001 [*] Single quote multiline found but double quotes preferred
 10 | | this is not a docstring
 11 | | '''
    | |___^
-   |
 help: Replace single multiline quotes with double quotes
    |
 8  |     pass

@@ -5,12 +5,13 @@ use ruff_python_ast::PythonVersion;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::Bound;
+use std::fmt;
 use std::ops::Deref;
 use strum::IntoEnumIterator;
 use thiserror::Error;
 
 /// A `pyproject.toml` as specified in PEP 517.
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct PyProject {
     /// PEP 621-compliant project metadata.
@@ -37,6 +38,10 @@ impl PyProject {
         source: ValueSource,
     ) -> Result<Self, PyProjectError> {
         let _guard = ValueSourceGuard::new(source, true);
+        Self::deserialize_toml(content)
+    }
+
+    fn deserialize_toml(content: &str) -> Result<Self, PyProjectError> {
         let mut pyproject: Self = toml::from_str(content).map_err(PyProjectError::TomlSyntax)?;
         // TOML tables are unordered and the `toml` crate sorts keys
         // lexicographically. Normalize rule order so that the `all` selector
@@ -53,100 +58,135 @@ impl PyProject {
 /// PEP 621 project metadata (`project`).
 ///
 /// See <https://packaging.python.org/en/latest/specifications/pyproject-toml>.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Project {
     /// The name of the project
     ///
     /// Note: Intentionally option to be more permissive during deserialization.
     /// `PackageMetadata::from_pyproject` reports missing names.
-    pub name: Option<RangedValue<PackageName>>,
+    pub(crate) name: Option<RangedValue<PackageName>>,
     /// The version of the project
-    pub version: Option<RangedValue<Version>>,
+    pub(crate) version: Option<RangedValue<Version>>,
     /// The Python versions this project is compatible with.
-    pub requires_python: Option<RangedValue<VersionSpecifiers>>,
+    pub(crate) requires_python: Option<RangedValue<VersionSpecifiers>>,
 }
 
-impl Project {
-    pub(super) fn resolve_requires_python_lower_bound(
-        &self,
-    ) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
-        let Some(requires_python) = self.requires_python.as_ref() else {
-            return Ok(None);
-        };
+pub(super) fn resolve_requires_python_lower_bound(
+    requires_python: &RangedValue<VersionSpecifiers>,
+) -> Result<Option<RangedValue<SupportedPythonVersion>>, ResolveRequiresPythonError> {
+    tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
 
-        tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
+    let ranges = release_specifiers_to_ranges((**requires_python).clone());
+    let Some((lower, _)) = ranges.bounding_range() else {
+        return Ok(None);
+    };
 
-        let ranges = release_specifiers_to_ranges((**requires_python).clone());
-        let Some((lower, _)) = ranges.bounding_range() else {
-            return Ok(None);
-        };
+    let version = match lower {
+        // Ex) `>=3.10.1` -> `>=3.10`
+        Bound::Included(version) => version,
 
-        let version = match lower {
-            // Ex) `>=3.10.1` -> `>=3.10`
-            Bound::Included(version) => version,
+        // Ex) `>3.10.1` -> `>=3.10` or `>3.10` -> `>=3.10`
+        // The second example looks obscure at first but it is required because
+        // `3.10.1 > 3.10` is true but we only have two digits here. So including 3.10 is the
+        // right move. Overall, using `>` without a patch release is most likely bogus.
+        Bound::Excluded(version) => version,
 
-            // Ex) `>3.10.1` -> `>=3.10` or `>3.10` -> `>=3.10`
-            // The second example looks obscure at first but it is required because
-            // `3.10.1 > 3.10` is true but we only have two digits here. So including 3.10 is the
-            // right move. Overall, using `>` without a patch release is most likely bogus.
-            Bound::Excluded(version) => version,
-
-            // Ex) `<3.10` or ``
-            Bound::Unbounded => {
-                return Err(ResolveRequiresPythonError::NoLowerBound(
-                    requires_python.to_string(),
-                ));
-            }
-        };
-
-        // Take the major and minor version
-        let mut versions = version.release().iter().take(2);
-
-        let Some(major) = versions.next().copied() else {
-            return Ok(None);
-        };
-
-        let minor = versions.next().copied().unwrap_or_default();
-
-        tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
-
-        let major =
-            u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
-        let minor =
-            u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
-
-        let lower_bound = PythonVersion::from((major, minor));
-        let supported_version = SupportedPythonVersion::iter()
-            .find(|supported_version| supported_version.to_python_version() >= lower_bound);
-
-        let Some(supported_version) = supported_version else {
-            return Err(ResolveRequiresPythonError::NoSupportedVersion(
+        // Ex) `<3.10` or ``
+        Bound::Unbounded => {
+            return Err(ResolveRequiresPythonError::NoLowerBound(
                 requires_python.to_string(),
             ));
-        };
+        }
+    };
 
-        Ok(Some(
-            requires_python.clone().map_value(|_| supported_version),
-        ))
+    // Take the major and minor version
+    let mut versions = version.release().iter().take(2);
+
+    let Some(major) = versions.next().copied() else {
+        return Ok(None);
+    };
+
+    let minor = versions.next().copied().unwrap_or_default();
+
+    tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
+
+    let major =
+        u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;
+    let minor =
+        u8::try_from(minor).map_err(|_| ResolveRequiresPythonError::TooLargeMinor(minor))?;
+
+    let lower_bound = PythonVersion::from((major, minor));
+    let supported_version = SupportedPythonVersion::iter()
+        .find(|supported_version| supported_version.to_python_version() >= lower_bound);
+
+    let Some(supported_version) = supported_version else {
+        return Err(ResolveRequiresPythonError::NoSupportedVersion(
+            requires_python.to_string(),
+        ));
+    };
+
+    Ok(Some(
+        requires_python.clone().map_value(|_| supported_version),
+    ))
+}
+
+#[derive(Debug)]
+pub enum ResolveRequiresPythonError {
+    TooLargeMajor(u64),
+    TooLargeMinor(u64),
+    NoLowerBound(String),
+    NoSupportedVersion(String),
+}
+
+impl ResolveRequiresPythonError {
+    /// Returns the error without its optional recovery guidance.
+    pub(crate) fn message(&self) -> String {
+        match self {
+            Self::TooLargeMajor(version) => {
+                format!(
+                    "The major version `{version}` is larger than the maximum supported value 255"
+                )
+            }
+            Self::TooLargeMinor(version) => {
+                format!(
+                    "The minor version `{version}` is larger than the maximum supported value 255"
+                )
+            }
+            Self::NoLowerBound(version) => {
+                format!("value `{version}` does not contain a lower bound")
+            }
+            Self::NoSupportedVersion(version) => {
+                format!("value `{version}` does not include any Python version supported by ty")
+            }
+        }
+    }
+
+    /// Returns guidance for fixing the invalid Python requirement, when available.
+    pub(crate) fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::NoLowerBound(_) => Some(
+                "Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`.",
+            ),
+            Self::NoSupportedVersion(_) => Some(
+                "Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly.",
+            ),
+            Self::TooLargeMajor(_) | Self::TooLargeMinor(_) => None,
+        }
     }
 }
 
-#[derive(Debug, Error)]
-pub enum ResolveRequiresPythonError {
-    #[error("The major version `{0}` is larger than the maximum supported value 255")]
-    TooLargeMajor(u64),
-    #[error("The minor version `{0}` is larger than the maximum supported value 255")]
-    TooLargeMinor(u64),
-    #[error(
-        "value `{0}` does not contain a lower bound. Add a lower bound to indicate the minimum compatible Python version (e.g., `>=3.13`) or specify a version in `environment.python-version`."
-    )]
-    NoLowerBound(String),
-    #[error(
-        "value `{0}` does not include any Python version supported by ty. Adjust `requires-python` to include a supported Python 3 version or specify `environment.python-version` explicitly."
-    )]
-    NoSupportedVersion(String),
+impl fmt::Display for ResolveRequiresPythonError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message())?;
+        if let Some(hint) = self.hint() {
+            write!(f, ". {hint}")?;
+        }
+        Ok(())
+    }
 }
+
+impl std::error::Error for ResolveRequiresPythonError {}
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -165,7 +205,7 @@ pub struct PackageName(String);
 
 impl PackageName {
     /// Create a validated, normalized package name.
-    pub(crate) fn new(name: String) -> Result<Self, InvalidPackageNameError> {
+    fn new(name: String) -> Result<Self, InvalidPackageNameError> {
         if name.is_empty() {
             return Err(InvalidPackageNameError::Empty);
         }
@@ -218,7 +258,7 @@ impl PackageName {
     }
 
     /// Returns the underlying package name.
-    pub(crate) fn as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         &self.0
     }
 }

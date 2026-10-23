@@ -13,8 +13,8 @@ use crate::system::{
 };
 
 use super::walk_directory::{
-    DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration, WalkDirectoryVisitor,
-    WalkDirectoryVisitorBuilder, WalkState,
+    DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    WalkDirectoryVisitor, WalkDirectoryVisitorBuilder, WalkState,
 };
 
 /// File system that stores all content in memory.
@@ -564,6 +564,20 @@ impl Iterator for ReadDirectory {
 
 impl FusedIterator for ReadDirectory {}
 
+struct MemoryIgnoreIncremental {
+    ignore_hidden: bool,
+}
+
+impl IgnoreIncremental for MemoryIgnoreIncremental {
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
+        // This matches the semantics of the in-memory recursive
+        // directory traversal. That is, the only thing we care
+        // about filtering is hidden files. We let everything else
+        // through.
+        self.ignore_hidden && !is_directory && is_hidden(path)
+    }
+}
+
 /// Recursively walks a directory in the memory file system.
 #[derive(Debug)]
 struct MemoryWalker {
@@ -592,12 +606,7 @@ impl MemoryWalker {
             }
 
             state
-        } else if ignore_hidden
-            && entry
-                .path
-                .file_name()
-                .is_some_and(|name| name.starts_with('.'))
-        {
+        } else if ignore_hidden && is_hidden(&entry.path) {
             WalkState::Skip
         } else {
             visitor.visit(Ok(entry))
@@ -702,6 +711,14 @@ impl DirectoryWalker for MemoryWalker {
             }
         }
     }
+
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental> {
+        let WalkDirectoryConfiguration { ignore_hidden, .. } = configuration;
+        Box::new(MemoryIgnoreIncremental { ignore_hidden })
+    }
 }
 
 #[derive(Debug)]
@@ -711,6 +728,10 @@ enum WalkerState {
 
     /// Traverse into the directory with the given path at the given depth.
     Nested { path: SystemPathBuf, depth: usize },
+}
+
+fn is_hidden(path: &SystemPath) -> bool {
+    path.file_name().is_some_and(|name| name.starts_with('.'))
 }
 
 #[cfg(test)]

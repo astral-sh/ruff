@@ -200,7 +200,6 @@ Module(
 2 | call(*yield x)
 3 | call(*yield from x)
   |       ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |
 
 
 ## Unsupported Syntax Errors

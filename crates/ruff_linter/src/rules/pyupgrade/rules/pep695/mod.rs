@@ -87,6 +87,14 @@ pub(crate) struct DisplayTypeVar<'a> {
 }
 
 impl TypeVar<'_> {
+    /// PEP 695 has no syntax for bounds or constraints on `TypeVarTuple` or `ParamSpec`.
+    fn has_unsupported_restriction(&self) -> bool {
+        matches!(
+            self.kind,
+            TypeParamKind::TypeVarTuple | TypeParamKind::ParamSpec
+        ) && self.restriction.is_some()
+    }
+
     fn display<'a>(&'a self, source: &'a str) -> DisplayTypeVar<'a> {
         DisplayTypeVar {
             type_var: self,
@@ -111,15 +119,21 @@ impl Display for DisplayTypeVar<'_> {
                 }
                 TypeVarRestriction::AnyStr => f.write_str("(bytes, str)")?,
                 TypeVarRestriction::Constraint(vec) => {
-                    let len = vec.len();
-                    f.write_str("(")?;
-                    for (i, v) in vec.iter().enumerate() {
-                        f.write_str(&self.source[v.range()])?;
-                        if i < len - 1 {
-                            f.write_str(", ")?;
+                    match vec.as_slice() {
+                        // A single starred expression needs a comma to form a constraint tuple:
+                        // `TypeVar("T", *constraints)` becomes `T: (*constraints,)`.
+                        [element] => {
+                            write!(f, "({element},)", element = &self.source[element.range()])?;
+                        }
+                        _ => {
+                            write!(
+                                f,
+                                "({})",
+                                vec.iter()
+                                    .format_with(", ", |expr, f| f(&&self.source[expr.range()])),
+                            )?;
                         }
                     }
-                    f.write_str(")")?;
                 }
             }
         }
@@ -284,6 +298,7 @@ pub(crate) fn expr_name_to_type_var<'a>(
 ) -> Option<TypeVar<'a>> {
     let StmtAssign { value, .. } = semantic
         .lookup_symbol(name.id.as_str())
+        .binding_id()
         .and_then(|binding_id| semantic.binding(binding_id).source)
         .map(|node_id| semantic.statement(node_id))?
         .as_assign_stmt()?;
@@ -366,6 +381,20 @@ fn in_nested_context(checker: &Checker) -> bool {
         .any(|stmt| matches!(stmt, Stmt::ClassDef(_) | Stmt::FunctionDef(_)))
 }
 
+/// Returns `true` if a type variable without a default follows a type variable with a default.
+///
+/// In a PEP 695 type parameter list this is a syntax error:
+///
+/// ```python
+/// type Pair[T = int, S] = tuple[T, S]  # non-default type parameter `S` follows default type parameter
+/// ```
+fn non_default_follows_default(type_vars: &[TypeVar]) -> bool {
+    type_vars
+        .iter()
+        .skip_while(|tv| tv.default.is_none())
+        .any(|tv| tv.default.is_none())
+}
+
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
 /// Also returns `None` if any `TypeVar` has a default value and the target Python version
 /// is below 3.13 or preview mode is not enabled. Note that `typing_extensions` backports
@@ -375,12 +404,20 @@ fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<
         return None;
     }
 
+    if vars.iter().any(TypeVar::has_unsupported_restriction) {
+        return None;
+    }
+
     // If any type variables have defaults, skip the rule unless
     // running with preview mode enabled and targeting Python 3.13+.
     if vars.iter().any(|tv| tv.default.is_some())
         && (checker.target_version() < PythonVersion::PY313
             || !is_type_var_default_enabled(checker.settings()))
     {
+        return None;
+    }
+
+    if non_default_follows_default(&vars) {
         return None;
     }
 

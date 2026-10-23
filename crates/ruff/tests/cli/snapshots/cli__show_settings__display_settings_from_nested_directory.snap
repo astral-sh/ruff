@@ -18,6 +18,7 @@ cache_dir = "[TMP]/subdir/.ruff_cache"
 fix = false
 fix_only = false
 output_format = full
+output_prefer_rule_codes = false
 show_fixes = false
 unsafe_fixes = hint
 
@@ -56,6 +57,9 @@ file_resolver.include = [
 	"*.pyi",
 	"*.ipynb",
 	"**/pyproject.toml",
+	"**/ruff.toml",
+	"**/.ruff.toml",
+	"*.md",
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
@@ -204,7 +208,7 @@ linter.explicit_preview_rules = false
 linter.extension = ExtensionMapping({})
 linter.allowed_confusables = []
 linter.builtins = []
-linter.dummy_variable_rgx = ^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$
+linter.dummy_variable_rgx = ^(_+|(_+[\p{XID_Continue}]*[\p{XID_Continue}--_]+?))$
 linter.external = []
 linter.ignore_init_module_imports = true
 linter.logger_objects = []
@@ -254,6 +258,7 @@ linter.flake8_gettext.function_names = [
 linter.flake8_implicit_str_concat.allow_multiline = true
 linter.flake8_import_conventions.aliases = {
 	altair = alt,
+	datetime = dt,
 	holoviews = hv,
 	matplotlib = mpl,
 	matplotlib.pyplot = plt,
@@ -310,8 +315,8 @@ linter.flake8_type_checking.exempt_modules = [
 	typing,
 	typing_extensions,
 ]
-linter.flake8_type_checking.runtime_required_base_classes = []
-linter.flake8_type_checking.runtime_required_decorators = []
+linter.flake8_type_checking.runtime_evaluated_base_classes = {}
+linter.flake8_type_checking.runtime_evaluated_decorators = {}
 linter.flake8_type_checking.quote_annotations = false
 linter.flake8_unused_arguments.ignore_variadic_names = false
 linter.isort.required_imports = []
@@ -373,6 +378,16 @@ linter.pylint.allow_magic_value_types = [
 	str,
 	bytes,
 ]
+linter.pylint.allow_magic_values = [
+	0,
+	1,
+	-1,
+	0.0,
+	1.0,
+	-1.0,
+	"",
+	"__main__",
+]
 linter.pylint.allow_dunder_method_names = []
 linter.pylint.max_args = 5
 linter.pylint.max_positional_args = 5
@@ -390,7 +405,7 @@ linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
-formatter.unresolved_target_version = 3.10
+formatter.unresolved_target_version = 3.11
 formatter.per_file_target_version = {}
 formatter.preview = disabled
 formatter.line_width = 120
@@ -406,7 +421,7 @@ formatter.docstring_code_line_width = dynamic
 # Analyze Settings
 analyze.exclude = []
 analyze.preview = disabled
-analyze.target_version = 3.10
+analyze.target_version = 3.11
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}

@@ -6,6 +6,7 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::{FixAvailability, Violation};
 
@@ -48,7 +49,7 @@ use crate::{FixAvailability, Violation};
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.14")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Correctness)]
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {
@@ -163,7 +164,7 @@ fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &
                 previous_expr,
             );
 
-            diagnostic.set_primary_message(format_args!("`{name}` duplicated here"));
+            diagnostic.set_primary_annotation_message(format_args!("`{name}` duplicated here"));
 
             diagnostic.try_set_fix(|| {
                 edits::remove_member(elts, index, source).map(|edit| {

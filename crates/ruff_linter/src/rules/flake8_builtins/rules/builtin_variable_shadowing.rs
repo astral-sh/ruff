@@ -1,8 +1,10 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_semantic::BindingKind;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
@@ -44,7 +46,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## References
 /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.48")]
+#[violation_metadata(stable_since = "v0.0.48", category = Category::Pedantic)]
 pub(crate) struct BuiltinVariableShadowing {
     name: String,
 }
@@ -65,6 +67,21 @@ pub(crate) fn builtin_variable_shadowing(checker: &Checker, name: &str, range: T
         name,
         "__doc__" | "__name__" | "__loader__" | "__package__" | "__spec__"
     ) {
+        return;
+    }
+
+    // In class scope, attribute bindings (e.g., `id = 1`) are covered by
+    // `builtin-attribute-shadowing` (A003), but other bindings (e.g., a `for`
+    // target or `:=`) are not and still shadow the builtin.
+    let scope = checker.semantic().current_scope();
+    if scope.kind.is_class()
+        && scope.get(name).is_none_or(|binding_id| {
+            matches!(
+                checker.semantic().binding(binding_id).kind,
+                BindingKind::Assignment | BindingKind::Annotation
+            )
+        })
+    {
         return;
     }
 

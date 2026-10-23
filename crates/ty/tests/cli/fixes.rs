@@ -47,6 +47,61 @@ fn add_ignore() -> anyhow::Result<()> {
 }
 
 #[test]
+fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "nested.py",
+        r#"
+            def f(value: int) -> int:
+                return value
+
+            seen_code = True
+            # ty: ignore[]
+            values = [
+                # ty: ignore[blanket-ignore-comment]
+                # ty: ignore
+                f("bad"),
+                # ty: ignore
+                missing,
+            ]
+            "#,
+    )?;
+
+    assert_cmd_snapshot!(
+        case.command()
+            .arg("--add-ignore")
+            .arg("--warn")
+            .arg("blanket-ignore-comment"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+    Added 1 ignore comment
+
+    ----- stderr -----
+    "
+    );
+
+    assert_snapshot!(fs::read_to_string(case.root().join("nested.py"))?, @r#"
+
+    def f(value: int) -> int:
+        return value
+
+    seen_code = True
+    # ty: ignore[blanket-ignore-comment]
+    values = [
+        # ty: ignore[blanket-ignore-comment]
+        # ty: ignore
+        f("bad"),
+        # ty: ignore
+        missing,
+    ]
+    "#);
+
+    Ok(())
+}
+
+#[test]
 fn add_ignore_unfixable() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("has_syntax_error.py", r"print(x  # [unresolved-reference]"),
@@ -83,23 +138,20 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     info[revealed-type]: Revealed type
      --> different_violations.py:6:13
       |
-    6 | reveal_type(x)  # ty:ignore[undefined-reveal]
+    6 | reveal_type(x)  # ty: ignore[undefined-reveal]
       |             ^ `Unknown`
-      |
 
     error[unresolved-reference]: Name `x` used when not defined
      --> has_syntax_error.py:1:7
       |
     1 | print(x  # [unresolved-reference]
       |       ^
-      |
 
     error[invalid-syntax]: unexpected EOF while parsing
      --> has_syntax_error.py:1:34
       |
     1 | print(x  # [unresolved-reference]
       |                                  ^
-      |
 
     Found 3 diagnostics
     Added 5 ignore comments
@@ -117,16 +169,20 @@ fn fix() -> anyhow::Result<()> {
         "unused_ignore.py",
         r#"
             x = 1  # ty: ignore[unresolved-reference]
+            values = [
+                # ty: ignore[]
+                1,
+            ]
             "#,
     )?;
 
     assert_cmd_snapshot!(
         case.command().arg("--fix").arg("--warn").arg("unused-ignore-comment"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
-    Found 1 diagnostic (1 fixed, 0 remaining).
+    Found 2 diagnostics (2 fixed, 0 remaining).
 
     ----- stderr -----
     "
@@ -134,8 +190,12 @@ fn fix() -> anyhow::Result<()> {
 
     assert_snapshot!(
         fs::read_to_string(case.root().join("unused_ignore.py"))?,
-        @r"
+        @"
+
     x = 1
+    values = [
+        1,
+    ]
     "
     );
 
@@ -161,9 +221,10 @@ fn fix_unfixable() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     error[invalid-syntax]: unexpected EOF while parsing
-    --> has_syntax_error.py:1:1
-     |
-     |
+     --> has_syntax_error.py:2:1
+      |
+    2 |
+      | ^
 
     Found 2 diagnostics (1 fixed, 1 remaining).
 
@@ -178,6 +239,63 @@ fn fix_unfixable() -> anyhow::Result<()> {
     x = 1
     "
     );
+
+    Ok(())
+}
+
+#[test]
+fn unsafe_fix() -> anyhow::Result<()> {
+    let case = CliTest::with_file("unsafe_fix.py", "raise NotImplemented")?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[invalid-raise]: Cannot raise `NotImplemented`
+     --> unsafe_fix.py:1:7
+      |
+    1 | raise NotImplemented
+      |       ^^^^^^^^^^^^^^ Did you mean `NotImplementedError`?
+    info: Can only raise an instance or subclass of `BaseException`
+    help: Use `NotImplementedError` instead
+      |
+      - raise NotImplemented
+    1 + raise NotImplementedError
+      |
+    note: This is an unsafe fix and may change runtime behavior
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn display_only_fix() -> anyhow::Result<()> {
+    let case = CliTest::with_file("display_only_fix.py", "if (x for x in range(3)): pass")?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    warning[redundant-condition]: A generator is always truthy
+     --> display_only_fix.py:1:4
+      |
+    1 | if (x for x in range(3)): pass
+      |    ^^^^^^^^^^^^^^^^^^^^^ Inferred type `GeneratorType[int, None, None]` is always truthy
+    help: Did you mean to use `any()`?
+      |
+      - if (x for x in range(3)): pass
+    1 + if any((x for x in range(3))): pass
+      |
+    note: This suggestion may be incorrect or produce invalid syntax. It requires manual review and cannot be applied automatically
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

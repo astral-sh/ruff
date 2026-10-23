@@ -1,7 +1,7 @@
 ## What it does
 
-Checks for type variables in nested generic classes or functions that shadow type variables
-from an enclosing scope.
+Checks for type variables in nested generic classes or functions that shadow type variables from an
+enclosing scope.
 
 ## Why is this bad?
 

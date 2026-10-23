@@ -46,7 +46,6 @@ Q002 [*] Double quote docstring found but single quotes preferred
 26 | def function_with_single_docstring(a):
 27 |     "Single line docstring"
    |     ^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace double quotes docstring with single quotes
    |
 26 | def function_with_single_docstring(a):

@@ -167,4 +167,3 @@ Module(
 3 | @foo
 4 | x = 1
   | ^ Syntax Error: Expected class, function definition or async function definition after decorator
-  |

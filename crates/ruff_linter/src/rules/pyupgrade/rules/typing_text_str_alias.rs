@@ -6,13 +6,11 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_typing_extensions_str_alias_enabled;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for uses of `typing.Text`.
-///
-/// In preview mode, also checks for `typing_extensions.Text`.
+/// Checks for uses of `typing.Text` and `typing_extensions.Text`.
 ///
 /// ## Why is this bad?
 /// `typing.Text` is an alias for `str`, and only exists for Python 2
@@ -34,7 +32,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.195")]
+#[violation_metadata(stable_since = "v0.0.195", category = Category::Suspicious)]
 pub(crate) struct TypingTextStrAlias {
     module: TypingModule,
 }
@@ -65,11 +63,7 @@ pub(crate) fn typing_text_str_alias(checker: &Checker, expr: &Expr) {
         let segments = qualified_name.segments();
         let module = match segments {
             ["typing", "Text"] => TypingModule::Typing,
-            ["typing_extensions", "Text"]
-                if is_typing_extensions_str_alias_enabled(checker.settings()) =>
-            {
-                TypingModule::TypingExtensions
-            }
+            ["typing_extensions", "Text"] => TypingModule::TypingExtensions,
             _ => return,
         };
 

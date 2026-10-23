@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::TypeHierarchyPrepareRequest;
 use lsp_types::{TypeHierarchyItem, TypeHierarchyPrepareParams, Uri};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::document::PositionExt;
 use crate::server::api::traits::{
@@ -45,20 +45,20 @@ impl BackgroundDocumentRequestHandler for PrepareTypeHierarchyRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
         };
 
-        let Some(item) = ty_ide::prepare_type_hierarchy(db, file, offset) else {
+        let Some(item) = ty_ide::prepare_type_hierarchy(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

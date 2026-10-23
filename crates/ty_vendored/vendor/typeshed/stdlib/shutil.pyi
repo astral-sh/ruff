@@ -9,8 +9,8 @@ import sys
 from _typeshed import BytesPath, ExcInfo, FileDescriptorOrPath, MaybeNone, StrOrBytesPath, StrPath, SupportsRead, SupportsWrite
 from collections.abc import Callable, Iterable, Sequence
 from tarfile import _TarfileFilter
-from typing import Any, AnyStr, NamedTuple, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
-from typing_extensions import deprecated
+from typing import Any, AnyStr, NamedTuple, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Never, deprecated
 
 __all__ = [
     "copyfileobj",
@@ -146,7 +146,7 @@ def copytree(
     src: StrPath,
     dst: _StrPathT,
     symlinks: bool = False,
-    ignore: None | Callable[[str, list[str]], Iterable[str]] | Callable[[StrPath, list[str]], Iterable[str]] = None,
+    ignore: Callable[[str, list[str]], Iterable[str]] | Callable[[StrPath, list[str]], Iterable[str]] | None = None,
     copy_function: Callable[[str, str], object] = ...,
     ignore_dangling_symlinks: bool = False,
     dirs_exist_ok: bool = False,
@@ -374,7 +374,7 @@ else:
 if sys.platform == "win32" and sys.version_info < (3, 12):
     @overload
     @deprecated("On Windows before Python 3.12, using a PathLike as `cmd` would always fail or return `None`.")
-    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> NoReturn:
+    def which(cmd: os.PathLike[str], mode: int = 1, path: StrPath | None = None) -> Never:
         """Given a command, mode, and a PATH string, return the path which
         conforms to the given mode on the PATH, or None if there is no such
         file.

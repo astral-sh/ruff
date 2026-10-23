@@ -262,6 +262,21 @@ Summary.
     }
 
     #[test]
+    fn preserve_code_span_wrapped_type() {
+        let docstring = "\
+:param value: The value.
+:type value: `str`
+";
+        let rendered = render_docstring(docstring);
+
+        assert_snapshot!(rendered, @"
+        ## Parameters
+        **value**: `str`  
+        The value.
+        ");
+    }
+
+    #[test]
     fn render_returns_with_supplemental_type() {
         let docstring = "\
 Summary.

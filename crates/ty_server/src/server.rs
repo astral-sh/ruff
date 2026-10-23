@@ -5,7 +5,7 @@ use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
 use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
-use lsp_server::Connection;
+use lsp_server::{Connection, ErrorCode, Message, Response};
 use lsp_types::{
     ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
     WorkspaceFoldersInitializeParams,
@@ -19,13 +19,18 @@ mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
+mod script_progress;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use api::{
+    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
+pub(crate) use lazy_work_done_progress::LazyWorkDoneProgress;
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
+pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
 
 pub struct Server {
@@ -56,7 +61,17 @@ impl Server {
             .context("Failed to deserialize initialization parameters")?;
 
         let (initialization_options, deserialization_error) =
-            InitializationOptions::from_value(initialization_options);
+            match InitializationOptions::from_value(initialization_options) {
+                Ok(options) => options,
+                Err(error) => {
+                    connection.sender.send(Message::Response(Response::new_err(
+                        id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("Invalid initialization options: {error:#}"),
+                    )))?;
+                    return Err(error).context("Failed to deserialize initialization options");
+                }
+            };
 
         if !in_test {
             crate::logging::init_logging(

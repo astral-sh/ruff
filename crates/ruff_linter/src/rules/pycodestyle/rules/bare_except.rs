@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for bare `except` catches in `try`-`except` statements.
@@ -45,7 +46,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 /// - [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.36")]
+#[violation_metadata(stable_since = "v0.0.36", category = Category::Suspicious)]
 pub(crate) struct BareExcept;
 
 impl Violation for BareExcept {

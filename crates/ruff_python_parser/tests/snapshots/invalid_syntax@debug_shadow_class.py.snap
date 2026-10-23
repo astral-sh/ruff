@@ -103,4 +103,3 @@ Module(
 1 | class __debug__: ...  # class name
 2 | class C[__debug__]: ...  # type parameter name
   |         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
-  |

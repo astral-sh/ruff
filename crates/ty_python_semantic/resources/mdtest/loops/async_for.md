@@ -80,7 +80,6 @@ error[not-iterable]: Object of type `NotAsyncIterable` is not async-iterable
   |
 5 |     async for x in NotAsyncIterable():
   |                    ^^^^^^^^^^^^^^^^^^
-  |
 info: It has no `__aiter__` method
 ```
 
@@ -107,7 +106,6 @@ error[not-iterable]: Object of type `Iterator` is not async-iterable
    |
 11 |     async for x in Iterator():
    |                    ^^^^^^^^^^
-   |
 info: It has no `__aiter__` method
 ```
 
@@ -132,7 +130,6 @@ error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
   |
 9 |     async for x in AsyncIterable():
   |                    ^^^^^^^^^^^^^^^
-  |
 info: Its `__aiter__` method returns an object of type `NoAnext`, which has no `__anext__` method
 ```
 
@@ -160,7 +157,6 @@ error[not-iterable]: Object of type `AsyncIterable` may not be async-iterable
    |
 12 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
-   |
 info: Its `__aiter__` method returns an object of type `PossiblyUnboundAnext`, which may not have a `__anext__` method
 info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
@@ -193,7 +189,6 @@ error[not-iterable]: Object of type `PossiblyUnboundAiter` may not be async-iter
    |
 12 |     async for x in PossiblyUnboundAiter():
    |                    ^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Its `__aiter__` attribute (with type `bound method PossiblyUnboundAiter.__aiter__() -> AsyncIterable`) may not be callable
 ```
 
@@ -220,11 +215,11 @@ error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
    |
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
-   |
 info: Its `__aiter__` method has an invalid signature
 info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
 info:     └── unexpected extra parameter `arg`
+help: Parameter `arg` must have a default value
 info: Expected signature `def __aiter__(self): ...`
 ```
 
@@ -251,7 +246,6 @@ error[not-iterable]: Object of type `AsyncIterable` is not async-iterable
    |
 11 |     async for x in AsyncIterable():
    |                    ^^^^^^^^^^^^^^^
-   |
 info: Its `__aiter__` method returns an object of type `AsyncIterator`, which has an invalid `__anext__` method
 info: type `AsyncIterable` is not assignable to protocol `AsyncIterable[Unknown]`
 info: └── protocol member `__aiter__` is incompatible
@@ -259,5 +253,6 @@ info:     └── incompatible return types: `AsyncIterator` is not assignable
 info:         └── type `AsyncIterator` is not assignable to protocol `AsyncIterator[Unknown]`
 info:             └── protocol member `__anext__` is incompatible
 info:                 └── unexpected extra parameter `arg`
+help: Parameter `arg` must have a default value
 info: Expected signature for `__anext__` is `def __anext__(self): ...`
 ```

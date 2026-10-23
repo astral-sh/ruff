@@ -7,6 +7,7 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing::is_dict;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 
@@ -16,8 +17,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## Why is this bad?
 /// By convention, environment variables should be capitalized.
 ///
-/// On Windows, environment variables are case-insensitive and are converted to
-/// uppercase, so using lowercase environment variables can lead to subtle bugs.
+/// Furthermore, `os.environ` behaves differently across platforms. On Windows,
+/// `os.environ` automatically converts environment variable names to uppercase.
+/// This means that if you define a lowercase environment variable (e.g., `foo=1`),
+/// iterating over `os.environ` will yield `FOO` on Windows, but
+/// `foo` on Linux and macOS. This can lead to subtle bugs in cross-platform code
+/// if it assumes environment variables preserve their original case.
 ///
 /// ## Example
 /// ```python
@@ -42,7 +47,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.218")]
+#[violation_metadata(stable_since = "v0.0.218", category = Category::Pedantic)]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -96,7 +101,7 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.261")]
+#[violation_metadata(stable_since = "v0.0.261", category = Category::Pedantic)]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -252,7 +257,7 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Expr::Call(ast::ExprCall {
         func,
         arguments: Arguments { args, keywords, .. },
-        range: _,
+        range_start: _,
         node_index: _,
     }) = expr
     else {

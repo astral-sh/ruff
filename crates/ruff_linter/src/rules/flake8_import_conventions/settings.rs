@@ -13,6 +13,7 @@ use crate::settings::types::PreviewMode;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
+    ("datetime", "dt"),
     ("matplotlib", "mpl"),
     ("matplotlib.pyplot", "plt"),
     ("networkx", "nx"),
@@ -53,7 +54,7 @@ impl Display for BannedAliases {
 
 impl BannedAliases {
     /// Returns an iterator over the banned aliases.
-    pub fn iter(&self) -> impl Iterator<Item = &str> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &str> {
         self.0.iter().map(String::as_str)
     }
 }

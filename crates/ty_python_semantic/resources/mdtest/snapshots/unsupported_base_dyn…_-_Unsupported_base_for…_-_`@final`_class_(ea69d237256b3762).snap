@@ -30,6 +30,5 @@ error[subclass-of-final-class]: Class `X` cannot inherit from final class `Final
   |
 7 | X = type("X", (FinalClass,), {})  # error: [subclass-of-final-class]
   |                ^^^^^^^^^^
-  |
 
 ```

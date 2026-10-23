@@ -192,6 +192,19 @@ MyEnum = types.new_class("MyEnum", (Enum,))
 reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
 ```
 
+### Protocol bases
+
+`types.new_class()` also preserves the `_ProtocolMeta` metaclass of source-defined protocols.
+
+```py
+import types
+from typing import Protocol
+
+class Interface(Protocol): ...
+
+reveal_type(type(types.new_class("Dynamic", (Interface,))))  # revealed: <class '_ProtocolMeta'>
+```
+
 ### Generic and TypedDict bases
 
 Even though `types.new_class()` handles `__mro_entries__` at runtime, ty does not yet model the full
@@ -229,7 +242,7 @@ emitted:
 
 ```py
 import types
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 class Base:
     base_attr: int = 1
@@ -255,6 +268,18 @@ def g(x: type[Any]):
     # No diagnostic: `Any` base is fine as-is
     Child = types.new_class("Child", (x,))
     reveal_type(Child)  # revealed: <class 'Child'>
+```
+
+## Instance layout conflicts
+
+As with a `class` statement, the bases of a class created with `types.new_class()` cannot have
+conflicting instance memory layouts:
+
+```py
+import types
+
+# error: [instance-layout-conflict]
+Conflict = types.new_class("Conflict", (int, str))
 ```
 
 ## Dynamic namespace via `exec_body`

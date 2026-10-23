@@ -81,4 +81,3 @@ Module(
 2 | with (a, ?b)
 3 | ?
   | ^ Syntax Error: Expected an indented block after `with` statement
-  |

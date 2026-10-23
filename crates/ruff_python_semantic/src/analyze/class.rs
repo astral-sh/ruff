@@ -16,15 +16,15 @@ use ruff_python_ast::{
 pub fn any_qualified_base_class<F>(
     class_def: &ast::StmtClassDef,
     semantic: &SemanticModel,
-    func: F,
+    mut func: F,
 ) -> bool
 where
-    F: Fn(QualifiedName) -> bool,
+    F: FnMut(QualifiedName) -> bool,
 {
     any_base_class(class_def, semantic, |expr| {
         semantic
             .resolve_qualified_name(map_subscript(expr))
-            .is_some_and(&func)
+            .is_some_and(&mut func)
     })
 }
 
@@ -155,16 +155,6 @@ impl<'a> ClassMemberDeclaration<'a> {
 pub enum ClassMemberBoundness {
     PossiblyUnbound,
     Bound,
-}
-
-impl ClassMemberBoundness {
-    pub const fn is_bound(self) -> bool {
-        matches!(self, Self::Bound)
-    }
-
-    pub const fn is_possibly_unbound(self) -> bool {
-        matches!(self, Self::PossiblyUnbound)
-    }
 }
 
 #[derive(Copy, Clone, Debug)]

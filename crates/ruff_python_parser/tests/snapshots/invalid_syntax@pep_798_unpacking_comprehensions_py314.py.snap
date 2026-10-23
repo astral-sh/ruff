@@ -331,4 +331,3 @@ Module(
 5 | (*x for x in y)
 6 | f(*x for x in y)
   |   ^^ Syntax Error: Cannot use iterable unpacking in a generator expression on Python 3.14 (syntax was added in Python 3.15)
-  |

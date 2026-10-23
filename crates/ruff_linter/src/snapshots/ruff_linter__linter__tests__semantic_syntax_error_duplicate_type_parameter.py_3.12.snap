@@ -6,4 +6,3 @@ invalid-syntax: duplicate type parameter
   |
 1 | class C[T, T]: pass
   |            ^
-  |

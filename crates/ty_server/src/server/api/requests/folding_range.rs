@@ -2,13 +2,10 @@ use std::borrow::Cow;
 
 use lsp_types::FoldingRangeRequest;
 use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
-use ruff_db::source::source_text;
-use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
-use crate::db::Db;
-use crate::document::ToRangeExt;
+use crate::document::{ToRangeExt, cell_range};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -39,24 +36,24 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         // If this document is a notebook cell, only return folding ranges for this cell.
         // Folding ranges are reported as local ranges, so returning notebook-wide ranges
-        // would produce invalid coordinates for every other cell.
-        let mut cell_range: Option<TextRange> = None;
+        // would produce invalid coordinates for every other cell. A cell without a range in the
+        // notebook's Python source, such as one that uses a cell magic, has no folding ranges.
+        let cell_range = if snapshot.document().is_cell() {
+            let Some(range) = cell_range(db, file, snapshot.document().uri()) else {
+                return Ok(None);
+            };
+            Some(range)
+        } else {
+            None
+        };
 
-        if snapshot.document().is_cell()
-            && let Some(notebook_document) = db.notebook_document(file)
-            && let Some(notebook) = source_text(db, file).as_notebook()
-        {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.uri());
-            cell_range = cell_index.and_then(|index| notebook.cell_range(index));
-        }
-
-        let results: Vec<_> = folding_ranges(db, file, cell_range)
+        let results: Vec<_> = folding_ranges(db, db.program_file(file).python_file(db), cell_range)
             .into_iter()
             .filter_map(|folding_range| {
                 let lsp_range = folding_range

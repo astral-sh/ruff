@@ -17,7 +17,7 @@ use args::{GlobalConfigArgs, ServerCommand};
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::{fs, warn_user, warn_user_once};
+use ruff_linter::{SuppressionKind, fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
 use crate::args::{
@@ -212,14 +212,8 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
-    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
     let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
-    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
-        warn_user_once!(
-            "The --output-format flag for the formatter is unstable and requires preview mode to use."
-        );
-    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
         commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
@@ -237,7 +231,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    commands::server::run_server(args.resolve_preview())
+    commands::server::run_server(args.resolve_preview(), args.resolve_workspace_trust())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -326,25 +320,44 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         warn_user!("Detected debug build without --no-cache.");
     }
 
-    if let Some(reason) = &cli.add_noqa {
+    let suppression = cli
+        .add_noqa
+        .as_ref()
+        .map(|reason| (reason, SuppressionKind::Noqa, "--add-noqa"))
+        .or_else(|| {
+            cli.add_ignore
+                .as_ref()
+                .map(|reason| (reason, SuppressionKind::Ignore, "--add-ignore"))
+        });
+
+    if let Some((reason, suppression_kind, flag)) = suppression {
         if !fix_mode.is_generate() {
-            warn_user!("--fix is incompatible with --add-noqa.");
+            warn_user!("--fix is incompatible with {flag}.");
         }
         if reason.contains(['\n', '\r']) {
             return Err(anyhow::anyhow!(
-                "--add-noqa <reason> cannot contain newline characters"
+                "{flag} <reason> cannot contain newline characters"
             ));
         }
 
         let reason_opt = (!reason.is_empty()).then_some(reason.as_str());
 
-        let modifications =
-            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments, reason_opt)?;
+        let modifications = commands::add_noqa::add_noqa(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            reason_opt,
+            suppression_kind,
+        )?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
+            let suppression = match suppression_kind {
+                SuppressionKind::Noqa => "noqa directive",
+                SuppressionKind::Ignore => "ignore comment",
+            };
             #[expect(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directive{s}.");
+                eprintln!("Added {modifications} {suppression}{s}.");
             }
         }
         return Ok(ExitStatus::Success);
@@ -362,6 +375,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // TODO: this should reference the global preview mode once https://github.com/astral-sh/ruff/issues/8232
     //   is resolved.
     let preview = pyproject_config.settings.linter.preview;
+    let prefer_rule_codes = pyproject_config.settings.output_prefer_rule_codes;
 
     if cli.watch {
         // Configure the file watcher.
@@ -387,52 +401,25 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             fix_mode,
             unsafe_fixes,
         )?;
-        printer.write_continuously(&mut writer, &diagnostics, preview)?;
+        printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
 
         // In watch mode, we may need to re-resolve the configuration.
         // TODO(charlie): Re-compute other derivative values, like the `printer`.
         let mut pyproject_config = pyproject_config;
 
         loop {
-            match rx.recv() {
-                Ok(event) => {
-                    let Some(change_kind) = change_detected(&event?) else {
-                        continue;
-                    };
+            let Some(change_kind) = change_detected(&rx.recv()??) else {
+                continue;
+            };
 
-                    if matches!(change_kind, ChangeKind::Configuration) {
-                        pyproject_config =
-                            resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
-                    }
-                    Printer::clear_screen()?;
-                    printer.write_to_user("File change detected...\n");
-
-                    let diagnostics = commands::check::check(
-                        &files,
-                        &pyproject_config,
-                        &config_arguments,
-                        cache.into(),
-                        noqa.into(),
-                        fix_mode,
-                        unsafe_fixes,
-                    )?;
-                    printer.write_continuously(&mut writer, &diagnostics, preview)?;
-                }
-                Err(err) => return Err(err.into()),
+            if matches!(change_kind, ChangeKind::Configuration) {
+                pyproject_config =
+                    resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
             }
-        }
-    } else {
-        // Generate lint violations.
-        let diagnostics = if is_stdin {
-            commands::check_stdin::check_stdin(
-                cli.stdin_filename.map(fs::normalize_path).as_deref(),
-                &pyproject_config,
-                &config_arguments,
-                noqa.into(),
-                fix_mode,
-            )?
-        } else {
-            commands::check::check(
+            Printer::clear_screen()?;
+            printer.write_to_user("File change detected...\n");
+
+            let diagnostics = commands::check::check(
                 &files,
                 &pyproject_config,
                 &config_arguments,
@@ -440,72 +427,98 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
                 noqa.into(),
                 fix_mode,
                 unsafe_fixes,
-            )?
-        };
-
-        // Always try to print violations (though the printer itself may suppress output)
-        // If we're writing fixes via stdin, the transformed source code goes to the writer
-        // so send the summary to stderr instead
-        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
-            stderr_writer
-        } else {
-            writer
-        };
-        if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut summary_writer)?;
-        } else {
-            printer.write_once(&diagnostics, &mut summary_writer, preview)?;
+            )?;
+            printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
         }
+    }
+    // Generate lint violations.
+    let diagnostics = if is_stdin {
+        commands::check_stdin::check_stdin(
+            cli.stdin_filename.map(fs::normalize_path).as_deref(),
+            &pyproject_config,
+            &config_arguments,
+            noqa.into(),
+            fix_mode,
+        )?
+    } else {
+        commands::check::check(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            cache.into(),
+            noqa.into(),
+            fix_mode,
+            unsafe_fixes,
+        )?
+    };
 
-        if !cli.exit_zero {
-            let max_severity = diagnostics
-                .inner
-                .iter()
-                .map(Diagnostic::severity)
-                .max()
-                .unwrap_or(Severity::Info);
-            if max_severity.is_fatal() {
-                // When a panic/fatal error is reported, prompt the user to open an issue on github.
-                // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
-                // message here instead of attaching it to the diagnostic ensures that we only print
-                // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
-                // the message from being captured by tools parsing the normal output.
-                let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
+    // Always try to print violations (though the printer itself may suppress output)
+    // If we're writing fixes via stdin, the transformed source code goes to the writer
+    // so send the summary to stderr instead
+    let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+        stderr_writer
+    } else {
+        writer
+    };
+    if cli.statistics {
+        printer.write_statistics(&diagnostics, &mut summary_writer)?;
+    } else {
+        printer.write_once(
+            &diagnostics,
+            &mut summary_writer,
+            preview,
+            prefer_rule_codes,
+        )?;
+    }
+
+    if !cli.exit_zero {
+        let max_severity = diagnostics
+            .inner
+            .iter()
+            .map(Diagnostic::severity)
+            .max()
+            .unwrap_or(Severity::Info);
+        if max_severity.is_fatal() {
+            // When a panic/fatal error is reported, prompt the user to open an issue on github.
+            // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
+            // message here instead of attaching it to the diagnostic ensures that we only print
+            // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
+            // the message from being captured by tools parsing the normal output.
+            let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
 ";
-                error!("{message}");
-                return Ok(ExitStatus::Error);
+            error!("{message}");
+            return Ok(ExitStatus::Error);
+        }
+        if cli.diff {
+            // If we're printing a diff, we always want to exit non-zero if there are
+            // any fixable violations (since we've printed the diff, but not applied the
+            // fixes).
+            if !diagnostics.fixed.is_empty() {
+                return Ok(ExitStatus::Failure);
             }
-            if cli.diff {
-                // If we're printing a diff, we always want to exit non-zero if there are
-                // any fixable violations (since we've printed the diff, but not applied the
-                // fixes).
+        } else if fix_only {
+            // If we're only fixing, we want to exit zero (since we've fixed all fixable
+            // violations), unless we're explicitly asked to exit non-zero on fix.
+            if cli.exit_non_zero_on_fix {
                 if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
-            } else if fix_only {
-                // If we're only fixing, we want to exit zero (since we've fixed all fixable
-                // violations), unless we're explicitly asked to exit non-zero on fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+            }
+        } else {
+            // If we're running the linter (not just fixing), we want to exit non-zero if
+            // there are any violations, unless we're explicitly asked to exit zero on
+            // fix.
+            if cli.exit_non_zero_on_fix {
+                if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             } else {
-                // If we're running the linter (not just fixing), we want to exit non-zero if
-                // there are any violations, unless we're explicitly asked to exit zero on
-                // fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
-                } else {
-                    if !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+                if !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }

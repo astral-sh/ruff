@@ -10,7 +10,8 @@ from collections.abc import Container, Generator, Iterable, Mapping
 from logging import Logger, _ExcInfoType
 from multiprocessing import JoinableQueue
 from multiprocessing.synchronize import Lock
-from typing import Any, ClassVar, Final, NoReturn, overload
+from typing import Any, ClassVar, Final, overload
+from typing_extensions import Never
 
 from .btm_matcher import BottomMatcher
 from .fixer_base import BaseFix
@@ -68,7 +69,7 @@ class RefactoringTool:
           post-order traversal.
         """
 
-    def log_error(self, msg: str, *args: Iterable[str], **kwargs: _ExcInfoType) -> NoReturn:
+    def log_error(self, msg: str, *args: Iterable[str], **kwargs: _ExcInfoType) -> Never:
         """Called when an error occurs."""
 
     @overload
@@ -209,7 +210,7 @@ class RefactoringTool:
 class MultiprocessingUnsupported(Exception): ...
 
 class MultiprocessRefactoringTool(RefactoringTool):
-    queue: JoinableQueue[None | tuple[Iterable[str], bool | int]] | None
+    queue: JoinableQueue[tuple[Iterable[str], bool | int] | None] | None
     output_lock: Lock | None
     def refactor(
         self, items: Iterable[str], write: bool = False, doctests_only: bool = False, num_processes: int = 1

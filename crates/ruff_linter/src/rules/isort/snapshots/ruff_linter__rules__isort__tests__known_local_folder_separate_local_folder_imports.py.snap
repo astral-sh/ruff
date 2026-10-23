@@ -12,7 +12,6 @@ I001 [*] Import block is un-sorted or un-formatted
 6 | | from .. import trailing_prefix
 7 | | from ruff import check
   | |______________________^
-  |
 help: Organize imports
   |
 1 + import os

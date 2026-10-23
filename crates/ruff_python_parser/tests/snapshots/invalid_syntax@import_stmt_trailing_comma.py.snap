@@ -71,4 +71,3 @@ Module(
 1 | import ,
 2 | import x, y,
   |            ^ Syntax Error: Trailing comma not allowed
-  |

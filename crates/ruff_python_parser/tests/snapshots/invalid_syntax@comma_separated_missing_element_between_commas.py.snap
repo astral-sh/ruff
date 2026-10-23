@@ -61,4 +61,3 @@ Module(
   |
 1 | [0, 1, , 2]
   |        ^ Syntax Error: Expected an expression or a ']'
-  |

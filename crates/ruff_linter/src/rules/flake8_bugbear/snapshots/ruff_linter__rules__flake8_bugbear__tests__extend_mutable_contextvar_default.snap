@@ -7,5 +7,4 @@ B039 Do not use mutable data structures for `ContextVar` defaults
 6 | from something_else import Depends
 7 | ContextVar("cv", default=Depends())
   |                          ^^^^^^^^^
-  |
 help: Replace with `None`; initialize with `.set()``

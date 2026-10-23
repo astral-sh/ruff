@@ -1291,7 +1291,6 @@ Module(
 21 | [*x if x else y for x in z]
 22 | [x if x else *y for x in z]
    |              ^^ Syntax Error: Starred expression cannot be used here
-   |
 
 
 ## Unsupported Syntax Errors

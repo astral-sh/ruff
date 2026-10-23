@@ -18,3 +18,7 @@ func(a=11, c=31, **{"c": 41, "a": 51})
 func(a=11, b=21, c=31, **{"b": 22, "c": 41, "a": 51})
 func(a=11, b=21, **{"c": 31}, **{"c": 32})
 func(a=11, b=21, **{"c": 31, "c": 32})
+func(**{"a": 11}, a=21)
+
+# Duplicate explicit keywords are syntax errors, not PLE1132 diagnostics.
+func(a=11, a=21)

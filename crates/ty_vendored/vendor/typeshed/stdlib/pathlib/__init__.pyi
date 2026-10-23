@@ -6,7 +6,6 @@ operating systems.
 """
 
 import sys
-import types
 from _typeshed import (
     OpenBinaryMode,
     OpenBinaryModeReading,
@@ -21,7 +20,7 @@ from _typeshed import (
 from collections.abc import Callable, Generator, Iterator, Sequence
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from os import PathLike, stat_result
-from types import GenericAlias, TracebackType
+from types import GenericAlias, ModuleType, TracebackType
 from typing import IO, Any, BinaryIO, ClassVar, Literal, TypeVar, overload
 from typing_extensions import Never, Self, deprecated
 
@@ -72,7 +71,7 @@ class PurePath(PathLike[str]):
         else:
             __slots__ = ("_drv", "_root", "_parts", "_str", "_hash", "_pparts", "_cached_cparts")
     if sys.version_info >= (3, 13):
-        parser: ClassVar[types.ModuleType]
+        parser: ClassVar[ModuleType]
         def full_match(self, pattern: StrPath, *, case_sensitive: bool | None = None) -> bool:
             """
             Return True if this path matches the given glob-style pattern. The
@@ -166,7 +165,7 @@ class PurePath(PathLike[str]):
         slashes.
         """
 
-    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.19. Use `Path.as_uri()` instead.")
+    @deprecated("Deprecated; will be removed in Python 3.19. Use `Path.as_uri()` instead.")
     def as_uri(self) -> str:
         """Return the path as a URI."""
 
@@ -178,7 +177,7 @@ class PurePath(PathLike[str]):
     if sys.version_info < (3, 15):
         if sys.version_info >= (3, 13):
             @deprecated(
-                "Deprecated since Python 3.13; will be removed in Python 3.15. "
+                "Deprecated since Python 3.13; removed in Python 3.15. "
                 "Use `os.path.isreserved()` to detect reserved paths on Windows."
             )
             def is_reserved(self) -> bool:
@@ -201,7 +200,7 @@ class PurePath(PathLike[str]):
         def is_relative_to(self, other: StrPath, /) -> bool:
             """Return True if the path is relative to another path or False."""
         @overload
-        @deprecated("Passing additional arguments is deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Passing additional arguments is deprecated; removed in Python 3.14.")
         def is_relative_to(self, other: StrPath, /, *_deprecated: StrPath) -> bool: ...
 
     if sys.version_info >= (3, 12):

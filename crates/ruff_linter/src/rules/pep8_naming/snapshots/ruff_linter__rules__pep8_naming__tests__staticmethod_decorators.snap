@@ -172,12 +172,12 @@ N805 First argument of a method should be named `self`
 help: Rename `this` to `self`
 
 N805 First argument of a method should be named `self`
-   --> N805.py:107:24
+   --> N805.py:107:25
     |
 105 |         pass
 106 |
-107 |     def self_as_varags(this, *self):
-    |                        ^^^^
+107 |     def self_as_varargs(this, *self):
+    |                         ^^^^
 108 |         pass
     |
 help: Rename `this` to `self`

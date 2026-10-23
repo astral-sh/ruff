@@ -5,6 +5,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::importer::ImportRequest;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -33,7 +34,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// logging.basicConfig(level=logging.WARNING)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct UndocumentedWarn;
 
 impl Violation for UndocumentedWarn {

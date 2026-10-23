@@ -81,10 +81,8 @@ Module(
   |
 1 | array[*start:*end]
   |       ^^^^^^ Syntax Error: Starred expression cannot be used here
-  |
 
 
   |
 1 | array[*start:*end]
   |              ^^^^ Syntax Error: Starred expression cannot be used here
-  |

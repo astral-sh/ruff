@@ -31,7 +31,6 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
       |
     2 | y = a + 5  # type: ignore
       |     ^
-      |
 
     Found 1 diagnostic
 
@@ -81,7 +80,6 @@ fn overrides_basic() -> anyhow::Result<()> {
       |
     2 | print(x)  # type: ignore  # ignore not-respected (override)
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -137,7 +135,6 @@ fn overrides_precedence() -> anyhow::Result<()> {
       |
     2 | print(y)  # type: ignore (should be an error, because type ignores are disabled)
       |       ^
-      |
 
     Found 1 diagnostic
 
@@ -189,14 +186,12 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
       |
     2 | print(y)  # type: ignore ignore not-respected (global)
       |       ^
-      |
 
     error[unresolved-reference]: Name `y` used when not defined
      --> tests/test_main.py:2:7
       |
     2 | print(y)  # type: ignore ignore respected (inherited from global)
       |       ^
-      |
 
     Found 2 diagnostics
 
