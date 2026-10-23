@@ -617,8 +617,8 @@ def _() -> None:
 
 ## Returning callables with generic overloads
 
-Matching the generic overload's return type to `A` also lets us infer `A` as the argument type of the
-returned callable, even though another overload accepts only the narrower `B`.
+Matching the generic overload's return type to `A` also lets us infer `A` as the argument type of
+the returned callable, even though another overload accepts only the narrower `B`.
 
 ```py
 from typing import Callable, TypeVar, overload
@@ -644,8 +644,9 @@ reveal_type(wrapped)  # revealed: (A, /) -> A
 wrapped(A())  # no diagnostic
 ```
 
-The generic overload of `sum` accepts iterables of arbitrary integers, even though its first overload
-only accepts iterables of booleans and certain integer literals. Wrapping it preserves this behavior:
+The generic overload of `sum` accepts iterables of arbitrary integers, even though its first
+overload only accepts iterables of booleans and certain integer literals. Wrapping it preserves this
+behavior:
 
 ```py
 def wrap_sum(fn: Callable[[T], int]) -> Callable[[T], int]:
