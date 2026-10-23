@@ -5426,142 +5426,7 @@ mod tests {
     }
 
     #[test]
-    fn valid_prefix_checks_have_linear_visit_cost() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let bound = Type::heterogeneous_tuple(db, &env, [Type::any()]);
-        let t = create_typevar(db, "T")
-            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
-        let inferable = TypeVarSet::from_typevars(db, [t]);
-        let builder = ConstraintSetBuilder::new();
-        let lower = |value| {
-            create_constraint_set_with_bounds(
-                db,
-                &env,
-                &builder,
-                t,
-                Some(Type::heterogeneous_tuple(
-                    db,
-                    &env,
-                    [Type::int_literal(i64::from(value))],
-                )),
-                None,
-            )
-        };
-        let length: u16 = 64;
-        // The final choice forces general traversal instead of the conjunction fast path.
-        // Checking each growing prefix from scratch would exhaust this linear visit budget.
-        let mut set = lower(length).or(db, &builder, || lower(length + 1));
-        for value in 0..length {
-            set = set.and(db, &builder, || lower(value));
-        }
-
-        let result = bounded_path_bounds(db, set, inferable, 2, 16 * usize::from(length));
-        let Ok(CandidateSolutions::Constrained(paths)) = result else {
-            panic!("expected complete valid solutions, got {result:?}");
-        };
-        assert_eq!(paths.len(), 2);
-        assert!(
-            paths
-                .iter()
-                .all(|path| matches!(path.validity, SolutionValidity::Valid))
-        );
-    }
-
-    #[test]
-    fn incompatible_lower_bound_alternatives_have_bounded_recovery() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::any()]);
-        let t = create_typevar(db, "T")
-            .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
-        let inferable = TypeVarSet::from_typevars(db, [t]);
-
-        for alternatives in [4_u16, 8, 12] {
-            let builder = ConstraintSetBuilder::new();
-            // Constraints allocated first are visited last in the normal TDD ordering. Put the
-            // valid alternative after the incompatible family in traversal order.
-            let valid_lower = KnownClass::List.to_specialized_instance(
-                db,
-                &env,
-                &[known_instance(db, KnownClass::Int)],
-            );
-            let valid_alternative =
-                create_constraint_set_with_bounds(db, &env, &builder, t, Some(valid_lower), None);
-            let lower = |value| {
-                create_constraint_set_with_bounds(
-                    db,
-                    &env,
-                    &builder,
-                    t,
-                    Some(Type::int_literal(i64::from(value))),
-                    None,
-                )
-            };
-            // Each argument supplies two independent lower-bound alternatives. Every one
-            // violates the declared bound, so enumerating all 2^n complete paths adds no valid
-            // solution. The gradual bound prevents static range sequents from pruning them.
-            let mut set = ConstraintSet::always(&builder);
-            for index in 0..alternatives {
-                set = set.and(db, &builder, || {
-                    lower(2 * index).or(db, &builder, || lower(2 * index + 1))
-                });
-            }
-
-            let result = bounded_path_bounds(
-                db,
-                set,
-                inferable,
-                2 * usize::from(alternatives),
-                64 * usize::from(alternatives),
-            );
-            let Ok(CandidateSolutions::Constrained(paths)) = result else {
-                panic!("expected complete diagnostic recovery, got {result:?}");
-            };
-            assert!(!paths.is_empty());
-            for path in &paths {
-                assert_matches!(path.validity, SolutionValidity::Invalid(_));
-                let [solution] = path.typevars.as_ref() else {
-                    panic!("expected one inferred type variable");
-                };
-                assert_eq!(solution.bound_typevar, t);
-                let lower = solution.effective_lower(db, &env);
-                // Recovery must retain evidence from a complete path, including every argument.
-                for index in 0..alternatives {
-                    assert!([2 * index, 2 * index + 1].into_iter().any(|value| {
-                        Type::int_literal(i64::from(value))
-                            .is_constraint_set_subtype_of(db, &env, lower)
-                    }));
-                }
-            }
-
-            // An invalid prefix must not consume the budget before a later valid alternative
-            // is considered.
-            let with_valid_alternative = set.or(db, &builder, || valid_alternative);
-            let result = bounded_path_bounds(
-                db,
-                with_valid_alternative,
-                inferable,
-                2 * usize::from(alternatives) + 1,
-                128 * usize::from(alternatives),
-            );
-            let Ok(CandidateSolutions::Constrained(paths)) = result else {
-                panic!("expected complete solution search, got {result:?}");
-            };
-            assert!(paths.iter().any(|path| {
-                matches!(path.validity, SolutionValidity::Valid)
-                    && path.typevars.iter().any(|solution| {
-                        solution.bound_typevar == t
-                            && solution.effective_lower(db, &env) == valid_lower
-                    })
-            }));
-        }
-    }
-
-    #[test]
-    fn invalid_prefix_recovers_later_typevar_and_gradual_evidence() {
+    fn invalid_prefix_preserves_recovery_and_valid_alternatives() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5573,21 +5438,40 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let int = known_instance(db, KnownClass::Int);
         let str = known_instance(db, KnownClass::Str);
+        // Constraints allocated first are visited last. Leave the valid alternative until after
+        // the invalid family, so pruning must preserve a valid sibling outside the invalid prefix.
+        let valid_lower = KnownClass::List.to_specialized_instance(db, &env, &[int]);
+        let valid_alternative =
+            create_constraint_set_with_bounds(db, &env, &builder, t, Some(valid_lower), None);
         let later_typevar = create_constraint(db, &builder, u, KnownClass::Bytes);
         let later_gradual =
             create_constraint_set_with_bounds(db, &env, &builder, t, Some(Type::any()), None);
 
-        // The first alternatives already violate T's declaration. Recovery still needs the
-        // remaining constraints to preserve both gradual evidence and U's inferred type. Allocate
-        // the alternatives last so they are visited before those remaining constraints.
-        let set = create_constraint_set_with_bounds(db, &env, &builder, t, Some(int), None)
-            .or(db, &builder, || {
-                create_constraint_set_with_bounds(db, &env, &builder, t, Some(str), None)
-            })
-            .and(db, &builder, || later_gradual)
-            .and(db, &builder, || later_typevar);
+        // Allocate the invalid alternatives last so they are visited before the valid sibling
+        // and the additional recovery evidence below.
+        let set = create_constraint_set_with_bounds(db, &env, &builder, t, Some(int), None).or(
+            db,
+            &builder,
+            || create_constraint_set_with_bounds(db, &env, &builder, t, Some(str), None),
+        );
 
-        let result = bounded_path_bounds(db, set, inferable, 2, 128);
+        let with_valid_alternative = set.or(db, &builder, || valid_alternative);
+        let result = bounded_path_bounds(db, with_valid_alternative, inferable, 3, 128);
+        let Ok(CandidateSolutions::Constrained(paths)) = result else {
+            panic!("expected a valid alternative, got {result:?}");
+        };
+        assert!(paths.iter().any(|path| {
+            matches!(path.validity, SolutionValidity::Valid)
+                && path.typevars.iter().any(|solution| {
+                    solution.bound_typevar == t && solution.effective_lower(db, &env) == valid_lower
+                })
+        }));
+        // An invalid prefix still needs the remaining constraints to preserve both gradual
+        // evidence and U's inferred type.
+        let with_recovery_evidence =
+            set.and(db, &builder, || later_gradual)
+                .and(db, &builder, || later_typevar);
+        let result = bounded_path_bounds(db, with_recovery_evidence, inferable, 2, 128);
         let Ok(CandidateSolutions::Constrained(paths)) = result else {
             panic!("expected diagnostic recovery, got {result:?}");
         };

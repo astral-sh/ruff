@@ -230,6 +230,100 @@ fn benchmark_many_upper_bound_callbacks(criterion: &mut Criterion) {
     });
 }
 
+/// Each union member contributes two lower-bound alternatives that violate `D`'s gradual bound.
+/// Recovering an invalid candidate must not enumerate their exponential cross product.
+fn benchmark_incompatible_lower_bound_alternatives(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for members in [4, 8, 12] {
+        let mut code = String::from(
+            "from collections.abc import Callable
+from typing import Any, Generic, Protocol, TypeVar, overload
+
+Q = TypeVar('Q')
+class DType(Generic[Q]): ...
+
+ItemT = TypeVar('ItemT')
+class Scalar(Generic[ItemT]):
+    @property
+    def dtype(self) -> DType[Any]:
+        raise NotImplementedError
+
+D_co = TypeVar('D_co', bound=DType[Any], covariant=True)
+class HasDType(Protocol[D_co]):
+    @property
+    def dtype(self) -> D_co: ...
+
+D = TypeVar('D', bound=DType[Any])
+@overload
+def full(dtype: Callable[[], D | HasDType[D]]) -> None: ...
+@overload
+def full(dtype: object) -> None: ...
+def full(dtype: object) -> None: ...
+
+",
+        );
+        for i in 0..members {
+            writeln!(&mut code, "class Scalar{i}(Scalar[int]): ...").ok();
+        }
+        code.push_str("\nMembers = ");
+        for i in 0..members {
+            if i > 0 {
+                code.push_str(" | ");
+            }
+            write!(&mut code, "Scalar{i}").ok();
+        }
+        code.push_str(
+            "\n\ndef check(dtype: Callable[[], type[Members]]) -> None:\n    full(dtype)\n",
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[incompatible_lower_bound_alternatives/{members}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |Case { db }| assert_eq!(db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
+/// Check each compatible lower bound once, rather than rescanning the growing valid prefix.
+fn benchmark_long_valid_bound_prefix(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from(
+        "from typing import Any, Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def check[T: tuple[Any]]() -> None:
+    bounds = (ConstraintSet.lower_bound(tuple[Literal[-1]], T)
+              | ConstraintSet.lower_bound(tuple[Literal[-2]], T))
+",
+    );
+    // Allocate the choice first so traversal reaches it after the compatible prefix. The
+    // disjunction prevents the conjunction fast path from bypassing prefix validation.
+    for i in 0..64 {
+        writeln!(
+            &mut code,
+            "    bounds &= ConstraintSet.lower_bound(tuple[Literal[{i}]], T)"
+        )
+        .ok();
+    }
+    code.push_str("    static_assert(len(bounds.solutions(inferable=tuple[T])) == 2)\n");
+
+    criterion.bench_function("ty_micro[long_valid_bound_prefix]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |Case { db }| assert_eq!(db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
     let venv_path = setup_micro_case_venv("pandas_tdd", &["pandas-stubs"]);
@@ -721,6 +815,8 @@ criterion_group!(
     benchmark_constraint_quantification,
     benchmark_factored_upper_bounds,
     benchmark_many_upper_bound_callbacks,
+    benchmark_incompatible_lower_bound_alternatives,
+    benchmark_long_valid_bound_prefix,
     benchmark_pandas_tdd,
     benchmark_mixed_typed_dict_union_copy,
     benchmark_missing_key_typed_dict_union_copy,
