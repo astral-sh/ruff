@@ -60,6 +60,8 @@ Preserve useful human-written comments unless the code change makes them inaccur
 
 File-watcher tests rely on operating-system events that some execution environments do not deliver. Do not run tests that depend on these events in a Codex sandbox or another sandbox where these events may not be delivered; for example, the `ty` crate's `file_watching` integration tests can time out waiting for them. The commands below exclude that test binary. It is usually unnecessary to run file-watcher tests locally before filing a change unless you are certain that the change affects file-watching behavior. To run the `file_watching` binary, use an environment that delivers file-watcher events and run `cargo nextest run -p ty --test file_watching` or `cargo test -p ty --test file_watching`, using the snapshot environment variables shown below.
 
+When testing whether constraint ordering affects mdtest results, follow the [constraint-order wobble skill](.agents/skills/wobbling-ty-constraint-order/SKILL.md) so snapshot differences fail the run and the expected snapshots are preserved.
+
 Run the workspace tests except `file_watching` (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
@@ -180,7 +182,7 @@ To inspect one evaluation task, run `cargo run --package ty_completion_eval -- s
 
 ### Ad hoc reproductions
 
-When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
+For issue, PR, and ecosystem inputs, follow the [repro isolation requirements](.agents/references/repro-isolation.md) before running ty. When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
 
 ### The `db` parameter
 
@@ -215,7 +217,7 @@ Salsa caching can occur due to a function/method having `#[salsa::tracked]` on i
 - Rust imports should always go at the top of the file, never locally in functions.
 - Run `uv run --only-dev --locked prek` at the end of a task if you changed files in the repo. This includes changes such as rebases or addressing review comments. Use `uv run --only-dev --locked prek run --files <path1> <path2>` and pass every file you changed. This keeps the hook run independent of staged state and avoids sweeping unrelated changes. Use `uv run --only-dev --locked prek run --all-files` when a full-repository hook sweep is specifically needed.
 - Before writing significant amounts of new code, look for existing utilities or mechanisms that could solve the problem. Avoid expanding the task to unrelated issues, but do not confuse keeping the task focused with minimizing the size of the implementation. Prefer addressing the underlying architectural problem over adding a localized workaround, even when doing so requires a substantial refactor or rearchitecture. Ask the user for guidance if in doubt about whether to attempt a larger refactor or not.
-- Try hard to avoid patterns that require `panic!`, `unreachable!`, `.unwrap()` or `.expect()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these unsafe calls.
+- In production code, try hard to avoid patterns that require `panic!`, `unreachable!`, `.unwrap()` or `.expect()`. Instead, try to encode those constraints in the type system. Don't be afraid to write code that's more verbose or requires largeish refactors if it enables you to avoid these panics.
 - Prefer let chains (`if let` combined with `&&`) and let guards (`PAT if let ... =>`) over nested `if let` statements to reduce indentation and improve readability. At the end of a task, always check your work to see if you missed opportunities to use `let` chains or `let` guards.
 - If you _have_ to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible. But if a lint is complaining about unused/dead code, it's usually best to just delete the unused code.
 - Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way. Make sure that a comment will make sense to somebody who's reading the code for the first time. Prefer plain language, avoid jargon, and don't be afraid to be more verbose if it's necessary to explain something well. Giving examples of the kind of Python code we're trying to model at this particular point in Ruff or ty can often be very helpful for future readers of the code.
