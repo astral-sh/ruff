@@ -1602,21 +1602,15 @@ fn ascii_identifier_prefix_len(bytes: &[u8]) -> usize {
 ///
 /// Multiplying a packed keyword by `KEYWORD_HASH_MULTIPLIER` and taking the high six
 /// bits gives each keyword a distinct slot in the 64-entry table. This is a perfect
-/// hash for the keywords only; other identifiers can collide and need a full-word
-/// comparison.
+/// hash for the keywords. Other identifiers can collide and need a full-word comparison.
 ///
 /// `phf::Map` uses `SipHash` and a displacement table to find each candidate's slot.
 /// With the same length and first-byte filters, `phf` 0.11.3 took 12–21% longer
 /// to lex the NumPy and Pydantic benchmark files on Apple Silicon.
 ///
-/// To add, remove, or rename a keyword, update `KEYWORDS` in the generator, then run:
-///
-/// ```text
-/// uv run scripts/generate_keyword_hash.py
-/// ```
-///
-/// Keywords must contain two to eight ASCII bytes; supporting other lengths
-/// requires changing the word representation and length filter.
+/// Edit `KEYWORDS` in the `keywords` module to change the keyword set. Rust finds
+/// the multiplier and builds the table at compile time. Keywords must contain
+/// two to eight ASCII bytes to fit the word representation and length filter.
 #[repr(align(64))]
 struct KeywordTable {
     words: [u64; 64],
@@ -1639,20 +1633,10 @@ impl KeywordTable {
         let mut words = [0; 64];
         let mut kinds = [TokenKind::Identifier; 64];
         while let Some((&(keyword, kind), rest)) = keywords.split_first() {
-            assert!(
-                keyword.len() >= 2 && keyword.len() <= 8 && keyword.is_ascii(),
-                "keywords must contain two to eight ASCII bytes"
-            );
+            let word = keywords::pack(keyword);
             starts[keyword.len() - 2] |= 1u64 << (keyword[0] & 63);
-            let mut bytes = [0; 8];
-            let (keyword_bytes, _) = bytes.split_at_mut(keyword.len());
-            keyword_bytes.copy_from_slice(keyword);
-            let word = u64::from_le_bytes(bytes) << ((8 - keyword.len()) * 8);
-            let slot = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
-            assert!(
-                words[slot] == 0,
-                "keyword hash collision: run `uv run scripts/generate_keyword_hash.py`"
-            );
+            let slot = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
+            assert!(words[slot] == 0, "keyword hash collision");
             words[slot] = word;
             kinds[slot] = kind;
             keywords = rest;
@@ -1688,7 +1672,7 @@ impl KeywordTable {
         // any bytes loaded from the source after the identifier.
         let word = ((continuation << 8) | u64::from(u32::from(first))) << ((8 - len) * 8);
 
-        let index = (word.wrapping_mul(KEYWORD_HASH_MULTIPLIER) >> 58) as usize;
+        let index = keywords::slot(word, KEYWORD_HASH_MULTIPLIER);
         if word == self.words[index] {
             self.kinds[index]
         } else {
