@@ -61,11 +61,18 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+mdtest = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "testing"] }
 ruff_python_trivia = { workspace = true }
+ty_project = { path = ".", default-features = false, features = ["testing"] }
 
+datatest-stable = { workspace = true }
 insta = { workspace = true, features = ["redactions", "ron"] }
 tempfile = { workspace = true }
+
+[[test]]
+name = "mdtest"
+harness = false
 
 [features]
 default = ["zstd"]

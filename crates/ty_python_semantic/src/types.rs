@@ -84,9 +84,10 @@ use crate::types::diagnostic::{
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 pub(crate) use crate::types::equality::{ComparisonSoundnessPolicy, equality_truthiness};
+pub(crate) use crate::types::function::KnownFunction;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction, OverloadLiteral,
+    FunctionType, OverloadLiteral,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{ApplySpecialization, Specialization, bind_typevar};
@@ -193,7 +194,11 @@ pub(crate) mod definition_resolution;
 mod property_tests;
 mod subscript;
 
-pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
+pub fn check_types(
+    db: &dyn Db,
+    file: ProgramFile<'_>,
+    extra_diagnostics: &[Diagnostic],
+) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();
     tracing::debug!("Checking file '{path}'", path = source_file.path(db));
@@ -262,7 +267,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .map(|error| Diagnostic::invalid_syntax(source_file, error, error)),
     );
 
-    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics);
+    let diagnostics = check_suppressions(db, file.python_file(db), diagnostics, extra_diagnostics);
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {
