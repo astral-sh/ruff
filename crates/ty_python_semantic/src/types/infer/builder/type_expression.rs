@@ -2359,6 +2359,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     subscript,
                     AnnotatedExprContext::TypeExpression,
                 )
+                .annotation_ty
                 .inner_type()
                 .in_type_expression(db, self.scope(), None, self.inference_flags())
                 .unwrap_or_else(|err| {

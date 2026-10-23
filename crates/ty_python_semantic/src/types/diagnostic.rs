@@ -155,6 +155,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
+    registry.register_lint(&UNTYPED_FINAL_FIELD);
     registry.register_lint(&ABSTRACT_AND_FINAL_METHOD);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
@@ -1048,6 +1049,15 @@ declare_lint! {
     pub(crate) static FINAL_WITHOUT_VALUE = {
         summary: "detects `Final` declarations without a value",
         status: LintStatus::stable("0.0.15"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/untyped-final-field.md")]
+    pub(crate) static UNTYPED_FINAL_FIELD = {
+        summary: "detects final dataclass fields whose types cannot be inferred",
+        status: LintStatus::stable("0.0.91"),
         default_level: Level::Error,
     }
 }

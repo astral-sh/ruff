@@ -99,6 +99,7 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
+use crate::types::infer::builder::annotation_expression::AnnotationExpressionInference;
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -381,6 +382,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// is a stub file but we're still in a non-deferred region.
     deferred_state: DeferredExpressionState,
 
+    /// The bare `Final` range for the annotated assignment being inferred, if any.
+    bare_final_annotation: Option<TextRange>,
+
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
@@ -512,6 +516,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             implicit_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
+            bare_final_annotation: None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
@@ -4581,18 +4586,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_annotated_assignment_annotation(
         &mut self,
         assignment: &AnnotatedAssignmentDefinitionKind,
-    ) -> TypeAndQualifiers<'db> {
+    ) -> AnnotationExpressionInference<'db> {
         let annotation = assignment.annotation(self.module());
 
         // Pydantic supports field specifiers in annotations via `Annotated[T, Field(...)]`.
         self.setup_dataclass_field_specifiers();
-        let declared = self.infer_annotation_expression_allow_pep_613(
+        let inferred = self.infer_annotation_expression_allow_pep_613(
             annotation,
             DeferredExpressionState::from(self.defer_annotations()),
         );
         self.dataclass_field_specifiers.clear();
 
-        declared
+        inferred
     }
 
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
@@ -4602,8 +4607,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &AnnotatedAssignmentDefinitionKind,
         cycle_recovery: Type<'db>,
     ) -> DefinitionInference<'db> {
-        let declared = self.infer_annotated_assignment_annotation(assignment);
-        self.declarations.insert(definition, declared);
+        let inferred = self.infer_annotated_assignment_annotation(assignment);
+        self.bare_final_annotation = inferred.bare_final_annotation;
+        self.declarations.insert(definition, inferred.annotation_ty);
         self.cycle_recovery = Some(cycle_recovery);
         self.finish_inferred_definition(definition)
     }
@@ -4657,7 +4663,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotation = assignment.annotation(self.module());
-        let mut declared = self.infer_annotated_assignment_annotation(assignment);
+        let inferred = self.infer_annotated_assignment_annotation(assignment);
+        self.bare_final_annotation = inferred.bare_final_annotation;
+        let mut declared = inferred.annotation_ty;
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
@@ -12090,6 +12098,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
+            bare_final_annotation: _,
 
             // builder only state
             expression_cache: _,
@@ -12156,6 +12165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
+            bare_final_annotation: _,
 
             // builder only state
             expression_cache: _,
@@ -12276,6 +12286,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             discards_dict_key_assignments: _,
             typevar_binding_context: _,
             deferred_state: _,
+            bare_final_annotation: _,
             index: _,
             region: _,
             cycle_recovery: _,
@@ -12326,6 +12337,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_decorator_calls,
             discards_dict_key_assignments,
             called_functions,
+            bare_final_annotation,
 
             // builder only state
             expression_cache: _,
@@ -12353,6 +12365,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(!deferred_decorator_calls.is_empty())
             + usize::from(!diagnostics.is_empty())
             + usize::from(discards_dict_key_assignments)
+            + usize::from(bare_final_annotation.is_some())
             + usize::from(!qualifiers.is_empty());
 
         let extra = match (non_undecorated_extra_field_count, undecorated_type) {
@@ -12413,6 +12426,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     undecorated_type,
                     deferred_decorator_calls: deferred_decorator_calls.into_iter().collect(),
                     discards_dict_key_assignments,
+                    bare_final_annotation,
                     qualifiers: FrozenMap::from(qualifiers),
                 };
                 Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))))
@@ -12525,6 +12539,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
+            bare_final_annotation: _,
 
             // Builder only state
             expression_cache: _,
@@ -12595,6 +12610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // These fields are type inference results, but do not affect the inference of a given
             // expression.
+            bare_final_annotation: _,
             implicit_aliases: _,
             context: _,
             collection_use_constraints: _,
@@ -12677,6 +12693,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             deferred_decorator_calls: _,
             discards_dict_key_assignments: _,
+            bare_final_annotation: _,
 
             // builder only state
             expression_cache: _,

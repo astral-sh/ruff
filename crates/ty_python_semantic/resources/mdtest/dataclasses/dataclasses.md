@@ -1895,6 +1895,177 @@ c = C(1)
 c.instance_variable = 2
 ```
 
+## Bare `Final` fields
+
+A field annotated with bare `Final` takes its type from the default value. The generated constructor
+accepts only values compatible with that inferred type.
+
+```py
+from dataclasses import dataclass
+from typing import Annotated, Final
+
+@dataclass
+class C:
+    value: Final = 3
+
+reveal_type(C.__init__)  # revealed: (self: C, value: Literal[3] = 3) -> None
+reveal_type(C().value)  # revealed: Literal[3]
+C(3)  # no diagnostic
+C(4)  # error: [invalid-argument-type]
+C().value = 3  # error: [invalid-assignment]
+
+def from_int(value: int):
+    C(value)  # error: [invalid-argument-type]
+
+@dataclass
+class Child(C): ...
+
+Child(3)  # no diagnostic
+Child(4)  # error: [invalid-argument-type]
+reveal_type(Child().value)  # revealed: Literal[3]
+```
+
+The default can also be assigned separately in the class body.
+
+```py
+@dataclass
+class Separate:
+    value: Final  # no diagnostic
+    value = 3
+
+reveal_type(Separate.__init__)  # revealed: (self: Separate, value: Literal[3] = 3) -> None
+Separate(4)  # error: [invalid-argument-type]
+```
+
+Wrapping `Final` in `Annotated` or a string annotation preserves this inference.
+
+```py
+@dataclass
+class Wrapped:
+    annotated: Annotated[Final, "metadata"] = 3
+    quoted: "Final" = 3
+    quoted_annotated: "Annotated[Final, 'metadata']" = 3
+
+reveal_type(Wrapped().annotated)  # revealed: Literal[3]
+reveal_type(Wrapped().quoted)  # revealed: Literal[3]
+reveal_type(Wrapped().quoted_annotated)  # revealed: Literal[3]
+Wrapped(annotated=4)  # error: [invalid-argument-type]
+Wrapped(quoted=4)  # error: [invalid-argument-type]
+```
+
+An explicit unknown type argument does not infer the field's type from its default.
+
+```py
+from ty_extensions._internal import Unknown
+
+@dataclass
+class Explicit:
+    value: Final[Unknown] = 3
+
+reveal_type(Explicit.__init__)  # revealed: (self: Explicit, value: Unknown = 3) -> None
+Explicit(4)  # no diagnostic
+```
+
+## Bare `Final` fields with field specifiers
+
+With a field specifier, the inferred type comes from the default value or factory result. The field
+specifier itself is not the type of the instance attribute.
+
+```py
+from dataclasses import dataclass, field
+from typing import Final
+
+@dataclass
+class C:
+    value: Final = field(default=3)
+    factory: Final = field(default_factory=int)
+    excluded: Final = field(default=3, init=False)
+
+reveal_type(C().value)  # revealed: Literal[3]
+reveal_type(C().factory)  # revealed: int
+reveal_type(C().excluded)  # revealed: Literal[3]
+C(3, 5)  # no diagnostic
+C(4, 5)  # error: [invalid-argument-type]
+C(3, "wrong")  # error: [invalid-argument-type]
+```
+
+## Bare `Final` fields without defaults
+
+A final dataclass field needs an explicit type argument when no default supplies its type. The
+generated constructor cannot infer the field's type from its callers.
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class C:
+    # snapshot: untyped-final-field
+    value: Final
+    explicit: Final[int]  # no diagnostic
+```
+
+```snapshot
+error[untyped-final-field]: Cannot infer the type of final field `value`
+ --> src/mdtest_snippet.py:7:12
+  |
+7 |     value: Final
+  |            ^^^^^
+help: Add a type argument to `Final` or provide a default value
+```
+
+The field still needs a type argument when the dataclass uses an explicit `__init__`.
+
+```py
+@dataclass(init=False)
+class CustomInit:
+    value: Final  # error: [untyped-final-field]
+
+    def __init__(self):
+        self.value = 3
+```
+
+Attributes declared inside `__init__` can still infer their type from a subsequent assignment.
+
+```py
+@dataclass
+class InInit:
+    def __init__(self):
+        self.value: Final  # no diagnostic
+        self.value = 3
+
+reveal_type(InInit().value)  # revealed: int
+```
+
+Calling `field()` without a default or factory does not supply a value from which to infer a type.
+These fields also require an explicit type argument.
+
+```py
+from dataclasses import field
+from typing import Annotated, ClassVar
+from ty_extensions._internal import Unknown
+
+@dataclass
+class Specifiers:
+    value: Final = field()  # error: [untyped-final-field] "Cannot infer the type of final field `value`"
+    annotated: Annotated[Final, "metadata"] = field()  # error: [untyped-final-field]
+    quoted: "Final" = field()  # error: [untyped-final-field]
+    quoted_annotated: "Annotated[Final, 'metadata']" = field()  # error: [untyped-final-field]
+    excluded: Final = field(init=False)  # error: [untyped-final-field]
+    explicit: Final[int] = field()  # no diagnostic
+    unknown: Final[Unknown] = field()  # no diagnostic
+    class_variable: ClassVar[Final] = field()  # no diagnostic
+```
+
+Outside dataclass fields, `field()` is an ordinary value and can initialize a bare `Final`.
+
+```py
+regular: Final = field()  # no diagnostic
+
+class Ordinary:
+    value: Final = field()  # no diagnostic
+```
+
 ## Inheritance
 
 ### Normal class inheriting from a dataclass

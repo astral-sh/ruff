@@ -1493,6 +1493,9 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    /// The bare `Final` in an annotated assignment, including through annotation wrappers.
+    bare_final_annotation: Option<TextRange>,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
@@ -1836,6 +1839,14 @@ impl<'db> DefinitionInference<'db> {
                 .copied()
                 .unwrap_or_default(),
             Some(_) | None => TypeExpressionFlags::default(),
+        }
+    }
+
+    /// Return the bare `Final` range for an annotated assignment, if any.
+    pub(crate) fn bare_final_annotation(&self) -> Option<TextRange> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.bare_final_annotation,
+            Some(_) | None => None,
         }
     }
 
