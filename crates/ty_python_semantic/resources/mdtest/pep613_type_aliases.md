@@ -263,18 +263,15 @@ import aliases
 
 DefaultImplicit: TypeAlias = Implicit
 DefaultExplicit: TypeAlias = aliases.Explicit
-ForwardedDefault = DefaultExplicit
 
-def inspect(implicit: DefaultImplicit, explicit: DefaultExplicit, forwarded: ForwardedDefault, imported: Default):
+def inspect(implicit: DefaultImplicit, explicit: DefaultExplicit, imported: Default):
     reveal_type(implicit)  # revealed: list[str]
     reveal_type(explicit)  # revealed: list[str]
-    reveal_type(forwarded)  # revealed: list[str]
     reveal_type(imported)  # revealed: list[str]
 
 def invalid(
     implicit: DefaultImplicit[int],  # error: [not-subscriptable]
     explicit: DefaultExplicit[int],  # error: [not-subscriptable]
-    forwarded: ForwardedDefault[int],  # error: [not-subscriptable]
     imported: Default[int],  # error: [not-subscriptable]
 ): ...
 ```

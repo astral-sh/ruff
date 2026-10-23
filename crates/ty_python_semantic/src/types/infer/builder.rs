@@ -155,7 +155,7 @@ use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
-    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
+    ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness, semantic_index,
     unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
@@ -491,6 +491,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// This is a fairly arbitrary number. It should be *far* more than enough
     /// for most use cases, but we can reevaluate it later if useful.
     pub(super) const MAX_STRING_LITERAL_SIZE: usize = 4096;
+
+    pub(super) fn for_definition(
+        db: &'db dyn Db,
+        env: &'ast ProgramEnvironment<'db>,
+        definition: Definition<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
+        let program_file = definition.program_file(db);
+        Self::new(
+            db,
+            env,
+            InferenceRegion::Definition(definition),
+            program_file.file(db),
+            program_file,
+            semantic_index(db, program_file),
+            module,
+        )
+    }
 
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
@@ -12860,25 +12878,13 @@ impl<'db> FullExpressionCacheEntry<'db> {
     }
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
-        self.implicit_aliases.is_empty()
-            && self.expressions.len() == 1
+        self.expressions.len() == 1
             && self.expressions.get(&expression) == Some(&ty)
-            && self.comparison_truthiness.is_empty()
-            && self.type_expression_flags.is_empty()
-            && self.collection_use_constraints.is_empty()
-            && self.string_annotations.is_empty()
-            && self.expected_types.is_empty()
-            && self.bindings.is_empty()
-            && self.context.is_empty()
-            && self.called_functions.is_empty()
-            && self.cycle_recovery.is_none()
+            && !self.has_extra()
     }
 
-    fn into_expression_inference(
-        mut self,
-        region: InferenceRegion<'db>,
-    ) -> ExpressionInference<'db> {
-        let extra = (!self.implicit_aliases.is_empty()
+    fn has_extra(&self) -> bool {
+        !self.implicit_aliases.is_empty()
             || !self.string_annotations.is_empty()
             || !self.comparison_truthiness.is_empty()
             || !self.type_expression_flags.is_empty()
@@ -12887,8 +12893,14 @@ impl<'db> FullExpressionCacheEntry<'db> {
             || self.cycle_recovery.is_some()
             || !self.bindings.is_empty()
             || !self.called_functions.is_empty()
-            || !self.context.is_empty())
-        .then(|| {
+            || !self.context.is_empty()
+    }
+
+    fn into_expression_inference(
+        mut self,
+        region: InferenceRegion<'db>,
+    ) -> ExpressionInference<'db> {
+        let extra = self.has_extra().then(|| {
             if self.bindings.len() > 20 {
                 tracing::debug!(
                     "Inferred expression region `{:?}` contains {} bindings. \

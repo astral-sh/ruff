@@ -265,13 +265,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let env = self.program_environment();
         match self.implicit_alias_reference(ty, definition, annotation) {
             ImplicitAliasReference::Alias(alias, parameters) => {
-                let result = match parameters {
-                    Some(parameters) => {
-                        alias.apply_specialization(db, parameters.default_specialization(db, None))
-                    }
-                    None => alias,
-                };
-                return self.check_type_variable_scope(annotation, result);
+                let specialization =
+                    parameters.map(|params| params.default_specialization(db, None));
+                let ty = alias.apply_optional_specialization(db, specialization);
+                return self.check_type_variable_scope(annotation, ty);
             }
             ImplicitAliasReference::Invalid => return Type::unknown(),
             ImplicitAliasReference::ValueFallback => {}
@@ -289,9 +286,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.inference_flags(),
         );
         // Do not add alias diagnostics when value-to-type conversion is still incomplete.
-        if result
-            .as_ref()
-            .is_ok_and(|result| !matches!(result, Type::Dynamic(DynamicType::Todo(_))))
+        if result.as_ref().is_ok_and(|result| !result.is_todo())
             && self.reject_non_alias_reference(ty, definition, annotation)
         {
             return Type::unknown();
@@ -1357,12 +1352,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 alias,
                 parameters,
                 &|arguments| {
-                    parameters.map_or(alias, |parameters| {
-                        alias.apply_specialization(
-                            db,
-                            parameters.specialize_partial(db, arguments.iter().copied()),
-                        )
-                    })
+                    let specialization = parameters
+                        .map(|params| params.specialize_partial(db, arguments.iter().copied()));
+                    alias.apply_optional_specialization(db, specialization)
                 },
             );
         }

@@ -140,18 +140,9 @@ pub(super) fn infer_implicit_alias_type<'db>(
             implicit_aliases: Box::default(),
         };
     };
-    let index = semantic_index(db, program_file);
     let env = ProgramEnvironment::from_file(program_file);
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .finish_implicit_alias_type(definition, value)
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_implicit_alias_type(definition, value)
 }
 
 /// The type and diagnostics inferred from an alias's right-hand side.
@@ -259,20 +250,9 @@ pub(crate) fn infer_definition_types<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, program_file);
-
     let env = ProgramEnvironment::from_file(program_file);
-
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .finish_definition(definition)
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .finish_definition(definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

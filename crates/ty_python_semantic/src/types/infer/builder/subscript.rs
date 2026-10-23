@@ -2428,19 +2428,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         subscript_context: AnnotatedExprContext,
     ) -> Option<TypeAndQualifiers<'db>> {
         let slice = &*subscript.slice;
-        let ast::Expr::Tuple(ast::ExprTuple {
-            elts: arguments, ..
-        }) = slice
-        else {
-            report_invalid_arguments_to_annotated(&self.context, subscript);
-            return Some(subscript_context.infer(self, slice));
+        let arguments = match slice {
+            ast::Expr::Tuple(tuple) => tuple.elts.as_slice(),
+            argument => std::slice::from_ref(argument),
         };
 
         if arguments.len() < 2 {
             report_invalid_arguments_to_annotated(&self.context, subscript);
         }
 
-        let Some(first_argument) = arguments.first() else {
+        let Some((first_argument, metadata)) = arguments.split_first() else {
             self.infer_expression(slice, TypeContext::default());
             return None;
         };
@@ -2449,7 +2446,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_TYPE_ALIAS, false);
-        for metadata_element in &arguments[1..] {
+        for metadata_element in metadata {
             self.infer_expression(metadata_element, TypeContext::default());
         }
         self.context

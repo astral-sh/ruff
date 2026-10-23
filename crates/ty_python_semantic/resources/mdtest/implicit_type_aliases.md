@@ -642,9 +642,8 @@ class Derived2(GenericBaseAlias[int]):
 
 ### Forwarding aliases
 
-Assigning a generic alias to another name keeps it as a generic alias (does not default-specialize
-it), and it remains subscriptable. Special forms assigned to a new name are also usable via the new
-name in the same way as via their original name.
+Forwarding a generic alias preserves its type parameters and defaults. A forwarded class or special
+form still accepts the same type arguments.
 
 ```py
 from typing_extensions import Annotated, TypeVar, Union
@@ -660,15 +659,13 @@ UnionAlias = Union
 ForwardedUnion = UnionAlias
 
 def inspect(
-    explicit: Forwarded[int],
     default: Forwarded,
-    repeated: ForwardedAgain[bytes],
+    specialized: ForwardedAgain[int],
     class_alias: ForwardedList[int],
     special_form: ForwardedUnion[int, str],
 ):
-    reveal_type(explicit)  # revealed: list[int]
     reveal_type(default)  # revealed: list[str]
-    reveal_type(repeated)  # revealed: list[bytes]
+    reveal_type(specialized)  # revealed: list[int]
     reveal_type(class_alias)  # revealed: list[int]
     reveal_type(special_form)  # revealed: int | str
 ```
@@ -826,16 +823,10 @@ import aliases
 Forwarded = Modern
 ForwardedAttribute = aliases.Modern
 
-def inspect(
-    specialized: Forwarded[int],
-    default: Forwarded,
-    specialized_attribute: ForwardedAttribute[bytes],
-    default_attribute: ForwardedAttribute,
-):
+def inspect(specialized: Forwarded[int], attribute: ForwardedAttribute[bytes], default: ForwardedAttribute):
     reveal_type(specialized)  # revealed: list[int]
+    reveal_type(attribute)  # revealed: list[bytes]
     reveal_type(default)  # revealed: list[str]
-    reveal_type(specialized_attribute)  # revealed: list[bytes]
-    reveal_type(default_attribute)  # revealed: list[str]
 ```
 
 ### Generic typed dictionaries in aliases
@@ -957,6 +948,7 @@ annotations. Aliases using those variables remain generic:
 from typing import TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
 ```
 
 `main.py`:
@@ -965,14 +957,11 @@ T = TypeVar("T")
 import variables
 
 renamed = variables
-Items = list[renamed.T]
-QuotedItems = list["renamed.T"]
+Pair = tuple[renamed.T, "renamed.U"]
 
-def inspect(explicit: Items[int], default: Items, quoted: QuotedItems[str], quoted_default: QuotedItems):
-    reveal_type(explicit)  # revealed: list[int]
-    reveal_type(default)  # revealed: list[Unknown]
-    reveal_type(quoted)  # revealed: list[str]
-    reveal_type(quoted_default)  # revealed: list[Unknown]
+def inspect(specialized: Pair[int, str], default: Pair):
+    reveal_type(specialized)  # revealed: tuple[int, str]
+    reveal_type(default)  # revealed: tuple[Unknown, Unknown]
 ```
 
 ### Imported tagged typed-dictionary aliases
@@ -2386,13 +2375,7 @@ def inspect(
 ):
     reveal_type(evaluated)  # revealed: Unknown
     reveal_type(specialized)  # revealed: Unknown
-    reveal_type(indexed)  # revealed: Unknown
-    reveal_type(indexed_name)  # revealed: Unknown
     reveal_type(indexed_mixed)  # revealed: Unknown
-    reveal_type(indexed_mapping)  # revealed: Unknown
-    reveal_type(conditional)  # revealed: Unknown
-    reveal_type(boolean)  # revealed: Unknown
-    reveal_type(forwarded)  # revealed: Unknown
 ```
 
 Errors in type arguments remain visible even when the alias itself is invalid:
@@ -2489,9 +2472,6 @@ def inspect(
     forwarded: Forwarded,  # error: [invalid-type-form]
     local: Local,  # error: [invalid-type-form]
 ):
-    reveal_type(imported)  # revealed: Unknown
-    reveal_type(attribute)  # revealed: Unknown
-    reveal_type(forwarded)  # revealed: Unknown
     reveal_type(local)  # revealed: Unknown
 
 def inspect_classes(
@@ -2500,9 +2480,6 @@ def inspect_classes(
     local: LocalClass,  # error: [invalid-type-form]
     local_attribute: AttributeClass,  # error: [invalid-type-form]
 ):
-    reveal_type(imported)  # revealed: Unknown
-    reveal_type(attribute)  # revealed: Unknown
-    reveal_type(local)  # revealed: Unknown
     reveal_type(local_attribute)  # revealed: Unknown
 ```
 

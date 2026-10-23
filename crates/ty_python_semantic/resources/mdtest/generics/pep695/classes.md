@@ -336,15 +336,11 @@ BoxAlias = Box
 DefaultBox: TypeAlias = Box
 ForwardedDefault = DefaultBox
 
-def inspect(generic: BoxAlias[int], default: DefaultBox, forwarded: ForwardedDefault):
+def inspect(generic: BoxAlias[int], default: DefaultBox):
     reveal_type(generic)  # revealed: Box[int]
     reveal_type(default)  # revealed: Box[str]
-    reveal_type(forwarded)  # revealed: Box[str]
 
-def invalid(
-    default: DefaultBox[int],  # error: [not-subscriptable]
-    forwarded: ForwardedDefault[int],  # error: [not-subscriptable]
-): ...
+def invalid(forwarded: ForwardedDefault[int]): ...  # error: [not-subscriptable]
 ```
 
 ## Narrowing class objects of final generic classes

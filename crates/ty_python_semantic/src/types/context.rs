@@ -239,9 +239,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(crate) fn extend(&mut self, other: &InferContextResult) {
-        if other.has_invalid_type_form {
-            self.mark_invalid_type_form();
-        }
+        *self.has_invalid_type_form.get_mut() |= other.has_invalid_type_form;
         self.diagnostics.get_mut().extend(&other.diagnostics);
     }
 
@@ -304,7 +302,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
-        if LintId::of(lint) == LintId::of(&INVALID_TYPE_FORM) {
+        let lint = LintId::of(lint);
+        if lint == LintId::of(&INVALID_TYPE_FORM) {
             self.mark_invalid_type_form();
         }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
@@ -661,11 +660,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
 
     fn new(
         ctx: &'ctx InferContext<'db, 'ctx>,
-        lint: &'static LintMetadata,
+        lint_id: LintId,
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
-        let lint_id = LintId::of(lint);
-
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
         let suppressions = suppressions(ctx.db(), ctx.python_file());

@@ -28,7 +28,6 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 
-use super::InferenceRegion;
 use super::builder::TypeInferenceBuilder;
 
 /// An eligible alias definition and its declaration style, independent of the defining AST.
@@ -97,17 +96,15 @@ pub(super) fn implicit_alias_definition<'db>(
     ) {
         return None;
     }
-    let is_explicit = match annotation {
-        Some(annotation)
-            if crate::types::definition_expression_type(db, definition, annotation)
-                .is_typealias_special_form() =>
-        {
-            true
-        }
-        None => false,
-        _ => return None,
-    };
-    if !is_explicit && matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+    if let Some(annotation) = annotation {
+        return crate::types::definition_expression_type(db, definition, annotation)
+            .is_typealias_special_form()
+            .then_some(ImplicitAliasDefinition {
+                definition,
+                is_explicit: true,
+            });
+    }
+    if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
         // For `Items = list[T]; Forwarded = Items`, reuse Items's definition, including
         // its parameters and recursive identity. Do this before inspecting its value:
         // `A: TypeAlias = list; B = A` must retain A's default specialization even though
@@ -130,16 +127,9 @@ pub(super) fn implicit_alias_definition<'db>(
             return Some(alias);
         }
         let env = ProgramEnvironment::from_definition(definition);
-        let (value_ty, target) = TypeInferenceBuilder::new(
-            db,
-            &env,
-            InferenceRegion::Definition(definition),
-            definition.file(db),
-            definition.program_file(db),
-            semantic_index(db, definition.program_file(db)),
-            &module,
-        )
-        .finish_implicit_alias_reference(definition, value);
+        let (value_ty, target) =
+            TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+                .finish_implicit_alias_reference(definition, value);
         if let Some(alias) = target.and_then(resolve_alias) {
             return Some(alias);
         }
@@ -163,7 +153,7 @@ pub(super) fn implicit_alias_definition<'db>(
     }
     Some(ImplicitAliasDefinition {
         definition,
-        is_explicit,
+        is_explicit: false,
     })
 }
 
@@ -283,15 +273,14 @@ fn forwarding_alias_definition<'db>(
     definition: Definition<'db>,
     value: &ast::Expr,
 ) -> Option<Definition<'db>> {
+    let env = ProgramEnvironment::from_definition(definition);
     let name = match value {
         ast::Expr::Name(name) if name.ctx.is_load() => name,
         ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
-            let env = ProgramEnvironment::from_definition(definition);
             let receiver =
                 crate::types::definition_expression_type(db, definition, &attribute.value);
-            let member = receiver.member(db, &env, &attribute.attr);
-            return match member.place {
-                Place::Defined(place) if member.place.is_definitely_bound() => {
+            return match receiver.member(db, &env, &attribute.attr).place {
+                Place::Defined(place) if place.is_definitely_defined() => {
                     place.provenance.definition()
                 }
                 _ => None,
@@ -299,53 +288,46 @@ fn forwarding_alias_definition<'db>(
         }
         _ => return None,
     };
-    let index = semantic_index(db, definition.program_file(db));
+    let file = definition.program_file(db);
+    let index = semantic_index(db, file);
     let mode = if definition.file(db).is_stub(db) {
         PlaceLoadMode::Deferred
     } else {
         PlaceLoadMode::AtExpression(name.into())
     };
-    let resolution = resolve_place_load(
+    let mut resolution = resolve_place_load(
         db,
         index,
-        index
-            .expression_scope_id(value)
-            .to_scope_id(db, definition.program_file(db)),
+        index.expression_scope_id(value).to_scope_id(db, file),
         PlaceExpr::from_expr_name(name),
         mode,
     );
-    for step in resolution {
-        let PlaceLoadResolutionStep::Source(source) = step else {
-            return None;
-        };
-        let (bindings, owning_place) = match source.kind {
+    let from_owning_scope = |scope, id| {
+        let use_def = use_def_map(db, scope);
+        (
+            use_def.reachable_bindings(id),
+            Some(use_def.reachable_declarations(id)),
+        )
+    };
+    while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+        let (bindings, declarations) = match source.kind {
             PlaceLoadSourceKind::Bindings(bindings) => (bindings, None),
-            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => (
-                use_def_map(db, scope).reachable_bindings(id),
-                Some((scope, id)),
-            ),
+            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                from_owning_scope(scope, id)
+            }
             PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
                 file,
                 name,
             }) => {
                 let scope = global_scope(db, file);
                 let id = place_table(db, scope).symbol_id(&name)?;
-                (
-                    use_def_map(db, scope).reachable_symbol_bindings(id),
-                    Some((scope, id.into())),
-                )
+                from_owning_scope(scope, id.into())
             }
-            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name)) => {
-                if class_body_implicit_symbol(
-                    db,
-                    &ProgramEnvironment::from_definition(definition),
-                    &name,
-                )
-                .place
-                .is_definitely_bound()
-                {
-                    return None;
-                }
+            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name))
+                if !class_body_implicit_symbol(db, &env, &name)
+                    .place
+                    .is_definitely_bound() =>
+            {
                 continue;
             }
             PlaceLoadSourceKind::Implicit(_) => return None,
@@ -353,22 +335,13 @@ fn forwarding_alias_definition<'db>(
         let Some(target) = unique_forwarding_target(db, bindings).ok()? else {
             continue;
         };
-        let target_use_def = use_def_map(db, target.scope(db));
-        let mut declarations = if let Some((scope, id)) = owning_place {
-            use_def_map(db, scope).reachable_declarations(id)
-        } else {
-            target_use_def.declarations_at_binding(target)
-        };
+        let declarations = declarations
+            .unwrap_or_else(|| use_def_map(db, target.scope(db)).declarations_at_binding(target));
         // A separate annotation can determine the loaded type instead of the assignment value.
-        if declarations.any(|declaration| {
-            declaration
-                .declaration
-                .definition()
-                .is_some_and(|declaration| declaration != target)
-        }) {
-            return None;
-        }
-        return Some(target);
+        return declarations
+            .filter_map(|declaration| declaration.declaration.definition())
+            .all(|declaration| declaration == target)
+            .then_some(target);
     }
     None
 }

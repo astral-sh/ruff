@@ -1580,31 +1580,20 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
     )?;
     let main = system_path_to_file(&db, "/src/main.py")?;
 
-    for (source, expected, should_run) in [
-        (
-            "Alias = list[int]\ndef unrelated(): return 1",
-            "list[int]",
-            true,
-        ),
+    for (alias, unrelated, should_run) in [
+        ("list[int]", 1, true),
         // The alias's meaning is unchanged by edits elsewhere in its defining module.
-        (
-            "Alias = list[int]\ndef unrelated(): return 2",
-            "list[int]",
-            false,
-        ),
-        (
-            "Alias = list[str]\ndef unrelated(): return 2",
-            "list[str]",
-            true,
-        ),
+        ("list[int]", 2, false),
+        ("list[str]", 2, true),
     ] {
+        let source = format!("Alias = {alias}\ndef unrelated(): return {unrelated}");
         db.write_file("/src/aliases.py", source)?;
         db.clear_salsa_events();
 
         let value = global_symbol(&db, main, "value").place.expect_type();
         assert_eq!(
             value.display(&db, &db.program_environment()).to_string(),
-            expected
+            alias
         );
 
         let events = db.take_salsa_events();
