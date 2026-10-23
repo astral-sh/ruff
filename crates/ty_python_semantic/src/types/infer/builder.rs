@@ -5928,15 +5928,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .filter_map(|(index, is_generic)| is_generic.then_some(index))
             .collect();
 
-        // Enable the expression cache if we are going to perform multi-inference.
-        let teardown_expression_cache = if !generic_arguments.is_empty()
-            || requires_overload_evaluation(&overload_candidates)
-        {
-            self.setup_expression_cache()
-        } else {
-            false
-        };
-
         // Infer independently against each member of a union type context.
         let narrow_targets = call_expression_tcx
             .narrow_targets(db, env)
@@ -5944,6 +5935,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // context has no effect.
             .filter(|_| has_generic_context)
             .unwrap_or_default();
+
+        // Enable the expression cache if we are going to perform multi-inference.
+        let teardown_expression_cache = if !generic_arguments.is_empty()
+            || requires_overload_evaluation(&overload_candidates)
+            || narrow_targets.len() > 1
+        {
+            self.setup_expression_cache()
+        } else {
+            false
+        };
 
         let mut try_narrow = |narrowed_ty: Type<'db>| {
             // Short-circuit if there is no overload with a matching return type.
