@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_os_path_samefile_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
+    check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr, is_file_descriptor,
 };
 use crate::{FixAvailability, Violation};
 
@@ -68,6 +68,20 @@ impl Violation for OsPathSamefile {
 /// PTH121
 pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&str]) {
     if segments != ["os", "path", "samefile"] {
+        return;
+    }
+
+    // `os.path.samefile` delegates to `os.stat` for both arguments, so either one may be a
+    // file descriptor, which `pathlib` doesn't support.
+    if call
+        .arguments
+        .find_argument_value("f1", 0)
+        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+        || call
+            .arguments
+            .find_argument_value("f2", 1)
+            .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+    {
         return;
     }
 
