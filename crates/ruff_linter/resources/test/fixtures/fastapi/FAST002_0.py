@@ -97,3 +97,13 @@ def do_stuff(
     some_header_param: Annotated[int, Header()] = 5,
 ):
     pass
+
+
+# Fixes sharing the same import edit, reordered by a `noqa` (#22159)
+
+@app.get("/test4")
+def handler4(x: str = Depends(get_x)): ...  # noqa: FAST002
+
+
+@app.get("/test5")
+def handler5(d: str = Depends(get_one), e: str = Depends(get_two)): ...
