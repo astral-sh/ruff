@@ -5,6 +5,8 @@ description: Use when a user says "summarise ecosystem results", "summarize this
 
 # Summarise Ecosystem Results
 
+Follow the [repro isolation requirements](../../references/repro-isolation.md) before preparing binaries or running third-party projects. Apply them to the primary agent's builds and to each worker's reproduction. Report any affected entries as incomplete if they cannot be reproduced safely.
+
 ## Priorities
 
 1. **Produce a readable document that pulls out common themes and patterns across the ecosystem.** Explain what changed, why it changed, and which recurring code patterns account for the effects. But don't be too verbose in your prose: show the changes through examples, and keep prose descriptions of these examples reasonably concise. Exhaustive reproduction, minimized examples, and complete entry inventories provide the evidence for your synthesis.
