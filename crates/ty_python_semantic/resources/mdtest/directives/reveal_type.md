@@ -447,3 +447,13 @@ if False:
 if 1 + 1 != 2:
     reveal_type(1)  # revealed: Literal[1]
 ```
+
+## Raw argument type with multiple matching contexts
+
+```py
+from typing import Callable, Unpack, reveal_type
+
+def f(callback: Callable[[Unpack[tuple[object, object]]], None]) -> None:
+    # revealed: (*tuple[object, object]) -> None
+    result: Callable[[int, str], None] | Callable[[str, int], None] = reveal_type(callback)
+```

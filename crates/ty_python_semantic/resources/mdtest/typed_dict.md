@@ -1116,6 +1116,45 @@ def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
 takes_td_or_iterable({42: 42})
 ```
 
+## Diagnostics for a union of `TypedDict` types
+
+When only one `TypedDict` matches, its field annotations supply context for the dictionary values:
+
+```py
+from collections.abc import Callable
+from typing import TypedDict, reveal_type
+
+class IntCallback(TypedDict):
+    callback: Callable[[int], object]
+
+class Other(TypedDict):
+    value: int
+
+# error: [unresolved-attribute]
+single: IntCallback | Other = {"callback": lambda value: reveal_type(value).upper()}  # revealed: int
+```
+
+When multiple `TypedDict` types match, their field annotations can disagree. Diagnostics and stored
+expression types use inference without type context:
+
+```py
+class StrCallback(TypedDict):
+    callback: Callable[[str], object]
+
+both: IntCallback | StrCallback = {"callback": lambda value: reveal_type(value)}  # revealed: Unknown
+reveal_type(both)  # revealed: IntCallback | StrCallback
+
+# error: [unresolved-reference] "Name `missing` used when not defined"
+invalid: IntCallback | StrCallback = {"callback": missing}
+```
+
+A compatible dictionary alternative also permits values that would produce errors under the
+`TypedDict` field's context:
+
+```py
+fallback: IntCallback | dict[str, object] = {"callback": lambda value: value.upper()}  # no diagnostic
+```
+
 ## Union of `TypedDict` behind a type alias
 
 ```toml

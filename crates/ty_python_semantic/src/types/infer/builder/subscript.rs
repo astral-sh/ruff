@@ -1675,7 +1675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
                 .place
             {
-                let mut identity_bindings = dunder_callable
+                let identity_bindings = dunder_callable
                     .bindings(db, env)
                     .match_parameters(db, env, &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
@@ -1695,11 +1695,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // for simplicity.
                             builder.infer_maybe_standalone_expression(expr, tcx)
                         },
-                        &mut identity_bindings,
+                        identity_bindings,
                         TypeContext::default(),
                     );
 
-                if call_result.is_ok() && boundness == Definedness::AlwaysDefined {
+                if let Ok(inferred) = call_result
+                    && boundness == Definedness::AlwaysDefined
+                {
+                    let identity_bindings = inferred.into_bindings();
                     for call_specialization in identity_bindings
                         .iter_flat()
                         .flat_map(CallableBinding::matching_overloads)

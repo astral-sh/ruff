@@ -63,6 +63,38 @@ reveal_type(f(True))  # revealed: Literal[True]
 reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
+## Multiple matching contexts for generic calls
+
+A generic call retains every compatible specialization, regardless of the order of the union:
+
+```py
+from typing import TypeVar, assert_type, reveal_type
+
+T = TypeVar("T")
+
+def singleton(value: T) -> list[T]:
+    return [value]
+
+x1: list[int | str] | list[int | None] = singleton(1)
+reveal_type(x1)  # revealed: list[int | str] | list[int | None]
+
+x2: list[int | None] | list[int | str] = singleton(1)
+reveal_type(x2)  # revealed: list[int | None] | list[int | str]
+```
+
+Type observations preserve the context supplied to the call and report once:
+
+```py
+# revealed: list[int | str] | list[int | None]
+x3: list[int | str] | list[int | None] = reveal_type(singleton(1))
+
+# error: [type-assertion-failure]
+x4: list[int | str] | list[int | None] = assert_type(singleton(1), list[int])
+
+# no diagnostic
+x5: list[int | str] | list[int | None] = assert_type(singleton(1), list[int | None] | list[int | str])
+```
+
 ## Inferring “deep” generic parameter types
 
 The matching up of call arguments and discovery of constraints on typevars can be a recursive

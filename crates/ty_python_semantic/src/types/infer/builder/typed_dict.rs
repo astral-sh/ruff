@@ -6,6 +6,7 @@ use strum::IntoEnumIterator;
 
 use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
+use crate::types::call::CallError;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
@@ -435,7 +436,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             callable_type
         };
-        let mut bindings =
+        let bindings =
             self.bindings_for_call(binding_callable)
                 .match_parameters(db, env, &call_arguments);
 
@@ -454,38 +455,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     builder.get_or_infer_expression(expr, tcx)
                 }
             },
-            &mut bindings,
+            bindings,
             call_expression_tcx,
         );
 
-        if result.is_err() {
-            if can_infer
-                && arguments.keywords.iter().any(|keyword| {
-                    keyword
-                        .arg
-                        .as_ref()
-                        .and_then(|name| typed_dict.item(db, name.id.as_str()))
-                        .is_some_and(|field| {
-                            !self.expression_type(&keyword.value).is_assignable_to(
-                                db,
-                                env,
-                                field.declared_ty,
-                            )
-                        })
-                })
-            {
-                validate_typed_dict_constructor(
-                    &self.context,
-                    typed_dict,
-                    arguments,
-                    error_node,
-                    |expr, _| self.expression_type(expr),
-                );
-                return fallback_ty;
-            }
+        let bindings = match result {
+            Ok(inferred) => inferred.into_bindings(),
+            Err(CallError(_, bindings)) => {
+                if can_infer
+                    && arguments.keywords.iter().any(|keyword| {
+                        keyword
+                            .arg
+                            .as_ref()
+                            .and_then(|name| typed_dict.item(db, name.id.as_str()))
+                            .is_some_and(|field| {
+                                !self.expression_type(&keyword.value).is_assignable_to(
+                                    db,
+                                    env,
+                                    field.declared_ty,
+                                )
+                            })
+                    })
+                {
+                    validate_typed_dict_constructor(
+                        &self.context,
+                        typed_dict,
+                        arguments,
+                        error_node,
+                        |expr, _| self.expression_type(expr),
+                    );
+                    return fallback_ty;
+                }
 
-            bindings.report_diagnostics(&self.context, call_expression.into());
-        }
+                bindings.report_diagnostics(&self.context, call_expression.into());
+                *bindings
+            }
+        };
 
         bindings.return_type(db, env)
     }
