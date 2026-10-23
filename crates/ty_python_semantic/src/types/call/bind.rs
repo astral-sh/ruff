@@ -8628,15 +8628,24 @@ impl<'db> Binding<'db> {
                     .filter(|ty| !ty.has_provisional_marker(db, env))
                     .map(|ty| {
                         let promoted = ty.promote(db, env);
+                        let Some(bound) = typevar.typevar(db).upper_bound(db, env) else {
+                            return promoted;
+                        };
+                        let bound =
+                            bound.apply_optional_specialization(db, argument_specialization);
+
                         // Context for other arguments must still satisfy the type variable's
                         // bound. For example, `Literal["a"]` satisfies `LiteralString`, but
                         // promoting it to `str` would violate that bound.
-                        if let Some(bound) = typevar.typevar(db).upper_bound(db, env)
-                            && !promoted.is_assignable_to(db, env, bound)
-                        {
+                        if promoted.is_assignable_to(db, env, bound) {
+                            promoted
+                        } else if ty.is_assignable_to(db, env, bound) {
                             ty
                         } else {
-                            promoted
+                            // TODO: Diagnostic recovery can sometimes solve a type variable to
+                            // a type incompatible with its bound, and so we avoid using an incompatible
+                            // inference as type context.
+                            bound
                         }
                     });
 

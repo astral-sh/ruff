@@ -447,3 +447,48 @@ if False:
 if 1 + 1 != 2:
     reveal_type(1)  # revealed: Literal[1]
 ```
+
+## Generic call narrowing
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When generic call narrowing produces multiple valid specializations of a call to `reveal_type`, the
+type revealed is the union of all inferred results.
+
+```py
+# revealed: list[int | str] | list[int | None]
+x: list[int | str] | list[int | None] = reveal_type(list((1,)))
+```
+
+The revealed type is the raw argument type, bypassing any simplification or expansion of the return
+type.
+
+```py
+from typing import Callable, Unpack
+
+def _(callback: Callable[[Unpack[tuple[object, object]]], None]):
+    # revealed: (*tuple[object, object]) -> None
+    result: Callable[[int, str], None] | Callable[[str, int], None] = reveal_type(callback)
+```
+
+Note that when nested inside an outer generic call that produces multiple valid specializations, the
+revealed type is the type of the inner expression when inferred without type context:
+
+```py
+from typing import assert_type
+from ty_extensions._internal import Unknown
+
+def identity[T](x: T) -> T:
+    return x
+
+# revealed: list[int]
+x: list[list[int | str]] | list[list[int | None]] = [reveal_type([1])]
+reveal_type(x)  # revealed: list[list[int | str]] | list[list[int | None]]
+
+# revealed: list[int]
+x: list[int | str] | list[int | None] = identity(reveal_type(list((1,))))
+reveal_type(x)  # revealed: list[int | str] | list[int | None]
+```
