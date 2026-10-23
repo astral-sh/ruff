@@ -1,7 +1,6 @@
 //! Definitions and type parameters of legacy type aliases. These include implicit aliases
 //! (`Alias = int`) and PEP 613 aliases (`Alias: TypeAlias = int`).
 
-use itertools::Itertools;
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
@@ -12,8 +11,8 @@ use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{
-    BindingWithConstraintsIterator, BoundnessAnalysis, global_scope, place_table, semantic_index,
-    use_def_map,
+    BindingWithConstraintsIterator, BoundnessAnalysis, ProgramFile, global_scope, place_table,
+    semantic_index, use_def_map,
 };
 
 use crate::place::{Place, class_body_implicit_symbol};
@@ -274,32 +273,49 @@ fn forwarding_alias_definition<'db>(
     definition: Definition<'db>,
     value: &ast::Expr,
 ) -> Option<Definition<'db>> {
-    let env = ProgramEnvironment::from_definition(definition);
-    let name = match value {
-        ast::Expr::Name(name) if name.ctx.is_load() => name,
+    match value {
+        ast::Expr::Name(name) if name.ctx.is_load() => {
+            referenced_name_definition(db, definition.program_file(db), name, None)
+        }
         ast::Expr::Attribute(attribute) if attribute.ctx.is_load() => {
+            let env = ProgramEnvironment::from_definition(definition);
             let receiver =
                 crate::types::definition_expression_type(db, definition, &attribute.value);
-            return match receiver.member(db, &env, &attribute.attr).place {
+            match receiver.member(db, &env, &attribute.attr).place {
                 Place::Defined(place) if place.is_definitely_defined() => {
                     place.provenance.definition()
                 }
                 _ => None,
-            };
+            }
         }
-        _ => return None,
-    };
-    let file = definition.program_file(db);
+        _ => None,
+    }
+}
+
+/// Resolve a name to its unique reachable definition. Names parsed from a string annotation
+/// use the enclosing string's scope because they have no use site in the semantic index.
+fn referenced_name_definition<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    name: &ast::ExprName,
+    string_annotation_scope: Option<FileScopeId>,
+) -> Option<Definition<'db>> {
     let index = semantic_index(db, file);
-    let mode = if definition.file(db).is_stub(db) {
-        PlaceLoadMode::Deferred
+    let (scope, mode) = if let Some(scope) = string_annotation_scope {
+        (scope, PlaceLoadMode::StringAnnotation)
     } else {
-        PlaceLoadMode::AtExpression(name.into())
+        let expression = ast::ExprRef::Name(name);
+        let mode = if file.file(db).is_stub(db) {
+            PlaceLoadMode::Deferred
+        } else {
+            PlaceLoadMode::AtExpression(expression)
+        };
+        (index.expression_scope_id(&expression), mode)
     };
     let mut resolution = resolve_place_load(
         db,
         index,
-        index.expression_scope_id(value).to_scope_id(db, file),
+        scope.to_scope_id(db, file),
         PlaceExpr::from_expr_name(name),
         mode,
     );
@@ -310,6 +326,7 @@ fn forwarding_alias_definition<'db>(
             Some(use_def.reachable_declarations(id)),
         )
     };
+    let env = ProgramEnvironment::from_file(file);
     while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
         let (bindings, declarations) = match source.kind {
             PlaceLoadSourceKind::Bindings(bindings) => (bindings, None),
@@ -405,7 +422,6 @@ pub(in crate::types) fn legacy_type_alias_parameters<'db>(
     let mut collector = LegacyTypeVarCollector {
         db,
         alias_definition: definition,
-        index: semantic_index(db, file),
         string_annotation_scope: None,
         variables: FxOrderSet::default(),
     };
@@ -419,39 +435,21 @@ pub(in crate::types) fn legacy_type_alias_parameters<'db>(
     })
 }
 
-struct LegacyTypeVarCollector<'a, 'db> {
+struct LegacyTypeVarCollector<'db> {
     db: &'db dyn Db,
     alias_definition: Definition<'db>,
-    index: &'a ty_python_core::SemanticIndex<'db>,
     string_annotation_scope: Option<FileScopeId>,
     variables: FxOrderSet<BoundTypeVarInstance<'db>>,
 }
 
-impl<'db> LegacyTypeVarCollector<'_, 'db> {
+impl<'db> LegacyTypeVarCollector<'db> {
     fn expression_type(&self, expression: &ast::Expr) -> Option<Type<'db>> {
         let db = self.db;
         let file = self.alias_definition.program_file(db);
         match expression {
             ast::Expr::Name(name) if name.ctx.is_load() => {
-                let definition = if let Some(scope) = self.string_annotation_scope {
-                    let (scope, symbol) =
-                        self.index
-                            .visible_ancestor_scopes(scope)
-                            .find_map(|(scope, _)| {
-                                self.index
-                                    .place_table(scope)
-                                    .symbol_id(&name.id)
-                                    .map(|symbol| (scope, symbol))
-                            })?;
-                    self.index
-                        .use_def_map(scope)
-                        .end_of_scope_symbol_bindings(symbol)
-                        .filter_map(|binding| binding.binding.definition())
-                        .exactly_one()
-                        .ok()?
-                } else {
-                    forwarding_alias_definition(db, self.alias_definition, expression)?
-                };
+                let definition =
+                    referenced_name_definition(db, file, name, self.string_annotation_scope)?;
                 // Another alias's parameters are not free parameters of this alias. Inferring
                 // its runtime value here can also re-enter parameter discovery before recursive
                 // aliases have stable generic contexts.
@@ -486,7 +484,7 @@ impl<'db> LegacyTypeVarCollector<'_, 'db> {
     }
 }
 
-impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_, '_> {
+impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_> {
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         if let ast::Expr::StringLiteral(string) = expr
             && let Some(string_literal) = string.as_single_part_string()
@@ -496,7 +494,7 @@ impl<'ast> Visitor<'ast> for LegacyTypeVarCollector<'_, '_> {
             if let Ok(parsed) = parsed_string_annotation(source.as_str(), string_literal) {
                 let string_scope = self
                     .string_annotation_scope
-                    .unwrap_or_else(|| self.index.expression_scope_id(expr));
+                    .unwrap_or_else(|| semantic_index(self.db, file).expression_scope_id(expr));
                 let previous_scope = self.string_annotation_scope.replace(string_scope);
                 self.visit_expr(parsed.expr());
                 self.string_annotation_scope = previous_scope;

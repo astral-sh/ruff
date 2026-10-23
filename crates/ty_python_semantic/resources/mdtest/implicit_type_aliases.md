@@ -1305,6 +1305,27 @@ def _(
     reveal_type(x2)  # revealed: set[int]
 ```
 
+#### Conditionally defined type variables
+
+A generic alias uses the reachable definition of a type variable, including when the variable is
+quoted on the right-hand side.
+
+```py
+from typing import TypeVar
+
+if 1 == 1:
+    T = TypeVar("T", bound=int)
+else:
+    T = TypeVar("T", bound=str)
+
+Direct = list[T]
+Quoted = list["T"]
+
+def inspect(direct: Direct[int], quoted: Quoted[int]):
+    reveal_type(direct)  # revealed: list[int]
+    reveal_type(quoted)  # revealed: list[int]
+```
+
 #### Statically unknown conditions
 
 If several definitions are visible, we emit an error:
