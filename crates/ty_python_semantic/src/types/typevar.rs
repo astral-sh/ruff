@@ -1307,7 +1307,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let env = ProgramEnvironment::from_program(self.binding_context(db).program(db));
         let typevar = self.typevar(db);
-        let bound_or_constraints = f(typevar.bound_or_constraints(db, &env));
+        let original_bound_or_constraints = typevar.bound_or_constraints(db, &env);
+        let bound_or_constraints = f(original_bound_or_constraints);
+        if bound_or_constraints == original_bound_or_constraints {
+            return self;
+        }
         let typevar = TypeVarInstance::new(
             db,
             typevar.identity(db),
