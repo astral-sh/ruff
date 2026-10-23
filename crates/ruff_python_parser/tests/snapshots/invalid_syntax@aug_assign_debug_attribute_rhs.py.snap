@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/aug_assign_debug_attribute_rhs.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..76,
+        body: [
+            AugAssign(
+                StmtAugAssign {
+                    node_index: NodeIndex(None),
+                    range: 44..75,
+                    target: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 44..47,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("y"),
+                                range: 46..47,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: ListComp(
+                        ExprListComp {
+                            node_index: NodeIndex(None),
+                            range: 51..75,
+                            elt: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 52..53,
+                                    id: Name("z"),
+                                    ctx: Load,
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 54..74,
+                                    node_index: NodeIndex(None),
+                                    target: Attribute(
+                                        ExprAttribute {
+                                            node_index: NodeIndex(None),
+                                            range: 58..69,
+                                            value: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 58..59,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            attr: Identifier {
+                                                id: Name("__debug__"),
+                                                range: 60..69,
+                                                node_index: NodeIndex(None),
+                                            },
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 73..74,
+                                            id: Name("c"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | # parse_options: {"target-version": "3.13"}
+2 | x.y += [z for a.__debug__ in c]
+  |               ^^^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
