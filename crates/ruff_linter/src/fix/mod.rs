@@ -167,6 +167,15 @@ fn cmp_fix(name1: &str, name2: &str, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             std::cmp::Ordering::Equal
         }
     })
+    // `min_start()` is only the start of the first edit. The order only looks at the first edit.
+    // What the tie-break does is make sure the fixes are applied correctly. Without it, the
+    // change made by `noqa` would affect their order.
+    .then_with(|| {
+        fix1.edits()
+            .iter()
+            .map(Edit::start)
+            .cmp(fix2.edits().iter().map(Edit::start))
+    })
 }
 
 #[cfg(test)]
