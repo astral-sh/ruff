@@ -2498,7 +2498,7 @@ impl<'db> ClassType<'db> {
         {
             let signature = match ty {
                 Type::FunctionLiteral(dunder_init_function) => {
-                    Some(dunder_init_function.signature(db))
+                    Some(dunder_init_function.signature_without_inferred_return_type(db))
                 }
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,

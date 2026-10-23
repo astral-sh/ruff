@@ -457,8 +457,8 @@ mod tests {
             .expect_type()
             .as_function_literal()
             .ok_or_else(|| anyhow::anyhow!("expected source"))?;
-        let signature = source
-            .signature(db)
+        let signatures = source.signature(db);
+        let signature = signatures
             .overloads
             .first()
             .ok_or_else(|| anyhow::anyhow!("expected source's signature"))?;
@@ -592,7 +592,12 @@ mod tests {
                 .wrapped(db)
                 .inner(db)
                 .as_function_literal()
-                .and_then(|function| function.signature(db).overloads.first())
+                .and_then(|function| {
+                    function
+                        .signature_without_inferred_return_type(db)
+                        .overloads
+                        .first()
+                })
                 .and_then(|signature| signature.parameters().iter().next())
                 .ok_or_else(|| anyhow::anyhow!("expected wrapped callable's parameter"))?;
             assert_eq!(parameter.annotated_type(), int);

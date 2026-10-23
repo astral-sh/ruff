@@ -6897,7 +6897,7 @@ mod tests {
 
         // With no decorators, internal and external signature are the same
         assert_eq!(
-            func.signature(&db),
+            func.signature(&db).as_ref(),
             &CallableSignature::single(expected_sig)
         );
     }

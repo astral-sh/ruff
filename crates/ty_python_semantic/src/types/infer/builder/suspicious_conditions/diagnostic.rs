@@ -64,7 +64,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<LintDiagnosticGuard<'ctx, 'ctx>> {
         #[derive(Debug)]
         enum FunctionInfo<'db> {
-            Function(&'db CallableSignature<'db>, &'db str),
+            Function(Cow<'db, CallableSignature<'db>>, &'db str),
             Method(&'db CallableSignature<'db>, Option<Cow<'db, str>>),
             Lambda(&'db CallableSignature<'db>),
         }
@@ -77,7 +77,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            fn signature(&self) -> &'db CallableSignature<'db> {
+            fn signature(&self) -> &CallableSignature<'db> {
                 match self {
                     FunctionInfo::Function(signature, _) => signature,
                     FunctionInfo::Method(signature, _) => signature,
