@@ -2316,17 +2316,23 @@ ForwardedNumber = one
 def inspect(
     expression: Number,  # snapshot: invalid-type-form
     forwarded: ForwardedNumber,  # error: [invalid-type-form]
+    specialized: Number[int],  # error: [invalid-type-form]
+    quoted: "Number",  # error: [invalid-type-form]
 ):
     reveal_type(expression)  # revealed: Unknown
     reveal_type(forwarded)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(quoted)  # revealed: Unknown
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable of type `Literal[3]` is not allowed in a parameter annotation
+error[invalid-type-form]: Variable is not allowed in parameter annotations
  --> src/mdtest_snippet.py:6:17
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
   |                 ^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
 An expression that evaluates to a class does not automatically define a type alias:
@@ -2341,9 +2347,9 @@ def inspect(called: Called):
 
 ```snapshot
 error[invalid-type-form]: Variable is not allowed in parameter annotations
-  --> src/mdtest_snippet.py:14:21
+  --> src/mdtest_snippet.py:18:21
    |
-14 | def inspect(called: Called):
+18 | def inspect(called: Called):
    |                     ^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -2359,6 +2365,8 @@ CalledGeneric = (lambda: list)()
 Indexed = [int][0]
 Classes = [int]
 IndexedName = Classes[0]
+Mixed = [int, 1]
+IndexedMixed = Mixed[0]
 Mapping = {"type": int}
 IndexedMapping = Mapping["type"]
 Conditional = int if 1 < 3 else str
@@ -2370,6 +2378,7 @@ def inspect(
     specialized: CalledGeneric[int],  # error: [invalid-type-form]
     indexed: Indexed,  # error: [invalid-type-form]
     indexed_name: IndexedName,  # error: [invalid-type-form]
+    indexed_mixed: IndexedMixed,  # error: [invalid-type-form]
     indexed_mapping: IndexedMapping,  # error: [invalid-type-form]
     conditional: Conditional,  # error: [invalid-type-form]
     boolean: Boolean,  # error: [invalid-type-form]
@@ -2379,6 +2388,7 @@ def inspect(
     reveal_type(specialized)  # revealed: Unknown
     reveal_type(indexed)  # revealed: Unknown
     reveal_type(indexed_name)  # revealed: Unknown
+    reveal_type(indexed_mixed)  # revealed: Unknown
     reveal_type(indexed_mapping)  # revealed: Unknown
     reveal_type(conditional)  # revealed: Unknown
     reveal_type(boolean)  # revealed: Unknown
@@ -2498,13 +2508,23 @@ def inspect_classes(
 
 ## Disabled invalid implicit alias diagnostics
 
-Disabling `invalid-type-form` does not make invalid aliases valid. An invalid union member cannot be
-hidden by simplification, and forwarding or nesting the alias preserves its `Unknown` fallback:
+Disabling `invalid-type-form` does not make invalid aliases valid:
 
 ```toml
 [rules]
 invalid-type-form = "ignore"
 ```
+
+```py
+Number = 1 + 2
+
+def inspect(number: Number, specialized: Number[int]):
+    reveal_type(number)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+```
+
+An invalid union member cannot be hidden by simplification, and forwarding or nesting the alias
+preserves its `Unknown` fallback:
 
 ```py
 from typing_extensions import Self

@@ -40,14 +40,28 @@ use crate::types::{
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
+enum ImplicitAliasReference<'db> {
+    Alias(Type<'db>, Option<GenericContext<'db>>),
+    /// The definition is invalid as a type alias, and its use has been rejected.
+    Invalid,
+    /// Use ordinary value-to-type conversion, including recovery for invalid type arguments.
+    ValueFallback,
+}
+
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
     fn implicit_alias_reference(
         &mut self,
+        value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
-    ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
+        reference: &ast::Expr,
+    ) -> ImplicitAliasReference<'db> {
         let db = self.db();
-        let alias_definition = implicit_alias_definition(db, definition?)?;
+        let Some(alias_definition) =
+            definition.and_then(|definition| implicit_alias_definition(db, definition))
+        else {
+            return ImplicitAliasReference::ValueFallback;
+        };
         let definition = alias_definition.definition;
         let parameters = implicit_alias_parameters(db, definition);
         let inference = infer_implicit_alias_type(db, definition, parameters);
@@ -65,7 +79,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 matches!(ty, Type::Recursive(_))
             })
         {
-            return None;
+            // Reject an invalid definition before converting its runtime value to a type.
+            // For example, `Number = 1 + 2` is invalid because of its right-hand side,
+            // independently of the resulting `Literal[3]` value. Generic subscriptions with
+            // invalid arguments, such as `list[1]`, can still recover as `list[Unknown]`.
+            return if self.reject_non_alias_reference(value_ty, Some(definition), reference) {
+                ImplicitAliasReference::Invalid
+            } else {
+                ImplicitAliasReference::ValueFallback
+            };
         }
         if inference.context.has_invalid_type_form {
             self.context.mark_invalid_type_form();
@@ -77,7 +99,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             self.implicit_aliases.insert(definition);
         }
-        Some((ty, parameters))
+        ImplicitAliasReference::Alias(ty, parameters)
     }
 
     /// Infer the value type and optional source definition for an assignment such as
@@ -241,14 +263,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        if let Some((alias, parameters)) = self.implicit_alias_reference(definition) {
-            let result = match parameters {
-                Some(parameters) => {
-                    alias.apply_specialization(db, parameters.default_specialization(db, None))
-                }
-                None => alias,
-            };
-            return self.check_type_variable_scope(annotation, result);
+        match self.implicit_alias_reference(ty, definition, annotation) {
+            ImplicitAliasReference::Alias(alias, parameters) => {
+                let result = match parameters {
+                    Some(parameters) => {
+                        alias.apply_specialization(db, parameters.default_specialization(db, None))
+                    }
+                    None => alias,
+                };
+                return self.check_type_variable_scope(annotation, result);
+            }
+            ImplicitAliasReference::Invalid => return Type::unknown(),
+            ImplicitAliasReference::ValueFallback => {}
         }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
@@ -1321,7 +1347,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
-        if let Some((alias, parameters)) = self.implicit_alias_reference(definition)
+        let alias_reference = self.implicit_alias_reference(value_ty, definition, &subscript.value);
+        if let ImplicitAliasReference::Alias(alias, parameters) = alias_reference
             && (parameters.is_some() || !alias.is_dynamic())
         {
             let db = self.db();
@@ -1339,7 +1366,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 },
             );
         }
-        if self.reject_non_alias_reference(value_ty, definition, &subscript.value) {
+        if matches!(alias_reference, ImplicitAliasReference::Invalid)
+            || self.reject_non_alias_reference(value_ty, definition, &subscript.value)
+        {
             if !self.in_string_annotation() {
                 self.infer_expression(slice, TypeContext::default());
             }
