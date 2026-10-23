@@ -200,19 +200,6 @@ fn rule_metadata() -> FxHashMap<LintName, RuleMetadata> {
         .collect()
 }
 
-/// Display format for [`Diagnostic`]s.
-///
-/// The emitter serializes a slice of [`Diagnostic`]s and writes them to a [`Write`].
-pub(crate) trait Emitter {
-    /// Serializes the `diagnostics` and writes the output to `writer`.
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        context: &EmitterContext,
-    ) -> anyhow::Result<()>;
-}
-
 /// Context used while rendering diagnostics.
 pub struct EmitterContext<'a> {
     notebook_indexes: &'a FxHashMap<String, NotebookIndex>,
@@ -221,10 +208,6 @@ pub struct EmitterContext<'a> {
 impl<'a> EmitterContext<'a> {
     pub fn new(notebook_indexes: &'a FxHashMap<String, NotebookIndex>) -> Self {
         Self { notebook_indexes }
-    }
-
-    fn notebook_index(&self, name: &str) -> Option<&NotebookIndex> {
-        self.notebook_indexes.get(name)
     }
 }
 
@@ -248,13 +231,7 @@ pub fn render_diagnostics(
         OutputFormat::Pylint => PylintRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Rdjson => RdjsonRenderer::new(context, config).write(writer, diagnostics),
         OutputFormat::Azure => AzureRenderer::new(context, config).write(writer, diagnostics),
-        OutputFormat::Grouped => GroupedEmitter::default()
-            .with_show_fix_status(config.show_fix_status())
-            .with_applicability(config.fix_applicability())
-            .with_preview(config.preview_enabled())
-            .with_prefer_rule_codes(config.is_prefer_rule_codes_enabled())
-            .emit(writer, diagnostics, context)
-            .map_err(std::io::Error::other),
+        OutputFormat::Grouped => GroupedEmitter::new(context, config).write(writer, diagnostics),
         OutputFormat::Sarif => SarifRenderer::new(context, config, rule_metadata(), crate::VERSION)
             .write(writer, diagnostics),
     }
@@ -262,7 +239,6 @@ pub fn render_diagnostics(
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
 
     use ruff_db::diagnostic::Diagnostic;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
@@ -270,7 +246,7 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::codes::Rule;
-    use crate::message::{Emitter, EmitterContext, create_lint_diagnostic};
+    use crate::message::create_lint_diagnostic;
     use crate::{Edit, Fix};
 
     pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
@@ -352,17 +328,5 @@ def fibonacci(n):
         );
 
         vec![unused_import, unused_variable, undefined_name]
-    }
-
-    pub(super) fn capture_emitter_output(
-        emitter: &mut dyn Emitter,
-        diagnostics: &[Diagnostic],
-    ) -> String {
-        let notebook_indexes = FxHashMap::default();
-        let context = EmitterContext::new(&notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, diagnostics, &context).unwrap();
-
-        String::from_utf8(output).expect("Output to be valid UTF-8")
     }
 }
