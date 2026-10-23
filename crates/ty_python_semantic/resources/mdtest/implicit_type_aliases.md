@@ -2337,11 +2337,12 @@ def inspect(
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Number` is not allowed in parameter annotations
  --> src/mdtest_snippet.py:6:17
   |
 6 |     expression: Number,  # snapshot: invalid-type-form
   |                 ^^^^^^
+info: `Number` is not a valid type alias
 info: Invalid binary operator `+` in a type alias definition
  --> src/mdtest_snippet.py:1:10
   |
@@ -2361,11 +2362,12 @@ def inspect(called: Called):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
-  --> src/mdtest_snippet.py:18:21
+error[invalid-type-form]: Variable `Called` is not allowed in parameter annotations
+  --> src/mdtest_snippet.py:14:21
    |
 18 | def inspect(called: Called):
    |                     ^^^^^^
+info: `Called` is not a valid type alias
 info: Function calls are not allowed in type alias definitions
   --> src/mdtest_snippet.py:11:10
    |
@@ -2478,11 +2480,12 @@ def inspect_forwarded(forwarded: ForwardedClass):
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `ForwardedClass` is not allowed in parameter annotations
  --> src/main.py:4:34
   |
 4 | def inspect_forwarded(forwarded: ForwardedClass):
   |                                  ^^^^^^^^^^^^^^
+info: `ForwardedClass` is not a valid type alias
 info: Function calls are not allowed in type alias definitions
  --> dependencies/values.py:3:17
   |
@@ -2490,6 +2493,32 @@ info: Function calls are not allowed in type alias definitions
   |                 ^^^^^^^^^^^^^^^
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+Quoted attribute references name the attribute used in the annotation, while the explanation points
+to its original definition:
+
+`quoted.py`:
+
+```py
+import values
+
+# snapshot: invalid-type-form
+def inspect_quoted(attribute: "values.Number"): ...
+```
+
+```snapshot
+error[invalid-type-form]: Variable `values.Number` is not allowed in parameter annotations
+ --> src/quoted.py:4:32
+  |
+4 | def inspect_quoted(attribute: "values.Number"): ...
+  |                                ^^^^^^^^^^^^^
+info: `values.Number` is not a valid type alias
+info: Invalid binary operator `+` in a type alias definition
+ --> dependencies/values.py:1:10
+  |
+1 | Number = 1 + 2
+  |          ^^^^^
 ```
 
 The same restriction applies to direct imports, module attributes, and local assignments:
@@ -2538,11 +2567,12 @@ def inspect(value: Number): ...
 ```
 
 ```snapshot
-error[invalid-type-form]: Variable is not allowed in parameter annotations
+error[invalid-type-form]: Variable `Number` is not allowed in parameter annotations
  --> src/mdtest_snippet.py:5:20
   |
 5 | def inspect(value: Number): ...
   |                    ^^^^^^
+info: `Number` is not a valid type alias
 info: Invalid binary operator `+` in a type alias definition
  --> src/mdtest_snippet.py:2:10
   |
