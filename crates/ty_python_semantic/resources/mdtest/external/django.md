@@ -1,6 +1,6 @@
 # Django
 
-Django support in ty currently relies on the stubs from [django-types]:
+Django support in ty currently relies on the stubs from [django-stubs]:
 
 ```toml
 [environment]
@@ -8,7 +8,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["django-types==0.24.0"]
+dependencies = ["django-stubs==6.1.2"]
 ```
 
 ## Basic model
@@ -51,8 +51,7 @@ Attribute assignments are checked against the field's *input* type:
 book.title = "The Restaurant at the End of the Universe"
 book.pages = 208
 
-# TODO: django-types should allow ISO-formatted date strings as input.
-book.published = "1980-10-12"  # error: [invalid-assignment]
+book.published = "1980-10-12"
 
 book.pages = models.F("pages") + 1
 
@@ -105,6 +104,35 @@ class Book(models.Model):
 def _(book: Book):
     reveal_type(book.title)  # revealed: str | None
     reveal_type(book.pages)  # revealed: int | None
+
+    book.title = None
+    book.pages = None
+    book.pages = []  # error: [invalid-assignment]
+```
+
+## Explicit field types
+
+Explicit type arguments and annotations take precedence over the field's default types:
+
+```py
+from typing import Any
+from django.db import models
+
+class Book(models.Model):
+    available = models.SmallIntegerField[bool, bool]()
+    pages: models.IntegerField[int, int] = models.IntegerField()
+    extra = models.CharField[Any, Any]()
+
+def _(book: Book):
+    reveal_type(book.available)  # revealed: bool
+    reveal_type(book.pages)  # revealed: int
+    reveal_type(book.extra)  # revealed: Any
+
+    book.available = True
+    book.pages = 180
+
+    book.available = 123  # error: [invalid-assignment]
+    book.pages = "123"  # error: [invalid-assignment]
 ```
 
 ## Field names
@@ -229,11 +257,15 @@ class Book(models.Model):
     editor = models.ForeignKey(Author, on_delete=models.SET_NULL, null=True, related_name="edited_books")
 
 def _(book: Book):
-    reveal_type(book.author)  # revealed: Author
-    reveal_type(book.author_id)  # revealed: int
+    # TODO: Should be `Author`.
+    reveal_type(book.author)  # revealed: Unknown
+    # TODO: Should be `int`.
+    reveal_type(book.author_id)  # revealed: Any
 
-    reveal_type(book.editor)  # revealed: Author | None
-    reveal_type(book.editor_id)  # revealed: int | None
+    # TODO: Should be `Author | None`.
+    reveal_type(book.editor)  # revealed: Unknown
+    # TODO: Should be `int | None`.
+    reveal_type(book.editor_id)  # revealed: Any | None
 ```
 
 A `ForeignKey` adds a reverse accessor to the related model. By default, its name is the lowercase
@@ -274,9 +306,11 @@ class Review(models.Model):
     book = models.ForeignKey(Book, on_delete=models.CASCADE)
 
 def _(review: Review):
-    reveal_type(review.book)  # revealed: Book
+    # TODO: Should be `Book`.
+    reveal_type(review.book)  # revealed: Unknown
 
-    reveal_type(review.book_id)  # revealed: str
+    # TODO: Should be `str`.
+    reveal_type(review.book_id)  # revealed: Any
 ```
 
 ### Explicit target field
@@ -295,9 +329,12 @@ class Review(models.Model):
     book = models.ForeignKey(Book, to_field="isbn", on_delete=models.CASCADE)
 
 def _(review: Review):
-    reveal_type(review.book)  # revealed: Book
+    # TODO: Should be `Book`.
+    reveal_type(review.book)  # revealed: Unknown
 
-    reveal_type(review.book_id)  # revealed: str
+    # TODO: Should not be an error, and the type should be `str`.
+    # error: [unresolved-attribute]
+    reveal_type(review.book_id)  # revealed: Unknown
 ```
 
 ## Choices
@@ -386,4 +423,4 @@ def _(article: NewsArticle):
     reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
 ```
 
-[django-types]: https://github.com/sbdchd/django-types
+[django-stubs]: https://github.com/typeddjango/django-stubs
