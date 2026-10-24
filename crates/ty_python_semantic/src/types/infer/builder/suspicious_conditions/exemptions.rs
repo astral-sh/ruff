@@ -772,7 +772,8 @@ fn definition_contains_special_cased_condition<'db>(
             }
             Some(&*assignment.value)
         }
-        DefinitionKind::Import(_)
+        DefinitionKind::ReceiverRefinement(_)
+        | DefinitionKind::Import(_)
         | DefinitionKind::ImportFrom(_)
         | DefinitionKind::ImportFromSubmodule(_)
         | DefinitionKind::StarImport(_)
@@ -885,6 +886,7 @@ fn predicate_contains_special_cased_condition<'db>(
         // particular, a statement such as `print(sys.platform)` should not make every later
         // definition environment-dependent merely because it is reached after that call returns.
         PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::CallRefinesReceiver(_)
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)

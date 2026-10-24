@@ -105,6 +105,7 @@ fn lexical_name_path_component_for_leaf(
         | DefinitionKind::StarImport(_)
         | DefinitionKind::NamedExpression(_)
         | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::ReceiverRefinement(_)
         | DefinitionKind::DictKeyAssignment(_)
         | DefinitionKind::For(_)
         | DefinitionKind::Comprehension(_)

@@ -281,6 +281,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
     /// separately from expression types.
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
+    /// Receiver postconditions are retained separately from call expression values.
+    receiver_refinements: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
@@ -532,6 +534,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
+            receiver_refinements: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
             qualifiers: FxHashMap::default(),
@@ -745,18 +748,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// Replacing an expression's type also replaces any truthiness override. A newly inferred
-    /// comparison may no longer need an override, so extending the sparse map alone is not enough.
+    /// Replacing an expression's type also replaces its sparse metadata. A newly inferred call
+    /// may have no receiver effect, and a comparison may no longer need a truthiness override.
     fn extend_expression_types(
         &mut self,
         expressions: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>,
     ) {
-        if self.comparison_truthiness.is_empty() {
+        if self.comparison_truthiness.is_empty() && self.receiver_refinements.is_empty() {
             self.expressions.extend(expressions);
         } else {
             for (expression, ty) in expressions {
                 self.expressions.insert(expression, ty);
                 self.comparison_truthiness.remove(&expression);
+                self.receiver_refinements.remove(&expression);
             }
         }
     }
@@ -766,6 +770,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_types(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
+            self.receiver_refinements
+                .extend(extra.receiver_refinements.iter().copied());
             self.legacy_aliases
                 .extend(extra.legacy_aliases.iter().copied());
             self.comparison_truthiness
@@ -804,6 +810,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .comparison_truthiness
                 .iter()
                 .map(|(key, truthiness)| (*key, *truthiness)),
+        );
+        self.receiver_refinements.extend(
+            inference
+                .receiver_refinements
+                .iter()
+                .map(|(key, ty)| (*key, *ty)),
         );
         self.context.extend(&inference.context);
         self.extend_cycle_recovery(inference.cycle_recovery);
@@ -1339,6 +1351,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
                 self.infer_annotated_assignment_definition(annotated_assignment, definition);
+            }
+            DefinitionKind::ReceiverRefinement(call) => {
+                let call = call.node(self.module());
+                let expression = self.index.expression(call);
+                let inference =
+                    infer_expression_types(self.db(), expression, TypeContext::default());
+                let after = inference.receiver_refinement(call).unwrap_or_else(|| {
+                    let db = self.db();
+                    let use_def = self.index.use_def_map(definition.file_scope(db));
+                    place_from_bindings_with_reachability_cache(
+                        db,
+                        self.program_environment(),
+                        use_def.bindings_at_definition(definition),
+                        self.reachability_cache(),
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::Never)
+                });
+                self.extend_expression(inference);
+                self.bindings.insert(definition, after);
             }
             DefinitionKind::AugmentedAssignment(augmented_assignment) => {
                 self.infer_augment_assignment_definition(
@@ -5497,6 +5530,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ReturnCallableTypeVarScope::Lexical,
                     )
                     .return_ty;
+                    let return_ty = return_ty
+                        .refines_parts(db, env)
+                        .map_or(return_ty, |(_, returned)| returned);
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
@@ -6590,6 +6626,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn infer_expression(&mut self, expression: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
+        if let ast::Expr::Call(call) = expression
+            && self.index.try_definition(call).is_some_and(|definition| {
+                matches!(
+                    definition.kind(self.db()),
+                    DefinitionKind::ReceiverRefinement(_)
+                )
+            })
+        {
+            return self.infer_standalone_expression(expression, tcx);
+        }
         debug_assert!(
             !self.index.is_standalone_expression(expression),
             "Calling `self.infer_expression` on a standalone-expression \
@@ -9930,7 +9976,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Ok(()) => bindings,
             Err(_) => {
                 bindings.report_diagnostics(&self.context, call_expression.into());
-                return bindings.return_type(db, env);
+                let return_ty = bindings.return_type(db, env);
+                return return_ty
+                    .refines_parts(db, env)
+                    .map_or(return_ty, |(_, returned)| returned);
             }
         };
 
@@ -10080,6 +10129,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or(return_ty)
             }
             _ => return_ty,
+        };
+
+        let return_ty = if let Some((receiver, returned)) = return_ty.refines_parts(db, env) {
+            if let Type::BoundMethod(method) = callable_type
+                && !method.class_method(db)
+            {
+                self.receiver_refinements
+                    .insert(call_expression.into(), receiver);
+            }
+            returned
+        } else {
+            return_ty
         };
 
         typeguard::bind_type_guard_return_type(db, self.scope(), return_ty, &bindings, arguments)
@@ -12095,6 +12156,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            receiver_refinements,
             qualifiers: _,
             type_expression_flags,
             collection_use_constraints,
@@ -12139,6 +12201,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             expressions,
             comparison_truthiness,
+            receiver_refinements,
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
@@ -12160,6 +12223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            receiver_refinements: _,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12280,6 +12344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness: _,
+            receiver_refinements: _,
             bindings,
             called_functions,
             expression_cache: _,
@@ -12333,6 +12398,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            receiver_refinements: _,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12535,6 +12601,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut collection_use_constraints,
             expressions,
             comparison_truthiness: _,
+            receiver_refinements: _,
             scope,
             cycle_recovery,
             qualifiers,
@@ -12623,6 +12690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: _,
             expressions: _,
             comparison_truthiness: _,
+            receiver_refinements: _,
             string_annotations: _,
             expected_types: _,
             scope: _,
@@ -12688,6 +12756,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context,
             expressions,
             comparison_truthiness,
+            receiver_refinements,
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
@@ -12730,6 +12799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.extend_expression_types(expressions);
         self.comparison_truthiness.extend(comparison_truthiness);
+        self.receiver_refinements.extend(receiver_refinements);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
@@ -12859,6 +12929,7 @@ struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
+    receiver_refinements: FxHashMap<ExpressionNodeKey, Type<'db>>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
     string_annotations: FxHashSet<ExpressionNodeKey>,
@@ -12890,6 +12961,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         !self.legacy_aliases.is_empty()
             || !self.string_annotations.is_empty()
             || !self.comparison_truthiness.is_empty()
+            || !self.receiver_refinements.is_empty()
             || !self.type_expression_flags.is_empty()
             || !self.collection_use_constraints.is_empty()
             || !self.expected_types.is_empty()
@@ -12919,6 +12991,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
                 legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
+                receiver_refinements: FrozenMap::from(self.receiver_refinements),
                 expected_types: FrozenMap::from(self.expected_types),
                 type_expression_flags: FrozenMap::from(self.type_expression_flags),
                 bindings: self.bindings.into_boxed_slice(),

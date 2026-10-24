@@ -2016,6 +2016,9 @@ struct ExpressionInferenceExtra<'db> {
     /// Metadata for type expressions in this region.
     type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
+    /// Post-call receiver types for calls annotated with `Refines`.
+    receiver_refinements: FrozenMap<ExpressionNodeKey, Type<'db>>,
+
     /// A comparison chain's truthiness when evaluated directly as a condition.
     ///
     /// Expression types describe the objects produced by evaluation, which is not always enough
@@ -2083,6 +2086,15 @@ impl<'db> ExpressionInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
         if let Some(extra) = self.extra.as_mut() {
+            for (expression, receiver) in &mut extra.receiver_refinements {
+                *receiver =
+                    if let Some(previous_receiver) = previous.receiver_refinement(*expression) {
+                        receiver.cycle_normalized(db, env, previous_receiver, cycle)
+                    } else {
+                        receiver.recursive_type_normalized(db, env, cycle)
+                    };
+            }
+
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
                     extra
@@ -2161,6 +2173,17 @@ impl<'db> ExpressionInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn receiver_refinement(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.extra
+            .as_deref()?
+            .receiver_refinements
+            .get(&expression.into())
+            .copied()
     }
 
     pub(crate) fn comparison_truthiness(
