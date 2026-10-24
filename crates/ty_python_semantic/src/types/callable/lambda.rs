@@ -7,7 +7,7 @@ use crate::types::generics::{ApplySpecialization, GenericContext, Specialization
 use crate::types::visitor::any_over_type_including_alias_arguments;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, MaterializationKind, PromotionKind, PromotionMode,
-    SelfBinding, Type, TypeContext, TypeMapping,
+    SelfBinding, SelfTypeVarOrigin, Type, TypeContext, TypeMapping,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::semantic_index;
@@ -49,10 +49,11 @@ pub(super) enum LambdaMapping<'db> {
     BindLegacyTypevars(BindingContext<'db>),
     FreshenBoundTypeVars(GenericContext<'db>, u32),
     BindSelf(SelfBinding<'db>),
-    ReplaceSelf(Type<'db>),
+    ReplaceSelf(SelfTypeVarOrigin<'db>, Type<'db>),
     Materialize(MaterializationKind),
     ReplaceParameterDefaults,
     EagerExpansion,
+    GeneralizeLocalTypes(ty_python_core::scope::ScopeId<'db>),
 }
 
 impl<'db> LambdaMapping<'db> {
@@ -104,10 +105,11 @@ impl<'db> LambdaMapping<'db> {
                 delta,
             } => Self::FreshenBoundTypeVars(*generic_context, *delta),
             TypeMapping::BindSelf(binding) => Self::BindSelf(binding.clone()),
-            TypeMapping::ReplaceSelf { new_upper_bound } => Self::ReplaceSelf(*new_upper_bound),
+            TypeMapping::ReplaceSelf { new_origin, new_upper_bound } => Self::ReplaceSelf(*new_origin, *new_upper_bound),
             TypeMapping::Materialize(kind) => Self::Materialize(*kind),
             TypeMapping::ReplaceParameterDefaults => Self::ReplaceParameterDefaults,
             TypeMapping::EagerExpansion => Self::EagerExpansion,
+            TypeMapping::GeneralizeLocalTypes(scope) => Self::GeneralizeLocalTypes(*scope),
             TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::NormalizeLambdaSignatures
             | TypeMapping::RescopeReturnCallables(_) => {
@@ -144,12 +146,14 @@ impl<'db> LambdaMapping<'db> {
                 }
             }
             Self::BindSelf(binding) => TypeMapping::BindSelf(binding.clone()),
-            Self::ReplaceSelf(new_upper_bound) => TypeMapping::ReplaceSelf {
+            Self::ReplaceSelf(new_origin, new_upper_bound) => TypeMapping::ReplaceSelf {
+                new_origin: *new_origin,
                 new_upper_bound: *new_upper_bound,
             },
             Self::Materialize(kind) => TypeMapping::Materialize(*kind),
             Self::ReplaceParameterDefaults => TypeMapping::ReplaceParameterDefaults,
             Self::EagerExpansion => TypeMapping::EagerExpansion,
+            Self::GeneralizeLocalTypes(scope) => TypeMapping::GeneralizeLocalTypes(*scope),
         }
     }
 }
@@ -246,7 +250,7 @@ impl<'db> LambdaSignature<'db> {
                     ty: map(binding.ty),
                     ..binding.clone()
                 }),
-                LambdaMapping::ReplaceSelf(ty) => LambdaMapping::ReplaceSelf(map(*ty)),
+                LambdaMapping::ReplaceSelf(origin, ty) => LambdaMapping::ReplaceSelf(*origin, map(*ty)),
                 other => other.clone(),
             };
             LambdaSignatureMapping {
@@ -327,7 +331,7 @@ impl<'db> LambdaSignature<'db> {
                 mapping,
                 LambdaMapping::BindSelf(_)
                     | LambdaMapping::BindLegacyTypevars(_)
-                    | LambdaMapping::ReplaceSelf(_)
+                    | LambdaMapping::ReplaceSelf(..)
                     | LambdaMapping::ReplaceParameterDefaults
                     | LambdaMapping::EagerExpansion
             )
