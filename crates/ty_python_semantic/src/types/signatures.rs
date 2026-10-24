@@ -584,6 +584,23 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
+    /// Replaces `typing.Self` like [`Self::apply_self_with_receiver`], but assumes that the
+    /// receiver satisfies any explicit receiver annotation instead of recording that requirement.
+    pub(crate) fn apply_self_assuming_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
+        Self {
+            overloads: self
+                .overloads
+                .iter()
+                .map(|signature| signature.apply_self_assuming_receiver(db, env, self_type))
+                .collect(),
+        }
+    }
+
     pub(crate) fn is_single_paramspec(
         &self,
     ) -> Option<(BoundTypeVarInstance<'db>, &Signature<'db>)> {
@@ -1863,15 +1880,13 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         self_type: Type<'db>,
     ) -> Self {
-        let binding_context = self.definition.map(BindingContext::Definition);
         let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
             db,
             env,
             receiver_type,
             Some(BindingContext::Synthetic(env.program(db))),
         ));
-        let self_mapping =
-            TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
+        let self_mapping = self.self_mapping(db, env, self_type);
         let receiver_visitor = ApplyTypeMappingVisitor::new(env);
         let self_visitor = ApplyTypeMappingVisitor::new(env);
         let inferable = self.inferable_typevars(db);
@@ -1891,6 +1906,44 @@ impl<'db> Signature<'db> {
                     inferable,
                 )
             });
+        self.apply_self_mapping(db, env, &self_mapping, &self_visitor, receiver_constraints)
+    }
+
+    /// Replaces `typing.Self` like [`Self::apply_self_with_receiver`], but assumes that the
+    /// receiver satisfies any explicit receiver annotation instead of recording that requirement.
+    fn apply_self_assuming_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> Self {
+        self.apply_self_mapping(
+            db,
+            env,
+            &self.self_mapping(db, env, self_type),
+            &ApplyTypeMappingVisitor::new(env),
+            None,
+        )
+    }
+
+    fn self_mapping(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Type<'db>,
+    ) -> TypeMapping<'db, 'db> {
+        let binding_context = self.definition.map(BindingContext::Definition);
+        TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context))
+    }
+
+    fn apply_self_mapping(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_mapping: &TypeMapping<'_, 'db>,
+        self_visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    ) -> Self {
         if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
@@ -1904,15 +1957,15 @@ impl<'db> Signature<'db> {
 
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
-            &self_mapping,
+            self_mapping,
             TypeContext::default(),
-            &self_visitor,
+            self_visitor,
         );
         let return_ty = self.return_ty.apply_type_mapping_impl(
             db,
-            &self_mapping,
+            self_mapping,
             TypeContext::default(),
-            &self_visitor,
+            self_visitor,
         );
         Self {
             generic_context: self.generic_context,
