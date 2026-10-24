@@ -18,6 +18,12 @@ on:
       full-report-artifact:
         type: string
         default: ""
+      upload-html:
+        type: boolean
+        default: false
+      html-files:
+        type: string
+        default: "{}"
     secrets:
       KV_API_URL:
         required: true
@@ -57,8 +63,8 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
-          version: "0.13.4"
-          checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
+          version: "0.13.5"
+          checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
           enable-cache: false
       - name: Read the stored comment ID
         uses: astral-sh/github-actions/key-value-store/get@9ece8e1afa7e9485a0bc35c40e34e1fa495ae454
@@ -77,6 +83,17 @@ jobs:
           permissions: |
             actions: read
             pull_requests: write
+      - name: Get report upload credentials
+        if: inputs.upload-html
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: ${{ vars.REPORTS_REGION }}
+          role-to-assume: ${{ vars.REPORTS_ROLE_ARN }}
+          role-duration-seconds: 900
+          role-session-name: report-${{ github.run_id }}-${{ github.run_attempt }}
+          unset-current-credentials: true
       - name: Publish the report
         id: publish
         env:
@@ -89,6 +106,9 @@ jobs:
           REPORT_FILENAME: ${{ inputs.filename }}
           REPORT_TITLE: ${{ inputs.title }}
           FULL_REPORT_ARTIFACT: ${{ inputs.full-report-artifact }}
+          HTML_BUCKET: ${{ steps.aws.outcome == 'success' && vars.REPORTS_BUCKET || '' }}
+          HTML_BASE_URL: ${{ vars.REPORTS_URL }}
+          HTML_FILES: ${{ inputs.html-files }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
           COMMENT_ID_FILE: ${{ runner.temp }}/report-comment-id-${{ github.run_id }}-${{ github.run_attempt }}
         run: >-
@@ -98,6 +118,8 @@ jobs:
           --report "$REPORT" --pull-request "$PULL_REQUEST"
           --artifact "$REPORT_ARTIFACT" --filename "$REPORT_FILENAME"
           --title "$REPORT_TITLE" --full-report-artifact "$FULL_REPORT_ARTIFACT"
+          --html-bucket "$HTML_BUCKET" --html-base-url "$HTML_BASE_URL"
+          --html-files "$HTML_FILES"
           --comment-id-file "$COMMENT_ID_FILE"
       - name: Store the comment ID
         if: steps.publish.outputs.comment-id != ''

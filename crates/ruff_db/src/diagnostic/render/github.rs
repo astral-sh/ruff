@@ -5,21 +5,21 @@ use crate::diagnostic::{
     UnifiedFile,
 };
 
-pub(super) struct GithubRenderer<'a> {
+use super::Renderer;
+
+pub struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for GithubRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         for diagnostic in diagnostics {
             let severity = match diagnostic.severity() {
                 Severity::Info => "notice",
@@ -190,9 +190,8 @@ impl std::fmt::Display for GithubAnnotation<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{TestEnvironment, create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, TestEnvironment, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

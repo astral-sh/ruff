@@ -179,6 +179,8 @@ impl InstanceDictionary {
             | KnownClass::UnittestTestCase
             | KnownClass::DjangoModel
             | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict

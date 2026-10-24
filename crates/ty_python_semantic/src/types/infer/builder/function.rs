@@ -436,14 +436,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let decorator_inference =
             (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
-            self.context.extend(decorator_inference.diagnostics());
+            self.context.extend(decorator_inference.context_result());
             self.expressions
                 .extend(decorator_inference.expression_types());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
-            self.implicit_aliases
-                .extend(decorator_inference.implicit_aliases().iter().copied());
+            self.legacy_aliases
+                .extend(decorator_inference.legacy_aliases().iter().copied());
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());

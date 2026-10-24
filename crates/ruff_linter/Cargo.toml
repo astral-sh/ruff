@@ -67,7 +67,6 @@ toml = { workspace = true }
 typed-arena = { workspace = true }
 unicode-normalization = { workspace = true }
 unicode-width = { workspace = true }
-url = { workspace = true }
 
 [dev-dependencies]
 # Disable colored output in tests

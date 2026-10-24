@@ -1,4 +1,4 @@
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
@@ -9,14 +9,13 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 #[cfg(feature = "serde")]
 use serde::Serialize;
 
-pub use self::render::{
-    DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
-};
+pub use self::render::{DummyFileResolver, FileResolver, Input};
+use self::render::{FullRenderer, Renderer};
 pub use self::stylesheet::{DiagnosticStylesheet, fmt_with_hyperlink};
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
-mod render;
+pub mod render;
 mod stylesheet;
 
 /// A collection of information that can be rendered into a diagnostic.
@@ -206,7 +205,7 @@ impl Diagnostic {
     }
 
     /// Return a `std::fmt::Display` implementation that renders this
-    /// diagnostic into a human readable format.
+    /// diagnostic in the full, human-readable format.
     ///
     /// Note that this `Display` impl includes a trailing line terminator, so
     /// callers should prefer using this with `write!` instead of `writeln!`.
@@ -214,8 +213,10 @@ impl Diagnostic {
         &'a self,
         resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
-    ) -> DisplayDiagnostic<'a> {
-        DisplayDiagnostic::new(resolver, config, self)
+    ) -> impl Display + 'a {
+        fmt::from_fn(move |f| {
+            FullRenderer::new(resolver, config).render(f, std::slice::from_ref(self))
+        })
     }
 
     /// Returns the identifier for this diagnostic.
@@ -503,20 +504,8 @@ impl Diagnostic {
         )
     }
 
-    /// Computes the end source location for the message.
-    ///
-    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
-    /// or if the span has no range.
-    pub fn ruff_end_location(&self) -> Option<LineColumn> {
-        Some(
-            self.ruff_source_file()?
-                .to_source_code()
-                .line_column(self.range()?.end()),
-        )
-    }
-
     /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn ruff_source_file(&self) -> Option<&SourceFile> {
+    fn ruff_source_file(&self) -> Option<&SourceFile> {
         self.primary_span_ref()?.as_ruff_file()
     }
 
@@ -1417,15 +1406,30 @@ pub enum HyperlinkMode {
     Never,
 }
 
+/// Descriptive information about a lint rule, independent of any particular diagnostic.
+#[derive(Clone, Debug)]
+pub struct RuleMetadata {
+    /// The canonical name of the rule.
+    pub name: LintName,
+    /// A short description of what the rule detects.
+    pub summary: &'static str,
+    /// The rule's full documentation.
+    pub description: Cow<'static, str>,
+    /// The URL of the rule's documentation.
+    pub help_url: String,
+    /// The linter that defines the rule, if applicable.
+    pub linter: Option<&'static str>,
+    /// The rule's severity before configuration overrides, if one is declared.
+    pub default_severity: Option<Severity>,
+    /// Whether the rule is enabled by default.
+    pub enabled_by_default: bool,
+}
+
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
     /// The program name used in structured output formats (e.g., JUnit, GitHub).
     program: &'static str,
-    /// The format to use for diagnostic rendering.
-    ///
-    /// This uses the "full" format by default.
-    format: DiagnosticFormat,
     /// Whether to enable colors or not.
     ///
     /// Disabled by default.
@@ -1473,7 +1477,6 @@ impl DisplayDiagnosticConfig {
     pub fn new(program: &'static str) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             program,
-            format: DiagnosticFormat::default(),
             color: false,
             hyperlinks: HyperlinkMode::Auto,
             anonymized_line_numbers: false,
@@ -1486,11 +1489,6 @@ impl DisplayDiagnosticConfig {
             fix_applicability: Applicability::Safe,
             cancellation_token: None,
         }
-    }
-
-    /// Whether to enable concise diagnostic output or not.
-    pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig { format, ..self }
     }
 
     /// Whether to enable colors or not.
@@ -1607,66 +1605,6 @@ impl DisplayDiagnosticConfig {
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
     }
-}
-
-/// The diagnostic output format.
-#[derive(Copy, Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub enum DiagnosticFormat {
-    /// The default full mode will print "pretty" diagnostics.
-    ///
-    /// That is, color will be used when printing to a `tty`.
-    /// Moreover, diagnostic messages may include additional
-    /// context and annotations on the input to help understand
-    /// the message.
-    #[default]
-    Full,
-    /// Print diagnostics in a concise mode.
-    ///
-    /// This will guarantee that each diagnostic is printed on
-    /// a single line. Only the most important or primary aspects
-    /// of the diagnostic are included. Contextual information is
-    /// dropped.
-    ///
-    /// This may use color when printing to a `tty`.
-    Concise,
-    /// Print diagnostics in the [Azure Pipelines] format.
-    ///
-    /// [Azure Pipelines]: https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
-    Azure,
-    /// Print diagnostics in JSON format.
-    ///
-    /// Unlike `json-lines`, this prints all of the diagnostics as a JSON array.
-    #[cfg(feature = "serde")]
-    Json,
-    /// Print diagnostics in JSON format, one per line.
-    ///
-    /// This will print each diagnostic as a separate JSON object on its own line. See the `json`
-    /// format for an array of all diagnostics. See <https://jsonlines.org/> for more details.
-    #[cfg(feature = "serde")]
-    JsonLines,
-    /// Print diagnostics in the JSON format expected by [reviewdog].
-    ///
-    /// [reviewdog]: https://github.com/reviewdog/reviewdog
-    #[cfg(feature = "serde")]
-    Rdjson,
-    /// Print diagnostics in the format emitted by Pylint.
-    Pylint,
-    /// Print diagnostics in the format expected by JUnit.
-    #[cfg(feature = "junit")]
-    Junit,
-    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
-    ///
-    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
-    #[cfg(feature = "serde")]
-    Gitlab,
-
-    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
-    ///
-    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
-    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.

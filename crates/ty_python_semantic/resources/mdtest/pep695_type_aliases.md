@@ -135,23 +135,23 @@ appear at the top level of a PEP 695 alias definition:
 from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly
 from dataclasses import InitVar
 
-# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias definitions"
 type Bad1 = ClassVar[str]
-# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ClassVar` is not allowed in type alias definitions"
 type Bad2 = ClassVar
-# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias definitions"
 type Bad3 = Final[int]
-# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Final` is not allowed in type alias definitions"
 type Bad4 = Final
-# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.Required` is not allowed in type alias definitions"
 type Bad5 = Required[int]
-# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.NotRequired` is not allowed in type alias definitions"
 type Bad6 = NotRequired[int]
-# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `typing.ReadOnly` is not allowed in type alias definitions"
 type Bad7 = ReadOnly[int]
-# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias definitions"
 type Bad8 = InitVar[int]
-# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias values"
+# error: [invalid-type-form] "Type qualifier `dataclasses.InitVar` is not allowed in type alias definitions"
 type Bad9 = InitVar
 ```
 
@@ -169,9 +169,9 @@ def f() -> None:
 
 ## `Self`
 
-`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
-body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
-type expression.
+`Self` is not allowed in a PEP 695 type alias value, even when the alias is defined in a class body.
+Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's type
+expression.
 
 TODO: Reject `Self` in alias type-parameter bounds and defaults.
 
@@ -232,7 +232,10 @@ But narrowing of names used in the type alias is still respected:
 
 ```py
 def _(flag: bool):
-    t = int if flag else None
+    if flag:
+        t = int
+    else:
+        t = None
     if t is not None:
         type Alias = t | str
         def f(x: Alias):
@@ -248,10 +251,20 @@ reveal_type(ListOrSet.__type_params__)
 type Tuple1[T] = tuple[T]
 
 def _(cond: bool):
-    Generic = ListOrSet if cond else Tuple1
+    if cond:
+        Generic = ListOrSet
+    else:
+        Generic = Tuple1
 
     def _(x: Generic[int]):
         reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
+
+# A conditional expression does not define a type alias.
+def invalid(cond: bool):
+    Computed = ListOrSet if cond else Tuple1
+
+    def _(x: Computed[int]):  # error: [invalid-type-form]
+        reveal_type(x)  # revealed: Unknown
 
 try:
     class Foo[T]:

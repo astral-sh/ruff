@@ -14,7 +14,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, Severity, Span,
 };
-use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
+use ruff_linter::message::{RenderContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
 use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
@@ -598,12 +598,12 @@ impl<'a> FormatResults<'a> {
             .sorted_unstable_by(Diagnostic::ruff_start_ordering)
             .collect();
 
-        let context = EmitterContext::new(&notebook_index);
+        let context = RenderContext::new(&notebook_index);
         let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());
 
-        render_diagnostics(f, output_format, config, &context, &diagnostics)
+        render_diagnostics(f, output_format, &config, &context, &diagnostics)
     }
 
     /// Write a summary of the formatting results to the given writer.

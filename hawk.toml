@@ -671,7 +671,7 @@ level = "expect"
 reason = "lint level predicates intentionally cover every severity"
 
 [[override]]
-lint = "hawk::dead_public"
+lint = "hawk::unnecessary_public"
 crate = "ty_python_semantic"
 item = "lint::Level::is_ignore"
 kind = "inherent_method"
