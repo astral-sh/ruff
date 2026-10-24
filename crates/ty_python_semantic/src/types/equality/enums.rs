@@ -13,8 +13,8 @@ use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
 use super::{
     ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
-    KnownComparisonSemantics, combine_definite_truthiness, enum_literal_value,
-    evaluate_against_results, evaluate_target_union,
+    KnownComparisonSemantics, combine_truthiness, enum_literal_value, evaluate_against_results,
+    evaluate_target_union,
 };
 
 /// Compare enum values without checking every pair of members.
@@ -171,7 +171,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
 
         if evaluator.goal == ComparisonGoal::Truthiness {
-            return combine_definite_truthiness(
+            return combine_truthiness(
                 self.other
                     .alternatives
                     .iter()
@@ -213,7 +213,7 @@ impl<'db> PartitionedEnumComparison<'db> {
         }
 
         if evaluator.goal == ComparisonGoal::Truthiness {
-            return combine_definite_truthiness(
+            return combine_truthiness(
                 self.target.alternatives.iter().map(|target| {
                     self.evaluate_against_other(evaluator, *target, branch, operator)
                 }),
