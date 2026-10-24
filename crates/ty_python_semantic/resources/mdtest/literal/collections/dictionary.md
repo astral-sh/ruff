@@ -210,6 +210,80 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
+## Inferred and declared dictionary value types
+
+We infer a value type for an unannotated dictionary from all its entries. A known key keeps its own
+value type both on direct lookup and when unpacked as a keyword argument.
+
+```py
+def connect(*, nickname: str | None, timeout: float): ...
+def notify(nickname):
+    options = {"nickname": nickname, "timeout": 30.0}
+    reveal_type(options)  # revealed: dict[str, Unknown | float]
+    reveal_type(options["nickname"])  # revealed: Unknown
+    connect(**options)  # no diagnostic
+```
+
+The same applies when the key is added after choosing an initializer.
+
+```py
+def notify_later(nickname, retry: bool):
+    options = dict(timeout=3.0) if retry else {"timeout": 30.0}
+    options["nickname"] = nickname
+    reveal_type(options["nickname"])  # revealed: Unknown
+    connect(**options)  # no diagnostic
+```
+
+When two branches build the dictionary, the nickname's type combines the values assigned to that key
+in each branch.
+
+```py
+def notify_with_defaults(saved):
+    if saved:
+        options = {"nickname": saved.name, "timeout": saved.timeout}
+    else:
+        options = {"nickname": "guest", "timeout": 30.0}
+    reveal_type(options["nickname"])  # revealed: Unknown | Literal["guest"]
+```
+
+The nickname also keeps its type when a loop rebuilds the dictionary with a different timeout.
+
+```py
+def notify_with_retries(nickname, timeouts: list[float]):
+    options = {"nickname": nickname, "timeout": 30.0}
+    for timeout in timeouts:
+        reveal_type(options["nickname"])  # revealed: Unknown
+        connect(**options)  # no diagnostic
+        options = {"nickname": nickname, "timeout": timeout}
+```
+
+An explicit declaration can give the same dictionary literal a different type for a known key.
+
+```py
+from typing import Any
+
+def compare(nickname: Any):
+    inferred = {"nickname": nickname, "timeout": 30.0}
+    reveal_type(inferred["nickname"])  # revealed: Any
+
+    declared: dict[str, Any | float]
+    declared = {"nickname": nickname, "timeout": 30.0}
+    reveal_type(declared["nickname"])  # revealed: Any | float
+```
+
+An attribute can get its declaration from the class.
+
+```py
+class Client:
+    defaults: dict[str, Any | float]
+
+    def __init__(self, nickname: Any):
+        self.defaults = {"nickname": nickname, "timeout": 30.0}
+        self.options = {"nickname": nickname, "timeout": 30.0}
+        reveal_type(self.defaults["nickname"])  # revealed: Any | float
+        reveal_type(self.options["nickname"])  # revealed: Any
+```
+
 ## Keys with gradual value types
 
 When a dictionary declares its values as `Any`, a literal key has that type even if its value is
@@ -223,6 +297,15 @@ current = payload["current"]
 reveal_type(current)  # revealed: Any
 reveal_type(payload["current"]["number"])  # revealed: Any
 {**current["base"]}  # no diagnostic
+```
+
+A function that reassigns the dictionary still uses its module-level declaration.
+
+```py
+def reset():
+    global payload
+    payload = {"current": 1}
+    reveal_type(payload["current"])  # revealed: Any
 ```
 
 An unpacked keyword has the same type as a direct read of the key.

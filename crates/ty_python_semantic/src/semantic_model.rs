@@ -19,7 +19,7 @@ use crate::Db;
 use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
-    builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
+    Place, builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
     loop_header_reachability, place_from_bindings,
 };
 use crate::place_load::{
@@ -29,8 +29,8 @@ use crate::place_load::{
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers, binding_type,
-    infer_complete_scope_types, infer_definition_types, inferred_declaration,
+    CycleDetector, MemberLookupPolicy, ProgramEnvironment, SpecialFormType, Type, TypeQualifiers,
+    binding_type, infer_complete_scope_types, infer_definition_types, inferred_declaration,
     is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -40,6 +40,68 @@ use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
+
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, _, _| false,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn is_inferred_collection_binding<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    let file = definition.program_file(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let model = SemanticModel::new(db, file);
+    let (target, value) = match definition.kind(db) {
+        DefinitionKind::LoopHeader(_) => {
+            let header = loop_header_reachability(db, definition);
+            return header.deleted_reachability.is_always_false()
+                && header
+                    .reachable_bindings
+                    .iter()
+                    .all(|binding| is_inferred_collection_binding(db, binding.definition));
+        }
+        DefinitionKind::Assignment(assignment) if assignment.unpack().is_none() => {
+            (assignment.target(&module), assignment.value(&module))
+        }
+        DefinitionKind::NamedExpression(named) => {
+            let named = named.node(&module);
+            (named.target.as_ref(), named.value.as_ref())
+        }
+        DefinitionKind::DictKeyAssignment(assignment) => {
+            return model.is_inferred_collection(assignment.value(&module));
+        }
+        _ => return false,
+    };
+    let index = semantic_index(db, file);
+    let scope = definition.file_scope(db);
+    let mut declarations = if let Some(symbol) = definition.place(db).as_symbol()
+        && let Some((owner, symbol)) = index.forwarded_assignment_owner(scope, symbol)
+    {
+        index
+            .use_def_map(owner)
+            .end_of_scope_symbol_declarations(symbol)
+    } else {
+        index.use_def_map(scope).declarations_at_binding(definition)
+    };
+    if declarations.any(|declaration| declaration.declaration.definition().is_some()) {
+        return false;
+    }
+    if let ast::Expr::Attribute(attribute) = target {
+        let object =
+            infer_definition_types(db, definition).expression_type(attribute.value.as_ref());
+        let member = object.member_lookup_with_policy(
+            db,
+            &model.program_environment(),
+            &attribute.attr,
+            MemberLookupPolicy::default(),
+        );
+        if let Place::Defined(member) = member.place
+            && member.origin.is_declared()
+        {
+            return false;
+        }
+    }
+    model.is_inferred_collection(value)
+}
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -725,6 +787,38 @@ impl<'db> SemanticModel<'db> {
         candidates.sort_unstable_by(|left, right| left.value.cmp(&right.value));
         candidates.dedup_by(|left, right| left.value == right.value);
         candidates
+    }
+
+    /// Whether the receiver's item type was inferred from a collection literal. An inferred
+    /// item type describes all keys together, so it must not override a known individual key.
+    pub(crate) fn is_inferred_collection(&self, receiver: &ast::Expr) -> bool {
+        match receiver {
+            Expr::Dict(_)
+            | Expr::DictComp(_)
+            | Expr::List(_)
+            | Expr::ListComp(_)
+            | Expr::Tuple(_) => return true,
+            Expr::If(condition) => {
+                return self.is_inferred_collection(&condition.body)
+                    && self.is_inferred_collection(&condition.orelse);
+            }
+            Expr::Call(call) => {
+                return call.func.as_name_expr().is_some_and(|name| {
+                    matches!(name.id.as_str(), "dict" | "list" | "tuple")
+                        && self.definitely_has_builtin_binding(&name.id, name.into())
+                });
+            }
+            Expr::Name(_) | Expr::Attribute(_) => {}
+            // A nested value can get its type from the declaration on the outer collection.
+            Expr::Subscript(subscript) if self.is_inferred_collection(&subscript.value) => {}
+            _ => return false,
+        }
+        let definitions = self.reaching_definitions_at(receiver);
+        !definitions.is_empty()
+            && definitions.iter().all(|&definition| {
+                definition.program_file(self.db) == self.file
+                    && is_inferred_collection_binding(self.db, definition)
+            })
     }
 
     /// Appends literal string keys from dictionary initializers that can reach `receiver`.

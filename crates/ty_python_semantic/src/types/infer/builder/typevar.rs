@@ -1545,7 +1545,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_definition = definition_order
             .and_then(|before| previous_definition_in(scope, place, before))
             .or_else(|| {
-                self.forwarded_assignment_owner(scope, place.expect_symbol())
+                self.index
+                    .forwarded_assignment_owner(scope, place.expect_symbol())
                     .and_then(|(owner_scope, owner_place)| {
                         let owner_use_def = self.index.use_def_map(owner_scope);
                         let before = owner_use_def

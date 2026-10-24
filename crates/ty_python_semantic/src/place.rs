@@ -808,7 +808,7 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     env: &ProgramEnvironment<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
-    declared_binding_ty: Option<Type<'db>>,
+    narrow_binding: Option<&dyn Fn(Type<'db>) -> Type<'db>>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
         db,
@@ -816,7 +816,7 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
-        declared_binding_ty,
+        narrow_binding,
     )
 }
 
@@ -1826,7 +1826,7 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
-    declared_binding_ty: Option<Type<'db>>,
+    narrow_binding: Option<&dyn Fn(Type<'db>) -> Type<'db>>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1992,8 +1992,8 @@ fn place_from_bindings_impl<'db>(
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
             let mut binding_ty = binding_type(db, binding);
-            if let Some(declared) = declared_binding_ty {
-                binding_ty = declared.narrowed_by_assignment(db, env, binding_ty);
+            if let Some(narrow) = narrow_binding {
+                binding_ty = narrow(binding_ty);
             }
             let narrowed = match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
