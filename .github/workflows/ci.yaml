@@ -49,7 +49,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-native-macos-sources-20261024-v1-macos-before
+        prefix-key: ruff-native-macos-sources-20261024-v2-macos-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -112,11 +112,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@131646431a5f35fe2c608863cc90560e1716c31a
+    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-macos-sources-20261024-v1-macos-after
+        prefix-key: ruff-native-macos-sources-20261024-v2-macos-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
