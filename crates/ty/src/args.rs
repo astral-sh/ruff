@@ -449,6 +449,9 @@ pub enum OutputFormat {
     /// Print diagnostics as a JUnit-style XML report.
     #[value(name = "junit")]
     Junit,
+    /// Print diagnostics as a SARIF report.
+    #[value(name = "sarif")]
+    Sarif,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -459,6 +462,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
             OutputFormat::Junit => Self::Junit,
+            OutputFormat::Sarif => Self::Sarif,
         }
     }
 }

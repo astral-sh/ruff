@@ -162,6 +162,11 @@ pub enum KnownClass {
     TyExtensionsAsyncIterator,
     TyExtensionsIterable,
     TyExtensionsIterator,
+    // Django
+    DjangoModel,
+    DjangoField,
+    DjangoDateField,
+    DjangoForeignKey,
     // Pydantic
     PydanticBaseModel,
     PydanticBaseSettings,
@@ -288,6 +293,10 @@ impl KnownClass {
             | Self::TyExtensionsIterable
             | Self::TyExtensionsIterator
             | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -425,6 +434,10 @@ impl KnownClass {
             | Self::ExtensionTypedDictFallback
             | Self::TypedDictFallback
             | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -552,6 +565,10 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
+            | KnownClass::DjangoModel
+            | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -671,6 +688,10 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
+            | KnownClass::DjangoModel
+            | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticRootModel
@@ -790,6 +811,10 @@ impl KnownClass {
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
             | KnownClass::UnittestTestCase
+            | KnownClass::DjangoModel
+            | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -921,6 +946,10 @@ impl KnownClass {
             | Self::MutableMapping
             | Self::Sequence
             | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1041,6 +1070,10 @@ impl KnownClass {
             | KnownClass::GenericContext
             | KnownClass::Specialization
             | KnownClass::UnittestTestCase
+            | KnownClass::DjangoModel
+            | KnownClass::DjangoField
+            | KnownClass::DjangoDateField
+            | KnownClass::DjangoForeignKey
             | KnownClass::PydanticBaseModel
             | KnownClass::PydanticBaseSettings
             | KnownClass::PydanticConfigDict
@@ -1173,6 +1206,10 @@ impl KnownClass {
             Self::FunctoolsPartial => "partial",
             Self::ProtocolMeta => "_ProtocolMeta",
             Self::UnittestTestCase => "TestCase",
+            Self::DjangoModel => "Model",
+            Self::DjangoField => "Field",
+            Self::DjangoDateField => "DateField",
+            Self::DjangoForeignKey => "ForeignKey",
             Self::PydanticBaseModel => "BaseModel",
             Self::PydanticBaseSettings => "BaseSettings",
             Self::PydanticConfigDict => "ConfigDict",
@@ -1610,6 +1647,9 @@ impl KnownClass {
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
             Self::UnittestTestCase => KnownModule::UnittestCase,
+            Self::DjangoModel => KnownModule::DjangoDbModelsBase,
+            Self::DjangoField | Self::DjangoDateField => KnownModule::DjangoDbModelsFields,
+            Self::DjangoForeignKey => KnownModule::DjangoDbModelsFieldsRelated,
             Self::PydanticBaseModel => KnownModule::PydanticMain,
             Self::PydanticBaseSettings => KnownModule::PydanticSettingsMain,
             Self::PydanticConfigDict => KnownModule::PydanticConfig,
@@ -1732,6 +1772,10 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict
@@ -1836,7 +1880,9 @@ impl KnownClass {
             "_version_info" => &[Self::VersionInfo],
             "EllipsisType" => &[Self::EllipsisType],
             "NotImplementedType" => &[Self::NotImplementedType],
-            "Field" => &[Self::Field],
+            "Field" => &[Self::Field, Self::DjangoField],
+            "DateField" => &[Self::DjangoDateField],
+            "ForeignKey" => &[Self::DjangoForeignKey],
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
@@ -1851,6 +1897,7 @@ impl KnownClass {
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             "_TypedDict" => &[Self::ExtensionTypedDictFallback],
             "TestCase" => &[Self::UnittestTestCase],
+            "Model" => &[Self::DjangoModel],
             "BaseModel" => &[Self::PydanticBaseModel],
             "BaseSettings" => &[Self::PydanticBaseSettings],
             "ConfigDict" => &[Self::PydanticConfigDict],
@@ -1961,6 +2008,10 @@ impl KnownClass {
             | Self::Path
             | Self::FunctoolsPartial
             | Self::UnittestTestCase
+            | Self::DjangoModel
+            | Self::DjangoField
+            | Self::DjangoDateField
+            | Self::DjangoForeignKey
             | Self::PydanticBaseModel
             | Self::PydanticBaseSettings
             | Self::PydanticConfigDict

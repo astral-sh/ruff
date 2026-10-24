@@ -252,6 +252,11 @@
           "description": "Print diagnostics as a JUnit-style XML report.",
           "type": "string",
           "const": "junit"
+        },
+        {
+          "description": "Print diagnostics as a [SARIF] report.\n\n[SARIF]: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html",
+          "type": "string",
+          "const": "sarif"
         }
       ]
     },

@@ -16,6 +16,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/build-docker.yml
+      - Dockerfile
 
 env:
   UV_LOCKED: 1

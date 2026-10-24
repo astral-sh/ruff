@@ -390,6 +390,67 @@ def consume_object(value: object) -> None: ...
 reveal_type(infer_from_consumer(consume_object))  # revealed: object
 ```
 
+## Inference from bottom callable signatures
+
+A callable that accepts every argument list and returns `Never` can satisfy any callable signature.
+Its return and parameter types still provide inference evidence: `Never ≤ T` infers `Never`, while
+`T ≤ object` infers `object`.
+
+```py
+from typing import Callable, Never
+
+def abort(*args: object, **kwargs: object) -> Never:
+    raise NotImplementedError
+
+def wrap[T](callback: Callable[[], T]) -> list[T]:
+    return []
+
+def wrap_param[T](callback: Callable[[T], object]) -> list[T]:
+    return []
+
+# revealed: list[Never]
+reveal_type(wrap(abort))
+# revealed: list[object]
+reveal_type(wrap_param(abort))
+value: str = wrap_param(abort)[0]  # error: [invalid-assignment]
+```
+
+## Inference from top callable signatures
+
+A callback accepting the top callable accepts any callable. Comparing its parameter with a callable
+returning `T` still contributes `T ≤ object` to inference.
+
+```py
+from typing import Callable
+from ty_extensions import Top
+
+def wrap[T](callback: Callable[[Callable[[], T]], None]) -> list[T]:
+    return []
+
+def accepts_top(callback: Top[Callable[..., object]]) -> None: ...
+
+# revealed: list[object]
+reveal_type(wrap(accepts_top))
+value: str = wrap(accepts_top)[0]  # error: [invalid-assignment]
+```
+
+Ignoring a source receiver restriction still preserves return-type inference.
+
+```py
+class Restricted[T]:
+    def method(self: "Allowed[T]") -> T:
+        raise NotImplementedError
+
+class Allowed[T](Restricted[T]): ...
+
+def infer[T](callback: Top[Callable[..., T]]) -> list[T]:
+    return []
+
+def check(restricted: Restricted[int]) -> None:
+    # revealed: list[int]
+    reveal_type(infer(restricted.method))
+```
+
 ## Intersecting inferred union upper bounds
 
 Multiple callable arguments can infer multiple union upper bounds for the same type variable. We

@@ -5,7 +5,10 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 
 use ruff_source_file::LineColumn;
 
-use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity, render::FileResolver};
+use crate::diagnostic::{
+    Diagnostic, DisplayDiagnosticConfig, Severity,
+    render::{FileResolver, Renderer},
+};
 
 /// Print diagnostics as a JUnit-style XML report.
 ///
@@ -15,21 +18,19 @@ use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity, render::F
 /// [`junit.xsd`]: https://github.com/junit-team/junit-framework/blob/2870b7d8fd5bf7c1efe489d3991d3ed3900e82bb/platform-tests/src/test/resources/jenkins-junit.xsd
 /// [version]: https://llg.cubic.org/docs/junit/
 /// [`quick_junit`]: https://docs.rs/quick-junit/latest/quick_junit/
-pub(super) struct JunitRenderer<'a> {
+pub struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
     config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> JunitRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+    pub fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
         Self { resolver, config }
     }
+}
 
-    pub(super) fn render(
-        &self,
-        f: &mut std::fmt::Formatter,
-        diagnostics: &[Diagnostic],
-    ) -> std::fmt::Result {
+impl Renderer for JunitRenderer<'_> {
+    fn render(&self, f: &mut std::fmt::Formatter, diagnostics: &[Diagnostic]) -> std::fmt::Result {
         let package = format!("org.{}", self.config.program);
         let mut report = Report::new(self.config.program);
 
@@ -195,9 +196,8 @@ impl std::io::Write for FmtAdapter<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::diagnostic::{
-        DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+    use crate::diagnostic::render::tests::{
+        DiagnosticFormat, create_diagnostics, create_syntax_error_diagnostics,
     };
 
     #[test]

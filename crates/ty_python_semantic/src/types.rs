@@ -43,7 +43,7 @@ pub(crate) use self::infer::{
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
 };
 use self::infer::{
-    implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,
+    infer_function_default_types, infer_legacy_type_alias, legacy_type_alias_parameters,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -78,7 +78,7 @@ pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{
-    AttributeAccessMethod, INVALID_AWAIT, INVALID_TYPE_FORM, report_bad_attribute_access_call,
+    AttributeAccessMethod, INVALID_AWAIT, report_bad_attribute_access_call,
     report_bad_dunder_get_call, report_bad_import_call,
 };
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -202,7 +202,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
 
     let index = semantic_index(db, file);
     let mut diagnostics = TypeCheckDiagnostics::default();
-    let mut implicit_aliases = Vec::new();
+    let mut legacy_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
         // Scopes that may require type context are inferred during the inference of
@@ -216,7 +216,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
         }
-        implicit_aliases.extend_from_slice(result.implicit_aliases());
+        legacy_aliases.extend_from_slice(result.legacy_aliases());
     }
 
     // Aliases can be referenced repeatedly, across scopes, or through mutually recursive
@@ -226,7 +226,7 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
         let span = diagnostic.primary_span()?;
         (span.file() == &UnifiedFile::Ty(source_file)).then_some((diagnostic.id(), span.range()))
     };
-    let mut reported = if implicit_aliases.is_empty() {
+    let mut reported = if legacy_aliases.is_empty() {
         FxHashSet::default()
     } else {
         (&diagnostics)
@@ -234,25 +234,25 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             .filter_map(diagnostic_key)
             .collect()
     };
-    while let Some(definition) = implicit_aliases.pop() {
+    while let Some(definition) = legacy_aliases.pop() {
         if !checked_aliases.insert(definition) {
             continue;
         }
         let inference =
-            infer_implicit_alias_type(db, definition, implicit_alias_parameters(db, definition));
+            infer_legacy_type_alias(db, definition, legacy_type_alias_parameters(db, definition));
         // Runtime-value inference can report the same error with different wording for its
         // expression context. Keep that diagnostic when the rule and source location match.
         // Compare with earlier inference results only: one alias can produce distinct errors
         // for the same rule and location.
-        diagnostics.extend_filtered(&inference.diagnostics, |diagnostic| {
+        diagnostics.extend_filtered(&inference.context.diagnostics, |diagnostic| {
             diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
         });
         reported.extend(
-            (&inference.diagnostics)
+            (&inference.context.diagnostics)
                 .into_iter()
                 .filter_map(diagnostic_key),
         );
-        implicit_aliases.extend_from_slice(&inference.implicit_aliases);
+        legacy_aliases.extend_from_slice(&inference.legacy_aliases);
     }
 
     diagnostics.extend_diagnostics(
@@ -284,8 +284,8 @@ pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) ->
 /// Returns whether a definition may represent a value that exists at runtime.
 ///
 /// Type-checking-only decorators and guards never represent runtime values. Private type-variable
-/// declarations, explicit aliases, and unambiguous typing aliases in stub files are also
-/// typing-only, while public aliases and genuine runtime values remain visible.
+/// declarations, PEP 613 and PEP 695 aliases, and unambiguous implicit aliases in stub files
+/// are also typing-only, while public aliases and genuine runtime values remain visible.
 ///
 /// ```python
 /// _T = TypeVar("_T")  # Typing-only helper.
@@ -351,7 +351,7 @@ pub(crate) fn may_exist_at_runtime<'db>(db: &'db dyn Db, definition: Definition<
         return false;
     }
 
-    // Explicit PEP 613 and PEP 695 type aliases in stubs are also typing-only helpers.
+    // Private PEP 613 and PEP 695 type aliases in stubs are also typing-only helpers.
     let model = SemanticModel::new(db, file);
     if model.is_type_alias_definition(definition) {
         return false;
@@ -3410,7 +3410,7 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
+            // `Recursive` currently only represents legacy type aliases with declared names.
             // Revisit this and `is_hintable` when general recursive type inference can produce
             // types without a declared alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
@@ -10763,9 +10763,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Default-specialize all legacy typevars in this type.
-    ///
-    /// This is used when an implicit type alias is referenced without explicitly specializing it.
+    /// Apply defaults to free legacy type variables before converting a referenced value to a type.
     fn default_specialize(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let mut variables = FxOrderSet::default();
         self.find_legacy_typevars(db, env, None, &mut variables);
@@ -11792,30 +11790,6 @@ impl<'db> TypeAndQualifiers<'db> {
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
     invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression<'db>; 1]>,
-}
-
-impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(
-        self,
-        context: &InferContext,
-        node: &impl Ranged,
-        flags: InferenceFlags,
-    ) -> Type<'db> {
-        let db = context.db();
-        let InvalidTypeExpressionError {
-            fallback_type,
-            invalid_expressions,
-        } = self;
-        let env = context.program_environment();
-        for error in invalid_expressions {
-            let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
-                continue;
-            };
-            let diagnostic = builder.into_diagnostic(error.reason(db, env, flags));
-            error.add_subdiagnostics(db, env, diagnostic, node);
-        }
-        fallback_type
-    }
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
