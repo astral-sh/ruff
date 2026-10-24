@@ -106,6 +106,7 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("TRIO1", "ASYNC1"),
         ("TRIO10", "ASYNC10"),
         ("TRIO100", "ASYNC100"),
+        ("TRIO103", "ASYNC103"),
         ("TRIO105", "ASYNC105"),
         ("TRIO109", "ASYNC109"),
         ("TRIO11", "ASYNC11"),
