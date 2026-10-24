@@ -329,8 +329,13 @@ pub struct Hover<'db> {
 }
 
 impl<'db> Hover<'db> {
-    /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> impl Display {
+    /// Renders the hover using the specified markup kind and client-supported HTML tags.
+    pub const fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        kind: MarkupKind,
+        allowed_html_tags: &'a [String],
+    ) -> impl Display {
         std::fmt::from_fn(move |f| {
             let mut first = true;
             let env = ProgramEnvironment::from_file(self.program_file);
@@ -339,7 +344,7 @@ impl<'db> Hover<'db> {
                     kind.horizontal_line().fmt(f)?;
                 }
 
-                content.display(db, &env, kind).fmt(f)?;
+                content.display(db, &env, kind, allowed_html_tags).fmt(f)?;
                 first = false;
             }
 
@@ -403,12 +408,14 @@ impl<'db> HoverContent<'db> {
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         kind: MarkupKind,
+        allowed_html_tags: &'a [String],
     ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
             db,
             env,
             content: self,
             kind,
+            allowed_html_tags,
         }
     }
 }
@@ -418,6 +425,7 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
+    allowed_html_tags: &'a [String],
 }
 
 impl<'db> DisplayHoverContent<'_, 'db> {
@@ -493,8 +501,12 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     .fenced_code_block(format!("(key of {owner}) {key}: {ty_string}"), syntax)
                     .fmt(f)
             }
-            HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
-            HoverContent::DocstringFragment(fragment) => fragment.render(self.kind).fmt(f),
+            HoverContent::Docstring(docstring) => {
+                docstring.render(self.kind, self.allowed_html_tags).fmt(f)
+            }
+            HoverContent::DocstringFragment(fragment) => {
+                fragment.render(self.kind, self.allowed_html_tags).fmt(f)
+            }
         }
     }
 }
@@ -578,8 +590,12 @@ mod tests {
         )
         .map(|hover| {
             (
-                hover.display(&test.db, MarkupKind::PlainText).to_string(),
-                hover.display(&test.db, MarkupKind::Markdown).to_string(),
+                hover
+                    .display(&test.db, MarkupKind::PlainText, &[])
+                    .to_string(),
+                hover
+                    .display(&test.db, MarkupKind::Markdown, &[])
+                    .to_string(),
             )
         });
 
@@ -7444,9 +7460,9 @@ type U<CURSOR> = MyType
             write!(
                 &mut buf,
                 "{plaintext}{line}{markdown}{line}",
-                plaintext = hover.display(&self.db, MarkupKind::PlainText),
+                plaintext = hover.display(&self.db, MarkupKind::PlainText, &[]),
                 line = MarkupKind::PlainText.horizontal_line(),
-                markdown = hover.display(&self.db, MarkupKind::Markdown),
+                markdown = hover.display(&self.db, MarkupKind::Markdown, &[]),
             )
             .unwrap();
 

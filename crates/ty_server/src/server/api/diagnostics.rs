@@ -45,7 +45,7 @@ impl Diagnostics {
         db: &dyn Db,
         diagnostics: impl Iterator<Item = &'a ruff_db::diagnostic::Diagnostic> + Clone,
         unnecessary_hints: &[Hint],
-        client_capabilities: ResolvedClientCapabilities,
+        client_capabilities: &ResolvedClientCapabilities,
     ) -> Option<String> {
         let diagnostic_count = diagnostics.clone().count();
         if diagnostic_count == 0 && unnecessary_hints.is_empty() {
@@ -95,7 +95,7 @@ impl Diagnostics {
     pub(super) fn result_id(
         &self,
         db: &dyn Db,
-        client_capabilities: ResolvedClientCapabilities,
+        client_capabilities: &ResolvedClientCapabilities,
     ) -> Option<String> {
         Self::result_id_from_hash(
             db,
@@ -108,7 +108,7 @@ impl Diagnostics {
     pub(super) fn to_lsp_diagnostics(
         &self,
         db: &ProjectDatabase,
-        client_capabilities: ResolvedClientCapabilities,
+        client_capabilities: &ResolvedClientCapabilities,
     ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Uri, Vec<Diagnostic>> = FxHashMap::default();
@@ -308,7 +308,7 @@ pub(crate) fn publish_settings_diagnostics(
     }
 
     let session_encoding = session.position_encoding();
-    let client_capabilities = session.client_capabilities();
+    let client_capabilities = session.client_capabilities().clone();
 
     let project_path = AnySystemPath::System(path);
 
@@ -369,7 +369,7 @@ pub(crate) fn publish_settings_diagnostics(
             .into_iter()
             .filter(|diagnostic| global_settings.should_show_diagnostic(diagnostic))
             .map(|diagnostic| {
-                to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1
+                to_lsp_diagnostic(db, &diagnostic, session_encoding, &client_capabilities).1
             })
             .collect::<Vec<_>>();
 
@@ -450,7 +450,7 @@ pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
-    client_capabilities: ResolvedClientCapabilities,
+    client_capabilities: &ResolvedClientCapabilities,
 ) -> (Option<lsp_types::Uri>, Diagnostic) {
     let supports_related_information =
         client_capabilities.supports_diagnostic_related_information();
@@ -616,7 +616,7 @@ enum FullDiagnosticOutput {
 }
 
 impl FullDiagnosticOutput {
-    fn from_client_capabilities(client_capabilities: ResolvedClientCapabilities) -> Self {
+    fn from_client_capabilities(client_capabilities: &ResolvedClientCapabilities) -> Self {
         if client_capabilities.supports_full_diagnostic_output() {
             Self::Enabled
         } else {

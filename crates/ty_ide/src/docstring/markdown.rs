@@ -7,16 +7,16 @@ use super::DocstringFragment;
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
-pub(super) fn render(source: &str) -> String {
+pub(super) fn render(source: &str, allowed_html_tags: &[String]) -> String {
     let mut output = String::new();
-    structured::render_into(&mut output, source);
+    structured::render_into(&mut output, source, allowed_html_tags);
     output
 }
 
 impl DocstringFragment {
-    pub(super) fn render_markdown(&self) -> String {
+    pub(super) fn render_markdown(&self, allowed_html_tags: &[String]) -> String {
         let mut output = String::new();
-        general::render_fragment_into(&mut output, &self.0);
+        general::render_fragment_into(&mut output, &self.0, allowed_html_tags);
         output
     }
 }
