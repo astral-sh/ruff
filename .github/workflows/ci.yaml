@@ -351,8 +351,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: |
@@ -369,17 +371,20 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 15
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: ". -> target/hawk"
-          cache-workspace-crates: "false"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup toolchain install 1.99.0
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          target-directory: target/hawk
+          # Cache dependencies without enabling unstable Cargo freshness for Hawk.
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
@@ -397,8 +402,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Cargo verifies each package from an extracted archive, so cache dependencies only.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "cargo publish dry-run"
         run: cargo publish --workspace --dry-run
@@ -410,18 +417,19 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
     env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: ruff-linux-debug
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install uv"
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -499,8 +507,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -536,11 +546,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
-          # Fix for https://github.com/Swatinem/rust-cache/issues/341
-          cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
       # Renovate needs a separate version/checksum pair for each archive.
@@ -577,8 +587,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
@@ -617,13 +629,17 @@ jobs:
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
-        run: rustup default "${MSRV}"
+        run: |
+          rustup toolchain install "${MSRV}" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          # Test the MSRV without enabling unstable Cargo features.
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Build tests"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
@@ -639,9 +655,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
-          workspaces: "fuzz -> target"
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
+          workspace: fuzz
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -652,6 +670,35 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - run: uv run --only-dev cargo fuzz build -s none
 
+  cargo-build-ruff:
+    name: "cargo build (ruff, ${{ matrix.runner }})"
+    runs-on: ${{ matrix.runner }}
+    # Depot and GitHub runners use separate cache services, so each needs a producer.
+    strategy:
+      matrix:
+        runner: [depot-ubuntu-24.04-8, github-ubuntu-24.04-x86_64-4]
+    needs: determine_changes
+    if: ${{ github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - id: rust-cache
+        uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+      - name: Build Ruff binary
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+        run: cargo build --bin ruff
+
   fuzz-parser:
     name: "fuzz parser"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -659,6 +706,10 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.parser == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: 20
     env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      # Line-tables-only debug info: faster builds, backtraces still work.
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
       FORCE_COLOR: 1
       # Keep in sync with the job's timeout-minutes.
       FUZZ_JOB_TIMEOUT_MINUTES: 20
@@ -673,16 +724,14 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: ruff-linux-debug
-          save-if: false
       - name: "Install Rust toolchain"
         run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          save-if: "false"
       - name: Build Ruff binary
-        env:
-          # Line-tables-only debug info: faster builds, backtraces still work.
-          CARGO_PROFILE_DEV_DEBUG: line-tables-only
         run: cargo build --bin ruff
       - name: Fuzz
         run: |
@@ -709,8 +758,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -754,6 +805,8 @@ jobs:
       )
     timeout-minutes: 20
     env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
       # Line-tables-only debug info: faster builds, backtraces still work.
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
@@ -773,10 +826,11 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
-          shared-key: ruff-linux-debug
-          save-if: false
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          save-if: "false"
 
       - name: Build baseline version
         run: |
@@ -909,8 +963,10 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Base and PR builds use different revisions; keep a smaller dependency cache.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1006,8 +1062,10 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1030,8 +1088,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
@@ -1061,8 +1121,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep a smaller cache for the separate instrumented and profile-guided builds.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install LLVM profiling tools"
         run: rustup component add llvm-tools-preview
@@ -1111,8 +1173,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1143,8 +1207,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1168,8 +1234,10 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -1217,14 +1285,20 @@ jobs:
     permissions:
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -1232,9 +1306,6 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-
-      - name: "Install Rust toolchain"
-        run: rustup show
 
       - name: "Build benchmarks"
         run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
@@ -1273,8 +1344,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -1408,9 +1481,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
@@ -1420,6 +1490,11 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Build benchmarks"
         run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_ide,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script --bench ty_ide
 
