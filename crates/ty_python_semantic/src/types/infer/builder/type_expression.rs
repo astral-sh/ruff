@@ -22,7 +22,8 @@ use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
     AliasInferenceCache, CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference,
-    LegacyTypeAliasInferenceExtra, TypeExpressionFlags, infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
+    LegacyTypeAliasInferenceExtra, TypeExpressionFlags, infer_legacy_type_alias,
+    legacy_type_alias_definition, legacy_type_alias_parameters,
     non_alias_type_expression_diagnostics,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -75,7 +76,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // when part of an alias is invalid, and validate PEP 613 aliases at their definitions.
         if alias_definition.is_implicit
             && inference.ty.is_ok()
-            && inference.extra.as_ref().is_some_and(|extra| extra.context.has_invalid_type_form)
+            && inference
+                .extra
+                .as_ref()
+                .is_some_and(|extra| extra.context.has_invalid_type_form)
             && !any_over_type(db, self.program_environment(), ty, false, |ty| {
                 matches!(ty, Type::Recursive(_))
             })
@@ -90,7 +94,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 LegacyTypeAliasReference::ValueFallback
             };
         }
-        if inference.extra.as_ref().is_some_and(|extra| extra.context.has_invalid_type_form) {
+        if inference
+            .extra
+            .as_ref()
+            .is_some_and(|extra| extra.context.has_invalid_type_form)
+        {
             self.context.mark_invalid_type_form();
         }
 
@@ -145,7 +153,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> TypeCheckDiagnostics {
         self.context.collect_type_expression_diagnostics();
         self.finish_legacy_type_alias(definition, value)
-            .extra.map(|extra| extra.context.diagnostics).unwrap_or_default()
+            .extra
+            .map(|extra| extra.context.diagnostics)
+            .unwrap_or_default()
     }
 
     pub(in crate::types::infer) fn finish_legacy_type_alias(

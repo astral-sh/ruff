@@ -248,7 +248,11 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
             diagnostics.extend_filtered(&extra.context.diagnostics, |diagnostic| {
                 diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
             });
-            reported.extend((&extra.context.diagnostics).into_iter().filter_map(diagnostic_key));
+            reported.extend(
+                (&extra.context.diagnostics)
+                    .into_iter()
+                    .filter_map(diagnostic_key),
+            );
             legacy_aliases.extend_from_slice(&extra.legacy_aliases);
         }
     }

@@ -99,12 +99,12 @@ use crate::types::function::{
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, bind_typevar, enclosing_binding_contexts,
 };
-use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
-use crate::types::infer::builder::named_tuple::NamedTupleKind;
-use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::alias_inputs::{
     is_implicit_alias_value, may_require_implicit_alias_inference,
 };
+use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
+use crate::types::infer::builder::named_tuple::NamedTupleKind;
+use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
     AliasInferenceCache, AliasInferenceInputsBuilder, StatementInference, StatementInferenceInner,
     StatementInferenceInnerExtra, TruthinessAnalyzer, TypeAndRange, TypeExpressionFlags,

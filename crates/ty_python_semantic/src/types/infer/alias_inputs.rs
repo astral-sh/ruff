@@ -310,4 +310,3 @@ pub(super) fn may_require_implicit_alias_inference<'db>(
         )
     })
 }
-
