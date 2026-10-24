@@ -1,0 +1,3 @@
+[extra-build-dependencies]
+# The pandas documentation theme's build backend omits this dependency.
+pydata-sphinx-theme = ["typing-extensions"]

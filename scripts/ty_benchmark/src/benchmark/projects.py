@@ -135,7 +135,7 @@ ALL: Final = [
         name="black",
         repository="https://github.com/psf/black",
         revision="ce1897a8f20d0f64844dd666d07f4003500d0e09",
-        python_version="3.10",
+        python_version="3.11",
         include=["src"],
         install_arguments=[
             "-r",
@@ -159,7 +159,7 @@ ALL: Final = [
         name="discord.py",
         repository="https://github.com/Rapptz/discord.py.git",
         revision="2fbed9362422dad4f7850eb6c5d9b1f8bff7c71a",
-        python_version="3.10",
+        python_version="3.11",
         include=["discord"],
         install_arguments=[
             "-r",
@@ -174,9 +174,6 @@ ALL: Final = [
         ),
     ),
     # Fairly chunky project, requires the pydantic mypy plugin.
-    #
-    # Pyrefly reports significantly more diagnostics than ty and, unlike ty, has partial pydantic support.
-    # Both could be the reason why Pyrefly is slower than ty (it's notable that it's mainly slower because it has a much higher system time)
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
@@ -217,7 +214,7 @@ ALL: Final = [
         name="jinja",
         repository="https://github.com/pallets/jinja",
         revision="5ef70112a1ff19c05324ff889dd30405b1002044",
-        python_version="3.10",
+        python_version="3.11",
         include=["src"],
         install_arguments=["-r", "pyproject.toml"],
         edit=IncrementalEdit(
@@ -283,7 +280,7 @@ ALL: Final = [
             "src/prefect/events",
             "src/prefect/input",
         ],
-        python_version="3.10",
+        python_version="3.11",
         install_arguments=[
             "-r",
             "pyproject.toml",
@@ -355,24 +352,23 @@ ALL: Final = [
         # separately by the benchmark.
         # https://github.com/pytorch/pytorch/blob/29d6170e7c79f2c71943692985a1546fb2bed28c/tools/linter/adapters/pyrefly_linter.py#L1-L28
         install_arguments=[
-            'numpy==1.26.4 ; python_version >= "3.10" and python_version <= "3.11"',
-            'numpy==2.1.0 ; python_version >= "3.12" and python_version <= "3.13"',
-            'numpy==2.3.4 ; python_version >= "3.14"',
-            "expecttest==0.3.0",
-            "sympy==1.13.3",
-            "types-requests==2.27.25",
-            "types-pyyaml==6.0.2",
-            "types-tabulate==0.8.8",
-            "types-protobuf==5.29.1.20250403",
-            "types-setuptools==79.0.0.20250422",
-            "types-jinja2==2.11.9",
-            "types-colorama==0.4.6",
-            "filelock==3.18.0",
-            "junitparser==2.1.1",
-            "rich==14.1.0",
-            "optree==0.17.0",
-            "types-openpyxl==3.1.5.20250919",
-            "types-python-dateutil==2.9.0.20251008",
+            "numpy",
+            "expecttest",
+            "sympy",
+            "spmd-types",
+            "types-requests",
+            "types-pyyaml",
+            "types-tabulate",
+            "types-protobuf",
+            "types-setuptools",
+            "types-jinja2",
+            "types-colorama",
+            "filelock",
+            "junitparser",
+            "rich",
+            "optree",
+            "types-openpyxl",
+            "types-python-dateutil",
         ],
         python_version="3.11",
         edit=IncrementalEdit(
