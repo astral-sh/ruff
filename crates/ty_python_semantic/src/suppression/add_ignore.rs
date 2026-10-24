@@ -12,6 +12,7 @@ use std::fmt::Formatter;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::LintName;
 use ruff_db::display::FormatterJoinExtension;
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
@@ -194,7 +195,7 @@ pub fn suppress_single(db: &dyn Db, file: PythonFile<'_>, id: LintId, range: Tex
 }
 
 /// Returns whether a diagnostic can be included in a bulk suppression fix.
-pub(crate) fn can_suppress(db: &dyn Db, file: ruff_db::files::File, id: LintName, range: TextRange) -> bool {
+pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
     !is_suppression_comment_lint(id) || !is_executable_shebang(&source_text(db, file), range)
 }
 

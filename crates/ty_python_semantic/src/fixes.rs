@@ -402,7 +402,7 @@ impl FixMode {
                         let span = diagnostic.primary_span()?;
                         let range = span.range()?;
 
-                        if !can_suppress(db, file, lint_id, range) {
+                        if !can_suppress(db, file.file(db), lint_id, range) {
                             return None;
                         }
 
