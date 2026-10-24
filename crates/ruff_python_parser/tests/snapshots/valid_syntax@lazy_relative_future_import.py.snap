@@ -1,0 +1,43 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/lazy_relative_future_import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..75,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 44..74,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 55..65,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 73..74,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("x"),
+                                range: 73..74,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 1,
+                    is_lazy: true,
+                },
+            ),
+        ],
+    },
+)
+```

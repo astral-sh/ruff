@@ -171,7 +171,7 @@ impl FutureImport for ModuleNameImport {
 
 impl FutureImport for MemberNameImport {
     fn is_future_import(&self) -> bool {
-        self.module.as_deref() == Some("__future__")
+        self.module.as_deref() == Some("__future__") && self.level == 0
     }
 }
 
@@ -282,5 +282,33 @@ impl schemars::JsonSchema for NameImports {
 
     fn json_schema(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
         schemars::json_schema!({ "type": "string" })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_member_name_import_future() {
+        let absolute = MemberNameImport {
+            module: Some("__future__".to_string()),
+            name: Alias {
+                name: "annotations".to_string(),
+                as_name: None,
+            },
+            level: 0,
+        };
+        assert!(absolute.is_future_import());
+
+        let relative = MemberNameImport {
+            module: Some("__future__".to_string()),
+            name: Alias {
+                name: "annotations".to_string(),
+                as_name: None,
+            },
+            level: 1,
+        };
+        assert!(!relative.is_future_import());
     }
 }

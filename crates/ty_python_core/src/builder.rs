@@ -4255,7 +4255,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // miss-placed `__future__` import.)
                     self.has_future_annotations |= !node.is_lazy
                         && alias.name.id == "annotations"
-                        && node.module.as_deref() == Some("__future__");
+                        && node.module.as_deref() == Some("__future__")
+                        && node.level == 0;
 
                     let symbol = self.add_symbol(symbol_name.clone());
 

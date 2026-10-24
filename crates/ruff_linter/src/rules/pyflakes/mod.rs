@@ -3259,6 +3259,30 @@ lambda: fu
     }
 
     #[test]
+    fn relative_future_import() {
+        // Relative imports from __future__ are treated as normal relative imports.
+        flakes(
+            r"
+        x = 5
+        from .__future__ import nonexistent
+        from ..__future__ import division
+        nonexistent
+        division
+        ",
+            &[],
+        );
+        // A relative import from __future__ counts as code and closes the __future__ preamble.
+        flakes(
+            r"
+        from .__future__ import bar
+        from __future__ import division
+        bar
+        ",
+            &[Rule::LateFutureImport],
+        );
+    }
+
+    #[test]
     fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
         // function scope.
