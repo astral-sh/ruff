@@ -349,11 +349,13 @@ impl<'db> CallableItem<'db> {
                     return;
                 }
                 let arguments = argument_types.with_self(binding.bound_type);
-                if let Some(matches) =
+                if let Some(result) =
                     positional::match_arguments(db, env, &arguments, &overload.signature)
                 {
                     let mut candidate = overload.clone();
-                    candidate.argument_matches = matches;
+                    candidate.argument_matches = result.argument_matches;
+                    candidate.variadic_argument_matched_to_variadic_parameter =
+                        result.variadic_argument_matched_to_variadic_parameter;
                     candidate.errors.clear();
                     candidate.parameter_tys.fill(None);
                     candidate.check_types(db, env, &arguments, call_expression_tcx);
@@ -5037,6 +5039,12 @@ struct ParameterInfo {
     suppress_missing_error: bool,
 }
 
+/// The parameter matches and variadic usage recorded while matching a call.
+struct ArgumentMatchResult<'db> {
+    argument_matches: Box<[MatchedArgument<'db>]>,
+    variadic_argument_matched_to_variadic_parameter: bool,
+}
+
 struct ArgumentMatcher<'a, 'db> {
     arguments: &'a CallArguments<'a, 'db>,
     parameters: &'a Parameters<'db>,
@@ -5667,7 +5675,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Box<[MatchedArgument<'db>]> {
+    ) -> ArgumentMatchResult<'db> {
         if let Some(first_excess_argument_index) = self.first_excess_positional {
             self.errors.push(BindingError::TooManyPositionalArguments {
                 first_excess_argument_index: self.get_argument_index(first_excess_argument_index),
@@ -5713,7 +5721,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             });
         }
 
-        self.argument_matches.into_boxed_slice()
+        ArgumentMatchResult {
+            argument_matches: self.argument_matches.into_boxed_slice(),
+            variadic_argument_matched_to_variadic_parameter: self
+                .variadic_argument_matched_to_variadic_parameter,
+        }
     }
 }
 
@@ -8730,9 +8742,10 @@ impl<'db> Binding<'db> {
             matcher.match_keyword_variadic(db, env, keywords_index, keywords_type);
         }
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
+        let result = matcher.finish(db, env);
         self.variadic_argument_matched_to_variadic_parameter =
-            matcher.variadic_argument_matched_to_variadic_parameter;
-        self.argument_matches = matcher.finish(db, env);
+            result.variadic_argument_matched_to_variadic_parameter;
+        self.argument_matches = result.argument_matches;
     }
 
     fn check_types(
