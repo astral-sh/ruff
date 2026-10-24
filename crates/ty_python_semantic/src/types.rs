@@ -2449,7 +2449,7 @@ impl<'db> Type<'db> {
     /// Keep the declared type when it and the assigned value are mutually assignable.
     /// For example, assigning a `list[int]` to a `list[Any]` preserves the annotation,
     /// while assigning an `int` to an `int | str` narrows the binding to `int`.
-    pub(crate) fn narrowed_by_assignment(
+    fn narrowed_by_assignment(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
