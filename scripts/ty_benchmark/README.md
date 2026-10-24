@@ -22,6 +22,8 @@ uv run --python 3.15 benchmark
 ```
 
 Measures how long it takes to type check a project without a pre-existing cache.
+Hyperfine 2.0 also reports peak resident set size (RSS) for each measured command
+in the `Memory` row. Both metrics use the same warmups and measured runs.
 
 You can run the benchmark with `--single-threaded` to measure the check time when using a single thread only.
 
