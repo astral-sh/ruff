@@ -45,6 +45,7 @@ pub use completion::{
     CompletionKind, CompletionSettings, completion,
 };
 pub use doc_highlights::document_highlights;
+pub use docstring::DocstringFragment;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
 pub use folding_range::{FoldingRange, FoldingRangeKind, folding_ranges};
