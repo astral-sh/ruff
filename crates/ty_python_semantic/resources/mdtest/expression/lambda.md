@@ -122,7 +122,7 @@ from typing import Annotated, Callable, TypeVar
 T = TypeVar("T")
 
 plain: Annotated[int, lambda value=list[T]: value]  # error: [unbound-type-variable]
-callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]  # no diagnostic
+callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]  # ok
 ```
 
 ## Defaults in string annotations
@@ -237,7 +237,7 @@ A lambda stored in a list can return another lambda whose default refers to the 
 The default is evaluated only when the outer lambda is called, after `callback` has been assigned.
 
 ```py
-callback = [lambda: lambda x=callback: x, lambda: callback][0]  # no diagnostic
+callback = [lambda: lambda x=callback: x, lambda: callback][0]  # ok
 ```
 
 ## Bound recursive lambdas

@@ -1635,7 +1635,7 @@ def identity(value: T) -> T:
     return value
 
 callback = identity(lambda: callback)
-callback()  # no diagnostic
+callback()  # ok
 ```
 
 ## Recursive lambdas with an incompatible return

@@ -4328,7 +4328,7 @@ class Box(Generic[T]):
         self.callback = partial(lambda: Box(lambda: value).callback)
 
 def check(box: Box[int]):
-    box.callback()()()  # no diagnostic
+    box.callback()()()  # ok
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

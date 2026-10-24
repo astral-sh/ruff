@@ -2554,7 +2554,7 @@ The callable in the list returns itself after `next` selects it. We do not use i
 type as the expected type of another argument.
 
 ```py
-callback = next(map(lambda x: x, [lambda: callback]))  # no diagnostic
+callback = next(map(lambda x: x, [lambda: callback]))  # ok
 ```
 
 ## Lambda contextual inference through type aliases

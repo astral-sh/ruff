@@ -87,7 +87,7 @@ Defaults of lambdas used as decorators follow the same rule:
 
 ```py
 @no_type_check
-@lambda value=missing: value  # no diagnostic
+@lambda value=missing: value  # ok
 def test(): ...
 ```
 
@@ -132,7 +132,7 @@ own defaults:
 from typing import no_type_check
 
 @no_type_check
-def nested(callback=lambda outer=(lambda inner=missing: inner): outer): ...  # no diagnostic
+def nested(callback=lambda outer=(lambda inner=missing: inner): outer): ...  # ok
 ```
 
 Type reveals are still reported:

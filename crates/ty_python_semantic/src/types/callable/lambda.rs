@@ -105,7 +105,10 @@ impl<'db> LambdaMapping<'db> {
                 delta,
             } => Self::FreshenBoundTypeVars(*generic_context, *delta),
             TypeMapping::BindSelf(binding) => Self::BindSelf(binding.clone()),
-            TypeMapping::ReplaceSelf { new_origin, new_upper_bound } => Self::ReplaceSelf(*new_origin, *new_upper_bound),
+            TypeMapping::ReplaceSelf {
+                new_origin,
+                new_upper_bound,
+            } => Self::ReplaceSelf(*new_origin, *new_upper_bound),
             TypeMapping::Materialize(kind) => Self::Materialize(*kind),
             TypeMapping::ReplaceParameterDefaults => Self::ReplaceParameterDefaults,
             TypeMapping::EagerExpansion => Self::EagerExpansion,
@@ -250,7 +253,9 @@ impl<'db> LambdaSignature<'db> {
                     ty: map(binding.ty),
                     ..binding.clone()
                 }),
-                LambdaMapping::ReplaceSelf(origin, ty) => LambdaMapping::ReplaceSelf(*origin, map(*ty)),
+                LambdaMapping::ReplaceSelf(origin, ty) => {
+                    LambdaMapping::ReplaceSelf(*origin, map(*ty))
+                }
                 other => other.clone(),
             };
             LambdaSignatureMapping {
