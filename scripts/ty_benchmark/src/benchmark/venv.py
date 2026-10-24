@@ -72,6 +72,8 @@ class Venv:
             "uv",
             "pip",
             "install",
+            "--config-file",
+            str(Path(__file__).parents[2] / "project-uv.toml"),
             "--python",
             self.python.as_posix(),
             "--quiet",
@@ -79,15 +81,13 @@ class Venv:
             # our projects isn't unexpectedly broken by a change in the
             # annotations of one of that project's dependencies
             "--exclude-newer",
-            "2026-06-07T00:00:00Z",
+            "2026-10-24T19:50:00Z",
             # Mypy needs to be installed into the project virtual environment
             # or it fails to load project-local plugins. The override keeps
             # project dev dependencies from pinning a different mypy version.
-            *(
-                ["--overrides", mypy_overrides.as_posix(), "mypy"]
-                if include_mypy
-                else []
-            ),
+            "--overrides",
+            mypy_overrides.as_posix(),
+            *(["mypy"] if include_mypy else []),
             *pip_install_args,
         ]
 
