@@ -46,6 +46,7 @@ use ty_python_core::semantic_index;
 
 /// Bound display expansion even when recursive specialization keeps changing the signature.
 const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
+const MAX_TUPLE_DISPLAY_ELEMENTS: usize = 256;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -176,6 +177,18 @@ impl<'db> DisplaySettings<'db> {
             multiline: false,
             ..self.clone()
         }
+    }
+
+    /// Returns settings for displaying this tuple's elements if they fit in the remaining budget.
+    /// Nested tuples share the budget because the same child can appear many times.
+    fn for_tuple_elements(&self, tuple: &TupleSpec<'db>) -> Option<Self> {
+        let mut settings = self.singleline();
+        let budget = settings
+            .tuple_element_budget
+            .get_or_insert_with(|| Rc::new(Cell::new(MAX_TUPLE_DISPLAY_ELEMENTS)));
+        let count = tuple.fixed_elements().len() + usize::from(tuple.is_variadic());
+        budget.set(budget.get().checked_sub(count)?);
+        Some(settings)
     }
 
     #[must_use]
@@ -1879,23 +1892,10 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
         f.with_type(KnownClass::Tuple.to_class_literal(db, self.env))
             .write_str("tuple")?;
         f.write_char('[')?;
-        // Each element can refer to the same nested tuple. Share one budget across
-        // its children so the displayed type cannot grow exponentially.
-        let mut settings = self.settings.singleline();
-        let budget = settings
-            .tuple_element_budget
-            .get_or_insert_with(|| Rc::new(Cell::new(256)));
-        let count = match self.tuple {
-            TupleSpec::Fixed(tuple) => tuple.len(),
-            TupleSpec::Variable(tuple) => {
-                tuple.prefix_elements().len() + 1 + tuple.suffix_elements().len()
-            }
-        };
-        let Some(remaining) = budget.get().checked_sub(count) else {
+        let Some(settings) = self.settings.for_tuple_elements(self.tuple) else {
             f.set_invalid_type_annotation();
             return f.write_str("...]");
         };
-        budget.set(remaining);
         match self.tuple {
             TupleSpec::Fixed(tuple) => {
                 let elements = tuple.elements_slice();
