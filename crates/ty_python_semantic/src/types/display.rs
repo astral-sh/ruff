@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -46,6 +46,7 @@ use ty_python_core::semantic_index;
 
 /// Bound display expansion even when recursive specialization keeps changing the signature.
 const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
+const MAX_TUPLE_DISPLAY_ELEMENTS: usize = 256;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -154,6 +155,8 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Tuple elements left to display in the current outermost tuple.
+    tuple_element_budget: Option<Rc<Cell<usize>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -174,6 +177,18 @@ impl<'db> DisplaySettings<'db> {
             multiline: false,
             ..self.clone()
         }
+    }
+
+    /// Returns settings for displaying this tuple's elements if they fit in the remaining budget.
+    /// Nested tuples share the budget because the same child can appear many times.
+    fn for_tuple_elements(&self, tuple: &TupleSpec<'db>) -> Option<Self> {
+        let mut settings = self.singleline();
+        let budget = settings
+            .tuple_element_budget
+            .get_or_insert_with(|| Rc::new(Cell::new(MAX_TUPLE_DISPLAY_ELEMENTS)));
+        let count = tuple.fixed_elements().len() + usize::from(tuple.is_variadic());
+        budget.set(budget.get().checked_sub(count)?);
+        Some(settings)
     }
 
     #[must_use]
@@ -1877,6 +1892,10 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
         f.with_type(KnownClass::Tuple.to_class_literal(db, self.env))
             .write_str("tuple")?;
         f.write_char('[')?;
+        let Some(settings) = self.settings.for_tuple_elements(self.tuple) else {
+            f.set_invalid_type_annotation();
+            return f.write_str("...]");
+        };
         match self.tuple {
             TupleSpec::Fixed(tuple) => {
                 let elements = tuple.elements_slice();
@@ -1884,7 +1903,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
@@ -1907,7 +1926,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings.clone())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
@@ -1915,7 +1934,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     VariableSegment::TypeVarTuple(typevar) => {
                         f.write_char('*')?;
                         Type::TypeVar(typevar)
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                     }
                     VariableSegment::Homogeneous(variable) => {
@@ -1929,7 +1948,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                             f.write_char('[')?;
                         }
                         variable
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                         f.write_str(", ...")?;
                         if !tuple.prefix_elements().is_empty()
@@ -1943,7 +1962,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
