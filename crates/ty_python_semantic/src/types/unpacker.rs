@@ -18,9 +18,7 @@ use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
     VariableLengthTuple,
 };
-use crate::types::{
-    KnownClass, Type, TypeContext, UnionBuilder, UnionType, 
-};
+use crate::types::{KnownClass, Type, TypeContext, UnionBuilder, UnionType};
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::ProgramFile;
 use ty_python_core::scope::ScopeId;

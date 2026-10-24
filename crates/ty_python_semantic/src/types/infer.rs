@@ -304,7 +304,7 @@ fn infer_definition_types_inner<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .with_environment(environment)
-    .finish_definition(definition)
+        .finish_definition(definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
