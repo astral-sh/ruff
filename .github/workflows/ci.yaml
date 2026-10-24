@@ -1,4 +1,4 @@
-name: Measure native Rust publish cache
+name: Measure dependency-only native Rust cache
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-publish-source-v1-publish-before
+        prefix-key: ruff-publish2-20261024-v1-publish-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -43,9 +43,9 @@ jobs:
       env:
         CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         EXPECTED_HIT: 'true'
-      run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - name: cargo publish dry-run
       run: cargo publish --workspace --dry-run
     env:
@@ -76,11 +76,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 30be8844b99adf2806693d3ebb620b1e105c065e
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-publish-source-v2-publish-after
+        prefix-key: ruff-publish2-20261024-v1-publish-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -89,9 +89,9 @@ jobs:
       env:
         CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         EXPECTED_HIT: 'true'
-      run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - name: cargo publish dry-run
       run: cargo publish --workspace --dry-run
     env:
