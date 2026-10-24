@@ -43,6 +43,7 @@
 //! alias inference builder. Simplifying a runtime union can remove recursive references, so the
 //! normalized runtime value alone cannot establish that an alias is valid.
 
+use crate::types::{KnownInstanceType, any_over_type};
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 use ty_python_core::ExpressionNodeKey;
@@ -276,3 +277,37 @@ impl<'db> AliasInferenceCache<'db> {
         }
     }
 }
+
+/// Whether an expression can supply cached inputs for a legacy type alias.
+pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
+    matches!(
+        value,
+        ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::StringLiteral(_)
+    )
+}
+
+/// Whether interpreting a value as an alias can reveal additional recursive references.
+/// Value inference uses this to decide whether to retain inputs for later alias inference.
+pub(super) fn may_require_implicit_alias_inference<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    any_over_type(db, env, ty, false, |ty| {
+        matches!(
+            ty,
+            Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
+                )
+        )
+    })
+}
+
