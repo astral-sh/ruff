@@ -2446,9 +2446,8 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// Keep the declared type when it and the assigned value are mutually assignable.
-    /// For example, assigning a `list[int]` to a `list[Any]` preserves the annotation,
-    /// while assigning an `int` to an `int | str` narrows the binding to `int`.
+    /// Keep the declaration when the assigned value and the declared type are mutually assignable.
+    /// For example, assigning a `list[int]` to a `list[Any]` preserves the declared element type.
     fn narrowed_by_assignment(
         self,
         db: &'db dyn Db,
@@ -2456,13 +2455,12 @@ impl<'db> Type<'db> {
         assigned: Self,
     ) -> Self {
         match (self, assigned) {
-            // TODO: Distinguish a missing declaration from an explicitly unknown one. Only the
-            // former should fall back to the assigned type.
+            // TODO: Distinguish a missing declaration from an explicitly unknown one. Only
+            // the former should fall back to the assigned type.
             (Type::Dynamic(DynamicType::Unknown), _) => assigned,
-            // For `str: "str" = ""`, the RHS lets the next fixpoint iteration reject the
-            // annotation instead of leaving both the annotation and the binding divergent.
+            // For `str: "str" = ""`, the value lets the next iteration reject the annotation.
             (Type::Divergent(_), _) => assigned,
-            // Dataclass field specifiers carry metadata such as `init=False` in the RHS type.
+            // Dataclass field specifiers carry metadata such as `init=False` on the value.
             (_, Type::KnownInstance(KnownInstanceType::Field(_))) => assigned,
             _ if self == assigned
                 || (self.is_assignable_to(db, env, assigned)
@@ -2472,6 +2470,16 @@ impl<'db> Type<'db> {
             }
             _ => assigned,
         }
+    }
+
+    fn dict_value_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Self> {
+        let [_, value] = self
+            .known_specialization(db, env, KnownClass::Dict)?
+            .types(db)
+        else {
+            return None;
+        };
+        Some(*value)
     }
 
     /// Checks whether the visited type contents contain no dynamic types.
@@ -2681,27 +2689,6 @@ impl<'db> Type<'db> {
 
     pub const fn is_generic_alias(&self) -> bool {
         matches!(self, Type::GenericAlias(_))
-    }
-
-    /// Whether an indexed write to this value could use an item type from a declaration.
-    fn may_carry_item_declaration(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::NominalInstance(instance) => instance.is_definition_generic(db),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.may_carry_item_declaration(db)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|ty| ty.may_carry_item_declaration(db)),
-            Type::Dynamic(_)
-            | Type::TypeVar(_)
-            | Type::TypedDict(_)
-            | Type::TypeAlias(_)
-            | Type::ProtocolInstance(_) => true,
-            _ => false,
-        }
     }
 
     /// Returns whether this type represents a specialization of a generic type.

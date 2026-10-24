@@ -60,7 +60,7 @@ use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
     TypeVarInferenceSolutions,
 };
-use crate::types::infer::{infer_definition_types, original_class_type};
+use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
@@ -1505,74 +1505,6 @@ impl<'db> Bindings<'db> {
                 .iter()
                 .map(|element| element.return_type(db, env)),
         )
-    }
-
-    /// Whether this call declares the item type in its result. A declared callable can supply
-    /// the signature, and a bound method can obtain a value type from its declared receiver.
-    pub(crate) fn has_declared_return_item(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        callee: Type<'db>,
-        result: Type<'db>,
-        source_declaration: impl Fn() -> Option<Type<'db>>,
-    ) -> bool {
-        match callee {
-            Type::GenericAlias(alias) if Type::instance(db, env, alias.into()) == result => {
-                return true;
-            }
-            Type::FunctionLiteral(function) if function.is_known(db, KnownFunction::Cast) => {
-                return true;
-            }
-            _ => {}
-        }
-
-        let Some(callable) = self.single_element() else {
-            return false;
-        };
-        let declared_callable = if matches!(callee, Type::Callable(_)) {
-            source_declaration().and_then(Type::as_callable)
-        } else {
-            None
-        };
-        let result_dict = result.known_specialization(db, env, KnownClass::Dict);
-        let mut selected = callable.selected_overloads().peekable();
-        selected.peek().is_some()
-            && selected.all(|(_, overload)| {
-                let Some(declared) = overload.declared_return_type(db, declared_callable) else {
-                    return false;
-                };
-
-                // A factory can infer the key type while declaring the value type in `dict[K, Any]`.
-                let (declared, inferred) = if let Some(dict) = result_dict {
-                    let Some(declared) = declared.known_specialization(db, env, KnownClass::Dict)
-                    else {
-                        return false;
-                    };
-                    let ([_, declared], [_, inferred]) = (declared.types(db), dict.types(db))
-                    else {
-                        return false;
-                    };
-
-                    // For methods such as `dict.copy()`, the return refers to the dictionary's own
-                    // value type variable. It carries the item declaration of the receiver, if any.
-                    if matches!(callee, Type::BoundMethod(_))
-                        && let Type::TypeVar(typevar) = *declared
-                        && dict.generic_context(db).variables(db).nth(1) == Some(typevar)
-                    {
-                        return source_declaration()
-                            .and_then(|receiver| {
-                                receiver.known_specialization(db, env, KnownClass::Dict)
-                            })
-                            .and_then(|receiver| receiver.get(db, typevar))
-                            == Some(*inferred);
-                    }
-                    (*declared, *inferred)
-                } else {
-                    (declared, result)
-                };
-                declared == inferred && !declared.has_typevar(db, env)
-            })
     }
 
     /// Returns the inferred type for the argument at the specified index.
@@ -8175,40 +8107,6 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
-    /// Returns the annotation before the call and its receiver specialize the signature.
-    fn declared_return_type(
-        &self,
-        db: &'db dyn Db,
-        declared_callable: Option<CallableType<'db>>,
-    ) -> Option<Type<'db>> {
-        if let Some(callable) = declared_callable {
-            return Some(
-                callable
-                    .signatures(db)
-                    .overloads
-                    .get(self.source_overload_index())?
-                    .return_ty,
-            );
-        }
-        let definition = self.signature.definition?;
-        let function = infer_definition_types(db, definition).function_type(definition)?;
-        if !function
-            .literal(db)
-            .last_definition
-            .has_explicit_return_annotation(db)
-        {
-            return None;
-        }
-        function
-            .without_updated_signatures(db)
-            .signature(db)
-            .overloads
-            .iter()
-            .rev()
-            .find(|signature| signature.definition == Some(definition))
-            .map(|signature| signature.return_ty)
-    }
-
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
     fn check_property_getter(
         &mut self,

@@ -540,7 +540,7 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
 pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
     pub(crate) key: &'ast ast::Expr,
     pub(crate) value: &'ast ast::Expr,
-    pub(crate) parent: Definition<'db>,
+    pub(crate) assignment: Definition<'db>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -716,11 +716,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
                 key,
                 value,
-                parent,
+                assignment,
             }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
                 key: AstNodeRef::new(parsed, key),
                 value: AstNodeRef::new(parsed, value),
-                parent,
+                assignment,
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
@@ -1532,7 +1532,7 @@ impl AnnotatedAssignmentDefinitionKind {
 pub struct DictKeyAssignmentKind<'db> {
     key: AstNodeRef<ast::Expr>,
     value: AstNodeRef<ast::Expr>,
-    parent: Definition<'db>,
+    assignment: Definition<'db>,
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
@@ -1544,17 +1544,8 @@ impl<'db> DictKeyAssignmentKind<'db> {
         self.value.node(module)
     }
 
-    /// The enclosing dictionary key, or the assignment that binds the initializer.
-    pub fn parent(&self) -> Definition<'db> {
-        self.parent
-    }
-
-    pub fn assignment(&self, db: &'db dyn Db) -> Definition<'db> {
-        let mut parent = self.parent;
-        while let DefinitionKind::DictKeyAssignment(key) = parent.kind(db) {
-            parent = key.parent;
-        }
-        parent
+    pub fn assignment(&self) -> Definition<'db> {
+        self.assignment
     }
 }
 

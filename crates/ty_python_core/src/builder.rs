@@ -1777,7 +1777,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         target: &MemberExprBuilder,
         expr: ast::ExprRef<'ast>,
-        parent: Definition<'db>,
+        assignment: Definition<'db>,
     ) {
         let ruff_python_ast::ExprRef::Dict(dict) = expr else {
             let items = match expr {
@@ -1802,7 +1802,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         node_index: AtomicNodeIndex::NONE,
                     }),
                 ) {
-                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), parent);
+                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
                 }
             }
             return;
@@ -1813,7 +1813,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if let ast::Expr::Dict(unpacked) = &item.value {
                     // The unpacked keys belong to the same target. Recording them in order
                     // lets later items replace earlier bindings, including nested keys.
-                    self.add_dict_key_assignment_definitions_impl(target, unpacked.into(), parent);
+                    self.add_dict_key_assignment_definitions_impl(
+                        target,
+                        unpacked.into(),
+                        assignment,
+                    );
                 }
                 continue;
             };
@@ -1825,11 +1829,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr.clone()) {
                 let place_id = self.add_place(place_expr);
 
-                let binding = self.add_definition(
+                self.add_definition(
                     place_id,
                     DictKeyAssignmentNodeRef {
                         key,
-                        parent,
+                        assignment,
                         value: &item.value,
                     },
                 );
@@ -1841,7 +1845,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.add_dict_key_assignment_definitions_impl(
                     &member_expr,
                     (&item.value).into(),
-                    binding,
+                    assignment,
                 );
             }
         }

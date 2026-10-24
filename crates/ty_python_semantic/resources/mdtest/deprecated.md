@@ -38,25 +38,6 @@ MyClass.afunc()  # error: [deprecated] "use something else"
 MyClass().amethod()  # error: [deprecated] "don't use this!"
 ```
 
-## Calls through a dictionary key
-
-Reading a dictionary key can identify a deprecated function when the value type is inferred. A key
-whose value type is declared as `Any` has no known callee.
-
-```py
-from typing import Any
-from typing_extensions import deprecated
-
-@deprecated("use replacement")
-def old() -> None: ...
-
-inferred = {"key": old}  # error: [deprecated] "use replacement"
-inferred["key"]()  # error: [deprecated] "use replacement"
-
-dynamic: dict[str, Any] = {"key": old}  # error: [deprecated] "use replacement"
-dynamic["key"]()  # no diagnostic
-```
-
 ## Function replacements
 
 An outer `@deprecated` decorator applies to the function returned by inner decorators.

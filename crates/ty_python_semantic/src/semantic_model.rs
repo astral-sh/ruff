@@ -16,10 +16,15 @@ use ty_module_resolver::{
 };
 
 use crate::Db;
-use crate::place::definitions::{DefinitionResolution, reaching_definitions_at};
+use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::place::{
-    builtins_module_scope, implicit_builtins_symbol_scope, loop_header_reachability,
+    builtins_module_scope, class_body_implicit_symbol, implicit_builtins_symbol_scope,
+    loop_header_reachability, place_from_bindings,
+};
+use crate::place_load::{
+    ImplicitPlaceLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
+    resolve_place_load,
 };
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{all_members, all_reachable_members};
@@ -29,11 +34,12 @@ use crate::types::{
     is_discarded_dict_key_assignment,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
-use ty_python_core::{Program, ProgramFile};
+use ty_python_core::{BindingWithConstraintsIterator, Program, ProgramFile};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -747,7 +753,7 @@ impl<'db> SemanticModel<'db> {
             return;
         }
 
-        let mut definitions = reaching_definitions_at(self.db, self.file, receiver).into_vec();
+        let mut definitions = self.reaching_definitions_at(receiver);
         while let Some(definition) = definitions.pop() {
             if !visited.insert(definition) {
                 continue;
@@ -784,6 +790,87 @@ impl<'db> SemanticModel<'db> {
                 Self::new(self.db, file).dictionary_initializer_keys(value, visited, candidates);
             }
         }
+    }
+
+    /// Returns definitions that can reach this expression's load.
+    ///
+    /// Names follow Python's scope lookup rules, stopping at a definitely bound source.
+    /// Other tracked places use the bindings recorded at their use site.
+    fn reaching_definitions_at(&self, receiver: &ast::Expr) -> Vec<Definition<'db>> {
+        let index = semantic_index(self.db, self.file);
+        let Some(scope) = index.try_expression_scope_id(receiver) else {
+            return Vec::new();
+        };
+        let Some(use_id) = index.try_expression_use_id(receiver.into()) else {
+            return Vec::new();
+        };
+        let mut definitions = Vec::new();
+        let mut add_bindings = |bindings: BindingWithConstraintsIterator<'db, 'db>| {
+            let resolution = DefinitionResolution::from_bindings(self.db, bindings);
+            definitions.extend_from_slice(resolution.definitions());
+        };
+        if let ast::Expr::Name(name) = receiver {
+            let mut resolution = resolve_place_load(
+                self.db,
+                index,
+                scope.to_scope_id(self.db, self.file),
+                PlaceExpr::from_expr_name(name),
+                PlaceLoadMode::AtExpression(name.into()),
+            );
+            while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+                match source.kind {
+                    PlaceLoadSourceKind::Bindings(bindings) => {
+                        let bound = place_from_bindings(
+                            self.db,
+                            &self.program_environment(),
+                            bindings.clone(),
+                        )
+                        .place
+                        .is_definitely_bound();
+                        add_bindings(bindings);
+                        if bound {
+                            break;
+                        }
+                    }
+                    PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
+                        let index = semantic_index(self.db, scope.program_file(self.db));
+                        add_bindings(
+                            index
+                                .use_def_map(scope.file_scope_id(self.db))
+                                .reachable_bindings(id),
+                        );
+                        break;
+                    }
+                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(name)) => {
+                        if class_body_implicit_symbol(self.db, &self.program_environment(), &name)
+                            .place
+                            .is_definitely_bound()
+                        {
+                            break;
+                        }
+                    }
+                    PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ExplicitGlobalSymbol {
+                        file,
+                        name,
+                    }) => {
+                        let index = semantic_index(self.db, file);
+                        if let Some(id) = index.place_table(FileScopeId::global()).symbol_id(&name)
+                        {
+                            add_bindings(
+                                index
+                                    .use_def_map(FileScopeId::global())
+                                    .reachable_symbol_bindings(id),
+                            );
+                        }
+                        break;
+                    }
+                    PlaceLoadSourceKind::Implicit(_) => break,
+                }
+            }
+        } else {
+            add_bindings(index.use_def_map(scope).bindings_at_use(use_id));
+        }
+        definitions
     }
 
     /// Appends the reachable bindings of a `from` import's symbol in its target module.

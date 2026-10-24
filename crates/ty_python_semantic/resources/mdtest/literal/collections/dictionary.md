@@ -210,122 +210,10 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
-## Inferred and declared dictionary value types
-
-We infer a value type for an unannotated dictionary from all its entries. A known key keeps its own
-value type both on direct lookup and when unpacked as a keyword argument.
-
-```py
-def connect(*, nickname: str | None, timeout: float): ...
-def notify(nickname):
-    options = {"nickname": nickname, "timeout": 30.0}
-    reveal_type(options)  # revealed: dict[str, Unknown | float]
-    reveal_type(options["nickname"])  # revealed: Unknown
-    connect(**options)  # no diagnostic
-```
-
-The same applies to later writes, whether the constructor is spelled `dict` or `builtins.dict`.
-
-```py
-import builtins
-
-def notify_later(nickname, retry: bool):
-    options = dict(timeout=3.0) if retry else builtins.dict(timeout=30.0)
-    options["nickname"] = nickname
-    reveal_type(options["nickname"])  # revealed: Unknown
-    connect(**options)  # no diagnostic
-```
-
-When two branches build the dictionary, the nickname's type combines the values assigned to that key
-in each branch.
-
-```py
-def notify_with_defaults(saved):
-    if saved:
-        options = {"nickname": saved.name, "timeout": saved.timeout}
-    else:
-        options = {"nickname": "guest", "timeout": 30.0}
-    reveal_type(options["nickname"])  # revealed: Unknown | Literal["guest"]
-```
-
-The nickname also keeps its type when a loop rebuilds the dictionary with a different timeout.
-
-```py
-def notify_with_retries(nickname, timeouts: list[float]):
-    options = {"nickname": nickname, "timeout": 30.0}
-    for timeout in timeouts:
-        reveal_type(options["nickname"])  # revealed: Unknown
-        connect(**options)  # no diagnostic
-        options = {"nickname": nickname, "timeout": timeout}
-```
-
-An explicit declaration can give the same dictionary literal a different type for a known key.
-
-```py
-from typing import Any
-
-def compare(nickname: Any):
-    inferred = {"nickname": nickname, "timeout": 30.0}
-    reveal_type(inferred["nickname"])  # revealed: Any
-
-    declared: dict[str, Any | float]
-    declared = {"nickname": nickname, "timeout": 30.0}
-    reveal_type(declared["nickname"])  # revealed: Any | float
-```
-
-When branches join, each one contributes its own type for the key. Here the new dictionary takes the
-nickname's type from the initializer, and the saved dictionary declares its values as `Any`.
-
-```py
-def notify_with_saved_options(nickname: Any, saved: dict[str, Any], use_saved: bool):
-    if use_saved:
-        options = saved
-        options["nickname"] = "guest"
-        options["timeout"] = 3.0
-    else:
-        options = {"nickname": nickname, "timeout": 30.0}
-    reveal_type(options["nickname"])  # revealed: Any
-    connect(**options)  # no diagnostic
-
-    options["nickname"] = "guest"
-    reveal_type(options["nickname"])  # revealed: Any | Literal["guest"]
-```
-
-If the saved dictionary declares its value type as `Any | float`, that path contributes the whole
-union. Writing the same nickname after the branches join gives the same result.
-
-```py
-def update_saved_options(nickname: Any, saved: dict[str, Any | float], use_saved: bool):
-    if use_saved:
-        options = saved
-        options["nickname"] = nickname
-    else:
-        options = {"timeout": 30.0}
-        options["nickname"] = nickname
-    reveal_type(options["nickname"])  # revealed: Any | float
-
-    options["nickname"] = nickname
-    reveal_type(options["nickname"])  # revealed: Any | float
-    connect(**options)  # error: [invalid-argument-type]
-```
-
-An attribute can get its declaration from the class.
-
-```py
-class Client:
-    defaults: dict[str, Any | float]
-
-    def __init__(self, nickname: Any):
-        self.defaults = {"nickname": nickname, "timeout": 30.0}
-        self.options = {"nickname": nickname, "timeout": 30.0}
-        reveal_type(self.defaults["nickname"])  # revealed: Any | float
-        reveal_type(self.options["nickname"])  # revealed: Any
-```
-
 ## Keys with gradual value types
 
-When a dictionary declares its values as `Any`, a literal key has that type even if its value is
-known from the initializer.
+A key keeps its declared value type when the declared and assigned types are mutually assignable.
+Reading the key and unpacking it as a keyword argument both preserve that type.
 
 ```py
 from typing import Any
@@ -333,213 +221,42 @@ from typing import Any
 payload: dict[str, Any] = {"current": {"number": 3, "base": {}}}
 current = payload["current"]
 reveal_type(current)  # revealed: Any
-reveal_type(payload["current"]["number"])  # revealed: Any
 {**current["base"]}  # no diagnostic
+reveal_type(dict(**payload)["current"])  # revealed: Any
 ```
 
-A function that reassigns the dictionary still uses its module-level declaration.
+A later write follows the same rule. An explicit guard can still narrow the key.
 
 ```py
-def reset():
-    global payload
-    payload = {"current": 1}
+def update(payload: dict[str, Any]):
+    payload["current"] = 1
     reveal_type(payload["current"])  # revealed: Any
+    if isinstance(payload["current"], str):
+        reveal_type(payload["current"])  # revealed: Any & str
 ```
 
-An unpacked keyword has the same type as a direct read of the key.
+The declared value type can contain `Any` inside a collection. It still applies when either branch
+could have supplied the dictionary.
 
 ```py
-from typing import TypeVar
-
-T = TypeVar("T")
-
-def read(*, current: T) -> T:
-    return current
-
-reveal_type(read(**payload))  # revealed: Any
-```
-
-A later assignment also respects the value type. An explicit type check can still narrow the key.
-
-```py
-payload["current"] = 1
-reveal_type(payload["current"])  # revealed: Any
-if isinstance(payload["current"], str):
-    reveal_type(payload["current"])  # revealed: Any & str
-    reveal_type(read(**payload))  # revealed: Any & str
-```
-
-The dictionary can also get its value type from a parameter or a function's return annotation.
-
-```py
-def make_payload() -> dict[str, Any]:
-    return {}
-
-def update_payload(original: dict[str, Any]):
-    alias = original
-    alias["current"] = 1
-    reveal_type(alias["current"])  # revealed: Any
-
-    fresh = make_payload()
-    fresh["current"] = 1
-    reveal_type(read(**fresh))  # revealed: Any
-```
-
-A key also preserves a gradual type nested inside a container. As with an annotated name, assigning
-a `list[int]` to a key of type `list[Any]` keeps the declared element type:
-
-```py
-def check(numbers: list[int]):
-    value: list[Any] = numbers
-    reveal_type(value)  # revealed: list[Any]
-
-    items: dict[str, list[Any]] = {"current": numbers}
-    reveal_type(items["current"])  # revealed: list[Any]
-    reveal_type(read(**items))  # revealed: list[Any]
-
-    items["current"] = numbers
-    reveal_type(items["current"])  # revealed: list[Any]
-```
-
-The same rule applies to a dictionary inside another collection.
-
-```py
-rows: list[dict[str, Any]] = [{"count": 1}, {**{"count": 2}}]
-reveal_type(rows[0]["count"])  # revealed: Any
-reveal_type(rows[1]["count"])  # revealed: Any
-
-dynamic_rows: list[Any] = [{"count": 1}]
-reveal_type(dynamic_rows[0]["count"])  # revealed: Any
-```
-
-## Dictionaries stored in unannotated literals
-
-An unannotated dictionary can hold another dictionary with a declared value type. A write through
-either name respects the inner dictionary's declaration.
-
-```py
-from typing import Any
-
-def update(values: dict[str, Any]):
-    outer = {"inner": values}
-    outer["inner"]["first"] = 1
-    reveal_type(outer["inner"]["first"])  # revealed: Any
-
-    child = outer["inner"]
-    child["second"] = "v"
-    reveal_type(child["second"])  # revealed: Any
-```
-
-## Imported dictionaries
-
-An imported dictionary keeps its declared value type with either import spelling.
-
-`settings.py`:
-
-```py
-from typing import Any
-
-values: dict[str, Any] = {}
-```
-
-`client.py`:
-
-```py
-import settings
-from settings import values
-
-values["name"] = "guest"
-reveal_type(values["name"])  # revealed: Any
-settings.values["count"] = 1
-reveal_type(settings.values["count"])  # revealed: Any
-```
-
-## Nested tagged dictionaries
-
-A nested dictionary literal can select one arm of a tagged union. Its tag determines the declared
-type of its other fields.
-
-```py
-from typing import Any, Literal, TypedDict
-
-class Dynamic(TypedDict):
-    kind: Literal["dynamic"]
-    value: Any
-
-class Flag(TypedDict):
-    kind: Literal["flag"]
-    value: bool
-
-records: dict[str, Dynamic | Flag] = {"entry": {"kind": "dynamic", "value": 42}}
-reveal_type(records["entry"])  # revealed: Dynamic
-reveal_type(records["entry"]["value"])  # revealed: Any
-records["entry"]["value"] = 43
-reveal_type(records["entry"]["value"])  # revealed: Any
-```
-
-Checking the tag also selects the field type when the two dictionaries come from separate bindings.
-
-```py
-def update(dynamic: Dynamic, flag: Flag, choose: bool):
-    record = dynamic if choose else flag
-    if record["kind"] == "dynamic":
-        record["value"] = 1
-        reveal_type(record["value"])  # revealed: Any
+def store(numbers: list[int], keep_previous: bool):
+    items: dict[str, list[Any]]
+    if keep_previous:
+        items = {"previous": numbers}
     else:
-        record["value"] = True
-        reveal_type(record["value"])  # revealed: Literal[True]
+        items = {}
+    items["numbers"] = numbers
+    reveal_type(items["numbers"])  # revealed: list[Any]
 ```
 
-## Dictionary value types from calls
-
-A factory can infer the key type from its argument and still declare the value type. We use the
-return annotation of the selected overload.
+In an unannotated dictionary, each known key keeps its own inferred type.
 
 ```py
-from typing import Any, Callable, TypeVar, cast, overload
-
-K = TypeVar("K")
-
-@overload
-def make(key: K) -> dict[K, Any]: ...
-@overload
-def make(key: K, value: int) -> dict[K, int]: ...
-def make(key, value=None):
-    return {key: value}
-
-options = make("name")
-options["name"] = "guest"
-reveal_type(options["name"])  # revealed: Any
-```
-
-A callable annotation also declares the return type. A copy of an inferred dictionary takes its
-value type from its receiver.
-
-```py
-def update(factory: Callable[[], dict[str, Any]], value: Any):
-    constructed = factory()
-    constructed["name"] = "guest"
-    reveal_type(constructed["name"])  # revealed: Any
-
-    copied = constructed.copy()
-    copied["name"] = "guest"
-    reveal_type(copied["name"])  # revealed: Any
-
-    inferred_copy = {"name": value}.copy()
-    inferred_copy["name"] = "guest"
-    reveal_type(inferred_copy["name"])  # revealed: Literal["guest"]
-```
-
-Specializing the constructor or casting the result also fixes the value type.
-
-```py
-specialized = dict[str, Any]()
-specialized["name"] = "guest"
-reveal_type(specialized["name"])  # revealed: Any
-
-casted = cast(dict[str, Any], object())
-casted["name"] = "guest"
-reveal_type(casted["name"])  # revealed: Any
+def connect(*, nickname: str, timeout: float): ...
+def notify(nickname):
+    options = {"nickname": nickname, "timeout": 30.0}
+    reveal_type(options["nickname"])  # revealed: Unknown
+    connect(**options)  # no diagnostic
 ```
 
 ## Key narrowing through dictionary unpacking
@@ -803,9 +520,9 @@ def loop_carried_value(c: C, repeat: bool) -> int:
 
 ## Rejected annotations in stubs
 
-Annotation-only declarations in stubs are also bindings. A rejected annotation falls back to the
-type obtained by normal member lookup. An ellipsis placeholder also preserves the declared item
-type:
+Annotation-only declarations in stubs are also bindings. A rejected annotation falls back to normal
+member lookup. Assigning `...` preserves `object` because its inferred type, `Unknown`, is mutually
+assignable with `object`.
 
 `stub.pyi`:
 
