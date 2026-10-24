@@ -1,4 +1,4 @@
-name: Measure dependency-only native Rust cache
+name: Measure pruned dependency caches
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -48,7 +48,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-clippy-before
+        prefix-key: ruff-prune-20261024-v1-clippy-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -97,11 +97,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-clippy-after
+        prefix-key: ruff-prune-20261024-v1-clippy-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -141,7 +141,7 @@ jobs:
         workspaces: . -> target/hawk
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-hawk-before
+        prefix-key: ruff-prune-20261024-v1-hawk-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -205,12 +205,12 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - name: Install Rust toolchain
       run: rustup toolchain install 1.99.0
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         target-directory: target/hawk
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-hawk-after
+        prefix-key: ruff-prune-20261024-v1-hawk-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -260,7 +260,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-linux-release-before
+        prefix-key: ruff-prune-20261024-v1-linux-release-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -314,11 +314,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-linux-release-after
+        prefix-key: ruff-prune-20261024-v1-linux-release-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -376,7 +376,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-deps-20261024-v1-windows-before
+        prefix-key: ruff-prune-20261024-v1-windows-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -439,11 +439,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-windows-after
+        prefix-key: ruff-prune-20261024-v1-windows-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -495,7 +495,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-wasm-before
+        prefix-key: ruff-prune-20261024-v1-wasm-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -553,11 +553,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-wasm-after
+        prefix-key: ruff-prune-20261024-v1-wasm-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -637,7 +637,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-msrv-before
+        prefix-key: ruff-prune-20261024-v1-msrv-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -697,11 +697,11 @@ jobs:
       run: |
         rustup toolchain install "${MSRV}" --profile minimal
         echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-msrv-after
+        prefix-key: ruff-prune-20261024-v1-msrv-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -736,7 +736,7 @@ jobs:
       with:
         workspaces: fuzz -> target
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-fuzz-build-before
+        prefix-key: ruff-prune-20261024-v1-fuzz-build-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -783,12 +783,12 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         workspace: fuzz
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-fuzz-build-after
+        prefix-key: ruff-prune-20261024-v1-fuzz-build-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -838,7 +838,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-scripts-before
+        prefix-key: ruff-prune-20261024-v1-scripts-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -896,11 +896,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-scripts-after
+        prefix-key: ruff-prune-20261024-v1-scripts-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -978,7 +978,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-ty-completion-evaluation-before
+        prefix-key: ruff-prune-20261024-v1-ty-completion-evaluation-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1028,11 +1028,11 @@ jobs:
       with:
         version: 0.13.5
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-ty-completion-evaluation-after
+        prefix-key: ruff-prune-20261024-v1-ty-completion-evaluation-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1072,7 +1072,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-python-package-before
+        prefix-key: ruff-prune-20261024-v1-python-package-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1129,11 +1129,11 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         architecture: x64
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-python-package-after
+        prefix-key: ruff-prune-20261024-v1-python-package-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1190,11 +1190,11 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         architecture: x64
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-pgo-after
+        prefix-key: ruff-prune-20261024-v1-pgo-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1240,7 +1240,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-docs-before
+        prefix-key: ruff-prune-20261024-v1-docs-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1296,11 +1296,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-docs-after
+        prefix-key: ruff-prune-20261024-v1-docs-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1360,7 +1360,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-formatter-before
+        prefix-key: ruff-prune-20261024-v1-formatter-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1408,11 +1408,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-formatter-after
+        prefix-key: ruff-prune-20261024-v1-formatter-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1465,7 +1465,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-playground-before
+        prefix-key: ruff-prune-20261024-v1-playground-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1535,11 +1535,11 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - name: Install Rust toolchain
       run: rustup target add wasm32-unknown-unknown
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-playground-after
+        prefix-key: ruff-prune-20261024-v1-playground-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1611,7 +1611,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-ty-benchmark-before
+        prefix-key: ruff-prune-20261024-v1-ty-benchmark-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1669,11 +1669,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-ty-benchmark-after
+        prefix-key: ruff-prune-20261024-v1-ty-benchmark-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1734,7 +1734,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-walltime-build-before
+        prefix-key: ruff-prune-20261024-v1-walltime-build-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1798,11 +1798,11 @@ jobs:
         checksum: 4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-deps-20261024-v1-walltime-build-after
+        prefix-key: ruff-prune-20261024-v1-walltime-build-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1879,7 +1879,7 @@ jobs:
       name: Restore Rust cache
       id: rust-cache
       with:
-        prefix-key: ruff-deps-20261024-v1-daily-fuzz-before
+        prefix-key: ruff-prune-20261024-v1-daily-fuzz-before
         save-if: ${{ inputs.phase == 'seed' }}
     - name: Record Rust cache availability
       if: ${{ inputs.phase == 'warm' }}
@@ -1924,10 +1924,10 @@ jobs:
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
-        prefix-key: ruff-deps-20261024-v1-daily-fuzz-after
+        prefix-key: ruff-prune-20261024-v1-daily-fuzz-after
         save-if: ${{ inputs.phase == 'seed' }}
       name: Restore Rust cache
       id: rust-cache
