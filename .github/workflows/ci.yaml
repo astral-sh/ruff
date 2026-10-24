@@ -82,11 +82,14 @@ jobs:
         cache-python: true
     - name: Run tests
       run: |
+        if [ "$DIAGNOSTIC_PHASE" = warm ]; then
+          CARGO_LOG=cargo::core::compiler::fingerprint=trace,cargo::compiler::fingerprint=trace \
+            uv run --locked --only-dev cargo nextest run --all-features --profile ci --no-run
+        fi
         uv run --locked --only-dev cargo nextest run --all-features --profile ci
         cargo test --all-features --doc
       env:
-        CARGO_LOG: ${{ inputs.phase == 'warm' && 'cargo::core::compiler::fingerprint=trace,cargo::compiler::fingerprint=trace'
-          || '' }}
+        DIAGNOSTIC_PHASE: ${{ inputs.phase }}
     permissions:
       contents: read
     defaults:
