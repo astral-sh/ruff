@@ -68,6 +68,13 @@ fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
 #[derive(Ord, PartialOrd, get_size2::GetSize)]
 pub struct ScopedUseId;
 
+/// A use that may be looked up from a different scope in the same file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
+pub(super) struct FileUseId {
+    pub(super) scope: FileScopeId,
+    pub(super) id: ScopedUseId,
+}
+
 pub trait HasScopedUseId {
     /// Returns the ID that uniquely identifies the use in its scope.
     fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId;

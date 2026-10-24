@@ -5375,84 +5375,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         })
     }
 
-    /// A bare annotation can change a name's declaration without creating a new binding.
-    /// Use the declarations visible in the scope that supplies the receiver of this write.
-    fn declared_name_type_at_use(&self, name: &ast::ExprName) -> Option<Type<'db>> {
-        let db = self.db();
-        let expression = ast::ExprRef::Name(name);
-        let scope = self.index.try_expression_scope_id(&expression)?;
-        let places = self.index.place_table(scope);
-        let symbol_id = places.symbol_id(&name.id)?;
-        let declared_in = |owner, symbol| {
-            let use_def = self.index.use_def_map(owner);
-            let declarations = if owner == scope
-                || self
-                    .index
-                    .ancestor_scopes(scope)
-                    .take_while(|(ancestor, _)| *ancestor != owner)
-                    .all(|(_, ancestor)| ancestor.is_eager())
-            {
-                use_def.subscript_receiver_declarations(expression)?
-            } else {
-                // The store can run after a later declaration in its enclosing scope.
-                use_def.reachable_symbol_declarations(symbol)
-            };
-            place_from_declarations_with_reachability_cache(
-                db,
-                self.program_environment(),
-                declarations,
-                self.reachability_cache(),
-            )
-            .ignore_conflicting_declarations()
-            .place
-            .definite_declared_type()
-        };
-        if scope.is_global()
-            || (places.symbol(symbol_id).is_local() && !self.index.scope(scope).kind().is_class())
-        {
-            return declared_in(scope, symbol_id);
-        }
-        self.index.try_expression_use_id(expression)?;
-        let mut resolution = resolve_place_load(
-            db,
-            self.index,
-            scope.to_scope_id(db, self.program_file()),
-            PlaceExpr::from_expr_name(name),
-            PlaceLoadMode::AtExpression(expression),
-        );
-        while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
-            if source.is_post_lexical() {
-                break;
-            }
-            let owner = match source.kind {
-                PlaceLoadSourceKind::Bindings(scope, _) => Some(scope),
-                _ => None,
-            };
-            let place = self
-                .infer_place_load_source(resolution.place_expr(), source, &[])
-                .place;
-            if place.is_undefined() {
-                continue;
-            }
-            let Some(owner) = owner else {
-                return place.definite_declared_type();
-            };
-            let table = self.index.place_table(owner);
-            let id = table.symbol_id(&name.id)?;
-            let symbol = table.symbol(id);
-            let (owner, id) = if owner.is_global() || symbol.is_local() {
-                (owner, id)
-            } else if symbol.is_global() || symbol.is_nonlocal() {
-                self.forwarded_assignment_owner(owner, id)?
-            } else {
-                // A nested function can rebind this name without declaring it in this scope.
-                continue;
-            };
-            return declared_in(owner, id);
-        }
-        None
-    }
-
     fn declared_item_at_subscript(&self, subscript: &ast::ExprSubscript) -> Option<Type<'db>> {
         let declared = self.declared_type_at_use(&subscript.value)?;
         let key = self.try_expression_type(&subscript.slice)?;
@@ -10857,6 +10779,72 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &attribute.attr,
             properties.functions(self.db(), access).iter().copied(),
         );
+    }
+
+    /// A bare annotation can change a name's declaration without creating a new binding.
+    /// Use the declarations visible in the scope that supplies the name.
+    fn declared_name_type_at_use(&self, name: &ast::ExprName) -> Option<Type<'db>> {
+        let db = self.db();
+        let expression = ast::ExprRef::Name(name);
+        let scope = self.index.try_expression_scope_id(&expression)?;
+        let places = self.index.place_table(scope);
+        let symbol_id = places.symbol_id(&name.id)?;
+        let declared_in = |owner| {
+            let declarations = self.index.symbol_declarations_at_use(name, owner)?;
+            place_from_declarations_with_reachability_cache(
+                db,
+                self.program_environment(),
+                declarations,
+                self.reachability_cache(),
+            )
+            .ignore_conflicting_declarations()
+            .place
+            .definite_declared_type()
+        };
+        if scope.is_global()
+            || (places.symbol(symbol_id).is_local() && !self.index.scope(scope).kind().is_class())
+        {
+            return declared_in(scope);
+        }
+        self.index.try_expression_use_id(expression)?;
+        let mut resolution = resolve_place_load(
+            db,
+            self.index,
+            scope.to_scope_id(db, self.program_file()),
+            PlaceExpr::from_expr_name(name),
+            PlaceLoadMode::AtExpression(expression),
+        );
+        while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+            if source.is_post_lexical() {
+                break;
+            }
+            let owner = match source.kind {
+                PlaceLoadSourceKind::Bindings(scope, _) => Some(scope),
+                _ => None,
+            };
+            let place = self
+                .infer_place_load_source(resolution.place_expr(), source, &[])
+                .place;
+            if place.is_undefined() {
+                continue;
+            }
+            let Some(owner) = owner else {
+                return place.definite_declared_type();
+            };
+            let table = self.index.place_table(owner);
+            let id = table.symbol_id(&name.id)?;
+            let symbol = table.symbol(id);
+            let owner = if owner.is_global() || symbol.is_local() {
+                owner
+            } else if symbol.is_global() || symbol.is_nonlocal() {
+                self.forwarded_assignment_owner(owner, id)?.0
+            } else {
+                // A nested function can rebind this name without declaring it in this scope.
+                continue;
+            };
+            return declared_in(owner);
+        }
+        None
     }
 
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
