@@ -322,17 +322,22 @@ pub(crate) fn unittest_assertion(
         && checker.semantic().current_expression_parent().is_none()
         && !checker.comment_ranges().intersects(expr.range())
     {
-        if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().stmt(&stmt),
-                parenthesized_range(
-                    expr.into(),
-                    checker.semantic().current_statement().into(),
-                    checker.tokens(),
-                )
-                .unwrap_or(expr.range()),
-            )));
-        }
+        diagnostic.try_set_fix(|| {
+            let (stmt, import_edit) =
+                unittest_assert.generate_assert(checker, args, keywords, func.start())?;
+            Ok(Fix::unsafe_edits(
+                Edit::range_replacement(
+                    checker.generator().stmt(&stmt),
+                    parenthesized_range(
+                        expr.into(),
+                        checker.semantic().current_statement().into(),
+                        checker.tokens(),
+                    )
+                    .unwrap_or(expr.range()),
+                ),
+                import_edit,
+            ))
+        });
     }
 }
 
