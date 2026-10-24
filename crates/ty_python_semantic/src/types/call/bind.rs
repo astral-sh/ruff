@@ -3920,8 +3920,12 @@ impl<'db> CallableBinding<'db> {
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
         let (should_retry_after_variadic_expansion, overloads_for_expansion) = if self
-            .should_retry_after_variadic_expansion(db, env, call_arguments.as_ref(), &argument_expansions)
-        {
+            .should_retry_after_variadic_expansion(
+                db,
+                env,
+                call_arguments.as_ref(),
+                &argument_expansions,
+            ) {
             // We will retry all overloads after argument expansion.
             (true, (0..self.overloads.len()).collect())
         } else {
@@ -4299,7 +4303,12 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_variadic_expansion(db, env, call_arguments, &call_arguments.expansions(db, env)) {
+        if self.should_retry_after_variadic_expansion(
+            db,
+            env,
+            call_arguments,
+            &call_arguments.expansions(db, env),
+        ) {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
@@ -4323,7 +4332,7 @@ impl<'db> CallableBinding<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         expansions: &CallArgumentExpansions<'_, '_, 'db>,
     ) -> bool {
-(self.overloads.len() > 1
+        (self.overloads.len() > 1
             && self.matching_overloads().count() < self.overloads.len()
             && expansions.has_expandable_variadic())
             || self.has_concrete_unpacked_variadic(db)
@@ -5718,10 +5727,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                         return Some(minimum + matched_count);
                     }
 
-                    let argument_type = self
-                        .arguments
-                        .argument_types(argument_index)?
-                        .get_default()?;
+                    let argument_type =
+                        self.arguments.source_types(argument_index)?.get_default()?;
                     let Type::Union(union) = argument_type.resolve_type_alias(db) else {
                         return None;
                     };

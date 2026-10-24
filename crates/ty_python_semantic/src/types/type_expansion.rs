@@ -123,24 +123,29 @@ impl<'db> TypeExpander<'_, 'db> {
             Type::Union(union) => {
                 // A union arm can name a union of tuple shapes. Expose those alternatives
                 // together because argument expansion visits each argument only once.
-                let expanded = if union.has_aliases(db) { union.expand_aliases(db, env) } else { ty };
+                let expanded = if union.has_aliases(db) {
+                    union.expand_aliases(db, env)
+                } else {
+                    ty
+                };
                 let elements = match &expanded {
                     Type::Union(union) => union.elements(db),
                     _ => std::slice::from_ref(&expanded),
                 };
-                Some(elements
-                    .iter()
-                    .flat_map(|element| match element {
-                        Type::EnumComplement(complement) => {
-                            complement.remaining_literal_types(db, env)
-                        }
-                        Type::Intersection(intersection) => intersection
-                            .finite_alternatives(db, env)
-                            .unwrap_or_else(|| vec![*element]),
-                        _ => vec![*element],
-                    })
-                    .collect(),
-            )
+                Some(
+                    elements
+                        .iter()
+                        .flat_map(|element| match element {
+                            Type::EnumComplement(complement) => {
+                                complement.remaining_literal_types(db, env)
+                            }
+                            Type::Intersection(intersection) => intersection
+                                .finite_alternatives(db, env)
+                                .unwrap_or_else(|| vec![*element]),
+                            _ => vec![*element],
+                        })
+                        .collect(),
+                )
             }
             // For type aliases, expand the underlying value type.
             Type::TypeAlias(alias) => self
