@@ -95,6 +95,14 @@ use ty_python_core::{
 };
 
 use crate::Db;
+use crate::place::{
+    ConsideredDefinitions, Definedness, Place, PlaceAndQualifiers, RequiresExplicitReExport,
+    builtins_module_scope, class_body_implicit_symbol, explicit_global_symbol,
+    implicit_builtins_symbol, module_type_implicit_global_symbol, place_by_id, place_from_bindings,
+    place_from_bindings_with_reachability_cache, typing_extensions_symbol,
+};
+use crate::reachability::ReachabilityEvaluationCache;
+use crate::types::{ProgramEnvironment, original_class_type};
 
 /// Returns an iterator over the steps that resolve a value for a place load.
 pub(crate) fn resolve_place_load<'db, 'ast>(
@@ -114,6 +122,85 @@ pub(crate) fn resolve_place_load<'db, 'ast>(
         },
         place_expr,
     )
+}
+
+/// Evaluates a source without applying expression-specific narrowing.
+pub(crate) fn evaluate_place_load_source<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    scope: ScopeId<'db>,
+    source: PlaceLoadSource<'db>,
+    reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
+) -> PlaceAndQualifiers<'db> {
+    let is_class_body_global_fallback = source.is_class_body_global_fallback();
+    match source.kind {
+        PlaceLoadSourceKind::Bindings(bindings) => {
+            let mut place = if let Some(cache) = reachability_cache {
+                place_from_bindings_with_reachability_cache(db, env, bindings, cache).place
+            } else {
+                place_from_bindings(db, env, bindings).place
+            };
+
+            // Compatibility policy: ty historically treats a possibly-bound module snapshot
+            // reached through a class-body global fallback as definitely bound. At runtime,
+            // an unbound snapshot would continue to builtins or produce a name error.
+            if is_class_body_global_fallback && let Place::Defined(defined) = place {
+                place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+            }
+            place.into()
+        }
+        PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
+            db,
+            scope,
+            id,
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::AllReachable,
+        ),
+        PlaceLoadSourceKind::Implicit(implicit) => match implicit {
+            ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
+                .map_or_else(
+                    || Place::Undefined.into(),
+                    |class| Place::bound(class).into(),
+                ),
+            ImplicitPlaceLoad::ClassBodySymbol(name) => {
+                let implicit = class_body_implicit_symbol(db, env, &name);
+                if implicit.place.is_definitely_bound() {
+                    implicit
+                } else {
+                    Place::Undefined.into()
+                }
+            }
+            ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
+                explicit_global_symbol(db, file, &name)
+            }
+            ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
+                module_type_implicit_global_symbol(db, file, &name)
+            }
+            ImplicitPlaceLoad::Builtin(name) => {
+                if Some(scope) == builtins_module_scope(db, env) {
+                    Place::Undefined.into()
+                } else {
+                    implicit_builtins_symbol(db, env, &name)
+                }
+            }
+        },
+    }
+}
+
+/// Returns the implicit type-checking fallback for an unimported `reveal_type`.
+pub(crate) fn unimported_reveal_type_fallback<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: ast::ExprRef<'_>,
+) -> PlaceAndQualifiers<'db> {
+    if expression
+        .as_name_expr()
+        .is_some_and(|name| name.id == "reveal_type")
+    {
+        typing_extensions_symbol(db, env, "reveal_type")
+    } else {
+        Place::Undefined.into()
+    }
 }
 
 /// Selects the binding state used for a place load's own scope.
@@ -420,6 +507,9 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
             let forwards_to_global = is_lexical_enclosing_scope
                 && enclosing_place
                     .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_global));
+            let forwards_to_nonlocal = is_lexical_enclosing_scope
+                && enclosing_place
+                    .is_some_and(|place| place.as_symbol().is_some_and(Symbol::is_nonlocal));
             let root_place_was_reassigned = || {
                 enclosing_place_table
                     .parents(place_expr)
@@ -455,6 +545,9 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                                 None,
                             );
                         }
+
+                        // A snapshot can also contain a binding declared `nonlocal`.
+                        self.crosses_scope_declaration |= forwards_to_nonlocal;
 
                         return (
                             Self::node_after_enclosing_scope(enclosing_scope.kind()),
@@ -503,7 +596,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                 return (PlaceLoadResolutionNode::ImplicitClassBodySource(None), None);
             }
             // Keep walking across `nonlocal` declarations until reaching the owning scope.
-            if enclosing_place.as_symbol().is_some_and(Symbol::is_nonlocal) {
+            if forwards_to_nonlocal {
                 self.crosses_scope_declaration = true;
                 continue;
             }
@@ -586,6 +679,11 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         } else {
             PlaceLoadResolutionNode::Failure(PlaceLoadFailure::UnboundFree)
         }
+    }
+
+    /// Returns whether the lookup has followed a `global` or `nonlocal` declaration.
+    pub(crate) fn crosses_scope_declaration(&self) -> bool {
+        self.crosses_scope_declaration
     }
 
     pub(crate) fn narrowing_constraints_for(
@@ -691,7 +789,7 @@ pub(crate) struct PlaceLoadSource<'db> {
 
 impl PlaceLoadSource<'_> {
     /// Returns whether this source is the module fallback for a class-local name.
-    pub(crate) fn is_class_body_global_fallback(&self) -> bool {
+    fn is_class_body_global_fallback(&self) -> bool {
         self.role == PlaceLoadSourceRole::ClassBodyGlobalFallback
     }
 

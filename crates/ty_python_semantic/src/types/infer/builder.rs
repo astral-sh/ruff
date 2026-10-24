@@ -35,16 +35,15 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
-    explicit_global_symbol, implicit_builtins_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings_with_reachability_cache, place_from_declarations_with_reachability_cache,
-    typing_extensions_symbol,
+    DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
+    loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_from_bindings_with_reachability_cache,
+    place_from_declarations_with_reachability_cache,
 };
 use crate::place_load::{
-    ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
-    PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
+    PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
+    PlaceLoadResolutionStep, PlaceLoadSource, evaluate_place_load_source, resolve_place_load,
+    unimported_reveal_type_fallback,
 };
 use crate::reachability::{
     ReachabilityEvaluationCache, evaluate_reachability_with_cache, is_end_of_scope_reachable,
@@ -314,6 +313,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Expressions that are string annotations
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// Place loads inferred as deferred.
+    deferred_place_loads: FxHashSet<ExpressionNodeKey>,
+
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
@@ -538,6 +540,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
+            deferred_place_loads: FxHashSet::default(),
             expected_types: FxHashMap::default(),
             bindings: VecMap::default(),
             declarations: VecMap::default(),
@@ -651,6 +654,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.string_annotations
                         .extend(string_annotations.iter().copied());
                 }
+                DefinitionInferenceExtra::DeferredPlaceLoads(deferred_place_loads) => {
+                    self.deferred_place_loads
+                        .extend(deferred_place_loads.iter().copied());
+                }
                 DefinitionInferenceExtra::Undecorated(_)
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
                 DefinitionInferenceExtra::Other(extra) => {
@@ -665,6 +672,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.deferred.extend(extra.deferred.iter().copied());
                     self.string_annotations
                         .extend(extra.string_annotations.iter().copied());
+                    self.deferred_place_loads
+                        .extend(extra.deferred_place_loads.iter().copied());
                     self.expected_types
                         .extend(extra.expected_types.iter().copied());
                     self.qualifiers.extend(extra.qualifiers.iter().copied());
@@ -720,6 +729,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.deferred.extend(extra.deferred.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.deferred_place_loads
+                .extend(extra.deferred_place_loads.iter().copied());
             self.expected_types
                 .extend(extra.expected_types.iter().copied());
             self.qualifiers.extend(extra.qualifiers.iter().copied());
@@ -776,6 +787,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.called_functions.iter().copied());
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.deferred_place_loads
+                .extend(extra.deferred_place_loads.iter().copied());
             self.expected_types
                 .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
@@ -813,6 +826,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .extend(inference.legacy_aliases.iter().copied());
         self.string_annotations
             .extend(inference.string_annotations.iter().copied());
+        self.deferred_place_loads
+            .extend(inference.deferred_place_loads.iter().copied());
         self.expected_types
             .extend(inference.expected_types.iter().map(|(key, ty)| (*key, *ty)));
         self.type_expression_flags.extend(
@@ -853,6 +868,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
+            self.deferred_place_loads
+                .extend(extra.deferred_place_loads.iter().copied());
             self.expected_types
                 .extend(extra.expected_types.iter().copied());
             self.type_expression_flags
@@ -10733,7 +10750,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
-        &self,
+        &mut self,
         place_expr: PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
@@ -10745,6 +10762,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
+
+        if matches!(mode, PlaceLoadMode::Deferred) {
+            self.deferred_place_loads.insert(expr_ref.into());
+        }
+
         let mut resolution =
             resolve_place_load(self.db(), self.index, self.scope(), place_expr, mode);
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
@@ -10815,63 +10837,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> PlaceAndQualifiers<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let is_class_body_global_fallback = source.is_class_body_global_fallback();
-
-        let place = match source.kind {
-            PlaceLoadSourceKind::Bindings(bindings) => {
-                let mut place = place_from_bindings_with_reachability_cache(
-                    db,
-                    env,
-                    bindings,
-                    self.reachability_cache(),
-                )
-                .place;
-
-                // Compatibility policy: ty historically treats a possibly-bound module snapshot
-                // reached through a class-body global fallback as definitely bound. At runtime,
-                // an unbound snapshot would continue to builtins or produce a name error.
-                if is_class_body_global_fallback && let Place::Defined(defined) = place {
-                    place = Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
-                }
-
-                place.into()
-            }
-            PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => place_by_id(
-                db,
-                scope,
-                id,
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::AllReachable,
-            ),
-            PlaceLoadSourceKind::Implicit(implicit) => match implicit {
-                ImplicitPlaceLoad::DunderClass(definition) => original_class_type(db, definition)
-                    .map_or_else(
-                        || Place::Undefined.into(),
-                        |class| Place::bound(class).into(),
-                    ),
-                ImplicitPlaceLoad::ClassBodySymbol(name) => {
-                    let implicit = class_body_implicit_symbol(db, env, &name);
-                    if implicit.place.is_definitely_bound() {
-                        implicit
-                    } else {
-                        Place::Undefined.into()
-                    }
-                }
-                ImplicitPlaceLoad::ExplicitGlobalSymbol { file, name } => {
-                    explicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::ModuleImplicitGlobal { file, name } => {
-                    module_type_implicit_global_symbol(db, file, &name)
-                }
-                ImplicitPlaceLoad::Builtin(name) => {
-                    if Some(self.scope()) == builtins_module_scope(db, env) {
-                        Place::Undefined.into()
-                    } else {
-                        implicit_builtins_symbol(db, env, &name)
-                    }
-                }
-            },
-        };
+        let place = evaluate_place_load_source(
+            db,
+            env,
+            self.scope(),
+            source,
+            Some(self.reachability_cache()),
+        );
 
         if narrowing_constraints.is_empty() {
             place
@@ -10898,7 +10870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             report_undefined_reveal(&self.context, name);
         }
 
-        typing_extensions_symbol(self.db(), self.program_environment(), "reveal_type")
+        unimported_reveal_type_fallback(self.db(), self.program_environment(), expr_ref)
     }
 
     /// Returns whether any tracked place-expression prefix has a definite or possible binding in
@@ -12099,6 +12071,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             scope,
             bindings,
@@ -12142,6 +12115,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             bindings,
             context,
@@ -12164,6 +12138,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             scope,
             bindings,
@@ -12195,6 +12170,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !context.is_empty()
             || !comparison_truthiness.is_empty()
             || !string_annotations.is_empty()
+            || !deferred_place_loads.is_empty()
             || cycle_recovery.is_some()
             || !expected_types.is_empty()
             || !deferred.is_empty()
@@ -12210,6 +12186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 legacy_aliases: legacy_aliases.into_iter().collect(),
                 comparison_truthiness: FrozenMap::from(comparison_truthiness),
                 string_annotations: FrozenSet::from(string_annotations),
+                deferred_place_loads: FrozenSet::from(deferred_place_loads),
                 expected_types: FrozenMap::from(expected_types),
                 called_functions: called_functions
                     .into_iter()
@@ -12288,6 +12265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             scope: _,
             string_annotations: _,
+            deferred_place_loads,
             expected_types: _,
             return_types_and_ranges: _,
             collection_use_constraints: _,
@@ -12307,6 +12285,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         FunctionDecoratorInference {
             legacy_aliases: legacy_aliases.into_iter().collect(),
+            deferred_place_loads: FrozenSet::from(deferred_place_loads),
             expression_types: FrozenMap::from(expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
@@ -12337,6 +12316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             scope,
             bindings,
@@ -12364,6 +12344,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
             + usize::from(!legacy_aliases.is_empty())
+            + usize::from(!deferred_place_loads.is_empty())
             + usize::from(!comparison_truthiness.is_empty())
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
@@ -12403,6 +12384,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if !string_annotations.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::StringAnnotations(FrozenSet::from(string_annotations)),
             )),
+            (1, None) if !deferred_place_loads.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::DeferredPlaceLoads(FrozenSet::from(deferred_place_loads)),
+            )),
             (1, None) if discards_dict_key_assignments => Some(Box::new(
                 DefinitionInferenceExtra::DiscardsDictKeyAssignments,
             )),
@@ -12423,6 +12407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     legacy_aliases: legacy_aliases.into_iter().collect(),
                     comparison_truthiness: FrozenMap::from(comparison_truthiness),
                     string_annotations: FrozenSet::from(string_annotations),
+                    deferred_place_loads: FrozenSet::from(deferred_place_loads),
                     expected_types: FrozenMap::from(expected_types),
                     collection_use_constraints,
                     called_functions: called_functions
@@ -12530,6 +12515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12566,6 +12552,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = (!legacy_aliases.is_empty()
             || !string_annotations.is_empty()
+            || !deferred_place_loads.is_empty()
             || !expected_types.is_empty()
             || !context.is_empty()
             || cycle_recovery.is_some()
@@ -12578,6 +12565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Box::new(ScopeInferenceExtra {
                 legacy_aliases: legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(string_annotations),
+                deferred_place_loads: FrozenSet::from(deferred_place_loads),
                 qualifiers: FrozenMap::from(qualifiers),
                 expected_types: FrozenMap::from(expected_types),
                 type_expression_flags: FrozenMap::from(type_expression_flags),
@@ -12624,6 +12612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: _,
             comparison_truthiness: _,
             string_annotations: _,
+            deferred_place_loads: _,
             expected_types: _,
             scope: _,
             bindings: _,
@@ -12691,6 +12680,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
+            deferred_place_loads,
             expected_types,
             scope,
             bindings,
@@ -12734,6 +12724,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations
             .extend(string_annotations.iter().copied());
+        self.deferred_place_loads.extend(deferred_place_loads);
         self.expected_types.extend(expected_types.iter());
         self.type_expression_flags
             .extend(type_expression_flags.iter());
@@ -12862,6 +12853,7 @@ struct FullExpressionCacheEntry<'db> {
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
     string_annotations: FxHashSet<ExpressionNodeKey>,
+    deferred_place_loads: FxHashSet<ExpressionNodeKey>,
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
     bindings: VecMap<Definition<'db>, Type<'db>>,
     context: InferContextResult,
@@ -12889,6 +12881,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
     fn has_extra(&self) -> bool {
         !self.legacy_aliases.is_empty()
             || !self.string_annotations.is_empty()
+            || !self.deferred_place_loads.is_empty()
             || !self.comparison_truthiness.is_empty()
             || !self.type_expression_flags.is_empty()
             || !self.collection_use_constraints.is_empty()
@@ -12918,6 +12911,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
             Box::new(ExpressionInferenceExtra {
                 legacy_aliases: self.legacy_aliases.into_iter().collect(),
                 string_annotations: FrozenSet::from(self.string_annotations),
+                deferred_place_loads: FrozenSet::from(self.deferred_place_loads),
                 comparison_truthiness: FrozenMap::from(self.comparison_truthiness),
                 expected_types: FrozenMap::from(self.expected_types),
                 type_expression_flags: FrozenMap::from(self.type_expression_flags),
