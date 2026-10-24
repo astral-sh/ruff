@@ -76,7 +76,7 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
         working-directory: ruff
-      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           workspace: ruff
 

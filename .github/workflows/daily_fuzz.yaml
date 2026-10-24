@@ -56,8 +56,9 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
+          # Keep the cache small without enabling unstable Cargo freshness features.
           cache-workspace-crates: "false"
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
