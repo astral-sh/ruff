@@ -1,0 +1,8 @@
+ast-serialize==0.13.1
+colorama==0.4.6
+librt==0.16.0
+mypy==2.4.0
+mypy-extensions==1.1.0
+pathspec==1.1.1
+types-colorama==0.4.15.20260508
+typing-extensions==4.16.0
