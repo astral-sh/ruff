@@ -2759,7 +2759,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .any(|ty| {
                         // Aliases and recursive types can hide typevars. Avoid expanding them just
                         // to decide whether to take a fast path.
-                        any_over_type(db, self.env, ty, false, |ty| {
+                        any_over_type(db, self.env, ty, |ty| {
                             matches!(
                                 ty,
                                 Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
