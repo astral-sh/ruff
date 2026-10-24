@@ -103,6 +103,9 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-clippy-after
+        profile: |
+          debug
+          wasm32-unknown-unknown/debug
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -214,6 +217,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-linux-release-after
+        profile: profiling
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -318,6 +322,9 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-wasm-after
+        profile: |
+          debug
+          wasm32-unknown-unknown/debug
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -433,6 +440,9 @@ jobs:
         workspace: fuzz
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-fuzz-build-after
+        profile: |
+          release
+          x86_64-unknown-linux-gnu/release
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -681,6 +691,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-ty-completion-evaluation-after
+        profile: profiling
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1138,6 +1149,9 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-playground-after
+        profile: |
+          debug
+          wasm32-unknown-unknown/debug
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1273,6 +1287,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-ty-benchmark-after
+        profile: profiling
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1403,6 +1418,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         prefix-key: ruff-extended-full-20261024-v1-walltime-build-after
+        profile: profiling
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
