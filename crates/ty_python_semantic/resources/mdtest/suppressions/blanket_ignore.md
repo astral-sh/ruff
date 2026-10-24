@@ -38,17 +38,20 @@ e = 1  # ty: ignore
 
 ## Suppression diagnostics
 
-Suppression-related diagnostics are checked before `blanket-ignore-comment`. A blanket ignore that
-suppresses an `ignore-comment-unknown-rule` or `invalid-ignore-comment` diagnostic therefore counts
-as used:
+Suppression-comment diagnostics require an explicit rule code. A blanket ignore cannot suppress an
+unknown or malformed ignore on the same line:
 
 ```py
 # The nested ignore contains an unknown rule.
+# error: [ignore-comment-unknown-rule]
 # error: [blanket-ignore-comment]
+# error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
 a = 1  # ty: ignore # ty: ignore[not-a-rule]
 
 # The nested ignore is invalid.
+# error: [invalid-ignore-comment]
 # error: [blanket-ignore-comment]
+# error: [unused-ignore-comment] "Unused blanket `ty: ignore` directive"
 b = 1  # ty: ignore # ty: ignore[*]
 ```
 
@@ -69,4 +72,13 @@ A blanket ignore can be suppressed by a code-specific ignore:
 
 ```py
 a = unresolved  # ty: ignore # ty: ignore[blanket-ignore-comment]
+```
+
+An own-line `blanket-ignore-comment` suppression also covers a blanket ignore on the following
+logical line.
+
+```py
+def f():
+    # ty: ignore[blanket-ignore-comment]
+    return missing  # ty: ignore
 ```

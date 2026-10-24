@@ -17,6 +17,7 @@ use rustc_hash::FxHasher;
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
+pub(crate) use crate::suppression::add_ignore::can_suppress;
 pub use crate::suppression::add_ignore::suppress_single;
 pub(crate) use crate::suppression::add_ignore::{SuppressFix, suppress_all};
 use crate::suppression::parser::{
@@ -73,6 +74,14 @@ declare_lint! {
 
 pub(crate) fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
+}
+
+/// Returns whether `name` diagnoses an ignore comment rather than the code it suppresses.
+fn is_suppression_comment_lint(name: LintName) -> bool {
+    name == IGNORE_COMMENT_UNKNOWN_RULE.name()
+        || name == INVALID_IGNORE_COMMENT.name()
+        || name == BLANKET_IGNORE_COMMENT.name()
+        || is_unused_ignore_comment_lint(name)
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -334,7 +343,7 @@ pub(crate) struct Suppressions {
     /// The outer suppression starts before the inner suppression but ends after it.
     inline: IntervalIndex,
 
-    /// Suppressions with lint codes that are unknown.
+    /// Suppressions with lint codes that are unknown, sorted by code range.
     unknown: Vec<UnknownSuppression>,
 
     /// Suppressions that are syntactically invalid.
@@ -474,7 +483,7 @@ impl Suppression {
 
     fn matches(&self, tested_id: LintId) -> bool {
         match self.target {
-            SuppressionTarget::All => true,
+            SuppressionTarget::All => !is_suppression_comment_lint(tested_id.name()),
             SuppressionTarget::Lint(suppressed_id) => tested_id == suppressed_id,
             SuppressionTarget::Empty => false,
         }
@@ -564,7 +573,7 @@ struct SuppressionsBuilder<'a> {
     source: &'a str,
 
     /// Ignore comments at the top of the file before any non-trivia code apply to the entire file.
-    /// This boolean tracks if there has been any non trivia token.
+    /// This boolean tracks if there has been any non-trivia token.
     seen_non_trivia_token: bool,
 
     inline: Vec<Suppression>,
@@ -594,7 +603,6 @@ impl<'a> SuppressionsBuilder<'a> {
         self.file.shrink_to_fit();
         self.unknown.shrink_to_fit();
         self.invalid.shrink_to_fit();
-
         Suppressions {
             file: self.file,
             inline: IntervalIndex::from_sorted(self.inline),
@@ -684,6 +692,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         Err(error) => self.unknown.push(UnknownSuppression {
                             range: code_range,
                             comment_range: comment.range(),
+                            kind: comment.kind(),
                             reason: error,
                         }),
                     }
@@ -758,7 +767,7 @@ fn own_line_suppression_range(range: TextRange, tokens: &Tokens) -> TextRange {
         }
     }
 
-    TextRange::new(range.start(), end)
+    TextRange::new(comment_token_start, end)
 }
 
 /// Suppression for an unknown lint rule.
@@ -769,6 +778,8 @@ struct UnknownSuppression {
 
     /// The range of the suppression comment
     comment_range: TextRange,
+
+    kind: SuppressionKind,
 
     reason: GetLintError,
 }
