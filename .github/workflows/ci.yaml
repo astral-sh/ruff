@@ -429,10 +429,9 @@ jobs:
           shared-key: ruff-linux-debug
           lookup-only: true
           cache-workspace-crates: "false"
-      - uses: astral-sh/github-actions/rust-workspace-cache@374b3d54bd4be0644dd1bb437decde17acd776b8
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
         with:
           key: ruff-linux-debug
-          restore-build-script-mtimes: "true"
           # Keep Cargo available for the dependency cache's post step.
           cache-bin: "false"
           add-job-id-key: "false"
