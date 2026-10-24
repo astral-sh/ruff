@@ -1464,10 +1464,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-        with:
-          cache-workspace-crates: "false"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
@@ -1477,6 +1473,10 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
+      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+        with:
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Build benchmarks"
         run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_ide,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script --bench ty_ide
 
