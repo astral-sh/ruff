@@ -13,8 +13,8 @@ use crate::{
     lint::LintMetadata,
     place::{DefinedPlace, Place, TypeOrigin},
     types::{
-        ClassBase, ClassType, ReceiverMemberShadowsNonDataDescriptor, IntersectionType,
-        KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        ClassBase, ClassType, IntersectionType, KnownInstanceType, MemberLookupPolicy,
+        ReceiverMemberShadowsNonDataDescriptor, StaticClassLiteral, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,

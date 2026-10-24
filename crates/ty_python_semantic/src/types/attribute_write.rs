@@ -20,9 +20,9 @@ use super::relation::TypeRelationChecker;
 use super::visitor::may_contain_typevar_from;
 use super::{
     BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
-    ReceiverMemberShadowsNonDataDescriptor, receiver_member_shadows_type_member,
+    PropertyInstanceType, ReceiverMemberShadowsNonDataDescriptor, SelfBinding, Signature, Type,
+    TypeContext, TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    receiver_member_shadows_type_member,
 };
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, builtins_symbol, place_from_bindings,
