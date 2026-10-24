@@ -18,3 +18,24 @@ help: Replace with `None`; initialize within function
 20 |     print(x)
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_9.py:29:10
+   |
+29 |   def m1(x=["""first
+   |  __________^
+30 | | second"""]):
+   | |__________^
+31 |       print(x)
+   |
+help: Replace with `None`; initialize within function
+   |
+28 |
+   - def m1(x=["""first
+   - second"""]):
+29 + def m1(x=None):
+30 +     if x is None:
+31 +         x = ["""first\nsecond"""]
+32 |     print(x)
+   |
+note: This is an unsafe fix and may change runtime behavior

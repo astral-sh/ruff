@@ -24,3 +24,8 @@ def w1(x=(1,)):
 
 def w2(x=(z := 3)):
     print(x)
+
+
+def m1(x=["""first
+second"""]):
+    print(x)
