@@ -131,8 +131,6 @@ enum NumericTowerDisplay {
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
-    /// Tuple elements left to display in the current outermost tuple.
-    tuple_element_budget: Option<Rc<Cell<usize>>>,
     /// Whether rendering can be multiline
     multiline: bool,
     /// Whether callable signatures should include their definition name.
@@ -156,6 +154,8 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Tuple elements left to display in the current outermost tuple.
+    tuple_element_budget: Option<Rc<Cell<usize>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
