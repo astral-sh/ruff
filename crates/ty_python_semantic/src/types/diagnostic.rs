@@ -4289,8 +4289,12 @@ pub(crate) fn report_invalid_or_unsupported_base(
         );
     };
 
-    let env = &context.program_environment();
-    match base_type.try_call_dunder(
+    // Class objects do not need `__mro_entries__`. A conditional base can combine class
+    // objects with instances that provide it, so only check the non-class union members.
+    let non_class_base = base_type.filter_union(db, env, |ty| {
+        !ty.is_assignable_to(db, env, instance_of_type)
+    });
+    match non_class_base.try_call_dunder(
         db,
         env,
         "__mro_entries__",
@@ -4313,7 +4317,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                 diagnostic.info(format_args!(
                     "Type `{}` has an `__mro_entries__` method, \
                     but it does not return a tuple of types",
-                    base_type.display(db, env)
+                    non_class_base.display(db, env)
                 ));
             }
         }
@@ -4329,7 +4333,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` may have an `__mro_entries__` attribute, but it may be missing",
-                        base_type.display(db, env)
+                        non_class_base.display(db, env)
                     ));
                     if let Some(unbound_on) = unbound_on {
                         for ty in unbound_on {
@@ -4344,7 +4348,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
-                        base_type.display(db, env)
+                        non_class_base.display(db, env)
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
@@ -4352,7 +4356,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it cannot be called with the expected arguments",
-                        base_type.display(db, env)
+                        non_class_base.display(db, env)
                     ));
                     diagnostic.info(
                         "Expected a signature at least as permissive as \
@@ -4364,7 +4368,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
                         but it may not be callable",
-                        base_type.display(db, env)
+                        non_class_base.display(db, env)
                     ));
                 }
             }
