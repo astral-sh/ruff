@@ -656,7 +656,8 @@ jobs:
   cargo-build-ruff:
     name: "cargo build (ruff, ${{ matrix.runner }})"
     runs-on: ${{ matrix.runner }}
-    # Installed Rust toolchains differ across runner images and affect cache keys.
+    # Both runners use `rust-toolchain.toml`, but `rust-cache` also hashes the
+    # versions of other installed toolchains, which differ between runner images.
     strategy:
       matrix:
         runner: [depot-ubuntu-24.04-8, github-ubuntu-24.04-x86_64-4]
