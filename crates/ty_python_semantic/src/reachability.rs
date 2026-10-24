@@ -597,6 +597,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     match predicate.node {
         PredicateNode::Expression { expression, .. }
         | PredicateNode::Condition(expression)
+        | PredicateNode::CallRefinesReceiver(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -2036,6 +2037,13 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             analyze_non_terminal_call(db, call).negate_if(!predicate.is_positive)
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
+        PredicateNode::CallRefinesReceiver(expression) => {
+            let module = parsed_module(db, expression.python_file(db)).load(db);
+            let node = expression.node_ref(db).node(&module);
+            let inference = infer_expression_types(db, expression, TypeContext::default());
+            Truthiness::from(inference.receiver_refinement(node).is_some())
+                .negate_if(!predicate.is_positive)
+        }
         PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)

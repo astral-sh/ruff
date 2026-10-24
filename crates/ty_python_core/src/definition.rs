@@ -352,6 +352,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
     AugmentedAssignment(&'ast ast::StmtAugAssign),
+    ReceiverRefinement(&'ast ast::ExprCall),
     DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     Parameter(ParameterDefinitionNodeRef<'ast>),
@@ -710,6 +711,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node: AstNodeRef::new(parsed, node),
                 has_value: node.value.is_some(),
             }),
+            DefinitionNodeRef::ReceiverRefinement(call) => {
+                DefinitionKind::ReceiverRefinement(AstNodeRef::new(parsed, call))
+            }
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
@@ -851,6 +855,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
+            Self::ReceiverRefinement(node) => DefinitionNodeKey(NodeKey::from_node(node)),
             Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
@@ -940,6 +945,8 @@ pub enum DefinitionKind<'db> {
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    /// A receiver's new flow binding, guarded by `CallRefinesReceiver`.
+    ReceiverRefinement(AstNodeRef<ast::ExprCall>),
     DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
@@ -1038,6 +1045,7 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
             DefinitionKind::Assignment(assignment) => assignment.target(module).range(),
             DefinitionKind::AnnotatedAssignment(assign) => assign.target(module).range(),
+            DefinitionKind::ReceiverRefinement(call) => call.node(module).func.range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
             }
@@ -1102,6 +1110,7 @@ impl<'db> DefinitionKind<'db> {
                 full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::ReceiverRefinement(call) => call.node(module).range(),
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
                 dict_key_assignment.key.node(module).range()
             }
@@ -1158,6 +1167,7 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
+            | DefinitionKind::ReceiverRefinement(_)
             | DefinitionKind::For(_)
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
@@ -1814,6 +1824,12 @@ impl From<&ast::ExprAttribute> for DefinitionNodeKey {
 
 impl From<&ast::ExprSubscript> for DefinitionNodeKey {
     fn from(node: &ast::ExprSubscript) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::ExprCall> for DefinitionNodeKey {
+    fn from(node: &ast::ExprCall) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

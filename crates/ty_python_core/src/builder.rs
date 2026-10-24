@@ -1173,6 +1173,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .then_some(definition)
     }
 
+    /// Finds direct calls on local receivers whose state can be tracked after the call.
+    fn receiver_refinement_target(
+        &self,
+        expr: &'ast ast::Expr,
+    ) -> Option<(&'ast ast::ExprCall, ScopedPlaceId)> {
+        let call = expr.as_call_expr()?;
+        let attribute = call.func.as_attribute_expr()?;
+        let receiver = attribute.value.as_name_expr()?;
+        // Argument evaluation can rebind the receiver after method lookup. Collection initializers
+        // also have their own inference from later mutations and must retain their binding identity.
+        if self.source_type.is_stub()
+            || any_over_expr(expr, &ast::Expr::is_named_expr)
+            || self
+                .unannotated_collection_initializer_binding(&attribute.value)
+                .is_some()
+        {
+            return None;
+        }
+        let symbol = self.current_place_table().symbol_id(&receiver.id)?;
+        if !self.current_place_table().symbol(symbol).is_bound() {
+            return None;
+        }
+        // Imported receivers can be modules exposing special constructors. Keep their calls in
+        // their original inference regions; this prototype only tracks locally bound objects.
+        let use_def = self.current_use_def_map();
+        let is_local = use_def.symbol_binding_definition_ids(symbol).all(|id| {
+            use_def
+                .definition(id)
+                .definition()
+                .is_some_and(|definition| {
+                    !matches!(
+                        definition.kind(self.db),
+                        DefinitionKind::Import(_)
+                            | DefinitionKind::ImportFrom(_)
+                            | DefinitionKind::ImportFromSubmodule(_)
+                    )
+                })
+        });
+        is_local.then_some((call, symbol.into()))
+    }
+
     /// Try to register a narrowing alias for a simple name assignment.
     ///
     /// Any pre-existing alias entry for the `target` name has already been removed by
@@ -1742,7 +1783,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let definition_id = self.current_use_def_map().next_definition_id();
         record(self.current_use_def_map_mut(), place);
 
-        if !is_loop_header {
+        if !is_loop_header
+            && !matches!(
+                definition.kind(self.db),
+                DefinitionKind::ReceiverRefinement(_)
+            )
+        {
             self.delete_associated_bindings(place);
         }
 
@@ -2420,6 +2466,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
                     PredicateNode::SubjectElementPattern(_)
                     | PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::CallRefinesReceiver(_)
                     | PredicateNode::ContextManagerSuppresses { .. }
                     | PredicateNode::FinallyNormalPathImpossible { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
@@ -3653,6 +3700,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
+                if let Some((call, place)) = self.receiver_refinement_target(expr) {
+                    let expression = self.add_standalone_expression(expr);
+                    // A postcondition acts like an assignment, so it must survive branch joins.
+                    // Retain the previous binding on calls without a receiver effect; forwarding
+                    // only its narrowed type would change subsequent gradual narrowing.
+                    let before = self.flow_snapshot();
+                    let constraint = self.record_reachability_constraint(
+                        PredicateOrLiteral::Predicate(Predicate {
+                            node: PredicateNode::CallRefinesReceiver(expression),
+                            is_positive: true,
+                        }),
+                    );
+                    self.add_definition(place, DefinitionNodeRef::ReceiverRefinement(call));
+                    let after = self.flow_snapshot();
+                    self.flow_restore(before);
+                    self.record_negated_reachability_constraint(constraint);
+                    self.flow_merge(after);
+                }
             }
             ast::Expr::UnaryOp(unary) => {
                 if unary.op == ast::UnaryOp::Not {
