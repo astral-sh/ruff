@@ -80,7 +80,7 @@ jobs:
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-publish-source-v1-publish-after
+        prefix-key: ruff-native-20261024-publish-source-v2-publish-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
