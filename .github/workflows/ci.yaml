@@ -87,7 +87,7 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@15637bf3eab8809710cb7c878731f33e5b4d7850
+    - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
       with:
         workspace: fuzz
         save-if: ${{ inputs.phase == 'seed' }}
