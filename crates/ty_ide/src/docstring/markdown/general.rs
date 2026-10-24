@@ -100,7 +100,11 @@ fn render_with_indentation_mode(
     let mut first_line = true;
     let mut renderer = Renderer::new(output, allowed_html_tags);
     let mut temp_owned_line;
-    for line in source.lines() {
+    let mut remaining = source;
+    while !remaining.is_empty() {
+        let source_from_line = remaining;
+        let (line, rest) = remaining.split_once('\n').unwrap_or((remaining, ""));
+        remaining = rest;
         // We can assume leading whitespace has been normalized
         let trimmed_source_line = line.trim_start_matches(' ');
         let mut rendered_line = trimmed_source_line;
@@ -165,16 +169,7 @@ fn render_with_indentation_mode(
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
-        let parsed_literal = trimmed_source_line
-            // first check for a line ending with `::`
-            .strip_suffix("::")
-            .map(|prefix| (prefix, None))
-            // if that fails, look for a line ending with `:: lang`
-            .or_else(|| {
-                let (prefix, lang) = trimmed_source_line.rsplit_once(' ')?;
-                let prefix = prefix.trim_end().strip_suffix("::")?;
-                Some((prefix, Some(lang)))
-            });
+        let parsed_literal = rest_literal_marker(trimmed_source_line);
         if renderer.block_state.is_prose()
             && let Some((without_literal, lang)) = parsed_literal
         {
@@ -271,6 +266,24 @@ fn render_with_indentation_mode(
                 && line_indent >= TextSize::from(4)
                 && !renderer.inline.has_pending_link();
 
+        // A physical newline inside an HTML tag must reach the Markdown parser
+        // without the hard break or indentation that we add between prose lines.
+        if renderer.block_state.is_prose()
+            && !is_indented_markdown_code
+            && !renderer.inline.has_pending_link()
+            && rendered_line == trimmed_source_line
+        {
+            let source_from_text = &source_from_line[line_indent.to_usize()..];
+            if let Some(end) = inline::wrapped_html_line_end(
+                source_from_text,
+                trimmed_source_line.len(),
+                allowed_html_tags,
+            ) {
+                rendered_line = &source_from_text[..end];
+                remaining = source_from_text[end..].strip_prefix('\n').unwrap_or("");
+            }
+        }
+
         renderer.render_line(
             rendered_line,
             line_indent.to_usize(),
@@ -278,6 +291,17 @@ fn render_with_indentation_mode(
         );
     }
     renderer.finish_document();
+}
+
+/// Parses a line ending in `::` or `:: lang` as a reST literal block marker.
+fn rest_literal_marker(line: &str) -> Option<(&str, Option<&str>)> {
+    line.strip_suffix("::")
+        .map(|prefix| (prefix, None))
+        .or_else(|| {
+            let (prefix, lang) = line.rsplit_once(' ')?;
+            let prefix = prefix.trim_end().strip_suffix("::")?;
+            Some((prefix, Some(lang)))
+        })
 }
 
 /// How to emit leading indentation outside recognized code blocks.

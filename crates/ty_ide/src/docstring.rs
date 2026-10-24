@@ -308,6 +308,88 @@ Summary.
         );
     }
 
+    #[test]
+    fn preserves_html_tags_wrapped_across_lines() {
+        let tags = ["a", "b"].map(str::to_string);
+        let docstring = Docstring::new(
+            "See `example` and <a\nhref=\"https://example.com\"\ntitle=\"a > b\">docs</a> and <b\nclass=\"label\">bold</b>.\nNext line."
+                .to_string(),
+        );
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(
+            rendered,
+            "See `example` and <a\nhref=\"https://example.com\"\ntitle=\"a > b\">docs</a> and <b\nclass=\"label\">bold</b>.  \nNext line."
+        );
+        assert_eq!(
+            DocstringFragment::new("<a\nhref=\"https://example.com\">docs</a>")
+                .render(MarkupKind::Markdown, &tags),
+            "<a\nhref=\"https://example.com\">docs</a>"
+        );
+    }
+
+    #[test]
+    fn does_not_join_incomplete_html_tags_across_code_blocks() {
+        let tags = ["a"].map(str::to_string);
+        let docstring = Docstring::new("<a\n```text\n> code\n```".to_string());
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(rendered, "&lt;a  \n```text\n> code\n```");
+    }
+
+    #[test]
+    fn does_not_join_incomplete_html_tags_across_rest_directives() {
+        let tags = ["a".to_string()];
+        let docstring = Docstring::new("<a\n.. note::\n    > details".to_string());
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(
+            rendered,
+            "&lt;a  \n**Note:**  \n&nbsp;&nbsp;&nbsp;&nbsp;&gt; details"
+        );
+    }
+
+    #[test]
+    fn wrapped_html_tag_does_not_change_following_rest_link_indentation() {
+        let tags = ["a".to_string()];
+        let docstring = Docstring::new(
+            "<a\n    href=\"https://example.com\"> `docs\n<https://example.com>`_".to_string(),
+        );
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(
+            rendered,
+            "&lt;a  \n&nbsp;&nbsp;&nbsp;&nbsp;href=\"https://example.com\"&gt; `docs  \n&lt;https://example.com&gt;`_"
+        );
+    }
+
+    #[test]
+    fn leaves_tag_shaped_text_in_inline_code_unchanged() {
+        let tags = ["a"].map(str::to_string);
+        let docstring = Docstring::new("`<a`\nhref=\"https://example.com\">".to_string());
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(rendered, "`<a`  \nhref=\"https://example.com\"&gt;");
+    }
+
+    #[test]
+    fn does_not_join_unsupported_tags_or_across_blank_lines() {
+        let tags = ["a"].map(str::to_string);
+        let docstring = Docstring::new("<custom\nattr=value>\n<a\n\n>".to_string());
+
+        let rendered = docstring.render(MarkupKind::Markdown, &tags);
+
+        assert_eq!(
+            rendered,
+            "&lt;custom  \nattr=value&gt;  \n&lt;a  \n  \n&gt;"
+        );
+    }
+
     // A literal block where the `::` is flush with the paragraph
     // and should become `:`
     #[test]
