@@ -816,10 +816,11 @@ fn evaluate_structural_comparison<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, env, left.constraints(db));
             let right = constraints.load(db, env, right.constraints(db));
-            operator.result_from_equality(
-                left.iff(db, &constraints, right)
-                    .is_always_satisfied(db, env),
-            )
+            operator.result_from_equality(left.iff(db, &constraints, right).is_always_satisfied(
+                db,
+                env,
+                crate::types::typevar::TypeVarSet::None,
+            ))
         }
         (left, right)
             if has_known_identity_comparison_semantics(db, env, left, operator)
@@ -1697,10 +1698,10 @@ fn compare_nominal_instances<'db>(
 
         let mut all_equal = true;
         for (&left, &right) in left_elements.iter().zip(right_elements) {
-            match evaluate_tuple_element_equality(evaluator, left, right) {
+            match evaluate_container_element_equality(evaluator, left, right) {
                 Truthiness::AlwaysTrue => {}
                 Truthiness::AlwaysFalse => return operator.result_from_equality(false),
-                Truthiness::Ambiguous => all_equal = false,
+                Truthiness::Ambiguous | Truthiness::Uninhabited => all_equal = false,
             }
         }
 
@@ -1714,7 +1715,7 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-fn evaluate_tuple_element_equality<'db>(
+fn evaluate_container_element_equality<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     right: Type<'db>,

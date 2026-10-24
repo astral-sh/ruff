@@ -1,5 +1,4 @@
 use crate::Db;
-use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -11,15 +10,15 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
-    ComparisonOperator as EqualityOperator, ComparisonSoundnessPolicy, TupleEqualityEvaluator,
-    equality_result_truthiness,
+    ComparisonOperator as EqualityOperator, ComparisonSoundnessPolicy,
+    ContainerElementEqualityEvaluator, equality_result_truthiness,
 };
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
     BoundMethodType, CallableType, DynamicType, FunctionType, IntersectionBuilder,
-    IntersectionType, KnownBoundMethodType, KnownClass, LiteralValueType, LiteralValueType,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType,
     LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType, Type, TypeContext,
     TypeTransformer, TypeVarBoundOrConstraints, UnionBuilder,
 };
@@ -717,6 +716,27 @@ impl From<MembershipOperator> for ast::CmpOp {
 enum NonIdentityOperator {
     Rich(RichCompareOperator),
     Membership(MembershipOperator),
+}
+
+impl NonIdentityOperator {
+    fn truthiness<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
+        soundness_policy: ComparisonSoundnessPolicy,
+    ) -> Truthiness {
+        let Self::Rich(operator) = self else {
+            return Truthiness::Ambiguous;
+        };
+        operator
+            .as_equality()
+            .and_then(|operator| {
+                equality_result_truthiness(db, env, left, right, operator, soundness_policy)
+            })
+            .unwrap_or(Truthiness::Ambiguous)
+    }
 }
 
 impl From<NonIdentityOperator> for ast::CmpOp {
