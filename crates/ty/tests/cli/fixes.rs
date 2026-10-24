@@ -94,7 +94,7 @@ fn add_ignore_keeps_nested_blanket_suppression_used() -> anyhow::Result<()> {
         # ty: ignore[blanket-ignore-comment]
         # ty: ignore
         f("bad"),
-        # ty: ignore  # ty:ignore[blanket-ignore-comment]
+        # ty: ignore  # ty: ignore[blanket-ignore-comment]
         missing,
         absent,
     ]

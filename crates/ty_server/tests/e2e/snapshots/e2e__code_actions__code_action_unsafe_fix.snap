@@ -86,14 +86,14 @@ expression: code_actions
             "range": {
               "start": {
                 "line": 0,
-                "character": 41
+                "character": 29
               },
               "end": {
                 "line": 0,
-                "character": 41
+                "character": 29
               }
             },
-            "newText": "  # ty: ignore[unused-ignore-comment]"
+            "newText": ", unused-ignore-comment"
           }
         ]
       }
