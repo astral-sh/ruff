@@ -319,7 +319,7 @@ impl<'db> CallableItem<'db> {
 
     fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self {
-            CallableItem::Regular(binding) => binding.return_type(),
+            CallableItem::Regular(binding) => binding.return_type(db, env),
             CallableItem::Constructor(binding) => binding.return_type(db, env),
         }
     }
@@ -4172,7 +4172,7 @@ impl<'db> CallableBinding<'db> {
                                 );
                                 None
                             }
-                            MatchingOverloadIndex::Single(_) => Some(self.return_type()),
+                            MatchingOverloadIndex::Single(_) => Some(self.return_type(db, env)),
                             MatchingOverloadIndex::Multiple(indexes) => {
                                 self.filter_overloads_using_any_or_unknown(
                                     db,
@@ -4188,7 +4188,7 @@ impl<'db> CallableBinding<'db> {
                                     "after step 5",
                                 );
 
-                                Some(self.return_type())
+                                Some(self.return_type(db, env))
                             }
                         }
                     }
@@ -4710,9 +4710,9 @@ impl<'db> CallableBinding<'db> {
     ///
     /// For an invalid call to a non-overloaded function, this is the return type of the function.
     ///
-    /// For an invalid call to an overloaded function, we return `Type::unknown`, since we cannot
-    /// make any useful conclusions about which overload was intended to be called.
-    fn return_type(&self) -> Type<'db> {
+    /// For an invalid overloaded call, we use the first overload whose only mismatches are
+    /// generic aliases passed as class objects. Otherwise, we return `Unknown`.
+    fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         if let Some(overload_call_result) = &self.overload_call_result {
             return match overload_call_result {
                 OverloadCallResult::ArgumentTypeExpansion(expanded) => expanded.return_type,
@@ -4724,6 +4724,18 @@ impl<'db> CallableBinding<'db> {
             return first_overload.return_type();
         }
         if let [overload] = self.overloads.as_slice() {
+            return overload.return_type();
+        }
+        if let Some(overload) = self.overloads.iter().find(|overload| {
+            overload.errors.iter().all(|error| match error {
+                BindingError::InvalidArgumentType {
+                    provided_ty: Type::GenericAlias(alias),
+                    expected_ty,
+                    ..
+                } => Type::SpecializedClass(*alias).is_assignable_to(db, env, *expected_ty),
+                _ => !error.affects_overload_resolution(),
+            })
+        }) {
             return overload.return_type();
         }
         Type::unknown()
@@ -7200,7 +7212,9 @@ impl<'db> CallInference<'_, 'db> {
                 continue;
             }
 
-            if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
+            if let Err(error) =
+                builder.infer_call_argument(relation.declared_type, relation.argument_type)
+            {
                 constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
