@@ -351,7 +351,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -378,7 +378,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup toolchain install 1.99.0
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           target-directory: target/hawk
           cache-workspace-crates: "false"
@@ -400,7 +400,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -424,7 +424,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install uv"
@@ -504,7 +504,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -542,7 +542,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -582,7 +582,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -629,7 +629,7 @@ jobs:
         run: |
           rustup toolchain install "${MSRV}" --profile minimal
           echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -648,7 +648,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           workspace: fuzz
@@ -683,7 +683,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+        uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -718,7 +718,7 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -750,7 +750,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -817,7 +817,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -954,7 +954,7 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1052,7 +1052,7 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1077,7 +1077,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1109,7 +1109,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1160,7 +1160,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1193,7 +1193,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1219,7 +1219,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1280,7 +1280,7 @@ jobs:
 
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1328,7 +1328,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1473,7 +1473,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+      - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
         with:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
