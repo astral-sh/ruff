@@ -1242,15 +1242,73 @@ def _(args: list[int] | tuple[int]) -> None:
     one(*args, 1)  # no diagnostic
 ```
 
-When a tuple union is followed by another positional argument, we currently combine its element
-types before checking the call. Here, we treat the tuple as an iterable of `int | str`. This reports
+Members of different lengths can place the later argument at different parameters:
+
+```py
+def f(a: int, b: str | float, c: float = 0.0) -> None: ...
+def _(args: tuple[int] | tuple[int, str]) -> None:
+    f(*args, 1.0)  # no diagnostic
+```
+
+When a call is invalid for one tuple member, ty can report imprecise diagnostics. Here, it reports
 an error for both `a` and `b`, even though only `b` can receive a `str`:
 
 ```py
-def f(a: int, b: int, c: int = 0) -> None: ...
+def invalid(a: int, b: int, c: int = 0) -> None: ...
 def _(args: tuple[int] | tuple[int, str]) -> None:
     # error: [invalid-argument-type]
-    f(*args, 1)  # error: [invalid-argument-type]
+    invalid(*args, 1)  # error: [invalid-argument-type]
+```
+
+### Variable-length tuple union members
+
+A variable-length member can supply fewer arguments than a fixed-length member:
+
+```py
+def f(a: int, text: str, b: int) -> None: ...
+def _(before: tuple[int, *tuple[str, ...]] | tuple[int, str, int], after: list[int]) -> None:
+    f(*before, *after)  # no diagnostic
+```
+
+### Several tuple union arguments
+
+Every combination of tuple members must match the parameters:
+
+```py
+def accepts_all(a: int, b: int | str = 0, c: str = "") -> None: ...
+def _(before: tuple[int] | tuple[int, int], after: tuple[()] | tuple[str]) -> None:
+    accepts_all(*before, *after)  # no diagnostic
+```
+
+The longer first tuple together with the nonempty second tuple would supply three arguments to a
+function that accepts only two. That one invalid combination is enough to reject the call:
+
+```py
+def rejects_longest(a: int, b: int | str = 0) -> None: ...
+def _(before: tuple[int] | tuple[int, int], after: tuple[()] | tuple[str]) -> None:
+    rejects_longest(*before, *after)  # error: [too-many-positional-arguments]
+```
+
+### Tuple unions with variadic keyword parameters
+
+The keyword argument still goes to `**options` for either tuple member:
+
+```py
+def f(a: int, b: str | float, c: float = 0.0, **options: bool) -> None: ...
+def _(args: tuple[int] | tuple[int, str]) -> None:
+    f(*args, 1.0, enabled=True)  # no diagnostic
+```
+
+### Tuple union expansion limit
+
+We check at most 256 combinations of tuple members. Eight two-member unions fit within that limit; a
+ninth exceeds it and produces a false-positive diagnostic:
+
+```py
+def f(a: int, *rest: int | str) -> None: ...
+def _(args: tuple[int] | tuple[int, str]) -> None:
+    f(*args, *args, *args, *args, *args, *args, *args, *args)  # no diagnostic
+    f(*args, *args, *args, *args, *args, *args, *args, *args, *args)  # error: [invalid-argument-type]
 ```
 
 ### Mixed argument and parameter containing variadic
