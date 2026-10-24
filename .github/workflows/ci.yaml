@@ -50,7 +50,7 @@ jobs:
       with:
         shared-key: ruff-linux-debug
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-aged-linux-20261024-v1-linux-before
+        prefix-key: ruff-aged-linux-deps-20261024-v1-linux-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -128,8 +128,6 @@ jobs:
       PYTHON_VERSION: '3.14'
       NEXTEST_PROFILE: ci
       MDTEST_EXTERNAL: '1'
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
-      RUSTC_BOOTSTRAP: '1'
       CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -142,7 +140,8 @@ jobs:
     - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-aged-linux-20261024-v1-linux-after
+        prefix-key: ruff-aged-linux-deps-20261024-v1-linux-after
+        cache-workspace-crates: 'false'
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
