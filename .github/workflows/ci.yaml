@@ -17,23 +17,6 @@ env:
   PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
   MDTEST_EXTERNAL: "1"
-"on":
-  workflow_dispatch:
-    inputs:
-      phase:
-        type: choice
-        options:
-          - seed
-          - warm
-        default: warm
-        required: true
-      suite:
-        type: choice
-        options:
-          - parser
-          - producer-github
-        default: parser
-        required: true
 jobs:
   parser-before:
     name: parser / before
@@ -138,6 +121,7 @@ jobs:
         id: rust-cache
       - name: Build Ruff binary
         run: cargo build --bin ruff
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
   producer-after:
     name: producer-github / after
     runs-on: github-ubuntu-24.04-x86_64-4
@@ -170,3 +154,81 @@ jobs:
           test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"'
       - name: Build Ruff binary
         run: cargo build --bin ruff
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+  seed-producer-depot:
+    name: producer / after
+    runs-on: depot-ubuntu-24.04-8
+    if: ${{ inputs.phase == 'seed' }}
+    timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          prefix-key: ruff-simple-parser-20261024-v1
+          save-if: "true"
+        name: Restore Rust cache
+        id: rust-cache
+      - name: Build Ruff binary
+        run: cargo build --bin ruff
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+  producer-after-depot:
+    name: producer / after
+    runs-on: depot-ubuntu-24.04-8
+    if: ${{ inputs.phase == 'warm' && inputs.suite == 'producer' }}
+    timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          prefix-key: ruff-simple-parser-20261024-v1
+          save-if: "true"
+        name: Restore Rust cache
+        id: rust-cache
+      - name: Record Rust cache availability
+        env:
+          CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+          EXPECTED_HIT: "true"
+        run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+
+          test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"'
+      - name: Build Ruff binary
+        run: cargo build --bin ruff
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+"on":
+  workflow_dispatch:
+    inputs:
+      phase:
+        type: choice
+        options:
+          - seed
+          - warm
+        default: warm
+        required: true
+      suite:
+        type: choice
+        options:
+          - parser
+          - producer
+          - producer-github
+        default: parser
+        required: true
