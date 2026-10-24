@@ -238,6 +238,13 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
             return;
         };
 
+        if type_vars
+            .iter()
+            .any(|type_var| type_var.has_unpacked_keywords)
+        {
+            return;
+        }
+
         // build the fix as a String to avoid removing comments from the entire function body
         let type_params = DisplayTypeVars {
             type_vars: &type_vars,
