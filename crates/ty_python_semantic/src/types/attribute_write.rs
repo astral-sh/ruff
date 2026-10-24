@@ -206,10 +206,10 @@ pub(super) fn instance_attribute_write_is_blocked<'db>(
             matches!(
                 frozen_dataclass_dispatch,
                 Some(FrozenDataclassDispatch::FrozenField)
-            ) || match setattr_result {
-                Ok(bindings) => bindings.return_type(db, env).is_never(),
-                Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
-            }
+            ) || matches!(
+                setattr_write_requirement(db, env, setattr_result),
+                SetAttrWriteRequirement::Terminal
+            )
         }
     }
 }
@@ -233,6 +233,45 @@ pub(super) enum ClassAttributeWriteMember<'db> {
     /// `has_instance_attribute` distinguishes assigning an instance-only declaration through the
     /// class from assigning a wholly unknown attribute.
     Unresolved { has_instance_attribute: bool },
+}
+
+/// The outcome of binding an attribute write against `__setattr__`.
+pub(super) enum SetAttrWriteRequirement<'a, 'db> {
+    /// At least one setter overload accepts the write.
+    Callable(&'a Bindings<'db>),
+    /// The selected setter never returns, so the write cannot complete.
+    Terminal,
+    /// The setter exists, but the call cannot be bound.
+    Invalid,
+    /// No setter was found.
+    Missing,
+}
+
+/// Interprets a bound `__setattr__` call consistently for assignments and protocol writes.
+///
+/// Terminal setters take precedence over other outcomes; possibly-unbound setters remain callable
+/// so their matching overloads can still govern the write.
+pub(super) fn setattr_write_requirement<'a, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    result: &'a Result<Bindings<'db>, CallDunderError<'db>>,
+) -> SetAttrWriteRequirement<'a, 'db> {
+    let returns_never = match result {
+        Ok(bindings) => bindings.return_type(db, env).is_never(),
+        Err(error) => error.return_type(db, env).is_some_and(|ty| ty.is_never()),
+    };
+    if returns_never {
+        return SetAttrWriteRequirement::Terminal;
+    }
+
+    match result {
+        Ok(bindings) => SetAttrWriteRequirement::Callable(bindings),
+        Err(CallDunderError::PossiblyUnbound { bindings, .. }) => {
+            SetAttrWriteRequirement::Callable(bindings)
+        }
+        Err(CallDunderError::CallError(..)) => SetAttrWriteRequirement::Invalid,
+        Err(CallDunderError::MethodNotAvailable) => SetAttrWriteRequirement::Missing,
+    }
 }
 
 /// How an explicitly resolved member accepts a write.
@@ -1512,8 +1551,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 member_name,
                 value_ty,
             ),
-            AttributeWriteRequirement::Class { member, .. } => {
-                self.check_class_attribute_write(db, member, value_ty)
+            AttributeWriteRequirement::Class { object_ty, member } => {
+                self.check_class_attribute_write(db, *object_ty, member, member_name, value_ty)
             }
         }
     }
@@ -1568,16 +1607,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 self.check_fallback_attribute_write(db, fallback, value_ty)
             }
             InstanceAttributeWriteMember::SetAttr => {
-                if !matches!(
-                    setattr_result,
-                    Ok(_) | Err(CallDunderError::PossiblyUnbound { .. })
-                ) {
-                    return self.never();
+                if value_ty.is_union() {
+                    return self.check_setattr_attribute_write(
+                        db,
+                        receiver.unwrap_or(object_ty),
+                        setattr_member,
+                        member_name,
+                        value_ty,
+                    );
                 }
-                self.check_setattr_attribute_write(
+                let SetAttrWriteRequirement::Callable(bindings) =
+                    setattr_write_requirement(db, env, &setattr_result)
+                else {
+                    return self.never();
+                };
+                self.check_bound_setattr_attribute_write(
                     db,
                     receiver.unwrap_or(object_ty),
-                    setattr_member,
+                    bindings,
                     value_ty,
                 )
             }
@@ -1587,7 +1634,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     fn check_class_attribute_write(
         &self,
         db: &'db dyn Db,
+        object_ty: Type<'db>,
         member: &ClassAttributeWriteMember<'db>,
+        member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         match member {
@@ -1607,7 +1656,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             ClassAttributeWriteMember::ClassAttribute(fallback) => {
                 self.check_fallback_attribute_write(db, fallback, value_ty)
             }
-            ClassAttributeWriteMember::Unresolved { .. } => self.never(),
+            ClassAttributeWriteMember::Unresolved { .. } => self.check_setattr_attribute_write(
+                db,
+                object_ty,
+                attribute_setattr_member(db, self.env, object_ty, None, None),
+                member_name,
+                value_ty,
+            ),
         }
     }
 
@@ -1668,18 +1723,89 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         self.check_callable_write_parameter(db, setter_ty, 1, descriptor_ty, value_ty)
     }
 
+    /// Checks an unresolved writable-protocol member against `__setattr__`.
+    ///
+    /// Union writes are checked one member at a time so separate setter overloads can cover them:
+    ///
+    /// ```python
+    /// class Meta(type):
+    ///     @overload
+    ///     def __setattr__(cls, attr: str, value: int) -> None: ...
+    ///     @overload
+    ///     def __setattr__(cls, attr: str, value: str) -> None: ...
+    /// ```
     fn check_setattr_attribute_write(
         &self,
         db: &'db dyn Db,
         object_ty: Type<'db>,
         setattr_member: PlaceAndQualifiers<'db>,
+        member_name: &str,
         value_ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let Place::Defined(DefinedPlace { ty: setattr_ty, .. }) = setattr_member.place else {
+        if let Type::Union(union) = value_ty {
+            return union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |value_ty| {
+                    self.check_setattr_attribute_write(
+                        db,
+                        object_ty,
+                        setattr_member,
+                        member_name,
+                        *value_ty,
+                    )
+                });
+        }
+
+        let env = self.env;
+        let setattr_result = Type::try_call_dunder_member_impl(
+            db,
+            env,
+            setattr_member.into(),
+            &mut CallArguments::positional([Type::string_literal(db, member_name), value_ty]),
+            TypeContext::default(),
+        );
+        let SetAttrWriteRequirement::Callable(bindings) =
+            setattr_write_requirement(db, env, &setattr_result)
+        else {
             return self.never();
         };
+        self.check_bound_setattr_attribute_write(db, object_ty, bindings, value_ty)
+    }
 
-        self.check_callable_write_parameter(db, setattr_ty, 1, object_ty, value_ty)
+    /// Checks the selected setter overloads using their inferred specialization and bound `Self`.
+    fn check_bound_setattr_attribute_write(
+        &self,
+        db: &'db dyn Db,
+        object_ty: Type<'db>,
+        bindings: &Bindings<'db>,
+        value_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        bindings
+            .iter_flat()
+            .when_all(db, self.constraints, |callable| {
+                callable
+                    .matching_overloads()
+                    .when_any(db, self.constraints, |(_, overload)| {
+                        overload
+                            .argument_matches()
+                            .get(1 + usize::from(callable.bound_type.is_some()))
+                            .into_iter()
+                            .flat_map(|argument| &argument.parameters)
+                            .when_all(db, self.constraints, |parameter| {
+                                let write_ty = overload.signature.parameters()[parameter.index]
+                                    .annotated_type()
+                                    .bind_self_typevars(db, self.env, object_ty);
+                                let write_ty = overload.merged_specialization(db).map_or(
+                                    write_ty,
+                                    |specialization| {
+                                        write_ty.apply_specialization(db, specialization)
+                                    },
+                                );
+                                self.check_type_pair(db, value_ty, write_ty)
+                            })
+                    })
+            })
     }
 
     fn check_callable_write_parameter(
