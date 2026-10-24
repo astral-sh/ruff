@@ -8192,16 +8192,21 @@ impl<'db> Binding<'db> {
         }
         let definition = self.signature.definition?;
         let function = infer_definition_types(db, definition).function_type(definition)?;
-        function
+        if !function
             .literal(db)
             .last_definition
             .has_explicit_return_annotation(db)
-            .then(|| {
-                function
-                    .without_updated_signatures(db)
-                    .last_definition_signature(db)
-                    .return_ty
-            })
+        {
+            return None;
+        }
+        function
+            .without_updated_signatures(db)
+            .signature(db)
+            .overloads
+            .iter()
+            .rev()
+            .find(|signature| signature.definition == Some(definition))
+            .map(|signature| signature.return_ty)
     }
 
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.

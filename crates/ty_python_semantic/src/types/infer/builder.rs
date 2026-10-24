@@ -10292,7 +10292,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => return_ty,
         };
 
-        if return_ty.may_carry_item_declaration(db)
+        if !return_ty.is_dynamic()
+            && return_ty.may_carry_item_declaration(db)
             && bindings.has_declared_return_item(db, env, callable_type, return_ty, || {
                 match (callable_type, func.as_ref()) {
                     (Type::BoundMethod(_), ast::Expr::Attribute(attr)) => {
@@ -12755,6 +12756,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
         let return_type = self.inferred_return_type();
+        // Item declarations have already been recorded on the bindings that use them.
+        self.expression_flags
+            .retain(|_, flags| !flags.type_expression.is_empty());
 
         let Self {
             legacy_aliases,

@@ -1384,7 +1384,7 @@ impl<'db> BindingDeclaration<'db> {
                     .iter()
                     .copied()
                     .filter(|source| {
-                        source.is_none_or(|ty| !ty.is_disjoint_from(db, env, receiver))
+                        source.is_none_or(|ty| ty.may_supply_item_declaration(db, env, receiver))
                     })
                     .map(|source| source.and_then(&mut item)),
             ),

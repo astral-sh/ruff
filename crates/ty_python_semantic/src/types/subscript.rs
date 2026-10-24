@@ -22,6 +22,7 @@ use super::diagnostic::{
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
+use super::visitor::contains_growing_type;
 use super::{
     ClassLiteral, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
     TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
@@ -575,16 +576,35 @@ impl<'db> Type<'db> {
         let Type::Union(union) = declared else {
             return item(declared);
         };
+        // Flow narrowing can select a declared member exactly, including a recursive one.
+        if union.elements(db).contains(&receiver) {
+            return item(receiver);
+        }
+        let unchanged = self == receiver || declared == receiver;
         let mut items = union
             .elements(db)
             .iter()
             .copied()
-            .filter(|arm| declared == receiver || !arm.is_disjoint_from(db, env, receiver))
+            .filter(|arm| unchanged || arm.may_supply_item_declaration(db, env, receiver))
             .filter_map(item);
         let builder = UnionBuilder::new(db, env)
             .or_recursively_defined(union.recursively_defined(db))
             .add(items.next()?);
         Some(items.fold(builder, UnionBuilder::add).build())
+    }
+
+    pub(super) fn may_supply_item_declaration(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+    ) -> bool {
+        // Structural disjointness can unfold these types with ever-growing arguments.
+        // Retain the possible declaration when that comparison cannot establish a finite result.
+        self == receiver
+            || contains_growing_type(db, env, self)
+            || contains_growing_type(db, env, receiver)
+            || !self.is_disjoint_from(db, env, receiver)
     }
 
     pub(super) fn subscript(
