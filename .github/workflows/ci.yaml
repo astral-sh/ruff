@@ -1,4 +1,4 @@
-name: Measure full workspace caching in Ruff Windows and macOS tests
+name: Measure Ruff cache reuse across source revisions
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -44,12 +44,12 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+        ref: ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6' }}
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-full-20261024-v1-windows-before
+        prefix-key: ruff-aged-full-20261024-v1-windows-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -113,11 +113,11 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+        ref: ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6' }}
     - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-full-20261024-v1-windows-after
+        prefix-key: ruff-aged-full-20261024-v1-windows-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -179,12 +179,12 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+        ref: ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6' }}
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-full-20261024-v1-macos-before
+        prefix-key: ruff-aged-full-20261024-v1-macos-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -248,11 +248,11 @@ jobs:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+        ref: ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6' }}
     - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-full-20261024-v1-macos-after
+        prefix-key: ruff-aged-full-20261024-v1-macos-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
