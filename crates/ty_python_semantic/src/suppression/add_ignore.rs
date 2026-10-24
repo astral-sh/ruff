@@ -194,7 +194,7 @@ pub fn suppress_single(db: &dyn Db, file: PythonFile<'_>, id: LintId, range: Tex
 }
 
 /// Returns whether a diagnostic can be included in a bulk suppression fix.
-pub(crate) fn can_suppress(db: &dyn Db, file: File, id: LintName, range: TextRange) -> bool {
+pub(crate) fn can_suppress(db: &dyn Db, file: ruff_db::files::File, id: LintName, range: TextRange) -> bool {
     !is_suppression_comment_lint(id) || !is_executable_shebang(&source_text(db, file), range)
 }
 
@@ -236,7 +236,7 @@ fn suppression_range(db: &dyn Db, file: PythonFile<'_>, range: TextRange) -> Tex
             )
         })
         .map(Ranged::start)
-        .unwrap_or_else(|| source_text(db, file).line_end(range.end()));
+        .unwrap_or_else(|| source_text(db, file.file(db)).line_end(range.end()));
 
     TextRange::new(line_start, line_end)
 }
