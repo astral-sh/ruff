@@ -49,6 +49,7 @@ rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
 rustc-hash = { workspace = true }
+rustc-stable-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }

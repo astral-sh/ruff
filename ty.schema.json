@@ -13,6 +13,17 @@
         }
       ]
     },
+    "baseline": {
+      "description": "Path to the JSON file that records existing lint diagnostics for this project.\nRelative paths are resolved against the project root. Use `ty check --update-baseline`\nto create or update the file.\n\nDiagnostic baselines are in preview. The file format may change between ty releases.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/RelativePathBuf"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [

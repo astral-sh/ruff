@@ -40,6 +40,7 @@ pub use uv::{
     uv_test_env_vars,
 };
 
+pub mod baseline;
 mod db;
 mod files;
 pub mod glob;
@@ -856,6 +857,7 @@ impl Project {
             .iter()
             .map(OptionDiagnostic::to_diagnostic)
             .chain(uv_diagnostic)
+            .chain(baseline::settings_diagnostic(db))
             .collect()
     }
 }
@@ -1032,7 +1034,10 @@ pub(crate) fn check_file_impl(
             diagnostics.extend(dependency_diagnostic);
             Ok(diagnostics.into_boxed_slice())
         }) {
-            Ok(result) => result,
+            Ok(result) => result.map(|mut diagnostics| {
+                baseline::demote_diagnostics(*db, source_file, &mut diagnostics);
+                diagnostics
+            }),
             Err(diagnostic) => Ok(Box::new([diagnostic])),
         }
     }

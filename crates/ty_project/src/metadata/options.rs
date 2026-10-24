@@ -64,6 +64,19 @@ use ty_static::EnvVars;
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Options {
+    /// Path to the JSON file that records existing lint diagnostics for this project.
+    /// Relative paths are resolved against the project root. Use `ty check --update-baseline`
+    /// to create or update the file.
+    ///
+    /// Diagnostic baselines are in preview. The file format may change between ty releases.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"null"#,
+        value_type = "str",
+        example = r#"baseline = "ty-baseline.json""#
+    )]
+    pub baseline: Option<RelativePathBuf>,
+
     /// Configures the type checking environment.
     #[option_group]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -544,6 +557,10 @@ impl Options {
         let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
+            baseline: self
+                .baseline
+                .as_ref()
+                .map(|path| path.absolute(context.configuration_root(), db.system())),
             rules: Arc::new(rules),
             terminal,
             src,
