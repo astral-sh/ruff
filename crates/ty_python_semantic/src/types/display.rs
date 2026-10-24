@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -131,6 +131,8 @@ enum NumericTowerDisplay {
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
 pub struct DisplaySettings<'db> {
+    /// Tuple elements left to display in the current outermost tuple.
+    tuple_element_budget: Option<Rc<Cell<usize>>>,
     /// Whether rendering can be multiline
     multiline: bool,
     /// Whether callable signatures should include their definition name.
@@ -1877,6 +1879,23 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
         f.with_type(KnownClass::Tuple.to_class_literal(db, self.env))
             .write_str("tuple")?;
         f.write_char('[')?;
+        // Each element can refer to the same nested tuple. Share one budget across
+        // its children so the displayed type cannot grow exponentially.
+        let mut settings = self.settings.singleline();
+        let budget = settings
+            .tuple_element_budget
+            .get_or_insert_with(|| Rc::new(Cell::new(256)));
+        let count = match self.tuple {
+            TupleSpec::Fixed(tuple) => tuple.len(),
+            TupleSpec::Variable(tuple) => {
+                tuple.prefix_elements().len() + 1 + tuple.suffix_elements().len()
+            }
+        };
+        let Some(remaining) = budget.get().checked_sub(count) else {
+            f.set_invalid_type_annotation();
+            return f.write_str("...]");
+        };
+        budget.set(remaining);
         match self.tuple {
             TupleSpec::Fixed(tuple) => {
                 let elements = tuple.elements_slice();
@@ -1884,7 +1903,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str("()")?;
                 } else {
                     elements
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
@@ -1907,7 +1926,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                 if !tuple.prefix_elements().is_empty() {
                     tuple
                         .prefix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings.clone())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
@@ -1915,7 +1934,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     VariableSegment::TypeVarTuple(typevar) => {
                         f.write_char('*')?;
                         Type::TypeVar(typevar)
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                     }
                     VariableSegment::Homogeneous(variable) => {
@@ -1929,7 +1948,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                             f.write_char('[')?;
                         }
                         variable
-                            .display_with(db, self.env, self.settings.singleline())
+                            .display_with(db, self.env, settings.clone())
                             .fmt_detailed(f)?;
                         f.write_str(", ...")?;
                         if !tuple.prefix_elements().is_empty()
@@ -1943,7 +1962,7 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_str(", ")?;
                     tuple
                         .suffix_elements()
-                        .display_with(db, self.env, self.settings.singleline())
+                        .display_with(db, self.env, settings)
                         .fmt_detailed(f)?;
                 }
             }
