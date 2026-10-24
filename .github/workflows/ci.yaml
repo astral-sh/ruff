@@ -1,4 +1,4 @@
-name: Measure dependency-only native Rust cache
+name: Measure pruned dependency caches
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-publish2-20261024-v1-publish-before
+        prefix-key: ruff-publish-prune-20261024-v1-publish-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -76,11 +76,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 30be8844b99adf2806693d3ebb620b1e105c065e
-    - uses: astral-sh/github-actions/rust-workspace-cache@ebba56fe7c986140673e8fa55355eae44fa0b4a0
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-publish2-20261024-v1-publish-after
+        prefix-key: ruff-publish-prune-20261024-v1-publish-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
