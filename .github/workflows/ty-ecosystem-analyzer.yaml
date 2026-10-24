@@ -76,9 +76,9 @@ jobs:
           gh auth setup-git
           git fetch --no-tags --filter=blob:none --unshallow origin
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
-          lookup-only: false
+          cache-workspace-crates: "false"
           save-if: false
 
       - name: Install Rust toolchain

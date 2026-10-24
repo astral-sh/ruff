@@ -351,8 +351,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: |
@@ -369,17 +370,19 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 15
+    env:
+      RUSTUP_TOOLCHAIN: "1.99.0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: ". -> target/hawk"
-          cache-workspace-crates: "false"
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup toolchain install 1.99.0
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
+        with:
+          target-directory: target/hawk
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
@@ -397,8 +400,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "cargo publish dry-run"
         run: cargo publish --workspace --dry-run
@@ -420,7 +424,7 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install uv"
@@ -500,8 +504,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -537,11 +542,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
-          # Fix for https://github.com/Swatinem/rust-cache/issues/341
-          cache-bin: "false"
       - name: "Install Rust toolchain"
         run: rustup show
       # Renovate needs a separate version/checksum pair for each archive.
@@ -578,8 +582,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
@@ -618,13 +623,16 @@ jobs:
         with:
           file: "Cargo.toml"
           field: "workspace.package.rust-version"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
-        run: rustup default "${MSRV}"
+        run: |
+          rustup toolchain install "${MSRV}" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
+        with:
+          cache-workspace-crates: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Build tests"
         env:
           MSRV: ${{ steps.msrv.outputs.value }}
@@ -640,9 +648,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
-          workspaces: "fuzz -> target"
+          cache-workspace-crates: "false"
+          workspace: fuzz
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -656,8 +665,7 @@ jobs:
   cargo-build-ruff:
     name: "cargo build (ruff, ${{ matrix.runner }})"
     runs-on: ${{ matrix.runner }}
-    # Both runners use `rust-toolchain.toml`, but `rust-cache` also hashes the
-    # versions of other installed toolchains, which differ between runner images.
+    # Depot and GitHub runners use separate cache services, so each needs a producer.
     strategy:
       matrix:
         runner: [depot-ubuntu-24.04-8, github-ubuntu-24.04-x86_64-4]
@@ -675,7 +683,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - id: rust-cache
-        uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+        uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -710,7 +718,7 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -742,8 +750,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
@@ -808,7 +817,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
           key: ruff-binary-debug
           add-job-id-key: "false"
@@ -945,8 +954,9 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1042,8 +1052,9 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.5"
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1066,8 +1077,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
@@ -1097,8 +1109,9 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install LLVM profiling tools"
         run: rustup component add llvm-tools-preview
@@ -1147,8 +1160,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1179,8 +1193,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup show
@@ -1204,8 +1219,9 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -1264,7 +1280,7 @@ jobs:
 
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -1312,8 +1328,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -1447,8 +1464,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@05b709d1dc87a73f23e546cf38ca45c7bdd3a53c
         with:
+          cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
