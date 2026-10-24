@@ -26,15 +26,14 @@
 //!
 //! To recognize an error after an edit, we use two anchors from the surrounding source. One captures
 //! the code leading up to the error, and the other starts at the error itself. In each direction,
-//! we count up to 100 characters, keeping line breaks and skipping other whitespace, including
-//! indentation. A diagnostic matches an entry for the same file and rule if either anchor matches,
-//! so the code on the other side can change. This heuristic is inspired by the
-//! [two-hash approach][paper] described in section III-C.
+//! we count up to 100 non-whitespace characters. A diagnostic matches an entry for the same
+//! file and rule if either anchor matches, so the code on the other side can change.
+//! This heuristic is inspired by the [two-hash approach][paper] described in section III-C.
 //!
 //! Within a file, this can preserve matches after:
 //!
 //! - Adding, removing, or changing code before or after the error.
-//! - Changing the spacing around an operator or reindenting a block.
+//! - Changing the spacing around an operator, reindenting a block, or rewrapping a call.
 //! - Moving or reordering blocks within the same file.
 //! - Editing code outside the hashed context.
 //! - Switching between LF, CRLF, and CR line endings.
@@ -45,13 +44,8 @@
 //!
 //! ## Whitespace normalization
 //!
-//! We skip whitespace other than line breaks when building each anchor so that a match can survive
-//! changes in spacing and indentation. For example, removing the spaces around `=` in
-//! `name: int = get_name()` leaves both anchors unchanged.
-//!
-//! We keep line breaks because they can separate Python statements. LF, CRLF, and CR each count
-//! as one `\n`, so converting line endings preserves the anchors. We don't lex the source, so even
-//! a line break inside parentheses counts. Rewrapping a call can therefore change an anchor.
+//! Both hashes skip whitespace, including line breaks. For example, moving the second argument
+//! of `f(x, y)` onto its own line leaves both hashes unchanged.
 //!
 //! ## What goes into each anchor
 //!
@@ -70,12 +64,12 @@
 //! prevents unchanged preceding code from hiding an error on a different call, but also means a
 //! harmless rename can make an existing diagnostic reappear.
 //!
-//! Each anchor extends up to 100 normalized characters (Unicode scalar values), stopping at file
+//! Each anchor extends up to 100 non-whitespace characters (Unicode scalar values), stopping at file
 //! boundaries. We store a hash of each anchor to keep the baseline compact.
 //!
 //! The 100-character limit keeps enough context to distinguish similar errors without depending on
-//! too much nearby code. In Home Assistant trials, shorter windows confused similar diagnostics;
-//! larger token windows resurfaced more existing diagnostics in Home Assistant and Airflow.
+//! too much nearby code. In trials on Home Assistant and Airflow, shorter windows hid more new
+//! diagnostics, while longer windows reported more existing diagnostics again.
 //!
 //! # Reordering and duplicates
 //!
@@ -498,7 +492,7 @@ impl<'a> BaselineMatcher<'a> {
 }
 
 /// Anchors both windows at the word containing `offset`; the diagnostic's end is not used.
-/// The character limit includes the word itself (truncating long words) and normalized newlines.
+/// The character limit includes the word itself, truncating long words.
 fn context_hashes(source: &str, offset: TextSize) -> (BaselineHash, BaselineHash) {
     let offset = usize::from(offset);
     let (word_start, word_end) = word_bounds(source, offset);
@@ -535,44 +529,22 @@ fn word_bounds(source: &str, offset: usize) -> (usize, usize) {
     (start, end)
 }
 
-#[derive(Clone, Copy)]
-enum HashDirection {
-    Forward,
-    Backward,
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, get_size2::GetSize)]
 struct BaselineHash(u128);
 
 impl BaselineHash {
     fn forward(context: &str) -> Self {
-        Self::from_context(context, HashDirection::Forward)
+        Self::from_chars(context.chars())
     }
 
     fn backward(context: &str) -> Self {
-        Self::from_context(context, HashDirection::Backward)
+        Self::from_chars(context.chars().rev())
     }
 
-    fn from_context(context: &str, direction: HashDirection) -> Self {
+    fn from_chars(characters: impl Iterator<Item = char>) -> Self {
         let mut hasher = StableSipHasher128::new();
-        let mut characters = context.char_indices();
         let mut length = 0_u8;
-
-        while usize::from(length) < CONTEXT_SIZE {
-            let character = match direction {
-                HashDirection::Forward => characters.next(),
-                HashDirection::Backward => characters.next_back(),
-            };
-            let Some((index, character)) = character else {
-                break;
-            };
-            let character = match character {
-                '\r' if context.as_bytes().get(index + 1) == Some(&b'\n') => continue,
-                '\r' | '\n' => '\n',
-                character if character.is_whitespace() => continue,
-                character => character,
-            };
-
+        for character in characters.filter(|c| !c.is_whitespace()).take(CONTEXT_SIZE) {
             hasher.write_u32(u32::from(character));
             length += 1;
         }
@@ -687,8 +659,8 @@ mod tests {
     }
 
     #[test]
-    fn baseline_hash_ignores_non_newline_whitespace() {
-        let spaced = "a + \tç . d";
+    fn baseline_hash_ignores_whitespace() {
+        let spaced = "a \n+\r\n\tç\r.\u{a0}d";
         let compact = "a+ç.d";
         assert_eq!(
             BaselineHash::forward(spaced),
@@ -698,26 +670,6 @@ mod tests {
             BaselineHash::backward(spaced),
             BaselineHash::backward(compact)
         );
-    }
-
-    #[test]
-    fn baseline_hash_preserves_newlines() {
-        assert_ne!(BaselineHash::forward("a\nb"), BaselineHash::forward("a b"));
-        assert_ne!(
-            BaselineHash::backward("a\nb"),
-            BaselineHash::backward("a b")
-        );
-    }
-
-    #[test]
-    fn baseline_hash_normalizes_line_endings() {
-        let forward = BaselineHash::forward("a\nb");
-        assert_eq!(BaselineHash::forward("a\rb"), forward);
-        assert_eq!(BaselineHash::forward("a\r\nb"), forward);
-
-        let backward = BaselineHash::backward("a\nb");
-        assert_eq!(BaselineHash::backward("a\rb"), backward);
-        assert_eq!(BaselineHash::backward("a\r\nb"), backward);
     }
 
     #[test]

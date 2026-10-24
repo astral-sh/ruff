@@ -51,8 +51,8 @@ fn update_and_use_configured_baseline() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "33af5dcbb4264a903ea8237661d2e9d2",
-            "followingHash": "9e9c1756bed4a360466ffdead18fa6a2"
+            "precedingHash": "8ebd71a52a203341065547993bedb37c",
+            "followingHash": "a0cd849c9d667180ddfd573ef768c91d"
           }
         ]
       }
@@ -334,8 +334,8 @@ fn update_baseline_does_not_suppress_syntax_errors() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "d35e8dd0ee85db3b3ca8d24dba7df1f5",
-            "followingHash": "cdf7576f3443c3935b0f95a430388e2e"
+            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
+            "followingHash": "34547de5556150b45c28c4de6d97284b"
           }
         ]
       }
@@ -429,8 +429,8 @@ fn update_baseline_replaces_invalid_json() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "d35e8dd0ee85db3b3ca8d24dba7df1f5",
-            "followingHash": "12970f0291d38ddad0189c30e27ca443"
+            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
+            "followingHash": "58939191012931335599693a80ceb20b"
           }
         ]
       }
@@ -461,14 +461,14 @@ fn baseline_entries_are_sorted_and_matched_by_file_path() -> anyhow::Result<()> 
           {
             "rule": "invalid-assignment",
             "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "12970f0291d38ddad0189c30e27ca443"
+            "followingHash": "58939191012931335599693a80ceb20b"
           }
         ],
         "b.py": [
           {
             "rule": "invalid-assignment",
             "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "12970f0291d38ddad0189c30e27ca443"
+            "followingHash": "58939191012931335599693a80ceb20b"
           }
         ]
       }

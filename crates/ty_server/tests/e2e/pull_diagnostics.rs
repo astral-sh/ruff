@@ -57,8 +57,8 @@ def foo() -> str:
         "files": {
             "foo.py": [{
                 "rule": "invalid-return-type",
-                "precedingHash": "41b4ab2dc0fd3c0697a4f3c3c8e4a048",
-                "followingHash": "7d090b0c134202a4dc847ca723b9a012"
+                "precedingHash": "d76ce7cc41f3478e9db97752a6afb3fc",
+                "followingHash": "eabe2dd185ed35b2919b29e7356dbdf5"
             }]
         }
     }"#;
