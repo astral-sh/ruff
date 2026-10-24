@@ -76,7 +76,7 @@ jobs:
           gh auth setup-git
           git fetch --no-tags --filter=blob:none --unshallow origin
 
-      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+      - uses: astral-sh/github-actions/rust-workspace-cache@243f4258608cb0f0dace8009ef4c5d8fbd3986c3
         with:
           # Base and PR builds use different revisions; keep a smaller dependency cache.
           cache-workspace-crates: "false"
