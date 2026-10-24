@@ -5600,7 +5600,7 @@ impl<'db> Type<'db> {
             db,
             env,
             meta_attr_plain,
-            fallback.unwrap_or_else(|error| error.fallback_member(db)),
+            fallback.unwrap_or_else(|error| error.fallback_member(db)).member(db),
             policy,
         ) {
             return fallback;
