@@ -3247,10 +3247,19 @@ impl<'a> Checker<'a> {
                             }
                         };
 
+                        let flags_snapshot = self.semantic.flags;
                         self.semantic.flags |=
                             SemanticModelFlags::TYPE_DEFINITION | type_definition_flag;
                         let parsed_expr = parsed_annotation.expression();
                         self.visit_expr(parsed_expr);
+                        self.semantic.flags = flags_snapshot;
+                        if self.is_rule_enabled(Rule::RuntimeStringUnion) {
+                            flake8_type_checking::rules::runtime_string_union(
+                                self,
+                                parsed_expr,
+                                string_expr,
+                            );
+                        }
                         if self.semantic.in_type_alias_value() {
                             // stub files are covered by PYI020
                             if !self.source_type.is_stub()
