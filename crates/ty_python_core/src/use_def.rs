@@ -736,6 +736,8 @@ enum DefinitionEntry<'db> {
     /// The early declaration of a combined definition whose binding is recorded separately.
     /// It participates in declaration lookup, but not in binding-usage analysis.
     DeclarationPart(Definition<'db>),
+    /// A conditional receiver update. A later method call can forward this binding.
+    ReceiverRefinement(Definition<'db>),
     /// A binding or standalone declaration with no recorded use.
     Unused(Definition<'db>),
     Used(Definition<'db>),
@@ -747,6 +749,7 @@ impl<'db> DefinitionEntry<'db> {
     fn state(self) -> DefinitionState<'db> {
         match self {
             Self::DeclarationPart(definition)
+            | Self::ReceiverRefinement(definition)
             | Self::Unused(definition)
             | Self::Used(definition) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
@@ -990,6 +993,7 @@ impl<'db> UseDefMap<'db> {
                 DefinitionEntry::Unused(definition) => Some((id, definition, false)),
                 DefinitionEntry::Used(definition) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
+                | DefinitionEntry::ReceiverRefinement(_)
                 | DefinitionEntry::Undefined
                 | DefinitionEntry::Deleted => None,
             })
@@ -2318,7 +2322,7 @@ impl<'db> UseDefMapBuilder<'db> {
         definition: Definition<'db>,
         condition: ScopedReachabilityConstraintId,
     ) {
-        let id = self.push_definition(DefinitionEntry::Unused(definition));
+        let id = self.push_definition(DefinitionEntry::ReceiverRefinement(definition));
         let reached = self
             .reachability_constraints
             .add_and_constraint(self.reachability, condition);
@@ -2341,12 +2345,27 @@ impl<'db> UseDefMapBuilder<'db> {
             target,
             &mut self.reachability_constraints,
         );
-        state.record_conditional_binding(
+        let inherited = state.record_conditional_binding(
+            |id| {
+                matches!(
+                    self.all_definitions[id],
+                    DefinitionEntry::ReceiverRefinement(_)
+                )
+            },
             id,
             reached,
             fallthrough,
             &mut self.reachability_constraints,
         );
+        if !inherited.as_slice().is_empty() {
+            self.definitions_by_definition.insert(
+                definition,
+                DefinitionsAtDefinition {
+                    bindings: inherited,
+                    declarations: Some(state.declarations().clone()),
+                },
+            );
+        }
         self.reachable_symbol_definitions[symbol]
             .bindings
             .record_binding(

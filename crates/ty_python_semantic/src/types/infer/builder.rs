@@ -1357,8 +1357,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let expression = self.index.expression(call);
                 let inference =
                     infer_expression_types(self.db(), expression, TypeContext::default());
-                // The old binding remains live when no receiver effect exists.
-                let after = inference.receiver_refinement(call).unwrap_or(Type::Never);
+                let after = inference.receiver_refinement(call).unwrap_or_else(|| {
+                    let db = self.db();
+                    let use_def = self.index.use_def_map(definition.file_scope(db));
+                    place_from_bindings_with_reachability_cache(
+                        db,
+                        self.program_environment(),
+                        use_def.bindings_at_definition(definition),
+                        self.reachability_cache(),
+                    )
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::Never)
+                });
                 self.extend_expression(inference);
                 self.bindings.insert(definition, after);
             }

@@ -2038,11 +2038,13 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
         PredicateNode::CallRefinesReceiver(expression) => {
-            let module = parsed_module(db, expression.python_file(db)).load(db);
-            let node = expression.node_ref(db).node(&module);
             let inference = infer_expression_types(db, expression, TypeContext::default());
-            Truthiness::from(inference.receiver_refinement(node).is_some())
-                .negate_if(!predicate.is_positive)
+            Truthiness::from(
+                inference
+                    .receiver_refinement(expression.node_ref(db))
+                    .is_some(),
+            )
+            .negate_if(!predicate.is_positive)
         }
         PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
         PredicateNode::SubjectElementPattern(subject_element) => {

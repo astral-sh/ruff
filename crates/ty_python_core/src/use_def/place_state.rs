@@ -598,25 +598,37 @@ impl PlaceState {
         );
     }
 
+    /// Replace earlier receiver updates with a single binding. It is live if this call refines
+    /// the receiver or an earlier update reaches it. Inference uses the returned bindings,
+    /// including their narrowing constraints, when the new call has no effect of its own.
     pub(super) fn record_conditional_binding(
         &mut self,
+        is_refinement: impl Fn(ScopedDefinitionId) -> bool,
         binding: ScopedDefinitionId,
-        reached: ScopedReachabilityConstraintId,
+        mut reached: ScopedReachabilityConstraintId,
         fallthrough: ScopedReachabilityConstraintId,
         constraints: &mut ReachabilityConstraintsBuilder,
-    ) {
-        for live in &mut self.bindings.live_bindings {
+    ) -> Bindings {
+        let mut inherited = Bindings::default();
+        self.bindings.live_bindings.retain_mut(|live| {
+            if is_refinement(live.binding()) {
+                reached = constraints.add_or_constraint(reached, live.reachability_constraint);
+                inherited.live_bindings.push(*live);
+                return false;
+            }
             if live.can_be_shadowed() == FutureDefinitions::ShadowThisOne {
                 live.reachability_constraint =
                     constraints.add_and_constraint(live.reachability_constraint, fallthrough);
             }
-        }
+            true
+        });
         self.bindings.live_bindings.push(LiveBinding::new(
             binding,
             ScopedNarrowingConstraint::ALWAYS_TRUE,
             reached,
             FutureDefinitions::ShadowThisOne,
         ));
+        inherited
     }
 
     /// Add given constraint to all live bindings.
