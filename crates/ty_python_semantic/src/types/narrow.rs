@@ -4390,7 +4390,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         insert_narrowing_constraint(
                             &mut constraints,
                             self.expect_place(&target),
-                            NarrowingConstraint::replacement(narrowed),
+                            NarrowingConstraint::precomputed_refinement(narrowed),
                         );
                     }
                 };
@@ -4511,31 +4511,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             && let rhs_type = inference.expression_type(right)
             && is_or_contains_mapping(db, &self.env, rhs_type)
         {
-            let apply_constraint =
-                |constraints: &mut NarrowingConstraints<'db>,
-                 constraint: NarrowingConstraint<'db>| {
-                    let comparator_place = PlaceExpr::try_from_expr(right)
-                        .and_then(|place_expr| self.places().place_id(&place_expr));
-                    if let Some(place) = comparator_place {
-                        constraints.insert(place, constraint.clone());
-                    }
+            let constraint = if is_positive == (*op == ast::CmpOp::In) {
+                NarrowingConstraint::present_key(rhs_type, key)
+            } else {
+                NarrowingConstraint::absent_key(rhs_type, key)
+            };
 
-            let comparator_place = PlaceExpr::try_from_expr(&comparators[0])
+            let comparator_place = PlaceExpr::try_from_expr(right)
                 .and_then(|place_expr| self.places().place_id(&place_expr));
             if let Some(place) = comparator_place {
                 constraints.insert(place, constraint.clone());
             }
 
-            if is_positive == (*op == ast::CmpOp::In) {
-                apply_constraint(
-                    &mut constraints,
-                    NarrowingConstraint::present_key(rhs_type, key),
-                );
-            } else {
-                apply_constraint(
-                    &mut constraints,
-                    NarrowingConstraint::absent_key(rhs_type, key),
-                );
+            let value_place = PlaceExpr::try_from_expr(rhs_expr)
+                .and_then(|place_expr| self.places().place_id(&place_expr));
+            if value_place != comparator_place
+                && let Some(place) = value_place
+            {
+                constraints.insert(place, constraint);
             }
         }
 
