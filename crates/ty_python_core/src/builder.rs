@@ -1177,7 +1177,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn receiver_refinement_target(
         &self,
         expr: &'ast ast::Expr,
-    ) -> Option<(&'ast ast::ExprCall, ScopedPlaceId)> {
+    ) -> Option<(&'ast ast::ExprCall, ScopedSymbolId)> {
         let call = expr.as_call_expr()?;
         let attribute = call.func.as_attribute_expr()?;
         let receiver = attribute.value.as_name_expr()?;
@@ -1211,7 +1211,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     )
                 })
         });
-        is_local.then_some((call, symbol.into()))
+        is_local.then_some((call, symbol))
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -3700,23 +3700,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Expr::Call(_) | ast::Expr::BinOp(_) => {
                 walk_expr(self, expr);
                 self.record_exception_checkpoint();
-                if let Some((call, place)) = self.receiver_refinement_target(expr) {
+                if let Some((call, symbol)) = self.receiver_refinement_target(expr) {
                     let expression = self.add_standalone_expression(expr);
-                    // A postcondition acts like an assignment, so it must survive branch joins.
-                    // Retain the previous binding on calls without a receiver effect; forwarding
-                    // only its narrowed type would change subsequent gradual narrowing.
-                    let before = self.flow_snapshot();
-                    let constraint = self.record_reachability_constraint(
-                        PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::CallRefinesReceiver(expression),
-                            is_positive: true,
-                        }),
+                    let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::CallRefinesReceiver(expression),
+                        is_positive: true,
+                    }));
+                    let constraint = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(predicate);
+                    let definition = self.create_definition(
+                        symbol.into(),
+                        DefinitionNodeRef::ReceiverRefinement(call),
                     );
-                    self.add_definition(place, DefinitionNodeRef::ReceiverRefinement(call));
-                    let after = self.flow_snapshot();
-                    self.flow_restore(before);
-                    self.record_negated_reachability_constraint(constraint);
-                    self.flow_merge(after);
+                    self.record_binding_with(definition, |use_def, _| {
+                        use_def.record_receiver_refinement(symbol, definition, constraint);
+                    });
                 }
             }
             ast::Expr::UnaryOp(unary) => {

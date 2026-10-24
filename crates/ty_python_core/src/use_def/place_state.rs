@@ -598,6 +598,27 @@ impl PlaceState {
         );
     }
 
+    pub(super) fn record_conditional_binding(
+        &mut self,
+        binding: ScopedDefinitionId,
+        reached: ScopedReachabilityConstraintId,
+        fallthrough: ScopedReachabilityConstraintId,
+        constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        for live in &mut self.bindings.live_bindings {
+            if live.can_be_shadowed() == FutureDefinitions::ShadowThisOne {
+                live.reachability_constraint =
+                    constraints.add_and_constraint(live.reachability_constraint, fallthrough);
+            }
+        }
+        self.bindings.live_bindings.push(LiveBinding::new(
+            binding,
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
+            reached,
+            FutureDefinitions::ShadowThisOne,
+        ));
+    }
+
     /// Add given constraint to all live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,
