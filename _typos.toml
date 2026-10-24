@@ -6,7 +6,6 @@ extend-exclude = [
     "crates/ruff_unicode_names2/data/UnicodeData.txt",
     "**/resources/**/*",
     "**/snapshots/**/*",
-    "scripts/ty_benchmark/locks/**",
     "crates/ruff_linter/src/rules/flake8_implicit_str_concat/rules/collection_literal.rs",
     # Completion tests tend to have a lot of incomplete
     # words naturally. It's annoying to have to make all
