@@ -420,21 +420,8 @@ jobs:
           persist-credentials: false
       - name: "Install Rust toolchain"
         run: rustup show
-      # Post steps run in reverse order, so the workspace cache is saved before
-      # workspace artifacts are removed for the shared dependency cache.
-      - name: Cache dependencies for shared consumers
-        if: ${{ github.ref == 'refs/heads/main' }}
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: ruff-linux-debug
-          lookup-only: true
-          cache-workspace-crates: "false"
       - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
         with:
-          key: ruff-linux-debug
-          # Keep Cargo available for the dependency cache's post step.
-          cache-bin: "false"
-          add-job-id-key: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install uv"
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
@@ -666,6 +653,35 @@ jobs:
           checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
       - run: uv run --only-dev cargo fuzz build -s none
 
+  cargo-build-ruff:
+    name: "cargo build (ruff, ${{ matrix.runner }})"
+    runs-on: ${{ matrix.runner }}
+    # Installed Rust toolchains differ across runner images and affect cache keys.
+    strategy:
+      matrix:
+        runner: [depot-ubuntu-24.04-8, github-ubuntu-24.04-x86_64-4]
+    needs: determine_changes
+    if: ${{ github.repository == 'astral-sh/ruff' && github.ref == 'refs/heads/main' }}
+    timeout-minutes: 20
+    env:
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - id: rust-cache
+        uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+      - name: Build Ruff binary
+        if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+        run: cargo build --bin ruff
+
   fuzz-parser:
     name: "fuzz parser"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -691,12 +707,13 @@ jobs:
           # renovate: datasource=github-release-attachments depName=astral-sh/uv
           version: "0.13.4"
           checksum: "2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: ruff-linux-debug
-          save-if: false
       - name: "Install Rust toolchain"
         run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
+        with:
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          save-if: "false"
       - name: Build Ruff binary
         run: cargo build --bin ruff
       - name: Fuzz
@@ -790,10 +807,11 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
         with:
-          shared-key: ruff-linux-debug
-          save-if: false
+          key: ruff-binary-debug
+          add-job-id-key: "false"
+          save-if: "false"
 
       - name: Build baseline version
         run: |
@@ -1245,7 +1263,7 @@ jobs:
 
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: astral-sh/github-actions/rust-workspace-cache@3c9fe5db47e144ea224b57565e3ab1ab769ef41d
+      - uses: astral-sh/github-actions/rust-workspace-cache@52ea66bbf7dbe95fc9e2baae530cb3827214c530
         with:
           profile: profiling
           save-if: ${{ github.ref == 'refs/heads/main' }}
