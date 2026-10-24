@@ -3,10 +3,7 @@
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use ty_python_core::{
-    definition::{Definition, DefinitionKind},
-    place_table,
-};
+use ty_python_core::{definition::Definition, place_table};
 
 use crate::{
     Db, ProgramEnvironment,
@@ -546,16 +543,7 @@ pub(super) fn check_override<'db>(
     } else {
         AttributeContractKind::ClassBody
     };
-    // An unannotated class default retains its inherited class-body annotation. Compare
-    // it with the same contracts on the bases, rather than rechecking receiver declarations.
-    let inherited_kind = if matches!(
-        definition.kind(db),
-        DefinitionKind::Assignment(_) | DefinitionKind::AugmentedAssignment(_)
-    ) {
-        AttributeContractKind::ClassBody
-    } else {
-        AttributeContractKind::Inherited
-    };
+    let inherited_kind = AttributeContractKind::Inherited;
     let Some(MemberContract::Attribute(source)) =
         member_contract(db, env, class, receiver, name, source_kind)
     else {

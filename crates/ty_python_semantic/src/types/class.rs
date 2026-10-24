@@ -2948,14 +2948,34 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
             let (base, specialization) = base.static_class_literal(db)?;
             let scope = base.body_scope(db);
-            let Some(symbol) = place_table(db, scope).symbol_id(name) else {
-                continue;
-            };
+            let symbol = place_table(db, scope).symbol_id(name);
             let use_def = use_def_map(db, scope);
-            let declarations = use_def.end_of_scope_symbol_declarations(symbol);
-            let declared = place_from_declarations(db, &self.env, declarations.clone())
-                .ignore_conflicting_declarations();
-            let declaration = if declared.is_undefined() {
+            if let Some(symbol) = symbol {
+                let declarations = use_def.end_of_scope_symbol_declarations(symbol);
+                let declared = place_from_declarations(db, &self.env, declarations.clone())
+                    .ignore_conflicting_declarations();
+                if !declared.is_undefined() {
+                    return (!declared.qualifiers.contains(TypeQualifiers::FINAL)
+                        && declarations.contains_only_annotated_assignments(db))
+                    .then(|| ClassBodyDeclaration {
+                        member: declared
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                        class: base,
+                    });
+                }
+            }
+
+            if let Some(declared) = base.implicit_instance_declaration(db, name) {
+                return (!declared.qualifiers.contains(TypeQualifiers::FINAL)).then(|| {
+                    ClassBodyDeclaration {
+                        member: declared
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                        class: base,
+                    }
+                });
+            }
+
+            if let Some(symbol) = symbol {
                 let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
                 let predicates = bindings.predicates();
                 let constraints = bindings.reachability_constraints();
@@ -2967,21 +2987,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)
-            } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(ClassBodyDeclaration {
-                    member: declared,
-                    class: base,
-                })
-            };
-            return declaration.map(|declaration| ClassBodyDeclaration {
-                member: declaration
-                    .member
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
-                ..declaration
-            });
+                return inherited_class_body_declaration(db, scope, symbol).map(|declaration| {
+                    ClassBodyDeclaration {
+                        member: declaration
+                            .member
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                        ..declaration
+                    }
+                });
+            }
         }
         None
     }
