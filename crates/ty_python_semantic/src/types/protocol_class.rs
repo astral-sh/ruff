@@ -31,7 +31,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
-        member::{class_member, inherited_class_body_declaration},
+        member::{ClassBodyDeclaration, class_member, inherited_class_body_declaration},
         signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
@@ -170,8 +170,12 @@ impl<'db> ProtocolClass<'db> {
                 if let Place::Defined(place) = member.place {
                     // Function declarations below replace the class context with their own scope.
                     let self_binding_context = place.ty.contains_self(db, env).then(|| {
-                        let class = inherited_class_body_declaration(db, parent_scope, symbol_id)
-                            .map_or(parent, |inherited| inherited.class);
+                        let class =
+                            match inherited_class_body_declaration(db, parent_scope, symbol_id) {
+                                ClassBodyDeclaration::Declared { class, .. } => class,
+                                ClassBodyDeclaration::Undeclared
+                                | ClassBodyDeclaration::Unknown => parent,
+                            };
                         BindingContext::Definition(class.definition(db))
                     });
                     direct_members.insert(
@@ -2109,21 +2113,22 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .nominal_class(db, env)
                 })
                 .is_some_and(|class| {
-                    effective_superclass_variable_kind(db, class, Name::new(self.name))
-                        == Some(VariableKind::Instance)
-                        && [
-                            class
-                                .class_member(db, env, self.name, MemberLookupPolicy::default())
-                                .place,
-                            class.instance_member(db, env, self.name).place,
-                        ]
-                        .into_iter()
-                        .any(|place| {
-                            matches!(
-                                place,
-                                Place::Defined(defined) if defined.provenance != Provenance::Unknown
-                            )
-                        })
+                    matches!(
+                        effective_superclass_variable_kind(db, class, Name::new(self.name)),
+                        Some(VariableKind::Instance | VariableKind::Regular)
+                    ) && [
+                        class
+                            .class_member(db, env, self.name, MemberLookupPolicy::default())
+                            .place,
+                        class.instance_member(db, env, self.name).place,
+                    ]
+                    .into_iter()
+                    .any(|place| {
+                        matches!(
+                            place,
+                            Place::Defined(defined) if defined.provenance != Provenance::Unknown
+                        )
+                    })
                 })
     }
 

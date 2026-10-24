@@ -701,6 +701,67 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     config
 }
 
+/// Whether Pydantic can merge the configuration involved in this inherited conflict.
+///
+/// Pydantic reads `model_config` on each direct base. A mixin can shadow a scalar
+/// from its own ancestor with a mapping, but a separate base can still supply
+/// an incompatible value.
+///
+/// ```python
+/// from pydantic import BaseModel, ConfigDict
+///
+/// class InvalidMixin:
+///     model_config = 1
+///
+/// class ConfigMixin(InvalidMixin):
+///     model_config = ConfigDict(extra="allow")
+///
+/// class Valid(BaseModel, ConfigMixin): ...  # Both values can be merged.
+/// class Invalid(BaseModel, ConfigMixin, InvalidMixin): ...  # The third cannot.
+/// ```
+pub(in crate::types) fn merges_inherited_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    name: &str,
+    owners: [ClassType<'db>; 2],
+) -> bool {
+    if name != "model_config" || !is_model(db, class) {
+        return false;
+    }
+    let config_mapping = KnownClass::Mapping.to_specialized_instance(
+        db,
+        env,
+        &[KnownClass::Str.to_instance(db, env), Type::object()],
+    );
+    class
+        .explicit_bases(db)
+        .iter()
+        .filter_map(|base| base.to_class_type(db))
+        .all(|base| {
+            let mut has_receiver_only_contract = false;
+            for ancestor in base.iter_mro(db).filter_map(ClassBase::into_class) {
+                let place = ancestor.own_class_member(db, env, None, name).inner.place;
+                if owners.contains(&ancestor) {
+                    match place
+                        .try_call_dunder_get(db, env, Type::from(base))
+                        .ignore_possibly_undefined()
+                    {
+                        Some(ty) if !ty.is_assignable_to(db, env, config_mapping) => return false,
+                        Some(_) => {}
+                        None => has_receiver_only_contract = true,
+                    }
+                }
+                if place.is_definitely_bound() {
+                    return true;
+                }
+            }
+
+            // A receiver-only contract supplies no class-level configuration to merge.
+            !has_receiver_only_contract
+        })
+}
+
 fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
     for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
         let Some((base, _)) = base.static_class_literal(db) else {
