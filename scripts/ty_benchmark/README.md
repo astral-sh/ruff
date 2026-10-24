@@ -78,13 +78,6 @@ versions, project Python versions, and the dependency cutoff in
 `src/benchmark/venv.py` the same across both runs. A project's updated requirements
 can still change its installed dependencies.
 
-Project dependency constraints are stored in `locks/pinned/<project>.txt`. Set
-`TY_BENCHMARK_LOCK_DIR` to select another directory of constraints.
-When refreshing dependencies, point this variable at an empty directory, resolve
-fresh project environments, and regenerate each constraint file with
-`uv pip freeze --python <project>/venv/bin/python`. Keep the original constraints
-alongside the refreshed files so dependency changes can be compared.
-
 Record the hardware, operating system, tool versions, Python versions, and ty source
 revision with the results. The benchmark harness uses Python 3.15; each project's
 environment uses the Python version specified in `projects.py`.

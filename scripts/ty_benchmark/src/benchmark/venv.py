@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -68,12 +67,6 @@ class Venv:
 
         logger.debug(f"Installing dependencies: {', '.join(pip_install_args)}")
         mypy_overrides = Path(__file__).with_name("mypy-overrides.txt")
-        lock_dir = Path(
-            os.environ.get(
-                "TY_BENCHMARK_LOCK_DIR", Path(__file__).parents[2] / "locks" / "pinned"
-            )
-        ).resolve()
-        lock = lock_dir / f"{self.project_name}.txt"
 
         command = [
             "uv",
@@ -89,7 +82,6 @@ class Venv:
             # annotations of one of that project's dependencies
             "--exclude-newer",
             "2026-10-24T19:50:00Z",
-            *(["--constraints", str(lock)] if lock.is_file() else []),
             # Mypy needs to be installed into the project virtual environment
             # or it fails to load project-local plugins. The override keeps
             # project dev dependencies from pinning a different mypy version.
