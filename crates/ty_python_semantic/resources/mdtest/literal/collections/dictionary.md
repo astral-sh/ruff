@@ -224,11 +224,13 @@ def notify(nickname):
     connect(**options)  # no diagnostic
 ```
 
-The same applies when the key is added after choosing an initializer.
+The same applies to later writes, whether the constructor is spelled `dict` or `builtins.dict`.
 
 ```py
+import builtins
+
 def notify_later(nickname, retry: bool):
-    options = dict(timeout=3.0) if retry else {"timeout": 30.0}
+    options = dict(timeout=3.0) if retry else builtins.dict(timeout=30.0)
     options["nickname"] = nickname
     reveal_type(options["nickname"])  # revealed: Unknown
     connect(**options)  # no diagnostic
@@ -269,6 +271,42 @@ def compare(nickname: Any):
     declared: dict[str, Any | float]
     declared = {"nickname": nickname, "timeout": 30.0}
     reveal_type(declared["nickname"])  # revealed: Any | float
+```
+
+When branches join, each one contributes its own type for the key. Here the new dictionary takes the
+nickname's type from the initializer, and the saved dictionary declares its values as `Any`.
+
+```py
+def notify_with_saved_options(nickname: Any, saved: dict[str, Any], use_saved: bool):
+    if use_saved:
+        options = saved
+        options["nickname"] = "guest"
+        options["timeout"] = 3.0
+    else:
+        options = {"nickname": nickname, "timeout": 30.0}
+    reveal_type(options["nickname"])  # revealed: Any
+    connect(**options)  # no diagnostic
+
+    options["nickname"] = "guest"
+    reveal_type(options["nickname"])  # revealed: Any | Literal["guest"]
+```
+
+If the saved dictionary declares its value type as `Any | float`, that path contributes the whole
+union. Writing the same nickname after the branches join gives the same result.
+
+```py
+def update_saved_options(nickname: Any, saved: dict[str, Any | float], use_saved: bool):
+    if use_saved:
+        options = saved
+        options["nickname"] = nickname
+    else:
+        options = {"timeout": 30.0}
+        options["nickname"] = nickname
+    reveal_type(options["nickname"])  # revealed: Any | float
+
+    options["nickname"] = nickname
+    reveal_type(options["nickname"])  # revealed: Any | float
+    connect(**options)  # error: [invalid-argument-type]
 ```
 
 An attribute can get its declaration from the class.
@@ -331,6 +369,22 @@ if isinstance(payload["current"], str):
     reveal_type(read(**payload))  # revealed: Any & str
 ```
 
+The dictionary can also get its value type from a parameter or a function's return annotation.
+
+```py
+def make_payload() -> dict[str, Any]:
+    return {}
+
+def update_payload(original: dict[str, Any]):
+    alias = original
+    alias["current"] = 1
+    reveal_type(alias["current"])  # revealed: Any
+
+    fresh = make_payload()
+    fresh["current"] = 1
+    reveal_type(read(**fresh))  # revealed: Any
+```
+
 A key also preserves a gradual type nested inside a container. As with an annotated name, assigning
 a `list[int]` to a key of type `list[Any]` keeps the declared element type:
 
@@ -356,6 +410,136 @@ reveal_type(rows[1]["count"])  # revealed: Any
 
 dynamic_rows: list[Any] = [{"count": 1}]
 reveal_type(dynamic_rows[0]["count"])  # revealed: Any
+```
+
+## Dictionaries stored in unannotated literals
+
+An unannotated dictionary can hold another dictionary with a declared value type. A write through
+either name respects the inner dictionary's declaration.
+
+```py
+from typing import Any
+
+def update(values: dict[str, Any]):
+    outer = {"inner": values}
+    outer["inner"]["first"] = 1
+    reveal_type(outer["inner"]["first"])  # revealed: Any
+
+    child = outer["inner"]
+    child["second"] = "v"
+    reveal_type(child["second"])  # revealed: Any
+```
+
+## Imported dictionaries
+
+An imported dictionary keeps its declared value type with either import spelling.
+
+`settings.py`:
+
+```py
+from typing import Any
+
+values: dict[str, Any] = {}
+```
+
+`client.py`:
+
+```py
+import settings
+from settings import values
+
+values["name"] = "guest"
+reveal_type(values["name"])  # revealed: Any
+settings.values["count"] = 1
+reveal_type(settings.values["count"])  # revealed: Any
+```
+
+## Nested tagged dictionaries
+
+A nested dictionary literal can select one arm of a tagged union. Its tag determines the declared
+type of its other fields.
+
+```py
+from typing import Any, Literal, TypedDict
+
+class Dynamic(TypedDict):
+    kind: Literal["dynamic"]
+    value: Any
+
+class Flag(TypedDict):
+    kind: Literal["flag"]
+    value: bool
+
+records: dict[str, Dynamic | Flag] = {"entry": {"kind": "dynamic", "value": 42}}
+reveal_type(records["entry"])  # revealed: Dynamic
+reveal_type(records["entry"]["value"])  # revealed: Any
+records["entry"]["value"] = 43
+reveal_type(records["entry"]["value"])  # revealed: Any
+```
+
+Checking the tag also selects the field type when the two dictionaries come from separate bindings.
+
+```py
+def update(dynamic: Dynamic, flag: Flag, choose: bool):
+    record = dynamic if choose else flag
+    if record["kind"] == "dynamic":
+        record["value"] = 1
+        reveal_type(record["value"])  # revealed: Any
+    else:
+        record["value"] = True
+        reveal_type(record["value"])  # revealed: Literal[True]
+```
+
+## Dictionary value types from calls
+
+A factory can infer the key type from its argument and still declare the value type. We use the
+return annotation of the selected overload.
+
+```py
+from typing import Any, Callable, TypeVar, cast, overload
+
+K = TypeVar("K")
+
+@overload
+def make(key: K) -> dict[K, Any]: ...
+@overload
+def make(key: K, value: int) -> dict[K, int]: ...
+def make(key, value=None):
+    return {key: value}
+
+options = make("name")
+options["name"] = "guest"
+reveal_type(options["name"])  # revealed: Any
+```
+
+A callable annotation also declares the return type. A copy of an inferred dictionary takes its
+value type from its receiver.
+
+```py
+def update(factory: Callable[[], dict[str, Any]], value: Any):
+    constructed = factory()
+    constructed["name"] = "guest"
+    reveal_type(constructed["name"])  # revealed: Any
+
+    copied = constructed.copy()
+    copied["name"] = "guest"
+    reveal_type(copied["name"])  # revealed: Any
+
+    inferred_copy = {"name": value}.copy()
+    inferred_copy["name"] = "guest"
+    reveal_type(inferred_copy["name"])  # revealed: Literal["guest"]
+```
+
+Specializing the constructor or casting the result also fixes the value type.
+
+```py
+specialized = dict[str, Any]()
+specialized["name"] = "guest"
+reveal_type(specialized["name"])  # revealed: Any
+
+casted = cast(dict[str, Any], object())
+casted["name"] = "guest"
+reveal_type(casted["name"])  # revealed: Any
 ```
 
 ## Key narrowing through dictionary unpacking

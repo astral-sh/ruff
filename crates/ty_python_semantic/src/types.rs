@@ -2683,6 +2683,27 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
+    /// Whether an indexed write to this value could use an item type from a declaration.
+    fn may_carry_item_declaration(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::NominalInstance(instance) => instance.is_definition_generic(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.may_carry_item_declaration(db)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|ty| ty.may_carry_item_declaration(db)),
+            Type::Dynamic(_)
+            | Type::TypeVar(_)
+            | Type::TypedDict(_)
+            | Type::TypeAlias(_)
+            | Type::ProtocolInstance(_) => true,
+            _ => false,
+        }
+    }
+
     /// Returns whether this type represents a specialization of a generic type.
     ///
     /// For example, whereas `<class 'list'>` is a generic type, `<class 'list[int]'>`

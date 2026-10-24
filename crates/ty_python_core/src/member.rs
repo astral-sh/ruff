@@ -35,6 +35,17 @@ impl Member {
         &self.expression
     }
 
+    /// The integer index at each segment, when the segment is an integer subscript.
+    pub fn integer_subscripts(&self) -> impl Iterator<Item = Option<i64>> {
+        self.expression.segments().map(|segment| {
+            if segment.kind == SegmentKind::IntSubscript {
+                segment.text.parse().ok()
+            } else {
+                None
+            }
+        })
+    }
+
     /// Is the place given a value in its containing scope?
     pub(crate) const fn is_bound(&self) -> bool {
         self.flags.contains(MemberFlags::IS_BOUND)

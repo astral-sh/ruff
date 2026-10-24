@@ -798,17 +798,14 @@ pub(super) fn place_from_bindings<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         None,
-        None,
     )
 }
 
-/// If supplied, narrow the declared type by each assignment before applying predicates.
 pub(super) fn place_from_bindings_with_reachability_cache<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     reachability_cache: &ReachabilityEvaluationCache<'db>,
-    narrow_binding: Option<&dyn Fn(Type<'db>) -> Type<'db>>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(
         db,
@@ -816,7 +813,6 @@ pub(super) fn place_from_bindings_with_reachability_cache<'db>(
         bindings_with_constraints,
         RequiresExplicitReExport::No,
         Some(reachability_cache),
-        narrow_binding,
     )
 }
 
@@ -1314,15 +1310,14 @@ pub(crate) fn place_by_id<'db>(
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
         ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
-    let infer_bindings = |bindings| {
-        place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None, None)
-    };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
     // inferred type, without unioning with `Unknown`, because it cannot be modified.
     if let Some(qualifiers) = declared.is_bare_final() {
         let bindings = all_considered_bindings();
-        return infer_bindings(bindings).place.with_qualifiers(qualifiers);
+        return place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+            .place
+            .with_qualifiers(qualifiers);
     }
 
     match declared {
@@ -1340,7 +1335,9 @@ pub(crate) fn place_by_id<'db>(
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
-            match infer_bindings(bindings).place {
+            match place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                .place
+            {
                 Place::Defined(DefinedPlace {
                     ty: inferred,
                     origin,
@@ -1388,7 +1385,8 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let inferred = infer_bindings(bindings);
+            let inferred =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None);
 
             let place = match inferred.place {
                 // Place is possibly undeclared and definitely unbound
@@ -1433,7 +1431,9 @@ pub(crate) fn place_by_id<'db>(
         } => {
             let bindings = all_considered_bindings();
             let boundness_analysis = bindings.boundness_analysis();
-            let mut inferred = infer_bindings(bindings).place;
+            let mut inferred =
+                place_from_bindings_impl(db, &env, bindings, requires_explicit_reexport, None)
+                    .place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
                 if let Place::Defined(defined) = inferred {
@@ -1826,7 +1826,6 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
     reachability_cache: Option<&ReachabilityEvaluationCache<'db>>,
-    narrow_binding: Option<&dyn Fn(Type<'db>) -> Type<'db>>,
 ) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
@@ -1991,10 +1990,7 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             provenance = provenance.or(Provenance::SingleDefinition(binding));
-            let mut binding_ty = binding_type(db, binding);
-            if let Some(narrow) = narrow_binding {
-                binding_ty = narrow(binding_ty);
-            }
+            let binding_ty = binding_type(db, binding);
             let narrowed = match narrowing_constraint.constraint() {
                 ScopedNarrowingConstraint::ALWAYS_TRUE => binding_ty,
                 ScopedNarrowingConstraint::ALWAYS_FALSE => Type::Never,

@@ -259,14 +259,14 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
         .expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
 
     let owner_type = Type::unknown();
-    let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
+    let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![], None);
     assert_matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type);
     assert_eq!(
         owner.bindings(first).collect::<Vec<_>>(),
         [(first, owner_type)]
     );
 
-    let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
+    let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![], None);
     assert_matches!(non_owner, DefinitionTypes::Other(_));
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),

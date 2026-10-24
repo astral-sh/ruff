@@ -8,7 +8,7 @@ use ty_module_resolver::{
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     dependency::{DependencyProjectKind, missing_direct_dependency},
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
+    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
     reachability::evaluate_reachability_with_cache,
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
@@ -17,7 +17,7 @@ use crate::{
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
-        infer::TypeInferenceBuilder,
+        infer::{BindingDeclaration, TypeInferenceBuilder},
         infer_definition_types,
     },
 };
@@ -44,22 +44,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         alias: &'ast ast::Alias,
         definition: Definition<'db>,
-        ty: Type<'db>,
+        member: DefinedPlace<'db>,
         qualifiers: TypeQualifiers,
-        provenance: Provenance<'db>,
     ) {
+        let ty = member.ty;
         // Check the imported value before assignment recovery can replace its type.
         if definition.kind(self.db()).as_star_import().is_none() {
             self.check_deprecated(alias, ty);
         }
 
+        if member.origin.is_declared() {
+            self.record_binding_declaration(definition, BindingDeclaration::Single(ty));
+        }
         self.add_binding(alias.into(), definition).insert(self, ty);
 
         if qualifiers.contains(TypeQualifiers::FINAL) {
             self.declarations.insert(
                 definition,
                 TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
-                    .with_provenance(provenance),
+                    .with_provenance(member.provenance),
             );
         }
     }
@@ -538,19 +541,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let result = module_literal.static_member(db, self.program_environment(), name);
             let error = result.err();
             if let PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty,
-                        definedness: boundness,
-                        provenance: source_provenance,
-                        ..
-                    }),
+                place: Place::Defined(member),
                 qualifiers,
             } = result
                 .unwrap_or_else(|error| error.fallback_member(db))
                 .member(db)
             {
-                if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
+                if &alias.name != "*" && member.definedness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
                     if let Some(builder) = self
@@ -563,9 +560,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers, source_provenance, error));
+                    from_module_getattr = Some((member, qualifiers, error));
                 } else {
-                    self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
+                    self.add_imported_binding(alias, definition, member, qualifiers);
                     return;
                 }
             }
@@ -606,7 +603,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
+        if let Some((member, qualifiers, error)) = from_module_getattr {
             if let Some(error) = error {
                 error.report_module_getattr_import_diagnostic(
                     &self.context,
@@ -615,7 +612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     name,
                 );
             }
-            self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
+            self.add_imported_binding(alias, definition, member, qualifiers);
             return;
         }
 

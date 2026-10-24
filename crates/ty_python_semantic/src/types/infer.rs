@@ -60,7 +60,7 @@ use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
-    TypeQualifiers,
+    TypeQualifiers, UnionType,
 };
 use crate::{Db, FxIndexSet};
 
@@ -176,10 +176,19 @@ bitflags::bitflags! {
 
         /// The expression refers to a `TypeVarTuple` without unpacking it.
         const INVALID_BARE_TYPE_VAR_TUPLE = 1 << 2;
+
     }
 }
 
 impl get_size2::GetSize for TypeExpressionFlags {}
+
+/// Properties of an expression that its inferred type alone does not encode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, get_size2::GetSize)]
+struct ExpressionFlags {
+    type_expression: TypeExpressionFlags,
+    /// The selected signature or explicit specialization supplies the call's item type.
+    declares_item_type: bool,
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct TypeAndRange<'db> {
@@ -290,7 +299,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
         return false;
     };
 
-    let assignment = dict_key_assignment.assignment();
+    let assignment = dict_key_assignment.assignment(db);
     infer_definition_types(db, assignment).discards_dict_key_assignments()
 }
 
@@ -1075,8 +1084,8 @@ struct ScopeInferenceExtra<'db> {
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
-    /// Metadata for type expressions in this region.
-    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+    /// Flags recorded while inferring expressions in this region.
+    expression_flags: FrozenMap<ExpressionNodeKey, ExpressionFlags>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -1206,14 +1215,14 @@ impl<'db> ScopeInference<'db> {
         extra.string_annotations.contains(&expression.into())
     }
 
-    /// Get metadata for a type expression.
     pub(crate) fn type_expression_flags(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> TypeExpressionFlags {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.type_expression_flags.get(&expression.into()).copied())
+            .and_then(|extra| extra.expression_flags.get(&expression.into()))
+            .map(|flags| flags.type_expression)
             .unwrap_or_default()
     }
 }
@@ -1265,6 +1274,8 @@ enum DefinitionTypes<'db> {
     #[default]
     Empty,
     Binding(Type<'db>),
+    /// The value carries a declaration from another binding, without declaring this name.
+    BindingWithDeclaredValue(Type<'db>),
     Declaration(TypeAndQualifiers<'db>),
     BindingAndDeclaration(TypeAndQualifiers<'db>),
     Other(Box<OtherDefinitionTypes<'db>>),
@@ -1273,10 +1284,167 @@ enum DefinitionTypes<'db> {
 type DefinitionBinding<'db> = (Definition<'db>, Type<'db>);
 type DefinitionDeclaration<'db> = (Definition<'db>, TypeAndQualifiers<'db>);
 
+/// The declarations that can govern writes through a value. A union in an individual
+/// annotation narrows as a unit. At a control-flow join each incoming declaration narrows
+/// independently, and a path without a declaration contributes the assigned type directly.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum BindingDeclaration<'db> {
+    Single(Type<'db>),
+    Alternatives(DeclarationAlternatives<'db>),
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DeclarationAlternatives<'db> {
+    #[returns(deref)]
+    elements: Box<[Option<Type<'db>>]>,
+}
+
+impl get_size2::GetSize for DeclarationAlternatives<'_> {}
+
+impl<'db> BindingDeclaration<'db> {
+    fn elements(
+        db: &'db dyn Db,
+        declaration: Option<Self>,
+    ) -> impl Iterator<Item = Option<Type<'db>>> {
+        match declaration {
+            Some(Self::Alternatives(alternatives)) => {
+                Either::Left(alternatives.elements(db).iter().copied())
+            }
+            Some(Self::Single(ty)) => Either::Right(std::iter::once(Some(ty))),
+            None => Either::Right(std::iter::once(None)),
+        }
+    }
+
+    fn from_elements(
+        db: &'db dyn Db,
+        mut elements: impl Iterator<Item = Option<Type<'db>>>,
+    ) -> Option<Self> {
+        let first = elements.next()?;
+        let Some(second) = elements.find(|element| *element != first) else {
+            return first.map(Self::Single);
+        };
+        let distinct = [first, second]
+            .into_iter()
+            .chain(elements)
+            .collect::<FxIndexSet<_>>();
+        Some(Self::Alternatives(DeclarationAlternatives::new(
+            db,
+            distinct.into_iter().collect::<Box<_>>(),
+        )))
+    }
+
+    fn merge(
+        db: &'db dyn Db,
+        declarations: impl IntoIterator<Item = Option<Self>>,
+    ) -> Option<Self> {
+        let mut declarations = declarations.into_iter();
+        let first = declarations.next()?;
+        let Some(second) = declarations.find(|declaration| *declaration != first) else {
+            return first;
+        };
+        Self::from_elements(
+            db,
+            [first, second]
+                .into_iter()
+                .chain(declarations)
+                .flat_map(|decl| Self::elements(db, decl)),
+        )
+    }
+
+    fn common_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
+        match self {
+            Self::Single(ty) => Some(ty),
+            Self::Alternatives(alternatives) => {
+                UnionType::try_from_elements(db, env, alternatives.elements(db).iter().copied())
+            }
+        }
+    }
+
+    fn project(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        mut item: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        match self {
+            Self::Single(ty) => item(ty).map(Self::Single),
+            Self::Alternatives(alternatives) => Self::from_elements(
+                db,
+                alternatives
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter(|source| {
+                        source.is_none_or(|ty| !ty.is_disjoint_from(db, env, receiver))
+                    })
+                    .map(|source| source.and_then(&mut item)),
+            ),
+        }
+    }
+
+    fn item_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        key: Type<'db>,
+    ) -> Option<Self> {
+        self.project(db, env, receiver, |ty| {
+            ty.declared_item_type(db, env, receiver, key)
+        })
+    }
+
+    fn narrowed_by_assignment(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        assigned: Type<'db>,
+    ) -> Type<'db> {
+        match self {
+            Self::Single(declared) => declared.narrowed_by_assignment(db, env, assigned),
+            Self::Alternatives(alternatives) => UnionType::from_elements(
+                db,
+                env,
+                alternatives.elements(db).iter().map(|declared| {
+                    declared.map_or(assigned, |declared| {
+                        declared.narrowed_by_assignment(db, env, assigned)
+                    })
+                }),
+            ),
+        }
+    }
+
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Option<Self>,
+        cycle: &salsa::Cycle,
+    ) -> Option<Self> {
+        if let (Self::Single(ty), Some(Self::Single(previous))) = (self, previous) {
+            return Some(Self::Single(ty.cycle_normalized(db, env, previous, cycle)));
+        }
+        let current = Self::from_elements(
+            db,
+            Self::elements(db, Some(self))
+                .map(|declared| declared.map(|ty| ty.recursive_type_normalized(db, env, cycle))),
+        );
+        // An iteration can discover another reaching declaration or coalesce two equal ones.
+        // Keep the previous alternatives without pairing declarations by position.
+        if previous.is_some() && cycle.iteration() > crate::TAINTED_CYCLES {
+            Self::merge(db, [previous, current])
+        } else {
+            current
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OtherDefinitionTypes<'db> {
     bindings: Box<[DefinitionBinding<'db>]>,
     declarations: Box<[DefinitionDeclaration<'db>]>,
+    declared_value: Option<BindingDeclaration<'db>>,
 }
 
 impl<'db> DefinitionTypes<'db> {
@@ -1284,10 +1452,19 @@ impl<'db> DefinitionTypes<'db> {
         owner: Definition<'db>,
         bindings: Vec<DefinitionBinding<'db>>,
         declarations: Vec<DefinitionDeclaration<'db>>,
+        declared_value: Option<BindingDeclaration<'db>>,
     ) -> Self {
         match (&*bindings, &*declarations) {
             ([], []) => Self::Empty,
-            ([(definition, ty)], []) if *definition == owner => Self::Binding(*ty),
+            ([(definition, ty)], []) if *definition == owner && declared_value.is_none() => {
+                Self::Binding(*ty)
+            }
+            ([(definition, ty)], [])
+                if *definition == owner
+                    && declared_value == Some(BindingDeclaration::Single(*ty)) =>
+            {
+                Self::BindingWithDeclaredValue(*ty)
+            }
             ([], [(definition, ty)]) if *definition == owner => Self::Declaration(*ty),
             ([(binding, binding_ty)], [(declaration, declaration_ty)])
                 if *binding == owner
@@ -1299,6 +1476,7 @@ impl<'db> DefinitionTypes<'db> {
             _ => Self::Other(Box::new(OtherDefinitionTypes {
                 bindings: bindings.into_boxed_slice(),
                 declarations: declarations.into_boxed_slice(),
+                declared_value,
             })),
         }
     }
@@ -1337,6 +1515,14 @@ impl<'db> DefinitionTypes<'db> {
         }
     }
 
+    fn declared_value(&self) -> Option<BindingDeclaration<'db>> {
+        match self {
+            Self::BindingWithDeclaredValue(ty) => Some(BindingDeclaration::Single(*ty)),
+            Self::Other(other) => other.declared_value,
+            _ => None,
+        }
+    }
+
     fn normalize_declaration(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1361,11 +1547,27 @@ impl<'db> DefinitionTypes<'db> {
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
     ) -> Self {
+        let normalize_declared_value = |declaration: BindingDeclaration<'db>| {
+            declaration.cycle_normalized(db, env, previous.declared_value(), cycle)
+        };
         match self {
             Self::Empty => Self::Empty,
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
                 db, env, previous, cycle, owner, owner, ty,
             )),
+            Self::BindingWithDeclaredValue(ty) => {
+                let binding = Self::normalize_binding(db, env, previous, cycle, owner, owner, ty);
+                let declared = normalize_declared_value(BindingDeclaration::Single(ty));
+                if declared == Some(BindingDeclaration::Single(binding)) {
+                    Self::BindingWithDeclaredValue(binding)
+                } else {
+                    Self::Other(Box::new(OtherDefinitionTypes {
+                        bindings: Box::new([(owner, binding)]),
+                        declarations: Box::new([]),
+                        declared_value: declared,
+                    }))
+                }
+            }
             Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
                 db, env, previous, cycle, owner, owner, ty,
             )),
@@ -1395,10 +1597,12 @@ impl<'db> DefinitionTypes<'db> {
                     Self::Other(Box::new(OtherDefinitionTypes {
                         bindings: Box::new([(owner, binding_ty)]),
                         declarations: Box::new([(owner, declaration_ty)]),
+                        declared_value: None,
                     }))
                 }
             }
             Self::Other(mut other) => {
+                other.declared_value = other.declared_value.and_then(normalize_declared_value);
                 for (definition, ty) in &mut other.bindings {
                     *ty =
                         Self::normalize_binding(db, env, previous, cycle, owner, *definition, *ty);
@@ -1416,6 +1620,12 @@ impl<'db> DefinitionTypes<'db> {
                 }
 
                 match (&*other.bindings, &*other.declarations) {
+                    ([(binding, ty)], [])
+                        if *binding == owner
+                            && other.declared_value == Some(BindingDeclaration::Single(*ty)) =>
+                    {
+                        Self::BindingWithDeclaredValue(*ty)
+                    }
                     ([(binding, binding_ty)], [(declaration, declaration_ty)])
                         if *binding == owner
                             && binding == declaration
@@ -1434,7 +1644,9 @@ impl<'db> DefinitionTypes<'db> {
         owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
         match self {
-            Self::Binding(ty) => Either::Left(std::iter::once((owner, *ty))),
+            Self::Binding(ty) | Self::BindingWithDeclaredValue(ty) => {
+                Either::Left(std::iter::once((owner, *ty)))
+            }
             Self::BindingAndDeclaration(declaration) => {
                 Either::Left(std::iter::once((owner, declaration.inner_type())))
             }
@@ -1452,7 +1664,9 @@ impl<'db> DefinitionTypes<'db> {
                 Either::Left(std::iter::once((owner, *declaration)))
             }
             Self::Other(other) => Either::Right(other.declarations.iter().copied()),
-            Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
+            Self::Empty | Self::Binding(..) | Self::BindingWithDeclaredValue(..) => {
+                Either::Right([].iter().copied())
+            }
         }
     }
 }
@@ -1509,8 +1723,8 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
 
-    /// Metadata for type expressions in this region.
-    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+    /// Flags recorded while inferring expressions in this region.
+    expression_flags: FrozenMap<ExpressionNodeKey, ExpressionFlags>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -1824,18 +2038,21 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    /// Get metadata for a type expression.
     pub(crate) fn type_expression_flags(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> TypeExpressionFlags {
+        self.expression_flags(expression).type_expression
+    }
+
+    fn expression_flags(&self, expression: impl Into<ExpressionNodeKey>) -> ExpressionFlags {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra
-                .type_expression_flags
+                .expression_flags
                 .get(&expression.into())
                 .copied()
                 .unwrap_or_default(),
-            Some(_) | None => TypeExpressionFlags::default(),
+            Some(_) | None => ExpressionFlags::default(),
         }
     }
 
@@ -1849,6 +2066,23 @@ impl<'db> DefinitionInference<'db> {
                 "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
+    }
+
+    /// The type supplied by a declaration on this binding or on the value it holds.
+    fn declared_binding_type(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<BindingDeclaration<'db>> {
+        self.types
+            .declaration_type(definition, definition)
+            .map(|declaration| BindingDeclaration::Single(declaration.inner_type()))
+            .or_else(|| self.types.declared_value())
+    }
+
+    fn expression_declaration(&self, expression: &ast::Expr) -> Option<Type<'db>> {
+        self.expression_flags(expression)
+            .declares_item_type
+            .then(|| self.expression_type(expression))
     }
 
     fn bindings(
@@ -1995,8 +2229,8 @@ struct ExpressionInferenceExtra<'db> {
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
-    /// Metadata for type expressions in this region.
-    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+    /// Flags recorded while inferring expressions in this region.
+    expression_flags: FrozenMap<ExpressionNodeKey, ExpressionFlags>,
 
     /// A comparison chain's truthiness when evaluated directly as a condition.
     ///
@@ -2255,8 +2489,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// The returned types and their corresponding ranges, if this statement is in a function body.
     return_types_and_ranges: Box<[TypeAndRange<'db>]>,
 
-    /// Metadata for type expressions in this region.
-    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
+    /// Flags recorded while inferring expressions in this region.
+    expression_flags: FrozenMap<ExpressionNodeKey, ExpressionFlags>,
 
     /// The constraints on any collection initializers that are accessed in this region.
     collection_use_constraints: CollectionUseConstraints<'db>,

@@ -557,6 +557,36 @@ fn typed_dict_subscript<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// The declared type of an item at a binding. For a union, the receiver's narrowed type
+    /// selects the alternatives that can supply an item declaration.
+    pub(super) fn declared_item_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: Type<'db>,
+        key: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let item = |receiver: Type<'db>| {
+            receiver
+                .subscript(db, env, key, ast::ExprContext::Load)
+                .ok()
+        };
+        let declared = self.expand_top_level_aliases(db, env);
+        let Type::Union(union) = declared else {
+            return item(declared);
+        };
+        let mut items = union
+            .elements(db)
+            .iter()
+            .copied()
+            .filter(|arm| declared == receiver || !arm.is_disjoint_from(db, env, receiver))
+            .filter_map(item);
+        let builder = UnionBuilder::new(db, env)
+            .or_recursively_defined(union.recursively_defined(db))
+            .add(items.next()?);
+        Some(items.fold(builder, UnionBuilder::add).build())
+    }
+
     pub(super) fn subscript(
         self,
         db: &'db dyn Db,
