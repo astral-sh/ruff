@@ -52,7 +52,7 @@ pub(super) struct ConstructorBinding<'db> {
     pub(super) entry: CallableBinding<'db>,
     /// Context for the constructor callable: the instance type being constructed and the kind of
     /// constructor method.
-    pub(super) constructor_context: ConstructorContext<'db>,
+    constructor_context: ConstructorContext<'db>,
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<Bindings<'db>>>,
