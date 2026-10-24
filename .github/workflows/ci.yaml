@@ -1,4 +1,4 @@
-name: Measure full workspace caching in Ruff Windows and macOS tests
+name: Inspect remaining Ruff workspace rebuilds
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -21,208 +21,6 @@ run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 permissions:
   contents: read
 jobs:
-  windows-before:
-    name: windows / before
-    runs-on: namespace-profile-windows-2022-x86-64-16x32
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'windows') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        cache-bin: 'false'
-        prefix-key: ruff-full-20261024-v1-windows-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv (Windows)
-      if: runner.os == 'Windows'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a
-        enable-cache: 'true'
-        cache-python: true
-    - name: Install uv (macOS)
-      if: runner.os == 'macOS'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: 743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: |
-        uv run --locked --only-dev cargo nextest run --all-features --profile ci
-        cargo test --all-features --doc
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-  windows-after:
-    name: windows / after
-    runs-on: namespace-profile-windows-2022-x86-64-16x32
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'windows') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
-      RUSTC_BOOTSTRAP: '1'
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-full-20261024-v1-windows-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv (Windows)
-      if: runner.os == 'Windows'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a
-        enable-cache: 'true'
-        cache-python: true
-    - name: Install uv (macOS)
-      if: runner.os == 'macOS'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: 743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: |
-        uv run --locked --only-dev cargo nextest run --all-features --profile ci
-        cargo test --all-features --doc
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
-  macos-before:
-    name: macos / before
-    runs-on: namespace-profile-macos-15
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'macos') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        cache-bin: 'false'
-        prefix-key: ruff-full-20261024-v1-macos-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv (Windows)
-      if: runner.os == 'Windows'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a
-        enable-cache: 'true'
-        cache-python: true
-    - name: Install uv (macOS)
-      if: runner.os == 'macOS'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: 743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: |
-        uv run --locked --only-dev cargo nextest run --all-features --profile ci
-        cargo test --all-features --doc
-    permissions:
-      contents: read
-    defaults:
-      run:
-        shell: bash
   macos-after:
     name: macos / after
     runs-on: namespace-profile-macos-15
@@ -252,7 +50,7 @@ jobs:
     - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-full-20261024-v1-macos-after
+        prefix-key: ruff-freshness-diagnostic-20261024-v1
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -286,6 +84,9 @@ jobs:
       run: |
         uv run --locked --only-dev cargo nextest run --all-features --profile ci
         cargo test --all-features --doc
+      env:
+        CARGO_LOG: ${{ inputs.phase == 'warm' && 'cargo::core::compiler::fingerprint=trace,cargo::compiler::fingerprint=trace'
+          || '' }}
     permissions:
       contents: read
     defaults:
