@@ -792,10 +792,6 @@ impl<'db> GenericContext<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn visit_bound_type_var_type(
                 &self,
                 db: &'db dyn Db,
@@ -1718,7 +1714,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Performance only: `source_top != source` below already handles unchanged
             // arguments. Without expanding aliases, treat them as potentially gradual.
             source.types(db).iter().any(|ty| {
-                any_over_type(db, env, *ty, false, |ty| {
+                any_over_type(db, env, *ty, |ty| {
                     ty.is_dynamic() || matches!(ty, Type::TypeAlias(_))
                 })
             })
@@ -3234,7 +3230,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 .iter_positive(db)
                 .chain(intersection.iter_negative(db))
                 .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            _ => any_over_type(db, self.env, ty, false, |nested| {
+            _ => any_over_type(db, self.env, ty, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(db);
                     dependency != identity
@@ -3268,7 +3264,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
 
         types.get(&identity).is_some_and(|ty| {
-            any_over_type(db, self.env, *ty, false, |nested| {
+            any_over_type(db, self.env, *ty, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(db);
                     // Recursive specialization skips a typevar's own slot. Only references
@@ -4111,7 +4107,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // Parameter-list inference extracts the actual signature's shape, including a
         // Concatenate tail. Argument validation separately checks the enclosing variance.
         let relation_polarity = if !polarity.is_covariant()
-            && (any_over_type(db, self.env, formal, false, |ty| {
+            && (any_over_type(db, self.env, formal, |ty| {
                 ty.as_typevar().is_some_and(|typevar| {
                     typevar.is_paramspec(db)
                         && typevar
@@ -4231,7 +4227,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // can widen the receiver's specialization, and variadic inference must preserve
                 // the caller's parameter pack instead of widening it through another union arm.
                 if !generic_element.is_type_var()
-                    && any_over_type(db, self.env, *generic_element, false, |ty| {
+                    && any_over_type(db, self.env, *generic_element, |ty| {
                         ty.as_typevar().is_some_and(|typevar| {
                             typevar.typevar(db).is_self(db)
                                 || typevar.is_paramspec(db)
