@@ -1,4 +1,4 @@
-name: Measure native Rust cache
+name: Measure Rust caching with matching uv versions
 run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 'on':
   workflow_dispatch:
@@ -21,305 +21,6 @@ run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
 permissions:
   contents: read
 jobs:
-  clippy-before:
-    name: clippy / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'clippy') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_BUILD_WARNINGS: deny
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-clippy-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: |
-        rustup component add clippy
-        rustup target add wasm32-unknown-unknown
-    - name: Clippy
-      run: cargo clippy --workspace --all-targets --all-features --locked
-    - name: Clippy (wasm)
-      run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked
-    permissions:
-      contents: read
-    defaults:
-      run: &id001
-        shell: bash
-  clippy-after:
-    name: clippy / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'clippy') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_BUILD_WARNINGS: deny
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-clippy-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: |
-        rustup component add clippy
-        rustup target add wasm32-unknown-unknown
-    - name: Clippy
-      run: cargo clippy --workspace --all-targets --all-features --locked
-    - name: Clippy (wasm)
-      run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked
-    permissions:
-      contents: read
-    defaults:
-      run: &id002
-        shell: bash
-  hawk-before:
-    name: hawk / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'hawk') }}
-    timeout-minutes: 15
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        workspaces: . -> target/hawk
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-hawk-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup toolchain install 1.99.0
-    - name: Install Hawk
-      run: |
-        curl --proto '=https' --tlsv1.2 -LsSf \
-          "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
-    - name: Hawk
-      run: cargo +1.99.0 hawk check --target-dir target/hawk --color=always -D warnings
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  hawk-after:
-    name: hawk / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'hawk') }}
-    timeout-minutes: 15
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      RUSTUP_TOOLCHAIN: 1.99.0
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Install Rust toolchain
-      run: rustup toolchain install 1.99.0
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        target-directory: target/hawk
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-hawk-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Hawk
-      run: |
-        curl --proto '=https' --tlsv1.2 -LsSf \
-          "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
-    - name: Hawk
-      run: cargo +1.99.0 hawk check --target-dir target/hawk --color=always -D warnings
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
-  publish-before:
-    name: publish / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-8' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'publish') }}
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-publish-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: cargo publish dry-run
-      run: cargo publish --workspace --dry-run
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  publish-after:
-    name: publish / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-8' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'publish') }}
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-publish-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: cargo publish dry-run
-      run: cargo publish --workspace --dry-run
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
   linux-before:
     name: linux / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -348,7 +49,7 @@ jobs:
       with:
         shared-key: ruff-linux-debug
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-linux-before
+        prefix-key: ruff-aligned-20261024-v1-linux-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -365,8 +66,8 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
         enable-cache: 'true'
         cache-python: true
     - name: ty mdtests (GitHub annotations)
@@ -406,7 +107,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   linux-after:
     name: linux / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -435,10 +137,10 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-linux-after
+        prefix-key: ruff-aligned-20261024-v1-linux-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -494,7 +196,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   linux-release-before:
     name: linux-release / before
     runs-on: depot-ubuntu-22.04-16
@@ -522,64 +225,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-linux-release-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
-    - name: Run doctests
-      run: cargo test --doc --profile profiling --all-features
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  linux-release-after:
-    name: linux-release / after
-    runs-on: depot-ubuntu-22.04-16
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'linux-release') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-linux-release-after
+        prefix-key: ruff-aligned-20261024-v1-linux-release-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -607,7 +253,66 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
+  linux-release-after:
+    name: linux-release / after
+    runs-on: depot-ubuntu-22.04-16
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'linux-release') }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: 'false'
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: '3.14'
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: '1'
+      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+      with:
+        cache-workspace-crates: 'false'
+        save-if: ${{ inputs.phase == 'seed' }}
+        prefix-key: ruff-aligned-20261024-v1-linux-release-after
+      name: Restore Rust cache
+      id: rust-cache
+    - name: Record Rust cache availability
+      if: ${{ inputs.phase == 'warm' }}
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        EXPECTED_HIT: 'true'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+    - name: Install Rust toolchain
+      run: rustup show
+    - name: Install uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+        enable-cache: 'true'
+        cache-python: true
+    - name: Run tests
+      run: uv run --locked --only-dev cargo nextest run --cargo-profile profiling --all-features
+    - name: Run doctests
+      run: cargo test --doc --profile profiling --all-features
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
   windows-before:
     name: windows / before
     runs-on: namespace-profile-windows-2022-x86-64-16x32
@@ -636,73 +341,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-native-20261024-v1-windows-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv (Windows)
-      if: runner.os == 'Windows'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: ccec7508a07d9933d7cb1261880633efcf1f30d6e6eddab21823f1dae6f23225
-        enable-cache: 'true'
-        cache-python: true
-    - name: Install uv (macOS)
-      if: runner.os == 'macOS'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: |
-        uv run --locked --only-dev cargo nextest run --all-features --profile ci
-        cargo test --all-features --doc
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  windows-after:
-    name: windows / after
-    runs-on: namespace-profile-windows-2022-x86-64-16x32
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'windows') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-windows-after
+        prefix-key: ruff-aligned-20261024-v1-windows-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -739,7 +378,75 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
+  windows-after:
+    name: windows / after
+    runs-on: namespace-profile-windows-2022-x86-64-16x32
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'windows') }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: 'false'
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: '3.14'
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: '1'
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+      with:
+        cache-workspace-crates: 'false'
+        save-if: ${{ inputs.phase == 'seed' }}
+        prefix-key: ruff-aligned-20261024-v1-windows-after
+      name: Restore Rust cache
+      id: rust-cache
+    - name: Record Rust cache availability
+      if: ${{ inputs.phase == 'warm' }}
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        EXPECTED_HIT: 'true'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+    - name: Install Rust toolchain
+      run: rustup show
+    - name: Install uv (Windows)
+      if: runner.os == 'Windows'
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a
+        enable-cache: 'true'
+        cache-python: true
+    - name: Install uv (macOS)
+      if: runner.os == 'macOS'
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: 743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73
+        enable-cache: 'true'
+        cache-python: true
+    - name: Run tests
+      run: |
+        uv run --locked --only-dev cargo nextest run --all-features --profile ci
+        cargo test --all-features --doc
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
   macos-before:
     name: macos / before
     runs-on: namespace-profile-macos-15
@@ -768,73 +475,7 @@ jobs:
       with:
         save-if: ${{ inputs.phase == 'seed' }}
         cache-bin: 'false'
-        prefix-key: ruff-native-20261024-v1-macos-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv (Windows)
-      if: runner.os == 'Windows'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: ccec7508a07d9933d7cb1261880633efcf1f30d6e6eddab21823f1dae6f23225
-        enable-cache: 'true'
-        cache-python: true
-    - name: Install uv (macOS)
-      if: runner.os == 'macOS'
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1
-        enable-cache: 'true'
-        cache-python: true
-    - name: Run tests
-      run: |
-        uv run --locked --only-dev cargo nextest run --all-features --profile ci
-        cargo test --all-features --doc
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  macos-after:
-    name: macos / after
-    runs-on: namespace-profile-macos-15
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'macos') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-macos-after
+        prefix-key: ruff-aligned-20261024-v1-macos-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -871,132 +512,12 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
-  wasm-before:
-    name: wasm / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'wasm') }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-wasm-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup target add wasm32-unknown-unknown
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-      with:
-        node-version: 24.21.0
-        cache: npm
-        cache-dependency-path: playground/package-lock.json
-    - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa
-      with:
-        version: v0.13.1
-    - name: Test ruff_wasm
-      run: |
-        cd crates/ruff_wasm
-        wasm-pack test --node
-    - name: Test ty_wasm
-      run: |
-        cd crates/ty_wasm
-        wasm-pack test --node
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  wasm-after:
-    name: wasm / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'wasm') }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-wasm-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup target add wasm32-unknown-unknown
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-      with:
-        node-version: 24.21.0
-        cache: npm
-        cache-dependency-path: playground/package-lock.json
-    - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa
-      with:
-        version: v0.13.1
-    - name: Test ruff_wasm
-      run: |
-        cd crates/ruff_wasm
-        wasm-pack test --node
-    - name: Test ty_wasm
-      run: |
-        cd crates/ty_wasm
-        wasm-pack test --node
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
-  msrv-before:
-    name: msrv / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'msrv') }}
+      run:
+        shell: bash
+  macos-after:
+    name: macos / after
+    runs-on: namespace-profile-macos-15
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'macos') }}
     timeout-minutes: 20
     env:
       UV_LOCKED: 1
@@ -1017,78 +538,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: SebRollen/toml-action@b1b3628f55fc3a28208d4203ada8b737e9687876
-      id: msrv
-      with:
-        file: Cargo.toml
-        field: workspace.package.rust-version
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-msrv-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      env:
-        MSRV: ${{ steps.msrv.outputs.value }}
-      run: rustup default "${MSRV}"
-    - name: Build tests
-      env:
-        MSRV: ${{ steps.msrv.outputs.value }}
-      run: cargo "+${MSRV}" test --no-run --all-features
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  msrv-after:
-    name: msrv / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'msrv') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: SebRollen/toml-action@b1b3628f55fc3a28208d4203ada8b737e9687876
-      id: msrv
-      with:
-        file: Cargo.toml
-        field: workspace.package.rust-version
-    - name: Install Rust toolchain
-      env:
-        MSRV: ${{ steps.msrv.outputs.value }}
-      run: |
-        rustup toolchain install "${MSRV}" --profile minimal
-        echo "RUSTUP_TOOLCHAIN=${MSRV}" >> "$GITHUB_ENV"
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-msrv-after
+        prefix-key: ruff-aligned-20261024-v1-macos-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1100,14 +554,33 @@ jobs:
       run: |-
         echo "Rust cache exact hit: ${CACHE_HIT:-false}"
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Build tests
-      env:
-        MSRV: ${{ steps.msrv.outputs.value }}
-      run: cargo "+${MSRV}" test --no-run --all-features
+    - name: Install Rust toolchain
+      run: rustup show
+    - name: Install uv (Windows)
+      if: runner.os == 'Windows'
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a
+        enable-cache: 'true'
+        cache-python: true
+    - name: Install uv (macOS)
+      if: runner.os == 'macOS'
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: 743f85035a1996ecb350659e01cd9faea9709829be09b1b4b03c73eaf3c9cd73
+        enable-cache: 'true'
+        cache-python: true
+    - name: Run tests
+      run: |
+        uv run --locked --only-dev cargo nextest run --all-features --profile ci
+        cargo test --all-features --doc
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   fuzz-build-before:
     name: fuzz-build / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1122,58 +595,7 @@ jobs:
       with:
         workspaces: fuzz -> target
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-fuzz-build-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
-    - run: uv run --only-dev cargo fuzz build -s none
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  fuzz-build-after:
-    name: fuzz-build / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'fuzz-build') }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        workspace: fuzz
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-fuzz-build-after
+        prefix-key: ruff-aligned-20261024-v1-fuzz-build-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1208,12 +630,42 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
-  producer-depot-after:
-    name: producer-depot / after
-    runs-on: depot-ubuntu-24.04-8
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'producer-depot') }}
-    timeout-minutes: 20
+      run:
+        shell: bash
+  fuzz-build-after:
+    name: fuzz-build / after
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'fuzz-build') }}
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+      with:
+        cache-workspace-crates: 'false'
+        workspace: fuzz
+        save-if: ${{ inputs.phase == 'seed' }}
+        prefix-key: ruff-aligned-20261024-v1-fuzz-build-after
+      name: Restore Rust cache
+      id: rust-cache
+    - name: Record Rust cache availability
+      if: ${{ inputs.phase == 'warm' }}
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        EXPECTED_HIT: 'true'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+    - name: Install Rust toolchain
+      run: rustup show
+    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+    - run: uv run --only-dev cargo fuzz build -s none
     env:
       UV_LOCKED: 1
       CARGO_INCREMENTAL: 0
@@ -1227,92 +679,11 @@ jobs:
       PYTHON_VERSION: '3.14'
       NEXTEST_PROFILE: ci
       MDTEST_EXTERNAL: '1'
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
-      RUSTC_BOOTSTRAP: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Install Rust toolchain
-      run: rustup show
-    - id: rust-cache
-      uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        key: ruff-binary-debug
-        add-job-id-key: 'false'
-        prefix-key: ruff-native-20261024-v1-ruff-binary-after
-        save-if: 'true'
-      name: Restore Rust cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Build Ruff binary
-      if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
-      run: cargo build --bin ruff
     permissions:
       contents: read
     defaults:
-      run: *id002
-  producer-github-after:
-    name: producer-github / after
-    runs-on: github-ubuntu-24.04-x86_64-4
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'producer-github') }}
-    timeout-minutes: 20
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
-      RUSTC_BOOTSTRAP: '1'
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Install Rust toolchain
-      run: rustup show
-    - id: rust-cache
-      uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        key: ruff-binary-debug
-        add-job-id-key: 'false'
-        prefix-key: ruff-native-20261024-v1-ruff-binary-after
-        save-if: 'true'
-      name: Restore Rust cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Build Ruff binary
-      if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
-      run: cargo build --bin ruff
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
+      run:
+        shell: bash
   parser-before:
     name: parser / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1342,13 +713,13 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         shared-key: ruff-linux-debug
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-linux-before
+        prefix-key: ruff-aligned-20261024-v1-linux-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1369,7 +740,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   parser-after:
     name: parser / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1406,12 +778,12 @@ jobs:
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         key: ruff-binary-debug
         add-job-id-key: 'false'
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ruff-binary-after
+        prefix-key: ruff-aligned-20261024-v1-ruff-binary-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1428,7 +800,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   scripts-before:
     name: scripts / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -1442,68 +815,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-scripts-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
-    - name: Install Rust toolchain
-      run: rustup component add rustfmt
-    - run: python crates/ruff_python_ast/generate.py
-    - run: python crates/ruff_python_formatter/generate.py
-    - run: test -z "$(git status --porcelain)"
-    - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes --category correctness
-    - run: cargo check
-    - run: |
-        ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-        ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
-    - run: cargo check
-    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer mypy
-    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff format --check
-    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff check
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  scripts-after:
-    name: scripts / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'scripts') }}
-    timeout-minutes: 5
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-scripts-after
+        prefix-key: ruff-aligned-20261024-v1-scripts-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1549,7 +861,70 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
+  scripts-after:
+    name: scripts / after
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'scripts') }}
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+      with:
+        cache-workspace-crates: 'false'
+        save-if: ${{ inputs.phase == 'seed' }}
+        prefix-key: ruff-aligned-20261024-v1-scripts-after
+      name: Restore Rust cache
+      id: rust-cache
+    - name: Record Rust cache availability
+      if: ${{ inputs.phase == 'warm' }}
+      shell: bash
+      env:
+        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        EXPECTED_HIT: 'true'
+      run: |-
+        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
+        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+    - name: Install Rust toolchain
+      run: rustup component add rustfmt
+    - run: python crates/ruff_python_ast/generate.py
+    - run: python crates/ruff_python_formatter/generate.py
+    - run: test -z "$(git status --porcelain)"
+    - run: ./scripts/add_rule.py --name DoTheThing --prefix F --code 999 --linter pyflakes --category correctness
+    - run: cargo check
+    - run: |
+        ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
+        ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test --category correctness
+    - run: cargo check
+    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer mypy
+    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff format --check
+    - run: uv run --python="${PYTHON_VERSION}" --directory=./python/py-fuzzer ruff check
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: 'false'
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: '3.14'
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: '1'
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
   ecosystem-before:
     name: ecosystem / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
@@ -1578,15 +953,15 @@ jobs:
       with:
         python-version: ${{ env.PYTHON_VERSION }}
         activate-environment: true
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         shared-key: ruff-linux-debug
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-linux-before
+        prefix-key: ruff-aligned-20261024-v1-linux-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1612,7 +987,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   ecosystem-after:
     name: ecosystem / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-8' || 'ubuntu-latest' }}
@@ -1647,12 +1023,12 @@ jobs:
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         key: ruff-binary-debug
         add-job-id-key: 'false'
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ruff-binary-after
+        prefix-key: ruff-aligned-20261024-v1-ruff-binary-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1678,7 +1054,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   fuzz-ty-before:
     name: fuzz-ty / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -1713,12 +1090,12 @@ jobs:
         git fetch --no-tags --filter=blob:none --unshallow origin
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-fuzz-ty-before
+        prefix-key: ruff-aligned-20261024-v1-fuzz-ty-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1753,7 +1130,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   fuzz-ty-after:
     name: fuzz-ty / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -1790,11 +1168,11 @@ jobs:
       with:
         version: 0.13.5
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-fuzz-ty-after
+        prefix-key: ruff-aligned-20261024-v1-fuzz-ty-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1829,7 +1207,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   ty-completion-evaluation-before:
     name: ty-completion-evaluation / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -1855,12 +1234,12 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ty-completion-evaluation-before
+        prefix-key: ruff-aligned-20261024-v1-ty-completion-evaluation-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1881,7 +1260,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   ty-completion-evaluation-after:
     name: ty-completion-evaluation / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -1909,11 +1289,11 @@ jobs:
       with:
         version: 0.13.5
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ty-completion-evaluation-after
+        prefix-key: ruff-aligned-20261024-v1-ty-completion-evaluation-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -1934,227 +1314,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
-  python-package-before:
-    name: python-package / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'python-package') }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        architecture: x64
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-python-package-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Prep README.md
-      run: python scripts/transform_readme.py --target pypi
-    - name: Build wheels
-      uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
-      with:
-        args: --out dist
-    - name: Test wheel
-      run: |
-        pip install --force-reinstall --find-links dist "${PACKAGE_NAME}"
-        ruff --help
-        python -m ruff --help
-    - name: Remove wheels from cache
-      run: rm -rf target/wheels
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  python-package-after:
-    name: python-package / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'python-package') }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        architecture: x64
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-python-package-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Prep README.md
-      run: python scripts/transform_readme.py --target pypi
-    - name: Build wheels
-      uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b
-      with:
-        args: --out dist
-    - name: Test wheel
-      run: |
-        pip install --force-reinstall --find-links dist "${PACKAGE_NAME}"
-        ruff --help
-        python -m ruff --help
-    - name: Remove wheels from cache
-      run: rm -rf target/wheels
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
-  pgo-before:
-    name: pgo / before
-    runs-on: depot-ubuntu-24.04-8
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'pgo') }}
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        architecture: x64
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-pgo-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install LLVM profiling tools
-      run: rustup component add llvm-tools-preview
-    - name: Run PGO pipeline
-      run: python scripts/build_ruff_pgo.py --debug
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  pgo-after:
-    name: pgo / after
-    runs-on: depot-ubuntu-24.04-8
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'pgo') }}
-    timeout-minutes: 20
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        architecture: x64
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-pgo-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install LLVM profiling tools
-      run: rustup component add llvm-tools-preview
-    - name: Run PGO pipeline
-      run: python scripts/build_ruff_pgo.py --debug
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
+      run:
+        shell: bash
   docs-before:
     name: docs / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -2167,66 +1328,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-docs-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Install uv
-      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        python-version: 3.13
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
-    - name: Update README File
-      run: uv run scripts/transform_readme.py --target mkdocs
-    - name: Generate docs
-      run: uv run scripts/generate_mkdocs.py
-    - name: Check docs formatting
-      run: uv run scripts/check_docs_formatted.py
-    - name: Build docs
-      run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'docs') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  docs-after:
-    name: docs / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-docs-after
+        prefix-key: ruff-aligned-20261024-v1-docs-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2271,21 +1373,22 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
-  formatter-before:
-    name: formatter / before
+      run:
+        shell: bash
+  docs-after:
+    name: docs / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'formatter') }}
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
+        cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-formatter-before
+        prefix-key: ruff-aligned-20261024-v1-docs-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2299,12 +1402,21 @@ jobs:
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - name: Install Rust toolchain
       run: rustup show
-    - name: Run checks
-      run: scripts/formatter_ecosystem_checks.sh
-    - name: Github step summary
-      run: cat target/formatter-ecosystem/stats.txt > "$GITHUB_STEP_SUMMARY"
-    - name: Remove checkouts from cache
-      run: rm -r target/formatter-ecosystem
+    - name: Install uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        python-version: 3.13
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+    - name: Update README File
+      run: uv run scripts/transform_readme.py --target mkdocs
+    - name: Generate docs
+      run: uv run scripts/generate_mkdocs.py
+    - name: Check docs formatting
+      run: uv run scripts/check_docs_formatted.py
+    - name: Build docs
+      run: uv run --only-group=docs mkdocs build --strict -f mkdocs.yml
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'docs') }}
     env:
       UV_LOCKED: 1
       CARGO_INCREMENTAL: 0
@@ -2321,203 +1433,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
-  formatter-after:
-    name: formatter / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'formatter') }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-formatter-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Run checks
-      run: scripts/formatter_ecosystem_checks.sh
-    - name: Github step summary
-      run: cat target/formatter-ecosystem/stats.txt > "$GITHUB_STEP_SUMMARY"
-    - name: Remove checkouts from cache
-      run: rm -r target/formatter-ecosystem
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
-  playground-before:
-    name: playground / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'playground') }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Install Rust toolchain
-      run: rustup target add wasm32-unknown-unknown
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-playground-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-      with:
-        node-version: 24.21.0
-        cache: npm
-        cache-dependency-path: |
-          playground/package-lock.json
-          playground/deploy/package-lock.json
-    - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29
-    - name: Check deployment dependencies
-      env:
-        WRANGLER_SEND_METRICS: 'false'
-        WRANGLER_SEND_ERROR_REPORTS: 'false'
-      run: |
-        npm ci --ignore-scripts
-        ./node_modules/.bin/wrangler --version
-      working-directory: playground/deploy
-    - name: Install Node dependencies
-      run: npm ci --ignore-scripts
-      working-directory: playground
-    - name: Build playgrounds
-      run: npm run dev:build
-      working-directory: playground
-    - name: Run TypeScript checks
-      run: npm run check
-      working-directory: playground
-    - name: Check formatting
-      run: npm run fmt:check
-      working-directory: playground
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id001
-  playground-after:
-    name: playground / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'playground') }}
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Install Rust toolchain
-      run: rustup target add wasm32-unknown-unknown
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-playground-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-      with:
-        node-version: 24.21.0
-        cache: npm
-        cache-dependency-path: |
-          playground/package-lock.json
-          playground/deploy/package-lock.json
-    - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29
-    - name: Check deployment dependencies
-      env:
-        WRANGLER_SEND_METRICS: 'false'
-        WRANGLER_SEND_ERROR_REPORTS: 'false'
-      run: |
-        npm ci --ignore-scripts
-        ./node_modules/.bin/wrangler --version
-      working-directory: playground/deploy
-    - name: Install Node dependencies
-      run: npm ci --ignore-scripts
-      working-directory: playground
-    - name: Build playgrounds
-      run: npm run dev:build
-      working-directory: playground
-    - name: Run TypeScript checks
-      run: npm run check
-      working-directory: playground
-    - name: Check formatting
-      run: npm run fmt:check
-      working-directory: playground
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CARGO_TERM_COLOR: always
-      HAWK_VERSION: 0.1.15
-      RUSTUP_MAX_RETRIES: 10
-      PACKAGE_NAME: ruff
-      PYTHON_VERSION: '3.14'
-      NEXTEST_PROFILE: ci
-      MDTEST_EXTERNAL: '1'
-    permissions:
-      contents: read
-    defaults:
-      run: *id002
+      run:
+        shell: bash
   ruff-benchmark-before:
     name: ruff-benchmark / before
     runs-on: depot-ubuntu-24.04
@@ -2534,7 +1451,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ruff-benchmark-before
+        prefix-key: ruff-aligned-20261024-v1-ruff-benchmark-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2548,8 +1465,8 @@ jobs:
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
     - name: Build benchmarks
@@ -2569,7 +1486,8 @@ jobs:
       NEXTEST_PROFILE: ci
       MDTEST_EXTERNAL: '1'
     defaults:
-      run: *id001
+      run:
+        shell: bash
   ruff-benchmark-after:
     name: ruff-benchmark / after
     runs-on: depot-ubuntu-24.04
@@ -2600,11 +1518,11 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         profile: profiling
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ruff-benchmark-after
+        prefix-key: ruff-aligned-20261024-v1-ruff-benchmark-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2624,7 +1542,8 @@ jobs:
       run: uv run --only-dev cargo codspeed build -m simulation -m memory --features "codspeed,ruff_instrumented" --profile
         profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
     defaults:
-      run: *id002
+      run:
+        shell: bash
   ty-benchmark-before:
     name: ty-benchmark / before
     runs-on: depot-ubuntu-24.04-4
@@ -2639,7 +1558,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ty-benchmark-before
+        prefix-key: ruff-aligned-20261024-v1-ty-benchmark-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2653,8 +1572,8 @@ jobs:
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
     - name: Build benchmarks
@@ -2684,7 +1603,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   ty-benchmark-after:
     name: ty-benchmark / after
     runs-on: depot-ubuntu-24.04-4
@@ -2696,11 +1616,11 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-ty-benchmark-after
+        prefix-key: ruff-aligned-20261024-v1-ty-benchmark-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2745,7 +1665,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   walltime-build-before:
     name: walltime-build / before
     runs-on: depot-ubuntu-22.04-arm-4
@@ -2760,7 +1681,7 @@ jobs:
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       with:
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-walltime-build-before
+        prefix-key: ruff-aligned-20261024-v1-walltime-build-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2774,8 +1695,8 @@ jobs:
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 1ae72b4718729e2ccc4f1ae2c6d1e531ca8467800e0546e9130b3886023a60ab
+        version: 0.13.5
+        checksum: 4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403
     - name: Install Rust toolchain
       run: rustup show
     - name: Build benchmarks
@@ -2805,7 +1726,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id001
+      run:
+        shell: bash
   walltime-build-after:
     name: walltime-build / after
     runs-on: depot-ubuntu-22.04-arm-4
@@ -2817,11 +1739,17 @@ jobs:
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+      with:
+        version: 0.13.5
+        checksum: 4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403
+    - name: Install Rust toolchain
+      run: rustup show
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         save-if: ${{ inputs.phase == 'seed' }}
-        prefix-key: ruff-native-20261024-v1-walltime-build-after
+        prefix-key: ruff-aligned-20261024-v1-walltime-build-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -2833,12 +1761,6 @@ jobs:
       run: |-
         echo "Rust cache exact hit: ${CACHE_HIT:-false}"
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
-      with:
-        version: 0.13.5
-        checksum: 4bb69cf95ed13f23713bb7bc09f241896ea0c75b7c557e615a20604b82f9c403
-    - name: Install Rust toolchain
-      run: rustup show
     - name: Build benchmarks
       run: uv run --only-dev cargo codspeed build -m walltime --features "codspeed,ty_ide,ty_walltime" --profile profiling
         --no-default-features -p ruff_benchmark --bench ty_walltime --bench ty_script --bench ty_ide
@@ -2866,7 +1788,8 @@ jobs:
     permissions:
       contents: read
     defaults:
-      run: *id002
+      run:
+        shell: bash
   daily-fuzz-before:
     name: daily-fuzz / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
@@ -2895,15 +1818,15 @@ jobs:
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
     - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
       name: Restore Rust cache
       id: rust-cache
       with:
-        prefix-key: ruff-native-20261024-v1-daily-fuzz-before
+        prefix-key: ruff-aligned-20261024-v1-daily-fuzz-before
         save-if: ${{ inputs.phase == 'seed' }}
     - name: Record Rust cache availability
       if: ${{ inputs.phase == 'warm' }}
@@ -2948,10 +1871,10 @@ jobs:
         checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
     - name: Install Rust toolchain
       run: rustup show
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
-        prefix-key: ruff-native-20261024-v1-daily-fuzz-after
+        prefix-key: ruff-aligned-20261024-v1-daily-fuzz-after
         save-if: ${{ inputs.phase == 'seed' }}
       name: Restore Rust cache
       id: rust-cache
@@ -2966,203 +1889,6 @@ jobs:
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
     - name: Build ruff
       run: cargo build --locked
-  typing-before:
-    name: typing / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        path: ruff
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Fetch full history without tags
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh auth setup-git
-        git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: python/typing
-        ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}
-        path: typing
-        persist-credentials: false
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        workspaces: ruff
-        prefix-key: ruff-native-20261024-v1-typing-before
-        save-if: ${{ inputs.phase == 'seed' }}
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Compute diagnostic diff
-      shell: bash
-      run: |
-        # Build the executable for the old and new commit
-        (
-          cd ruff
-
-          echo "new commit"
-          git rev-list --format=%s --max-count=1 "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-          cargo build --bin ty
-          mv target/debug/ty ty-new
-
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          git checkout -b old_commit "$MERGE_BASE"
-          echo "old commit (merge base)"
-          git rev-list --format=%s --max-count=1 old_commit
-          cargo build --bin ty
-          mv target/debug/ty ty-old
-        )
-
-        (
-          echo "Creating comment with conformance comparison"
-          cd ruff
-          git switch - --detach
-
-          python "./scripts/conformance.py" \
-           --old-ty "./ty-old" \
-           --new-ty "./ty-new" \
-           --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
-           --python-version "$PYTHON_VERSION" \
-           --output ../typing_conformance_diagnostics.diff
-        )
-    - name: Upload diff
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: typing_conformance_diagnostics_diff-typing-before
-        path: typing_conformance_diagnostics.diff
-        retention-days: 1
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'typing') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CONFORMANCE_SUITE_COMMIT: d06c5dd6bbae4a39eb7cb0210c5b2099aafd8032
-      PYTHON_VERSION: 3.12
-    permissions:
-      contents: read
-  typing-after:
-    name: typing / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_DEV_DEBUG: line-tables-only
-      CARGO_PROFILE_DEV_LTO: 'false'
-      CARGO_PROFILE_DEV_OPT_LEVEL: 0
-      CONFORMANCE_SUITE_COMMIT: d06c5dd6bbae4a39eb7cb0210c5b2099aafd8032
-      PYTHON_VERSION: 3.12
-      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
-      RUSTC_BOOTSTRAP: '1'
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        path: ruff
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Fetch full history without tags
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh auth setup-git
-        git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        repository: python/typing
-        ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}
-        path: typing
-        persist-credentials: false
-    - name: Install Rust toolchain
-      run: rustup show
-      working-directory: ruff
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        workspace: ruff
-        prefix-key: ruff-native-20261024-v1-typing-after
-        save-if: ${{ inputs.phase == 'seed' }}
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'true'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-    - name: Compute diagnostic diff
-      shell: bash
-      run: |
-        # Build the executable for the old and new commit
-        (
-          cd ruff
-
-          echo "new commit"
-          git rev-list --format=%s --max-count=1 "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-          cargo build --bin ty
-          mv target/debug/ty ty-new
-
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          git checkout -b old_commit "$MERGE_BASE"
-          echo "old commit (merge base)"
-          git rev-list --format=%s --max-count=1 old_commit
-          cargo build --bin ty
-          mv target/debug/ty ty-old
-        )
-
-        (
-          echo "Creating comment with conformance comparison"
-          cd ruff
-          git switch - --detach
-
-          python "./scripts/conformance.py" \
-           --old-ty "./ty-old" \
-           --new-ty "./ty-new" \
-           --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
-           --python-version "$PYTHON_VERSION" \
-           --output ../typing_conformance_diagnostics.diff
-        )
-    - name: Upload diff
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: typing_conformance_diagnostics_diff-typing-after
-        path: typing_conformance_diagnostics.diff
-        retention-days: 1
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'typing') }}
-    permissions:
-      contents: read
   memory-before:
     name: memory / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
@@ -3183,7 +1909,7 @@ jobs:
       with:
         workspaces: ruff
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-memory-before
+        prefix-key: ruff-aligned-20261024-v1-memory-before
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -3200,8 +1926,8 @@ jobs:
         python-version: ${{ env.PYTHON_VERSION }}
     - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
       with:
-        version: 0.13.4
-        checksum: 2b428396f12572d4429cf210ca234dd599a33b3af0958a4d5ed569d63e3f344f
+        version: 0.13.5
+        checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
         enable-cache: true
         save-cache: false
     - name: Install Rust toolchain
@@ -3257,12 +1983,12 @@ jobs:
       run: |
         gh auth setup-git
         git -C ruff fetch --no-tags --filter=blob:none --unshallow origin
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
         cache-workspace-crates: 'false'
         workspace: ruff
         save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-memory-after
+        prefix-key: ruff-aligned-20261024-v1-memory-after
       name: Restore Rust cache
       id: rust-cache
     - name: Record Rust cache availability
@@ -3320,325 +2046,109 @@ jobs:
       PYTHON_VERSION: 3.14
     permissions:
       contents: read
-  ty-ecosystem-base-before:
-    name: ty-ecosystem-base / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
+  producer-depot-after:
+    name: producer-depot / after
+    runs-on: depot-ubuntu-24.04-8
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'producer-depot') }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: 'false'
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: '3.14'
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: '1'
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
+      RUSTC_BOOTSTRAP: '1'
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Fetch full history without tags
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh auth setup-git
-        git fetch --no-tags --filter=blob:none --unshallow origin
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+    - name: Install Rust toolchain
+      run: rustup show
+    - id: rust-cache
+      uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
-        lookup-only: false
-        save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ty-ecosystem-base-before
+        key: ruff-binary-debug
+        add-job-id-key: 'false'
+        prefix-key: ruff-aligned-20261024-v1-ruff-binary-after
+        save-if: 'true'
       name: Restore Rust cache
-      id: rust-cache
     - name: Record Rust cache availability
       if: ${{ inputs.phase == 'warm' }}
       shell: bash
       env:
         CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'false'
+        EXPECTED_HIT: 'true'
       run: |-
         echo "Rust cache exact hit: ${CACHE_HIT:-false}"
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Build ty
-      env:
-        REVISION: base
-      run: |
-        if [[ "${REVISION}" == "base" ]]; then
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          echo "${MERGE_BASE}" > merge-base.txt
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-
-          git checkout "${MERGE_BASE}"
-        fi
-
-        echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-        cargo build --package ty --profile profiling
-        cp target/profiling/ty "ty-${REVISION}"
-
-        if [[ "${REVISION}" == "pr" ]]; then
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
-          cp .github/ty-ecosystem-constraints.txt ty-ecosystem-constraints.txt
-        fi
-    - name: Upload base ty binary
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-base-ty-ecosystem-base-before
-        compression-level: 1
-        path: |
-          ty-base
-          merge-base.txt
-        retention-days: 1
-    if: ${{ inputs.phase == 'warm' && (inputs.suite == 'all' || inputs.suite == 'ty-ecosystem-base') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+    - name: Build Ruff binary
+      if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+      run: cargo build --bin ruff
     permissions:
       contents: read
     defaults:
-      run: &id003
+      run:
         shell: bash
-  ty-ecosystem-base-after:
-    name: ty-ecosystem-base / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
+  producer-github-after:
+    name: producer-github / after
+    runs-on: github-ubuntu-24.04-x86_64-4
+    if: ${{ (inputs.suite == 'all' || inputs.suite == 'producer-github') }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: 'false'
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: '3.14'
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: '1'
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: 'true'
+      RUSTC_BOOTSTRAP: '1'
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       with:
         persist-credentials: false
         ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - name: Fetch full history without tags
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh auth setup-git
-        git fetch --no-tags --filter=blob:none --unshallow origin
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
+    - name: Install Rust toolchain
+      run: rustup show
+    - id: rust-cache
+      uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
       with:
-        cache-workspace-crates: 'false'
-        save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ty-ecosystem-base-after
+        key: ruff-binary-debug
+        add-job-id-key: 'false'
+        prefix-key: ruff-aligned-20261024-v1-ruff-binary-after
+        save-if: 'true'
       name: Restore Rust cache
-      id: rust-cache
     - name: Record Rust cache availability
       if: ${{ inputs.phase == 'warm' }}
       shell: bash
       env:
         CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'false'
+        EXPECTED_HIT: 'true'
       run: |-
         echo "Rust cache exact hit: ${CACHE_HIT:-false}"
         test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Build ty
-      env:
-        REVISION: base
-      run: |
-        if [[ "${REVISION}" == "base" ]]; then
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          echo "${MERGE_BASE}" > merge-base.txt
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-
-          git checkout "${MERGE_BASE}"
-        fi
-
-        echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-        cargo build --package ty --profile profiling
-        cp target/profiling/ty "ty-${REVISION}"
-
-        if [[ "${REVISION}" == "pr" ]]; then
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
-          cp .github/ty-ecosystem-constraints.txt ty-ecosystem-constraints.txt
-        fi
-    - name: Upload base ty binary
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-base-ty-ecosystem-base-after
-        compression-level: 1
-        path: |
-          ty-base
-          merge-base.txt
-        retention-days: 1
-    if: ${{ inputs.phase == 'warm' && (inputs.suite == 'all' || inputs.suite == 'ty-ecosystem-base') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+    - name: Build Ruff binary
+      if: ${{ steps.rust-cache.outputs.cache-hit != 'true' }}
+      run: cargo build --bin ruff
     permissions:
       contents: read
     defaults:
-      run: &id004
+      run:
         shell: bash
-  ty-ecosystem-pr-before:
-    name: ty-ecosystem-pr / before
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-      with:
-        lookup-only: false
-        save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ty-ecosystem-pr-before
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'false'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Build ty
-      env:
-        REVISION: pr
-      run: |
-        if [[ "${REVISION}" == "base" ]]; then
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          echo "${MERGE_BASE}" > merge-base.txt
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-
-          git checkout "${MERGE_BASE}"
-        fi
-
-        echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-        cargo build --package ty --profile profiling
-        cp target/profiling/ty "ty-${REVISION}"
-
-        if [[ "${REVISION}" == "pr" ]]; then
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
-          cp .github/ty-ecosystem-constraints.txt ty-ecosystem-constraints.txt
-        fi
-    - name: Upload PR ty binary, flaky project list, config, and constraints
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-pr-ty-ecosystem-pr-before
-        compression-level: 1
-        path: |
-          ty-pr
-          projects_flaky.txt
-          ty-ecosystem.toml
-          ty-ecosystem-constraints.txt
-        retention-days: 1
-    - name: Upload ecosystem-analyzer dependency metadata
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-dependencies-ty-ecosystem-pr-before
-        path: |
-          pyproject.toml
-          uv.lock
-        retention-days: 1
-    if: ${{ inputs.phase == 'warm' && (inputs.suite == 'all' || inputs.suite == 'ty-ecosystem-pr') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-    permissions:
-      contents: read
-    defaults:
-      run: *id003
-  ty-ecosystem-pr-after:
-    name: ty-ecosystem-pr / after
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-32' || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with:
-        persist-credentials: false
-        ref: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6
-    - uses: astral-sh/github-actions/rust-workspace-cache@4f88db2c55c0e0588aaae819ef0ef95e4924c753
-      with:
-        cache-workspace-crates: 'false'
-        save-if: 'false'
-        prefix-key: ruff-native-20261024-v1-ty-ecosystem-pr-after
-      name: Restore Rust cache
-      id: rust-cache
-    - name: Record Rust cache availability
-      if: ${{ inputs.phase == 'warm' }}
-      shell: bash
-      env:
-        CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-        EXPECTED_HIT: 'false'
-      run: |-
-        echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-        test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
-    - name: Install Rust toolchain
-      run: rustup show
-    - name: Build ty
-      env:
-        REVISION: pr
-      run: |
-        if [[ "${REVISION}" == "base" ]]; then
-          # The first parent contains any preceding layers in a stacked pull request.
-          MERGE_BASE="$(git rev-parse "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6")"
-          echo "${MERGE_BASE}" > merge-base.txt
-          echo "Merge base: ${MERGE_BASE}"
-          echo "PR commit: 7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
-
-          git checkout "${MERGE_BASE}"
-        fi
-
-        echo "Building ${REVISION} revision $(git rev-parse HEAD)"
-        cargo build --package ty --profile profiling
-        cp target/profiling/ty "ty-${REVISION}"
-
-        if [[ "${REVISION}" == "pr" ]]; then
-          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
-          cp .github/ty-ecosystem.toml ty-ecosystem.toml
-          cp .github/ty-ecosystem-constraints.txt ty-ecosystem-constraints.txt
-        fi
-    - name: Upload PR ty binary, flaky project list, config, and constraints
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-pr-ty-ecosystem-pr-after
-        compression-level: 1
-        path: |
-          ty-pr
-          projects_flaky.txt
-          ty-ecosystem.toml
-          ty-ecosystem-constraints.txt
-        retention-days: 1
-    - name: Upload ecosystem-analyzer dependency metadata
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-      with:
-        name: ty-build-dependencies-ty-ecosystem-pr-after
-        path: |
-          pyproject.toml
-          uv.lock
-        retention-days: 1
-    if: ${{ inputs.phase == 'warm' && (inputs.suite == 'all' || inputs.suite == 'ty-ecosystem-pr') }}
-    env:
-      UV_LOCKED: 1
-      CARGO_INCREMENTAL: 0
-      CARGO_NET_RETRY: 10
-      CARGO_TERM_COLOR: always
-      RUSTUP_MAX_RETRIES: 10
-      RUST_BACKTRACE: 1
-      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
-    permissions:
-      contents: read
-    defaults:
-      run: *id004
