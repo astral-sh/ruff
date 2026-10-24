@@ -347,11 +347,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         UnionTypeInstance::new(
                             db,
                             None,
-                            Ok(UnionType::from_two_elements(
+                            Ok(UnionType::from_type_expression_elements(
                                 db,
                                 env,
-                                ty,
-                                Type::none(db, env),
+                                [ty, Type::none(db, env)],
+                                true,
                             )),
                         ),
                     )));
@@ -364,7 +364,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             UnionTypeInstance::new(
                                 db,
                                 None,
-                                Ok(UnionType::from_elements(db, env, elements)),
+                                Ok(UnionType::from_type_expression_elements(
+                                    db, env, elements, true,
+                                )),
                             ),
                         ));
 

@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use std::convert::Infallible;
 
@@ -45,8 +46,61 @@ pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for UnionType<'_> {}
 
+/// The operands of a union before simplification, shared across inference regions.
+///
+/// Value expressions expand aliases, while type expressions retain their constructors so that
+/// recursive references remain available for validation. The expansion policy is part of the key.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct TypeExpressionUnion<'db> {
+    #[returns(copy)]
+    program: Program<'db>,
+    #[returns(ref)]
+    elements: SmallVec<[Type<'db>; 2]>,
+    #[returns(copy)]
+    unpack_aliases: bool,
+}
+
+impl get_size2::GetSize for TypeExpressionUnion<'_> {}
+
+#[salsa::tracked]
+impl<'db> TypeExpressionUnion<'db> {
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, union: TypeExpressionUnion<'db>| {
+            result.cycle_normalized(db, &ProgramEnvironment::from_program(union.program(db)), *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn normalized(self, db: &'db dyn Db) -> Type<'db> {
+        let env = ProgramEnvironment::from_program(self.program(db));
+        let elements = self.elements(db).iter().copied();
+        if self.unpack_aliases(db) {
+            UnionType::from_elements(db, &env, elements)
+        } else {
+            UnionType::from_elements_leave_aliases(db, &env, elements)
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> UnionType<'db> {
+    /// Normalize a union, sharing the result across value and type-expression inference.
+    ///
+    /// `unpack_aliases` selects [`Self::from_elements`] when true and
+    /// [`Self::from_elements_leave_aliases`] when false, preserving each constructor's
+    /// simplification rules, including its treatment of a single operand.
+    pub(crate) fn from_type_expression_elements(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: impl IntoIterator<Item = Type<'db>>,
+        unpack_aliases: bool,
+    ) -> Type<'db> {
+        let mut elements: SmallVec<[Type<'db>; 2]> = elements.into_iter().collect();
+        elements.shrink_to_fit();
+        TypeExpressionUnion::new(db, env.program(db), elements, unpack_aliases).normalized(db)
+    }
+
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
     ///
