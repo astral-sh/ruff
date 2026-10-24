@@ -249,6 +249,24 @@ def store(numbers: list[int], keep_previous: bool):
     reveal_type(items["numbers"])  # revealed: list[Any]
 ```
 
+A class annotation applies both when the dictionary is initialized and when a key is reassigned. An
+attribute without its own annotation keeps the assigned value's type.
+
+```py
+class Record:
+    fields: dict[str, Any]
+
+    def __init__(self, extra: dict[str, Any]):
+        self.fields = {"count": 1}
+        reveal_type(self.fields["count"])  # revealed: Any
+        self.fields["count"] = 2
+        reveal_type(self.fields["count"])  # revealed: Any
+
+        self.extra = extra
+        self.extra["count"] = 2
+        reveal_type(self.extra["count"])  # revealed: Literal[2]
+```
+
 In an unannotated dictionary, each known key keeps its own inferred type.
 
 ```py
@@ -257,6 +275,95 @@ def notify(nickname):
     options = {"nickname": nickname, "timeout": 30.0}
     reveal_type(options["nickname"])  # revealed: Unknown
     connect(**options)  # no diagnostic
+```
+
+## Declarations at a key write
+
+A key write uses the declaration in effect at that point.
+
+```py
+from typing import Any
+
+items = {"value": 0}
+items["value"] = 1
+reveal_type(items["value"])  # revealed: Literal[1]
+items: dict[str, Any]
+items["value"] = 1
+reveal_type(items["value"])  # revealed: Any
+```
+
+A class body sees the enclosing dictionary until it binds its own `items`.
+
+```py
+class Update:
+    items["value"] = 1
+    reveal_type(items["value"])  # revealed: Any
+    items = {"value": 2}
+    items["value"] = 3
+    reveal_type(items["value"])  # revealed: Literal[3]
+
+items: dict[str, int]
+items["value"] = 2
+reveal_type(items["value"])  # revealed: Literal[2]
+```
+
+A nested function can run after the enclosing variable receives its annotation.
+
+```py
+def make_update():
+    items = {"value": 0}
+
+    def update():
+        items["value"] = 2
+        reveal_type(items["value"])  # revealed: Any
+
+    items: dict[str, Any]
+    return update
+```
+
+A nested function that rebinds a global does not make it local to the enclosing function.
+
+```py
+shared: dict[str, Any] = {}
+
+def update_shared():
+    def reset():
+        global shared
+        shared = {}
+
+    shared["value"] = 2
+    reveal_type(shared["value"])  # revealed: Any
+```
+
+## Gradual value types in nested dictionaries
+
+A nested key keeps its declared type when we replace either its value or the dictionary containing
+it.
+
+```py
+from typing import Any
+
+rows: dict[str, dict[str, Any]] = {"row": {"value": 1}}
+reveal_type(rows["row"]["value"])  # revealed: Any
+rows["row"]["value"] = 2
+reveal_type(rows["row"]["value"])  # revealed: Any
+rows["row"] = {"value": 3}
+reveal_type(rows["row"]["value"])  # revealed: Any
+
+def update_row():
+    rows["row"]["value"] = 4
+    reveal_type(rows["row"]["value"])  # revealed: Any
+```
+
+The dictionary can also occupy a known position in a tuple.
+
+```py
+items: list[tuple[str, dict[str, Any]]] = [("row", {"value": 1})]
+reveal_type(items[0][1]["value"])  # revealed: Any
+items[0][1]["value"] = 2
+reveal_type(items[0][1]["value"])  # revealed: Any
+items[0] = ("row", {"value": 3})
+reveal_type(items[0][1]["value"])  # revealed: Any
 ```
 
 ## Key narrowing through dictionary unpacking

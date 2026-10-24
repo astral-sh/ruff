@@ -259,7 +259,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
-use crate::ast_ids::ScopedUseId;
+use crate::ast_ids::{ExpressionNodeKey, ScopedUseId};
 use crate::definition::{Definition, DefinitionCategory, DefinitionState};
 use crate::frozen::FrozenMap;
 use crate::member::ScopedMemberId;
@@ -686,6 +686,9 @@ impl PredicateNarrowingTargets {
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+
+    /// Declarations of the root names in subscript assignment targets, sorted by expression.
+    subscript_receiver_declarations: ThinVec<(ExpressionNodeKey, InternedDeclarationsId)>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -1226,6 +1229,21 @@ impl<'db> UseDefMap<'db> {
             self.retained_declarations_at_binding(binding),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    /// Declarations reaching `d` in a tracked assignment such as `d["key"] = value`.
+    pub fn subscript_receiver_declarations(
+        &self,
+        receiver: impl Into<ExpressionNodeKey>,
+    ) -> Option<DeclarationsIterator<'_, 'db>> {
+        let entries = &self.extra.as_deref()?.subscript_receiver_declarations;
+        let index = entries
+            .binary_search_by_key(&receiver.into(), |&(expr, _)| expr)
+            .ok()?;
+        Some(self.declarations_iterator(
+            &self.interned_declarations[entries[index].1],
+            BoundnessAnalysis::BasedOnUnboundVisibility,
+        ))
     }
 
     /// Imports that may contribute a `Final` qualifier at this binding.
@@ -2072,6 +2090,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
+    subscript_receiver_declarations: ThinVec<(ExpressionNodeKey, Declarations)>,
+
     /// Live bindings associated with each so-far-recorded use.
     ///
     /// Unlike `bindings_by_use`, this field supports associating multiple bindings with a
@@ -2146,6 +2166,7 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
+            subscript_receiver_declarations: ThinVec::new(),
             multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
@@ -2773,6 +2794,26 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    pub(super) fn record_subscript_receiver_declarations(
+        &mut self,
+        receiver: ExpressionNodeKey,
+        symbol: ScopedSymbolId,
+    ) {
+        let state = self.pending_reachability.materialize_ref_at_use(
+            &mut self.symbol_states[symbol],
+            self.pending_reachability.current,
+            &mut self.reachability_constraints,
+        );
+        let declarations = state.declarations();
+        if declarations.iter().any(|declaration| {
+            declaration.declaration() != ScopedDefinitionId::UNBOUND
+                && !declaration.is_imported_qualifier()
+        }) {
+            self.subscript_receiver_declarations
+                .push((receiver, declarations.clone()));
+        }
+    }
+
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -3191,6 +3232,13 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let bindings_by_use =
             Self::intern_bindings_by_use(self.bindings_by_use, &mut place_state_interner);
+        let mut subscript_receiver_declarations =
+            ThinVec::with_capacity(self.subscript_receiver_declarations.len());
+        for (expr, declarations) in self.subscript_receiver_declarations {
+            subscript_receiver_declarations
+                .push((expr, place_state_interner.intern_declarations(declarations)));
+        }
+        subscript_receiver_declarations.sort_unstable_by_key(|&(expr, _)| expr);
         let if_chain_start_by_use = FrozenMap::from_entries(
             self.if_chain_start_by_use
                 .into_iter()
@@ -3270,6 +3318,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // source order. Sort the recorded IDs so root membership can use binary search.
         boolean_test_roots.sort_unstable();
         let extra = (!bindings_by_use.is_empty()
+            || !subscript_receiver_declarations.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
             || !loop_headers.is_empty()
@@ -3277,6 +3326,7 @@ impl<'db> UseDefMapBuilder<'db> {
         .then(|| {
             Box::new(UseDefMapExtra {
                 bindings_by_use: bindings_by_use.into(),
+                subscript_receiver_declarations,
                 if_chain_start_by_use,
                 multi_bindings_by_use,
                 member_states,

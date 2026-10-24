@@ -2472,7 +2472,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn dict_value_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Self> {
+    fn declared_dict_value_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Self> {
+        if self.resolve_type_alias(db).is_dynamic() {
+            return Some(self);
+        }
         let [_, value] = self
             .known_specialization(db, env, KnownClass::Dict)?
             .types(db)
@@ -2480,6 +2487,27 @@ impl<'db> Type<'db> {
             return None;
         };
         Some(*value)
+    }
+
+    /// Look up the declared element of a built-in collection along a literal subscript path.
+    fn declared_collection_item(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: Self,
+    ) -> Option<Self> {
+        let declared = self.resolve_type_alias(db);
+        match declared
+            .as_nominal_instance()
+            .and_then(|instance| instance.known_class(db))
+        {
+            Some(KnownClass::List | KnownClass::Tuple) if key.as_int_like_literal().is_some() => {
+                declared
+                    .subscript(db, env, key, ast::ExprContext::Load)
+                    .ok()
+            }
+            _ => self.declared_dict_value_type(db, env),
+        }
     }
 
     /// Checks whether the visited type contents contain no dynamic types.
