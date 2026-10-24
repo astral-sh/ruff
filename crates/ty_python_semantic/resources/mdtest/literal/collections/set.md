@@ -22,7 +22,7 @@ def b(_: int) -> int:
     return 1
 
 x = {a, b}
-reveal_type(x)  # revealed: set[(_: int) -> int]
+reveal_type(x)  # revealed: set[FunctionType[(_: int), int]]
 ```
 
 ## Mixed set

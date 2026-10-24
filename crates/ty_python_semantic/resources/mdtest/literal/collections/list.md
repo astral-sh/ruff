@@ -22,10 +22,10 @@ def b(_: int) -> int:
     return 1
 
 x = [a, b]
-reveal_type(x)  # revealed: list[(_: int) -> int]
+reveal_type(x)  # revealed: list[FunctionType[(_: int), int]]
 ```
 
-The inferred `Callable` type is function-like, i.e. we can still access attributes like `__name__`:
+The inferred `FunctionType` preserves function attributes such as `__name__`:
 
 ```py
 reveal_type(x[0].__name__)  # revealed: str
