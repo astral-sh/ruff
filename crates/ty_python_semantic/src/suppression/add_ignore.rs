@@ -172,7 +172,12 @@ pub(crate) struct SuppressFix {
 }
 
 /// Creates a fix to suppress a single lint, unless doing so would edit an executable shebang.
-pub fn suppress_single(db: &dyn Db, file: PythonFile<'_>, id: LintId, range: TextRange) -> Option<Fix> {
+pub fn suppress_single(
+    db: &dyn Db,
+    file: PythonFile<'_>,
+    id: LintId,
+    range: TextRange,
+) -> Option<Fix> {
     let suppressions = suppressions(db, file);
     let source = source_text(db, file.file(db));
     let codes = &[id.name()];

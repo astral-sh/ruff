@@ -90,8 +90,8 @@ mod tests {
     use ty_project::ProjectMetadata;
     use ty_project::metadata::Options;
     use ty_project::metadata::options::AnalysisOptions;
-    use ty_python_core::program::FallibleStrategy;
     use ty_python_core::ProgramFile;
+    use ty_python_core::program::FallibleStrategy;
     use ty_python_semantic::{
         default_lint_registry,
         lint::LintMetadata,
@@ -316,10 +316,9 @@ mod tests {
         3 | # ty: ignore[not-a-rule] tracked by [123]
           |              ^^^^^^^^^^
           |
-          |
         2 | seen_code = True
           - # ty: ignore[not-a-rule] tracked by [123]
-        3 + # ty: ignore[not-a-rule] tracked by [123]  # ty:ignore[ignore-comment-unknown-rule]
+        3 + # ty: ignore[not-a-rule] tracked by [123]  # ty: ignore[ignore-comment-unknown-rule]
         4 | value = 1
           |
         ");
@@ -341,7 +340,6 @@ mod tests {
           |
         3 | # ty: ignore[not-a-rule]
           |              ^^^^^^^^^^
-          |
           |
         2 | seen_code = True
           - # ty: ignore[not-a-rule]
@@ -366,10 +364,9 @@ mod tests {
         2 | value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
           |                                                     ^^^^^^^^^^
           |
-          |
         1 |
           - value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]
-        2 + value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]  # ty:ignore[ignore-comment-unknown-rule]
+        2 + value = missing  # ty: ignore[unresolved-reference, not-a-rule] tracked by [123]  # ty: ignore[ignore-comment-unknown-rule]
           |
         ");
     }
@@ -388,7 +385,6 @@ mod tests {
           |
         2 | items = []  # type: list[int]  # ty: ignore[not-a-rule]
           |                                             ^^^^^^^^^^
-          |
           |
         1 |
           - items = []  # type: list[int]  # ty: ignore[not-a-rule]
@@ -411,7 +407,6 @@ mod tests {
           |
         2 | value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
           |                                                       ^^^^^^^^^^
-          |
           |
         1 |
           - value = "x"  # type: ignore[assignment]  # ty: ignore[not-a-rule]
@@ -436,7 +431,6 @@ mod tests {
           |
         3 | # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
           |              ^^^^^^^^^^
-          |
           |
         2 | seen_code = True
           - # ty: ignore[not-a-rule]  # ty: ignore[unresolved-reference]
@@ -463,7 +457,6 @@ mod tests {
         3 | # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
           |              ^^^
           |
-          |
         2 | seen_code = True
           - # ty: ignore[*-*]  # ty: ignore[unresolved-reference]
         3 + # ty: ignore[*-*]  # ty: ignore[unresolved-reference, invalid-ignore-comment]
@@ -489,10 +482,9 @@ mod tests {
         3 | # ty: ignore[#]
           |              ^
           |
-          |
         2 | seen_code = True
           - # ty: ignore[#]
-        3 + # ty: ignore[#]  # ty:ignore[invalid-ignore-comment]
+        3 + # ty: ignore[#]  # ty: ignore[invalid-ignore-comment]
         4 | value = 1
           |
         ");
@@ -515,10 +507,9 @@ mod tests {
         3 | # ty: ignore[unresolved-reference#]
           |                                  ^
           |
-          |
         2 | seen_code = True
           - # ty: ignore[unresolved-reference#]
-        3 + # ty: ignore[unresolved-reference#]  # ty:ignore[invalid-ignore-comment]
+        3 + # ty: ignore[unresolved-reference#]  # ty: ignore[invalid-ignore-comment]
         4 | value = 1
           |
         ");
@@ -539,7 +530,6 @@ mod tests {
           |
         2 | # ty: ignore[not-a-rule]
           |              ^^^^^^^^^^
-          |
           |
         1 |
           - # ty: ignore[not-a-rule]
@@ -578,7 +568,6 @@ mod tests {
         3 | #! notes # ty: ignore[not-a-rule]
           |                       ^^^^^^^^^^
           |
-          |
         2 | seen_code = True
           - #! notes # ty: ignore[not-a-rule]
         3 + #! notes # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
@@ -600,7 +589,6 @@ mod tests {
           |
         1 | value = 1  # ty: ignore[not-a-rule]
           |                         ^^^^^^^^^^
-          |
           |
           - value = 1  # ty: ignore[not-a-rule]
         1 + value = 1  # ty: ignore[not-a-rule, ignore-comment-unknown-rule]
