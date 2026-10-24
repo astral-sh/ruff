@@ -1568,6 +1568,25 @@ target("a", ["a"])
 forward(target, "a", ["a"])
 ```
 
+### Forwarded arguments with type-variable constraints
+
+A constrained generic callback can receive an argument matching any of its constraints. Capturing
+its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T", str, bytes)
+
+def forward(function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def identity(value: T) -> T:
+    return value
+
+forward(identity, b"text")  # no diagnostic
+```
+
 ### Generic constructors with bounded return types
 
 A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
