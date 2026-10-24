@@ -1431,6 +1431,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().record_use(place_id, use_id);
     }
 
+    fn record_subscript_receiver_declarations(&mut self, subscript: &ast::ExprSubscript) {
+        let mut receiver = subscript.value.as_ref();
+        while let ast::Expr::Subscript(subscript) = receiver {
+            receiver = &subscript.value;
+        }
+        let ast::Expr::Name(name) = receiver else {
+            return;
+        };
+
+        // An eager class body can read an enclosing name before a later annotation changes it.
+        // Keep its declarations at the same point as the enclosing binding snapshot.
+        for (scope, ancestor) in VisibleAncestorsIter::new(&self.scopes, self.current_scope()) {
+            let places = &self.place_tables[scope];
+            if let Some(symbol) = places.symbol_id(&name.id)
+                && places.symbol(symbol).is_declared()
+            {
+                self.use_def_maps[scope]
+                    .record_subscript_receiver_declarations(receiver.into(), symbol);
+            }
+            if !ancestor.is_eager() {
+                break;
+            }
+        }
+    }
+
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
         match self.current_assignment() {
             Some(CurrentAssignment::Assign {
@@ -3496,6 +3521,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         if accessed_object_refers_to_first_parameter {
                             member.mark_instance_attribute();
                         }
+                    }
+
+                    if let ast::Expr::Subscript(subscript) = expr
+                        && *ctx == ast::ExprContext::Store
+                    {
+                        self.record_subscript_receiver_declarations(subscript);
                     }
 
                     let (is_use, is_definition) = match (ctx, self.current_assignment()) {

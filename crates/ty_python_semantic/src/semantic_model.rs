@@ -819,7 +819,7 @@ impl<'db> SemanticModel<'db> {
             );
             while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
                 match source.kind {
-                    PlaceLoadSourceKind::Bindings(bindings) => {
+                    PlaceLoadSourceKind::Bindings(_, bindings) => {
                         let bound = place_from_bindings(
                             self.db,
                             &self.program_environment(),

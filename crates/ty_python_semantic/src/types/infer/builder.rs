@@ -208,12 +208,6 @@ impl<'db> DeclaredAndInferredType<'db> {
     }
 }
 
-fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
-    // Dataclass field specifiers carry metadata in the inferred RHS type; replacing it with the
-    // declared field type would lose settings like `init=False`.
-    matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
-}
-
 /// We currently store one dataclass field-specifiers inline, because that covers standard
 /// dataclasses. attrs uses 2 specifiers, pydantic and strawberry use 3 specifiers. SQLAlchemy
 /// uses 7 field specifiers. We could probably store more inline if this turns out to be a
@@ -1661,15 +1655,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Undefined => None,
         };
 
-        let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
+        let declared_place = if resolved_place.is_undefined() && !place.is_symbol() {
+            self.fallback_member_place(node)
         } else {
-            None
-        }
-        .or_else(|| resolved_place.ignore_possibly_undefined());
+            resolved_place
+        };
 
         AddBinding {
-            declared_ty,
+            declared_place,
             declaration,
             binding,
             node,
@@ -1679,26 +1672,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    /// For a member binding without a live place declaration, obtain its declared type from
-    /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    /// For a member without a live declaration, use ordinary lookup to check the assignment.
+    /// Keep the origin: the type inferred for a subscript can constrain a write without
+    /// declaring the types of any dictionary keys in its value.
+    fn fallback_member_place(&mut self, node: AnyNodeRef<'_>) -> Place<'db> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
             let value_type = self.try_expression_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
-            if let Place::Defined(DefinedPlace {
-                ty,
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) = value_type
+            let member = value_type
                 .member(db, self.program_environment(), attr)
-                .place
-            {
+                .place;
+            if member.is_definitely_bound() {
                 // TODO: also consider qualifiers on the attribute
-                Some(ty)
+                member
             } else {
-                None
+                Place::Undefined
             }
         } else if let AnyNodeRef::ExprSubscript(
             subscript @ ast::ExprSubscript {
@@ -1708,12 +1698,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let value_ty = self.get_or_infer_expression(value, TypeContext::default());
             let slice_ty = self.get_or_infer_expression(slice, TypeContext::default());
-            Some(
+            Place::bound(
                 self.infer_subscript_expression_types(subscript, value_ty, slice_ty, *ctx)
                     .unwrap_or_else(|recovery_ty| recovery_ty),
             )
         } else {
-            None
+            Place::Undefined
         }
     }
 
@@ -1937,24 +1927,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let declared_type = declared_ty.inner_type();
                 if self.validate_assignment_type(node, definition, None, declared_type, inferred_ty)
                 {
-                    // TODO We currently can't distinguish here between "no declared type" and
-                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                    // but use inferred type if there is no declared type.
-                    // Keep the inferred value while a cyclic annotation is unresolved. For
-                    // `str: "str" = ""`, that value lets the next iteration reject the annotation
-                    // instead of leaving both the annotation and the binding divergent.
-                    if !should_preserve_inferred_binding_type(inferred_ty)
-                        && !matches!(
-                            declared_type,
-                            Type::Dynamic(DynamicType::Unknown) | Type::Divergent(_)
-                        )
-                        && declared_type.is_assignable_to(db, env, inferred_ty)
-                    {
-                        (declared_ty, declared_type)
-                    } else {
-                        (declared_ty, inferred_ty)
-                    }
+                    (
+                        declared_ty,
+                        declared_type.narrowed_by_assignment(db, env, inferred_ty),
+                    )
                 } else {
                     self.discard_dict_key_assignments_for(definition);
 
@@ -3530,7 +3506,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
-        add.insert(self, target_ty);
+        add.insert_assignment(self, target_ty, Some(assignment.value(self.module())));
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
@@ -4653,7 +4629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                declared_place: self.fallback_member_place(node),
                 declaration: None,
                 binding: definition,
                 node,
@@ -4669,10 +4645,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or(value_ty)
             } else {
                 // Annotation-only definitions are bindings in stubs.
-                add.declared_ty.unwrap_or(Type::unknown())
+                add.declared_place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::unknown())
             };
             self.store_expression_type(target, target_ty);
-            add.insert(self, target_ty);
+            add.insert_assignment(self, target_ty, value);
 
             return;
         }
@@ -5008,6 +4986,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
+            if Self::can_contain_dict_keys(value)
+                && !self.discards_dict_key_assignments
+                && !declared.inner_type().resolve_type_alias(db).is_dynamic()
+            {
+                self.record_dict_key_bindings(value, declared.inner_type());
+            }
             self.store_expression_type(target, inferred_ty);
         } else {
             if is_pep_613_type_alias {
@@ -5291,9 +5275,188 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
+        let owner = infer_definition_types(self.db(), assignment);
+        let value_ty = owner
+            .types
+            .binding_type(assignment, definition)
+            .unwrap_or_else(|| owner.expression_type(value));
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
+    }
+
+    fn can_contain_dict_keys(value: &ast::Expr) -> bool {
+        matches!(
+            value,
+            ast::Expr::Dict(_) | ast::Expr::List(_) | ast::Expr::Tuple(_)
+        )
+    }
+
+    /// Record a key binding when its declared type changes what we would infer from the
+    /// value alone. The value expression keeps its own type (e.g., `Literal[1]` in a
+    /// `dict[str, Any]`). The semantic index identifies which literal keys have bindings.
+    fn record_dict_key_bindings(&mut self, value: &ast::Expr, declared: Type<'db>) {
+        let db = self.db();
+        let env = self.program_environment();
+        let declared = self.narrow_collection_declaration(value, declared);
+        let elements = match value {
+            ast::Expr::Dict(dict) => {
+                let Some(declared_item) = declared.declared_dict_value_type(db, env) else {
+                    return;
+                };
+                for item in &dict.items {
+                    let Some(key) = &item.key else {
+                        if item.value.is_dict_expr() {
+                            self.record_dict_key_bindings(&item.value, declared);
+                        }
+                        continue;
+                    };
+                    let Some([definition]) = self.index.try_definitions(key.into()) else {
+                        continue;
+                    };
+                    if !matches!(definition.kind(db), DefinitionKind::DictKeyAssignment(_)) {
+                        continue;
+                    }
+                    let assigned = self.expression_type(&item.value);
+                    let bound = declared_item.narrowed_by_assignment(db, env, assigned);
+                    if bound != assigned {
+                        self.bindings.insert(*definition, bound);
+                    }
+                    if Self::can_contain_dict_keys(&item.value) {
+                        self.record_dict_key_bindings(&item.value, declared_item);
+                    }
+                }
+                return;
+            }
+            ast::Expr::List(list) => &list.elts,
+            ast::Expr::Tuple(tuple) => &tuple.elts,
+            _ => return,
+        };
+
+        for (index, element) in (0_i64..).zip(elements.iter().take_while(|e| !e.is_starred_expr()))
+        {
+            if Self::can_contain_dict_keys(element)
+                && let Some(item) =
+                    declared.declared_collection_item(db, env, Type::int_literal(index))
+            {
+                self.record_dict_key_bindings(element, item);
+            }
+        }
+    }
+
+    fn declared_type_at_use(&self, receiver: &ast::Expr) -> Option<Type<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+        let declared = match receiver {
+            ast::Expr::Name(name) => self.declared_name_type_at_use(name),
+            ast::Expr::Attribute(attr) => self
+                .try_expression_type(&attr.value)?
+                .member(db, env, &attr.attr.id)
+                .place
+                .definite_declared_type(),
+            ast::Expr::Subscript(subscript) => self.declared_item_at_subscript(subscript),
+            _ => return None,
+        }?;
+        let declared = self.narrow_collection_declaration(receiver, declared);
+        // Any can describe a dictionary's items, but it doesn't declare the root as a dictionary.
+        (receiver.is_subscript_expr() || !declared.resolve_type_alias(db).is_dynamic())
+            .then_some(declared)
+    }
+
+    /// For a declaration like `dict[str, Any] | None`, use the arm that can contain this value.
+    fn narrow_collection_declaration(
+        &self,
+        receiver: &ast::Expr,
+        declared: Type<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let env = self.program_environment();
+        declared.filter_union(db, env, |arm| {
+            !arm.is_disjoint_from(db, env, self.expression_type(receiver))
+        })
+    }
+
+    /// A bare annotation can change a name's declaration without creating a new binding.
+    /// Use the declarations visible in the scope that supplies the receiver of this write.
+    fn declared_name_type_at_use(&self, name: &ast::ExprName) -> Option<Type<'db>> {
+        let db = self.db();
+        let expression = ast::ExprRef::Name(name);
+        let scope = self.index.try_expression_scope_id(&expression)?;
+        let places = self.index.place_table(scope);
+        let symbol_id = places.symbol_id(&name.id)?;
+        let declared_in = |owner, symbol| {
+            let use_def = self.index.use_def_map(owner);
+            let declarations = if owner == scope
+                || self
+                    .index
+                    .ancestor_scopes(scope)
+                    .take_while(|(ancestor, _)| *ancestor != owner)
+                    .all(|(_, ancestor)| ancestor.is_eager())
+            {
+                use_def.subscript_receiver_declarations(expression)?
+            } else {
+                // The store can run after a later declaration in its enclosing scope.
+                use_def.reachable_symbol_declarations(symbol)
+            };
+            place_from_declarations_with_reachability_cache(
+                db,
+                self.program_environment(),
+                declarations,
+                self.reachability_cache(),
+            )
+            .ignore_conflicting_declarations()
+            .place
+            .definite_declared_type()
+        };
+        if scope.is_global()
+            || (places.symbol(symbol_id).is_local() && !self.index.scope(scope).kind().is_class())
+        {
+            return declared_in(scope, symbol_id);
+        }
+        self.index.try_expression_use_id(expression)?;
+        let mut resolution = resolve_place_load(
+            db,
+            self.index,
+            scope.to_scope_id(db, self.program_file()),
+            PlaceExpr::from_expr_name(name),
+            PlaceLoadMode::AtExpression(expression),
+        );
+        while let Some(PlaceLoadResolutionStep::Source(source)) = resolution.next() {
+            if source.is_post_lexical() {
+                break;
+            }
+            let owner = match source.kind {
+                PlaceLoadSourceKind::Bindings(scope, _) => Some(scope),
+                _ => None,
+            };
+            let place = self
+                .infer_place_load_source(resolution.place_expr(), source, &[])
+                .place;
+            if place.is_undefined() {
+                continue;
+            }
+            let Some(owner) = owner else {
+                return place.definite_declared_type();
+            };
+            let table = self.index.place_table(owner);
+            let id = table.symbol_id(&name.id)?;
+            let symbol = table.symbol(id);
+            let (owner, id) = if owner.is_global() || symbol.is_local() {
+                (owner, id)
+            } else if symbol.is_global() || symbol.is_nonlocal() {
+                self.forwarded_assignment_owner(owner, id)?
+            } else {
+                // A nested function can rebind this name without declaring it in this scope.
+                continue;
+            };
+            return declared_in(owner, id);
+        }
+        None
+    }
+
+    fn declared_item_at_subscript(&self, subscript: &ast::ExprSubscript) -> Option<Type<'db>> {
+        let declared = self.declared_type_at_use(&subscript.value)?;
+        let key = self.try_expression_type(&subscript.slice)?;
+        declared.declared_collection_item(self.db(), self.program_environment(), key)
     }
 
     fn infer_type_alias_statement(&mut self, node: &ast::StmtTypeAlias) {
@@ -10818,7 +10981,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let is_class_body_global_fallback = source.is_class_body_global_fallback();
 
         let place = match source.kind {
-            PlaceLoadSourceKind::Bindings(bindings) => {
+            PlaceLoadSourceKind::Bindings(_, bindings) => {
                 let mut place = place_from_bindings_with_reachability_cache(
                     db,
                     env,
@@ -13402,7 +13565,7 @@ impl<V> IntoIterator for VecSet<V> {
 
 #[must_use]
 struct AddBinding<'db, 'ast> {
-    declared_ty: Option<Type<'db>>,
+    declared_place: Place<'db>,
     declaration: Option<Definition<'db>>,
     binding: Definition<'db>,
     node: AnyNodeRef<'ast>,
@@ -13414,7 +13577,7 @@ struct AddBinding<'db, 'ast> {
 
 impl<'db, 'ast> AddBinding<'db, 'ast> {
     fn type_context(&self) -> TypeContext<'db> {
-        TypeContext::declared(self.declared_ty)
+        TypeContext::declared(self.declared_place.ignore_possibly_undefined())
     }
 
     fn insert(
@@ -13422,10 +13585,24 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder: &mut TypeInferenceBuilder<'db, 'ast>,
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
+        self.insert_assignment(builder, inferred_ty, None)
+    }
+
+    fn insert_assignment(
+        self,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        inferred_ty: Type<'db>,
+        value: Option<&ast::Expr>,
+    ) -> Type<'db> {
         let env = builder.program_environment();
-        let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
+        let declared_ty = self
+            .declared_place
+            .ignore_possibly_undefined()
+            .unwrap_or(Type::unknown());
 
         let db = builder.db();
+        let value = value.filter(|value| TypeInferenceBuilder::can_contain_dict_keys(value));
+        let mut literal_target_type = None;
         let file_scope_id = self.binding.file_scope(db);
         let use_def = builder.index.use_def_map(file_scope_id);
         let place_table = builder.index.place_table(file_scope_id);
@@ -13540,17 +13717,36 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
             }
-        } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
-            let value_ty = builder
-                .try_expression_type(value)
-                .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
+        } else if let AnyNodeRef::ExprSubscript(subscript) = self.node {
+            let value_ty =
+                builder.get_or_infer_expression(&subscript.value, TypeContext::default());
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, env, value_ty) {
                 builder.discard_dict_key_assignments_for(self.binding);
                 bound_ty = declared_ty;
+            } else if let Some(class @ (KnownClass::Dict | KnownClass::List)) = value_ty
+                .as_nominal_instance()
+                .and_then(|instance| instance.known_class(db))
+                && (class == KnownClass::Dict || value.is_some())
+                && let Some(item) = builder.declared_item_at_subscript(subscript)
+            {
+                literal_target_type = Some(item);
+                if class == KnownClass::Dict {
+                    bound_ty = item.narrowed_by_assignment(db, env, bound_ty);
+                }
             }
         }
 
+        if !builder.discards_dict_key_assignments
+            && let Some(value) = value
+            && let Some(declared) = literal_target_type.or_else(|| {
+                self.declared_place
+                    .definite_declared_type()
+                    .filter(|ty| !ty.resolve_type_alias(db).is_dynamic())
+            })
+        {
+            builder.record_dict_key_bindings(value, declared);
+        }
         builder.bindings.insert(self.binding, bound_ty);
 
         inferred_ty
