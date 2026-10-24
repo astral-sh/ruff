@@ -52,6 +52,49 @@ mod tests {
         Ok(())
     }
 
+    #[test_case("import os as alias\nalias.path.join('a', 'b')", "os.path.join", 1; "module_alias")]
+    #[test_case("from os import path as alias\nalias.join('a', 'b')", "os.path.join", 1; "member_alias")]
+    #[test_case("import os\nos.path.join('a', 'b')", "os.path.joi", 0; "exact_member")]
+    #[test_case("import os\nos.path.join('a', 'b')", "other.path.join", 0; "unrelated_module")]
+    #[test_case("dict.fromkeys([])", ".dict.fromkeys", 1; "builtin_attribute")]
+    #[test_case("dict.fromkeys([])", "dict.fromkeys", 0; "builtin_is_not_module")]
+    #[test_case("import builtins\nbuiltins.dict.fromkeys([])", "builtins.dict.fromkeys", 1; "explicit_builtin")]
+    #[test_case("import builtins\nbuiltins.dict.fromkeys([])", ".dict.fromkeys", 0; "explicit_builtin_is_not_implicit")]
+    #[test_case("from . import sibling\nsibling.member()", "..sibling.member", 0; "unresolved_relative_import")]
+    #[test_case("import os\ndef f(os):\n    os.path.join('a', 'b')", "os.path.join", 0; "shadowed_import")]
+    #[test_case("import δοκιμή\nδοκιμή.μέλος()", "δοκιμή.μέλος", 1; "unicode_name")]
+    #[test_case("import a\na.b.c.d.e.f.g.h.i.j.k()", "a.b.c.d.e.f.g.h.i.j.k", 1; "long_name")]
+    fn banned_attribute_access(source: &str, banned_name: &str, expected_count: usize) {
+        let (diagnostics, _) = test_contents(
+            &SourceKind::Python {
+                code: source.to_string(),
+                is_stub: false,
+            },
+            Path::new("flake8_tidy_imports/TID251.py"),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    banned_api: FxHashMap::from_iter([(
+                        banned_name.to_string(),
+                        ApiBan {
+                            msg: "Use an alternative.".to_string(),
+                        },
+                    )]),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(Rule::BannedApi)
+            },
+        );
+
+        let messages: Vec<_> = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.headline_message())
+            .collect();
+        assert_eq!(
+            messages,
+            vec![format!("`{banned_name}` is banned: Use an alternative."); expected_count]
+        );
+    }
+
     #[test]
     fn banned_api_package() -> Result<()> {
         let diagnostics = test_path(
