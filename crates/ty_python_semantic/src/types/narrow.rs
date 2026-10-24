@@ -20,11 +20,11 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     Parameter, Parameters, Signature, SpecialFormType, StringLiteralType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder,
-    binding_type, class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult,
+    UnionBuilder, binding_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1364,7 +1364,9 @@ impl<'db> NarrowingConstraint<'db> {
         {
             return Self(NarrowingConstraintKind::Single(kind, *operation));
         }
-        Self(NarrowingConstraintKind::Combined(Box::new([ConstraintDisjunct { kind, conjunction }])))
+        Self(NarrowingConstraintKind::Combined(Box::new([
+            ConstraintDisjunct { kind, conjunction },
+        ])))
     }
 
     fn from_disjuncts(mut disjuncts: SmallVec<[ConstraintDisjunct<'db>; 1]>) -> Self {
@@ -1374,7 +1376,9 @@ impl<'db> NarrowingConstraint<'db> {
                 let disjunct = disjuncts.pop().unwrap();
                 Self::singleton(disjunct.kind, disjunct.conjunction)
             }
-            _ => Self(NarrowingConstraintKind::Combined(disjuncts.into_vec().into_boxed_slice())),
+            _ => Self(NarrowingConstraintKind::Combined(
+                disjuncts.into_vec().into_boxed_slice(),
+            )),
         }
     }
 
@@ -1390,17 +1394,24 @@ impl<'db> NarrowingConstraint<'db> {
             NarrowingConstraintKind::Combined(disjuncts) => disjuncts.as_ref(),
             _ => &[],
         };
-        single.into_iter().map(Cow::Owned).chain(combined.iter().map(Cow::Borrowed))
+        single
+            .into_iter()
+            .map(Cow::Owned)
+            .chain(combined.iter().map(Cow::Borrowed))
     }
 
     fn into_disjuncts(self) -> SmallVec<[ConstraintDisjunct<'db>; 1]> {
         match self.0 {
             NarrowingConstraintKind::Empty => smallvec![],
-            NarrowingConstraintKind::Single(kind, operation) => smallvec_inline![ConstraintDisjunct {
-                kind,
-                conjunction: ConstraintConjunction::from_operation(operation),
-            }],
-            NarrowingConstraintKind::Combined(disjuncts) => SmallVec::from_vec(disjuncts.into_vec()),
+            NarrowingConstraintKind::Single(kind, operation) => {
+                smallvec_inline![ConstraintDisjunct {
+                    kind,
+                    conjunction: ConstraintConjunction::from_operation(operation),
+                }]
+            }
+            NarrowingConstraintKind::Combined(disjuncts) => {
+                SmallVec::from_vec(disjuncts.into_vec())
+            }
         }
     }
 
