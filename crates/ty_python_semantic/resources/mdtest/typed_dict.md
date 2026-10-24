@@ -3098,7 +3098,7 @@ def invalid_default(mapping: OptionalValue) -> None:
 ```
 
 For a required field, the default cannot contribute to the result. This also holds when the field
-type is an explicit type alias:
+type is a PEP 695 alias:
 
 ```py
 type ValueAlias = Value
@@ -5783,6 +5783,9 @@ from typing_extensions import TypedDict
 # error: [unknown-argument] "Argument `year` does not match any known parameter of function `TypedDict`"
 # error: [missing-argument] "No argument provided for required parameter `fields` of function `TypedDict`"
 Movie2 = TypedDict("Movie2", name=str, year=int)
+
+# The invalid declaration does not cause another diagnostic when used as an annotation.
+def use(value: Movie2): ...  # no diagnostic
 ```
 
 ## Function syntax with invalid arguments

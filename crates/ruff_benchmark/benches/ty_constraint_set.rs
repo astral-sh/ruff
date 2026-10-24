@@ -140,6 +140,41 @@ fn benchmark_constraint_quantification(criterion: &mut Criterion) {
     }
 }
 
+/// Compare bottom sources and top targets against distinct signatures.
+fn benchmark_bottom_and_top_signature_comparisons(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for name in ["bottom", "top"] {
+        let mut code = String::from(
+            "\
+from typing import Any, Callable, Literal
+from ty_extensions import Bottom, Top
+",
+        );
+        for i in 0..128 {
+            let signature = format!("Callable[[Literal[{i}], str, bytes], int]");
+            let (source, target) = if name == "bottom" {
+                ("Bottom[Callable[..., Any]]", signature.as_str())
+            } else {
+                (signature.as_str(), "Top[Callable[..., object]]")
+            };
+            writeln!(
+                &mut code,
+                "\ndef check_{i}(source: {source}) -> None:\n    target: {target} = source"
+            )
+            .ok();
+        }
+
+        criterion.bench_function(&format!("ty_micro[{name}_signature_comparisons]"), |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |Case { db }| assert_eq!(db.check().len(), 0),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Benchmarks solving many union-bearing upper bounds while inferring a generic call.
 ///
 /// Each callable argument places a distinct union upper bound on `T` through callable-parameter
@@ -719,6 +754,7 @@ criterion_group!(
     benchmark_typevar_mapping_large_accumulation,
     benchmark_typevar_mapping_small_accumulations,
     benchmark_constraint_quantification,
+    benchmark_bottom_and_top_signature_comparisons,
     benchmark_factored_upper_bounds,
     benchmark_many_upper_bound_callbacks,
     benchmark_pandas_tdd,

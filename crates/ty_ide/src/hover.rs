@@ -507,8 +507,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
-        Severity, Span,
+        Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, LintName, Severity, Span,
     };
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextRange};
@@ -7451,10 +7450,7 @@ type U<CURSOR> = MyType
             )
             .unwrap();
 
-            let config = DisplayDiagnosticConfig::new("ty")
-                .color(false)
-                .context(0)
-                .format(DiagnosticFormat::Full);
+            let config = DisplayDiagnosticConfig::new("ty").color(false).context(0);
 
             let mut diagnostic = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("hover")),

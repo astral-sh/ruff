@@ -17,6 +17,14 @@
     {
       "caller": "ruff",
       "environment": "automations",
+      "caller_workflow": "ai-policy.yml",
+      "on": ["workflow_dispatch"],
+      "permissions": { "issues": "write", "pull_requests": "write" },
+      "target": "ruff"
+    },
+    {
+      "caller": "ruff",
+      "environment": "automations",
       "caller_ref": "refs/heads/main",
       "caller_workflow": "pull-request-reviewers.yml",
       "on": ["workflow_dispatch"],

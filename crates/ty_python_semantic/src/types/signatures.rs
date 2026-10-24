@@ -1058,6 +1058,22 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::bottom(), Type::Never)
     }
 
+    /// Returns whether this is the bottom signature, which is assignable to all other signatures.
+    /// (It accepts all parameter lists, and returns `Never`.)
+    fn is_bottom(&self) -> bool {
+        self.return_ty.is_never()
+            && self.parameters.is_bottom()
+            && self.receiver_constraints().is_none()
+    }
+
+    /// Returns whether this is the top signature, which is assignable from all other signatures.
+    /// (It permits no calls, and has return type `object`.)
+    fn is_top(&self) -> bool {
+        self.return_ty.is_object()
+            && self.parameters.is_top()
+            && self.receiver_constraints().is_none()
+    }
+
     /// Returns `true` if `Self` should be hidden from the generic context display.
     ///
     /// `Self` is hidden if it does not appear in:
@@ -2733,6 +2749,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let may_contain_typevars = |signature: &Signature<'db>| {
+            signature.generic_context.is_some()
+                || signature
+                    .receiver_constraints()
+                    .is_some_and(|constraints| constraints.assignability.is_nontrivial())
+                || std::iter::once(signature.return_ty)
+                    .chain(signature.parameters.iter().map(Parameter::annotated_type))
+                    .any(|ty| {
+                        // Aliases and recursive types can hide typevars. Avoid expanding them just
+                        // to decide whether to take a fast path.
+                        any_over_type(db, self.env, ty, false, |ty| {
+                            matches!(
+                                ty,
+                                Type::TypeVar(_) | Type::TypeAlias(_) | Type::Recursive(_)
+                            )
+                        })
+                    })
+        };
+
+        // Fast path: If the source is the bottom signature or the target is the top signature,
+        // assignability holds no matter what, and we can return without spending the time matching
+        // parameter lists. However, the opposite signature's typevars still need inference
+        // bounds: even `Never ≤ T` or `T ≤ object` can determine an inferred type.
+        if (source.is_bottom() && !may_contain_typevars(target))
+            || (target.is_top() && !may_contain_typevars(source))
+        {
+            return self.always();
+        }
+
         let env = self.env;
         // In lazy comparisons, a captured parameter list refers to typevars owned by the
         // surrounding call inference. Preserve constraints on those variables instead of
@@ -2794,9 +2839,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             checker.typevar_evaluation = TypeVarEvaluation::Lazy;
         }
         let when = checker.with_signature_recursion_guard(source, target, || {
+            // A target that permits no calls imposes no receiver requirements. Still compare
+            // return types so that their constraints contribute to inference.
+            if target.parameters.is_top() {
+                return checker.check_signature_pair_inner(db, source, target);
+            }
+
             source
                 .receiver_constraints_when_satisfied(db, &checker)
                 .and(db, self.constraints, || {
+                    // Once its receiver is eligible, a source accepting every argument list
+                    // accepts every call permitted by the target, regardless of the target's
+                    // receiver restriction. Parameter and return types still contribute
+                    // inference bounds.
+                    if source.parameters.is_bottom() {
+                        return checker.check_signature_pair_inner(db, source, target);
+                    }
+
                     target
                         .receiver_constraints_when_satisfied(db, &checker)
                         .and(db, self.constraints, || {
