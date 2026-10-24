@@ -442,9 +442,10 @@ impl<'a> ImplementationsFinder<'a> {
             let ty = binding_type(db, *definition);
 
             let root = match ty {
-                Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_) => {
-                    extract_class_literal(db, env, ty)
-                }
+                Type::ClassLiteral(_)
+                | Type::SubclassOf(_)
+                | Type::SpecializedClass(_)
+                | Type::GenericAlias(_) => extract_class_literal(db, env, ty),
                 _ => None,
             };
 
@@ -773,11 +774,12 @@ fn collect_implementation_root_classes<'db>(
         ty => {
             // `dog: Dog` maps directly to the `Dog` class root.
             let root = match ty {
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                Type::ClassLiteral(_) | Type::SpecializedClass(_) | Type::SubclassOf(_) => {
                     extract_class_literal(db, env, ty)
                 }
                 Type::NominalInstance(_)
                 | Type::ProtocolInstance(_)
+                | Type::GenericAlias(_)
                 | Type::KnownInstance(_)
                 | Type::LiteralValue(_)
                 | Type::TypedDict(_)
@@ -2059,7 +2061,9 @@ fn extract_class_literal<'db>(
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
-        Type::GenericAlias(generic_alias) => Some(ClassLiteral::Static(generic_alias.origin(db))),
+        Type::SpecializedClass(generic_alias) | Type::GenericAlias(generic_alias) => {
+            Some(ClassLiteral::Static(generic_alias.origin(db)))
+        }
         Type::NominalInstance(instance) => Some(instance.class(db, env).class_literal(db)),
         Type::Union(union) => union
             .elements(db)

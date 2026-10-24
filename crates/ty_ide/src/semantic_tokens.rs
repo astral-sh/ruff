@@ -489,7 +489,7 @@ impl<'db> SemanticTokenVisitor<'db> {
 
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
-                        || value_ty.is_generic_alias()
+                        || value_ty.is_specialized_class_or_alias()
                     {
                         return Some((SemanticTokenType::Class, modifiers));
                     }
@@ -573,6 +573,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         // highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
         match ty {
             Type::ClassLiteral(_)
+            | Type::SpecializedClass(_)
             | Type::GenericAlias(_)
             | Type::SubclassOf(_)
             | Type::NominalInstance(_)
@@ -3216,6 +3217,30 @@ marker = TypeAlias
         "OldAlias" @ 99..107: Class
         "marker" @ 115..121: Variable [definition]
         "TypeAlias" @ 124..133: Variable
+        "#);
+    }
+
+    #[test]
+    fn class_attribute_type_alias() {
+        let test = SemanticTokenTest::new(
+            r#"
+class Holder:
+    Alias = list[int]
+
+x: Holder.Alias
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "Holder" @ 7..13: Class [definition]
+        "Alias" @ 19..24: Class [definition]
+        "list" @ 27..31: Class
+        "int" @ 32..35: Class
+        "x" @ 38..39: Variable [definition]
+        "Holder" @ 41..47: Class
+        "Alias" @ 48..53: Class
         "#);
     }
 

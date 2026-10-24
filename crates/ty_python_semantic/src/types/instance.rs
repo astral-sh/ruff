@@ -76,7 +76,9 @@ impl<'db> Type<'db> {
             // Functional TypedDicts return a TypedDict instance type.
             ClassLiteral::DynamicTypedDict(_) => Type::typed_dict(class),
             ClassLiteral::Static(class_literal) => {
-                let specialization = class.into_generic_alias().map(|g| g.specialization(db));
+                let specialization = class
+                    .into_class_specialization()
+                    .map(|g| g.specialization(db));
                 match class_literal.known(db) {
                     Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
                         db,
@@ -318,7 +320,7 @@ impl<'db> NominalInstanceType<'db> {
                     .find_map(|class| match class.known(db)? {
                         KnownClass::Tuple => Some(
                             class
-                                .into_generic_alias()
+                                .into_class_specialization()
                                 .and_then(|alias| {
                                     Some(Cow::Borrowed(alias.specialization(db).tuple(db)?))
                                 })
@@ -642,10 +644,10 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
             }
         }
 
-        fn visit_generic_alias_type(
+        fn visit_class_specialization(
             &self,
             db: &'db dyn Db,
-            alias: crate::types::GenericAlias<'db>,
+            alias: crate::types::ClassSpecialization<'db>,
         ) {
             let specialization = alias.specialization(db);
             if specialization.materialization_kind(db).is_some() {
@@ -700,7 +702,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                 Type::Never
                 | Type::Callable(_)
                 | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
+                | Type::SpecializedClass(_)
                 | Type::NominalInstance(_)
                 | Type::Union(_)
                 | Type::Intersection(_)
@@ -812,7 +814,9 @@ fn specialization_argument_is_static<'db>(
         | Type::Union(_)
         | Type::Intersection(_)
         | Type::LiteralValue(_) => false,
-        Type::GenericAlias(alias) => alias.specialization(db).materialization_kind(db).is_some(),
+        Type::SpecializedClass(alias) => {
+            alias.specialization(db).materialization_kind(db).is_some()
+        }
         Type::TypeVar(variable) => {
             class_context.is_none_or(|context| !context.contains(db, variable.identity(db)))
         }
@@ -1090,7 +1094,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let env = self.env;
         let source = ty.as_nominal_instance()?;
         let source_class = source.class(db, env);
-        let source_alias = source_class.into_generic_alias()?;
+        let source_alias = source_class.into_class_specialization()?;
 
         let source_arguments = source_alias.specialization(db).types(db);
         // Nested variables, such as `T` in `Concrete[T | Iterable[T]]`, can also be
@@ -1352,7 +1356,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// instance attributes and properties are intentionally not required on the class object.
     ///
     /// `meta_ty` must be a class-object type represented by `ClassLiteral`, `SubclassOf`, or
-    /// `GenericAlias`. Other types are not necessarily subtypes of `type` or callable, and could
+    /// `SpecializedClass`. Other types are not necessarily subtypes of `type` or callable, and could
     /// therefore incorrectly satisfy this check through an `Unknown` constructor return type.
     pub(super) fn check_meta_type_satisfies_protocol(
         &self,
@@ -1363,7 +1367,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let env = self.env;
         debug_assert_matches!(
             meta_ty,
-            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::GenericAlias(_)
+            Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::SpecializedClass(_)
         );
 
         let constructed_ty = meta_ty.instance_type_for_meta_protocol(db, env);

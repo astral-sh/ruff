@@ -4147,6 +4147,63 @@ def wrapped_returns(mapping: V | Invariant[V] | Covariant[V]) -> None:
     reveal_type(make_sink(lambda: mapping))  # revealed: (Invariant[V@wrapped_returns] | V@wrapped_returns, /) -> None
 ```
 
+### Inferred class-object return alternatives
+
+Class-object returns preserve invariant type arguments. A callback returning `Box` can satisfy both
+signatures below, so inference retains a union and the code after the call remains reachable:
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Box(Generic[T]):
+    value: T
+
+def make_box() -> type[Box[T]]:
+    return Box
+
+def invoke(callback: Callable[[], R]) -> R:
+    return callback()
+
+def check(
+    callback: Intersection[Callable[[], type[Box[int]]], Callable[[], type[Box[str]]]] = make_box,
+) -> None:
+    reveal_type(invoke(callback))  # revealed: type[Box[int] | Box[str]]
+    bad: str = 1  # error: [invalid-assignment]
+```
+
+### Inferred final class-object return alternatives
+
+The same rule applies to final generic classes, whose specialized class types identify an exact
+class object:
+
+```py
+from typing import Callable, Generic, TypeVar, final
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+@final
+class Box(Generic[T]):
+    value: T
+
+def make_box() -> type[Box[T]]:
+    return Box
+
+def invoke(callback: Callable[[], R]) -> R:
+    return callback()
+
+def check(
+    callback: Intersection[Callable[[], type[Box[int]]], Callable[[], type[Box[str]]]] = make_box,
+) -> None:
+    reveal_type(invoke(callback))  # revealed: <class 'Box[int]'> | <class 'Box[str]'>
+    bad: str = 1  # error: [invalid-assignment]
+```
+
 ### Inferred TypedDict return alternatives
 
 Writable `TypedDict` fields are invariant even when the dictionaries have no type parameters. A
