@@ -133,7 +133,7 @@ impl<'db> BoundSuperError<'db> {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     let env = context.program_environment();
                     match pivot_class {
-                        Type::SpecializedClass(alias) | Type::GenericAlias(alias) => {
+                        Type::GenericAlias(alias) => {
                             builder.into_diagnostic(format_args!(
                                 "`types.GenericAlias` instance `{}` is not a valid class",
                                 alias.display_with(db, env, DisplaySettings::default(),),
@@ -572,6 +572,7 @@ impl<'db> BoundSuperType<'db> {
         //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
         let pivot_class = match pivot_class_type {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
+            Type::SpecializedClass(alias) => ClassBase::Class(ClassType::Generic(alias)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
                 _ => match subclass_of.subclass_of().into_class(db, env) {
@@ -836,6 +837,9 @@ impl<'db> BoundSuperType<'db> {
             Type::KnownInstance(instance) => {
                 return delegate_to(instance.instance_fallback(db, env));
             }
+            Type::GenericAlias(_) => {
+                return delegate_to(KnownClass::GenericAlias.to_instance(db, env));
+            }
             Type::FunctionLiteral(_) | Type::DataclassDecorator(_) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db, env));
             }
@@ -851,8 +855,16 @@ impl<'db> BoundSuperType<'db> {
             Type::ModuleLiteral(_) => {
                 return delegate_to(KnownClass::ModuleType.to_instance(db, env));
             }
-            Type::SpecializedClass(_) | Type::GenericAlias(_) => {
-                return delegate_to(KnownClass::GenericAlias.to_instance(db, env));
+            Type::SpecializedClass(alias) => {
+                SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
+                    db,
+                    pivot_class,
+                    pivot_class_type,
+                    owner_type,
+                    owner_type,
+                    ClassType::Generic(alias),
+                    None,
+                )?)
             }
             Type::PropertyInstance(property) => {
                 return delegate_to(property.instance_fallback(db, env));
