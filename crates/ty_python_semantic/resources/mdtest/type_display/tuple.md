@@ -31,5 +31,6 @@ def chain(n: int):
     f = (n, e)
     g = (n, f)
     h = (n, g)
-    reveal_type(h)  # revealed: tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, int]]]]]]]]
+    # revealed: tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, tuple[int, int]]]]]]]]
+    reveal_type(h)
 ```
