@@ -430,28 +430,18 @@ jobs:
           checksum: "f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f"
           enable-cache: "true"
           cache-python: true
-      - name: ty mdtests (GitHub annotations)
-        if: ${{ needs.determine_changes.outputs.ty == 'true' }}
-        env:
-          NO_COLOR: 1
-          MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
-        # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
-        # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
-        run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        env:
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
+          NEXTEST_PROFILE: ci-annotations
       - name: "Run doctests"
         run: cargo test --doc --all-features
       # A workspace build enables stacker through the CLI crates' dependencies.
       - name: "Check parser without stacker"
         run: cargo check --locked -p ruff_python_parser --no-default-features --all-targets
-      # On a PR, the annotation mdtests step above can install a Python version
-      # that uv can reuse for py-fuzzer. When the annotation step is skipped (as
-      # on pushes to `main`), uv may select a newer Python for the step below, for
-      # which py-fuzzer's locked dependencies may not have wheels. With source
-      # builds of those dependencies disabled, installation fails. We therefore set
-      # `--python` explicitly to use the version in `PYTHON_VERSION`, even if it
-      # differs from one used by the annotation mdtests.
+      # Use the pinned Python version so py-fuzzer's locked dependencies have
+      # wheels available; source builds are disabled.
       - name: Dogfood ty on py-fuzzer
         run: uv run --quiet --python="${PYTHON_VERSION}" --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark

@@ -22,3 +22,11 @@ slow-timeout =  { period = "1s", terminate-after = 60 }
 
 # Show slow jobs in the final summary
 final-status-level = "slow"
+
+[profile.ci-annotations]
+inherits = "ci"
+
+[[profile.ci-annotations.overrides]]
+filter = 'binary(mdtest)'
+# Emit each GitHub annotation once.
+failure-output = "immediate"
