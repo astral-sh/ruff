@@ -740,13 +740,19 @@ jobs:
           mkdir -p "$(dirname "$probe_log")"
           set +e
           uv run --locked --only-dev cargo insta test --all-features --unreferenced reject \
-            --test-runner nextest --disable-nextest-doctest -- -E 'test(annotation_probe.md)' \
+            --test-runner nextest --disable-nextest-doctest -- annotation_probe.md \
             2>&1 | tee "$probe_log"
           result=${PIPESTATUS[0]}
           set -e
           test "$result" -ne 0
-          rg '1 test run: 0 passed, 1 failed' "$probe_log"
-          rg 'To rerun this specific test' "$probe_log"
+          uv run --no-project python - "$probe_log" <<'PYTHON'
+          from pathlib import Path
+          import re
+          import sys
+          output = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", Path(sys.argv[1]).read_text())
+          assert "1 test run: 0 passed, 1 failed" in output
+          assert "To rerun this specific test" in output
+          PYTHON
     permissions:
       contents: read
     defaults:
