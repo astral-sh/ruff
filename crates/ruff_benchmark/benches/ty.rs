@@ -1444,6 +1444,48 @@ fn benchmark_typed_dict_get_large_literal_union(criterion: &mut Criterion) {
     );
 }
 
+fn benchmark_union_construction(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 256;
+
+    let mut construction = String::new();
+    let mut type_form =
+        String::from("from typing_extensions import TypeForm\nclass CommonBase: ...\n");
+    for index in 0..NUM_CLASSES {
+        writeln!(construction, "class C{index}[T]: ...").ok();
+        writeln!(type_form, "class C{index}[T](CommonBase): ...").ok();
+    }
+    let members = (0..NUM_CLASSES)
+        .map(|index| format!("C{index}[int]"))
+        .join(" | ");
+
+    // The unused alias measures the cost of building a runtime union in a single expression.
+    // Nothing asks for the type it denotes, so the union can stay unnormalized.
+    writeln!(construction, "Alias = {members}").ok();
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_construction_256]",
+        &construction,
+    );
+
+    // Storing the union in an unannotated tuple makes ty infer it in a value context. The later
+    // assignment forces ty to normalize the stored union to check it against `TypeForm[CommonBase]`.
+    writeln!(type_form, "stored = ({members},)").ok();
+    type_form.push_str("checked: tuple[TypeForm[CommonBase], ...] = stored\n");
+    benchmark_micro_case(
+        criterion,
+        "ty_micro[generic_union_type_form_256]",
+        &type_form,
+    );
+
+    // Each assignment extends a previously inferred union by one literal. The final union is unused,
+    // but rescanning the growing prefix at each assignment would still make construction quadratic.
+    let mut split = String::from("from typing import Literal\nU1 = Literal[0] | Literal[1]\n");
+    for i in 2..=1024 {
+        writeln!(split, "U{i} = U{} | Literal[{i}]", i - 1).ok();
+    }
+    benchmark_micro_case(criterion, "ty_micro[split_literal_union_1024]", &split);
+}
+
 /// Benchmark for narrowing a large union type through multiple match statements.
 ///
 /// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
@@ -2617,6 +2659,7 @@ criterion_group!(
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
+    benchmark_union_construction,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_literal_match_fallthrough,
