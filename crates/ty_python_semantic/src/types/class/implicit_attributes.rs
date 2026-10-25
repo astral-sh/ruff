@@ -190,8 +190,8 @@ impl<'db> StaticClassLiteral<'db> {
 
                 let annotation = if assignment.value(&module).is_some() {
                     let annotation = infer_receiver_annotation(db, declaration);
-                    // A PEP 613 declaration denotes its right-hand side, even when its
-                    // `TypeAlias` marker is imported under another name.
+                    // Recover the assigned value for an invalid `self.x: TypeAlias = ...`,
+                    // even when the marker is imported under another name.
                     if annotation.is_some_and(|ty| ty.inner_type().is_typealias_special_form()) {
                         inferred_declaration(db, declaration).declared()
                     } else {

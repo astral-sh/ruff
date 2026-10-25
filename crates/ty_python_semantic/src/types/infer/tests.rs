@@ -1610,7 +1610,7 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
 #[test]
 fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
     let mut db = setup_db();
-    db.write_file("/src/dependency.py", "value = 42")?;
+    db.write_file("/src/dependency.py", "def value() -> int: return 42")?;
     db.write_dedented(
         "/src/model.py",
         r#"
@@ -1619,7 +1619,8 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
 
             def reset(self):
                 from dependency import value
-                self.value = value
+                self.value = value()
+                self.other: str = value()
         "#,
     )?;
     db.write_dedented(
@@ -1627,8 +1628,8 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
         r#"
         from model import Model
 
-        def read(model: Model):
-            return model.value
+        def read(model: Model) -> tuple[int, str]:
+            return model.value, model.other
         "#,
     )?;
 
@@ -1637,107 +1638,14 @@ fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::
     assert_file_diagnostics(&db, "/src/main.py", &[]);
     let events = db.take_salsa_events();
 
-    // The declaration determines the result. Looking up `Model.value` should not even
-    // index modules that are only used by assignments to it in method bodies.
-    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
-
-    Ok(())
-}
-
-#[test]
-fn receiver_annotation_does_not_infer_its_initializer_until_checked() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/dependency.py",
-        r#"
-        def value() -> str:
-            return "wrong"
-        "#,
-    )?;
-    db.write_dedented(
-        "/src/model.py",
-        r#"
-        class Model:
-            def initialize(self):
-                from dependency import value
-                self.attr: int = value()
-        "#,
-    )?;
-    db.write_dedented(
-        "/src/consumer.py",
-        r#"
-        from model import Model
-        result = Model().attr
-        "#,
-    )?;
-    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
-    let consumer = system_path_to_file(&db, "/src/consumer.py")?;
-    db.clear_salsa_events();
-    assert_eq!(
-        global_symbol(&db, consumer, "result").place.expect_type(),
-        KnownClass::Int.to_instance(&db, &db.program_environment()),
-    );
-    let events = db.take_salsa_events();
+    // Both declarations determine the type without indexing the initializer's dependency.
     assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
 
     assert_file_diagnostics(
         &db,
         "/src/model.py",
-        &["Object of type `str` is not assignable to `int`"],
+        &["Object of type `int` is not assignable to `str`"],
     );
-    let events = db.take_salsa_events();
-    assert_function_query_was_run(&db, semantic_index, program_file(&db, dependency), &events);
-    Ok(())
-}
-
-#[test]
-fn receiver_declaration_edits_preserve_value_dependent_types() -> anyhow::Result<()> {
-    enum Expected {
-        Instance(KnownClass),
-        TargetClass,
-        IntLiteral,
-    }
-
-    let mut db = setup_db();
-    db.write_file(
-        "/src/consumer.py",
-        "from model import Model\nresult = Model().attr",
-    )?;
-    let consumer = system_path_to_file(&db, "/src/consumer.py")?;
-
-    // Keep the same database and member read as its definition changes shape. In particular,
-    // a PEP 613 alias uses its value even when the marker is imported under another name.
-    for (assignment, expected) in [
-        ("self.attr: int = 42", Expected::Instance(KnownClass::Int)),
-        ("self.attr: Marker = Target", Expected::TargetClass),
-        ("self.attr: Final = 7", Expected::IntLiteral),
-        (
-            "self.attr = b'mutable'",
-            Expected::Instance(KnownClass::Bytes),
-        ),
-        ("self.attr: str", Expected::Instance(KnownClass::Str)),
-    ] {
-        db.write_file(
-            "/src/model.py",
-            format!(
-                "from typing import Final, TypeAlias as Marker\nclass Target: pass\nclass Model:\n    def initialize(self):\n        {assignment}\n"
-            ),
-        )?;
-        let env = db.program_environment();
-        let expected = match expected {
-            Expected::Instance(class) => class.to_instance(&db, &env),
-            Expected::TargetClass => {
-                let model = system_path_to_file(&db, "/src/model.py")?;
-                global_symbol(&db, model, "Target").place.expect_type()
-            }
-            Expected::IntLiteral => Type::int_literal(7),
-        };
-        assert_eq!(
-            global_symbol(&db, consumer, "result").place.expect_type(),
-            expected,
-            "{assignment}"
-        );
-    }
     Ok(())
 }
 

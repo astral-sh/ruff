@@ -301,19 +301,10 @@ pub(super) fn infer_receiver_annotation<'db>(
         return None;
     };
     let file = definition.program_file(db);
-    let python_file = file.python_file(db);
-    let module = parsed_module(db, python_file).load(db);
-    assignment.value(&module)?;
-    TypeInferenceBuilder::new(
-        db,
-        &ProgramEnvironment::from_file(file),
-        InferenceRegion::Definition(definition),
-        python_file.file(db),
-        file,
-        semantic_index(db, file),
-        &module,
-    )
-    .infer_receiver_annotation(assignment)
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let env = ProgramEnvironment::from_file(file);
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .infer_receiver_annotation(assignment)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

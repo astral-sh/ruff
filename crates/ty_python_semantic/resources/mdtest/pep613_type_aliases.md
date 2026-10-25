@@ -993,6 +993,19 @@ def _(x: TypeAlias):
 y: list[TypeAlias] = []
 ```
 
+An instance attribute cannot declare a type alias. We report the error and use the assigned value's
+type for attribute access, even when the marker is imported under another name:
+
+```py
+from typing import TypeAlias as Alias
+
+class C:
+    def __init__(self):
+        self.attr: Alias = str  # error: [invalid-type-form]
+
+reveal_type(C().attr)  # revealed: <class 'str'>
+```
+
 ## Right-hand side is required
 
 ```py
