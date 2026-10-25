@@ -1047,6 +1047,15 @@ enum ProjectedNarrowingEntry<'db> {
     },
 }
 
+/// The effect of a predicate on the one place being narrowed by a projector.
+enum ProjectedPredicate<'db> {
+    Narrows {
+        positive: Option<NarrowingConstraint<'db>>,
+        negative: Option<NarrowingConstraint<'db>>,
+    },
+    Truthiness(Truthiness),
+}
+
 /// Narrowing graph containing only predicates that can narrow one place.
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
@@ -1056,13 +1065,7 @@ struct ProjectedNarrowingGraph<'db> {
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
-    predicate_constraints_cache: FxHashMap<
-        ScopedPredicateId,
-        (
-            Option<NarrowingConstraint<'db>>,
-            Option<NarrowingConstraint<'db>>,
-        ),
-    >,
+    predicates: FxHashMap<ScopedPredicateId, ProjectedPredicate<'db>>,
 }
 
 impl<'db> ProjectedNarrowingGraph<'db> {
@@ -1241,32 +1244,23 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         narrowed
     }
 
-    /// Returns the cached positive and negative narrowing constraints for a predicate.
-    fn predicate_constraints(
+    /// Retains narrowing constraints when a predicate affects this place, otherwise its truthiness.
+    fn projected_predicate(
         &mut self,
-        predicate_id: ScopedPredicateId,
-    ) -> (
-        Option<NarrowingConstraint<'db>>,
-        Option<NarrowingConstraint<'db>>,
-    ) {
-        if !self
-            .predicate_narrowing_targets
-            .contains(predicate_id, self.place)
-        {
-            return (None, None);
-        }
-
-        let db = self.db;
-        if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
-            return cached.clone();
-        }
-
-        let constraints =
-            infer_narrowing_constraints(db, self.predicates[predicate_id], self.place);
-        self.graph
-            .predicate_constraints_cache
-            .insert(predicate_id, constraints.clone());
-        constraints
+        id: ScopedPredicateId,
+        can_narrow: bool,
+    ) -> &ProjectedPredicate<'db> {
+        self.graph.predicates.entry(id).or_insert_with(|| {
+            let predicate = self.predicates[id];
+            if can_narrow && self.predicate_narrowing_targets.contains(id, self.place) {
+                let (positive, negative) =
+                    infer_narrowing_constraints(self.db, predicate, self.place);
+                if positive.is_some() || negative.is_some() {
+                    return ProjectedPredicate::Narrows { positive, negative };
+                }
+            }
+            ProjectedPredicate::Truthiness(analyze_single(self.db, self.env, &predicate))
+        })
     }
 
     /// Interns a projected node, collapsing nodes with identical branches.
@@ -1518,7 +1512,12 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     ) {
-                        let branch = match analyze_single(db, self.env, &predicate) {
+                        let ProjectedPredicate::Truthiness(truthiness) =
+                            self.projected_predicate(node.atom, false)
+                        else {
+                            unreachable!("statically decidable predicates do not narrow places");
+                        };
+                        let branch = match truthiness {
                             Truthiness::AlwaysTrue => node.if_true,
                             Truthiness::AlwaysFalse => node.if_false,
                             Truthiness::Uninhabited => Id::ALWAYS_FALSE,
@@ -1554,13 +1553,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), if_uncertain);
                         continue;
                     }
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
-
-                    let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
+                    let projected = if let ProjectedPredicate::Truthiness(truthiness) =
+                        self.projected_predicate(node.atom, true)
+                    {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(db, self.env, &self.predicates[node.atom]) {
+                        match truthiness {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -1663,26 +1662,29 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                     return apply_accumulated_narrowing(db, self.env, ty, accumulated);
                 }
             };
-            let (pos_constraint, neg_constraint) =
-                self.graph.predicate_constraints_cache[&node.atom].clone();
+            let ProjectedPredicate::Narrows { positive, negative } =
+                &self.graph.predicates[&node.atom]
+            else {
+                unreachable!("projected graph nodes retain only narrowing predicates");
+            };
 
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, negative.clone());
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated, positive.clone());
                 self.narrow(node.if_true, true_accumulated)
             } else {
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated.clone(), positive.clone());
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
                 let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
 
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, negative.clone());
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
