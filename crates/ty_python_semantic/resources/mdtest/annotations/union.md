@@ -121,6 +121,23 @@ staticmethod(f) | None  # error: [unsupported-operator]
 range(5) | None  # error: [unsupported-operator]
 ```
 
+## Runtime operands and the type they denote
+
+`bool | int` is a union object even though it denotes just `int`. Adding `Literal[True]` preserves
+the denoted type, but `isinstance` rejects the literal among the runtime operands.
+
+```py
+from typing import Literal
+
+Ints = bool | int
+WithLiteral = Literal[True] | Ints
+reveal_type(Ints)  # revealed: <types.UnionType special-form 'int'>
+
+def check(value: WithLiteral):
+    reveal_type(value)  # revealed: int
+    isinstance(value, WithLiteral)  # error: [invalid-argument-type]
+```
+
 ## Recursive assignments to invalid union operands
 
 An invalid operation still produces a diagnostic when its operand is inferred recursively:

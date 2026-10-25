@@ -569,6 +569,15 @@ def _(
     reveal_type(type_or_list)  # revealed: type[Any] | list[Any]
 ```
 
+A runtime union of two generic alias values preserves the distinct bindings of their type variables:
+
+```py
+First = T | int
+Second = T | str
+Both = First | Second
+reveal_type(Both)  # revealed: <types.UnionType special-form 'T@First | int | T@Second | str'>
+```
+
 If a generic implicit type alias is used unspecialized in a type expression, we use the default
 specialization. For type variables without defaults, this is `Unknown`:
 
