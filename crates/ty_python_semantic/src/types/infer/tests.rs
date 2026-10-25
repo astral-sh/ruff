@@ -1692,18 +1692,18 @@ fn receiver_annotation_does_not_infer_its_initializer_until_checked() -> anyhow:
 
 #[test]
 fn receiver_declaration_edits_preserve_value_dependent_types() -> anyhow::Result<()> {
+    enum Expected {
+        Instance(KnownClass),
+        TargetClass,
+        IntLiteral,
+    }
+
     let mut db = setup_db();
     db.write_file(
         "/src/consumer.py",
         "from model import Model\nresult = Model().attr",
     )?;
     let consumer = system_path_to_file(&db, "/src/consumer.py")?;
-
-    enum Expected {
-        Instance(KnownClass),
-        TargetClass,
-        IntLiteral,
-    }
 
     // Keep the same database and member read as its definition changes shape. In particular,
     // a PEP 613 alias uses its value even when the marker is imported under another name.
