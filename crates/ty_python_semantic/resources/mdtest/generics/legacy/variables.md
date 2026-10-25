@@ -1592,4 +1592,32 @@ def async_fire_internal(event_data: _DataT):
     event = Event(event_data)
 ```
 
+## Replacing instance methods
+
+A method replacement uses the bound signature with the receiver's class arguments substituted.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def get(self, default: T) -> T:
+        return default
+
+    def replace(self, unknown) -> None:
+        self.get = unknown  # no diagnostic
+
+reveal_type(Box[int]().get(1))  # revealed: int
+Box[int]().get("wrong")  # error: [invalid-argument-type]
+
+class Child(Box[str]): ...
+
+reveal_type(Child().get("a"))  # revealed: str
+
+def patch(box: Box[int]) -> None:
+    box.get = lambda default: default  # no diagnostic
+    box.get = lambda default: str(default)  # error: [invalid-assignment]
+```
+
 [generics]: https://typing.python.org/en/latest/spec/generics.html

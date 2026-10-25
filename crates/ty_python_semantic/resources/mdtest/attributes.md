@@ -1531,6 +1531,290 @@ DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
+## Replacing ordinary methods on instances
+
+An instance can shadow an ordinary method with any callable that accepts the bound method's
+arguments and returns a compatible result. The replacement is stored on the instance, so it is
+called without another implicit `self` argument.
+
+```py
+class Formatter:
+    def format(self, value: int) -> str:
+        return str(value)
+
+    def replacement(self, value: int) -> str:
+        return f"value={value}"
+
+    def replace(self) -> None:
+        self.format = self.replacement  # no diagnostic
+
+formatter = Formatter()
+reveal_type(formatter.format(1))  # revealed: str
+formatter.replace()
+reveal_type(formatter.format(1))  # revealed: str
+
+def patch(formatter: Formatter) -> None:
+    formatter.format = lambda value: str(value)  # no diagnostic
+    reveal_type(formatter.format(1))  # revealed: str
+
+class CallableFormatter:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+def patch_with_object(formatter: Formatter) -> None:
+    formatter.format = CallableFormatter()  # no diagnostic
+
+def wrong_argument(value: str) -> str:
+    return value
+
+def wrong_return(value: int) -> int:
+    return value
+
+def invalid_replacements(formatter: Formatter) -> None:
+    formatter.format = wrong_argument  # error: [invalid-assignment]
+    formatter.format = wrong_return  # error: [invalid-assignment]
+    formatter.format = None  # error: [invalid-assignment]
+    formatter.format = Formatter.format  # error: [invalid-assignment]
+    formatter.format = lambda value: value  # error: [invalid-assignment]
+
+# A replacement need not be a bound method, so its contract does not guarantee `__self__`.
+def inspect_replacement(formatter: Formatter) -> None:
+    formatter.format.__self__  # error: [unresolved-attribute]
+
+# Class access still exposes the unbound function.
+reveal_type(Formatter.format(formatter, 1))  # revealed: str
+# error: [missing-argument]
+# error: [invalid-argument-type]
+Formatter.format(1)
+```
+
+## Replacing unannotated instance methods
+
+The replacement's receiver is already bound, including when both methods have unannotated return
+types. Calls before and after the replacement require no explicit receiver.
+
+Regression test for <https://github.com/astral-sh/ty/issues/350>.
+
+```py
+class A:
+    def f1(self):
+        print("f1")
+
+    def f1_replace(self):
+        print("replace")
+
+    def f2(self):
+        self.f1 = self.f1_replace  # no diagnostic
+
+a = A()
+a.f1()  # no diagnostic
+a.f2()
+a.f1()  # no diagnostic
+```
+
+## Incompatible inferred method replacements
+
+After rejecting an incompatible assignment, subsequent reads retain the inferred value. In
+particular, storing non-callable data does not make a truthiness test behave like a test of the
+inherited method.
+
+```py
+class Base:
+    def color(self) -> str:
+        return "blue"
+
+class Disabled(Base):
+    def __init__(self) -> None:
+        self.color = None  # error: [invalid-assignment]
+        reveal_type(self.color)  # revealed: None
+        if self.color:  # error: [redundant-condition] "`None` is always falsy"
+            pass
+```
+
+The stored object's attributes also remain available for error recovery.
+
+```py
+class Palette:
+    def get(self) -> str:
+        return "blue"
+
+class Custom(Base):
+    def __init__(self) -> None:
+        self.color = Palette()  # error: [invalid-assignment]
+        reveal_type(self.color)  # revealed: Palette
+        if self.color:  # no diagnostic
+            reveal_type(self.color.get())  # revealed: str
+```
+
+## Gradual method replacements and recursive wrappers
+
+An unknown replacement must not introduce the unbound method into subsequent reads. Wrapping a
+method in terms of its current value also preserves its declared callable contract.
+
+```py
+from typing import Callable
+
+class Formatter:
+    def format(self, value: int, /) -> str:
+        return str(value)
+
+    def replace(self, unknown) -> None:
+        self.format = unknown  # no diagnostic
+
+    def wrap(self) -> None:
+        self.format = wrapper(self.format)  # no diagnostic
+
+def wrapper(function: Callable[[int], str]) -> Callable[[int], str]:
+    return function
+
+reveal_type(Formatter().format(1))  # revealed: str
+Formatter().format("wrong")  # error: [invalid-argument-type]
+```
+
+## Inherited method replacement contracts
+
+Assignments in a subclass still obey an inherited method's signature. A `Self` return type follows
+the instance through which the method is accessed.
+
+```py
+from typing import Self
+
+class Base:
+    def copy(self) -> Self:
+        return self
+
+class Child(Base):
+    def replace(self, unknown) -> None:
+        self.copy = unknown  # no diagnostic
+
+reveal_type(Child().copy())  # revealed: Child
+
+class Parent:
+    def copy(self) -> Self:
+        return self
+
+    def replace(self, unknown) -> None:
+        self.copy = unknown  # no diagnostic
+
+class Derived(Parent): ...
+
+reveal_type(Derived().copy())  # revealed: Derived
+```
+
+## Overloaded method replacement contracts
+
+A replacement must satisfy every overload of the bound method.
+
+```py
+from typing import overload
+
+class Converter:
+    @overload
+    def convert(self, value: int) -> int: ...
+    @overload
+    def convert(self, value: str) -> str: ...
+    def convert(self, value: int | str) -> int | str:
+        return value
+
+    def replace(self, unknown) -> None:
+        self.convert = unknown  # no diagnostic
+
+reveal_type(Converter().convert(1))  # revealed: int
+reveal_type(Converter().convert("a"))  # revealed: str
+
+def only_int(value: int) -> int:
+    return value
+
+def patch(converter: Converter) -> None:
+    converter.convert = only_int  # error: [invalid-assignment]
+```
+
+## Conditional instance method replacement
+
+Conditional method definitions retain each possible bound signature.
+
+```py
+from typing import Literal
+
+def example(flag: bool) -> None:
+    class C:
+        if flag:
+            def method(self, value: int) -> Literal[1]:
+                return 1
+
+        else:
+            def method(self, value: int) -> Literal[2]:
+                return 2
+
+        def replace(self, unknown) -> None:
+            self.method = unknown  # no diagnostic
+
+    reveal_type(C().method(1))  # revealed: Literal[1, 2]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    C().method("wrong")
+```
+
+## Method replacements and writable protocols
+
+A method with a compatible replacement contract can satisfy a writable callable attribute.
+
+```py
+from typing import Callable, Protocol
+
+class HasCallback(Protocol):
+    callback: Callable[[int], str]
+
+class C:
+    def callback(self, value: int, /) -> str:
+        return str(value)
+
+    def replace(self, unknown) -> None:
+        self.callback = unknown  # no diagnostic
+
+def install(obj: HasCallback) -> None:
+    obj.callback = lambda value: str(value)
+
+install(C())  # no diagnostic
+```
+
+## Explicit callable instance annotations
+
+A callable declared as an instance attribute does not acquire method binding, even when its value is
+a function with a parameter named `self`.
+
+```py
+from typing import Callable
+
+class Callback:
+    callback: Callable[[int], str]
+
+    def __init__(self) -> None:
+        self.callback = lambda self: str(self)
+
+reveal_type(Callback().callback(1))  # revealed: str
+```
+
+An explicit instance annotation also keeps its own contract when shadowing an inherited method. Here
+the annotation does not promise keyword arguments, although the original method accepts them. This
+is an incompatible override; subsequent accesses still respect the explicit annotation.
+
+```py
+class MethodBase:
+    def callback(self, value: int) -> str:
+        return str(value)
+
+class AnnotatedMethod(MethodBase):
+    def replace(self) -> None:
+        # error: [invalid-attribute-override]
+        self.callback: Callable[[int], str] = lambda value: str(value)
+
+reveal_type(AnnotatedMethod().callback(1))  # revealed: str
+# error: [unknown-argument]
+# error: [missing-argument]
+AnnotatedMethod().callback(value=1)
+```
+
 ## Shadowing static methods on instances
 
 ### Nominal instances
@@ -1556,6 +1840,38 @@ class writes still require the `staticmethod` wrapper.
 ```py
 Decoder.decode = Decoder.decode  # error: [invalid-assignment]
 Decoder.decode = staticmethod(Decoder.decode)
+```
+
+### Structural replacements
+
+Static methods can be shadowed by other compatible callables, including callable objects. Their
+parameters are preserved without binding an extra receiver.
+
+```py
+from collections.abc import Callable
+
+class Decoder:
+    @staticmethod
+    def decode(data: bytes, /) -> str:
+        return data.decode()
+
+class Decode:
+    def __call__(self, data: bytes, /) -> str:
+        return data.decode()
+
+def replace(decoder: Decoder, callback: Callable[[bytes], str]) -> None:
+    decoder.decode = callback  # no diagnostic
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = Decode()  # no diagnostic
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = lambda data: data.decode()  # no diagnostic
+    decoder.decode = lambda data: 0  # error: [invalid-assignment]
+
+def wrong_argument(data: int, /) -> str:
+    return str(data)
+
+def invalid_replacement(decoder: Decoder) -> None:
+    decoder.decode = wrong_argument  # error: [invalid-assignment]
 ```
 
 ### Implicit `self`
@@ -1653,6 +1969,53 @@ class C:
 def replace(c: C) -> None:
     c.f = staticmethod(f)
     c.f = f  # error: [invalid-assignment]
+```
+
+## Shadowing class methods on instances
+
+A class method accessed on an instance binds the class before deriving the replacement signature. A
+callable stored on the instance receives only the remaining arguments.
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Factory:
+    @classmethod
+    def create(cls, value: int, /) -> Self:
+        return cls()
+
+    def replace(self, unknown) -> None:
+        self.create = unknown  # no diagnostic
+
+class Child(Factory): ...
+
+reveal_type(Child().create(1))  # revealed: Child
+
+class Create:
+    def __call__(self, value: int, /) -> Factory:
+        return Factory()
+
+def replace(factory: Factory, callback: Callable[[int], Factory]) -> None:
+    factory.create = callback  # no diagnostic
+    reveal_type(factory.create(1))  # revealed: Factory
+    factory.create = Create()  # no diagnostic
+    reveal_type(factory.create(1))  # revealed: Factory
+    factory.create = None  # error: [invalid-assignment]
+    factory.create = lambda value: value  # error: [invalid-assignment]
+
+def wrong_argument(value: str, /) -> Factory:
+    return Factory()
+
+def invalid_replacement(factory: Factory) -> None:
+    factory.create = wrong_argument  # error: [invalid-assignment]
+```
+
+Assignments to the class itself still require a classmethod descriptor.
+
+```py
+Factory.create = Factory.create  # error: [invalid-assignment]
+Factory.create = classmethod(Factory.create.__func__)  # no diagnostic
 ```
 
 ## Accessing attributes on class objects
@@ -3901,8 +4264,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment]
-        self.__getattribute__ = external_getattribute
+        self.__getattribute__ = external_getattribute  # no diagnostic
 
 # error: [unresolved-attribute]
 ThisFails().x

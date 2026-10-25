@@ -5584,6 +5584,24 @@ impl<'db> Type<'db> {
         let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
         let fallback_properties = fallback_member.deprecated_properties(db);
         let fallback_member = fallback_member.member(db);
+        // Instance assignments shadow methods without invoking the replacement's descriptor.
+        // Derive the storage contract from the class method after binding the actual receiver.
+        // Explicit instance annotations keep their own contract. Preserve incompatible inferred
+        // values for error recovery instead of turning non-callable data into a callable.
+        let fallback_member = if let Place::Defined(DefinedPlace { origin, ty, .. }) =
+            fallback_member.place
+            && (!origin.is_declared()
+                || fallback_member
+                    .qualifiers
+                    .contains(TypeQualifiers::METHOD_INSTANCE_ATTRIBUTE))
+            && let Some(contract) =
+                meta_attr_ty.and_then(|method| method.instance_method_contract(db, env, receiver))
+            && (origin.is_declared() || ty.is_assignable_to(db, env, contract))
+        {
+            fallback_member.map_type(|_| contract)
+        } else {
+            fallback_member
+        };
 
         // A slot stores the same instance attribute described by the receiver's declarations.
         // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
@@ -11651,7 +11669,7 @@ impl std::fmt::Display for DynamicType<'_> {
 bitflags! {
     /// Type qualifiers from annotations or synthesized member metadata.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
-    pub struct TypeQualifiers: u8 {
+    pub struct TypeQualifiers: u16 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
         /// `typing.Final`
@@ -11672,6 +11690,10 @@ bitflags! {
         /// `__getattr__` function. We need this in order to implement precedence of submodules
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
+        /// Instance storage governed by a method declaration on the class. The stored type
+        /// still describes the class function; bind its callable contract to the receiver
+        /// when resolving instance access, after MRO and generic specialization.
+        const METHOD_INSTANCE_ATTRIBUTE = 1 << 8;
     }
 }
 
@@ -11704,8 +11726,9 @@ impl TypeQualifiers {
     /// Non-standard qualifiers are internal implementation details like
     /// `IMPLICIT_INSTANCE_ATTRIBUTE` and `FROM_MODULE_GETATTR`.
     pub fn is_non_standard(self) -> bool {
-        const NON_STANDARD: TypeQualifiers =
-            TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE.union(TypeQualifiers::FROM_MODULE_GETATTR);
+        const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
+            .union(TypeQualifiers::FROM_MODULE_GETATTR)
+            .union(TypeQualifiers::METHOD_INSTANCE_ATTRIBUTE);
         self.intersects(NON_STANDARD)
     }
 }
