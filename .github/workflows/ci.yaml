@@ -1,5 +1,5 @@
-name: Measure Rust cache modes after source changes
-run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
+name: Replay Rust cache behavior across commit history
+run-name: ${{ inputs.phase }} / commit ${{ inputs.commit_index }} / pair ${{ inputs.replica }}
 "on":
   workflow_dispatch:
     inputs:
@@ -18,6 +18,15 @@ run-name: ${{ inputs.phase }} / ${{ inputs.suite }}
         type: string
         default: "false"
         required: false
+      source:
+        type: string
+        required: true
+      commit_index:
+        type: string
+        required: true
+      replica:
+        type: string
+        required: true
 permissions:
   contents: read
 jobs:
@@ -46,18 +55,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          ref:
-            ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6'
-            }}
+          ref: ${{ inputs.source }}
       - name: Record source revision
         shell: bash
-        run: 'echo "Measured source revision: $(git rev-parse HEAD)"'
+        run: |-
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          echo "Measured source revision: $(git rev-parse HEAD)"
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source }}
       - name: Install Rust toolchain
         run: rustup show
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-modes-aged-20261025-v1-linux-before
+          prefix-key: ruff-history-20261025-v1-before
           cache-workspace-crates: "false"
         name: Restore Rust cache
         id: rust-cache
@@ -66,10 +78,7 @@ jobs:
         shell: bash
         env:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-          EXPECTED_HIT: "true"
-        run: |-
-          echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-          test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+        run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"'
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
@@ -144,18 +153,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-          ref:
-            ${{ inputs.phase == 'seed' && 'acba99d527b8a9fd2e15490df42d0e6d744a4331' || '7a8f63f0d71a1d381f99652a5fee3b043b32e8e6'
-            }}
+          ref: ${{ inputs.source }}
       - name: Record source revision
         shell: bash
-        run: 'echo "Measured source revision: $(git rev-parse HEAD)"'
+        run: |-
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          echo "Measured source revision: $(git rev-parse HEAD)"
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source }}
       - name: Install Rust toolchain
         run: rustup show
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-modes-aged-20261025-v1-linux-after
+          prefix-key: ruff-history-20261025-v1-after
           cache-workspace-crates: "true"
         name: Restore Rust cache
         id: rust-cache
@@ -164,10 +176,7 @@ jobs:
         shell: bash
         env:
           CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
-          EXPECTED_HIT: "true"
-        run: |-
-          echo "Rust cache exact hit: ${CACHE_HIT:-false}"
-          test "${CACHE_HIT:-false}" = "$EXPECTED_HIT"
+        run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"'
       - name: Install uv
         uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
         with:
