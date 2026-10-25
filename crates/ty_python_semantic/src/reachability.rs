@@ -1512,10 +1512,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
                     ) {
-                        let ProjectedPredicate::Truthiness(truthiness) =
-                            self.projected_predicate(node.atom, false)
-                        else {
-                            unreachable!("statically decidable predicates do not narrow places");
+                        // Before the first suffix is projected this walk follows a chain of
+                        // strictly ordered predicates. None can repeat on that initial descent.
+                        let truthiness = if self.project_cache.is_empty() {
+                            analyze_single(db, self.env, &predicate)
+                        } else {
+                            let ProjectedPredicate::Truthiness(truthiness) =
+                                self.projected_predicate(node.atom, false)
+                            else {
+                                unreachable!(
+                                    "statically decidable predicates do not narrow places"
+                                );
+                            };
+                            *truthiness
                         };
                         let branch = match truthiness {
                             Truthiness::AlwaysTrue => node.if_true,
