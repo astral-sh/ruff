@@ -16,7 +16,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, ProgramEnvironment, attribute_declarations,
+    Db, FxIndexSet, ProgramEnvironment, attribute_declarations,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -177,10 +177,12 @@ fn check_inherited_conflicts<'db>(
             .cloned(),
     );
     let attribute_contracts = configuration.check_attribute_type_violations().then(|| {
+        // The MRO and the explicit bases usually contain the same classes. Only
+        // different specializations introduce additional override contracts.
         mro.iter()
             .copied()
             .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
-            .collect::<Vec<_>>()
+            .collect::<FxIndexSet<_>>()
     });
 
     for (index, candidate_owner) in mro.iter().copied().enumerate() {
@@ -297,7 +299,7 @@ fn check_inherited_method_conflict<'db>(
     name: &Name,
     definition: Definition<'db>,
 ) {
-    if is_constructor_like_method(name) {
+    if contracts.is_empty() || is_constructor_like_method(name) {
         return;
     }
     let db = context.db();

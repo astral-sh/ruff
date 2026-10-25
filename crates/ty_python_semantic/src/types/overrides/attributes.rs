@@ -1,5 +1,7 @@
 //! Compatibility of the values read from and written to inherited attributes.
 
+use std::cell::LazyCell;
+
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
@@ -9,7 +11,7 @@ use ty_python_core::{
 };
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, FxIndexSet, ProgramEnvironment,
     lint::LintMetadata,
     place::{DefinedPlace, Place, TypeOrigin},
     types::{
@@ -828,23 +830,24 @@ pub(super) fn check_inherited_conflict<'db>(
     class: StaticClassLiteral<'db>,
     class_type: ClassType<'db>,
     owner: ClassType<'db>,
-    contracts: &[ClassType<'db>],
+    contracts: &FxIndexSet<ClassType<'db>>,
     name: &Name,
 ) {
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
     let kind = AttributeContractKind::Inherited;
-    let Some(MemberContract::Attribute(source)) =
-        member_contract(db, env, owner, receiver, name, kind)
-    else {
-        return;
-    };
+    // Most inherited names occur on just one base. Bind the selected descriptor
+    // to this subclass only if another base actually supplies an attribute contract.
+    let source = LazyCell::new(|| member_contract(db, env, owner, receiver, name, kind));
     for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
         let Some(MemberContract::Attribute(target)) =
             member_contract(db, env, target_owner, receiver, name, kind)
         else {
             continue;
+        };
+        let Some(MemberContract::Attribute(source)) = &*source else {
+            return;
         };
         let Some(violation) = attribute_violation(
             db,
@@ -852,12 +855,12 @@ pub(super) fn check_inherited_conflict<'db>(
             receiver,
             Type::instance(db, env, target_owner),
             name,
-            &source,
+            source,
             &target,
         ) else {
             continue;
         };
-        if already_inherited(db, env, class_type, target_owner, name, &source, kind) {
+        if already_inherited(db, env, class_type, target_owner, name, source, kind) {
             continue;
         }
         let rule = violation.rule(source.is_property || target.is_property);
