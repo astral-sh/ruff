@@ -4616,6 +4616,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         declared
     }
 
+    pub(super) fn infer_receiver_annotation(
+        mut self,
+        assignment: &AnnotatedAssignmentDefinitionKind,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        // Full inference of the declaring assignment owns the annotation's diagnostics.
+        self.context.suppress_diagnostics();
+        let annotation = self
+            .is_valid_receiver_annotation_target(assignment.target(self.module()))
+            .then(|| self.infer_annotated_assignment_annotation(assignment));
+        self.context.defuse();
+        annotation
+    }
+
     /// Initialize a declaration cycle without discarding its annotation diagnostics or metadata.
     pub(super) fn infer_annotated_assignment_cycle_initial(
         mut self,

@@ -8,7 +8,7 @@ use crate::{
     types::{
         KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
-        infer::infer_unpack_types,
+        infer::{infer_receiver_annotation, infer_unpack_types},
         infer_expression_type, inferred_declaration,
         member::Member,
     },
@@ -188,7 +188,20 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                let annotation = if assignment.value(&module).is_some() {
+                    let annotation = infer_receiver_annotation(db, declaration);
+                    // A PEP 613 declaration denotes its right-hand side, even when its
+                    // `TypeAlias` marker is imported under another name.
+                    if annotation.is_some_and(|ty| ty.inner_type().is_typealias_special_form()) {
+                        inferred_declaration(db, declaration).declared()
+                    } else {
+                        annotation
+                    }
+                } else {
+                    // An annotation without a value can conflict with an earlier binding.
+                    inferred_declaration(db, declaration).declared()
+                };
+                let Some(annotation) = annotation else {
                     continue;
                 };
                 let annotation = Place::declared(annotation.inner)

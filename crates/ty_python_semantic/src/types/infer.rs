@@ -279,6 +279,43 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Reading an imported `self.x: T = rhs()` only needs `T`. When checking the declaring
+/// method, the full inference still validates `rhs()` and reports annotation diagnostics.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, id, _| Some(TypeAndQualifiers::declared(Type::divergent(id))),
+    cycle_fn=|db, cycle, previous: &Option<TypeAndQualifiers<'db>>, current: Option<TypeAndQualifiers<'db>>, definition: Definition<'db>| {
+        let env = ProgramEnvironment::from_definition(definition);
+        current.map(|current| current.map_type(|ty| match previous {
+            Some(previous) => ty.cycle_normalized(db, &env, previous.inner_type(), cycle),
+            None => ty.recursive_type_normalized(db, &env, cycle),
+        }))
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+pub(super) fn infer_receiver_annotation<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<TypeAndQualifiers<'db>> {
+    let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    let file = definition.program_file(db);
+    let python_file = file.python_file(db);
+    let module = parsed_module(db, python_file).load(db);
+    assignment.value(&module)?;
+    TypeInferenceBuilder::new(
+        db,
+        &ProgramEnvironment::from_file(file),
+        InferenceRegion::Definition(definition),
+        python_file.file(db),
+        file,
+        semantic_index(db, file),
+        &module,
+    )
+    .infer_receiver_annotation(assignment)
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:
