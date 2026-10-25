@@ -55,7 +55,7 @@ impl ScopedNarrowingConstraint {
     pub const ALWAYS_TRUE: Self = Self(u32::MAX);
     pub const ALWAYS_FALSE: Self = Self(u32::MAX - 1);
 
-    pub fn is_terminal(self) -> bool {
+    fn is_terminal(self) -> bool {
         self.0 >= Self::ALWAYS_FALSE.0
     }
 }
