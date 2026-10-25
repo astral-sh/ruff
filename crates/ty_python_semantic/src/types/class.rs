@@ -3184,9 +3184,35 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
+                    let member = class.own_instance_member(db, &self.env, name);
+                    let definitely_declared = matches!(
+                        member.inner.place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Declared,
+                            definedness: Definedness::AlwaysDefined,
+                            ..
+                        })
+                    );
+                    if definitely_declared {
+                        let overriding_class_default =
+                            definitely_bound_member.is_some_and(|previous| {
+                                !previous
+                                    .qualifiers
+                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                            }) && !member
+                                .inner
+                                .qualifiers
+                                .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
+                        if !overriding_class_default {
+                            // Annotations take precedence over inferred writes, including augmented
+                            // assignments. Avoid inferring method bodies just to discard their types.
+                            return InstanceMemberResult::Done(member.inner);
+                        }
+                    }
+
                     let implicit = class.member_with_augmented_bindings(
                         db,
-                        class.own_instance_member(db, &self.env, name),
+                        member,
                         name,
                         MethodDecorator::None,
                     );
@@ -3194,11 +3220,16 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         pending_augmented_bindings.push((class, bindings));
                     }
 
+                    if definitely_declared {
+                        // An overriding class default shadows this declaration, but its augmented
+                        // assignments can still contribute to an inherited instance attribute.
+                        continue;
+                    }
+
                     if let member @ PlaceAndQualifiers {
                         place:
                             Place::Defined(DefinedPlace {
                                 ty,
-                                origin,
                                 definedness: boundness,
                                 provenance: member_provenance,
                                 ..
@@ -3207,24 +3238,6 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     } = implicit.member.inner
                     {
                         if boundness == Definedness::AlwaysDefined {
-                            if origin.is_declared() {
-                                if definitely_bound_member.is_some_and(|member| {
-                                    !member
-                                        .qualifiers
-                                        .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                                }) && !qualifiers
-                                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
-                                {
-                                    // An overriding class default shadows inherited declarations,
-                                    // but inherited instance assignments must still be collected.
-                                    continue;
-                                }
-
-                                // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from subclasses and return the declared type.
-                                return InstanceMemberResult::Done(member);
-                            }
-
                             definitely_bound_member = Some(member);
                         }
 
