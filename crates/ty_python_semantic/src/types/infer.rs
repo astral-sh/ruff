@@ -68,7 +68,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::Expression;
+use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -581,9 +581,16 @@ pub(crate) fn infer_expression_types<'db>(
     returns(ref),
     cycle_initial=expression_cycle_initial,
     cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
-        let (expression, _) = input.into_inner(db);
+        let (expression, tcx) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
-        inference.cycle_normalized(db, &env, previous, cycle)
+        let mut inference = inference.cycle_normalized(db, &env, previous, cycle);
+        if tcx.annotation.is_none() && let ExpressionKind::Predicate(context) = expression.kind(db) {
+            let module = parsed_module(db, expression.python_file(db)).load(db);
+            // Normalizing the operand types can change whether the expression can complete.
+            let result = inference.expression_truthiness(db, &env, expression.node_ref(db).node(&module), context);
+            inference.set_predicate_truthiness(crate::reachability::widen_truthiness(cycle, previous.predicate_truthiness(), result));
+        }
+        inference
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -608,7 +615,7 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let env = ProgramEnvironment::from_file(program_file);
 
-    TypeInferenceBuilder::new(
+    let mut inference = TypeInferenceBuilder::new(
         db,
         &env,
         InferenceRegion::Expression(expression, tcx),
@@ -617,7 +624,19 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .finish_expression()
+    .finish_expression();
+    if tcx.annotation.is_none()
+        && let ExpressionKind::Predicate(context) = expression.kind(db)
+    {
+        let truthiness = inference.expression_truthiness(
+            db,
+            &env,
+            expression.node_ref(db).node(&module),
+            context,
+        );
+        inference.set_predicate_truthiness(truthiness);
+    }
+    inference
 }
 
 fn expression_cycle_initial<'db>(
@@ -2004,6 +2023,9 @@ pub(crate) struct ExpressionInference<'db> {
 /// Extra data that only exists for few inferred expression regions.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct ExpressionInferenceExtra<'db> {
+    /// Truthiness of the root predicate. An ambiguous outcome needs no storage.
+    predicate_truthiness: Option<Truthiness>,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     legacy_aliases: Box<[Definition<'db>]>,
 
@@ -2062,6 +2084,40 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    pub(crate) fn expression_truthiness(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        node: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Truthiness {
+        TruthinessAnalyzer::new(
+            db,
+            env,
+            |node| self.expression_type(node),
+            |node| self.comparison_truthiness(node),
+        )
+        .truthiness(node, context)
+    }
+
+    /// An initial cycle result has no operand types yet, so its predicate is ambiguous.
+    pub(crate) fn predicate_truthiness(&self) -> Truthiness {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.predicate_truthiness)
+            .unwrap_or(Truthiness::Ambiguous)
+    }
+
+    fn set_predicate_truthiness(&mut self, truthiness: Truthiness) {
+        if truthiness.is_ambiguous() {
+            if let Some(extra) = &mut self.extra {
+                extra.predicate_truthiness = None;
+            }
+        } else {
+            self.extra.get_or_insert_default().predicate_truthiness = Some(truthiness);
+        }
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {

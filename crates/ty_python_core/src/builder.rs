@@ -2245,35 +2245,45 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.register_narrowing_alias_predicates(predicate_node);
 
-        let expression = self.add_standalone_expression(predicate_node);
-
-        match resolve_to_literal(predicate_node) {
-            Some(literal) => PredicateOrLiteral::Literal(literal),
-            None => PredicateOrLiteral::Predicate(Predicate {
-                node: match (context, predicate_node) {
-                    (
-                        ExpressionContext::Condition,
-                        ast::Expr::BoolOp(_)
-                        | ast::Expr::If(_)
-                        | ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                            op: ast::UnaryOp::Not,
-                            ..
-                        }),
-                    ) => PredicateNode::Condition(expression),
-                    (ExpressionContext::Condition, ast::Expr::Compare(compare))
-                        if compare.ops.len() > 1 =>
-                    {
-                        PredicateNode::Condition(expression)
-                    }
-                    _ => PredicateNode::Expression {
-                        expression,
-                        truthiness_from_type: predicate_node.is_name_expr()
-                            || predicate_node.is_literal_expr(),
-                    },
-                },
-                is_positive: true,
-            }),
+        if let Some(literal) = resolve_to_literal(predicate_node) {
+            self.add_standalone_expression(predicate_node);
+            return PredicateOrLiteral::Literal(literal);
         }
+
+        // A name or literal needs only its inferred type. Other predicates also depend on
+        // whether their operands can produce a value.
+        let kind = match (context, predicate_node) {
+            (
+                ExpressionContext::Condition,
+                ast::Expr::BoolOp(_)
+                | ast::Expr::If(_)
+                | ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    ..
+                }),
+            ) => ExpressionKind::Predicate(ExpressionContext::Condition),
+            (ExpressionContext::Condition, ast::Expr::Compare(compare))
+                if compare.ops.len() > 1 =>
+            {
+                ExpressionKind::Predicate(ExpressionContext::Condition)
+            }
+            _ if predicate_node.is_name_expr() || predicate_node.is_literal_expr() => {
+                ExpressionKind::Normal
+            }
+            _ => ExpressionKind::Predicate(ExpressionContext::Value),
+        };
+        let expression = self.add_standalone_expression_impl(predicate_node, kind, None);
+        PredicateOrLiteral::Predicate(Predicate {
+            node: if kind == ExpressionKind::Predicate(ExpressionContext::Condition) {
+                PredicateNode::Condition(expression)
+            } else {
+                PredicateNode::Expression {
+                    expression,
+                    truthiness_from_type: kind == ExpressionKind::Normal,
+                }
+            },
+            is_positive: true,
+        })
     }
 
     fn visit_condition(&mut self, test: &'ast ast::Expr) {

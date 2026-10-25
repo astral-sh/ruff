@@ -202,7 +202,7 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
-        NarrowingConstraint, SpecialFormType, TruthinessAnalyzer, Type, TypeContext, UnionType,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -220,7 +220,7 @@ use ty_python_core::{
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
     definition::{DefinitionKind, DefinitionState},
-    expression::{Expression, ExpressionContext},
+    expression::{Expression, ExpressionContext, ExpressionKind},
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
@@ -311,9 +311,9 @@ fn type_narrowed_after_pattern<'db>(
 /// Whether the guard cannot reject a value matched by the pattern.
 fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
-    predicate
-        .guard(db)
-        .is_none_or(|guard| condition_truthiness(db, guard).is_always_true())
+    predicate.guard(db).is_none_or(|guard| {
+        predicate_truthiness(db, guard, ExpressionContext::Condition).is_always_true()
+    })
 }
 
 /// Narrow `subject_ty` by a match pattern.
@@ -1941,7 +1941,7 @@ fn context_manager_suppresses<'db>(
     cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+fn tracked_value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     expression_truthiness(db, expression, ExpressionContext::Value)
 }
 
@@ -1952,11 +1952,32 @@ fn value_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthi
     cycle_fn = |_, cycle: &salsa::Cycle, previous: &Truthiness, result: Truthiness, _| widen_truthiness(cycle, *previous, result),
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+fn tracked_condition_truthiness<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     expression_truthiness(db, expression, ExpressionContext::Condition)
 }
 
-fn widen_truthiness(cycle: &salsa::Cycle, previous: Truthiness, result: Truthiness) -> Truthiness {
+/// Reuse the truthiness computed from the same operands as the predicate's type. Other
+/// consumers, such as a match guard, can request a different evaluation context.
+fn predicate_truthiness<'db>(
+    db: &'db dyn Db,
+    expression: Expression<'db>,
+    context: ExpressionContext,
+) -> Truthiness {
+    if expression.kind(db) == ExpressionKind::Predicate(context) {
+        infer_expression_types(db, expression, TypeContext::default()).predicate_truthiness()
+    } else {
+        match context {
+            ExpressionContext::Value => tracked_value_truthiness(db, expression),
+            ExpressionContext::Condition => tracked_condition_truthiness(db, expression),
+        }
+    }
+}
+
+pub(crate) fn widen_truthiness(
+    cycle: &salsa::Cycle,
+    previous: Truthiness,
+    result: Truthiness,
+) -> Truthiness {
     // A condition can control whether one of its own inputs is reachable. Expression inference
     // can lose its previous result when it ceases to be a cycle head, so its type widening alone
     // does not ensure that the condition's truthiness converges. Delay widening here to avoid
@@ -1968,8 +1989,7 @@ fn widen_truthiness(cycle: &salsa::Cycle, previous: Truthiness, result: Truthine
     }
 }
 
-/// Keep this separate from type inference: `bool(never)` has type `bool`, but cannot produce a
-/// boolean outcome. The calling query caches that distinction and widens it during inference cycles.
+/// Compute truthiness for expressions whose inference did not record the requested context.
 fn expression_truthiness<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
@@ -1979,13 +1999,7 @@ fn expression_truthiness<'db>(
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let node = expression.node_ref(db).node(&module);
-    TruthinessAnalyzer::new(
-        db,
-        &env,
-        |node| inference.expression_type(node),
-        |node| inference.comparison_truthiness(node),
-    )
-    .truthiness(node, context)
+    inference.expression_truthiness(db, &env, node, context)
 }
 
 /// Evaluate a predicate, returning `Uninhabited` when it cannot produce a boolean outcome.
@@ -2012,9 +2026,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::Expression {
             expression: test_expr,
             truthiness_from_type: false,
-        } => value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
+        } => predicate_truthiness(db, test_expr, ExpressionContext::Value)
+            .negate_if(!predicate.is_positive),
         PredicateNode::Condition(test_expr) => {
-            condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
+            predicate_truthiness(db, test_expr, ExpressionContext::Condition)
+                .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
             expression,
