@@ -228,7 +228,9 @@ use ty_python_core::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
         ScopedPredicateId,
     },
-    reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    reachability_constraints::{
+        InteriorNode, ReachabilityConstraints, ScopedReachabilityConstraintId,
+    },
     scope::ScopeId,
     use_def_map,
 };
@@ -815,6 +817,52 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
+/// Whether a conditional statement call leads to the same continuation regardless of its result.
+///
+/// The decision diagram orders predicates in reverse source order, so a call can precede its
+/// guard. When a returning call continues at `next` and a terminal call selects `next` under
+/// the guard, we can go directly to `next` without inferring the callable's type. Restrict this
+/// lookahead to module scopes, where inferring an exported name can otherwise pull in an
+/// unrelated module just to inspect a guarded import's return type.
+fn conditional_call_is_bypassed(
+    db: &dyn Db,
+    scope: ScopeId<'_>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+    node: InteriorNode,
+    evaluate_guard: impl FnOnce(ScopedPredicateId) -> Truthiness,
+) -> bool {
+    let next = node.if_true();
+    if node.if_ambiguous() != next
+        || terminal_reachability(node.if_false()).is_some()
+        || !matches!(
+            predicates[node.atom()].node,
+            PredicateNode::IsNonTerminalCall(_)
+        )
+    {
+        return false;
+    }
+
+    let guard = constraints.get_interior_node(node.if_false());
+    if guard.if_ambiguous() != next
+        || (guard.if_true() != next && guard.if_false() != next)
+        || !matches!(
+            predicates[guard.atom()].node,
+            PredicateNode::Expression { .. } | PredicateNode::Condition(_)
+        )
+        || !scope.file_scope_id(db).is_global()
+    {
+        return false;
+    }
+
+    match evaluate_guard(guard.atom()) {
+        Truthiness::AlwaysTrue => guard.if_true() == next,
+        Truthiness::Ambiguous => true,
+        Truthiness::AlwaysFalse => guard.if_false() == next,
+        Truthiness::Uninhabited => false,
+    }
+}
+
 /// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
 ///
 /// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
@@ -855,7 +903,19 @@ fn evaluate_reachability_path<'db>(
             if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
                 evaluate_reachability_checkpoint(db, scope, id)
             } else {
-                id = match analyze_single(db, &env, &predicates[node.atom()]) {
+                let truthiness = if conditional_call_is_bypassed(
+                    db,
+                    scope,
+                    constraints,
+                    predicates,
+                    node,
+                    |guard| analyze_single(db, &env, &predicates[guard]),
+                ) {
+                    Truthiness::AlwaysTrue
+                } else {
+                    analyze_single(db, &env, &predicates[node.atom()])
+                };
+                id = match truthiness {
                     Truthiness::AlwaysTrue => node.if_true(),
                     Truthiness::Ambiguous => node.if_ambiguous(),
                     Truthiness::AlwaysFalse => node.if_false(),

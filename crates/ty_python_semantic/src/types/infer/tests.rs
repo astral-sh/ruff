@@ -1069,6 +1069,42 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
 }
 
 #[test]
+fn guarded_call_can_skip_its_import_during_public_symbol_lookup() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/library.py",
+            r#"
+condition: bool = bool(input())
+try:
+    value = 1
+except BaseException:
+    pass
+if condition:
+    from hook import register
+
+    register()
+"#,
+        ),
+        (
+            "/src/hook.py",
+            "from typing import Never\ndef register() -> Never: raise RuntimeError",
+        ),
+        (
+            "/src/main.py",
+            "from typing import reveal_type\nfrom library import value\nreveal_type(value)",
+        ),
+    ])?;
+    let hook = system_path_to_file(&db, "/src/hook.py")?;
+    db.clear_salsa_events();
+    assert_revealed_type(&db, "/src/main.py", "Literal[1]");
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, hook), &events);
+
+    Ok(())
+}
+
+#[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
