@@ -1457,9 +1457,9 @@ jobs:
           - name: "colour_science|static_frame"
             target: ty_walltime
             filter: "colour_science|static_frame"
-          - name: "pydantic|freqtrade|multithreaded|altair"
+          - name: "pydantic|freqtrade|multithreaded|altair|isort"
             target: ty_walltime
-            filter: "pydantic|freqtrade|multithreaded|altair"
+            filter: "pydantic|freqtrade|multithreaded|altair|isort"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
