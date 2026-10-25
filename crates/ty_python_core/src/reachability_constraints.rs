@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 
 use ruff_index::Idx;
 use rustc_hash::FxHashMap;
+use thin_vec::ThinVec;
 
 use crate::interned_nodes::InternedNodes;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
@@ -149,6 +150,9 @@ pub struct ReachabilityConstraints {
     ///
     /// If all interior nodes were retained, the original ID can be used directly instead.
     used_indices: Option<RankBitBox>,
+    /// A while test has separate entry and exit atoms but one source expression. In
+    /// increasing exit-atom order; empty tables do not allocate.
+    while_exit_sources: ThinVec<(ScopedPredicateId, ScopedPredicateId)>,
 }
 
 impl ReachabilityConstraints {
@@ -168,6 +172,26 @@ impl ReachabilityConstraints {
         }
     }
 
+    /// The source position up to which preceding calls can warm this constraint.
+    ///
+    /// A constraint containing only a loop's exit test evaluates the same expression
+    /// as its entry test. Calls in the body follow that expression in source order.
+    /// Inferring loop-carried bindings still evaluates their own reachability constraints.
+    /// Constraints with other atoms still need the normal call prefix for their graph.
+    pub fn call_warmup_predicate(&self, node: InteriorNode) -> ScopedPredicateId {
+        let atom = node.atom();
+        if self.while_exit_sources.is_empty()
+            || !node.if_true().is_terminal()
+            || !node.if_ambiguous().is_terminal()
+            || !node.if_false().is_terminal()
+        {
+            return atom;
+        }
+        self.while_exit_sources
+            .binary_search_by_key(&atom, |&(exit, _)| exit)
+            .map_or(atom, |index| self.while_exit_sources[index].1)
+    }
+
     pub fn used_interiors(&self) -> &[InteriorNode] {
         &self.used_interiors
     }
@@ -176,6 +200,7 @@ impl ReachabilityConstraints {
 #[derive(Debug, Default)]
 pub struct ReachabilityConstraintsBuilder {
     interiors: InternedNodes<ScopedReachabilityConstraintId, InteriorNode>,
+    while_exit_sources: ThinVec<(ScopedPredicateId, ScopedPredicateId)>,
     interior_used: RankBitBoxVec,
     not_cache: FxHashMap<ScopedReachabilityConstraintId, ScopedReachabilityConstraintId>,
     and_cache: FxHashMap<
@@ -205,6 +230,7 @@ impl ReachabilityConstraintsBuilder {
             ReachabilityConstraints {
                 used_interiors: self.interiors.into_nodes_boxed_slice(),
                 used_indices: None,
+                while_exit_sources: self.while_exit_sources,
             }
         } else {
             let used_interiors = self
@@ -217,8 +243,27 @@ impl ReachabilityConstraintsBuilder {
             ReachabilityConstraints {
                 used_interiors,
                 used_indices: Some(used_indices),
+                while_exit_sources: self.while_exit_sources,
             }
         }
+    }
+
+    /// Record the entry atom for the synthetic later evaluation of a while test.
+    pub(crate) fn add_while_exit_atom(
+        &mut self,
+        source: ScopedPredicateId,
+        exit: ScopedPredicateId,
+    ) -> ScopedReachabilityConstraintId {
+        // Literal conditions already use a terminal predicate, not distinct atoms.
+        if source != exit {
+            debug_assert!(
+                self.while_exit_sources
+                    .last()
+                    .is_none_or(|&(last, _)| last < exit)
+            );
+            self.while_exit_sources.push((exit, source));
+        }
+        self.add_atom(exit)
     }
 
     /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were

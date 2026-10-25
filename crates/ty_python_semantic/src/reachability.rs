@@ -745,8 +745,12 @@ fn evaluate_reachability_constraint<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
-    let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+    let root = constraints.get_interior_node(id);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(
+        db,
+        predicates,
+        constraints.call_warmup_predicate(root),
+    );
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -943,11 +947,15 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return reachability;
         }
 
-        let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let root = self.get_interior_node(id);
+        analyze_non_terminal_calls_up_to_predicate(
+            db,
+            predicates,
+            self.call_warmup_predicate(root),
+        );
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            predicate_scope(db, &predicates[root.atom()]),
             self,
             predicates,
             None,
@@ -2373,6 +2381,39 @@ class TargetB:
         // Enter the range directly so it becomes the cycle head when inferring `other.target`
         // reaches the other module and then re-enters this scope.
         analyze_non_terminal_call_range(&db, setup_scope, 0, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn checking_loop_exit_does_not_infer_calls_in_the_body() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        let body = "        callback()\n".repeat(NON_TERMINAL_CALL_CHUNK_SIZE + 1);
+        let source = format!(
+            "from dependency import callback\n\ndef f(flag: bool) -> None:\n    while flag:\n{body}"
+        );
+        db.write_files([
+            ("/src/dependency.py", "def callback() -> None: ..."),
+            ("/src/test.py", source.as_str()),
+        ])?;
+        let file = system_path_to_file(&db, "/src/test.py")?;
+        let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+        let index = semantic_index(&db, program_file);
+        let scope = index
+            .child_scopes(FileScopeId::global())
+            .next()
+            .unwrap()
+            .0
+            .to_scope_id(&db, program_file);
+
+        // The condition only depends on `flag`. It can be false before any calls run.
+        assert!(is_end_of_scope_reachable(&db, scope));
+        let events = db.take_salsa_events();
+        ruff_db::testing::assert_function_query_was_not_run_by_name(
+            &db,
+            "analyze_non_terminal_call_range",
+            None,
+            &events,
+        );
         Ok(())
     }
 

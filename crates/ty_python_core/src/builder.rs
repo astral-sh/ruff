@@ -4664,7 +4664,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let later_predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
                 let later_reachability_constraint = self
                     .current_reachability_constraints_mut()
-                    .add_atom(later_predicate_id);
+                    .add_while_exit_atom(predicate_id, later_predicate_id);
                 self.record_negated_reachability_constraint(later_reachability_constraint);
 
                 self.record_negated_narrowing_constraint(predicate, predicate_id);
