@@ -23,13 +23,16 @@ use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::variance::{TypeVarVariance, VarianceInferable};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type_including_alias_arguments,
+    walk_type_with_recursion_guard,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-    ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
-    ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
-    UpcastPolicy,
+    ClassType, CycleDetector, DivergentFlags, DivergentProjection, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db, FxOrderSet,
@@ -1797,7 +1800,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         // TODO: Once https://github.com/astral-sh/ruff/pull/28307 lands, reuse its gradual-type
-        // descent here: specialize the opposite type's variables to the same cycle marker, then
+        // descent here: specialize the opposite type's variables to projected cycle markers, then
         // let ordinary relation checking collect bounds and handle variance and recursion.
         // This should replace `Occurrences`; `type[T]` still needs care because substituting
         // a cycle marker for `T` collapses the whole type to that marker.
@@ -1920,6 +1923,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         ConstraintSet::constrain_typevar_equivalence_bound
                     }
                     TypeVarVariance::Bivariant => return self.always(),
+                };
+                let marker = if let Type::Divergent(mut divergent) = marker
+                    && marker.is_recursive_divergent()
+                    && !divergent.flags.contains(DivergentFlags::FROZEN)
+                    && !matches!(other, Type::TypeVar(_))
+                    && !any_over_type_including_alias_arguments(db, self.env, other, |ty| {
+                        ty.is_divergent()
+                    }) {
+                    divergent.projection = Some(DivergentProjection::new(
+                        db,
+                        divergent.projection,
+                        other,
+                        typevar,
+                        polarity,
+                    ));
+                    Type::Divergent(divergent)
+                } else {
+                    marker
                 };
                 constrain(
                     db,

@@ -236,7 +236,11 @@ fn normalize_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(
+            db,
+            definition,
+            Type::divergent(id).binding_cycle_marker(definition),
+        )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -271,6 +275,7 @@ pub(crate) fn infer_definition_types<'db>(
         &module,
     )
     .finish_definition(definition)
+    .resolve_binding_projections(db, &env, definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -1280,6 +1285,29 @@ struct OtherDefinitionTypes<'db> {
 }
 
 impl<'db> DefinitionTypes<'db> {
+    fn replace_divergent_projections(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacements: &[(Type<'db>, Type<'db>)],
+    ) -> Self {
+        let replace = |ty: Type<'db>| ty.replace_divergent_projections(db, env, replacements);
+        match &mut self {
+            Self::Empty => {}
+            Self::Binding(ty) => *ty = replace(*ty),
+            Self::Declaration(ty) | Self::BindingAndDeclaration(ty) => *ty = ty.map_type(replace),
+            Self::Other(other) => {
+                for (_, ty) in &mut other.bindings {
+                    *ty = replace(*ty);
+                }
+                for (_, ty) in &mut other.declarations {
+                    *ty = ty.map_type(replace);
+                }
+            }
+        }
+        self
+    }
+
     fn from_parts(
         owner: Definition<'db>,
         bindings: Vec<DefinitionBinding<'db>>,
@@ -1611,7 +1639,9 @@ impl<'db> DefinitionInference<'db> {
         cycle_recovery: Type<'db>,
     ) -> Self {
         let env = ProgramEnvironment::from_definition(definition);
-        let mut types = DefinitionTypes::Empty;
+        // Other missing fields use the generic fallback below. Only the owner binding can be
+        // used to resolve projections of this marker.
+        let mut types = DefinitionTypes::Binding(cycle_recovery);
 
         // Eagerly store more precise types for collection literals to avoid an extra
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
@@ -1628,9 +1658,12 @@ impl<'db> DefinitionInference<'db> {
 
             if let Some(known_collection) = known_collection {
                 if let Some(collection_class) = known_collection.try_to_class_literal(db, &env) {
-                    let divergent_collection = collection_class
-                        .apply_specialization(db, |generic_context| {
-                            generic_context.repeat_specialization(db, cycle_recovery)
+                    let divergent_collection =
+                        collection_class.apply_specialization(db, |generic_context| {
+                            generic_context.repeat_specialization(
+                                db,
+                                cycle_recovery.without_binding_cycle_origin(),
+                            )
                         });
 
                     types =
@@ -1667,7 +1700,7 @@ impl<'db> DefinitionInference<'db> {
                 .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
-                    cycle_recovery,
+                    cycle_recovery.without_binding_cycle_origin(),
                 );
             }
         }
@@ -1679,11 +1712,55 @@ impl<'db> DefinitionInference<'db> {
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
                 OtherDefinitionInferenceExtra {
-                    cycle_recovery: Some(cycle_recovery),
+                    cycle_recovery: Some(cycle_recovery.without_binding_cycle_origin()),
                     ..OtherDefinitionInferenceExtra::default()
                 },
             )))),
         }
+    }
+
+    /// Projection resolution can request additional inference, so it runs in the query body
+    /// instead of the cycle callback, where new query cycles cannot be introduced.
+    fn resolve_binding_projections(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        definition: Definition<'db>,
+    ) -> Self {
+        let replacements = self
+            .types
+            .binding_type(definition, definition)
+            .map(|ty| ty.binding_projection_replacements(db, env, definition))
+            .unwrap_or_default();
+        if replacements.is_empty() {
+            return self;
+        }
+
+        for (_, ty) in &mut self.expressions {
+            *ty = ty.replace_divergent_projections(db, env, &replacements);
+        }
+        self.types = self
+            .types
+            .replace_divergent_projections(db, env, &replacements);
+
+        if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
+            for (_, ty) in &mut extra.deferred_decorator_calls {
+                *ty = ty.replace_divergent_projections(db, env, &replacements);
+            }
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "constraints for distinct collection definitions are resolved independently"
+            )]
+            for types in extra.collection_use_constraints.values_mut() {
+                *types = std::mem::take(types)
+                    .into_iter()
+                    .map(|ty| ty.replace_divergent_projections(db, env, &replacements))
+                    .collect();
+                types.shrink_to_fit();
+            }
+        }
+
+        self
     }
 
     fn cycle_normalized(

@@ -25,6 +25,16 @@ def wrap_callback(paths: list[int], start: int):
         values = (consume_callback(lambda: values),)
 
 
+def nest_callable(value: Callable[[T], T]) -> Callable[[list[T]], list[T]]:
+    raise NotImplementedError
+
+
+def wrap_callable(initial: Callable[[int], int], running: bool):
+    value = initial
+    while running:
+        value = nest_callable(value)
+
+
 # Walking a recursive protocol with growing type arguments must terminate.
 class Recursive(Protocol[T]):
     def next(self) -> tuple[T, "Recursive[list[T]]"]: ...

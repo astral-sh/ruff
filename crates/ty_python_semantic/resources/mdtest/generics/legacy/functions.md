@@ -4403,6 +4403,111 @@ def wrap(paths: list[int]):
     reveal_type(cls)  # revealed: <class 'int'> | type[list[int | Divergent]]
 ```
 
+## Unpacking generic return types in loops
+
+A loop that unpacks a generic helper's return value preserves the list's element type. The second
+argument also supplies that element type independently of the loop.
+
+```toml
+[rules]
+unsound-assignment = "error"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def rebuild(items: list[T], item: T) -> tuple[list[T]]:
+    raise NotImplementedError
+
+def update(items: list[T], item: T):
+    for _ in range(3):
+        (items,) = rebuild(items, item)  # no diagnostic
+    reveal_type(items)  # revealed: list[T@update]
+```
+
+## Reconstructing generic tuples in loops
+
+Rebuilding a tuple and passing it through a generic helper preserves the nested list's element type.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def combine(left: tuple[list[T], int | None], right: tuple[list[T], int | None]) -> tuple[list[T], int | None]:
+    raise NotImplementedError
+
+def update(initial: tuple[list[T], int | None]) -> tuple[list[T], int | None]:
+    result = (initial[0], 0)
+    for index in range(3):
+        result = (result[0], index)
+        result = combine(result, initial)
+    reveal_type(result)  # revealed: tuple[list[T@update], int | None]
+    return result  # no diagnostic
+```
+
+## Intermediate tuple expressions in loops
+
+The string occupies a different position in an intermediate tuple than in the loop variable. Both
+tuples retain their respective element types.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def second(value: tuple[object, T]) -> T:
+    return value[1]
+
+def update(initial: tuple[int, str]):
+    value = initial
+    for _ in range(3):
+        # revealed: tuple[str, Literal[1]]
+        value = (0, reveal_type((second(value), 1))[0])
+    reveal_type(value)  # revealed: tuple[Literal[0], str]
+```
+
+## Filtering generic iterables in loops
+
+Repeatedly filtering an iterable preserves its element type when each filter returns an iterator
+over the same type.
+
+```toml
+[rules]
+unsound-assignment = "error"
+unsound-return-statement = "error"
+```
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Iterable(Protocol[T_co]):
+    def __iter__(self) -> "Iterator[T_co]": ...
+
+class Iterator(Iterable[T_co], Protocol[T_co]):
+    def __next__(self) -> T_co: ...
+
+class Filter:
+    def filter(self, items: Iterable[T]) -> Iterator[T]:
+        return iter(items)
+
+def filter_all(filters: list[Filter], items: Iterable[T]) -> Iterator[T]:
+    for step in filters:
+        items = step.filter(items)  # no diagnostic
+    reveal_type(iter(items))  # revealed: Iterator[T@filter_all]
+    return iter(items)  # no diagnostic
+```
+
 ## Element types across generic calls in loops
 
 Updating a collection while iterating through a generic wrapper preserves its element type, so

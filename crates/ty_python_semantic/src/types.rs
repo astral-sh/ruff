@@ -2056,7 +2056,7 @@ pub enum Type<'db> {
     /// The dynamic type: a statically unknown set of values
     Dynamic(DynamicType<'db>),
     /// An unresolved value during cyclic inference, or a recursive type marker.
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     /// A recursive type whose references are bound by its body.
     /// See the module documentation in `recursive.rs` for details.
     Recursive(RecursiveType<'db>),
@@ -2374,7 +2374,27 @@ impl<'db> Type<'db> {
             origin: DivergentOrigin::PendingNarrowing,
             flags: DivergentFlags::empty(),
             materialization: None,
+            projection: None,
+            binding: None,
         })
+    }
+
+    fn binding_cycle_marker(self, definition: Definition<'db>) -> Self {
+        if let Type::Divergent(mut divergent) = self {
+            divergent.binding = Some(definition);
+            Type::Divergent(divergent)
+        } else {
+            self
+        }
+    }
+
+    fn without_binding_cycle_origin(self) -> Self {
+        if let Type::Divergent(mut divergent) = self {
+            divergent.binding = None;
+            Type::Divergent(divergent)
+        } else {
+            self
+        }
     }
 
     const fn is_pending_narrowing(&self) -> bool {
@@ -2401,7 +2421,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
-    const fn as_divergent(self) -> Option<DivergentType> {
+    const fn as_divergent(self) -> Option<DivergentType<'db>> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
             _ => None,
@@ -3725,16 +3745,105 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // Structural inference may extract an element type from an unresolved collection. Give
+        // that projection time to resolve before treating it as recursive nesting. After the
+        // initial iterations, discard projection metadata and use the ordinary recursive cutoff;
+        // otherwise repeated extraction could grow projection chains indefinitely.
+        let mut current = self;
+        if cycle.iteration() > crate::TAINTED_CYCLES {
+            let projections = RefCell::new(FxOrderSet::default());
+            any_over_type_including_alias_arguments(db, env, self, |ty| {
+                if let Type::Divergent(divergent) = ty
+                    && divergent.projection.is_some()
+                    && let DivergentOrigin::Recursive(id) = divergent.origin
+                    && cycle.head_ids().any(|head| head == id)
+                {
+                    projections.borrow_mut().insert(ty);
+                }
+                false
+            });
+            for marker in projections.into_inner() {
+                let Type::Divergent(mut divergent) = marker else {
+                    continue;
+                };
+                divergent.projection = None;
+                divergent.binding = None;
+                divergent.flags.insert(DivergentFlags::FROZEN);
+                current = current.apply_type_mapping(
+                    db,
+                    env,
+                    &TypeMapping::ReplaceDivergent {
+                        marker,
+                        replacement: Type::Divergent(divergent),
+                    },
+                    TypeContext::default(),
+                );
+            }
+        }
         let normalized =
-            self.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
+            current.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
                 cycle
                     .head_ids()
                     .any(|id| ty.same_divergent_marker(Type::divergent(id)))
             });
         cycle.head_ids().fold(normalized, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
+            let mut divergent = DivergentType::new(id);
+            if cycle.iteration() > crate::TAINTED_CYCLES {
+                divergent.flags.insert(DivergentFlags::FROZEN);
+            }
+            let marker = Type::Divergent(divergent);
+            ty.recursive_type_normalized_impl(db, env, marker, false)
+                .unwrap_or(marker)
         })
+    }
+
+    fn binding_projection_replacements(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        definition: Definition<'db>,
+    ) -> Vec<(Type<'db>, Type<'db>)> {
+        // A marker refers to a particular query's owner binding. Intermediate expressions and
+        // markers belonging to other cycle heads cannot supply its defining equation.
+        let markers = RefCell::new(FxOrderSet::default());
+        any_over_type_including_alias_arguments(db, env, self, |ty| {
+            if let Type::Divergent(divergent) = ty
+                && divergent.binding == Some(definition)
+                && let Some(projection) = divergent.projection
+            {
+                markers.borrow_mut().insert((ty, projection));
+            }
+            false
+        });
+        markers
+            .into_inner()
+            .into_iter()
+            .filter_map(|(marker, projection)| {
+                generics::resolve_divergent_projection(db, env, self, projection, marker)
+                    .map(|replacement| (marker, replacement))
+            })
+            .collect()
+    }
+
+    fn replace_divergent_projections(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        replacements: &[(Type<'db>, Type<'db>)],
+    ) -> Self {
+        replacements
+            .iter()
+            .fold(self, |ty, &(marker, replacement)| {
+                ty.apply_type_mapping(
+                    db,
+                    env,
+                    &TypeMapping::ReplaceDivergent {
+                        marker,
+                        replacement,
+                    },
+                    TypeContext::default(),
+                )
+            })
     }
 
     /// Discard unresolved narrowing while preserving recursive structure around it. A bare
@@ -9610,6 +9719,20 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if let TypeMapping::ReplaceDivergent {
+            marker,
+            replacement,
+        } = type_mapping
+            && self.same_divergent_marker(*marker)
+        {
+            return match self
+                .as_divergent()
+                .and_then(DivergentType::materialization_kind)
+            {
+                Some(kind) => replacement.materialize(db, kind, visitor),
+                None => *replacement,
+            };
+        }
         if let TypeMapping::GeneralizeLocalTypes(scope) = type_mapping {
             let is_local = |definition: Definition<'db>| {
                 definition.program_file(db) == scope.program_file(db)
@@ -9996,6 +10119,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::RescopeReturnCallables(_)
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
@@ -10019,6 +10143,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::GeneralizeLocalTypes(_)
+                | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11350,6 +11475,11 @@ impl<'db> SelfBinding<'db> {
 /// literal).
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
+    /// Substitute a resolved projection, preserving materialization at each occurrence.
+    ReplaceDivergent {
+        marker: Type<'db>,
+        replacement: Type<'db>,
+    },
     /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Applies a specialization and materializes only substituted typevars.
@@ -11477,6 +11607,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => Some(context),
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -11530,6 +11661,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::GeneralizeLocalTypes(_)
+            | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }
@@ -11550,6 +11682,8 @@ bitflags! {
         /// The cycle comes from type alias inference. Value inference can also diverge,
         /// for example when an assignment feeds into the next iteration of a loop.
         const FROM_TYPE_ALIAS = 1 << 0;
+        /// Widening has committed to recursive recovery; do not resume projection refinement.
+        const FROZEN = 1 << 1;
     }
 }
 
@@ -11571,29 +11705,55 @@ enum DivergentOrigin {
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DivergentType {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub struct DivergentType<'db> {
     origin: DivergentOrigin,
     flags: DivergentFlags,
     /// If this divergent marker has been materialized, preserve whether it should behave like the
     /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
     materialization: Option<MaterializationKind>,
+    projection: Option<DivergentProjection<'db>>,
+    /// The owner binding of an `infer_definition_types` query, when this marker represents it.
+    binding: Option<Definition<'db>>,
 }
 
 // The Salsa heap is tracked separately.
-impl get_size2::GetSize for DivergentType {}
+impl get_size2::GetSize for DivergentType<'_> {}
 
-impl DivergentType {
+/// A type variable extracted from an unresolved value by structural generic inference.
+///
+/// For example, inferring `T` from `Iterable[T]` extracts the value's element type. Keeping that
+/// operation separate from the value's marker lets `Iterator[T | element_type(self)]` resolve
+/// to `Iterator[T]`, while an element type such as `list[element_type(self)]` remains recursive.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DivergentProjection<'db> {
+    #[returns(copy)]
+    parent: Option<DivergentProjection<'db>>,
+    #[returns(copy)]
+    formal: Type<'db>,
+    #[returns(copy)]
+    typevar: BoundTypeVarInstance<'db>,
+    #[returns(copy)]
+    polarity: TypeVarVariance,
+}
+
+impl get_size2::GetSize for DivergentProjection<'_> {}
+
+impl DivergentType<'_> {
     const fn new(id: salsa::Id) -> Self {
         Self {
             origin: DivergentOrigin::Recursive(id),
             flags: DivergentFlags::empty(),
             materialization: None,
+            projection: None,
+            binding: None,
         }
     }
 
     fn same_marker(self, other: Self) -> bool {
         self.origin == other.origin
+            && self.projection == other.projection
+            && (self.projection.is_none() || self.binding == other.binding)
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {

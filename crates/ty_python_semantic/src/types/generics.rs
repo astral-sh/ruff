@@ -34,15 +34,15 @@ use crate::types::typevar::{
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    walk_type_with_recursion_guard,
+    any_over_type_including_alias_arguments, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin, SubclassOfInner,
-    Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    ClassLiteral, DivergentProjection, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SelfTypeVarOrigin,
+    SubclassOfInner, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2524,6 +2524,70 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
             self.type_identity(db, self.actual),
         )
     }
+}
+
+/// Resolve a projected cycle marker when its inferred type has no remaining provisional dependency.
+/// Apply chained projections before normalization so intermediate structure remains available.
+pub(super) fn resolve_divergent_projection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    actual: Type<'db>,
+    projection: DivergentProjection<'db>,
+    marker: Type<'db>,
+) -> Option<Type<'db>> {
+    let projections: Vec<_> =
+        std::iter::successors(Some(projection), |projection| projection.parent(db)).collect();
+    let mut inferred = actual;
+    for projection in projections.into_iter().rev() {
+        // Only covariant extraction preserves unions, allowing a direct self-reference to be
+        // removed from its defining equation. Invariant or contravariant inference can choose
+        // a concrete bound while other alternatives still depend on the recursive value.
+        if !projection
+            .polarity(db)
+            .compose(
+                projection
+                    .formal(db)
+                    .variance_of(db, env, projection.typevar(db).identity(db))
+                    .evaluate(db),
+            )
+            .is_covariant()
+        {
+            return None;
+        }
+        let context = GenericContext::from_typevar_instances(db, env, [projection.typevar(db)]);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder = SpecializationBuilder::new(db, env, &constraints, context);
+        builder
+            .infer_map_impl(
+                projection.formal(db),
+                inferred,
+                projection.polarity(db),
+                &InferSpecializationVisitor::new(Ok(())),
+            )
+            .ok()?;
+        let inference = builder.build_inference_with(|_, _| None).ok()?;
+        // A compatibility mapping or an unresolved alternative is not evidence that the
+        // recursive dependency has disappeared.
+        match inference.solutions(db) {
+            TypeVarInferenceSolutions::Single => {}
+            TypeVarInferenceSolutions::Alternatives(alternatives)
+                if !alternatives.is_empty()
+                    && alternatives.iter().all(|solution| {
+                        matches!(solution.as_ref(), [Some(SolutionType::Resolved(_))])
+                    }) => {}
+            _ => return None,
+        }
+        inferred = inference.merged_types(db).first().copied().flatten()?;
+    }
+    let resolved = inferred
+        .recursive_type_normalized_impl(db, env, marker, false)
+        .unwrap_or(marker);
+    // An explicit `Any` supplies independent evidence, just like a static type. Inference
+    // fallbacks such as `Unknown` cannot establish that the recursive dependency is gone.
+    (!any_over_type_including_alias_arguments(db, env, resolved, |ty| {
+        (ty.is_dynamic() && ty != Type::any()) || ty.is_divergent()
+    }))
+    .then_some(resolved)
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a

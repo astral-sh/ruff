@@ -887,6 +887,38 @@ def stringify(initial: int) -> int | str:
     return value
 ```
 
+### Rebuilding lists through `zip`
+
+Reconstructing a list from the first element of each pair preserves its element type across loop
+iterations.
+
+```toml
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+def rebuild(items: list[str], flags: list[bool], running: bool) -> list[str]:
+    result = items
+    while running:
+        result = [item for item, _ in zip(result, flags)]
+    reveal_type(result)  # revealed: list[str]
+    return result  # no diagnostic
+```
+
+An explicit `Any` element type also survives the loop without acquiring a recursive marker.
+
+```py
+from typing import Any
+
+def rebuild_dynamic(items: list[Any], flags: list[bool], running: bool) -> list[Any]:
+    result = items
+    while running:
+        result = [item for item, _ in zip(result, flags)]
+    reveal_type(result)  # revealed: list[Any]
+    return result  # no diagnostic
+```
+
 ### Recursive assignments guarded by predicates
 
 Conditional loop inference preserves recursive type structure introduced by assignments, including
