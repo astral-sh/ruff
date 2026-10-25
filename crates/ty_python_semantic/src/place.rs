@@ -2000,7 +2000,9 @@ fn place_from_bindings_impl<'db>(
                         NarrowingProjector::new(
                             db,
                             env,
-                            narrowing_constraint.use_def(),
+                            narrowing_constraint.narrowing_constraints(),
+                            predicates,
+                            narrowing_constraint.predicate_narrowing_targets(),
                             binding.place(db),
                             binding_ty,
                         )
