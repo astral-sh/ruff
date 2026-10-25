@@ -542,3 +542,58 @@ class Alias:
 
 Alias()  # error: [call-non-callable]
 ```
+
+## Decorators that replace a descriptor
+
+A decorator can return an ordinary descriptor or an abstract method from another class. When the
+decorators are stacked, an outer decorator can replace the descriptor with an abstract property.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from abc import abstractmethod
+from collections.abc import Callable
+
+class Descriptor[T]:
+    def __get__(self, instance: object, owner: type) -> T:
+        raise NotImplementedError
+
+def descriptor[T]() -> Callable[[Callable[..., T]], Descriptor[T]]:
+    def decorate(function: Callable[..., T]) -> Descriptor[T]:
+        return Descriptor()
+
+    return decorate
+
+def replace_with[T](value: T) -> Callable[[object], T]:
+    return lambda _: value
+
+class Source:
+    @abstractmethod
+    def method(self) -> int: ...
+    @property
+    @abstractmethod
+    def prop(self) -> int: ...
+
+class Concrete:
+    @descriptor()
+    def member(self) -> int:
+        return 1
+
+class WrappedMethod:
+    @replace_with(Source.method)
+    def member(self) -> int:
+        return 1
+
+class WrappedProperty:
+    @replace_with(Source.prop)
+    @descriptor()
+    def member(self) -> int:
+        return 1
+
+Concrete()
+WrappedMethod()  # error: [call-non-callable]
+WrappedProperty()  # error: [call-non-callable]
+```

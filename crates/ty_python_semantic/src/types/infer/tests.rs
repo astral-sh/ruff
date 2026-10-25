@@ -1608,6 +1608,40 @@ fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
 }
 
 #[test]
+fn concrete_decorator_result_avoids_inferring_method_annotations() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file("/src/dependency.py", "class Payload: ...")?;
+    db.write_dedented(
+        "/src/model.py",
+        r#"
+        from typing import Callable, Generic, TypeVar
+        from dependency import Payload
+
+        T = TypeVar("T")
+
+        class Descriptor(Generic[T]):
+            def __get__(self, instance: object, owner: type) -> T:
+                raise NotImplementedError
+
+        def descriptor() -> Callable[[Callable[..., T]], Descriptor[T]]: ...
+
+        class Model:
+            @descriptor()
+            def value(self) -> "Payload": ...
+        "#,
+    )?;
+    db.write_file("/src/main.py", "from model import Model\nModel()")?;
+
+    let dependency = system_path_to_file(&db, "/src/dependency.py")?;
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/main.py", &[]);
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(&db, semantic_index, program_file(&db, dependency), &events);
+
+    Ok(())
+}
+
+#[test]
 fn declared_instance_attribute_avoids_inferring_method_assignments() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_file("/src/dependency.py", "value = 42")?;
