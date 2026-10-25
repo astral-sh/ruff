@@ -16,7 +16,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, FxIndexSet, ProgramEnvironment, attribute_declarations,
+    Db, ProgramEnvironment, attribute_declarations,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -182,7 +182,7 @@ fn check_inherited_conflicts<'db>(
         mro.iter()
             .copied()
             .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
-            .collect::<FxIndexSet<_>>()
+            .collect::<crate::FxIndexSet<_>>()
     });
 
     for (index, candidate_owner) in mro.iter().copied().enumerate() {
