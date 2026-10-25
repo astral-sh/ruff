@@ -203,6 +203,17 @@ def _(
     reveal_type(i2)  # revealed: P & Q
 ```
 
+Recombining the truthy and falsy parts of `int` also subsumes the earlier `bool` operand.
+
+```py
+from typing import Union
+from ty_extensions import AlwaysFalsy, AlwaysTruthy
+
+TruthyInt = Intersection[int, Not[AlwaysFalsy]]
+FalsyInt = Intersection[int, Not[AlwaysTruthy]]
+reveal_type(Union[bool, TruthyInt, FalsyInt])  # revealed: <types.UnionType special-form 'int'>
+```
+
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
 ```toml
