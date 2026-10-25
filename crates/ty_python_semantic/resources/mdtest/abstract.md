@@ -543,57 +543,36 @@ class Alias:
 Alias()  # error: [call-non-callable]
 ```
 
-## Decorators that replace a descriptor
-
-A decorator can return an ordinary descriptor or an abstract method from another class. When the
-decorators are stacked, an outer decorator can replace the descriptor with an abstract property.
-
-```toml
-[environment]
-python-version = "3.12"
-```
+A decorator can also return an abstract method. Here the decorator replaces `Decorated.method` with
+`Abstract.method`, so `Decorated` is abstract.
 
 ```py
-from abc import abstractmethod
+from abc import ABC
 from collections.abc import Callable
+from typing import TypeVar
 
-class Descriptor[T]:
-    def __get__(self, instance: object, owner: type) -> T:
-        raise NotImplementedError
+T = TypeVar("T")
 
-def descriptor[T]() -> Callable[[Callable[..., T]], Descriptor[T]]:
-    def decorate(function: Callable[..., T]) -> Descriptor[T]:
-        return Descriptor()
-
-    return decorate
-
-def replace_with[T](value: T) -> Callable[[object], T]:
+def replace_with(value: T) -> Callable[[object], T]:
     return lambda _: value
 
-class Source:
-    @abstractmethod
-    def method(self) -> int: ...
-    @property
-    @abstractmethod
-    def prop(self) -> int: ...
+class Decorated(ABC):
+    @replace_with(Abstract.method)
+    def method(self) -> None:
+        pass
 
-class Concrete:
-    @descriptor()
-    def member(self) -> int:
-        return 1
+Decorated()  # error: [call-non-callable]
+```
 
-class WrappedMethod:
-    @replace_with(Source.method)
-    def member(self) -> int:
-        return 1
+Python applies the inner decorator first. It returns a plain object, which the outer decorator
+replaces with `Abstract.method`.
 
-class WrappedProperty:
-    @replace_with(Source.prop)
-    @descriptor()
-    def member(self) -> int:
-        return 1
+```py
+class Stacked(ABC):
+    @replace_with(Abstract.method)
+    @replace_with(object())
+    def method(self) -> None:
+        pass
 
-Concrete()
-WrappedMethod()  # error: [call-non-callable]
-WrappedProperty()  # error: [call-non-callable]
+Stacked()  # error: [call-non-callable]
 ```
