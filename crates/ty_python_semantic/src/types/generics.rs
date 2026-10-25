@@ -540,7 +540,17 @@ impl<'db> GenericContext<'db> {
 
     /// Returns the typevars directly bound by this generic context.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
-        TypeVarSet::from_typevars(db, self.variables(db))
+        // Argument inference asks for this set for each parameter of each candidate overload.
+        // Build and intern the ordered set once per generic context.
+        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        fn inferable_typevars_impl<'db>(
+            db: &'db dyn Db,
+            context: GenericContext<'db>,
+        ) -> TypeVarSet<'db> {
+            TypeVarSet::from_typevars(db, context.variables(db))
+        }
+
+        inferable_typevars_impl(db, self)
     }
 
     pub(crate) fn variables(
