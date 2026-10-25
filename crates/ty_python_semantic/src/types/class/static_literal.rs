@@ -3045,36 +3045,41 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
+                        let implicit = match declaredness {
+                            Definedness::AlwaysDefined
+                                if self.has_implicit_instance_attribute(db, name) =>
+                            {
+                                // A method assigns to this attribute, but its declared type
+                                // already determines what an instance can read.
+                                return Member {
+                                    inner: declared.with_qualifiers(qualifiers),
+                                };
+                            }
+                            Definedness::AlwaysDefined => Member::unbound(),
+                            Definedness::PossiblyUndefined => {
+                                self.implicit_attribute(db, name, MethodDecorator::None)
+                            }
+                        };
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
                             ..
                         }) = implicit.inner.place
                         {
-                            if declaredness == Definedness::AlwaysDefined {
-                                // If a symbol is definitely declared, and we see
-                                // attribute assignments in methods of the class,
-                                // we trust the declared type.
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
-                            } else {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_two_elements(
-                                            db,
-                                            env,
-                                            declared_ty,
-                                            implicit_ty,
-                                        ),
-                                        origin: TypeOrigin::Declared,
-                                        definedness: declaredness,
-                                        public_type_policy: PublicTypePolicy::Raw,
-                                        provenance: implicit_provenance.or(declared_provenance),
-                                    })
-                                    .with_qualifiers(qualifiers),
-                                }
+                            Member {
+                                inner: Place::Defined(DefinedPlace {
+                                    ty: UnionType::from_two_elements(
+                                        db,
+                                        env,
+                                        declared_ty,
+                                        implicit_ty,
+                                    ),
+                                    origin: TypeOrigin::Declared,
+                                    definedness: declaredness,
+                                    public_type_policy: PublicTypePolicy::Raw,
+                                    provenance: implicit_provenance.or(declared_provenance),
+                                })
+                                .with_qualifiers(qualifiers),
                             }
                         } else if self.is_own_dataclass_instance_field(db, name)
                             && declared_ty
