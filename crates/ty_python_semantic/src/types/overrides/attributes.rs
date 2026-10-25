@@ -41,7 +41,7 @@ struct AttributeContract<'db> {
 
 /// An inferred default has no declared attribute contract, but its value can still
 /// provide a call signature that an overriding method needs to preserve.
-enum MemberContract<'db, A = AttributeContract<'db>> {
+enum MemberContract<'db, A> {
     Attribute(A),
     Inferred(Type<'db>),
 }
@@ -129,7 +129,7 @@ fn member_contract<'db>(
     receiver: Type<'db>,
     name: &str,
     kind: AttributeContractKind,
-) -> Option<MemberContract<'db>> {
+) -> Option<MemberContract<'db, AttributeContract<'db>>> {
     match unbound_member_contract(db, env, owner, name, kind)? {
         MemberContract::Attribute(attribute) => Some(MemberContract::Attribute(bind_attribute(
             db, env, owner, receiver, name, &attribute,
