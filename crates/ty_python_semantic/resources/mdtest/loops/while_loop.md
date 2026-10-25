@@ -411,6 +411,25 @@ while x < 10:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
+### Assignments in a loop that cannot start
+
+`remaining` is zero before the first iteration. Only the loop body can change it, so the assignment
+of `None` inside the loop cannot reach the return.
+
+```py
+def example(flag: bool) -> int:
+    result = 1
+    remaining = 0
+    while remaining:
+        if flag:
+            if bool(result):
+                remaining = result
+            else:
+                result = 0
+        result = result or None
+    return result
+```
+
 ### Deletions in nested loops reach the outer loop
 
 An inner loop can delete a variable on one iteration, then exit through `break` on a later

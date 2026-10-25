@@ -629,13 +629,13 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
 /// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
 /// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
-/// demand.
+/// demand. Returns the scope's call predicates when it is large enough to precompute them.
 fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
+    scope: ScopeId<'db>,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
-) -> bool {
-    let scope = predicate_scope(db, &predicates[root_predicate]);
+) -> Option<&'db [ScopedPredicateId]> {
     let has_many_calls = predicates
         .iter()
         .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
@@ -643,7 +643,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         .is_some();
 
     if !has_many_calls {
-        return false;
+        return None;
     }
 
     let call_predicates = non_terminal_call_predicates(db, scope);
@@ -660,7 +660,7 @@ fn analyze_non_terminal_calls_up_to_predicate<'db>(
         remaining -= length;
     }
 
-    true
+    Some(call_predicates)
 }
 
 /// Returns the statement-call predicates for `scope` in source order.
@@ -737,18 +737,34 @@ fn evaluate_reachability_constraint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
-    cache: Option<&PredicateTruthinessCache>,
 ) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
     }
 
     let use_def = use_def_map(db, scope);
-    let constraints = use_def.reachability_constraints();
-    let predicates = use_def.predicates();
+    evaluate_reachability_in_scope(
+        db,
+        scope,
+        use_def.reachability_constraints(),
+        use_def.predicates(),
+        id,
+        None,
+    )
+}
+
+/// Evaluates a nonterminal constraint using the graph and predicates already loaded for its scope.
+fn evaluate_reachability_in_scope<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    id: ScopedReachabilityConstraintId,
+    cache: Option<&PredicateTruthinessCache>,
+) -> Truthiness {
     let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
-    let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
+    let call_predicates =
+        analyze_non_terminal_calls_up_to_predicate(db, scope, predicates, root_predicate);
 
     evaluate_reachability_path(
         db,
@@ -793,7 +809,7 @@ fn evaluate_finally_continuation<'db>(
     scope: ScopeId<'db>,
     continuation: ScopedReachabilityConstraintId,
 ) -> Truthiness {
-    evaluate_reachability_constraint(db, scope, continuation, None)
+    evaluate_reachability_constraint(db, scope, continuation)
 }
 
 fn terminal_reachability(id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
@@ -959,10 +975,11 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         }
 
         let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
+        let scope = predicate_scope(db, &predicates[root_predicate]);
+        let _ = analyze_non_terminal_calls_up_to_predicate(db, scope, predicates, root_predicate);
         evaluate_reachability_path(
             db,
-            predicate_scope(db, &predicates[root_predicate]),
+            scope,
             self,
             |env, id| analyze_single(db, env, &predicates[id]),
             None,
@@ -1436,6 +1453,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
+            AnalyzeNonTerminal(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
         }
@@ -1447,7 +1465,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         while let Some(action) = actions.pop() {
             match action {
                 Action::Visit(id) => {
-                    if self.cached_projection(id).is_some() {
+                    if id.is_terminal() || self.project_cache.contains_key(&(id, self.base_ty)) {
                         continue;
                     }
 
@@ -1496,45 +1514,39 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), projected);
                         continue;
                     }
-                    // The unconditional path applies even when the predicate is uninhabited.
-                    // If it leaves the place unconstrained, the other paths cannot narrow it.
-                    match self.cached_projection(node.if_uncertain) {
-                        None => {
-                            actions.push(Action::Visit(id));
-                            actions.push(Action::Visit(node.if_uncertain));
-                            continue;
-                        }
-                        Some(ProjectedNarrowingNodeId::ALWAYS_TRUE) => {
-                            self.project_cache
-                                .insert((id, self.base_ty), ProjectedNarrowingNodeId::ALWAYS_TRUE);
-                            continue;
-                        }
-                        Some(_) => {}
-                    }
-
-                    if matches!(
+                    let is_control_flow_gate = matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
                             | PredicateNode::ContextManagerSuppresses { .. }
                             | PredicateNode::FinallyNormalPathImpossible { .. }
-                    ) {
-                        let branch = match analyze_single(db, self.env, &predicate) {
-                            Truthiness::AlwaysTrue => node.if_true,
-                            Truthiness::AlwaysFalse => node.if_false,
-                            Truthiness::Uninhabited => Id::ALWAYS_FALSE,
-                            Truthiness::Ambiguous => {
-                                unreachable!(
-                                    "statically decidable predicates should never be Ambiguous"
-                                )
-                            }
-                        };
-                        actions.push(Action::FinishNonTerminal { id, branch });
-                        actions.push(Action::Visit(branch));
+                    );
+
+                    if is_control_flow_gate {
+                        actions.push(Action::AnalyzeNonTerminal(id));
+                        actions.push(Action::Visit(node.if_uncertain));
                     } else {
                         actions.push(Action::FinishPredicate(id));
                         actions.push(Action::Visit(node.if_false));
+                        actions.push(Action::Visit(node.if_uncertain));
                         actions.push(Action::Visit(node.if_true));
                     }
+                }
+                Action::AnalyzeNonTerminal(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    let predicate = self.predicates[node.atom];
+                    let branch = match analyze_single(db, self.env, &predicate) {
+                        Truthiness::AlwaysTrue => node.if_true,
+                        Truthiness::AlwaysFalse => node.if_false,
+                        Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
+                        Truthiness::Ambiguous => {
+                            unreachable!(
+                                "statically decidable predicates should never be Ambiguous"
+                            )
+                        }
+                    };
+
+                    actions.push(Action::FinishNonTerminal { id, branch });
+                    actions.push(Action::Visit(branch));
                 }
                 Action::FinishNonTerminal { id, branch } => {
                     let node = self.constraints.get_interior_node(id);
@@ -1548,19 +1560,13 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
-                    // No outcome of this predicate can change the projection, including
-                    // an uninhabited test, which contributes only the unconditional branch.
-                    if if_true == if_uncertain && if_false == if_uncertain {
-                        self.project_cache.insert((id, self.base_ty), if_uncertain);
-                        continue;
-                    }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(db, self.env, &self.predicates[node.atom]) {
+                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -1586,15 +1592,10 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 
     fn projected_node(&self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
-        self.cached_projection(id)
-            .expect("child nodes are projected before their parent")
-    }
-
-    fn cached_projection(&self, id: ScopedNarrowingConstraint) -> Option<ProjectedNarrowingNodeId> {
         match id {
-            ScopedNarrowingConstraint::ALWAYS_TRUE => Some(ProjectedNarrowingNodeId::ALWAYS_TRUE),
-            ScopedNarrowingConstraint::ALWAYS_FALSE => Some(ProjectedNarrowingNodeId::ALWAYS_FALSE),
-            _ => self.project_cache.get(&(id, self.base_ty)).copied(),
+            ScopedNarrowingConstraint::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            ScopedNarrowingConstraint::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            _ => self.project_cache[&(id, self.base_ty)],
         }
     }
 }
@@ -2226,9 +2227,17 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
-        let predicate = predicates[constraints.get_interior_node(id).atom()];
         let constraints_key = std::ptr::from_ref(constraints).addr();
-        let scope = predicate_scope(db, &predicate);
+        let index = id.index();
+        // Entries in the primary graph were already checked to belong to the primary scope.
+        if constraints_key == self.primary_constraints
+            && let Some(result) = self.primary_entries.borrow().get(index).copied().flatten()
+        {
+            return result;
+        }
+
+        let predicate = &predicates[constraints.get_interior_node(id).atom()];
+        let scope = predicate_scope(db, predicate);
 
         if scope != self.primary_scope || constraints_key != self.primary_constraints {
             let key = (constraints_key, id);
@@ -2236,19 +2245,16 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 return result;
             }
 
-            let result = evaluate_reachability_constraint(db, scope, id, None);
+            let result = evaluate_reachability_constraint(db, scope, id);
             self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
 
-        let index = id.index();
-        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
-            return result;
-        }
-
-        let result = evaluate_reachability_constraint(
+        let result = evaluate_reachability_in_scope(
             db,
             self.primary_scope,
+            constraints,
+            predicates,
             id,
             self.primary_predicates.as_ref(),
         );
@@ -2435,13 +2441,8 @@ class TargetB:
             let scope = function_scope.to_scope_id(&db, program_file);
             let use_def = use_def_map(&db, scope);
             assert!(
-                evaluate_reachability_constraint(
-                    &db,
-                    scope,
-                    use_def.end_of_scope_reachability(),
-                    None
-                )
-                .may_be_true()
+                evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(),)
+                    .may_be_true()
             );
         }
 
@@ -2454,7 +2455,7 @@ class TargetB:
         let scope = function_scope.to_scope_id(&db, program_file);
         let use_def = use_def_map(&db, scope);
         assert!(
-            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability(), None)
+            evaluate_reachability_constraint(&db, scope, use_def.end_of_scope_reachability())
                 .is_always_false()
         );
         Ok(())
