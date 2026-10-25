@@ -309,7 +309,7 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, _, _| FunctionDecoratorInference {
-        has_unknown_decorators: true,
+        may_produce_abstract_method: true,
         ..FunctionDecoratorInference::default()
     },
     heap_size=ruff_memory_usage::heap_size
@@ -356,8 +356,9 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     called_functions: Box<[FunctionType<'db>]>,
     legacy_aliases: Box<[Definition<'db>]>,
     known_decorators: FunctionDecorators,
-    /// Whether any decorator is unrecognized, or decorator inference is incomplete.
-    has_unknown_decorators: bool,
+    /// Whether a decorator could produce an explicitly abstract method, or decorator
+    /// inference is incomplete.
+    may_produce_abstract_method: bool,
     context: InferContextResult,
 }
 
@@ -387,12 +388,12 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.legacy_aliases
     }
 
-    pub(super) fn known_decorators(&self) -> FunctionDecorators {
+    fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
     }
 
-    pub(super) fn has_unknown_decorators(&self) -> bool {
-        self.has_unknown_decorators
+    pub(super) fn may_produce_abstract_method(&self) -> bool {
+        self.may_produce_abstract_method
     }
 
     fn context_result(&self) -> &InferContextResult {

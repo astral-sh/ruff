@@ -542,3 +542,37 @@ class Alias:
 
 Alias()  # error: [call-non-callable]
 ```
+
+A decorator can also return an abstract method. Here the decorator replaces `Decorated.method` with
+`Abstract.method`, so `Decorated` is abstract.
+
+```py
+from abc import ABC
+from collections.abc import Callable
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def replace_with(value: T) -> Callable[[object], T]:
+    return lambda _: value
+
+class Decorated(ABC):
+    @replace_with(Abstract.method)
+    def method(self) -> None:
+        pass
+
+Decorated()  # error: [call-non-callable]
+```
+
+Python applies the inner decorator first. It returns a plain object, which the outer decorator
+replaces with `Abstract.method`.
+
+```py
+class Stacked(ABC):
+    @replace_with(Abstract.method)
+    @replace_with(object())
+    def method(self) -> None:
+        pass
+
+Stacked()  # error: [call-non-callable]
+```
