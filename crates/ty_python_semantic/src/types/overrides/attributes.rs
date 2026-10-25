@@ -891,8 +891,8 @@ pub(super) fn check_inherited_conflict<'db>(
         let Some(MemberContract::Attribute(declaration)) = &*declaration else {
             return;
         };
-        // Method pairs use the separate signature check. Mixed method and attribute pairs
-        // still compare the types exposed by descriptor access.
+        // `attribute_violation` accepts two methods regardless of their read and write types,
+        // so we can skip binding them to the subclass.
         if declaration.is_method && target.is_method {
             continue;
         }
