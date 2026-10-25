@@ -2,9 +2,10 @@ use crate::normalizer::Normalizer;
 use anyhow::anyhow;
 use datatest_stable::Utf8Path;
 use insta::assert_snapshot;
+use ruff_db::diagnostic::render::{FullRenderer, Renderer};
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DummyFileResolver, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    Annotation, Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DummyFileResolver, Severity,
+    Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_formatter::FormatOptions;
 use ruff_python_ast::Mod;
@@ -164,11 +165,8 @@ fn black_compatibility(input_path: &Utf8Path, content: String) -> datatest_stabl
             writeln!(
                 snapshot,
                 "{}",
-                DisplayDiagnostics::new(
-                    &DummyFileResolver,
-                    &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
-                    &unsupported_syntax_errors
-                )
+                FullRenderer::new(&DummyFileResolver, &DisplayDiagnosticConfig::new("ruff"))
+                    .display(&unsupported_syntax_errors)
             )
             .unwrap();
         }
@@ -243,11 +241,8 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
                 writeln!(
                     snapshot,
                     "### Unsupported Syntax Errors\n{}",
-                    DisplayDiagnostics::new(
-                        &DummyFileResolver,
-                        &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
-                        &unsupported_syntax_errors
-                    )
+                    FullRenderer::new(&DummyFileResolver, &DisplayDiagnosticConfig::new("ruff"))
+                        .display(&unsupported_syntax_errors)
                 )
                 .unwrap();
             }
@@ -289,11 +284,8 @@ fn format(input_path: &Utf8Path, content: String) -> datatest_stable::Result<()>
             writeln!(
                 snapshot,
                 "## Unsupported Syntax Errors\n{}",
-                DisplayDiagnostics::new(
-                    &DummyFileResolver,
-                    &DisplayDiagnosticConfig::new("ruff").format(DiagnosticFormat::Full),
-                    &unsupported_syntax_errors
-                )
+                FullRenderer::new(&DummyFileResolver, &DisplayDiagnosticConfig::new("ruff"))
+                    .display(&unsupported_syntax_errors)
             )
             .unwrap();
         }

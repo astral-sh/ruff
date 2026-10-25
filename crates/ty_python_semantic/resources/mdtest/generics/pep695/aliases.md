@@ -115,7 +115,7 @@ reveal_type(SpecializedList[str])  # revealed: Unknown
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias values"
+# error: [invalid-type-form] "Only simple names and dotted names can be subscripted in type alias definitions"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):

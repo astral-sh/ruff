@@ -1308,7 +1308,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise | github | gitlab | junit`
+**Type**: `full | concise | github | gitlab | junit | sarif`
 
 **Example usage**:
 

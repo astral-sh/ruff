@@ -1328,6 +1328,21 @@ target("a", ["a"])
 forward(target, "a", ["a"])
 ```
 
+### Forwarded arguments with type-variable constraints
+
+A constrained generic callback can receive an argument matching any of its constraints. Capturing
+its parameters in a `ParamSpec` does not restrict the callback to its first constraint:
+
+```py
+from collections.abc import Callable
+
+def forward[**P](function: Callable[P, object], *args: P.args, **kwargs: P.kwargs) -> None: ...
+def identity[T: (str, bytes)](value: T) -> T:
+    return value
+
+forward(identity, b"text")  # no diagnostic
+```
+
 ### Forwarded callbacks with gradual types
 
 A callback forwarded through a `ParamSpec` receives its own parameter type as context, including
