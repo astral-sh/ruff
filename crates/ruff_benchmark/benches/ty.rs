@@ -453,6 +453,33 @@ fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
     );
 }
 
+/// Check subclasses that share two mixins. Each mixin defines some methods of its own and
+/// some that must be checked against the other mixin's signature.
+fn benchmark_inherited_mixin_members(criterion: &mut Criterion) {
+    let mut code = String::new();
+    for (base, prefix) in [("Left", "left"), ("Right", "right")] {
+        writeln!(code, "class {base}:\n    status: int").unwrap();
+        for index in 0..48 {
+            writeln!(
+                code,
+                "    def shared_{index}(self, arg: int) -> int: return arg"
+            )
+            .unwrap();
+        }
+        for index in 0..32 {
+            writeln!(
+                code,
+                "    def {prefix}_{index}(self, arg: str) -> str: return arg"
+            )
+            .unwrap();
+        }
+    }
+    for index in 0..32 {
+        writeln!(code, "class Child{index}(Left, Right): ...").unwrap();
+    }
+    benchmark_micro_case(criterion, "ty_micro[inherited_mixin_members]", &code);
+}
+
 fn benchmark_many_enum_members(criterion: &mut Criterion) {
     const NUM_ENUM_MEMBERS: usize = 512;
 
@@ -2593,6 +2620,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
+    benchmark_inherited_mixin_members,
     benchmark_gradual_vararg_call,
     benchmark_large_enum_membership,
     benchmark_many_enum_members,

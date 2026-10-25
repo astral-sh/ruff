@@ -96,8 +96,6 @@ pub(super) fn check_class<'db>(
             configuration,
         );
     }
-    let enum_info = enum_metadata(db, class.into());
-
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
     if configuration.check_liskov_violations() {
         let generic_bases: FxHashMap<_, _> = bases
@@ -127,20 +125,36 @@ pub(super) fn check_class<'db>(
         attributes::check_instance_overrides(context, class_specialized, &bases);
     }
 
+    if own_class_members.is_empty() {
+        return;
+    }
+    // Most classes have no NamedTuple bases. Classify the bases once instead of traversing
+    // the entire MRO again for every member of the class.
+    let named_tuple_bases = if configuration.check_invalid_named_tuple_field_overrides() {
+        class
+            .iter_mro(db, None)
+            .skip(1)
+            .filter_map(ClassBase::into_class)
+            .filter(|base| CodeGeneratorKind::NamedTuple.matches(db, base.class_literal(db)))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let override_class = OverrideClass {
+        class: class_specialized,
+        scope,
+        kind: CodeGeneratorKind::from_class(db, class.into()),
+        enum_info: enum_metadata(db, class.into()),
+        bases,
+        named_tuple_bases,
+    };
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
     )]
     for member in own_class_members {
-        check_class_declaration(
-            context,
-            configuration,
-            enum_info,
-            class_specialized,
-            scope,
-            &bases,
-            &member,
-        );
+        check_class_declaration(context, configuration, &override_class, &member);
     }
 }
 
@@ -207,39 +221,41 @@ fn check_inherited_conflicts<'db>(
         //
         // class Conflict(Ordered, AcceptsObject): ...
         // ```
-        let names = all_end_of_scope_members(db, literal.body_scope(db))
-            .map(|member| (member.member.name, Some(member.first_reachable_definition)))
+        let names = inherited_source_definitions(db, literal)
+            .iter()
+            .map(|(name, definition)| (name, Some(*definition)))
             .chain(
                 candidate_owner
                     .own_instance_attribute_names(db)
                     .iter()
                     .chain(literal.slot_names(db).unwrap_or_default().iter())
-                    .cloned()
                     .map(|name| (name, None)),
             );
         for (name, definition) in names {
-            if is_mangled_private(&name)
+            if is_mangled_private(name)
                 || name == "__hash__"
                 || !seen.insert(name.clone())
                 || class
-                    .own_synthesized_member(db, env, None, None, &name)
+                    .own_synthesized_member(db, env, None, None, name)
                     .is_some()
             {
                 continue;
             }
-            let owner = mro[..=index]
+            let owner_index = mro[..index]
                 .iter()
-                .copied()
-                .find(|owner| {
-                    !owner.own_class_member(db, env, None, &name).is_undefined()
-                        || !owner.own_instance_member(db, env, &name).is_undefined()
+                .position(|owner| {
+                    !owner.own_class_member(db, env, None, name).is_undefined()
+                        || !owner.own_instance_member(db, env, name).is_undefined()
                 })
-                .unwrap_or(candidate_owner);
+                .unwrap_or(index);
+            let owner = mro[owner_index];
+            // Lookup already established that no earlier MRO entry defines this name.
+            let later_bases = &mro[owner_index + 1..];
 
             // Only a source definition on the selected owner goes to the method checker.
             // A generated member on an earlier base must not expose an older method.
             if configuration.check_method_liskov_violations()
-                && owner == candidate_owner
+                && owner_index == index
                 && let Some(definition) = definition
             {
                 check_inherited_method_conflict(
@@ -247,14 +263,23 @@ fn check_inherited_conflicts<'db>(
                     class,
                     class_type,
                     owner,
-                    &mro[index + 1..],
-                    &name,
+                    later_bases,
+                    name,
                     definition,
                 );
             }
-            if let Some(contracts) = &attribute_contracts {
+            // The ordered set starts with the valid MRO, followed by any additional
+            // specializations from other paths to the same base.
+            if let Some(contracts) = &attribute_contracts
+                && owner_index + 1 < contracts.len()
+            {
                 attributes::check_inherited_conflict(
-                    context, class, class_type, owner, contracts, &name,
+                    context,
+                    class,
+                    class_type,
+                    owner,
+                    contracts.iter().skip(owner_index + 1).copied(),
+                    name,
                 );
             }
         }
@@ -316,18 +341,23 @@ fn check_inherited_method_conflict<'db>(
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
+    let mut targets = contracts
+        .iter()
+        .filter_map(|&target| {
+            let (decorator, ty) = source_method_contract(db, env, target, receiver, name)?;
+            Some((target, decorator, ty))
+        })
+        .peekable();
+    if targets.peek().is_none() {
+        return;
+    }
     let Some((selected_decorator, selected_ty)) =
         source_method_contract(db, env, owner, receiver, name)
     else {
         return;
     };
 
-    for contract_owner in contracts.iter().copied() {
-        let Some((contract_decorator, contract_ty)) =
-            source_method_contract(db, env, contract_owner, receiver, name)
-        else {
-            continue;
-        };
+    for (contract_owner, contract_decorator, contract_ty) in targets {
         let Some((selected_ty, contract_ty)) =
             method_override_types(db, env, selected_ty, contract_ty)
         else {
@@ -425,8 +455,12 @@ fn inherited_conflict_mro<'db>(
 ) -> Option<(Vec<ClassType<'db>>, Option<usize>)> {
     let db = context.db();
     let env = &context.program_environment();
+    let explicit_bases = class.explicit_bases(db);
+    if explicit_bases.len() < 2 {
+        return None;
+    }
     let mut direct_bases = Vec::new();
-    for base in class.explicit_bases(db) {
+    for base in explicit_bases {
         match ClassBase::try_from_explicit_base(db, env, *base, Some(class.into())) {
             Some(ClassBase::Class(base)) if base.static_class_literal(db).is_some() => {
                 direct_bases.push(base);
@@ -468,6 +502,18 @@ fn inherited_conflict_mro<'db>(
         }
     }
     Some((mro, first_dynamic_base))
+}
+
+/// Subclasses share the source declarations of a base, even when they specialize it differently.
+/// Keep the definitions in lookup order; binding their types still depends on the subclass.
+#[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+fn inherited_source_definitions<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Box<[(Name, Definition<'db>)]> {
+    all_end_of_scope_members(db, class.body_scope(db))
+        .map(|member| (member.member.name, member.first_reachable_definition))
+        .collect()
 }
 
 /// Returns a source-defined method bound to the class whose MRO is being checked.
@@ -533,62 +579,64 @@ fn enum_class_creation_manages_conflict<'db>(
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
-fn conflicting_named_tuple_field_in_mro<'db>(
+fn conflicting_named_tuple_field<'db>(
     db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
+    named_tuple_bases: &[ClassType<'db>],
     field_name: &Name,
 ) -> Option<(ClassType<'db>, Option<Definition<'db>>)> {
-    for class_base in class.iter_mro(db, None).skip(1) {
-        let Some(superclass) = class_base.into_class() else {
-            continue;
-        };
-
+    for &superclass in named_tuple_bases {
         let (superclass_literal, superclass_specialization) =
             superclass.class_literal_and_specialization(db);
 
-        if CodeGeneratorKind::NamedTuple.matches(db, superclass_literal) {
-            match superclass_literal {
-                ClassLiteral::Static(superclass_literal) => {
-                    if let Some(field) = superclass_literal
-                        .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
-                        .get(field_name)
-                    {
-                        return Some((superclass, field.first_declaration));
-                    }
+        match superclass_literal {
+            ClassLiteral::Static(superclass_literal) => {
+                if let Some(field) = superclass_literal
+                    .own_fields(db, superclass_specialization, CodeGeneratorKind::NamedTuple)
+                    .get(field_name)
+                {
+                    return Some((superclass, field.first_declaration));
                 }
-                ClassLiteral::DynamicNamedTuple(namedtuple) => {
-                    if namedtuple.field(db, field_name).is_some() {
-                        return Some((superclass, namedtuple.definition(db)));
-                    }
-                }
-                ClassLiteral::Dynamic(_)
-                | ClassLiteral::DynamicTypedDict(_)
-                | ClassLiteral::DynamicEnum(_) => {}
             }
+            ClassLiteral::DynamicNamedTuple(namedtuple) => {
+                if namedtuple.field(db, field_name).is_some() {
+                    return Some((superclass, namedtuple.definition(db)));
+                }
+            }
+            ClassLiteral::Dynamic(_)
+            | ClassLiteral::DynamicTypedDict(_)
+            | ClassLiteral::DynamicEnum(_) => {}
         }
     }
 
     None
 }
 
+struct OverrideClass<'db> {
+    class: ClassType<'db>,
+    scope: ScopeId<'db>,
+    kind: Option<CodeGeneratorKind<'db>>,
+    enum_info: Option<&'db EnumMetadata<'db>>,
+    bases: Vec<ClassBase<'db>>,
+    named_tuple_bases: Vec<ClassType<'db>>,
+}
+
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
-    enum_info: Option<&EnumMetadata<'db>>,
-    class: ClassType<'db>,
-    class_scope: ScopeId<'db>,
-    bases: &[ClassBase<'db>],
+    override_class: &OverrideClass<'db>,
     member: &MemberWithDefinition<'db>,
 ) {
     let db = context.db();
     let env = &context.program_environment();
+    let class = override_class.class;
+    let class_scope = override_class.scope;
+    let class_kind = override_class.kind;
+    let bases = &override_class.bases;
 
     let MemberWithDefinition {
         member,
         first_reachable_definition,
     } = member;
-
-    let instance_of_class = Type::instance(db, env, class);
 
     let subclass_instance_member = lookup_override_member(db, env, class, &member.name);
     let Place::Defined(DefinedPlace {
@@ -598,11 +646,6 @@ fn check_class_declaration<'db>(
     else {
         return;
     };
-
-    let Some((literal, _)) = class.static_class_literal(db) else {
-        return;
-    };
-    let class_kind = CodeGeneratorKind::from_class(db, literal.into());
 
     // Hashability may change in either direction across subclasses. Only the hash protocol's
     // signature constrains each definition; finality and override decorators are checked below.
@@ -680,9 +723,8 @@ fn check_class_declaration<'db>(
         Some(CodeGeneratorKind::Pydantic(_) | CodeGeneratorKind::TypedDict) | None => {}
     }
 
-    if configuration.check_invalid_named_tuple_field_overrides()
-        && let Some((superclass, overridden_field_declaration)) =
-            conflicting_named_tuple_field_in_mro(db, literal, &member.name)
+    if let Some((superclass, overridden_field_declaration)) =
+        conflicting_named_tuple_field(db, &override_class.named_tuple_bases, &member.name)
         && let Some(builder) = context.report_lint(
             &INVALID_NAMED_TUPLE_OVERRIDE,
             first_reachable_definition.focus_range(db, context.module()),
@@ -711,7 +753,7 @@ fn check_class_declaration<'db>(
     }
 
     // Check for invalid Enum member values.
-    if let Some(enum_info) = enum_info {
+    if let Some(enum_info) = override_class.enum_info {
         if member.name != "_value_"
             && matches!(
                 first_reachable_definition.kind(db),
@@ -758,7 +800,7 @@ fn check_class_declaration<'db>(
                     check_enum_member_against_constructor_method(
                         context,
                         init_function,
-                        instance_of_class,
+                        Type::instance(db, env, class),
                         member_value_type,
                         &member.name,
                         *first_reachable_definition,
@@ -913,74 +955,65 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            // An inferred receiver assignment is still an override target, but it does not
-            // take ownership of a conflict inherited from an earlier declaration.
-            if !superclass
-                .own_class_member(db, env, None, &member.name)
-                .is_undefined()
-                || matches!(
-                    superclass
-                        .own_instance_member(db, env, &member.name)
-                        .inner
-                        .place,
-                    Place::Defined(DefinedPlace {
-                        origin: TypeOrigin::Declared,
-                        ..
-                    })
-                )
-            {
-                inherited_member_owner.get_or_insert(superclass);
-            }
-
-            if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
-                || (configuration.check_final_variable_overridden()
-                    && overridden_final_variable.is_none())
-            {
+            let needs_owner = inherited_member_owner.is_none()
+                && !liskov_check_complete
+                && configuration.check_liskov_violations()
+                && member.name != "__hash__";
+            let needs_final_method =
+                configuration.check_final_method_overridden() && overridden_final_method.is_none();
+            let needs_final_variable = configuration.check_final_variable_overridden()
+                && overridden_final_variable.is_none();
+            if needs_owner || needs_final_method || needs_final_variable {
                 let own_class_member = superclass.own_class_member(db, env, None, &member.name);
 
-                if configuration.check_final_method_overridden() {
-                    overridden_final_method = overridden_final_method.or_else(|| {
-                        let (superclass_scope, superclass_symbol_id) = superclass_symbol?;
-
-                        // TODO: `@final` should be more like a type qualifier:
-                        // we should also recognise `@final`-decorated methods that don't end up
-                        // as being function- or property-types (because they're wrapped by other
-                        // decorators that transform the type into something else).
-                        let underlying_functions = extract_underlying_functions(
-                            db,
-                            own_class_member.ignore_possibly_undefined()?,
-                        );
-
-                        if underlying_functions.iter().any(|function| {
-                            function.has_known_decorator(db, FunctionDecorators::FINAL)
-                        }) && is_function_definition(db, superclass_scope, superclass_symbol_id)
-                        {
-                            Some((superclass, underlying_functions))
-                        } else {
-                            None
-                        }
-                    });
+                // An inferred receiver assignment is an override target but does not take
+                // ownership of a conflict inherited from an earlier declaration.
+                if needs_owner
+                    && (!own_class_member.is_undefined()
+                        || matches!(
+                            superclass
+                                .own_instance_member(db, env, &member.name)
+                                .inner
+                                .place,
+                            Place::Defined(DefinedPlace {
+                                origin: TypeOrigin::Declared,
+                                ..
+                            })
+                        ))
+                {
+                    inherited_member_owner = Some(superclass);
                 }
 
-                if configuration.check_final_variable_overridden() {
-                    overridden_final_variable = overridden_final_variable.or_else(|| {
-                        if !own_class_member
-                            .qualifiers()
-                            .contains(TypeQualifiers::FINAL)
-                        {
-                            return None;
-                        }
+                if needs_final_method
+                    && let Some((superclass_scope, superclass_symbol_id)) = superclass_symbol
+                    && let Some(ty) = own_class_member.ignore_possibly_undefined()
+                {
+                    // TODO: `@final` should be more like a type qualifier:
+                    // we should also recognise `@final`-decorated methods that don't end up
+                    // as being function- or property-types (because they're wrapped by other
+                    // decorators that transform the type into something else).
+                    let underlying_functions = extract_underlying_functions(db, ty);
+                    if underlying_functions
+                        .iter()
+                        .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+                        && is_function_definition(db, superclass_scope, superclass_symbol_id)
+                    {
+                        overridden_final_method = Some((superclass, underlying_functions));
+                    }
+                }
 
-                        // Find the declaration definition in the superclass for the secondary
-                        // annotation.
-                        let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
-                            use_def_map(db, scope)
-                                .end_of_scope_symbol_declarations(id)
-                                .find_map(|decl| decl.declaration.definition())
-                        });
-
-                        Some((superclass, superclass_definition))
+                if needs_final_variable
+                    && own_class_member
+                        .qualifiers()
+                        .contains(TypeQualifiers::FINAL)
+                {
+                    // Find the declaration definition in the superclass for the secondary annotation.
+                    let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
+                        use_def_map(db, scope)
+                            .end_of_scope_symbol_declarations(id)
+                            .find_map(|decl| decl.declaration.definition())
                     });
+                    overridden_final_variable = Some((superclass, superclass_definition));
                 }
             }
 
