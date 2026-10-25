@@ -1564,10 +1564,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
-        if CodeGeneratorKind::from_class(db, self.into())
-            .is_some_and(CodeGeneratorKind::is_dataclass_like)
-        {
+        let code_generator = CodeGeneratorKind::from_static_class(db, self);
+        if code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
                 return Member {
@@ -1589,7 +1587,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
+        if matches!(code_generator, Some(CodeGeneratorKind::NamedTuple)) {
             if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
@@ -1672,8 +1670,7 @@ impl<'db> StaticClassLiteral<'db> {
             .place
             .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
-            && CodeGeneratorKind::from_static_class(db, self)
-                .is_some_and(CodeGeneratorKind::is_dataclass_like)
+            && code_generator.is_some_and(CodeGeneratorKind::is_dataclass_like)
         {
             return Member::unbound();
         }
@@ -1723,8 +1720,8 @@ impl<'db> StaticClassLiteral<'db> {
         // Only synthesize methods that are not already defined in the MRO.
         // Note: We use direct scope lookups here to avoid infinite recursion
         // through `own_class_member` -> `own_synthesized_member`.
-        if self.total_ordering(db)
-            && matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
+        if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__")
+            && self.total_ordering(db)
             && !self
                 .iter_mro(db, specialization)
                 .filter_map(ClassBase::into_class)
