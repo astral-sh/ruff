@@ -279,8 +279,8 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
-/// Reading an imported `self.x: T = rhs()` only needs `T`. When checking the declaring
-/// method, the full inference still validates `rhs()` and reports annotation diagnostics.
+/// Read the annotation of an unconditional `self.x: T = rhs()` without inferring `rhs()`.
+/// Full inference still checks the initializer and the annotation in the declaring method.
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _| Some(TypeAndQualifiers::declared(Type::divergent(id))),

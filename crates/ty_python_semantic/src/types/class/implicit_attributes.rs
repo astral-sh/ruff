@@ -19,6 +19,7 @@ use ty_python_core::{
     attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
+    reachability_constraints::ScopedReachabilityConstraintId,
     scope::{Scope, ScopeId},
     semantic_index, use_def_map,
 };
@@ -188,7 +189,10 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let annotation = if assignment.value(&module).is_some() {
+                let annotation = if attribute_declaration.reachability_constraint
+                    == ScopedReachabilityConstraintId::ALWAYS_TRUE
+                    && assignment.value(&module).is_some()
+                {
                     let annotation = infer_receiver_annotation(db, declaration);
                     // Recover the assigned value for an invalid `self.x: TypeAlias = ...`,
                     // even when the marker is imported under another name.
@@ -198,7 +202,10 @@ impl<'db> StaticClassLiteral<'db> {
                         annotation
                     }
                 } else {
-                    // An annotation without a value can conflict with an earlier binding.
+                    // A standalone annotation can conflict with an earlier binding. A conditional
+                    // initializer can depend on the absence of the very attribute it defines,
+                    // e.g. `if not hasattr(self, "limit"): self.limit: int = self.config.getint()`.
+                    // Keep the initializer in the inference cycle with that guard.
                     inferred_declaration(db, declaration).declared()
                 };
                 let Some(annotation) = annotation else {
