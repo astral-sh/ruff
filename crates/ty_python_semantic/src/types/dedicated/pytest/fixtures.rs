@@ -1056,11 +1056,11 @@ fn conftest_files<'db>(db: &'db dyn Db, request_file: ProgramFile<'db>) -> Vec<P
 pub(super) fn fixture_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> &'db Option<FixtureDeclaration<'db>> {
+) -> Option<&'db FixtureDeclaration<'db>> {
     fixture_declaration_query(db, crate::types::SpecializedDefinition::new(db, definition))
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn fixture_declaration_query<'db>(
     db: &'db dyn Db,
     key: crate::types::SpecializedDefinition<'db>,
@@ -1332,7 +1332,7 @@ fn fixture_exposures_from_import<'db>(
     source_exposures
         .iter()
         .filter_map(|source| {
-            let declaration = fixture_declaration(db, source.fixture).as_ref()?;
+            let declaration = fixture_declaration(db, source.fixture)?;
             FixtureExposure::new(
                 local_name,
                 importing_definition,

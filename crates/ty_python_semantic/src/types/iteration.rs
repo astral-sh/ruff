@@ -60,14 +60,14 @@ pub(super) fn add_async_generator_stub_help<'db>(
 fn async_generator_stub_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> &'db Option<(Span, Name)> {
+) -> Option<&'db (Span, Name)> {
     async_generator_stub_declaration_query(
         db,
         crate::types::SpecializedDefinition::new(db, definition),
     )
 }
 
-#[salsa::tracked]
+#[salsa::tracked(returns(as_ref))]
 fn async_generator_stub_declaration_query<'db>(
     db: &'db dyn Db,
     key: crate::types::SpecializedDefinition<'db>,
