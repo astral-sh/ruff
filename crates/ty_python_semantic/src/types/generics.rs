@@ -371,6 +371,7 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
 
+#[salsa::tracked]
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
@@ -539,18 +540,11 @@ impl<'db> GenericContext<'db> {
     }
 
     /// Returns the typevars directly bound by this generic context.
+    ///
+    /// Argument inference reuses this set for each parameter of each candidate overload.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> TypeVarSet<'db> {
-        // Argument inference asks for this set for each parameter of each candidate overload.
-        // Build and intern the ordered set once per generic context.
-        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
-        fn inferable_typevars_impl<'db>(
-            db: &'db dyn Db,
-            context: GenericContext<'db>,
-        ) -> TypeVarSet<'db> {
-            TypeVarSet::from_typevars(db, context.variables(db))
-        }
-
-        inferable_typevars_impl(db, self)
+        TypeVarSet::from_typevars(db, self.variables(db))
     }
 
     pub(crate) fn variables(
