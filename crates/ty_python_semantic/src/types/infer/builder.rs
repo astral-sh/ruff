@@ -555,14 +555,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.reachability_cache
             .get_or_init(|| {
                 let scope = self.scope();
-                let reachability_constraints = self
-                    .index
-                    .use_def_map(scope.file_scope_id(self.db()))
-                    .reachability_constraints();
-                Rc::new(ReachabilityEvaluationCache::new(
-                    scope,
-                    reachability_constraints,
-                ))
+                let use_def = self.index.use_def_map(scope.file_scope_id(self.db()));
+                Rc::new(ReachabilityEvaluationCache::new(scope, use_def))
             })
             .as_ref()
     }

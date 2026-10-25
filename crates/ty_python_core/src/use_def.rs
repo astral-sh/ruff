@@ -957,6 +957,12 @@ impl<'db> UseDefMap<'db> {
         &self.extra().loop_headers[id]
     }
 
+    pub fn has_loop_headers(&self) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| !extra.loop_headers.is_empty())
+    }
+
     pub fn reachability_constraints(&self) -> &ReachabilityConstraints {
         &self.constraint_tables().reachability_constraints
     }
@@ -969,6 +975,14 @@ impl<'db> UseDefMap<'db> {
 
     pub fn predicates(&self) -> &Predicates<'db> {
         &self.constraint_tables().predicates
+    }
+
+    pub fn narrowing_constraints(&self) -> &NarrowingConstraints {
+        &self.constraint_tables().narrowing_constraints
+    }
+
+    pub fn predicate_narrowing_targets(&self) -> &PredicateNarrowingTargets {
+        &self.constraint_tables().predicate_narrowing_targets
     }
 
     pub fn range_reachability(
@@ -1058,10 +1072,7 @@ impl<'db> UseDefMap<'db> {
     ) -> ApplicableConstraints<'_, 'db> {
         match constraint_key {
             ConstraintKey::NarrowingConstraint(constraint) => {
-                ApplicableConstraints::UnboundBinding(NarrowingEvaluator {
-                    constraint,
-                    constraint_tables: self.constraint_tables(),
-                })
+                ApplicableConstraints::UnboundBinding(self.narrowing_evaluator(constraint))
             }
             ConstraintKey::NestedScope(nested_scope) => {
                 let EnclosingSnapshotResult::FoundBindings(bindings) =
@@ -1092,7 +1103,7 @@ impl<'db> UseDefMap<'db> {
     ) -> NarrowingEvaluator<'_, 'db> {
         NarrowingEvaluator {
             constraint,
-            constraint_tables: self.constraint_tables(),
+            use_def: self,
         }
     }
 
@@ -1379,7 +1390,7 @@ impl<'db> UseDefMap<'db> {
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
-            all_definitions: &self.all_definitions,
+            use_def: self,
             constraint_tables: self.constraint_tables(),
             boundness_analysis,
             initial_unbound: None,
@@ -1445,7 +1456,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map RetainedDefinitions<'db>,
+    use_def: &'map UseDefMap<'db>,
     constraint_tables: &'map ConstraintTables<'db>,
     boundness_analysis: BoundnessAnalysis,
     initial_unbound: Option<ScopedReachabilityConstraintId>,
@@ -1474,10 +1485,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             return Some(BindingWithConstraints {
                 binding: DefinitionState::Undefined,
                 binding_order: ScopedDefinitionId::UNBOUND,
-                narrowing_constraint: NarrowingEvaluator {
-                    constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
-                    constraint_tables: self.constraint_tables,
-                },
+                narrowing_constraint: self
+                    .use_def
+                    .narrowing_evaluator(ScopedNarrowingConstraint::ALWAYS_TRUE),
                 reachability_constraint,
             });
         }
@@ -1485,12 +1495,11 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
         self.inner
             .next()
             .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions.get(live_binding.binding()).state(),
+                binding: self.use_def.definition(live_binding.binding()),
                 binding_order: live_binding.binding(),
-                narrowing_constraint: NarrowingEvaluator {
-                    constraint: live_binding.narrowing_constraint(),
-                    constraint_tables: self.constraint_tables,
-                },
+                narrowing_constraint: self
+                    .use_def
+                    .narrowing_evaluator(live_binding.narrowing_constraint()),
                 reachability_constraint: live_binding.reachability_constraint(),
             })
     }
@@ -1508,7 +1517,7 @@ pub struct BindingWithConstraints<'map, 'db> {
 
 pub struct NarrowingEvaluator<'map, 'db> {
     constraint: ScopedNarrowingConstraint,
-    constraint_tables: &'map ConstraintTables<'db>,
+    use_def: &'map UseDefMap<'db>,
 }
 
 impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
@@ -1516,16 +1525,8 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
         self.constraint
     }
 
-    pub fn predicates(&self) -> &'map Predicates<'db> {
-        &self.constraint_tables.predicates
-    }
-
-    pub fn predicate_narrowing_targets(&self) -> &'map PredicateNarrowingTargets {
-        &self.constraint_tables.predicate_narrowing_targets
-    }
-
-    pub fn narrowing_constraints(&self) -> &'map NarrowingConstraints {
-        &self.constraint_tables.narrowing_constraints
+    pub fn use_def(&self) -> &'map UseDefMap<'db> {
+        self.use_def
     }
 }
 
