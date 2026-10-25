@@ -58,7 +58,7 @@ impl<'db> StaticClassLiteral<'db> {
         let class_body_scope = self.body_scope(db);
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
-        let names = implicit_attribute_names(db, class_body_scope);
+        let names = implicit_attribute_definition_names(db, class_body_scope);
         let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
         else {
             return ImplicitAttribute {
@@ -463,16 +463,36 @@ pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
+    collect_implicit_attribute_names(db, class_body_scope, false)
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn implicit_attribute_definition_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Box<[Name]> {
+    collect_implicit_attribute_names(db, class_body_scope, true)
+}
+
+fn collect_implicit_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    defined_only: bool,
+) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let mut names = Vec::new();
 
     for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+        let table = index.place_table(function_scope_id);
+        if defined_only {
+            names.extend(table.defined_instance_attribute_names().map(Name::new));
+        } else {
+            names.extend(
+                table
+                    .members()
+                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+            );
+        }
     }
 
     names.sort_unstable();

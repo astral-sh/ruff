@@ -16,7 +16,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    Db, FxIndexSet, ProgramEnvironment, attribute_declarations,
+    Db, FxIndexSet, ProgramEnvironment,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
@@ -44,10 +44,12 @@ use crate::{
     },
 };
 use ty_python_core::{
+    attribute_scopes,
     definition::{Definition, DefinitionKind},
     place::ScopedPlaceId,
     place_table,
     scope::ScopeId,
+    semantic_index,
     symbol::ScopedSymbolId,
     use_def_map,
 };
@@ -166,10 +168,8 @@ fn check_inherited_conflicts<'db>(
         .collect();
     seen.extend(class.slot_names(db).unwrap_or_default().iter().cloned());
     seen.extend(
-        class_type
-            .own_instance_attribute_names(db)
+        declared_instance_attribute_names(db, class.body_scope(db))
             .iter()
-            .filter(|name| has_own_instance_declaration(db, class.body_scope(db), name))
             .filter(|name| {
                 matches!(class_type.own_instance_member(db, env, name).inner.place,
                     Place::Defined(place) if place.origin == TypeOrigin::Declared)
@@ -261,19 +261,30 @@ fn check_inherited_conflicts<'db>(
     }
 }
 
-/// Check for a receiver annotation without inferring the method that contains it.
-///
-/// Only call this for the class being checked: accessing another file's declarations
-/// directly would add a dependency on its AST. The caller still checks the resolved
-/// member's origin, since a syntactic declaration may be inactive.
-fn has_own_instance_declaration<'db>(
+/// Collect receiver annotations without inferring the methods that contain them. A method
+/// can read many attributes without declaring any; scan each scope once for declarations.
+/// The callers still check the resolved member's origin, since an annotation may be inactive.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn declared_instance_attribute_names<'db>(
     db: &'db dyn Db,
     class_scope: ScopeId<'db>,
-    name: &str,
-) -> bool {
-    attribute_declarations(db, class_scope, name).any(|(mut declarations, _)| {
-        declarations.any(|declaration| declaration.declaration.definition().is_some())
-    })
+) -> Box<[Name]> {
+    let index = semantic_index(db, class_scope.program_file(db));
+    let mut names = Vec::new();
+    for scope in attribute_scopes(db, class_scope) {
+        let map = index.use_def_map(scope);
+        for (member, name) in index.place_table(scope).declared_instance_attributes() {
+            if map
+                .reachable_member_declarations(member)
+                .any(|declaration| declaration.declaration.definition().is_some())
+            {
+                names.push(Name::new(name));
+            }
+        }
+    }
+    names.sort_unstable();
+    names.dedup();
+    names.into_boxed_slice()
 }
 
 /// Check a source-defined method against the later declarations in the resolved MRO.

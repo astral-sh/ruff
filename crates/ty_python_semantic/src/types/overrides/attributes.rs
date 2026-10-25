@@ -664,13 +664,10 @@ pub(super) fn check_instance_overrides<'db>(
     let Some((literal, _)) = class.static_class_literal(db) else {
         return;
     };
-    for name in class.own_instance_attribute_names(db) {
+    for name in super::declared_instance_attribute_names(db, literal.body_scope(db)) {
         // Ordinary assignments introduce no override contract. Do not infer their method
         // bodies just to discard the inferred type; a lazy cache can depend on its own reads.
-        if is_mangled_private(name)
-            || name == "__hash__"
-            || !super::has_own_instance_declaration(db, literal.body_scope(db), name)
-        {
+        if is_mangled_private(name) || name == "__hash__" {
             continue;
         }
         // Avoid inferring method bodies for names that do not override anything. Ordinary
