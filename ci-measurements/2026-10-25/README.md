@@ -24,6 +24,21 @@ These isolated caches are reconstructed from historical source. The replay does 
 
 The separate `ty` annotation test pass runs for PR source changes matching the production path filter. Cache-producing runs skip it, matching `main`, where the change detector compares the checked-out revision with itself. Both cache modes retain the PR annotation pass; [#29710](https://github.com/astral-sh/ruff/pull/29710) removes that duplicate work separately.
 
+## Reuse across source changes
+
+An exact key hit does not mean that workspace artifacts match the checked-out source. Source-only changes do not replace the immutable cache entry, so an unrelated change can still rebuild workspace crates if the entry predates earlier Rust changes.
+
+Selected commits illustrate the difference. Each row is the mean of three paired runs; the headline includes all 30 commits. Times are dependency-only → full workspace.
+
+| Source change                                                                                                                         | Cache age (commits) | Main compilation (s) | Entire job (s) |
+| ------------------------------------------------------------------------------------------------------------------------------------- | ------------------: | -------------------: | -------------: |
+| [Playground lockfile; cache predates Rust changes](https://github.com/astral-sh/ruff/commit/7e8a18d49e5f3820e2192701f81c5e0cde9068fc) |                  20 |          56.0 → 55.5 |  234.2 → 252.6 |
+| [Python dependencies; Rust source matches cache](https://github.com/astral-sh/ruff/commit/5bc8cb3e06a907a419dd723f1945c4e4c463544c)   |                   1 |           56.2 → 3.5 |  233.7 → 147.6 |
+| [Hook configuration; Rust source matches cache](https://github.com/astral-sh/ruff/commit/7dce6d505b9d0f90275c7f906758dadfbc92f4ba)    |                   2 |           56.8 → 3.5 |  235.5 → 148.9 |
+| [Rust source changes after a cache refresh](https://github.com/astral-sh/ruff/commit/d2d9e8a54edf076e38c26ceee209c5f1380be002)        |                   1 |          55.4 → 51.3 |  282.4 → 297.3 |
+
+The two changes with matching Rust source avoid most main test compilation despite the larger restore cost. A recent cache can still save little when many workspace crates rebuild after source changes.
+
 ## Initial-cache sensitivity
 
 A read-only sensitivity seeded at the start of the window gives 262.0 → 247.2 s, 1.06× (0.99–1.15×). It uses a separate cohort for the first 9 commits and the same later runs. This is an alternate reconstruction, not an isolated causal estimate of cache age, because the initial runner cohort also differs.
