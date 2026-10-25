@@ -1,0 +1,2867 @@
+{
+  "repository": "astral-sh/ruff",
+  "action": "8139eb474ac22fe39bb1e33b50afa426dcdaf455",
+  "measurement_window": {
+    "parent": "9e9ad51c272cb8606ee4678b8fa8981b3c133871",
+    "first": "7e8a18d49e5f3820e2192701f81c5e0cde9068fc",
+    "last": "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6"
+  },
+  "source_history": [
+    {
+      "index": 0,
+      "sha": "9e9ad51c272cb8606ee4678b8fa8981b3c133871",
+      "subject": "Update smol-toml (#29521)",
+      "date": "2026-10-20T16:09:41-07:00",
+      "changed_files": [],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 1,
+      "sha": "7e8a18d49e5f3820e2192701f81c5e0cde9068fc",
+      "subject": "Update source-map-js (#29523)",
+      "date": "2026-10-20T16:09:47-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 2,
+      "sha": "b50b6833ea3a70f2d9c2a5d66d66701c53d843ba",
+      "subject": "Update tar (#29524)",
+      "date": "2026-10-20T16:09:53-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 3,
+      "sha": "61104fce09275c44e401bd958904d93b90e245bb",
+      "subject": "Update picomatch (#29525)",
+      "date": "2026-10-20T16:10:01-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 4,
+      "sha": "96c8d444c6c8a660face2ed6c1a199faa6005b18",
+      "subject": "Update ws (#29526)",
+      "date": "2026-10-20T16:10:06-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 5,
+      "sha": "84e3f4f79016e95ccff09c318605cba3551a11d8",
+      "subject": "Update fflate (#29528)",
+      "date": "2026-10-20T16:10:11-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 6,
+      "sha": "7111ca7f50ef650663ef78e68a0aeff3698d1dd4",
+      "subject": "[ty] Fix recursive type materialization (#29532)",
+      "date": "2026-10-20T16:40:41-07:00",
+      "changed_files": [
+        "crates/ruff_benchmark/benches/ty.rs",
+        "crates/ty_python_semantic/resources/mdtest/annotations/intersection_types.md",
+        "crates/ty_python_semantic/resources/mdtest/implicit_type_aliases.md",
+        "crates/ty_python_semantic/resources/mdtest/pep695_type_aliases.md",
+        "crates/ty_python_semantic/resources/mdtest/type_properties/materialization.md",
+        "crates/ty_python_semantic/src/types.rs",
+        "crates/ty_python_semantic/src/types/cyclic.rs",
+        "crates/ty_python_semantic/src/types/generics.rs",
+        "crates/ty_python_semantic/src/types/type_alias.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 7,
+      "sha": "5bf63e4c10ae5f7bf9d3a11b09012407ab59e239",
+      "subject": "Update dependency pyrefly to v1.3.1 (#29564)",
+      "date": "2026-10-20T19:43:15-07:00",
+      "changed_files": [
+        "scripts/ty_benchmark/pyproject.toml",
+        "scripts/ty_benchmark/uv.lock"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 8,
+      "sha": "b3933bb2118b53afc308e0a268c94330fe8dcc3d",
+      "subject": "Update dependency prettier to v3.9.8 (#29563)",
+      "date": "2026-10-20T19:44:57-07:00",
+      "changed_files": [
+        "playground/package-lock.json"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 9,
+      "sha": "dd12d6f2b14e37a15406177cb4f59308a2530000",
+      "subject": "Update Rust crate syn to v3.0.6 (#29570)",
+      "date": "2026-10-20T19:45:23-07:00",
+      "changed_files": [
+        "Cargo.lock"
+      ],
+      "categories": [
+        "cargo-dependencies"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 10,
+      "sha": "12f3548dbfde09b65cc10f3f3f9e107ec9cf6731",
+      "subject": "Update Rust crate rand to v0.10.3 (#29569)",
+      "date": "2026-10-20T19:45:56-07:00",
+      "changed_files": [
+        "Cargo.lock"
+      ],
+      "categories": [
+        "cargo-dependencies"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 11,
+      "sha": "55364c78ac2306c17d8abd3f12bb2242c9d0df1d",
+      "subject": "Update Rust crate thin-vec to v0.2.20 (#29571)",
+      "date": "2026-10-20T19:46:39-07:00",
+      "changed_files": [
+        "Cargo.lock"
+      ],
+      "categories": [
+        "cargo-dependencies"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 12,
+      "sha": "da8e8e24cf649e5c2f31f8244f9de239305b1c0b",
+      "subject": "Update Rust crate clap to v4.6.7 (#29568)",
+      "date": "2026-10-20T19:47:06-07:00",
+      "changed_files": [
+        "Cargo.lock"
+      ],
+      "categories": [
+        "cargo-dependencies"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 13,
+      "sha": "2555405ab9a78578c2a9fc41235b80d67594aff2",
+      "subject": "Update Rust crate camino to v1.2.6 (#29567)",
+      "date": "2026-10-20T19:47:30-07:00",
+      "changed_files": [
+        "Cargo.lock"
+      ],
+      "categories": [
+        "cargo-dependencies"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 14,
+      "sha": "5bc8cb3e06a907a419dd723f1945c4e4c463544c",
+      "subject": "Update dependency unidiff to v1.0.1 (#29565)",
+      "date": "2026-10-20T19:48:28-07:00",
+      "changed_files": [
+        "python/ruff-ecosystem/pyproject.toml",
+        "python/ruff-ecosystem/uv.lock"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 15,
+      "sha": "7dce6d505b9d0f90275c7f906758dadfbc92f4ba",
+      "subject": "Update prek dependencies (#29566)",
+      "date": "2026-10-20T19:49:46-07:00",
+      "changed_files": [
+        ".pre-commit-config.yaml"
+      ],
+      "categories": [],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 16,
+      "sha": "6b161598cd07796e178f1f8e1e422743bbd1e165",
+      "subject": "Update phf to 0.14.0 (#29575)",
+      "date": "2026-10-20T20:35:44-07:00",
+      "changed_files": [
+        "Cargo.lock",
+        "Cargo.toml",
+        "crates/ruff_unicode_names2_generator/src/lib.rs"
+      ],
+      "categories": [
+        "cargo-dependencies",
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 17,
+      "sha": "d2d9e8a54edf076e38c26ceee209c5f1380be002",
+      "subject": "[ty] Preserve namespace fallback for partial stub packages (#29559)",
+      "date": "2026-10-20T20:43:32-07:00",
+      "changed_files": [
+        "crates/ty_module_resolver/src/resolve.rs",
+        "crates/ty_module_resolver/src/resolve/search.rs",
+        "crates/ty_python_semantic/resources/mdtest/import/partial_stub_packages.md"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 18,
+      "sha": "e8b4b288b489e7fc4f3c7a27e662acb115e01a0f",
+      "subject": "Update docker/setup-buildx-action action to v4.4.1 (#29574)",
+      "date": "2026-10-21T09:01:21-04:00",
+      "changed_files": [
+        ".github/workflows/build-docker.yml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 19,
+      "sha": "008d4526cab4aabf974a7e32f23927e0b3449bf1",
+      "subject": "Update docker/build-push-action action to v7.4.0 (#29573)",
+      "date": "2026-10-21T09:01:56-04:00",
+      "changed_files": [
+        ".github/workflows/build-docker.yml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 20,
+      "sha": "9cced9ab2e69d4e91a29dadde291a2c4b0ba6da7",
+      "subject": "[`pyupgrade`] Remove mentions of variance related to fix safety (`UP040`, `UP047`) (#29592)",
+      "date": "2026-10-21T13:50:52+00:00",
+      "changed_files": [
+        "crates/ruff_linter/src/rules/pyupgrade/rules/pep695/non_pep695_generic_function.rs",
+        "crates/ruff_linter/src/rules/pyupgrade/rules/pep695/non_pep695_type_alias.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 21,
+      "sha": "477638fb1b031dbf88c2dfcc745d6d214d40ae2b",
+      "subject": "[ty] Compare protocol receiver restrictions before binding (#29443)",
+      "date": "2026-10-21T09:52:21-04:00",
+      "changed_files": [
+        "crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md",
+        "crates/ty_python_semantic/resources/mdtest/generics/pep695/classes.md",
+        "crates/ty_python_semantic/resources/mdtest/protocols.md",
+        "crates/ty_python_semantic/src/types/protocol_class.rs",
+        "crates/ty_python_semantic/src/types/signatures.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 22,
+      "sha": "c46acee0f9d37d2515d303bc4b1c4c500031a56e",
+      "subject": "[ty] Refactor constraint traversal and cache satisfiability checks (#29492)",
+      "date": "2026-10-21T10:15:33-04:00",
+      "changed_files": [
+        "crates/ruff_benchmark/benches/ty_constraint_set.rs",
+        "crates/ty_python_semantic/resources/mdtest/regression/constraint_set_ordering.md",
+        "crates/ty_python_semantic/resources/mdtest/type_properties/constraints.md",
+        "crates/ty_python_semantic/src/types/call/bind.rs",
+        "crates/ty_python_semantic/src/types/constraints.rs",
+        "crates/ty_python_semantic/src/types/constraints/owned.rs",
+        "crates/ty_python_semantic/src/types/constraints/paths.rs",
+        "crates/ty_python_semantic/src/types/constraints/sequents.rs",
+        "crates/ty_python_semantic/src/types/constraints/solutions.rs",
+        "crates/ty_python_semantic/src/types/constraints/variables.rs",
+        "crates/ty_vendored/ty_extensions/_internal.pyi"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 23,
+      "sha": "6f8de53aa533bf3c2de2ad5e1d6987aee7c9bc72",
+      "subject": "Prefilter bidirectional Unicode checks by UTF-8 leading bytes (#29561)",
+      "date": "2026-10-21T10:11:49-07:00",
+      "changed_files": [
+        "crates/ruff_linter/resources/test/fixtures/pylint/bidirectional_unicode.py",
+        "crates/ruff_linter/src/rules/pylint/rules/bidirectional_unicode.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 24,
+      "sha": "acba99d527b8a9fd2e15490df42d0e6d744a4331",
+      "subject": "Consolidate dependency pins in root Cargo.toml (#29595)",
+      "date": "2026-10-21T17:18:57+00:00",
+      "changed_files": [
+        "Cargo.toml",
+        "crates/ruff_db/Cargo.toml",
+        "crates/ruff_dev/Cargo.toml",
+        "crates/ty/Cargo.toml"
+      ],
+      "categories": [
+        "cargo-dependencies",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 25,
+      "sha": "5da3b41cb6a4d66f528a37318d5c571a57f989f9",
+      "subject": "[ty] Give Self type variables distinct class identities (#29191)",
+      "date": "2026-10-21T13:03:43-07:00",
+      "changed_files": [
+        "crates/ty_ide/src/semantic_tokens.rs",
+        "crates/ty_python_semantic/resources/mdtest/named_tuple.md",
+        "crates/ty_python_semantic/src/types.rs",
+        "crates/ty_python_semantic/src/types/class/named_tuple.rs",
+        "crates/ty_python_semantic/src/types/class/static_literal.rs",
+        "crates/ty_python_semantic/src/types/class/typed_dict.rs",
+        "crates/ty_python_semantic/src/types/diagnostic.rs",
+        "crates/ty_python_semantic/src/types/generics.rs",
+        "crates/ty_python_semantic/src/types/signatures.rs",
+        "crates/ty_python_semantic/src/types/tests.rs",
+        "crates/ty_python_semantic/src/types/typevar.rs",
+        "crates/ty_python_semantic/src/types/variance.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 26,
+      "sha": "6f06c4a7cd3754b9211f25abd5e212228d5efff7",
+      "subject": "[ty] Remove redundant methods from the docstrings interface (#29602)",
+      "date": "2026-10-21T15:06:50-07:00",
+      "changed_files": [
+        "crates/ty_ide/src/docstring.rs",
+        "crates/ty_ide/src/signature_help.rs",
+        "crates/ty_server/src/server/api/requests/completion.rs",
+        "crates/ty_server/src/server/api/requests/signature_help.rs",
+        "crates/ty_wasm/src/lib.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 27,
+      "sha": "3bf4988cf062dc76895ff2f8421acf766172392b",
+      "subject": "[ty] Avoid widening compatible generic return alternatives (#29578)",
+      "date": "2026-10-21T16:24:41-07:00",
+      "changed_files": [
+        "crates/ty_python_semantic/resources/mdtest/generics/legacy/functions.md",
+        "crates/ty_python_semantic/resources/mdtest/generics/pep695/functions.md",
+        "crates/ty_python_semantic/src/types/call/bind.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 28,
+      "sha": "dfe14506d23010aa5dbc4ff6fea702a22ba312bd",
+      "subject": "[ty] Avoid cancelling requests for unrelated file changes (#29604)",
+      "date": "2026-10-21T17:17:08-07:00",
+      "changed_files": [
+        "crates/ty_project/src/db.rs",
+        "crates/ty_project/src/files.rs",
+        "crates/ty_project/src/lib.rs"
+      ],
+      "categories": [
+        "rust-source",
+        "ty"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    },
+    {
+      "index": 29,
+      "sha": "ab68285f20c861bda87c0de490968eb644c426a7",
+      "subject": "[ty] Reduce tuple class-pattern benchmark inputs (#29610)",
+      "date": "2026-10-21T17:31:55-07:00",
+      "changed_files": [
+        "crates/ruff_benchmark/benches/ty.rs"
+      ],
+      "categories": [
+        "rust-source"
+      ],
+      "pr_eligible": true,
+      "ty_changed": false
+    },
+    {
+      "index": 30,
+      "sha": "7a8f63f0d71a1d381f99652a5fee3b043b32e8e6",
+      "subject": "[ty] Rebalance microbenchmark CI shards (#29612)",
+      "date": "2026-10-21T17:45:57-07:00",
+      "changed_files": [
+        ".github/workflows/ci.yaml"
+      ],
+      "categories": [
+        "docs-or-ci-only"
+      ],
+      "pr_eligible": true,
+      "ty_changed": true
+    }
+  ],
+  "initial_cache_source": "3e3f22dcc47a534d5bb6668817464b02c6e6e133",
+  "initial_cache_age_before_window": 19,
+  "initial_seed_execution": {
+    "historical": "full-job",
+    "window_boundary_sensitivity": "full-job"
+  },
+  "workflow_heads": [
+    "d18084d434cd223dcdbbbdea4d42153bfda59ee1",
+    "e60b501424731584ce37200ac98990d5fe05e604"
+  ],
+  "variants": {
+    "before": "Dependency-only cache",
+    "after": "Full workspace cache"
+  },
+  "replicas_per_commit": 3,
+  "timing_basis": "First to last runner-log timestamp, including setup and post steps, excluding queue time.",
+  "interval_method": "90% percentile intervals from 50,000 circular moving-block bootstrap resamples of paired per-commit means, block length 5 commits. Repetitions are averaged within each commit; they are not treated as independent source changes. Intervals describe the observed histories, not arbitrary future workloads.",
+  "bootstrap_block_length": 5,
+  "cohort_join": {
+    "replace_indices": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "overlap_index": 10,
+    "overlap_audit": {
+      "project": "ruff",
+      "index": 10,
+      "source": "12f3548dbfde09b65cc10f3f3f9e107ec9cf6731",
+      "variants": {
+        "before": {
+          "cache_source_sha": "dd12d6f2b14e37a15406177cb4f59308a2530000",
+          "archive_bytes_original_corrected": [
+            984186741,
+            984179333
+          ],
+          "archive_size_relative_change": -7.5270268247162875e-06,
+          "workspace_compilation_multisets_equal": true,
+          "workspace_compilation_multisets": [
+            [
+              [
+                [
+                  "mdtest",
+                  2
+                ],
+                [
+                  "ruff",
+                  1
+                ],
+                [
+                  "ruff_annotate_snippets",
+                  2
+                ],
+                [
+                  "ruff_benchmark",
+                  1
+                ],
+                [
+                  "ruff_cache",
+                  2
+                ],
+                [
+                  "ruff_command_line",
+                  1
+                ],
+                [
+                  "ruff_db",
+                  2
+                ],
+                [
+                  "ruff_dev",
+                  1
+                ],
+                [
+                  "ruff_diagnostics",
+                  2
+                ],
+                [
+                  "ruff_formatter",
+                  1
+                ],
+                [
+                  "ruff_graph",
+                  1
+                ],
+                [
+                  "ruff_index",
+                  2
+                ],
+                [
+                  "ruff_linter",
+                  1
+                ],
+                [
+                  "ruff_macros",
+                  3
+                ],
+                [
+                  "ruff_markdown",
+                  1
+                ],
+                [
+                  "ruff_mdtest",
+                  1
+                ],
+                [
+                  "ruff_memory_usage",
+                  2
+                ],
+                [
+                  "ruff_notebook",
+                  2
+                ],
+                [
+                  "ruff_options_metadata",
+                  1
+                ],
+                [
+                  "ruff_python_ast",
+                  2
+                ],
+                [
+                  "ruff_python_ast_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_python_codegen",
+                  2
+                ],
+                [
+                  "ruff_python_edits",
+                  2
+                ],
+                [
+                  "ruff_python_formatter",
+                  1
+                ],
+                [
+                  "ruff_python_importer",
+                  2
+                ],
+                [
+                  "ruff_python_index",
+                  1
+                ],
+                [
+                  "ruff_python_literal",
+                  2
+                ],
+                [
+                  "ruff_python_parser",
+                  2
+                ],
+                [
+                  "ruff_python_semantic",
+                  1
+                ],
+                [
+                  "ruff_python_stdlib",
+                  2
+                ],
+                [
+                  "ruff_python_trivia",
+                  3
+                ],
+                [
+                  "ruff_python_trivia_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_ranged_value",
+                  2
+                ],
+                [
+                  "ruff_server",
+                  1
+                ],
+                [
+                  "ruff_source_file",
+                  3
+                ],
+                [
+                  "ruff_text_size",
+                  2
+                ],
+                [
+                  "ruff_unicode_names2",
+                  3
+                ],
+                [
+                  "ruff_unicode_names2_generator",
+                  3
+                ],
+                [
+                  "ruff_wasm",
+                  1
+                ],
+                [
+                  "ruff_workspace",
+                  1
+                ],
+                [
+                  "ty",
+                  1
+                ],
+                [
+                  "ty_combine",
+                  2
+                ],
+                [
+                  "ty_completion_bench",
+                  1
+                ],
+                [
+                  "ty_completion_eval",
+                  1
+                ],
+                [
+                  "ty_ide",
+                  1
+                ],
+                [
+                  "ty_module_resolver",
+                  2
+                ],
+                [
+                  "ty_project",
+                  1
+                ],
+                [
+                  "ty_python_core",
+                  2
+                ],
+                [
+                  "ty_python_semantic",
+                  2
+                ],
+                [
+                  "ty_server",
+                  1
+                ],
+                [
+                  "ty_site_packages",
+                  2
+                ],
+                [
+                  "ty_static",
+                  2
+                ],
+                [
+                  "ty_test",
+                  2
+                ],
+                [
+                  "ty_vendored",
+                  3
+                ],
+                [
+                  "ty_wasm",
+                  1
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  "mdtest",
+                  2
+                ],
+                [
+                  "ruff",
+                  1
+                ],
+                [
+                  "ruff_annotate_snippets",
+                  2
+                ],
+                [
+                  "ruff_benchmark",
+                  1
+                ],
+                [
+                  "ruff_cache",
+                  2
+                ],
+                [
+                  "ruff_command_line",
+                  1
+                ],
+                [
+                  "ruff_db",
+                  2
+                ],
+                [
+                  "ruff_dev",
+                  1
+                ],
+                [
+                  "ruff_diagnostics",
+                  2
+                ],
+                [
+                  "ruff_formatter",
+                  1
+                ],
+                [
+                  "ruff_graph",
+                  1
+                ],
+                [
+                  "ruff_index",
+                  2
+                ],
+                [
+                  "ruff_linter",
+                  1
+                ],
+                [
+                  "ruff_macros",
+                  3
+                ],
+                [
+                  "ruff_markdown",
+                  1
+                ],
+                [
+                  "ruff_mdtest",
+                  1
+                ],
+                [
+                  "ruff_memory_usage",
+                  2
+                ],
+                [
+                  "ruff_notebook",
+                  2
+                ],
+                [
+                  "ruff_options_metadata",
+                  1
+                ],
+                [
+                  "ruff_python_ast",
+                  2
+                ],
+                [
+                  "ruff_python_ast_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_python_codegen",
+                  2
+                ],
+                [
+                  "ruff_python_edits",
+                  2
+                ],
+                [
+                  "ruff_python_formatter",
+                  1
+                ],
+                [
+                  "ruff_python_importer",
+                  2
+                ],
+                [
+                  "ruff_python_index",
+                  1
+                ],
+                [
+                  "ruff_python_literal",
+                  2
+                ],
+                [
+                  "ruff_python_parser",
+                  2
+                ],
+                [
+                  "ruff_python_semantic",
+                  1
+                ],
+                [
+                  "ruff_python_stdlib",
+                  2
+                ],
+                [
+                  "ruff_python_trivia",
+                  3
+                ],
+                [
+                  "ruff_python_trivia_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_ranged_value",
+                  2
+                ],
+                [
+                  "ruff_server",
+                  1
+                ],
+                [
+                  "ruff_source_file",
+                  3
+                ],
+                [
+                  "ruff_text_size",
+                  2
+                ],
+                [
+                  "ruff_unicode_names2",
+                  3
+                ],
+                [
+                  "ruff_unicode_names2_generator",
+                  3
+                ],
+                [
+                  "ruff_wasm",
+                  1
+                ],
+                [
+                  "ruff_workspace",
+                  1
+                ],
+                [
+                  "ty",
+                  1
+                ],
+                [
+                  "ty_combine",
+                  2
+                ],
+                [
+                  "ty_completion_bench",
+                  1
+                ],
+                [
+                  "ty_completion_eval",
+                  1
+                ],
+                [
+                  "ty_ide",
+                  1
+                ],
+                [
+                  "ty_module_resolver",
+                  2
+                ],
+                [
+                  "ty_project",
+                  1
+                ],
+                [
+                  "ty_python_core",
+                  2
+                ],
+                [
+                  "ty_python_semantic",
+                  2
+                ],
+                [
+                  "ty_server",
+                  1
+                ],
+                [
+                  "ty_site_packages",
+                  2
+                ],
+                [
+                  "ty_static",
+                  2
+                ],
+                [
+                  "ty_test",
+                  2
+                ],
+                [
+                  "ty_vendored",
+                  3
+                ],
+                [
+                  "ty_wasm",
+                  1
+                ]
+              ]
+            ]
+          ],
+          "job_seconds_original_corrected": [
+            283.899384,
+            284.49842866666665
+          ],
+          "main_build_seconds_original_corrected": [
+            55.52666666666667,
+            55.8
+          ],
+          "runs_original_corrected": [
+            [
+              40162856442,
+              40162859215,
+              40162861537
+            ],
+            [
+              40169019064,
+              40169021327,
+              40169023587
+            ]
+          ]
+        },
+        "after": {
+          "cache_source_sha": "dd12d6f2b14e37a15406177cb4f59308a2530000",
+          "archive_bytes_original_corrected": [
+            2648779095,
+            2648756835
+          ],
+          "archive_size_relative_change": -8.403871822326714e-06,
+          "workspace_compilation_multisets_equal": true,
+          "workspace_compilation_multisets": [
+            [
+              [
+                [
+                  "mdtest",
+                  2
+                ],
+                [
+                  "ruff",
+                  1
+                ],
+                [
+                  "ruff_annotate_snippets",
+                  2
+                ],
+                [
+                  "ruff_benchmark",
+                  1
+                ],
+                [
+                  "ruff_cache",
+                  1
+                ],
+                [
+                  "ruff_db",
+                  2
+                ],
+                [
+                  "ruff_dev",
+                  1
+                ],
+                [
+                  "ruff_diagnostics",
+                  1
+                ],
+                [
+                  "ruff_graph",
+                  1
+                ],
+                [
+                  "ruff_index",
+                  1
+                ],
+                [
+                  "ruff_linter",
+                  1
+                ],
+                [
+                  "ruff_markdown",
+                  1
+                ],
+                [
+                  "ruff_mdtest",
+                  1
+                ],
+                [
+                  "ruff_memory_usage",
+                  1
+                ],
+                [
+                  "ruff_notebook",
+                  2
+                ],
+                [
+                  "ruff_python_ast",
+                  1
+                ],
+                [
+                  "ruff_python_ast_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_python_codegen",
+                  2
+                ],
+                [
+                  "ruff_python_edits",
+                  2
+                ],
+                [
+                  "ruff_python_formatter",
+                  1
+                ],
+                [
+                  "ruff_python_importer",
+                  2
+                ],
+                [
+                  "ruff_python_index",
+                  1
+                ],
+                [
+                  "ruff_python_literal",
+                  1
+                ],
+                [
+                  "ruff_python_parser",
+                  2
+                ],
+                [
+                  "ruff_python_semantic",
+                  1
+                ],
+                [
+                  "ruff_python_trivia",
+                  1
+                ],
+                [
+                  "ruff_python_trivia_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_ranged_value",
+                  2
+                ],
+                [
+                  "ruff_server",
+                  1
+                ],
+                [
+                  "ruff_source_file",
+                  1
+                ],
+                [
+                  "ruff_text_size",
+                  1
+                ],
+                [
+                  "ruff_unicode_names2",
+                  3
+                ],
+                [
+                  "ruff_unicode_names2_generator",
+                  3
+                ],
+                [
+                  "ruff_wasm",
+                  1
+                ],
+                [
+                  "ruff_workspace",
+                  1
+                ],
+                [
+                  "ty",
+                  1
+                ],
+                [
+                  "ty_combine",
+                  2
+                ],
+                [
+                  "ty_completion_bench",
+                  1
+                ],
+                [
+                  "ty_completion_eval",
+                  1
+                ],
+                [
+                  "ty_ide",
+                  1
+                ],
+                [
+                  "ty_module_resolver",
+                  2
+                ],
+                [
+                  "ty_project",
+                  1
+                ],
+                [
+                  "ty_python_core",
+                  2
+                ],
+                [
+                  "ty_python_semantic",
+                  2
+                ],
+                [
+                  "ty_server",
+                  1
+                ],
+                [
+                  "ty_site_packages",
+                  2
+                ],
+                [
+                  "ty_test",
+                  2
+                ],
+                [
+                  "ty_vendored",
+                  2
+                ],
+                [
+                  "ty_wasm",
+                  1
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  "mdtest",
+                  2
+                ],
+                [
+                  "ruff",
+                  1
+                ],
+                [
+                  "ruff_annotate_snippets",
+                  2
+                ],
+                [
+                  "ruff_benchmark",
+                  1
+                ],
+                [
+                  "ruff_cache",
+                  1
+                ],
+                [
+                  "ruff_db",
+                  2
+                ],
+                [
+                  "ruff_dev",
+                  1
+                ],
+                [
+                  "ruff_diagnostics",
+                  1
+                ],
+                [
+                  "ruff_graph",
+                  1
+                ],
+                [
+                  "ruff_index",
+                  1
+                ],
+                [
+                  "ruff_linter",
+                  1
+                ],
+                [
+                  "ruff_markdown",
+                  1
+                ],
+                [
+                  "ruff_mdtest",
+                  1
+                ],
+                [
+                  "ruff_memory_usage",
+                  1
+                ],
+                [
+                  "ruff_notebook",
+                  2
+                ],
+                [
+                  "ruff_python_ast",
+                  1
+                ],
+                [
+                  "ruff_python_ast_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_python_codegen",
+                  2
+                ],
+                [
+                  "ruff_python_edits",
+                  2
+                ],
+                [
+                  "ruff_python_formatter",
+                  1
+                ],
+                [
+                  "ruff_python_importer",
+                  2
+                ],
+                [
+                  "ruff_python_index",
+                  1
+                ],
+                [
+                  "ruff_python_literal",
+                  1
+                ],
+                [
+                  "ruff_python_parser",
+                  2
+                ],
+                [
+                  "ruff_python_semantic",
+                  1
+                ],
+                [
+                  "ruff_python_trivia",
+                  1
+                ],
+                [
+                  "ruff_python_trivia_integration_tests",
+                  1
+                ],
+                [
+                  "ruff_ranged_value",
+                  2
+                ],
+                [
+                  "ruff_server",
+                  1
+                ],
+                [
+                  "ruff_source_file",
+                  1
+                ],
+                [
+                  "ruff_text_size",
+                  1
+                ],
+                [
+                  "ruff_unicode_names2",
+                  3
+                ],
+                [
+                  "ruff_unicode_names2_generator",
+                  3
+                ],
+                [
+                  "ruff_wasm",
+                  1
+                ],
+                [
+                  "ruff_workspace",
+                  1
+                ],
+                [
+                  "ty",
+                  1
+                ],
+                [
+                  "ty_combine",
+                  2
+                ],
+                [
+                  "ty_completion_bench",
+                  1
+                ],
+                [
+                  "ty_completion_eval",
+                  1
+                ],
+                [
+                  "ty_ide",
+                  1
+                ],
+                [
+                  "ty_module_resolver",
+                  2
+                ],
+                [
+                  "ty_project",
+                  1
+                ],
+                [
+                  "ty_python_core",
+                  2
+                ],
+                [
+                  "ty_python_semantic",
+                  2
+                ],
+                [
+                  "ty_server",
+                  1
+                ],
+                [
+                  "ty_site_packages",
+                  2
+                ],
+                [
+                  "ty_test",
+                  2
+                ],
+                [
+                  "ty_vendored",
+                  2
+                ],
+                [
+                  "ty_wasm",
+                  1
+                ]
+              ]
+            ]
+          ],
+          "job_seconds_original_corrected": [
+            303.239165,
+            305.440097
+          ],
+          "main_build_seconds_original_corrected": [
+            55.22666666666667,
+            55.236666666666665
+          ],
+          "runs_original_corrected": [
+            [
+              40162856442,
+              40162859215,
+              40162861537
+            ],
+            [
+              40169019064,
+              40169021327,
+              40169023587
+            ]
+          ]
+        }
+      }
+    },
+    "overlap_audit_sha256": "c007ac6dfded627d55daf1b6fd342e9d7fcf30553c9074b15b770bd78c360d88",
+    "overlap_review": "At the overlapping commit, both cohorts restore the same cache source and cache keys apart from isolation prefixes, use the same compiler, run the same test count, and compile the same workspace crates. Archive sizes differ by less than 0.001% in both modes. Full-cache compilation averages 55.23 s and 55.24 s in the two cohorts. The later cohort therefore supplies the remaining history after this cache refresh."
+  },
+  "unmeasured_failed_attempts": [],
+  "sample_selection": {
+    "writer_indices": [],
+    "selected_job_ids": [
+      121086374358,
+      121086374405,
+      121086382203,
+      121086382362,
+      121086389935,
+      121086390181,
+      121087325367,
+      121087325533,
+      121087331494,
+      121087331706,
+      121087338158,
+      121087338254,
+      121088251149,
+      121088251395,
+      121088256751,
+      121088256830,
+      121088266890,
+      121088267146,
+      121089155867,
+      121089156101,
+      121089162012,
+      121089162161,
+      121089168872,
+      121089168935,
+      121090163586,
+      121090163778,
+      121090170361,
+      121090170503,
+      121090176405,
+      121090176508,
+      121091043711,
+      121091043893,
+      121091049621,
+      121091049797,
+      121091055060,
+      121091055250,
+      121092030418,
+      121092030526,
+      121092039103,
+      121092039243,
+      121092046093,
+      121092046373,
+      121092959157,
+      121092959255,
+      121092965833,
+      121092966056,
+      121092971160,
+      121092971276,
+      121093840762,
+      121093840978,
+      121093847854,
+      121093847983,
+      121093854107,
+      121093854311,
+      121077865618,
+      121077865769,
+      121077872986,
+      121077873144,
+      121077879364,
+      121077879447,
+      121079876606,
+      121079876734,
+      121079881617,
+      121079881663,
+      121079887680,
+      121079887816,
+      121082009221,
+      121082009382,
+      121082016543,
+      121082016683,
+      121082023133,
+      121082023254,
+      121083882045,
+      121083882077,
+      121083889710,
+      121083889806,
+      121083896878,
+      121083897002,
+      121085908069,
+      121085908211,
+      121085914695,
+      121085914796,
+      121085920455,
+      121085920560,
+      121086762084,
+      121086762236,
+      121086769953,
+      121086770079,
+      121086778832,
+      121086778954,
+      121087609176,
+      121087609338,
+      121087615643,
+      121087615750,
+      121087620972,
+      121087621130,
+      121089773813,
+      121089773917,
+      121089781122,
+      121089781316,
+      121089787784,
+      121089787893,
+      121090858645,
+      121090858826,
+      121090864029,
+      121090864171,
+      121090870720,
+      121090870869,
+      121091630093,
+      121091630348,
+      121091637222,
+      121091637377,
+      121091646422,
+      121091646592,
+      121092491680,
+      121092491888,
+      121092498601,
+      121092498730,
+      121092505445,
+      121092505571,
+      121093301898,
+      121093302039,
+      121093308200,
+      121093308382,
+      121093315217,
+      121093315306,
+      121094294817,
+      121094295634,
+      121094301752,
+      121094301795,
+      121094307282,
+      121094307407,
+      121095271794,
+      121095271898,
+      121095277605,
+      121095277731,
+      121095283108,
+      121095283185,
+      121096162850,
+      121096163009,
+      121096167875,
+      121096168035,
+      121096174220,
+      121096174471,
+      121098139282,
+      121098139470,
+      121098146658,
+      121098146800,
+      121098153762,
+      121098154042,
+      121099152882,
+      121099152957,
+      121099161490,
+      121099161671,
+      121099166459,
+      121099166697,
+      121100276707,
+      121100276987,
+      121100285021,
+      121100285176,
+      121100291793,
+      121100291909,
+      121101294144,
+      121101294291,
+      121101300360,
+      121101300497,
+      121101306447,
+      121101306610,
+      121102533029,
+      121102533169,
+      121102539704,
+      121102539887,
+      121102547065,
+      121102547285,
+      121103526866,
+      121103526977,
+      121103534677,
+      121103534804,
+      121103540709,
+      121103540819
+    ],
+    "sample_description": "Ruff PR jobs do not save caches. The aggregate uses the mean of three read-only pairs per source change, with each source change receiving equal weight."
+  },
+  "timing": {
+    "commits": 30,
+    "before_mean": 262.7637843111111,
+    "after_mean": 266.89921496666665,
+    "saved": -4.135430655555524,
+    "speedup": 0.9845056469871146,
+    "block_length": 5,
+    "resamples": 50000,
+    "before_ci90": [
+      252.50063834222223,
+      273.12273674999994
+    ],
+    "after_ci90": [
+      254.552548295,
+      278.18099867055554
+    ],
+    "saved_ci90": [
+      -14.631590443888781,
+      7.80204038277776
+    ],
+    "speedup_ci90": [
+      0.9461712005899914,
+      1.030270076031126
+    ],
+    "paired_runs": 90
+  },
+  "components": {
+    "job_seconds": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        252.50063834222223,
+        273.12273674999994
+      ],
+      "after_ci90": [
+        254.552548295,
+        278.18099867055554
+      ],
+      "saved_ci90": [
+        -14.631590443888781,
+        7.80204038277776
+      ],
+      "speedup_ci90": [
+        0.9461712005899914,
+        1.030270076031126
+      ]
+    },
+    "restore_seconds": {
+      "commits": 30,
+      "before_mean": 6.822222222222222,
+      "after_mean": 30.966666666666665,
+      "saved": -24.144444444444442,
+      "speedup": 0.2203085755292429,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        6.633333333333334,
+        7.011111111111111
+      ],
+      "after_ci90": [
+        29.777777777777782,
+        32.03333333333334
+      ],
+      "saved_ci90": [
+        -25.06666666666667,
+        -23.122222222222224
+      ],
+      "speedup_ci90": [
+        0.21604503870513728,
+        0.2247150997150997
+      ]
+    },
+    "main_build_seconds": {
+      "commits": 30,
+      "before_mean": 55.84033333333332,
+      "after_mean": 48.52188888888889,
+      "saved": 7.318444444444431,
+      "speedup": 1.1508276905955386,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        55.585444444444434,
+        56.12
+      ],
+      "after_ci90": [
+        42.78779444444444,
+        53.15856111111111
+      ],
+      "saved_ci90": [
+        2.6609777777777857,
+        13.12070000000001
+      ],
+      "speedup_ci90": [
+        1.0500485001903381,
+        1.3068756599172136
+      ]
+    },
+    "nextest_seconds": {
+      "commits": 30,
+      "before_mean": 68.50895555555553,
+      "after_mean": 68.11370000000002,
+      "saved": 0.39525555555550795,
+      "speedup": 1.005802878944405,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        68.08975333333332,
+        68.92951222222223
+      ],
+      "after_ci90": [
+        67.84021055555556,
+        68.3944
+      ],
+      "saved_ci90": [
+        0.029162222222183256,
+        0.7276344444444262
+      ],
+      "speedup_ci90": [
+        1.0004275330135681,
+        1.0106886558452295
+      ]
+    },
+    "mdtest_step_seconds": {
+      "commits": 30,
+      "before_mean": 27.266666666666662,
+      "after_mean": 27.31111111111111,
+      "saved": -0.04444444444444784,
+      "speedup": 0.9983726606997557,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        18.666666666666668,
+        35.87777777777777
+      ],
+      "after_ci90": [
+        18.744444444444447,
+        35.877777777777766
+      ],
+      "saved_ci90": [
+        -0.23333333333333428,
+        0.13333333333333997
+      ],
+      "speedup_ci90": [
+        0.9905187993899573,
+        1.004743551734361
+      ]
+    },
+    "apt_seconds": {
+      "commits": 30,
+      "before_mean": 0.0,
+      "after_mean": 0.0,
+      "saved": 0.0,
+      "speedup": null,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        0.0,
+        0.0
+      ],
+      "after_ci90": [
+        0.0,
+        0.0
+      ],
+      "saved_ci90": [
+        0.0,
+        0.0
+      ],
+      "speedup_ci90": null
+    },
+    "other_seconds": {
+      "commits": 30,
+      "before_mean": 104.3256065333333,
+      "after_mean": 91.98584830000001,
+      "saved": 12.339758233333285,
+      "speedup": 1.1341484419765173,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        102.84028287499999,
+        106.10598474166665
+      ],
+      "after_ci90": [
+        85.03022591888887,
+        98.40693327722222
+      ],
+      "saved_ci90": [
+        5.671076544444431,
+        19.2211230972222
+      ],
+      "speedup_ci90": [
+        1.0577274534066463,
+        1.2254628929007207
+      ]
+    }
+  },
+  "interval_sensitivity": {
+    "1": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 1,
+      "resamples": 50000,
+      "before_ci90": [
+        254.4021102055556,
+        271.07510373555556
+      ],
+      "after_ci90": [
+        254.1726514538889,
+        278.46869860833334
+      ],
+      "saved_ci90": [
+        -12.156655349444465,
+        4.933405631666655
+      ],
+      "speedup_ci90": [
+        0.9557166961259429,
+        1.0191816586954525
+      ]
+    },
+    "3": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 3,
+      "resamples": 50000,
+      "before_ci90": [
+        253.05551385444446,
+        272.4777058083333
+      ],
+      "after_ci90": [
+        253.56779922000004,
+        278.24450271
+      ],
+      "saved_ci90": [
+        -13.797592002222258,
+        7.229515923888757
+      ],
+      "speedup_ci90": [
+        0.9493063283945605,
+        1.0281183271382346
+      ]
+    },
+    "10": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 10,
+      "resamples": 50000,
+      "before_ci90": [
+        254.98626017777778,
+        270.49581273333337
+      ],
+      "after_ci90": [
+        256.8079879666667,
+        275.6235665555556
+      ],
+      "saved_ci90": [
+        -13.920756255555489,
+        5.378619399999991
+      ],
+      "speedup_ci90": [
+        0.9485926914296382,
+        1.0205403267333857
+      ]
+    }
+  },
+  "read_only_timing": {
+    "commits": 30,
+    "before_mean": 262.7637843111111,
+    "after_mean": 266.89921496666665,
+    "saved": -4.135430655555524,
+    "speedup": 0.9845056469871146,
+    "block_length": 5,
+    "resamples": 50000,
+    "before_ci90": [
+      252.50063834222223,
+      273.12273674999994
+    ],
+    "after_ci90": [
+      254.552548295,
+      278.18099867055554
+    ],
+    "saved_ci90": [
+      -14.631590443888781,
+      7.80204038277776
+    ],
+    "speedup_ci90": [
+      0.9461712005899914,
+      1.030270076031126
+    ],
+    "paired_runs": 90
+  },
+  "read_only_fresh_initial_cache_sensitivity": {
+    "commits": 30,
+    "before_mean": 262.04445596666665,
+    "after_mean": 247.18227904444447,
+    "saved": 14.862176922222176,
+    "speedup": 1.060126385191027,
+    "block_length": 5,
+    "resamples": 50000,
+    "before_ci90": [
+      251.74089867666663,
+      272.42209461333334
+    ],
+    "after_ci90": [
+      220.75571306111112,
+      270.50456463388883
+    ],
+    "saved_ci90": [
+      -1.6048233194443686,
+      33.293558045555486
+    ],
+    "speedup_ci90": [
+      0.9940021483927871,
+      1.1497122221563907
+    ],
+    "paired_runs": 90
+  },
+  "read_only_components": {
+    "job_seconds": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        252.50063834222223,
+        273.12273674999994
+      ],
+      "after_ci90": [
+        254.552548295,
+        278.18099867055554
+      ],
+      "saved_ci90": [
+        -14.631590443888781,
+        7.80204038277776
+      ],
+      "speedup_ci90": [
+        0.9461712005899914,
+        1.030270076031126
+      ]
+    },
+    "restore_seconds": {
+      "commits": 30,
+      "before_mean": 6.822222222222222,
+      "after_mean": 30.966666666666665,
+      "saved": -24.144444444444442,
+      "speedup": 0.2203085755292429,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        6.633333333333334,
+        7.011111111111111
+      ],
+      "after_ci90": [
+        29.777777777777782,
+        32.03333333333334
+      ],
+      "saved_ci90": [
+        -25.06666666666667,
+        -23.122222222222224
+      ],
+      "speedup_ci90": [
+        0.21604503870513728,
+        0.2247150997150997
+      ]
+    },
+    "main_build_seconds": {
+      "commits": 30,
+      "before_mean": 55.84033333333332,
+      "after_mean": 48.52188888888889,
+      "saved": 7.318444444444431,
+      "speedup": 1.1508276905955386,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        55.585444444444434,
+        56.12
+      ],
+      "after_ci90": [
+        42.78779444444444,
+        53.15856111111111
+      ],
+      "saved_ci90": [
+        2.6609777777777857,
+        13.12070000000001
+      ],
+      "speedup_ci90": [
+        1.0500485001903381,
+        1.3068756599172136
+      ]
+    },
+    "nextest_seconds": {
+      "commits": 30,
+      "before_mean": 68.50895555555553,
+      "after_mean": 68.11370000000002,
+      "saved": 0.39525555555550795,
+      "speedup": 1.005802878944405,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        68.08975333333332,
+        68.92951222222223
+      ],
+      "after_ci90": [
+        67.84021055555556,
+        68.3944
+      ],
+      "saved_ci90": [
+        0.029162222222183256,
+        0.7276344444444262
+      ],
+      "speedup_ci90": [
+        1.0004275330135681,
+        1.0106886558452295
+      ]
+    },
+    "mdtest_step_seconds": {
+      "commits": 30,
+      "before_mean": 27.266666666666662,
+      "after_mean": 27.31111111111111,
+      "saved": -0.04444444444444784,
+      "speedup": 0.9983726606997557,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        18.666666666666668,
+        35.87777777777777
+      ],
+      "after_ci90": [
+        18.744444444444447,
+        35.877777777777766
+      ],
+      "saved_ci90": [
+        -0.23333333333333428,
+        0.13333333333333997
+      ],
+      "speedup_ci90": [
+        0.9905187993899573,
+        1.004743551734361
+      ]
+    },
+    "apt_seconds": {
+      "commits": 30,
+      "before_mean": 0.0,
+      "after_mean": 0.0,
+      "saved": 0.0,
+      "speedup": null,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        0.0,
+        0.0
+      ],
+      "after_ci90": [
+        0.0,
+        0.0
+      ],
+      "saved_ci90": [
+        0.0,
+        0.0
+      ],
+      "speedup_ci90": null
+    },
+    "other_seconds": {
+      "commits": 30,
+      "before_mean": 104.3256065333333,
+      "after_mean": 91.98584830000001,
+      "saved": 12.339758233333285,
+      "speedup": 1.1341484419765173,
+      "block_length": 5,
+      "resamples": 50000,
+      "before_ci90": [
+        102.84028287499999,
+        106.10598474166665
+      ],
+      "after_ci90": [
+        85.03022591888887,
+        98.40693327722222
+      ],
+      "saved_ci90": [
+        5.671076544444431,
+        19.2211230972222
+      ],
+      "speedup_ci90": [
+        1.0577274534066463,
+        1.2254628929007207
+      ]
+    }
+  },
+  "read_only_interval_sensitivity": {
+    "1": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 1,
+      "resamples": 50000,
+      "before_ci90": [
+        254.4021102055556,
+        271.07510373555556
+      ],
+      "after_ci90": [
+        254.1726514538889,
+        278.46869860833334
+      ],
+      "saved_ci90": [
+        -12.156655349444465,
+        4.933405631666655
+      ],
+      "speedup_ci90": [
+        0.9557166961259429,
+        1.0191816586954525
+      ]
+    },
+    "3": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 3,
+      "resamples": 50000,
+      "before_ci90": [
+        253.05551385444446,
+        272.4777058083333
+      ],
+      "after_ci90": [
+        253.56779922000004,
+        278.24450271
+      ],
+      "saved_ci90": [
+        -13.797592002222258,
+        7.229515923888757
+      ],
+      "speedup_ci90": [
+        0.9493063283945605,
+        1.0281183271382346
+      ]
+    },
+    "10": {
+      "commits": 30,
+      "before_mean": 262.7637843111111,
+      "after_mean": 266.89921496666665,
+      "saved": -4.135430655555524,
+      "speedup": 0.9845056469871146,
+      "block_length": 10,
+      "resamples": 50000,
+      "before_ci90": [
+        254.98626017777778,
+        270.49581273333337
+      ],
+      "after_ci90": [
+        256.8079879666667,
+        275.6235665555556
+      ],
+      "saved_ci90": [
+        -13.920756255555489,
+        5.378619399999991
+      ],
+      "speedup_ci90": [
+        0.9485926914296382,
+        1.0205403267333857
+      ]
+    }
+  },
+  "read_only_cache": {
+    "before": {
+      "reads": 90,
+      "hit_types": {
+        "exact": 69,
+        "fallback": 21
+      },
+      "archive_bytes": [
+        823827416,
+        984186741,
+        993223037,
+        1003390458,
+        1025286366,
+        1029317606,
+        1031785031,
+        1031794109
+      ],
+      "ages": [
+        20,
+        20,
+        20,
+        21,
+        21,
+        21,
+        22,
+        22,
+        22,
+        23,
+        23,
+        23,
+        24,
+        24,
+        24,
+        25,
+        25,
+        25,
+        26,
+        26,
+        26,
+        27,
+        27,
+        27,
+        28,
+        28,
+        28,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6,
+        7,
+        7,
+        7,
+        8,
+        8,
+        8,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6
+      ],
+      "workspace_compile_counts": [
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        91,
+        61,
+        61,
+        61,
+        91,
+        91,
+        91
+      ],
+      "mean_fetch_seconds": 1.4061116333333334,
+      "mean_extract_seconds": 2.5151326,
+      "producer_cache_saves": 8,
+      "mean_producer_post_seconds": 12.5,
+      "refresh_cache_saves": 7,
+      "mean_refresh_post_seconds": 12.714285714285714
+    },
+    "after": {
+      "reads": 90,
+      "hit_types": {
+        "exact": 69,
+        "fallback": 21
+      },
+      "archive_bytes": [
+        2489282658,
+        2648779095,
+        2659770600,
+        2670057971,
+        2692786790,
+        2695069331,
+        2695525511,
+        2697496705
+      ],
+      "ages": [
+        20,
+        20,
+        20,
+        21,
+        21,
+        21,
+        22,
+        22,
+        22,
+        23,
+        23,
+        23,
+        24,
+        24,
+        24,
+        25,
+        25,
+        25,
+        26,
+        26,
+        26,
+        27,
+        27,
+        27,
+        28,
+        28,
+        28,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6,
+        7,
+        7,
+        7,
+        8,
+        8,
+        8,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        6,
+        6,
+        6
+      ],
+      "workspace_compile_counts": [
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        75,
+        75,
+        75,
+        46,
+        46,
+        46,
+        46,
+        46,
+        46,
+        82,
+        82,
+        82,
+        69,
+        69,
+        69,
+        76,
+        76,
+        76,
+        49,
+        49,
+        49,
+        58,
+        58,
+        58,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        68,
+        68,
+        68,
+        49,
+        49,
+        49,
+        22,
+        22,
+        22,
+        22,
+        22,
+        22,
+        23,
+        23,
+        23,
+        50,
+        50,
+        50,
+        52,
+        52,
+        52,
+        25,
+        25,
+        25,
+        52,
+        52,
+        52,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        41,
+        14,
+        14,
+        14,
+        41,
+        41,
+        41
+      ],
+      "mean_fetch_seconds": 2.717526122222222,
+      "mean_extract_seconds": 24.550741866666666,
+      "producer_cache_saves": 8,
+      "mean_producer_post_seconds": 31.75,
+      "refresh_cache_saves": 7,
+      "mean_refresh_post_seconds": 32.142857142857146
+    }
+  },
+  "seed_boundary": {
+    "project": "ruff",
+    "original_seed": "9e9ad51c272cb8606ee4678b8fa8981b3c133871",
+    "historical_producer": "3e3f22dcc47a534d5bb6668817464b02c6e6e133",
+    "prehistory_commits": 19,
+    "dependency_digest": "41a339f16c3dc6d47717",
+    "prior_dependency_digest": "764ccaf3f81f4b94c541",
+    "config_matches": true,
+    "cache_key_inputs_unchanged_since_producer": true
+  },
+  "runners": [
+    [
+      "depot-ubuntu-22.04-16"
+    ]
+  ],
+  "compilers": [
+    "rustc 1.99.0 (b940084d7 2026-09-28)"
+  ],
+  "refreshes": [
+    {
+      "index": 9,
+      "source": "dd12d6f2b14e37a15406177cb4f59308a2530000",
+      "run_id": 40168687782,
+      "rows": [
+        {
+          "variant": "before",
+          "job_id": 121094925279,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40168687782/job/121094925279",
+          "primary_key": "ruff-history-origin-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-b38c5b345d49b433244c",
+          "restored_key": "ruff-history-origin-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-41a339f16c3dc6d47717",
+          "pruning": []
+        },
+        {
+          "variant": "after",
+          "job_id": 121094925410,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40168687782/job/121094925410",
+          "primary_key": "ruff-history-origin-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-b38c5b345d49b433244c",
+          "restored_key": "ruff-history-origin-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-41a339f16c3dc6d47717",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 245,
+              "removed_paths": 780,
+              "active_fingerprints": 1445
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 10,
+      "source": "12f3548dbfde09b65cc10f3f3f9e107ec9cf6731",
+      "run_id": 40163203861,
+      "rows": [
+        {
+          "variant": "before",
+          "job_id": 121078886806,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40163203861/job/121078886806",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-418d0b1e878495b2cd45",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-b38c5b345d49b433244c",
+          "pruning": []
+        },
+        {
+          "variant": "after",
+          "job_id": 121078887320,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40163203861/job/121078887320",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-418d0b1e878495b2cd45",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-b38c5b345d49b433244c",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 177,
+              "removed_paths": 569,
+              "active_fingerprints": 1449
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 11,
+      "source": "55364c78ac2306c17d8abd3f12bb2242c9d0df1d",
+      "run_id": 40163916876,
+      "rows": [
+        {
+          "variant": "before",
+          "job_id": 121080969398,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40163916876/job/121080969398",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-bf52210179cbf8776eae",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-418d0b1e878495b2cd45",
+          "pruning": []
+        },
+        {
+          "variant": "after",
+          "job_id": 121080969535,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40163916876/job/121080969535",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-bf52210179cbf8776eae",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-418d0b1e878495b2cd45",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 220,
+              "removed_paths": 726,
+              "active_fingerprints": 1449
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 12,
+      "source": "da8e8e24cf649e5c2f31f8244f9de239305b1c0b",
+      "run_id": 40164625704,
+      "rows": [
+        {
+          "variant": "after",
+          "job_id": 121083036274,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40164625704/job/121083036274",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-db23f0f4ae3c3d5366ae",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-bf52210179cbf8776eae",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 75,
+              "removed_paths": 239,
+              "active_fingerprints": 1449
+            }
+          ]
+        },
+        {
+          "variant": "before",
+          "job_id": 121083036414,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40164625704/job/121083036414",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-db23f0f4ae3c3d5366ae",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-bf52210179cbf8776eae",
+          "pruning": []
+        }
+      ]
+    },
+    {
+      "index": 13,
+      "source": "2555405ab9a78578c2a9fc41235b80d67594aff2",
+      "run_id": 40165269334,
+      "rows": [
+        {
+          "variant": "before",
+          "job_id": 121084915612,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40165269334/job/121084915612",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-a0b2723adc652f970e76",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-db23f0f4ae3c3d5366ae",
+          "pruning": []
+        },
+        {
+          "variant": "after",
+          "job_id": 121084915849,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40165269334/job/121084915849",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-a0b2723adc652f970e76",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-db23f0f4ae3c3d5366ae",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 122,
+              "removed_paths": 401,
+              "active_fingerprints": 1449
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 16,
+      "source": "6b161598cd07796e178f1f8e1e422743bbd1e165",
+      "run_id": 40166560823,
+      "rows": [
+        {
+          "variant": "before",
+          "job_id": 121088708838,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40166560823/job/121088708838",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-f54a202fcdd96c26cc2f",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-a0b2723adc652f970e76",
+          "pruning": []
+        },
+        {
+          "variant": "after",
+          "job_id": 121088709016,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40166560823/job/121088709016",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-f54a202fcdd96c26cc2f",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-a0b2723adc652f970e76",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 172,
+              "removed_paths": 552,
+              "active_fingerprints": 1447
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 24,
+      "source": "acba99d527b8a9fd2e15490df42d0e6d744a4331",
+      "run_id": 40169456308,
+      "rows": [
+        {
+          "variant": "after",
+          "job_id": 121097162775,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40169456308/job/121097162775",
+          "primary_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-e00d7c0601ec3975f3ab",
+          "restored_key": "ruff-history-20261025-v1-after-native-v1-Linux-X64-c139a7b5b0f82009276e-f54a202fcdd96c26cc2f",
+          "pruning": [
+            {
+              "superseded_workspace_fingerprints": 0,
+              "removed_paths": 0,
+              "active_fingerprints": 1447
+            }
+          ]
+        },
+        {
+          "variant": "before",
+          "job_id": 121097163043,
+          "url": "https://github.com/astral-sh/ruff/actions/runs/40169456308/job/121097163043",
+          "primary_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-e00d7c0601ec3975f3ab",
+          "restored_key": "ruff-history-20261025-v1-before-native-v1-Linux-X64-86b3b240608833cefb34-f54a202fcdd96c26cc2f",
+          "pruning": []
+        }
+      ]
+    }
+  ],
+  "refresh_timing": {
+    "commits": 7,
+    "before_mean": 254.28853157142856,
+    "after_mean": 279.6564527142857,
+    "saved": -25.367921142857142,
+    "speedup": 0.9092889833342248
+  },
+  "other_work_breakdown": {
+    "Documentation builds": {
+      "before": 37.8,
+      "after": 31.955555555555556
+    },
+    "Dogfooding": {
+      "before": 32.7,
+      "after": 28.055555555555557
+    },
+    "Doctests": {
+      "before": 10.177777777777777,
+      "after": 10.122222222222222
+    },
+    "Parser feature check": {
+      "before": 2.111111111111111,
+      "after": 0.9222222222222223
+    }
+  }
+}
