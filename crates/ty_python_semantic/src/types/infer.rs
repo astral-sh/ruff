@@ -388,7 +388,7 @@ impl<'db> FunctionDecoratorInference<'db> {
         &self.legacy_aliases
     }
 
-    pub(super) fn known_decorators(&self) -> FunctionDecorators {
+    fn known_decorators(&self) -> FunctionDecorators {
         self.known_decorators
     }
 
