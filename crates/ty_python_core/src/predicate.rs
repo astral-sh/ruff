@@ -172,6 +172,8 @@ pub enum PredicateNode<'db> {
     /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
     /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
     Condition(Expression<'db>),
+    /// The semantic index has already recorded the predicate's evaluation context.
+    RecordedTruthiness(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

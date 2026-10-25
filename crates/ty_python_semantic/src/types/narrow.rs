@@ -88,7 +88,9 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
 ) {
     let constraints = match predicate.node {
-        PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
+        PredicateNode::Expression { expression, .. }
+        | PredicateNode::Condition(expression)
+        | PredicateNode::RecordedTruthiness(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
             (constraints.get(place, true), constraints.get(place, false))
         }
@@ -1731,7 +1733,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
+            PredicateNode::Expression { expression, .. }
+            | PredicateNode::Condition(expression)
+            | PredicateNode::RecordedTruthiness(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
             PredicateNode::Pattern(pattern) => {
@@ -3497,6 +3501,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match self.predicate {
             PredicateNode::Expression { expression, .. }
             | PredicateNode::Condition(expression)
+            | PredicateNode::RecordedTruthiness(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,

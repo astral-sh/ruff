@@ -597,6 +597,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     match predicate.node {
         PredicateNode::Expression { expression, .. }
         | PredicateNode::Condition(expression)
+        | PredicateNode::RecordedTruthiness(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -2026,10 +2027,14 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
         PredicateNode::Expression {
             expression: test_expr,
             truthiness_from_type: false,
-        } => predicate_truthiness(db, test_expr, ExpressionContext::Value)
-            .negate_if(!predicate.is_positive),
+        } => tracked_value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
         PredicateNode::Condition(test_expr) => {
-            predicate_truthiness(db, test_expr, ExpressionContext::Condition)
+            tracked_condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
+        }
+        PredicateNode::RecordedTruthiness(test_expr) => {
+            debug_assert!(matches!(test_expr.kind(db), ExpressionKind::Predicate(_)));
+            infer_expression_types(db, test_expr, TypeContext::default())
+                .predicate_truthiness()
                 .negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {

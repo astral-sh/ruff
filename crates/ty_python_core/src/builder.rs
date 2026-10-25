@@ -2272,9 +2272,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             _ => ExpressionKind::Predicate(ExpressionContext::Value),
         };
-        let expression = self.add_standalone_expression_impl(predicate_node, kind, None);
+        // Within a loop the predicate can depend on bindings from an earlier iteration:
+        // let its truthiness and operand types converge in the same inference query.
+        // Elsewhere a dedicated scalar query is cheaper to read on repeated graph walks.
+        let record = self.in_loop_context() && matches!(kind, ExpressionKind::Predicate(_));
+        let expression = self.add_standalone_expression_impl(
+            predicate_node,
+            if record { kind } else { ExpressionKind::Normal },
+            None,
+        );
         PredicateOrLiteral::Predicate(Predicate {
-            node: if kind == ExpressionKind::Predicate(ExpressionContext::Condition) {
+            node: if record {
+                PredicateNode::RecordedTruthiness(expression)
+            } else if kind == ExpressionKind::Predicate(ExpressionContext::Condition) {
                 PredicateNode::Condition(expression)
             } else {
                 PredicateNode::Expression {
@@ -2416,7 +2426,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 match pred.node {
                     PredicateNode::Expression { expression, .. }
-                    | PredicateNode::Condition(expression) => {
+                    | PredicateNode::Condition(expression)
+                    | PredicateNode::RecordedTruthiness(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);
