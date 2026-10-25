@@ -5,6 +5,8 @@
 
 mod attributes;
 
+use std::cell::LazyCell;
+
 use bitflags::bitflags;
 use ruff_db::{
     diagnostic::{Annotation, Span},
@@ -341,23 +343,16 @@ fn check_inherited_method_conflict<'db>(
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
-    let mut targets = contracts
-        .iter()
-        .filter_map(|&target| {
-            let (decorator, ty) = source_method_contract(db, env, target, receiver, name)?;
-            Some((target, decorator, ty))
-        })
-        .peekable();
-    if targets.peek().is_none() {
-        return;
-    }
-    let Some((selected_decorator, selected_ty)) =
-        source_method_contract(db, env, owner, receiver, name)
-    else {
-        return;
-    };
-
-    for (contract_owner, contract_decorator, contract_ty) in targets {
+    let selected = LazyCell::new(|| source_method_contract(db, env, owner, receiver, name));
+    for &contract_owner in contracts {
+        let Some((contract_decorator, contract_ty)) =
+            source_method_contract(db, env, contract_owner, receiver, name)
+        else {
+            continue;
+        };
+        let Some((selected_decorator, selected_ty)) = *selected else {
+            return;
+        };
         let Some((selected_ty, contract_ty)) =
             method_override_types(db, env, selected_ty, contract_ty)
         else {
@@ -955,66 +950,62 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            let needs_owner = inherited_member_owner.is_none()
+            let own_class_member =
+                LazyCell::new(|| superclass.own_class_member(db, env, None, &member.name));
+
+            // An inferred receiver assignment is an override target but does not take
+            // ownership of a conflict inherited from an earlier declaration.
+            if inherited_member_owner.is_none()
                 && !liskov_check_complete
                 && configuration.check_liskov_violations()
-                && member.name != "__hash__";
-            let needs_final_method =
-                configuration.check_final_method_overridden() && overridden_final_method.is_none();
-            let needs_final_variable = configuration.check_final_variable_overridden()
-                && overridden_final_variable.is_none();
-            if needs_owner || needs_final_method || needs_final_variable {
-                let own_class_member = superclass.own_class_member(db, env, None, &member.name);
+                && member.name != "__hash__"
+                && (!own_class_member.is_undefined()
+                    || matches!(
+                        superclass
+                            .own_instance_member(db, env, &member.name)
+                            .inner
+                            .place,
+                        Place::Defined(DefinedPlace {
+                            origin: TypeOrigin::Declared,
+                            ..
+                        })
+                    ))
+            {
+                inherited_member_owner = Some(superclass);
+            }
 
-                // An inferred receiver assignment is an override target but does not take
-                // ownership of a conflict inherited from an earlier declaration.
-                if needs_owner
-                    && (!own_class_member.is_undefined()
-                        || matches!(
-                            superclass
-                                .own_instance_member(db, env, &member.name)
-                                .inner
-                                .place,
-                            Place::Defined(DefinedPlace {
-                                origin: TypeOrigin::Declared,
-                                ..
-                            })
-                        ))
+            if configuration.check_final_method_overridden()
+                && overridden_final_method.is_none()
+                && let Some((superclass_scope, superclass_symbol_id)) = superclass_symbol
+                && let Some(ty) = own_class_member.ignore_possibly_undefined()
+            {
+                // TODO: `@final` should be more like a type qualifier:
+                // we should also recognise `@final`-decorated methods that don't end up
+                // as being function- or property-types (because they're wrapped by other
+                // decorators that transform the type into something else).
+                let underlying_functions = extract_underlying_functions(db, ty);
+                if underlying_functions
+                    .iter()
+                    .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
+                    && is_function_definition(db, superclass_scope, superclass_symbol_id)
                 {
-                    inherited_member_owner = Some(superclass);
+                    overridden_final_method = Some((superclass, underlying_functions));
                 }
+            }
 
-                if needs_final_method
-                    && let Some((superclass_scope, superclass_symbol_id)) = superclass_symbol
-                    && let Some(ty) = own_class_member.ignore_possibly_undefined()
-                {
-                    // TODO: `@final` should be more like a type qualifier:
-                    // we should also recognise `@final`-decorated methods that don't end up
-                    // as being function- or property-types (because they're wrapped by other
-                    // decorators that transform the type into something else).
-                    let underlying_functions = extract_underlying_functions(db, ty);
-                    if underlying_functions
-                        .iter()
-                        .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
-                        && is_function_definition(db, superclass_scope, superclass_symbol_id)
-                    {
-                        overridden_final_method = Some((superclass, underlying_functions));
-                    }
-                }
-
-                if needs_final_variable
-                    && own_class_member
-                        .qualifiers()
-                        .contains(TypeQualifiers::FINAL)
-                {
-                    // Find the declaration definition in the superclass for the secondary annotation.
-                    let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
-                        use_def_map(db, scope)
-                            .end_of_scope_symbol_declarations(id)
-                            .find_map(|decl| decl.declaration.definition())
-                    });
-                    overridden_final_variable = Some((superclass, superclass_definition));
-                }
+            if configuration.check_final_variable_overridden()
+                && overridden_final_variable.is_none()
+                && own_class_member
+                    .qualifiers()
+                    .contains(TypeQualifiers::FINAL)
+            {
+                // Find the declaration definition in the superclass for the secondary annotation.
+                let superclass_definition = superclass_symbol.and_then(|(scope, id)| {
+                    use_def_map(db, scope)
+                        .end_of_scope_symbol_declarations(id)
+                        .find_map(|decl| decl.declaration.definition())
+                });
+                overridden_final_variable = Some((superclass, superclass_definition));
             }
 
             // **********************************************************

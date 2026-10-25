@@ -1,6 +1,6 @@
 //! Compatibility of the values read from and written to inherited attributes.
 
-use std::cell::LazyCell;
+use std::cell::{LazyCell, OnceCell};
 
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
@@ -880,26 +880,17 @@ pub(super) fn check_inherited_conflict<'db>(
     let kind = AttributeContractKind::Inherited;
     // Most inherited names occur on just one base. Only look up the selected declaration
     // once we know another base supplies a contract for the same name.
-    let mut targets = contracts
-        .filter_map(|target_owner| {
-            let MemberContract::Attribute(target) =
-                unbound_member_contract(db, env, target_owner, name, kind)?
-            else {
-                return None;
-            };
-            Some((target_owner, target))
-        })
-        .peekable();
-    if targets.peek().is_none() {
-        return;
-    }
-    let Some(MemberContract::Attribute(declaration)) =
-        unbound_member_contract(db, env, owner, name, kind)
-    else {
-        return;
-    };
-    let source = LazyCell::new(|| bind_attribute(db, env, owner, receiver, name, &declaration));
-    for (target_owner, target) in targets {
+    let declaration = LazyCell::new(|| unbound_member_contract(db, env, owner, name, kind));
+    let source = OnceCell::new();
+    for target_owner in contracts {
+        let Some(MemberContract::Attribute(target)) =
+            unbound_member_contract(db, env, target_owner, name, kind)
+        else {
+            continue;
+        };
+        let Some(MemberContract::Attribute(declaration)) = &*declaration else {
+            return;
+        };
         // Method pairs use the separate signature check. Mixed method and attribute pairs
         // still compare the types exposed by descriptor access.
         if declaration.is_method && target.is_method {
@@ -908,7 +899,9 @@ pub(super) fn check_inherited_conflict<'db>(
         let Some(target) = bind_attribute(db, env, target_owner, receiver, name, &target) else {
             continue;
         };
-        let Some(source) = source.as_ref() else {
+        let Some(source) =
+            source.get_or_init(|| bind_attribute(db, env, owner, receiver, name, declaration))
+        else {
             return;
         };
         let Some(violation) = attribute_violation(
