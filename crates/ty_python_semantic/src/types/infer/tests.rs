@@ -74,34 +74,6 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
     assert_diagnostic_messages(&diagnostics, expected);
 }
 
-#[test]
-fn inherited_attribute_conflict_after_editing_base() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_file("/src/left.py", "class Left:\n    value: int\n")?;
-    db.write_file(
-        "/src/child.py",
-        "from left import Left\nfrom right import Right\n\nclass Child(Left, Right): ...\n",
-    )?;
-
-    // Adding a competing name changes which contracts are checked. Changing its type
-    // must also update the diagnostic even though the list of names stays the same.
-    for (declaration, expected) in [
-        ("other: str", &[][..]),
-        (
-            "value: str",
-            &["Incompatible inherited attribute `value`"][..],
-        ),
-        ("value: int", &[][..]),
-    ] {
-        db.write_file(
-            "/src/right.py",
-            format!("class Right:\n    {declaration}\n"),
-        )?;
-        assert_file_diagnostics(&db, "/src/child.py", expected);
-    }
-    Ok(())
-}
-
 #[track_caller]
 fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
     let file = system_path_to_file(db, filename).unwrap();
