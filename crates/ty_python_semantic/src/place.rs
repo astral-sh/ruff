@@ -1678,10 +1678,10 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
-    // Evaluating a condition can infer a narrowed binding and re-enter this loop.
-    // Count both decision graphs when budgeting that work.
-    let use_exact_reachability =
-        use_def.constraint_node_count() <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
+    // Only reachability is approximated below. Counting narrowing nodes here can make an
+    // unreachable assignment visible on the next loop iteration.
+    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
     for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous

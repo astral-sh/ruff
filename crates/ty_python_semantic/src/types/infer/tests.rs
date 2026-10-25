@@ -1022,6 +1022,31 @@ class Form(Ui):
 }
 
 #[test]
+fn many_conditional_calls_preserve_loop_reachability() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    // The conditional calls create many narrowing constraints, but the loop's reachability
+    // graph is still small enough to rule out its uninhabited assignment.
+    let calls = "        if flag: print()\n".repeat(128);
+    let source = format!(
+        r#"import sys
+from typing_extensions import reveal_type
+
+def f(flag: bool, more: bool):
+    x = 0
+    while more:
+        if flag and sys.exit():
+            x = "unreachable"
+        reveal_type(x)
+{calls}"#
+    );
+    db.write_file("/src/main.py", &source)?;
+
+    assert_revealed_type(&db, "/src/main.py", "Literal[0]");
+    Ok(())
+}
+
+#[test]
 fn nested_binding_remains_precise_after_many_module_calls() -> anyhow::Result<()> {
     let mut db = setup_db();
     let calls = "noop()\n".repeat(MANY_NON_TERMINAL_CALLS);

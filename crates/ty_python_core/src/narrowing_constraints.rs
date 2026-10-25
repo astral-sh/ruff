@@ -110,10 +110,6 @@ impl NarrowingConstraints {
         }
     }
 
-    pub(crate) fn len(&self) -> usize {
-        self.used_interiors.len()
-    }
-
     pub(crate) fn is_empty(&self) -> bool {
         self.used_interiors.is_empty()
     }
