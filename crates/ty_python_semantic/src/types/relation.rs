@@ -1932,21 +1932,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     }
                     TypeVarVariance::Bivariant => return self.always(),
                 };
-                let marker = if let Type::Divergent(mut divergent) = marker
+                let marker = if let Type::Divergent(divergent) = marker
                     && marker.is_recursive_divergent()
-                    && !divergent.flags.contains(DivergentFlags::FROZEN)
+                    && !divergent.flags().contains(DivergentFlags::FROZEN)
                     && !matches!(other, Type::TypeVar(_))
                     && !any_over_type_including_alias_arguments(db, self.env, other, |ty| {
                         ty.is_divergent()
                     }) {
-                    divergent.projection = Some(DivergentProjection::new(
+                    let projection = DivergentProjection::new(
                         db,
-                        divergent.projection,
+                        divergent.projection(db),
                         other,
                         typevar,
                         polarity,
-                    ));
-                    Type::Divergent(divergent)
+                    );
+                    Type::Divergent(divergent.with_projection(db, projection))
                 } else {
                     marker
                 };

@@ -11,8 +11,8 @@ use itertools::Itertools;
 
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
+    BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, KnownClass, MaterializationKind,
+    SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -51,14 +51,14 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_object(&self) -> bool {
-        matches!(
-            self,
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
-                    ..
-                })
-        )
+        match self {
+            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object)) => true,
+            Type::Divergent(divergent) => matches!(
+                divergent.materialization_kind(),
+                Some(MaterializationKind::Top)
+            ),
+            _ => false,
+        }
     }
 
     pub(crate) fn instance(

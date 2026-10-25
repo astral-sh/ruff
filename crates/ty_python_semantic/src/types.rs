@@ -2363,58 +2363,38 @@ impl<'db> Type<'db> {
 
     /// Returns a divergent marker for a cycle in type alias inference.
     fn divergent_alias(id: salsa::Id) -> Self {
-        Self::Divergent(DivergentType {
-            flags: DivergentFlags::FROM_TYPE_ALIAS,
-            ..DivergentType::new(id)
-        })
+        Self::Divergent(DivergentType::new(id).with_flags(DivergentFlags::FROM_TYPE_ALIAS))
     }
 
     const fn pending_narrowing() -> Self {
-        Self::Divergent(DivergentType {
-            origin: DivergentOrigin::PendingNarrowing,
-            flags: DivergentFlags::empty(),
-            materialization: None,
-            projection: None,
-            binding: None,
-        })
+        Self::Divergent(DivergentType(DivergentTypeInner::PendingNarrowing(
+            DivergentFlags::empty(),
+            None,
+        )))
     }
 
-    fn binding_cycle_marker(self, definition: Definition<'db>) -> Self {
-        if let Type::Divergent(mut divergent) = self {
-            divergent.binding = Some(definition);
-            Type::Divergent(divergent)
+    fn binding_cycle_marker(self, db: &'db dyn Db, definition: Definition<'db>) -> Self {
+        if let Type::Divergent(divergent) = self {
+            Type::Divergent(divergent.with_binding(db, Some(definition)))
         } else {
             self
         }
     }
 
-    fn without_binding_cycle_origin(self) -> Self {
-        if let Type::Divergent(mut divergent) = self {
-            divergent.binding = None;
-            Type::Divergent(divergent)
+    fn without_binding_cycle_origin(self, db: &'db dyn Db) -> Self {
+        if let Type::Divergent(divergent) = self {
+            Type::Divergent(divergent.with_binding(db, None))
         } else {
             self
         }
     }
 
     const fn is_pending_narrowing(&self) -> bool {
-        matches!(
-            self,
-            Self::Divergent(DivergentType {
-                origin: DivergentOrigin::PendingNarrowing,
-                ..
-            })
-        )
+        matches!(self, Self::Divergent(divergent) if divergent.is_pending_narrowing())
     }
 
     const fn is_recursive_divergent(&self) -> bool {
-        matches!(
-            self,
-            Self::Divergent(DivergentType {
-                origin: DivergentOrigin::Recursive(_),
-                ..
-            })
-        )
+        matches!(self, Self::Divergent(divergent) if !divergent.is_pending_narrowing())
     }
 
     const fn is_divergent(&self) -> bool {
@@ -2430,9 +2410,9 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if both types reference the same recursive query, or both represent
     /// pending narrowing, regardless of materialization state.
-    fn same_divergent_marker(self, other: Type<'db>) -> bool {
+    fn same_divergent_marker(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         match (self, other) {
-            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(db, right),
             _ => false,
         }
     }
@@ -2496,14 +2476,14 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        matches!(
-            self,
-            Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
-        )
+        match self {
+            Type::Never => true,
+            Type::Divergent(divergent) => matches!(
+                divergent.materialization_kind(),
+                Some(MaterializationKind::Bottom)
+            ),
+            _ => false,
+        }
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -2713,14 +2693,11 @@ impl<'db> Type<'db> {
     }
 
     const fn is_dynamic(&self) -> bool {
-        matches!(
-            self,
-            Type::Dynamic(_)
-                | Type::Divergent(DivergentType {
-                    materialization: None,
-                    ..
-                })
-        )
+        match self {
+            Type::Dynamic(_) => true,
+            Type::Divergent(divergent) => divergent.materialization_kind().is_none(),
+            _ => false,
+        }
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
@@ -3754,8 +3731,8 @@ impl<'db> Type<'db> {
             let projections = RefCell::new(FxOrderSet::default());
             any_over_type_including_alias_arguments(db, env, self, |ty| {
                 if let Type::Divergent(divergent) = ty
-                    && divergent.projection.is_some()
-                    && let DivergentOrigin::Recursive(id) = divergent.origin
+                    && divergent.projection(db).is_some()
+                    && let Some(DivergentOrigin(id)) = divergent.origin(db)
                     && cycle.head_ids().any(|head| head == id)
                 {
                     projections.borrow_mut().insert(ty);
@@ -3763,18 +3740,15 @@ impl<'db> Type<'db> {
                 false
             });
             for marker in projections.into_inner() {
-                let Type::Divergent(mut divergent) = marker else {
+                let Type::Divergent(divergent) = marker else {
                     continue;
                 };
-                divergent.projection = None;
-                divergent.binding = None;
-                divergent.flags.insert(DivergentFlags::FROZEN);
                 current = current.apply_type_mapping(
                     db,
                     env,
                     &TypeMapping::ReplaceDivergent {
                         marker,
-                        replacement: Type::Divergent(divergent),
+                        replacement: Type::Divergent(divergent.frozen(db)),
                     },
                     TypeContext::default(),
                 );
@@ -3784,12 +3758,12 @@ impl<'db> Type<'db> {
             current.pending_narrowing_normalized(db, env, Type::divergent(cycle.id()), &|ty| {
                 cycle
                     .head_ids()
-                    .any(|id| ty.same_divergent_marker(Type::divergent(id)))
+                    .any(|id| ty.same_divergent_marker(db, Type::divergent(id)))
             });
         cycle.head_ids().fold(normalized, |ty, id| {
             let mut divergent = DivergentType::new(id);
             if cycle.iteration() > crate::TAINTED_CYCLES {
-                divergent.flags.insert(DivergentFlags::FROZEN);
+                divergent = divergent.with_flags(DivergentFlags::FROZEN);
             }
             let marker = Type::Divergent(divergent);
             ty.recursive_type_normalized_impl(db, env, marker, false)
@@ -3808,8 +3782,8 @@ impl<'db> Type<'db> {
         let markers = RefCell::new(FxOrderSet::default());
         any_over_type_including_alias_arguments(db, env, self, |ty| {
             if let Type::Divergent(divergent) = ty
-                && divergent.binding == Some(definition)
-                && let Some(projection) = divergent.projection
+                && divergent.binding(db) == Some(definition)
+                && let Some(projection) = divergent.projection(db)
             {
                 markers.borrow_mut().insert((ty, projection));
             }
@@ -3966,7 +3940,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
+        if nested && (self.same_divergent_marker(db, div) || self.is_pending_narrowing()) {
             return None;
         }
         // Some of these types stay opaque, but pending values in their stored arguments, bounds, or
@@ -9723,7 +9697,7 @@ impl<'db> Type<'db> {
             marker,
             replacement,
         } = type_mapping
-            && self.same_divergent_marker(*marker)
+            && self.same_divergent_marker(db, *marker)
         {
             return match self
                 .as_divergent()
@@ -11687,13 +11661,11 @@ bitflags! {
 
 impl get_size2::GetSize for DivergentFlags {}
 
+/// A back-reference to the query that caused a recursive inference cycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum DivergentOrigin {
-    /// A back-reference to the query that caused a recursive inference cycle.
-    Recursive(salsa::Id),
-    /// A predicate's narrowing is not yet known. This carries no recursive type identity.
-    PendingNarrowing,
-}
+struct DivergentOrigin(salsa::Id);
+
+impl get_size2::GetSize for DivergentOrigin {}
 
 /// An internal marker used while resolving cyclic type inference.
 ///
@@ -11704,19 +11676,37 @@ enum DivergentOrigin {
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
-pub struct DivergentType<'db> {
-    origin: DivergentOrigin,
-    flags: DivergentFlags,
-    /// If this divergent marker has been materialized, preserve whether it should behave like the
-    /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
-    materialization: Option<MaterializationKind>,
-    projection: Option<DivergentProjection<'db>>,
-    /// The owner binding of an `infer_definition_types` query, when this marker represents it.
-    binding: Option<Definition<'db>>,
-}
+pub struct DivergentType<'db>(DivergentTypeInner<'db>);
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DivergentType<'_> {}
+
+/// Keep flags and materialization in each variant so they fit beside its discriminant. Storing
+/// them alongside this enum would grow `DivergentType` beyond 12 bytes and enlarge every `Type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::SalsaValue)]
+enum DivergentTypeInner<'db> {
+    Recursive(DivergentOrigin, DivergentFlags, Option<MaterializationKind>),
+    Inferred(
+        DivergentInference<'db>,
+        DivergentFlags,
+        Option<MaterializationKind>,
+    ),
+    /// A predicate's narrowing is not yet known. This carries no recursive type identity.
+    PendingNarrowing(DivergentFlags, Option<MaterializationKind>),
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct DivergentInference<'db> {
+    #[returns(copy)]
+    origin: DivergentOrigin,
+    #[returns(copy)]
+    projection: Option<DivergentProjection<'db>>,
+    /// The owner binding of an `infer_definition_types` query, when this marker represents it.
+    #[returns(copy)]
+    binding: Option<Definition<'db>>,
+}
+
+impl get_size2::GetSize for DivergentInference<'_> {}
 
 /// A type variable extracted from an unresolved value by structural generic inference.
 ///
@@ -11737,32 +11727,122 @@ struct DivergentProjection<'db> {
 
 impl get_size2::GetSize for DivergentProjection<'_> {}
 
-impl DivergentType<'_> {
+impl<'db> DivergentType<'db> {
     const fn new(id: salsa::Id) -> Self {
-        Self {
-            origin: DivergentOrigin::Recursive(id),
-            flags: DivergentFlags::empty(),
-            materialization: None,
-            projection: None,
-            binding: None,
+        Self(DivergentTypeInner::Recursive(
+            DivergentOrigin(id),
+            DivergentFlags::empty(),
+            None,
+        ))
+    }
+
+    const fn is_pending_narrowing(self) -> bool {
+        matches!(self.0, DivergentTypeInner::PendingNarrowing(..))
+    }
+
+    fn origin(self, db: &'db dyn Db) -> Option<DivergentOrigin> {
+        match self.0 {
+            DivergentTypeInner::Recursive(origin, ..) => Some(origin),
+            DivergentTypeInner::Inferred(inference, ..) => Some(inference.origin(db)),
+            DivergentTypeInner::PendingNarrowing(..) => None,
         }
     }
 
-    fn same_marker(self, other: Self) -> bool {
-        self.origin == other.origin
-            && self.projection == other.projection
-            && (self.projection.is_none() || self.binding == other.binding)
-    }
-
-    const fn materialized(self, kind: MaterializationKind) -> Self {
-        Self {
-            materialization: Some(kind),
-            ..self
+    const fn flags(self) -> DivergentFlags {
+        match self.0 {
+            DivergentTypeInner::Recursive(_, flags, _)
+            | DivergentTypeInner::Inferred(_, flags, _)
+            | DivergentTypeInner::PendingNarrowing(flags, _) => flags,
         }
     }
 
+    const fn with_flags(mut self, flags: DivergentFlags) -> Self {
+        match &mut self.0 {
+            DivergentTypeInner::Recursive(_, current, _)
+            | DivergentTypeInner::Inferred(_, current, _)
+            | DivergentTypeInner::PendingNarrowing(current, _) => *current = flags,
+        }
+        self
+    }
+
+    fn projection(self, db: &'db dyn Db) -> Option<DivergentProjection<'db>> {
+        match self.0 {
+            DivergentTypeInner::Inferred(inference, ..) => inference.projection(db),
+            _ => None,
+        }
+    }
+
+    fn binding(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self.0 {
+            DivergentTypeInner::Inferred(inference, ..) => inference.binding(db),
+            _ => None,
+        }
+    }
+
+    fn with_binding(self, db: &'db dyn Db, binding: Option<Definition<'db>>) -> Self {
+        let Some(origin) = self.origin(db) else {
+            return self;
+        };
+        let projection = self.projection(db);
+        Self(if projection.is_some() || binding.is_some() {
+            DivergentTypeInner::Inferred(
+                DivergentInference::new(db, origin, projection, binding),
+                self.flags(),
+                self.materialization_kind(),
+            )
+        } else {
+            DivergentTypeInner::Recursive(origin, self.flags(), self.materialization_kind())
+        })
+    }
+
+    fn with_projection(self, db: &'db dyn Db, projection: DivergentProjection<'db>) -> Self {
+        let Some(origin) = self.origin(db) else {
+            return self;
+        };
+        Self(DivergentTypeInner::Inferred(
+            DivergentInference::new(db, origin, Some(projection), self.binding(db)),
+            self.flags(),
+            self.materialization_kind(),
+        ))
+    }
+
+    fn frozen(self, db: &'db dyn Db) -> Self {
+        let flags = self.flags() | DivergentFlags::FROZEN;
+        match self.origin(db) {
+            Some(origin) => Self(DivergentTypeInner::Recursive(
+                origin,
+                flags,
+                self.materialization_kind(),
+            )),
+            None => self.with_flags(flags),
+        }
+    }
+
+    fn same_marker(self, db: &'db dyn Db, other: Self) -> bool {
+        self.origin(db) == other.origin(db)
+            && self.projection(db) == other.projection(db)
+            && (self.projection(db).is_none() || self.binding(db) == other.binding(db))
+    }
+
+    const fn materialized(mut self, kind: MaterializationKind) -> Self {
+        match &mut self.0 {
+            DivergentTypeInner::Recursive(_, _, materialization)
+            | DivergentTypeInner::Inferred(_, _, materialization)
+            | DivergentTypeInner::PendingNarrowing(_, materialization) => {
+                *materialization = Some(kind);
+            }
+        }
+        self
+    }
+
+    /// Materialized markers behave like `object` or `Never` while remaining recognizable as
+    /// divergent, so their materialization must survive inference and normalization.
     const fn materialization_kind(self) -> Option<MaterializationKind> {
-        self.materialization
+        match self.0 {
+            DivergentTypeInner::Recursive(_, _, materialization)
+            | DivergentTypeInner::Inferred(_, _, materialization)
+            | DivergentTypeInner::PendingNarrowing(_, materialization) => materialization,
+        }
     }
 }
 

@@ -256,7 +256,7 @@ fn normalize_collection_use_constraints<'db>(
         DefinitionInference::cycle_initial(
             db,
             definition,
-            Type::divergent(id).binding_cycle_marker(definition),
+            Type::divergent(id).binding_cycle_marker(db, definition),
         )
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
@@ -1680,7 +1680,7 @@ impl<'db> DefinitionInference<'db> {
                         collection_class.apply_specialization(db, |generic_context| {
                             generic_context.repeat_specialization(
                                 db,
-                                cycle_recovery.without_binding_cycle_origin(),
+                                cycle_recovery.without_binding_cycle_origin(db),
                             )
                         });
 
@@ -1718,7 +1718,7 @@ impl<'db> DefinitionInference<'db> {
                 .infer_annotated_assignment_cycle_initial(
                     definition,
                     assignment,
-                    cycle_recovery.without_binding_cycle_origin(),
+                    cycle_recovery.without_binding_cycle_origin(db),
                 );
             }
         }
@@ -1730,7 +1730,7 @@ impl<'db> DefinitionInference<'db> {
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
                 OtherDefinitionInferenceExtra {
-                    cycle_recovery: Some(cycle_recovery.without_binding_cycle_origin()),
+                    cycle_recovery: Some(cycle_recovery.without_binding_cycle_origin(db)),
                     ..OtherDefinitionInferenceExtra::default()
                 },
             )))),

@@ -738,7 +738,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
     let int = KnownClass::Int.to_instance(&db, &env);
     let foreign = Type::divergent(salsa::plumbing::Id::from_bits(2));
-    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(&db, recursive);
     let normalize =
         |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);
@@ -799,7 +799,7 @@ fn pending_narrowing_cycle_recovery_checks_alias_arguments() -> anyhow::Result<(
     let file = ProgramFile::new(&db, file, env.program(&db));
     let pending = Type::pending_narrowing();
     let recursive = Type::divergent(salsa::plumbing::Id::from_bits(1));
-    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(recursive);
+    let is_cycle_marker = |ty: Type<'_>| ty.same_divergent_marker(&db, recursive);
     let normalize =
         |ty| Type::pending_narrowing_normalized(ty, &db, &env, recursive, &is_cycle_marker);
     let list_of = |element| KnownClass::List.to_specialized_instance(&db, &env, &[element]);

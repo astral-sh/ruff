@@ -98,7 +98,7 @@ impl<'db> AliasCycleSummary<'db> {
                 .chain(intersection.negative(db))
                 .find_map(|&element| Self::collect(db, element, typevars)),
             Type::Divergent(divergent)
-                if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
+                if divergent.flags().contains(DivergentFlags::FROM_TYPE_ALIAS) =>
             {
                 Some(ty)
             }
