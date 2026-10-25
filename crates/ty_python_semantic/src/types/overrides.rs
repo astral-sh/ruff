@@ -271,16 +271,14 @@ fn declared_instance_attribute_names<'db>(
     let mut names = Vec::new();
     for scope in attribute_scopes(db, class_scope) {
         let map = index.use_def_map(scope);
-        names.extend(
-            index
-                .place_table(scope)
-                .declared_instance_attributes()
-                .filter_map(|(member, name)| {
-                    map.reachable_member_declarations(member)
-                        .any(|declaration| declaration.declaration.definition().is_some())
-                        .then(|| Name::new(name))
-                }),
-        );
+        for (member, name) in index.place_table(scope).declared_instance_attributes() {
+            if map
+                .reachable_member_declarations(member)
+                .any(|declaration| declaration.declaration.definition().is_some())
+            {
+                names.push(Name::new(name));
+            }
+        }
     }
     names.sort_unstable();
     names.dedup();
