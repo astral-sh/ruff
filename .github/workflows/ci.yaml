@@ -73,7 +73,7 @@ jobs:
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-history-20261025-v1-before
+          prefix-key: ruff-history-origin-20261025-v1-before
           cache-workspace-crates: "false"
         name: Restore Rust cache
         id: rust-cache
@@ -171,7 +171,7 @@ jobs:
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-history-20261025-v1-after
+          prefix-key: ruff-history-origin-20261025-v1-after
           cache-workspace-crates: "true"
         name: Restore Rust cache
         id: rust-cache
