@@ -1,4 +1,4 @@
-name: Replay Rust cache behavior across commit history
+name: Measure mdtest annotation builds
 run-name: ${{ inputs.phase }} / commit ${{ inputs.commit_index }} / pair ${{ inputs.replica }}
 "on":
   workflow_dispatch:
@@ -34,10 +34,10 @@ run-name: ${{ inputs.phase }} / commit ${{ inputs.commit_index }} / pair ${{ inp
 permissions:
   contents: read
 jobs:
-  linux-before:
-    name: linux / before
+  linux-deps-before:
+    name: linux-deps / before
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'linux') }}
+    if: ${{ inputs.suite == 'linux-deps' }}
     timeout-minutes: 20
     env:
       UV_LOCKED: 1
@@ -73,7 +73,7 @@ jobs:
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-history-20261025-v1-before
+          prefix-key: ruff-annotations-deps-20261025-v1-before
           cache-workspace-crates: "false"
         name: Restore Rust cache
         id: rust-cache
@@ -132,10 +132,10 @@ jobs:
     defaults:
       run:
         shell: bash
-  linux-after:
-    name: linux / after
+  linux-deps-after:
+    name: linux-deps / after
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
-    if: ${{ (inputs.suite == 'all' || inputs.suite == 'linux') }}
+    if: ${{ inputs.suite == 'linux-deps' }}
     timeout-minutes: 20
     env:
       UV_LOCKED: 1
@@ -171,7 +171,101 @@ jobs:
       - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
         with:
           save-if: ${{ inputs.phase == 'seed' }}
-          prefix-key: ruff-history-20261025-v1-after
+          prefix-key: ruff-annotations-deps-20261025-v1-after
+          cache-workspace-crates: "false"
+        name: Restore Rust cache
+        id: rust-cache
+      - name: Record Rust cache availability
+        if: ${{ inputs.phase == 'warm' }}
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"'
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: 0.13.5
+          checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+          enable-cache: "true"
+          cache-python: true
+      - name: Run tests
+        run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        env:
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: "1"
+      - name: Run doctests
+        run: cargo test --doc --all-features
+      - name: Check parser without stacker
+        run: cargo check --locked -p ruff_python_parser --no-default-features --all-targets
+      - name: Dogfood ty on py-fuzzer
+        run:
+          uv run --quiet --python="${PYTHON_VERSION}" --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer
+          --color=always
+      - name: Dogfood ty on ty_benchmark
+        run:
+          uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark
+          --color=always
+      - name: Dogfood ty on scripts
+        env:
+          TY_UV: scripts
+          UV_LOCKED: "true"
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
+        run: |
+          uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
+          cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
+      - run: cargo doc --all --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run:
+          cargo doc --no-deps -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine
+          -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter
+          --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+  linux-full-before:
+    name: linux-full / before
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    if: ${{ inputs.suite == 'linux-full' }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: "false"
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: "3.14"
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: "1"
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source }}
+      - name: Record source revision
+        shell: bash
+        run: |-
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          echo "Measured source revision: $(git rev-parse HEAD)"
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source }}
+      - name: Install Rust toolchain
+        run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          save-if: ${{ inputs.phase == 'seed' }}
+          prefix-key: ruff-annotations-full-20261025-v1-before
           cache-workspace-crates: "true"
         name: Restore Rust cache
         id: rust-cache
@@ -230,3 +324,141 @@ jobs:
     defaults:
       run:
         shell: bash
+  linux-full-after:
+    name: linux-full / after
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    if: ${{ inputs.suite == 'linux-full' }}
+    timeout-minutes: 20
+    env:
+      UV_LOCKED: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_NET_RETRY: 10
+      CARGO_PROFILE_DEV_LTO: "false"
+      CARGO_PROFILE_DEV_OPT_LEVEL: 0
+      CARGO_TERM_COLOR: always
+      HAWK_VERSION: 0.1.15
+      RUSTUP_MAX_RETRIES: 10
+      PACKAGE_NAME: ruff
+      PYTHON_VERSION: "3.14"
+      NEXTEST_PROFILE: ci
+      MDTEST_EXTERNAL: "1"
+      CARGO_UNSTABLE_CHECKSUM_FRESHNESS: "true"
+      RUSTC_BOOTSTRAP: "1"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source }}
+      - name: Record source revision
+        shell: bash
+        run: |-
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          echo "Measured source revision: $(git rev-parse HEAD)"
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source }}
+      - name: Install Rust toolchain
+        run: rustup show
+      - uses: astral-sh/github-actions/rust-workspace-cache@8139eb474ac22fe39bb1e33b50afa426dcdaf455
+        with:
+          save-if: ${{ inputs.phase == 'seed' }}
+          prefix-key: ruff-annotations-full-20261025-v1-after
+          cache-workspace-crates: "true"
+        name: Restore Rust cache
+        id: rust-cache
+      - name: Record Rust cache availability
+        if: ${{ inputs.phase == 'warm' }}
+        shell: bash
+        env:
+          CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
+        run: 'echo "Rust cache exact hit: ${CACHE_HIT:-false}"'
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: 0.13.5
+          checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+          enable-cache: "true"
+          cache-python: true
+      - name: Run tests
+        run: uv run --locked --only-dev cargo insta test --all-features --unreferenced reject --test-runner nextest --disable-nextest-doctest
+        env:
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: "1"
+      - name: Run doctests
+        run: cargo test --doc --all-features
+      - name: Check parser without stacker
+        run: cargo check --locked -p ruff_python_parser --no-default-features --all-targets
+      - name: Dogfood ty on py-fuzzer
+        run:
+          uv run --quiet --python="${PYTHON_VERSION}" --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer
+          --color=always
+      - name: Dogfood ty on ty_benchmark
+        run:
+          uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark
+          --color=always
+      - name: Dogfood ty on scripts
+        env:
+          TY_UV: scripts
+          UV_LOCKED: "true"
+          UV_PYTHON: ${{ env.PYTHON_VERSION }}
+        run: |
+          uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
+          cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
+      - run: cargo doc --all --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run:
+          cargo doc --no-deps -p ty_python_semantic -p ty_python_core -p ty_module_resolver -p ty_site_packages -p ty_combine
+          -p ty_project -p ty_ide -p ty_wasm -p ty_vendored -p ty_static -p ty -p ty_test -p ruff_db -p ruff_python_formatter
+          --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+  annotation-probe:
+    name: Captured annotation output
+    if: ${{ inputs.suite == 'annotation-probe' }}
+    runs-on: depot-ubuntu-22.04-16
+    timeout-minutes: 10
+    env:
+      CARGO_TERM_COLOR: always
+      UV_LOCKED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source }}
+      - name: Install Rust toolchain
+        run: rustup show
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884
+        with:
+          version: 0.13.5
+          checksum: f68d291c75783122dad58ab77def0e13f3233f358731db5d6d7e8715603b928f
+      - name: Check captured annotation output
+        shell: bash
+        run: |
+          probe_dir="$HOME/code/tmp/annotation-probe"
+          mkdir -p "$probe_dir/src"
+          cat > "$probe_dir/Cargo.toml" <<'TOML'
+          [package]
+          name = "annotation-probe"
+          version = "0.1.0"
+          edition = "2024"
+          TOML
+          cat > "$probe_dir/src/lib.rs" <<'RUST'
+          #[test]
+          fn captured_annotation() {
+              println!("::error file=.github/workflows/ci.yaml,line=1::Intentional captured-output annotation probe");
+              panic!("intentional failure to inspect annotation handling");
+          }
+          RUST
+          set +e
+          uv run --locked --only-dev cargo nextest run \
+            --manifest-path "$probe_dir/Cargo.toml" \
+            --failure-output immediate-final --status-level skip
+          result=$?
+          set -e
+          test "$result" -eq 100
