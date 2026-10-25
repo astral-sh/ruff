@@ -123,8 +123,13 @@ impl<'db> AmbiguousReturnMerger<'_, 'db> {
             // require ordinary ambiguity handling, even when a cycle marker is also present.
             let equivalent = self.equivalent_representative(&residuals)?;
             // A marker-only return has no concrete evidence to agree with the other overloads.
-            // Keep its marker until the cycle resolves instead of retaining a speculative return.
-            if residuals.len() == types.len() {
+            // Independent dynamic returns still contribute uncertainty needed for convergence;
+            // unlike concrete types, they do not introduce a speculative return shape.
+            if residuals.len() == types.len()
+                || equivalent
+                    .resolve_type_alias(self.db)
+                    .is_non_divergent_dynamic()
+            {
                 builder.add_in_place(equivalent);
             }
         }

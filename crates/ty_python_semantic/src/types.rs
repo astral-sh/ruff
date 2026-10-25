@@ -3819,7 +3819,6 @@ impl<'db> Type<'db> {
                 .unwrap_or(div);
         };
         let mut builder = UnionBuilder::new(db, env)
-            .unpack_aliases(false)
             .cycle_recovery(true)
             .or_recursively_defined(union.recursively_defined(db));
         for element in union.elements(db) {

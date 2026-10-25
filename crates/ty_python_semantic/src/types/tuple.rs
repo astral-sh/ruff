@@ -29,7 +29,9 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::visitor::any_over_type_expanding_aliases;
+use crate::types::visitor::{
+    any_over_type_expanding_aliases, any_over_type_including_alias_arguments,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
     IntersectionType, Type, TypeContext, TypeMapping, UnionType,
@@ -2577,6 +2579,47 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
         Self::Variable(VariableLengthTuple::homogeneous(
             VariableSegment::Homogeneous(element),
         ))
+    }
+
+    /// Check containment between homogeneous tuples without relation queries. A widened tuple
+    /// can absorb narrower alternatives that would otherwise reappear on the next cycle iteration.
+    pub(super) fn is_contained_by_homogeneous(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &Self,
+    ) -> bool {
+        let (Self::Variable(source), Self::Variable(target)) = (self, other) else {
+            return false;
+        };
+        if source.len() != TupleLength::unknown() || target.len() != TupleLength::unknown() {
+            return false;
+        }
+        let (Some(source), Some(Type::Union(target))) = (
+            source.variable().homogeneous_type(),
+            target.variable().homogeneous_type(),
+        ) else {
+            return false;
+        };
+        let source_elements = if let Type::Union(source) = &source {
+            if source.recursively_defined(db) != target.recursively_defined(db) {
+                return false;
+            }
+            source.elements(db)
+        } else {
+            std::slice::from_ref(&source)
+        };
+        source_elements
+            .iter()
+            .all(|element| target.elements(db).contains(element))
+            // A broader tuple with an extra marker can collapse at a later nested-constructor
+            // boundary where the narrower tuple survives. Preserve that independent alternative.
+            && target.elements(db).iter().all(|element| {
+                source_elements.contains(element)
+                    || !any_over_type_including_alias_arguments(db, env, *element, |ty| {
+                        ty.is_divergent()
+                    })
+            })
     }
 
     pub(crate) fn homogeneous_element_type(

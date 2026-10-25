@@ -4172,6 +4172,7 @@ impl<'db> CallableBinding<'db> {
             };
 
             let mut cases = Vec::with_capacity(expanded_argument_lists.len());
+            let mut merged_evaluation_state: Option<CallableBindingSnapshot<'db>> = None;
 
             for expanded_arguments in &expanded_argument_lists {
                 // Ambiguity belongs to one expanded argument list. In particular, an earlier
@@ -4251,13 +4252,19 @@ impl<'db> CallableBinding<'db> {
                 };
 
                 if let Some(return_type) = return_type {
+                    if !partition_divergent {
+                        let snapshot = snapshotter.take(self);
+                        match &mut merged_evaluation_state {
+                            Some(merged) => merged.update(&snapshot),
+                            state @ None => *state = Some(snapshot),
+                        }
+                    }
                     cases.push(ExpandedCallEvaluation {
                         return_type,
                         selected_overloads: self
                             .selected_overloads()
                             .map(|(index, _)| index)
                             .collect(),
-                        snapshot: snapshotter.take(self),
                     });
                 } else {
                     // No need to check the remaining argument lists if the current argument list
@@ -4266,24 +4273,17 @@ impl<'db> CallableBinding<'db> {
                 }
             }
 
-            if cases.len() == expanded_argument_lists.len()
-                && let Some((first, rest)) = cases.split_first()
-            {
+            if cases.len() == expanded_argument_lists.len() && !cases.is_empty() {
                 // The merged view supports consumers that need one binding per overload. Keep
                 // the individual evaluations as well: the same generic overload can infer a
                 // different specialization for each expanded argument list.
-                if partition_divergent {
-                    // The partitions refine only the return type. Argument contexts, partial
-                    // application, and collection specialization still need the inference from
-                    // the complete arguments, not the inference from the last partition.
-                    snapshotter.restore(self, post_evaluation_snapshot);
-                } else {
-                    let mut merged_evaluation_state = first.snapshot.clone();
-                    for case in rest {
-                        merged_evaluation_state.update(&case.snapshot);
-                    }
-                    snapshotter.restore(self, merged_evaluation_state);
-                }
+                // Recovery partitions refine only the return type. Argument contexts, partial
+                // application, and collection specialization still need the inference from the
+                // complete arguments, so restore their original bindings instead.
+                snapshotter.restore(
+                    self,
+                    merged_evaluation_state.unwrap_or(post_evaluation_snapshot),
+                );
 
                 // Every expanded argument list must succeed. Alternative matches within a case
                 // cannot compensate for a different argument list with no matches.
@@ -5057,14 +5057,12 @@ struct ExpandedOverloadCall<'db> {
     cases: Box<[ExpandedCallEvaluation<'db>]>,
 }
 
-/// One successful expanded argument list, before its bindings are merged with other cases.
-/// The snapshot retains matching candidates; selection records the overloads that determine
-/// this case's result after resolving equivalent return types or ambiguity.
+/// The return type and selected overloads of one successful expanded argument list, after
+/// resolving equivalent return types or ambiguity.
 #[derive(Debug, Clone)]
 struct ExpandedCallEvaluation<'db> {
     return_type: Type<'db>,
     selected_overloads: SmallVec<[usize; 2]>,
-    snapshot: CallableBindingSnapshot<'db>,
 }
 
 #[derive(Debug)]

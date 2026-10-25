@@ -1084,6 +1084,21 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if self.cycle_recovery
+                && let (Some(new_tuple), Some(existing_tuple)) = (
+                    ty.exact_tuple_instance_spec(db),
+                    element_type.exact_tuple_instance_spec(db),
+                )
+            {
+                if new_tuple.is_contained_by_homogeneous(db, &self.env, &existing_tuple) {
+                    return;
+                }
+                if existing_tuple.is_contained_by_homogeneous(db, &self.env, &new_tuple) {
+                    to_remove.push(i);
+                    continue;
+                }
+            }
+
             // Preserve the first representation when cycle iterations reorder argument unions.
             // Structural comparison retains exact marker identities without inference queries.
             if self.cycle_recovery
@@ -2619,7 +2634,7 @@ mod tests {
     }
 
     #[test]
-    fn cycle_recovery_deduplicates_reordered_union_arguments() {
+    fn cycle_recovery_reduces_unions_without_relation_queries() {
         let db = setup_db();
         let mut events_db = db.clone();
         let env = db.program_environment();
@@ -2634,6 +2649,18 @@ mod tests {
         let reordered = list_of([div, int]);
         let distinct_marker = list_of([int, other_div]);
         assert_ne!(first, reordered);
+        let narrow_tuple = Type::homogeneous_tuple(&db, &env, div);
+        let broad_tuple = Type::homogeneous_tuple(
+            &db,
+            &env,
+            UnionType::from_elements_cycle_recovery(&db, &env, [int, div]),
+        );
+        let concrete_tuple = Type::homogeneous_tuple(&db, &env, int);
+        let nested_marker_tuple = Type::homogeneous_tuple(
+            &db,
+            &env,
+            UnionType::from_elements_cycle_recovery(&db, &env, [div, distinct_marker]),
+        );
         events_db.clear_salsa_events();
 
         for (left, right) in [(first, reordered), (reordered, first)] {
@@ -2648,6 +2675,21 @@ mod tests {
             union.expect_union().elements(&db),
             &[first, distinct_marker]
         );
+        for pair in [[narrow_tuple, broad_tuple], [broad_tuple, narrow_tuple]] {
+            assert_eq!(
+                UnionType::from_elements_cycle_recovery(&db, &env, pair),
+                broad_tuple,
+            );
+        }
+        // These alternatives survive a cutoff that collapses the broader tuple, including when
+        // the extra marker is nested inside a generic argument.
+        for pair in [
+            [concrete_tuple, broad_tuple],
+            [narrow_tuple, nested_marker_tuple],
+        ] {
+            let independent = UnionType::from_elements_cycle_recovery(&db, &env, pair);
+            assert_eq!(independent.expect_union().elements(&db), &pair);
+        }
         assert!(
             events_db
                 .take_salsa_events()
