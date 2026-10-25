@@ -128,18 +128,6 @@ static FREQTRADE: Benchmark = Benchmark::new(RealWorldProject {
     python_version: SupportedPythonVersion::Py311,
 });
 
-// This revision exercises a conditional empty list whose element type is constrained by
-// a constructor call after a large loop in isort/parse.py.
-static ISORT: Benchmark = Benchmark::new(RealWorldProject {
-    name: "isort",
-    repository: "https://github.com/PyCQA/isort",
-    commit: "a514c71ed86c2216d0040c7d60e302ed76a4f7ab",
-    paths: &["isort"],
-    dependencies: &["colorama", "types-colorama"],
-    max_dep_date: "2026-10-24T19:50:00Z",
-    python_version: SupportedPythonVersion::Py311,
-});
-
 static PANDAS: Benchmark = Benchmark::new(RealWorldProject {
     name: "pandas",
     repository: "https://github.com/pandas-dev/pandas",
@@ -217,11 +205,6 @@ fn altair(bencher: Bencher) {
 #[bench(sample_size = 2, sample_count = 3)]
 fn freqtrade(bencher: Bencher) {
     run_single_threaded(bencher, &FREQTRADE);
-}
-
-#[bench(sample_size = 2, sample_count = 3)]
-fn isort(bencher: Bencher) {
-    run_single_threaded(bencher, &ISORT);
 }
 
 #[bench(sample_size = 2, sample_count = 3)]
