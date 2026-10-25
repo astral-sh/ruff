@@ -961,6 +961,12 @@ impl<'db> UseDefMap<'db> {
         &self.constraint_tables().reachability_constraints
     }
 
+    /// Number of retained decision nodes that can be visited when resolving loop-carried bindings.
+    pub fn constraint_node_count(&self) -> usize {
+        let tables = self.constraint_tables();
+        tables.reachability_constraints.used_interiors().len() + tables.narrowing_constraints.len()
+    }
+
     pub fn predicates(&self) -> &Predicates<'db> {
         &self.constraint_tables().predicates
     }

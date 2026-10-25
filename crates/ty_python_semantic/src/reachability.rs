@@ -738,6 +738,15 @@ fn evaluate_reachability_constraint<'db>(
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
+    evaluate_reachability_constraint_with_predicate_cache(db, scope, id, None)
+}
+
+fn evaluate_reachability_constraint_with_predicate_cache<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    cache: Option<&PredicateTruthinessCache>,
+) -> Truthiness {
     if let Some(reachability) = terminal_reachability(id) {
         return reachability;
     }
@@ -753,7 +762,7 @@ fn evaluate_reachability_constraint<'db>(
         db,
         scope,
         constraints,
-        predicates,
+        PredicateEvaluator { predicates, cache },
         call_predicates,
         id,
         true,
@@ -815,6 +824,37 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
+/// Local to a single scope and inference region. Different decision nodes can test the
+/// same predicate. During cycle recovery even a Salsa cache hit merges the query's
+/// provisional dependencies, so avoid repeating that lookup inside one inference.
+#[derive(Default)]
+struct PredicateTruthinessCache(RefCell<FxHashMap<ScopedPredicateId, Truthiness>>);
+
+#[derive(Clone, Copy)]
+struct PredicateEvaluator<'a, 'db> {
+    predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    cache: Option<&'a PredicateTruthinessCache>,
+}
+
+impl<'db> PredicateEvaluator<'_, 'db> {
+    fn evaluate(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        id: ScopedPredicateId,
+    ) -> Truthiness {
+        let Some(cache) = self.cache else {
+            return analyze_single(db, env, &self.predicates[id]);
+        };
+        if let Some(truthiness) = cache.0.borrow().get(&id) {
+            return *truthiness;
+        }
+        let truthiness = analyze_single(db, env, &self.predicates[id]);
+        cache.0.borrow_mut().insert(id, truthiness);
+        truthiness
+    }
+}
+
 /// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
 ///
 /// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
@@ -833,7 +873,7 @@ fn evaluate_reachability_path<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicates: PredicateEvaluator<'_, 'db>,
     call_predicates: Option<&[ScopedPredicateId]>,
     mut id: ScopedReachabilityConstraintId,
     mut use_checkpoint: bool,
@@ -855,7 +895,7 @@ fn evaluate_reachability_path<'db>(
             if use_checkpoint && is_reachability_checkpoint(call_predicates, node.atom(), visited) {
                 evaluate_reachability_checkpoint(db, scope, id)
             } else {
-                id = match analyze_single(db, &env, &predicates[node.atom()]) {
+                id = match predicates.evaluate(db, &env, node.atom()) {
                     Truthiness::AlwaysTrue => node.if_true(),
                     Truthiness::Ambiguous => node.if_ambiguous(),
                     Truthiness::AlwaysFalse => node.if_false(),
@@ -914,7 +954,10 @@ fn evaluate_reachability_checkpoint<'db>(
         db,
         scope,
         use_def.reachability_constraints(),
-        predicates,
+        PredicateEvaluator {
+            predicates,
+            cache: None,
+        },
         call_predicates,
         id,
         false,
@@ -949,7 +992,10 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             db,
             predicate_scope(db, &predicates[root_predicate]),
             self,
-            predicates,
+            PredicateEvaluator {
+                predicates,
+                cache: None,
+            },
             None,
             id,
             true,
@@ -1141,6 +1187,7 @@ pub(crate) struct NarrowingProjector<'a, 'db> {
     base_ty: Type<'db>,
     /// Checkpoint entries retain narrowed types, so projections are specific to the binding type.
     project_cache: FxHashMap<(ScopedNarrowingConstraint, Type<'db>), ProjectedNarrowingNodeId>,
+    predicate_truthiness_cache: PredicateTruthinessCache,
     graph: ProjectedNarrowingGraph<'db>,
     narrowed_cache: FxHashMap<(ProjectedNarrowingNodeId, Type<'db>), Type<'db>>,
 }
@@ -1166,6 +1213,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             base_ty,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
+            predicate_truthiness_cache: PredicateTruthinessCache::default(),
             narrowed_cache: FxHashMap::default(),
         }
     }
@@ -1224,6 +1272,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         let narrowed = context.narrow(root, None);
         self.narrowed_cache.insert(key, narrowed);
         narrowed
+    }
+
+    fn predicate_truthiness(&self, id: ScopedPredicateId) -> Truthiness {
+        PredicateEvaluator {
+            predicates: self.predicates,
+            cache: Some(&self.predicate_truthiness_cache),
+        }
+        .evaluate(self.db, self.env, id)
     }
 
     /// Returns the cached positive and negative narrowing constraints for a predicate.
@@ -1421,6 +1477,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         type Id = ScopedNarrowingConstraint;
         enum Action {
             Visit(Id),
+            AfterUncertain(Id),
             AnalyzeNonTerminal(Id),
             FinishNonTerminal { id: Id, branch: Id },
             FinishPredicate(Id),
@@ -1482,6 +1539,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         self.project_cache.insert((id, self.base_ty), projected);
                         continue;
                     }
+                    actions.push(Action::AfterUncertain(id));
+                    actions.push(Action::Visit(node.if_uncertain));
+                }
+                Action::AfterUncertain(id) => {
+                    let node = self.constraints.get_interior_node(id);
+                    let if_uncertain = self.projected_node(node.if_uncertain);
+                    // The unconditional path applies to every outcome, including an
+                    // uninhabited test. Once it is unconstrained the other paths cannot narrow.
+                    if if_uncertain == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        continue;
+                    }
+                    let predicate = self.predicates[node.atom];
                     let is_control_flow_gate = matches!(
                         predicate.node,
                         PredicateNode::IsNonTerminalCall(_)
@@ -1491,18 +1561,15 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
                     if is_control_flow_gate {
                         actions.push(Action::AnalyzeNonTerminal(id));
-                        actions.push(Action::Visit(node.if_uncertain));
                     } else {
                         actions.push(Action::FinishPredicate(id));
                         actions.push(Action::Visit(node.if_false));
-                        actions.push(Action::Visit(node.if_uncertain));
                         actions.push(Action::Visit(node.if_true));
                     }
                 }
                 Action::AnalyzeNonTerminal(id) => {
                     let node = self.constraints.get_interior_node(id);
-                    let predicate = self.predicates[node.atom];
-                    let branch = match analyze_single(db, self.env, &predicate) {
+                    let branch = match self.predicate_truthiness(node.atom) {
                         Truthiness::AlwaysTrue => node.if_true,
                         Truthiness::AlwaysFalse => node.if_false,
                         Truthiness::Uninhabited => ScopedNarrowingConstraint::ALWAYS_FALSE,
@@ -1528,13 +1595,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let if_true = self.projected_node(node.if_true);
                     let if_uncertain = self.projected_node(node.if_uncertain);
                     let if_false = self.projected_node(node.if_false);
+                    // No outcome of this predicate can change the projection, including
+                    // an uninhabited test, which contributes only the unconditional branch.
+                    if if_true == if_uncertain && if_false == if_uncertain {
+                        self.project_cache.insert((id, self.base_ty), if_uncertain);
+                        continue;
+                    }
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     let projected = if pos_constraint.is_none() && neg_constraint.is_none() {
                         // This node represents `if_uncertain || (P && if_true) || (!P && if_false)`.
                         // Since the predicate `P` cannot narrow this place, remove it while retaining only branches that `P` can take.
                         // Including a statically unreachable branch could erase narrowing from the reachable branch.
-                        match analyze_single(self.db, self.env, &self.predicates[node.atom]) {
+                        match self.predicate_truthiness(node.atom) {
                             Truthiness::AlwaysTrue => self.or(if_true, if_uncertain),
                             Truthiness::AlwaysFalse => self.or(if_false, if_uncertain),
                             Truthiness::Ambiguous => {
@@ -2154,6 +2227,7 @@ pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
     primary_constraints: usize,
     primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    primary_predicates: PredicateTruthinessCache,
     other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
@@ -2171,6 +2245,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             primary_scope,
             primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
             primary_entries: RefCell::new(Vec::new()),
+            primary_predicates: PredicateTruthinessCache::default(),
             other_entries: RefCell::new(FxHashMap::default()),
         }
     }
@@ -2215,7 +2290,12 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        let result = evaluate_reachability_constraint(db, self.primary_scope, id);
+        let result = evaluate_reachability_constraint_with_predicate_cache(
+            db,
+            self.primary_scope,
+            id,
+            Some(&self.primary_predicates),
+        );
         let mut entries = self.primary_entries.borrow_mut();
         if entries.len() <= index {
             entries.resize(index + 1, None);

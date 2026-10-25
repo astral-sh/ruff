@@ -2676,7 +2676,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 4096;
         let db = self.db();
 
-        let loop_header = loop_header_reachability(self.db(), definition);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
@@ -2691,6 +2690,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
+        let loop_header = loop_header_reachability(db, definition);
         let place = loop_header_kind.place();
         let env = self.program_environment();
         let mut union = UnionBuilder::new(db, env).or_recursively_defined(RecursivelyDefined::Yes);

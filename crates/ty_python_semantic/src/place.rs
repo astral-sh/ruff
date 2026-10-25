@@ -1633,7 +1633,7 @@ fn symbol_impl<'db>(
 
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
-    returns(clone),
+    returns(ref),
     cycle_initial=|db, _, definition: Definition<'db>| {
         loop_header_reachability_impl(db, definition, Some(&mut FxHashMap::default()))
     },
@@ -1678,10 +1678,11 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut deleted_narrowing_constraints = FxIndexSet::default();
     let mut reachable_bindings = FxIndexSet::default();
-    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
-        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
-    for live_binding in live_bindings {
+    // Evaluating a condition can infer a narrowed binding and re-enter this loop.
+    // Count both decision graphs when budgeting that work.
+    let use_exact_reachability =
+        use_def.constraint_node_count() <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
+    for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if cycle_initial_cache.is_some() {
             Truthiness::Ambiguous
         } else if use_exact_reachability {

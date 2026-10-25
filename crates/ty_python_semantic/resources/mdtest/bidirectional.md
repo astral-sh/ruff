@@ -3269,6 +3269,34 @@ x24[1] = "b"
 reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
+## Collection inference through a loop and a return
+
+The empty list in the conditional assignment is constrained by the return. Inference for the other
+argument to the same constructor reads that list inside a loop.
+
+```py
+from typing import NamedTuple
+
+class Parsed(NamedTuple):
+    lines: list[str]
+    output: list[str]
+
+def parse(text: str) -> Parsed:
+    lines = text.split("\n")
+    if not text:
+        lines = []
+    output = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        index += 1
+        if line:
+            output.append(line)
+    reveal_type(lines)  # revealed: list[str]
+    reveal_type(output)  # revealed: list[str]
+    return Parsed(lines=lines, output=output)
+```
+
 ## Unconstrained collection use-sites
 
 Calling a method that does not constrain a collection's element type does not affect its inferred
