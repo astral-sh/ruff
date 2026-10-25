@@ -12,7 +12,7 @@ use ruff_text_size::Ranged;
 
 use crate::Db;
 use crate::types::dict::dict_literal_key_value_types;
-use crate::types::infer::{ExpressionInference, FrozenMap};
+use crate::types::infer::{FrozenMap, infer_same_file_expression_type};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -85,14 +85,19 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_inference = infer_expression_types(
-            self.context.db(),
-            value.expression(),
-            TypeContext::default(),
-        );
-        let value_expr = value.expression().node_ref(self.db()).node(self.module());
-
-        let value_type = value_inference.expression_type(value_expr);
+        let value_expr = value.expression().node_ref(db).node(self.module());
+        let inference = std::cell::OnceCell::new();
+        let expression_type = |expression: &ast::Expr| {
+            inference
+                .get_or_init(|| {
+                    infer_expression_types(db, value.expression(), TypeContext::default())
+                })
+                .expression_type(expression)
+        };
+        let value_type = (matches!(value.kind(), UnpackKind::Assign))
+            .then(|| self.fixed_call_result(value_expr))
+            .flatten()
+            .unwrap_or_else(|| expression_type(value_expr));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -106,9 +111,8 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 let env = self.context.program_environment();
                 if !mode.is_async()
                     && let ast::Expr::Dict(dict) = value_expr
-                    && let Some((keys, _)) = dict_literal_key_value_types(db, env, dict, |expr| {
-                        value_inference.expression_type(expr)
-                    })
+                    && let Some((keys, _)) =
+                        dict_literal_key_value_types(db, env, dict, |expr| expression_type(expr))
                 {
                     keys
                 } else {
@@ -148,8 +152,49 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 expression: matches!(value.kind(), UnpackKind::Assign).then_some(value_expr),
                 promote_literals: false,
             },
-            value_inference,
+            &expression_type,
         );
+    }
+
+    /// For a plain call with one concrete tuple return annotation, argument inference cannot affect an
+    /// unpacked target's type. The assignment statement separately checks the full RHS, including
+    /// its arguments. Avoiding that dependency here breaks cycles such as `a, b = f(a)` in a loop.
+    fn fixed_call_result(&self, value: &ast::Expr) -> Option<Type<'db>> {
+        let db = self.db();
+        let call = value.as_call_expr()?;
+        if !call.func.is_name_expr() || self.context.scope().node(db).as_function().is_none() {
+            return None;
+        }
+        let index = ty_python_core::semantic_index(db, self.context.program_file());
+        let callee = index.try_expression(&call.func)?;
+        let Type::FunctionLiteral(function) =
+            infer_same_file_expression_type(db, callee, TypeContext::default())
+        else {
+            return None;
+        };
+
+        // Call binding can override the annotated return type for known functions and dataclass
+        // transformers. Overloaded and generic calls can also depend on their arguments.
+        let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
+            return None;
+        };
+        if implementation.known(db).is_some()
+            || function.file(db).is_stub(db)
+            || !implementation.decorators(db).is_empty()
+            || implementation.dataclass_transformer_params(db).is_some()
+            || !implementation.has_explicit_return_annotation(db)
+        {
+            return None;
+        }
+        let [signature] = function.signature(db).overloads.as_slice() else {
+            return None;
+        };
+        let ty = signature.return_ty;
+        let env = self.context.program_environment();
+        (signature.generic_context.is_none()
+            && ty.tuple_instance_spec(db, env).is_some()
+            && !ty.has_typevar(db, env))
+        .then_some(ty)
     }
 
     /// Records `Unknown` for a malformed unpack target and all of its descendant expressions.
@@ -184,7 +229,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         target: &ast::Expr,
         value_expr: AnyNodeRef<'_>,
         value: UnpackElement<'db, 'ast>,
-        value_inference: &ExpressionInference<'db>,
+        expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
     ) {
         let db = self.db();
         let env = self.context.program_environment();
@@ -194,7 +239,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 return;
             }
             ast::Expr::Starred(starred) => {
-                self.unpack_inner(&starred.value, value_expr, value, value_inference);
+                self.unpack_inner(&starred.value, value_expr, value, expression_type);
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. })
@@ -213,7 +258,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 expression,
                 value.promote_literals,
                 &|expression, promote| {
-                    let ty = value_inference.expression_type(expression);
+                    let ty = expression_type(expression);
                     UnpackElement {
                         ty: if promote { ty.promote(db, env) } else { ty },
                         expression: Some(expression),
@@ -224,7 +269,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     // The starred expression's inference has already reported iteration errors.
                     // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
                     // though the enclosing list's type has erased positions and length.
-                    let ty = value_inference.expression_type(expression);
+                    let ty = expression_type(expression);
                     let ty = if promote { ty.promote(db, env) } else { ty };
                     let mut tuple = ty.iterate(db, env);
                     if let Some(length) = known_length
@@ -350,7 +395,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     expression,
                     promote_literals,
                 },
-                value_inference,
+                expression_type,
             );
         }
     }

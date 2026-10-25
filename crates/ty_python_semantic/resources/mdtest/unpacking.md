@@ -15,6 +15,46 @@ reveal_type(b)  # revealed: Literal[2]
 reveal_type(c)  # revealed: Literal[3]
 ```
 
+### Fixed call results in a loop
+
+An unpacked result can have a fixed type even when its arguments depend on the values from a
+previous iteration. We still check the arguments and the uses of all targets.
+
+```py
+from typing import NamedTuple
+
+class Result(NamedTuple):
+    text: str
+    value: int
+
+def update(value: int) -> Result:
+    return Result(str(value), value)
+
+def loop(value: int, flag: bool):
+    while flag:
+        text, value = update(value)
+        reveal_type(text)  # revealed: str
+        reveal_type(value)  # revealed: int
+        a, b = update(text)  # error: [invalid-argument-type]
+        reveal_type(a)  # revealed: str
+        reveal_type(b)  # revealed: int
+```
+
+Some decorators change the result of the call even when the function has a tuple return annotation.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def factory() -> tuple[int, str]:
+    return 1, ""
+
+def use_factory():
+    a, b = factory()  # error: [not-iterable]
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+```
+
 ### Simple list
 
 ```py
