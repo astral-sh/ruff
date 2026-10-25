@@ -399,7 +399,7 @@ mod tests {
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
-    use crate::{Db as _, ProjectMetadata};
+    use crate::{Db as _, ProjectMetadata, UseUv};
 
     use super::{Script, script};
 
@@ -430,6 +430,33 @@ mod tests {
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(&db, crate::should_check_file, ordinary, &events);
         assert_function_query_was_not_run(&db, script, ordinary, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn script_synchronization_only_indexes_files_when_enabled() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        for mode in [UseUv::Off, UseUv::Scripts, UseUv::On] {
+            let mut db = TestDb::new(ProjectMetadata::new("test", root.clone()).with_use_uv(mode));
+            db.write_file("/project/ordinary.py", "x = 1")?;
+            db.write_file(
+                "/project/script.py",
+                "# /// script\n# dependencies = []\n# ///\n",
+            )?;
+            let script = system_path_to_file(&db, SystemPath::new("/project/script.py"))?;
+            let project = db.project();
+
+            let scripts = project.scripts_to_synchronize(&db);
+            if mode == UseUv::Off {
+                assert!(scripts.is_empty());
+                assert!(project.file_set(&db).is_lazy());
+                // Inline settings still apply when uv integration is disabled.
+                assert!(Script::for_file(&db, script).is_some());
+            } else {
+                assert_eq!(scripts, [script]);
+            }
+        }
 
         Ok(())
     }
