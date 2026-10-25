@@ -567,15 +567,26 @@ fn definition_reachability<'db>(
     reachability
 }
 
+fn resolved_condition_definition_info<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> ConditionDefinitionInfo<'db> {
+    resolved_condition_definition_info_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, definition),
+    )
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
-fn resolved_condition_definition_info<'db>(
+fn resolved_condition_definition_info_query<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> ConditionDefinitionInfo<'db> {
+    let definition = key.definition(db);
     let scope = definition.scope(db);
     let places = place_table(db, scope);
     let symbol_name = places
@@ -689,15 +700,26 @@ fn attribute_condition_definition_info<'db>(
 ///
 /// This Salsa-tracked query reads the definition's AST behind its own incremental boundary, so
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
+fn definition_contains_special_cased_condition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> bool {
+    definition_contains_special_cased_condition_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, definition),
+    )
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| false,
     heap_size = ruff_memory_usage::heap_size
 )]
-fn definition_contains_special_cased_condition<'db>(
+fn definition_contains_special_cased_condition_query<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> bool {
+    let definition = key.definition(db);
     let module = parsed_module(db, definition.python_file(db)).load(db);
     let definition_kind = definition.kind(db);
     let file = definition.file(db);

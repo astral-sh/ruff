@@ -169,11 +169,19 @@ pub(crate) enum PytestTestKind {
 /// scope determine collection eligibility; the underlying function may be defined elsewhere.
 /// Returns `None` for unavailable bindings, values whose function cannot be identified, fixtures,
 /// and bindings that fail the naming or enclosing-class rules.
-#[salsa::tracked(returns(as_ref))]
 pub(crate) fn pytest_test_for_binding<'db>(
     db: &'db dyn Db,
     binding: Definition<'db>,
+) -> Option<&'db PytestTest<'db>> {
+    pytest_test_for_binding_query(db, crate::types::SpecializedDefinition::new(db, binding))
+}
+
+#[salsa::tracked(returns(as_ref))]
+fn pytest_test_for_binding_query<'db>(
+    db: &'db dyn Db,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> Option<PytestTest<'db>> {
+    let binding = key.definition(db);
     if !is_default_pytest_test_file(db, binding.program_file(db)) {
         return None;
     }
@@ -265,8 +273,16 @@ fn is_excluded_test_function<'db>(db: &'db dyn Db, definition: Definition<'db>) 
 /// An inherited `__test__` binding may belong to another file. Tracking keeps that file's AST and
 /// semantic-index dependencies on the defining binding, so subclasses share the result and
 /// unrelated edits to the defining file need not invalidate their collection queries.
-#[salsa::tracked(returns(copy))]
 fn binding_value_type<'db>(db: &'db dyn Db, binding: Definition<'db>) -> Type<'db> {
+    binding_value_type_query(db, crate::types::SpecializedDefinition::new(db, binding))
+}
+
+#[salsa::tracked(returns(copy))]
+fn binding_value_type_query<'db>(
+    db: &'db dyn Db,
+    key: crate::types::SpecializedDefinition<'db>,
+) -> Type<'db> {
+    let binding = key.definition(db);
     let module = parsed_module(db, binding.python_file(db)).load(db);
     let target = match binding.kind(db) {
         DefinitionKind::Assignment(assignment) => Some(assignment.target(&module)),

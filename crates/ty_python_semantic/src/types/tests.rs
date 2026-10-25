@@ -1,5 +1,5 @@
 use super::*;
-use crate::db::tests::{TestDbBuilder, setup_db};
+use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
@@ -22,6 +22,38 @@ fn member_lookup_result_size() {
         size_of::<MemberLookupResult<'_>>(),
         size_of::<Result<PlaceAndQualifiers<'_>, MemberLookupError<'_>>>(),
     );
+}
+
+#[test]
+fn deleting_a_typed_dict_discards_its_specialized_definition() -> anyhow::Result<()> {
+    use salsa::Database as _;
+
+    let mut db = setup_db();
+    let path = "/src/record.py";
+    db.write_dedented(
+        path,
+        r#"
+        from typing import TypedDict
+
+        Record = TypedDict("Record", {"value": int})
+        record: Record = {"value": 1}
+        "#,
+    )?;
+    let file = system_path_to_file(&db, path)?;
+    let check = |db: &TestDb| {
+        let file = ProgramFile::new(db, file, db.program_environment().program(db));
+        crate::check_file_unwrap(db, file)
+    };
+    assert!(check(&db).is_empty());
+    db.clear_salsa_events();
+
+    db.write_file(path, "from typing import TypedDict\n")?;
+    assert!(check(&db).is_empty());
+    assert!(db.take_salsa_events().iter().any(|event| {
+        matches!(event.kind, salsa::EventKind::DidDiscard { key }
+            if db.ingredient_debug_name(key.ingredient_index()) == "SpecializedDefinition")
+    }));
+    Ok(())
 }
 
 #[test]

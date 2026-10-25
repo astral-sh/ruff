@@ -193,6 +193,35 @@ pub(crate) mod definition_resolution;
 mod property_tests;
 mod subscript;
 
+/// Cache key for queries used by specialized forms of definitions.
+///
+/// Salsa reserves a slot for every registered query on a definition as soon as the first
+/// query is memoized. Keep specialized queries off that table: most definitions have no need
+/// for pytest, dynamic class construction, or conditional diagnostic queries.
+#[salsa::tracked(debug, constructor = from_query, heap_size=ruff_memory_usage::heap_size)]
+struct SpecializedDefinition<'db> {
+    #[returns(copy)]
+    definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for SpecializedDefinition<'_> {}
+
+impl<'db> SpecializedDefinition<'db> {
+    fn new(db: &'db dyn Db, definition: Definition<'db>) -> Self {
+        specialized_definition(db, definition)
+    }
+}
+
+/// The owning query ties this key and its specialized memos to the original definition.
+/// Deleting the definition drops the query's tracked output.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+fn specialized_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> SpecializedDefinition<'db> {
+    SpecializedDefinition::from_query(db, definition)
+}
+
 pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let source_file = file.file(db);
     let _span = tracing::trace_span!("check_types", ?source_file).entered();

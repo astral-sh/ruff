@@ -446,12 +446,20 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     }
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
+        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
+            deferred_spec_query(db, crate::types::SpecializedDefinition::new(db, definition))
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn deferred_spec<'db>(db: &'db dyn Db, definition: Definition<'db>) -> NamedTupleSpec<'db> {
+        fn deferred_spec_query<'db>(
+            db: &'db dyn Db,
+            key: crate::types::SpecializedDefinition<'db>,
+        ) -> NamedTupleSpec<'db> {
+            let definition = key.definition(db);
             let python_file = definition.python_file(db);
             let module = parsed_module(db, python_file).load(db);
             let node = definition

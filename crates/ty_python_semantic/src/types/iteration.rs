@@ -57,11 +57,22 @@ pub(super) fn add_async_generator_stub_help<'db>(
 
 /// Only stub-like bodies warrant advice about changing the declaration. A coroutine with an
 /// implementation can intentionally return an async iterator, which its caller must await.
-#[salsa::tracked]
 fn async_generator_stub_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
+) -> &'db Option<(Span, Name)> {
+    async_generator_stub_declaration_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, definition),
+    )
+}
+
+#[salsa::tracked]
+fn async_generator_stub_declaration_query<'db>(
+    db: &'db dyn Db,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> Option<(Span, Name)> {
+    let definition = key.definition(db);
     let DefinitionKind::Function(function) = definition.kind(db) else {
         return None;
     };

@@ -1448,15 +1448,26 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
     }
 }
 
+pub(super) fn deferred_functional_typed_dict_schema<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> &'db TypedDictSchema<'db> {
+    deferred_functional_typed_dict_schema_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, definition),
+    )
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial = |_, _, _|TypedDictSchema::default(),
     heap_size = ruff_memory_usage::heap_size
 )]
-pub(super) fn deferred_functional_typed_dict_schema<'db>(
+fn deferred_functional_typed_dict_schema_query<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> TypedDictSchema<'db> {
+    let definition = key.definition(db);
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
@@ -1513,15 +1524,26 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// ```python
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
+pub(super) fn deferred_functional_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypedDictOpenness<'db> {
+    deferred_functional_typed_dict_openness_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, definition),
+    )
+}
+
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
-pub(super) fn deferred_functional_typed_dict_openness<'db>(
+fn deferred_functional_typed_dict_openness_query<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> TypedDictOpenness<'db> {
+    let definition = key.definition(db);
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);

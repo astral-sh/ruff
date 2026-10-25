@@ -197,11 +197,22 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
+        ) -> &'db [Type<'db>] {
+            deferred_explicit_bases_query(
+                db,
+                crate::types::SpecializedDefinition::new(db, definition),
+            )
+        }
+
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_explicit_bases_query<'db>(
+            db: &'db dyn Db,
+            key: crate::types::SpecializedDefinition<'db>,
         ) -> Box<[Type<'db>]> {
+            let definition = key.definition(db);
             let program_file = definition.program_file(db);
             let python_file = program_file.python_file(db);
             let env = ProgramEnvironment::from_file(program_file);

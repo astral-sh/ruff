@@ -127,11 +127,22 @@ use crate::{Db, FxIndexMap, FxIndexSet};
 /// named `dependency`, but for now we just resolve both A and B with the same
 /// approach (a search through lexical scopes). That always resolves that to the
 /// global `dependency` fixture at B even though that result is incomplete.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn fixture_bindings_for_parameter<'db>(
     db: &'db dyn Db,
     parameter: Definition<'db>,
+) -> &'db [FixtureBinding<'db>] {
+    fixture_bindings_for_parameter_query(
+        db,
+        crate::types::SpecializedDefinition::new(db, parameter),
+    )
+}
+
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn fixture_bindings_for_parameter_query<'db>(
+    db: &'db dyn Db,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> Box<[FixtureBinding<'db>]> {
+    let parameter = key.definition(db);
     let Some(request) = fixture_request_for_parameter(db, parameter) else {
         return Box::default();
     };
@@ -1042,11 +1053,19 @@ fn conftest_files<'db>(db: &'db dyn Db, request_file: ProgramFile<'db>) -> Vec<P
 }
 
 /// Returns a fixture declaration for a function with a canonical pytest fixture decorator.
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn fixture_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
+) -> &'db Option<FixtureDeclaration<'db>> {
+    fixture_declaration_query(db, crate::types::SpecializedDefinition::new(db, definition))
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn fixture_declaration_query<'db>(
+    db: &'db dyn Db,
+    key: crate::types::SpecializedDefinition<'db>,
 ) -> Option<FixtureDeclaration<'db>> {
+    let definition = key.definition(db);
     let DefinitionKind::Function(function_ref) = definition.kind(db) else {
         return None;
     };
