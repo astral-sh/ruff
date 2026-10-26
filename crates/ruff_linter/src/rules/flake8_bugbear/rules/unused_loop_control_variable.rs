@@ -3,7 +3,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{NameFinder, StoredNameFinder};
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_semantic::Binding;
+use ruff_python_semantic::{Binding, BindingKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -107,8 +107,53 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
             continue;
         }
 
-        // Ignore any names that are actually used in the loop body.
-        if used_names.contains_key(name) {
+        // Ignore names whose loop binding or a same-scope rebind is used in the loop body. A
+        // same-named reference in a nested scope (e.g., a comprehension) may resolve to a
+        // different binding, and nested loop variables should not count as uses of this binding.
+        let semantic = checker.semantic();
+        let scope = semantic.current_scope();
+        let binding_id = scope
+            .get_all(name)
+            .find(|binding_id| semantic.binding(*binding_id).start() == expr.start());
+        let used_in_body = binding_id
+            .map(|_| {
+                scope.get_all(name).any(|binding_id| {
+                    let binding = semantic.binding(binding_id);
+                    let is_target = binding.start() == expr.start();
+                    if !is_target && matches!(&binding.kind, BindingKind::LoopVar) {
+                        return false;
+                    }
+
+                    // `NameFinder` treated same-scope stores as uses. Preserve that conservative
+                    // behavior, while excluding nested loop targets above.
+                    if !is_target
+                        && matches!(
+                            &binding.kind,
+                            BindingKind::Assignment
+                                | BindingKind::NamedExprAssignment
+                                | BindingKind::Annotation
+                                | BindingKind::WithItemVar
+                                | BindingKind::BoundException
+                                | BindingKind::Deletion
+                        )
+                        && stmt_for.body.iter().any(|stmt| {
+                            binding.start() >= stmt.start() && binding.end() <= stmt.end()
+                        })
+                    {
+                        return true;
+                    }
+
+                    binding.references().any(|reference_id| {
+                        let reference = semantic.reference(reference_id);
+                        reference.is_load()
+                            && stmt_for.body.iter().any(|stmt| {
+                                reference.start() >= stmt.start() && reference.end() <= stmt.end()
+                            })
+                    })
+                })
+            })
+            .unwrap_or_else(|| used_names.contains_key(name));
+        if used_in_body {
             continue;
         }
 
