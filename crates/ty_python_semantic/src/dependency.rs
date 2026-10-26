@@ -254,14 +254,18 @@ impl DependencyMetadata {
             if !search_path.is_editable() {
                 return None;
             }
+
+            // A wheel can own another child of the same namespace. Without an editable source
+            // root, only an entry for this exact module can identify its distribution.
+            return self.module_owner([module.name(db).clone()]);
         }
 
-        self.module_owner(module.name(db))
+        self.module_owner(module.name(db).ancestors())
     }
 
-    fn module_owner(&self, module: &ModuleName) -> Option<&str> {
-        let owners = module
-            .ancestors()
+    fn module_owner(&self, names: impl IntoIterator<Item = ModuleName>) -> Option<&str> {
+        let owners = names
+            .into_iter()
             .find_map(|name| self.module_owners.get(&name))?;
 
         // In particular, importing a namespace shared by several distributions doesn't establish
@@ -308,7 +312,7 @@ impl DependencyMetadata {
         };
 
         if let Some(module) = file_to_module(db, file.resolver_file(db))
-            && self.module_owner(module.name(db)) == Some(id.as_str())
+            && self.module_owner(module.name(db).ancestors()) == Some(id.as_str())
         {
             return true;
         }
