@@ -2509,9 +2509,9 @@ impl<'db> HasIdentity<'db> for InferSpecialization<'db> {
 
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
-pub(crate) struct SpecializationBuilder<'db, 'c> {
+pub(crate) struct SpecializationBuilder<'db, 'c, 'env> {
     db: &'db dyn Db,
-    env: &'c ProgramEnvironment<'db>,
+    env: &'env ProgramEnvironment<'db>,
     constraints: &'c ConstraintSetBuilder<'db>,
     generic_context: GenericContext<'db>,
     inferable: TypeVarSet<'db>,
@@ -2746,10 +2746,10 @@ fn relation_directions<T: Copy>(
     .flatten()
 }
 
-impl<'db, 'c> SpecializationBuilder<'db, 'c> {
+impl<'db, 'c, 'env> SpecializationBuilder<'db, 'c, 'env> {
     pub(crate) fn new(
         db: &'db dyn Db,
-        env: &'c ProgramEnvironment<'db>,
+        env: &'env ProgramEnvironment<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
     ) -> Self {

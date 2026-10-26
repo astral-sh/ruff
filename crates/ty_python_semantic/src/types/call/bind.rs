@@ -6753,7 +6753,7 @@ impl<'db> CallInference<'_, 'db> {
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
         generic_context: GenericContext<'db>,
-        mut builder: SpecializationBuilder<'db, 'c>,
+        mut builder: SpecializationBuilder<'db, 'c, '_>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
@@ -6908,7 +6908,7 @@ impl<'db> CallInference<'_, 'db> {
     /// ```
     fn infer_typevartuple_argument_constraints<'c>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'c, '_>,
         check_type_context: bool,
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
@@ -7168,7 +7168,7 @@ impl<'db> CallInference<'_, 'db> {
 
     fn infer_argument_constraints<'c>(
         &self,
-        builder: &mut SpecializationBuilder<'db, 'c>,
+        builder: &mut SpecializationBuilder<'db, 'c, '_>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
