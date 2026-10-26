@@ -17,6 +17,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
+use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
@@ -33,7 +34,8 @@ use ty_python_core::definition::docstring_from_body;
 use ty_python_core::platform::PythonPlatform;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
-    BindingWithConstraints, DeclarationsIterator, FileScopeId, attribute_scopes, semantic_index,
+    BindingWithConstraints, DeclarationsIterator, FileScopeId, ScopedMemberId, attribute_scopes,
+    semantic_index,
 };
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
@@ -158,6 +160,40 @@ impl ty_combine::Combine for ReturnTypeInference {
     fn combine_with(&mut self, _other: Self) {}
 }
 
+/// Index receiver assignments and declarations once per class. Looking up each attribute by
+/// scanning every method's places is quadratic for classes that define many attributes.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn receiver_attribute_definitions<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Box<[(Name, FileScopeId, ScopedMemberId)]> {
+    let index = semantic_index(db, class_body_scope.program_file(db));
+    let mut definitions: Vec<_> = attribute_scopes(db, class_body_scope)
+        .flat_map(|scope| {
+            index
+                .place_table(scope)
+                .defined_instance_attributes()
+                .map(move |(member, name)| (Name::new(name), scope, member))
+        })
+        .collect();
+    // Preserve method order for declarations of the same name.
+    definitions.sort_by(|(left, ..), (right, ..)| left.cmp(right));
+    definitions.into_boxed_slice()
+}
+
+fn receiver_attribute_members<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (FileScopeId, ScopedMemberId)> + use<'db, 's> {
+    let definitions = receiver_attribute_definitions(db, class_body_scope);
+    let start = definitions.partition_point(|(candidate, ..)| candidate.as_str() < name);
+    definitions[start..]
+        .iter()
+        .take_while(move |(candidate, ..)| candidate.as_str() == name)
+        .map(|(_, scope, member)| (*scope, *member))
+}
+
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
 /// the one given for a specific class body scope.
 ///
@@ -178,19 +214,19 @@ pub(crate) fn attribute_assignments<'db, 's>(
 > + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(move |function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = index.use_def_map(function_scope_id);
-        let assignments = use_def
-            .reachable_member_bindings(member)
-            .filter(move |binding| {
-                !binding
-                    .binding
-                    .is_defined_and(|definition| definition.kind(db).is_loop_header())
-            });
-        Some((assignments, function_scope_id))
-    })
+    receiver_attribute_members(db, class_body_scope, name).map(
+        move |(function_scope_id, member)| {
+            let use_def = index.use_def_map(function_scope_id);
+            let assignments = use_def
+                .reachable_member_bindings(member)
+                .filter(move |binding| {
+                    !binding
+                        .binding
+                        .is_defined_and(|definition| definition.kind(db).is_loop_header())
+                });
+            (assignments, function_scope_id)
+        },
+    )
 }
 
 /// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
@@ -205,14 +241,12 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
     let index = semantic_index(db, class_body_scope.program_file(db));
 
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
+    receiver_attribute_members(db, class_body_scope, name).map(|(function_scope_id, member)| {
         let use_def = index.use_def_map(function_scope_id);
-        Some((
+        (
             use_def.reachable_member_declarations(member),
             function_scope_id,
-        ))
+        )
     })
 }
 

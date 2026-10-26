@@ -261,6 +261,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    has_augmented_attribute_assignment: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
 
@@ -336,6 +337,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             exception_context_stack_manager: ExceptionContextStackManager::default(),
 
             has_future_annotations: false,
+            has_augmented_attribute_assignment: false,
             in_type_checking_block: false,
 
             scopes: IndexVec::new(),
@@ -3434,6 +3436,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
+            has_augmented_attribute_assignment: self.has_augmented_attribute_assignment,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
@@ -4425,6 +4428,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
+
+                self.has_augmented_attribute_assignment |= target.is_attribute_expr();
 
                 // An augmented assignment loads its target before evaluating the right-hand side,
                 // but only defines the target after the operation succeeds.

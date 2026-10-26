@@ -497,7 +497,19 @@ pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, false)
+    let index = semantic_index(db, class_body_scope.program_file(db));
+    let mut names = Vec::new();
+    for scope in attribute_scopes(db, class_body_scope) {
+        names.extend(
+            index
+                .place_table(scope)
+                .members()
+                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
+        );
+    }
+    names.sort_unstable();
+    names.dedup();
+    names.into_boxed_slice()
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
@@ -505,33 +517,10 @@ fn implicit_attribute_definition_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
-    collect_implicit_attribute_names(db, class_body_scope, true)
-}
-
-fn collect_implicit_attribute_names<'db>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    defined_only: bool,
-) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.program_file(db));
-    let mut names = Vec::new();
-
-    for function_scope_id in attribute_scopes(db, class_body_scope) {
-        let table = index.place_table(function_scope_id);
-        if defined_only {
-            names.extend(table.defined_instance_attribute_names().map(Name::new));
-        } else {
-            names.extend(
-                table
-                    .members()
-                    .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-            );
-        }
-    }
-
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
+    crate::receiver_attribute_definitions(db, class_body_scope)
+        .chunk_by(|(left, ..), (right, ..)| left == right)
+        .map(|group| group[0].0.clone())
+        .collect()
 }
 
 fn implicit_attribute_cycle_recover<'db>(

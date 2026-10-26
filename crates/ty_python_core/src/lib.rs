@@ -25,6 +25,7 @@ pub use ast_ids::ExpressionNodeKey;
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
+pub use member::ScopedMemberId;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
@@ -80,6 +81,12 @@ pub fn semantic_index<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> SemanticI
     let module = parsed_module(db, file.python_file(db)).load(db);
 
     SemanticIndexBuilder::new(db, file, &module).build()
+}
+
+/// Whether this file contains an augmented assignment with an attribute target.
+#[salsa::tracked(returns(copy))]
+pub fn has_augmented_attribute_assignment<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> bool {
+    semantic_index(db, file).has_augmented_attribute_assignment
 }
 
 /// Returns the place table for a specific `scope`.
@@ -335,6 +342,8 @@ pub struct SemanticIndex<'db> {
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
+
+    has_augmented_attribute_assignment: bool,
 
     /// Map of all of the enclosing snapshots that appear in this file.
     enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
