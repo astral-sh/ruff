@@ -3932,6 +3932,12 @@ class Color(StrEnum):
     GREEN = "g"
     BLUE = "b"
 
+def match_string(value: str):
+    match value:
+        case Color.GREEN as captured:
+            reveal_type(value)  # revealed: str
+            reveal_type(captured)  # revealed: str
+
 def test_literal_as_enum(x: Literal["g"]) -> None:
     match x:
         case Color.RED:

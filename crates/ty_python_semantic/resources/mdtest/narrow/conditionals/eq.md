@@ -864,6 +864,29 @@ def loop_back():
             value = Integer.Y
 ```
 
+The comparison narrows a `str | int` to the matching builtin type. A plain string can equal
+`String.X` and reach the `.name` access.
+
+```py
+def compare_with_enum_member(value: str | int):
+    if value == String.X:
+        reveal_type(value)  # revealed: str
+        value.name  # error: [unresolved-attribute]
+
+    if Integer.X == value:
+        reveal_type(value)  # revealed: int
+```
+
+Members of other `IntEnum` classes can also compare equal to `Integer.X`.
+
+```py
+def compare_int_enums(value: IntEnum):
+    if value != Integer.X:
+        reveal_type(value)  # revealed: IntEnum & ~Literal[Integer.X]
+    else:
+        reveal_type(value)  # revealed: IntEnum
+```
+
 A custom `__new__` can replace the value declared in an `IntEnum` class body. We can still narrow
 the members of `Foo`, whose runtime values are known, but must preserve all of `Shifted` because its
 members' runtime values cannot be determined statically:

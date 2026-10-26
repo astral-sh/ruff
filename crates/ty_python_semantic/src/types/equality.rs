@@ -1540,7 +1540,20 @@ fn compare_literal_to_other<'db>(
     };
     let condition_expects_equality = operator.condition_expects_equality(branch);
 
-    // Treat broad builtin types as if only the literal itself can compare equal. This is
+    let literal_constraint = || {
+        if !condition_expects_equality {
+            ComparisonResult::CanNarrow(literal_type.negate(db, env))
+        } else if matches!(literal, LiteralValueTypeKind::Enum(_))
+            && literal_semantics != KnownComparisonSemantics::Object
+        {
+            // A plain string can compare equal to a `StrEnum` member.
+            ComparisonResult::Ambiguous
+        } else {
+            ComparisonResult::CanNarrow(literal_type)
+        }
+    };
+
+    // Treat broad builtin types as if only the builtin literal itself can compare equal. This is
     // intentionally unsafe: subclasses, including `bool` for `int`, can compare equal without
     // inhabiting the literal type. Explicitly typed subclasses do not take this path.
     if evaluator.soundness_policy.allow_unsafe_equality
@@ -1549,7 +1562,7 @@ fn compare_literal_to_other<'db>(
         && let Some(other_semantics) = unsafe_narrowable_builtin_semantics(db, other)
     {
         return if literal_semantics == other_semantics {
-            ComparisonResult::CanNarrow(literal_type)
+            literal_constraint()
         } else {
             operator.result_from_equality(false)
         };
@@ -1574,17 +1587,12 @@ fn compare_literal_to_other<'db>(
             if literal_operand == LiteralOperand::Other
                 && !other.is_disjoint_from(db, env, literal_type) =>
         {
-            ComparisonResult::CanNarrow(literal_type.negate_if(
-                db,
-                env,
-                !condition_expects_equality,
-            ))
+            literal_constraint()
         }
-        Some(_) => ComparisonResult::Ambiguous,
         None if literal_operand == LiteralOperand::Other && !condition_expects_equality => {
-            ComparisonResult::CanNarrow(literal_type.negate(db, env))
+            literal_constraint()
         }
-        None => ComparisonResult::Ambiguous,
+        _ => ComparisonResult::Ambiguous,
     }
 }
 
