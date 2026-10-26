@@ -1,6 +1,6 @@
 # Django
 
-Django support in ty currently relies on the stubs from [django-types]:
+Django support in ty currently relies on the stubs from [django-stubs]:
 
 ```toml
 [environment]
@@ -8,7 +8,7 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["django-types==0.24.0"]
+dependencies = ["django-stubs @ git+https://github.com/UnknownPlatypus/django-stubs.git@5f2e45ba31627b7c821a4247fe6cf82eb5d487d0"]
 ```
 
 ## Basic model
@@ -51,8 +51,7 @@ Attribute assignments are checked against the field's *input* type:
 book.title = "The Restaurant at the End of the Universe"
 book.pages = 208
 
-# TODO: django-types should allow ISO-formatted date strings as input.
-book.published = "1980-10-12"  # error: [invalid-assignment]
+book.published = "1980-10-12"
 
 book.pages = models.F("pages") + 1
 
@@ -355,9 +354,10 @@ def _(article: Article):
     reveal_type(article.get_next_by_published())  # revealed: Article
     reveal_type(article.get_previous_by_published())  # revealed: Article
 
-    # Date fields with `null=True` do not generate these methods.
-    article.get_next_by_reviewed()  # error: [unresolved-attribute]
-    article.get_previous_by_reviewed()  # error: [unresolved-attribute]
+    # TODO: Report unresolved-attribute for both calls. Django only generates these methods
+    # for non-nullable date fields.
+    article.get_next_by_reviewed()
+    article.get_previous_by_reviewed()
 ```
 
 `DateTimeField` also generates these methods:
@@ -389,4 +389,4 @@ def _(article: NewsArticle):
     reveal_type(Article.get_previous_by_published(article))  # revealed: NewsArticle
 ```
 
-[django-types]: https://github.com/sbdchd/django-types
+[django-stubs]: https://github.com/typeddjango/django-stubs
