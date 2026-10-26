@@ -51,8 +51,9 @@ fn update_and_use_configured_baseline() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "8ebd71a52a203341065547993bedb37c",
-            "followingHash": "a0cd849c9d667180ddfd573ef768c91d"
+            "startColumn": 9,
+            "endColumn": 16,
+            "lineCount": 1
           }
         ]
       }
@@ -107,6 +108,60 @@ fn update_and_use_configured_baseline() -> anyhow::Result<()> {
 
     Found 1 diagnostic
     Updated baseline `<temp_dir>/baseline.json` with 2 diagnostics.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn matches_duplicate_ranges_in_source_order() -> anyhow::Result<()> {
+    let source = "\
+𐐀: int = '''a
+🍎'''
+x: int = 1.5
+";
+    let case = CliTest::with_file("test.py", source)?;
+
+    assert_cmd_snapshot!(case.command().args(["--baseline", "baseline.json", "--update-baseline"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Updated baseline `<temp_dir>/baseline.json` with 2 diagnostics.
+
+    ----- stderr -----
+    ");
+    assert_snapshot!(fs::read_to_string(case.root().join("baseline.json"))?, @r#"
+    {
+      "version": 0,
+      "files": {
+        "test.py": [
+          {
+            "rule": "invalid-assignment",
+            "startColumn": 10,
+            "endColumn": 5,
+            "lineCount": 2
+          },
+          {
+            "rule": "invalid-assignment",
+            "startColumn": 9,
+            "endColumn": 12,
+            "lineCount": 1
+          }
+        ]
+      }
+    }
+    "#);
+
+    // The inserted assignment has the same rule and columns as the final assignment.
+    // The multiline diagnostic between them lets Myers distinguish the two occurrences.
+    case.write_file("test.py", &format!("y: int = 0.5\n{source}"))?;
+    assert_cmd_snapshot!(case.command().args(["--baseline", "baseline.json", "--output-format=concise"]), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    test.py:1:10: error[invalid-assignment] Object of type `float*` is not assignable to `int`
+    Found 1 diagnostic
 
     ----- stderr -----
     ");
@@ -334,8 +389,9 @@ fn update_baseline_does_not_suppress_syntax_errors() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "34547de5556150b45c28c4de6d97284b"
+            "startColumn": 9,
+            "endColumn": 16,
+            "lineCount": 1
           }
         ]
       }
@@ -429,8 +485,9 @@ fn update_baseline_replaces_invalid_json() -> anyhow::Result<()> {
         "test.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "58939191012931335599693a80ceb20b"
+            "startColumn": 9,
+            "endColumn": 16,
+            "lineCount": 1
           }
         ]
       }
@@ -460,22 +517,24 @@ fn baseline_entries_are_sorted_and_matched_by_file_path() -> anyhow::Result<()> 
         "a.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "58939191012931335599693a80ceb20b"
+            "startColumn": 9,
+            "endColumn": 16,
+            "lineCount": 1
           }
         ],
         "b.py": [
           {
             "rule": "invalid-assignment",
-            "precedingHash": "dbf2bab93e84c709e7668f862f2cf7d4",
-            "followingHash": "58939191012931335599693a80ceb20b"
+            "startColumn": 9,
+            "endColumn": 16,
+            "lineCount": 1
           }
         ]
       }
     }
     "#);
 
-    // Both files have identical fingerprints. Only the error in the renamed file should reappear.
+    // Both files have identical baseline entries. Only the error in the renamed file should reappear.
     fs::rename(case.root().join("a.py"), case.root().join("renamed.py"))?;
     assert_cmd_snapshot!(case.command().args(["--baseline", "baseline.json", "--output-format=concise"]), @r#"
     success: false
