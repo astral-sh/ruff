@@ -45,7 +45,7 @@
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -648,7 +648,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         &module,
     )
     .finish_expression();
-    inference.record_predicate_truthiness(db, &env, input);
+    inference.record_predicate_truthiness(db, &env, input, Some(module));
     inference
 }
 
@@ -2103,6 +2103,7 @@ impl<'db> ExpressionInference<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         input: InferExpression<'db>,
+        module: Option<ParsedModuleRef>,
     ) {
         let InferExpression::Bare(expression) = input else {
             return;
@@ -2110,7 +2111,8 @@ impl<'db> ExpressionInference<'db> {
         let ExpressionKind::Predicate { context, .. } = expression.kind(db) else {
             return;
         };
-        let module = parsed_module(db, expression.python_file(db)).load(db);
+        let module =
+            module.unwrap_or_else(|| parsed_module(db, expression.python_file(db)).load(db));
         self.predicate_truthiness = TruthinessAnalyzer::new(
             db,
             env,
@@ -2168,7 +2170,7 @@ impl<'db> ExpressionInference<'db> {
 
         // Normalizing the operands can change whether the predicate completes. Once the first
         // provisional results have cleared, retain earlier outcomes so the predicate converges.
-        self.record_predicate_truthiness(db, env, input);
+        self.record_predicate_truthiness(db, env, input, None);
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.predicate_truthiness = previous
                 .predicate_truthiness
