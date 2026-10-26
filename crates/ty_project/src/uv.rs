@@ -16,6 +16,8 @@ mod command;
 mod environments;
 mod metadata;
 mod service;
+#[cfg(test)]
+mod testing;
 
 /// Controls which uv integrations ty uses.
 #[derive(

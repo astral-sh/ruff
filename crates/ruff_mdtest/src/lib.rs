@@ -4,9 +4,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use camino::Utf8Path;
 
-use mdtest::{
-    Failures, FileFailures, MarkdownEdit, TestFile, TestOutcome, attempt_test, matcher, parser,
-};
+use mdtest::{Failures, MarkdownEdit, TestFile, TestOutcome, attempt_test, parser};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
@@ -160,28 +158,19 @@ fn run_test(
                 .resolve_target_version(path.as_std_path())
                 .parser_version();
 
-            let failure = match matcher::match_file(
+            let failure = match test_file.check_diagnostics(
                 db,
-                test_file.file,
+                "ruff",
                 python_version,
                 &diagnostics,
                 mdtest::RunOptions::default(),
-            )
-            .and_then(|inline_diagnostics| {
-                mdtest::validate_inline_snapshot(
-                    db,
-                    "ruff",
-                    test_file,
-                    &inline_diagnostics,
-                    &mut markdown_edits,
-                    str::to_owned,
-                )
-            }) {
-                Ok(()) => None,
-                Err(line_failures) => Some(FileFailures {
-                    backtick_offsets: test_file.to_code_block_backtick_offsets(),
-                    by_line: line_failures,
-                }),
+                str::to_owned,
+            ) {
+                Ok(edits) => {
+                    markdown_edits.extend(edits);
+                    None
+                }
+                Err(failure) => Some(failure),
             };
 
             all_diagnostics.extend(diagnostics);

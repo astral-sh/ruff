@@ -796,17 +796,16 @@ fn script_python(db: &dyn Db) -> Option<SystemPathBuf> {
 #[cfg(test)]
 mod tests {
     use anyhow::Context;
-    use ruff_db::Db as _;
     use ruff_db::diagnostic::DiagnosticId;
-    use ruff_db::files::{File, system_path_to_file};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath};
-    use salsa::Setter;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use salsa::plumbing::AsId;
     use serde_json::{Value, json};
     use ty_python_semantic::Db as _;
 
-    use super::{UvMetadata, script_environment};
+    use super::script_environment;
     use crate::db::testing::TestDb;
+    use crate::uv::testing::{apply_metadata, as_script, dependency_fixture};
     use crate::{Db as _, ProjectMetadata, UseUv};
 
     #[test]
@@ -838,43 +837,28 @@ mod tests {
         Ok(())
     }
 
-    fn script_test_environment() -> anyhow::Result<(TestDb, &'static SystemPath)> {
+    fn script_test_environment() -> anyhow::Result<(TestDb, SystemPathBuf, Value)> {
         let root = SystemPath::new(if cfg!(windows) {
             "C:/project"
         } else {
             "/project"
         });
-        let environment = root.join(".venv");
-        let site_packages = environment.join(if cfg!(windows) {
-            "Lib/site-packages"
-        } else {
-            "lib/python3.13/site-packages"
-        });
         let metadata = ProjectMetadata::new("test", root.to_path_buf()).with_use_uv(UseUv::Scripts);
-        let mut db = TestDb::new(metadata);
-        db.write_dedented(
-            environment.join("pyvenv.cfg").as_str(),
-            &format!(
-                r#"
-                home = {root}
-                include-system-site-packages = false
-                version = 3.13.5
-                "#,
-            ),
+        let db = TestDb::new(metadata);
+        let path = root.join("script.py");
+        let mut input = dependency_fixture(
+            db.test_system(),
+            root,
+            [("parent", vec![]), ("leaf", vec!["leaf"])],
         )?;
-        db.write_file(site_packages.join("leaf.py"), "")?;
-        Ok((db, root))
+        as_script(&mut input, &path);
+        Ok((db, path, input))
     }
 
     #[test]
     fn older_uv_still_type_checks_scripts() -> anyhow::Result<()> {
-        let (mut db, root) = script_test_environment()?;
-        let path = root.join("script.py");
-        let metadata = json!({
-            "schema": {"version": "preview"},
-            "workspace_root": root.as_str(),
-            "environment": {"root": root.join(".venv")}
-        });
+        let (mut db, path, mut metadata) = script_test_environment()?;
+        metadata["environment"] = json!({"root": metadata["environment"]["root"]});
         for rule in ["", "missing-direct-dependency = 'error'"] {
             db.write_dedented(
                 path.as_str(),
@@ -891,7 +875,7 @@ mod tests {
                 ),
             )?;
             let file = system_path_to_file(&db, &path)?;
-            apply_dependency_metadata(&mut db, file, &metadata)?;
+            apply_metadata(&mut db, &metadata)?;
             let diagnostics = db.check_file(file);
             assert!(diagnostics[0].id().is_lint_named("invalid-assignment"));
             if rule.is_empty() {
@@ -912,8 +896,7 @@ mod tests {
 
     #[test]
     fn dependency_metadata_changes_recheck_unchanged_imports() -> anyhow::Result<()> {
-        let (mut db, root) = script_test_environment()?;
-        let path = root.join("script.py");
+        let (mut db, path, mut indirect_metadata) = script_test_environment()?;
         let indirect = r#"
             # /// script
             # dependencies = ['parent']
@@ -926,8 +909,9 @@ mod tests {
         db.write_dedented(path.as_str(), indirect)?;
         let file = system_path_to_file(&db, &path)?;
 
-        let indirect_metadata = dependency_metadata(root, &path, &["parent"]);
-        apply_dependency_metadata(&mut db, file, &indirect_metadata)?;
+        indirect_metadata["resolution"]["app"]["dependencies"] = json!([{"id": "parent"}]);
+        indirect_metadata["resolution"]["parent"]["dependencies"] = json!([{"id": "leaf"}]);
+        apply_metadata(&mut db, &indirect_metadata)?;
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
         assert!(
@@ -940,8 +924,10 @@ mod tests {
         db.write_dedented(path.as_str(), &declared)?;
         assert_eq!(db.check_file(file).len(), 1);
 
-        let declared_metadata = dependency_metadata(root, &path, &["parent", "leaf"]);
-        apply_dependency_metadata(&mut db, file, &declared_metadata)?;
+        let mut declared_metadata = indirect_metadata.clone();
+        declared_metadata["resolution"]["app"]["dependencies"] =
+            json!([{"id": "parent"}, {"id": "leaf"}]);
+        apply_metadata(&mut db, &declared_metadata)?;
         assert!(db.check_file(file).is_empty());
 
         db.write_dedented(path.as_str(), indirect)?;
@@ -950,7 +936,7 @@ mod tests {
 
         // Only the synchronization result changes after the preceding check. Its dependency
         // declarations must invalidate the cached diagnostic even though `Program` is unchanged.
-        apply_dependency_metadata(&mut db, file, &indirect_metadata)?;
+        apply_metadata(&mut db, &indirect_metadata)?;
         assert_eq!(db.program_file(file).program(&db).as_id(), program);
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
@@ -963,9 +949,9 @@ mod tests {
         // Removing the declaration and resolution node does not uninstall the package.
         let mut unmanaged_metadata = indirect_metadata;
         unmanaged_metadata["resolution"] = json!({
-            "script+test": {"kind": "script", "dependencies": []}
+            "app": {"kind": "script", "dependencies": []}
         });
-        apply_dependency_metadata(&mut db, file, &unmanaged_metadata)?;
+        apply_metadata(&mut db, &unmanaged_metadata)?;
         let diagnostics = db.check_file(file);
         assert_eq!(diagnostics.len(), 1);
         assert!(
@@ -975,46 +961,6 @@ mod tests {
         );
         assert!(diagnostics[0].headline_message().contains("leaf"));
 
-        Ok(())
-    }
-
-    fn dependency_metadata(root: &SystemPath, path: &SystemPath, dependencies: &[&str]) -> Value {
-        json!({
-            "schema": {"version": "preview"},
-            "workspace_root": root.as_str(),
-            "environment": {
-                "root": root.join(".venv"),
-                "python": {"version": "3.13.5"},
-                "packages": {
-                    "parent": {"name": "parent", "editable": false},
-                    "leaf": {"name": "leaf", "editable": false}
-                }
-            },
-            "script": {"path": path.as_str(), "id": "script+test"},
-            "resolution": {
-                "script+test": {
-                    "kind": "script",
-                    "dependencies": dependencies.iter().map(|id| json!({"id": id})).collect::<Vec<_>>()
-                },
-                "parent": {
-                    "kind": "package", "name": "parent", "dependencies": [{"id": "leaf"}]
-                },
-                "leaf": {"kind": "package", "name": "leaf", "dependencies": []}
-            },
-            "modules": {
-                "leaf": {"owners": [{"package_id": "leaf"}]}
-            }
-        })
-    }
-
-    fn apply_dependency_metadata(
-        db: &mut TestDb,
-        file: File,
-        metadata: &Value,
-    ) -> anyhow::Result<()> {
-        let metadata = UvMetadata::from_metadata(&serde_json::to_vec(metadata)?, db.system())?;
-        let environment = script_environment(db, file).context("expected a script environment")?;
-        environment.set_uv_metadata(db).to(Some(metadata));
         Ok(())
     }
 
