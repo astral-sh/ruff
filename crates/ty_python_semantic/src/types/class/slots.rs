@@ -168,6 +168,7 @@ impl InstanceDictionary {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
+            | KnownClass::Refines
             | KnownClass::ConstraintSet
             | KnownClass::ConstraintSetSolution
             | KnownClass::GenericContext

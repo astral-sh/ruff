@@ -2763,6 +2763,22 @@ impl<'db> Type<'db> {
         self.specialization_of(db, env, class_literal)
     }
 
+    /// Returns the post-call receiver type and the call's return type for a `Refines` annotation.
+    fn refines_parts(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<(Type<'db>, Type<'db>)> {
+        let (class, specialization) = self.resolve_type_alias(db).class_specialization(db, env)?;
+        if !class.is_known(db, KnownClass::Refines) {
+            return None;
+        }
+        let [receiver, returned] = specialization.types(db) else {
+            return None;
+        };
+        Some((*receiver, *returned))
+    }
+
     /// If the type is a specialized instance of the given class, returns the specialization.
     fn specialization_of(
         self,

@@ -248,6 +248,8 @@ pub enum KnownModule {
     TyExtensions,
     #[strum(serialize = "ty_extensions._internal")]
     TyExtensionsInternal,
+    #[strum(serialize = "ty_extensions.experimental")]
+    TyExtensionsExperimental,
     #[strum(serialize = "ty_extensions.pydantic")]
     TyExtensionsPydantic,
     #[strum(serialize = "importlib")]
@@ -319,6 +321,7 @@ impl KnownModule {
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
             Self::TyExtensions => "ty_extensions",
             Self::TyExtensionsInternal => "ty_extensions._internal",
+            Self::TyExtensionsExperimental => "ty_extensions.experimental",
             Self::TyExtensionsPydantic => "ty_extensions.pydantic",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
@@ -404,6 +407,7 @@ impl KnownModule {
             | Self::TypeCheckerInternals
             | Self::TyExtensions
             | Self::TyExtensionsInternal
+            | Self::TyExtensionsExperimental
             | Self::TyExtensionsPydantic
             | Self::ImportLib
             | Self::UnittestCase

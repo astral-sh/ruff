@@ -6522,17 +6522,20 @@ impl<'db> CallInference<'_, 'db> {
                 .variables(db)
                 .any(|typevar| typevar.is_paramspec(db) || typevar.is_typevartuple(db));
 
+        let returned = self
+            .return_ty
+            .refines_parts(db, self.env)
+            .map_or(self.return_ty, |(_, returned)| returned);
+
         let declared_return_context = match self.call_expression_tcx.annotation {
             Some(tcx) if !use_legacy_solver => {
-                let validity = self
-                    .return_ty
-                    .when_constraint_set_assignable_to_with_provenance(
-                        db,
-                        self.env,
-                        tcx,
-                        constraints,
-                        ConstraintProvenance::Validity,
-                    );
+                let validity = returned.when_constraint_set_assignable_to_with_provenance(
+                    db,
+                    self.env,
+                    tcx,
+                    constraints,
+                    ConstraintProvenance::Validity,
+                );
                 builder.record_constraint_set(validity);
                 None
             }
@@ -6573,8 +6576,7 @@ impl<'db> CallInference<'_, 'db> {
                     return None;
                 }
 
-                let return_ty = self
-                    .return_ty
+                let return_ty = returned
                     .discard_disjoint_union_elements(db, self.env, tcx, self.inferable_typevars)
                     .or_never();
                 let tcx = tcx
@@ -8561,6 +8563,9 @@ impl<'db> Binding<'db> {
             let normalized_return_ty = self
                 .normalized_constructor_return(db)
                 .unwrap_or(self.signature.return_ty);
+            let normalized_return_ty = normalized_return_ty
+                .refines_parts(db, env)
+                .map_or(normalized_return_ty, |(_, returned)| returned);
             let path_bounds = normalized_return_ty.assignable_solutions_with_inferable(
                 db,
                 env,

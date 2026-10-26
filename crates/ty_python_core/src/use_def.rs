@@ -736,6 +736,8 @@ enum DefinitionEntry<'db> {
     /// The early declaration of a combined definition whose binding is recorded separately.
     /// It participates in declaration lookup, but not in binding-usage analysis.
     DeclarationPart(Definition<'db>),
+    /// A conditional receiver update. A later method call can forward this binding.
+    ReceiverRefinement(Definition<'db>),
     /// A binding or standalone declaration with no recorded use.
     Unused(Definition<'db>),
     Used(Definition<'db>),
@@ -747,6 +749,7 @@ impl<'db> DefinitionEntry<'db> {
     fn state(self) -> DefinitionState<'db> {
         match self {
             Self::DeclarationPart(definition)
+            | Self::ReceiverRefinement(definition)
             | Self::Unused(definition)
             | Self::Used(definition) => DefinitionState::Defined(definition),
             Self::Undefined => DefinitionState::Undefined,
@@ -990,6 +993,7 @@ impl<'db> UseDefMap<'db> {
                 DefinitionEntry::Unused(definition) => Some((id, definition, false)),
                 DefinitionEntry::Used(definition) => Some((id, definition, true)),
                 DefinitionEntry::DeclarationPart(_)
+                | DefinitionEntry::ReceiverRefinement(_)
                 | DefinitionEntry::Undefined
                 | DefinitionEntry::Deleted => None,
             })
@@ -1673,6 +1677,9 @@ struct PendingReachabilityId;
 
 #[derive(Debug)]
 struct PendingReachabilityConstraint {
+    /// The most recent scope-wide branch on this path. Later call gates constrain only
+    /// whether execution continues.
+    last_branch: PendingReachabilityId,
     parent: PendingReachabilityId,
     reachability_constraint: ScopedReachabilityConstraintId,
     narrowing_constraint: ScopedNarrowingConstraint,
@@ -1693,6 +1700,7 @@ impl Default for PendingReachability {
         let mut constraints = IndexVec::new();
         let root = constraints.next_index();
         constraints.push(PendingReachabilityConstraint {
+            last_branch: root,
             parent: root,
             reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
@@ -1711,6 +1719,7 @@ impl PendingReachability {
         narrowing_constraint: ScopedNarrowingConstraint,
     ) {
         self.current = self.constraints.push(PendingReachabilityConstraint {
+            last_branch: self.constraints[self.current].last_branch,
             parent: self.current,
             reachability_constraint,
             narrowing_constraint,
@@ -2306,6 +2315,69 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// A call can replace the receiver's binding without affecting other places in the scope.
+    pub(super) fn record_receiver_refinement(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition: Definition<'db>,
+        condition: ScopedReachabilityConstraintId,
+    ) {
+        let id = self.push_definition(DefinitionEntry::ReceiverRefinement(definition));
+        let reached = self
+            .reachability_constraints
+            .add_and_constraint(self.reachability, condition);
+        let fallthrough = self.reachability_constraints.add_not_constraint(condition);
+        let pending = &mut self.symbol_states[symbol];
+        let target = self.pending_reachability.current;
+        let last_branch = self.pending_reachability.constraints[target].last_branch;
+        // Branch tests can narrow the old receiver and must be applied before adding its
+        // replacement. Subsequent call gates apply equally to both. Leave them pending so a
+        // sequence of calls doesn't build a separate narrowing formula for each suffix.
+        if pending.narrowing.index() < last_branch.index() {
+            self.pending_reachability.materialize_narrowing(
+                pending,
+                last_branch,
+                &mut self.narrowing_constraints,
+            );
+        }
+        let state = self.pending_reachability.materialize_reachability(
+            pending,
+            target,
+            &mut self.reachability_constraints,
+        );
+        let inherited = state.record_conditional_binding(
+            |id| {
+                matches!(
+                    self.all_definitions[id],
+                    DefinitionEntry::ReceiverRefinement(_)
+                )
+            },
+            id,
+            reached,
+            fallthrough,
+            &mut self.reachability_constraints,
+        );
+        if !inherited.as_slice().is_empty() {
+            self.definitions_by_definition.insert(
+                definition,
+                DefinitionsAtDefinition {
+                    bindings: inherited,
+                    declarations: Some(state.declarations().clone()),
+                },
+            );
+        }
+        self.reachable_symbol_definitions[symbol]
+            .bindings
+            .record_binding(
+                id,
+                reached,
+                self.is_class_scope,
+                true,
+                PreviousDefinitions::AreKept,
+                FutureDefinitions::ShadowThisOne,
+            );
+    }
+
     pub(crate) fn bindings_at_use(
         &self,
         use_id: ScopedUseId,
@@ -2623,6 +2695,8 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedNarrowingConstraint::ALWAYS_TRUE
         };
         self.record_reachability_constraint_impl(reachability_constraint, narrowing_constraint);
+        let current = self.pending_reachability.current;
+        self.pending_reachability.constraints[current].last_branch = current;
     }
 
     /// Records a reachability predicate and its corresponding narrowing gate together.

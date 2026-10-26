@@ -111,6 +111,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::IsNonTerminalCall(_)
+        | PredicateNode::CallRefinesReceiver(_)
         | PredicateNode::IsNonEmptyIterable(_)
         | PredicateNode::OrPatternAlternative(_)
         | PredicateNode::StarImportPlaceholder(_) => (None, None),
@@ -1742,7 +1743,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PredicateNode::ContextManagerSuppresses { .. }
             | PredicateNode::FinallyNormalPathImpossible { .. }
-            | PredicateNode::IsNonTerminalCall(_) => return None,
+            | PredicateNode::IsNonTerminalCall(_)
+            | PredicateNode::CallRefinesReceiver(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
             PredicateNode::OrPatternAlternative(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
@@ -3497,6 +3499,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         match self.predicate {
             PredicateNode::Expression { expression, .. }
             | PredicateNode::Condition(expression)
+            | PredicateNode::CallRefinesReceiver(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,

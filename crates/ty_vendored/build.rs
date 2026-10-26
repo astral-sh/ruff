@@ -25,6 +25,10 @@ const TY_EXTENSIONS_STUBS: &[(&str, &str)] = &[
         "stdlib/ty_extensions/_internal.pyi",
     ),
     (
+        "ty_extensions/experimental.pyi",
+        "stdlib/ty_extensions/experimental.pyi",
+    ),
+    (
         "ty_extensions/pydantic.pyi",
         "stdlib/ty_extensions/pydantic.pyi",
     ),

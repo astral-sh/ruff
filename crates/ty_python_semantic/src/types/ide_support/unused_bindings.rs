@@ -35,6 +35,7 @@ fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
         | DefinitionKind::Class(_)
         | DefinitionKind::TypeAlias(_)
         | DefinitionKind::AugmentedAssignment(_)
+        | DefinitionKind::ReceiverRefinement(_)
         | DefinitionKind::DictKeyAssignment(_)
         | DefinitionKind::TypeVar(_)
         | DefinitionKind::ParamSpec(_)

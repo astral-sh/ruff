@@ -164,6 +164,9 @@ impl<'db> ExpectedReturnType<'db> {
             env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> Type<'db> {
+            let ty = ty
+                .refines_parts(db, env)
+                .map_or(ty, |(_, returned)| returned);
             match ty.resolve_type_alias(db) {
                 Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(db, env),
                 _ => ty,
