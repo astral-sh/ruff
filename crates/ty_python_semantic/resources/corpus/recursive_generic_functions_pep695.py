@@ -1,6 +1,6 @@
 # Generic inference converges when loops pass recursively growing values directly or via callbacks.
 
-from typing import Callable, Iterable, Protocol
+from typing import Callable, Iterable, Protocol, overload
 
 
 def consume_iterable[T](values: Iterable[T] | int) -> list[T]:
@@ -48,3 +48,25 @@ def wrap_recursive(paths: list[int]):
         values = [values]
     if values is not None:
         consume_recursive(values[0])
+
+
+# Repeated overloaded generic calls converge with conditional loop feedback.
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+
+@overload
+def extract[T](a: Box[T], b: object, /) -> T: ...
+@overload
+def extract[T](a: object, b: Box[T], /) -> T: ...
+def extract(a, b):
+    raise NotImplementedError
+
+
+def repeat_extraction(value, choices):
+    result = value
+    for choice in choices:
+        result = extract(result, result)
+        if choice:
+            result = extract(result, value)

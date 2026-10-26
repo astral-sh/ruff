@@ -3723,11 +3723,14 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         // Structural inference may extract an element type from an unresolved collection. Give
-        // that projection time to resolve before treating it as recursive nesting. After the
-        // initial iterations, discard projection metadata and use the ordinary recursive cutoff;
-        // otherwise repeated extraction could grow projection chains indefinitely.
+        // that projection time to resolve before treating it as recursive nesting. Freezing the
+        // remaining projections bounds the growth of projection chains. Do this before the last
+        // tainted iteration, leaving one inference pass with normalized types before widening
+        // joins previous results. Otherwise a provisional overload result can be retained even
+        // after its input cycle resolves.
+        let freeze_projections = cycle.iteration() >= crate::TAINTED_CYCLES - 1;
         let mut current = self;
-        if cycle.iteration() > crate::TAINTED_CYCLES {
+        if freeze_projections {
             let projections = RefCell::new(FxOrderSet::default());
             any_over_type_including_alias_arguments(db, env, self, |ty| {
                 if let Type::Divergent(divergent) = ty
@@ -3762,7 +3765,7 @@ impl<'db> Type<'db> {
             });
         cycle.head_ids().fold(normalized, |ty, id| {
             let mut divergent = DivergentType::new(id);
-            if cycle.iteration() > crate::TAINTED_CYCLES {
+            if freeze_projections {
                 divergent = divergent.with_flags(DivergentFlags::FROZEN);
             }
             let marker = Type::Divergent(divergent);
@@ -11654,7 +11657,7 @@ bitflags! {
         /// The cycle comes from type alias inference. Value inference can also diverge,
         /// for example when an assignment feeds into the next iteration of a loop.
         const FROM_TYPE_ALIAS = 1 << 0;
-        /// Widening has committed to recursive recovery; do not resume projection refinement.
+        /// Recursive inference has committed to recovery; do not resume projection refinement.
         const FROZEN = 1 << 1;
     }
 }
