@@ -9796,7 +9796,7 @@ impl<'db> Type<'db> {
                     });
                     expansion_size = expansion_size.saturating_mul(count);
                     if counted.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
-                        return Type::unknown();
+                        return Type::Callable(CallableType::unknown(db));
                     }
                 }
 
@@ -9823,7 +9823,7 @@ impl<'db> Type<'db> {
                             // intersection-valued ParamSpecs are expanded recursively.
                             Some(self.apply_type_mapping(db, visitor.env, &mapping, tcx))
                         })
-                        .unwrap_or_else(Type::unknown)
+                        .unwrap_or_else(|| Type::Callable(CallableType::unknown(db)))
                 });
             }
         }
