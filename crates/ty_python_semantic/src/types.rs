@@ -11830,10 +11830,26 @@ impl<'db> DivergentType<'db> {
         }
     }
 
-    // Keep metadata lookups out of the inlined `Type::same_divergent_marker` check. Recursive
-    // normalization calls it for every nested type, most of which are not divergent markers.
-    #[inline(never)]
     fn same_marker(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self.0, other.0) {
+            (DivergentTypeInner::Recursive(left, ..), DivergentTypeInner::Recursive(right, ..)) => {
+                left == right
+            }
+            (
+                DivergentTypeInner::PendingNarrowing(..),
+                DivergentTypeInner::PendingNarrowing(..),
+            ) => true,
+            (DivergentTypeInner::Inferred(..), _) | (_, DivergentTypeInner::Inferred(..)) => {
+                self.same_marker_with_inference(db, other)
+            }
+            _ => false,
+        }
+    }
+
+    // Keep metadata lookups out of the inlined marker comparison. Recursive normalization
+    // checks every nested type, but only inferred markers need to read metadata from the database.
+    #[inline(never)]
+    fn same_marker_with_inference(self, db: &'db dyn Db, other: Self) -> bool {
         self.origin(db) == other.origin(db)
             && self.projection(db) == other.projection(db)
             && (self.projection(db).is_none() || self.binding(db) == other.binding(db))
