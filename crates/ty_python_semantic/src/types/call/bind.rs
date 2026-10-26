@@ -6044,6 +6044,10 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
         let db = self.db;
         let env = self.env;
 
+        // TODO: Track which callback supplied the inferred parameter list. With repeated
+        // ParamSpecs, a later callback can determine the signature, so selecting the first
+        // callback can point a diagnostic at an unrelated parameter declaration. Fall back to
+        // the forwarding function's parameter when no single source can be identified.
         enumerate_argument_types(self.arguments).find_map(
             |(argument_index, _, argument, argument_types)| {
                 if matches!(argument, Argument::Synthetic) {

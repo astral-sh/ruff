@@ -1116,7 +1116,7 @@ def compatible(
     reveal_type(contravariant(second))  # revealed: Target[(str, /)]
 ```
 
-Invariant wrappers reject differing lists, while contravariant ones can match a member.
+Invariant wrappers reject differing parameter lists, while contravariant ones can match a member.
 
 ```py
 def incompatible(
@@ -1558,6 +1558,8 @@ Callbacks in one iterable must share a parameter list.
 
 TODO: We reject incomparable signatures until we can construct their common parameter list.
 
+When no common signature is inferred, the first parameter list supplies the result type.
+
 ```py
 from typing import Callable, Iterable, ParamSpec
 
@@ -1581,9 +1583,9 @@ reveal_type(combine([left, left]))  # revealed: (x: int, y: object, /) -> list[i
 
 ### Repeated parameter lists retain outer variables
 
-A concrete list cannot satisfy an arbitrary enclosing `ParamSpec`.
+A concrete parameter list cannot satisfy an arbitrary enclosing `ParamSpec`.
 
-Until we can infer a common parameter list, we choose the first one.
+The first parameter list is retained here too, including an enclosing `ParamSpec`.
 
 ```py
 from typing import Callable, ParamSpec
@@ -1617,14 +1619,14 @@ def generic(callback: Callable[Q, None]):
     # snapshot: invalid-argument-type
     # error: [missing-argument]
     # snapshot: invalid-argument-type
-    forward(callback, integer, integer)
+    forward(callback, integer, "foo")
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `forward` is incorrect
   --> src/mdtest_snippet.py:27:23
    |
-27 |     forward(callback, integer, integer)
+27 |     forward(callback, integer, "foo")
    |                       ^^^^^^^ Expected `(**Q@generic) -> None`, found `def integer(value: int, /) -> None`
 info: Function defined here
   --> src/mdtest_snippet.py:17:5
@@ -1636,8 +1638,8 @@ info: Function defined here
 error[invalid-argument-type]: Argument to function `forward` is incorrect
   --> src/mdtest_snippet.py:27:32
    |
-27 |     forward(callback, integer, integer)
-   |                                ^^^^^^^ Expected `Q@generic.args`, found `def integer(value: int, /) -> None`
+27 |     forward(callback, integer, "foo")
+   |                                ^^^^^ Expected `Q@generic.args`, found `Literal["foo"]`
 info: Function defined here
  --> src/mdtest_snippet.py:9:5
   |
@@ -1661,7 +1663,9 @@ def forward(left: Callable[P, None], right: Callable[P, None], /, *args: P.args,
 def left(x: int, y: object, /) -> None: ...
 def right(x: object, y: int, /) -> None: ...
 
+# TODO: no error as the common parameter list would be `(int, int, /)`.
 forward(left, right, 1, 1)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(int, int, /)`.
 forward(right, left, 1, 1)  # error: [invalid-argument-type]
 forward(left, right, 1, "bad")  # error: [invalid-argument-type]
 # error: [invalid-argument-type]
@@ -1677,7 +1681,9 @@ Optional keyword parameters still require a common parameter list to be inferred
 def left(*, value: int | str = 0) -> None: ...
 def right(*, value: int | bytes = 0) -> None: ...
 
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
 forward(left, right)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
 forward(left, right, value=1)  # error: [invalid-argument-type]
 forward(left, right, value="bad")  # error: [invalid-argument-type]
 # error: [invalid-argument-type]
@@ -1760,7 +1766,7 @@ callback(None)
 
 ### Repeated parameter lists from generic instances
 
-The invariant legacy `Callback` specializes to the concrete list in either argument order.
+An invariant generic callable retains the concrete parameter list in either argument order.
 
 A concrete callable supplies the parameter list when paired with a gradual instance.
 
@@ -1801,7 +1807,7 @@ def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
 
 ### Empty parameter lists override defaults
 
-A missing callback uses the default parameter list. An explicit empty list remains empty.
+A missing callback uses the default parameter list. An explicit empty parameter list remains empty.
 
 ```py
 from typing import Callable, Generic

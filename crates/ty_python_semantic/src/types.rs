@@ -2173,6 +2173,19 @@ pub enum Type<'db> {
 
 /// A captured parameter list, another `ParamSpec`, or an intersection of those values.
 ///
+/// An intersection of callables describes a callable supporting every constituent signature, so it
+/// accurately represents a conjunction of upper bounds on a ParamSpec. A union of callables
+/// describes alternative callable types rather than their shared calling interface, so it's not an
+/// accurate representation of a conjunction of lower bounds on a ParamSpec.
+///
+/// For example, callbacks accepting `(int, object)` and `(object, int)` share the calling interface
+/// `(int, int)`. A callable accepting only two integers satisfies that shared interface but
+/// satisfies neither original callable type, so `(int, int)` does not belong to the union
+/// `(int, object) | (object, int)`. Supporting conjunctions of lower bounds on a `ParamSpec`
+/// requires constructing a common signature (e.g. constructing `(int, int)` from the conjunction
+/// of `(object, int)` and `(int, object)`); until we implement that, union-valued solutions are
+/// rejected.
+///
 /// Use [`Type::as_paramspec_value`] to validate callable kinds, whole `ParamSpec` references,
 /// and the members of positive-only intersections.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -2183,7 +2196,7 @@ enum ParamSpecValue<'db> {
 }
 
 impl<'db> ParamSpecValue<'db> {
-    /// Maps captured lists and `ParamSpec` references, retaining their intersection.
+    /// Maps captured parameter lists and `ParamSpec` references, retaining their intersection.
     fn try_map(
         self,
         db: &'db dyn Db,

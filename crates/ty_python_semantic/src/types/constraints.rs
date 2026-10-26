@@ -4008,7 +4008,7 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         // A single parameter list must satisfy all of its lower bounds. A union of captured
-        // lists is not that common signature, nor does it represent alternative runtime calls.
+        // parameter lists represents neither that common signature nor alternative runtime calls.
         // TODO: Construct a common behavioral supertype where possible.
         if path_bound.bound_typevar.domain(db) == TypeVarDomain::ParameterSignature
             && restricted.is_union()

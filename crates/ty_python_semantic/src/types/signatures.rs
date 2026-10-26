@@ -4903,7 +4903,7 @@ impl<'db> Parameters<'db> {
     /// Create a parameter list with an explicit kind.
     ///
     /// This constructor does not infer the kind from the parameter types or normalize an unpacked
-    /// `TypedDict`. Use [`Self::standard`] for a known-standard list and
+    /// `TypedDict`. Use [`Self::standard`] for a known standard parameter list and
     /// [`Self::from_annotation`] when the kind should be inferred from annotations; preserve the
     /// existing kind when transforming a parameter list.
     fn new(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {

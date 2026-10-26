@@ -3380,8 +3380,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                     None => choose(*variable, None)?,
                 };
-                // Unsupported parameter-list unions can survive in the legacy recovery map.
-                // Keep one list so argument validation reports the incompatible callbacks.
+                // The legacy recovery map can retain a union of parameter lists. Keep the first
+                // parameter list so argument validation reports the incompatible callbacks.
                 let chosen = if variable.domain(db) == TypeVarDomain::ParameterSignature
                     && let Type::Union(union) = chosen
                 {

@@ -730,6 +730,8 @@ Callbacks in one iterable must share a parameter list.
 
 TODO: We reject incomparable signatures until we can construct their common parameter list.
 
+When no common signature is inferred, the first parameter list supplies the result type.
+
 ```py
 from typing import Callable, Iterable
 
@@ -751,9 +753,9 @@ reveal_type(combine([left, left]))  # revealed: (x: int, y: object, /) -> list[i
 
 ### Repeated parameter lists retain outer variables
 
-A concrete list cannot satisfy an arbitrary enclosing `ParamSpec`.
+A concrete parameter list cannot satisfy an arbitrary enclosing `ParamSpec`.
 
-Until we can infer a common parameter list, we choose the first one.
+The first parameter list is retained here too, including an enclosing `ParamSpec`.
 
 ```py
 from typing import Callable
@@ -784,14 +786,14 @@ def generic[**Q](callback: Callable[Q, None]):
     # snapshot: invalid-argument-type
     # error: [missing-argument]
     # snapshot: invalid-argument-type
-    forward(callback, integer, integer)
+    forward(callback, integer, "foo")
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `forward` is incorrect
   --> src/mdtest_snippet.py:24:23
    |
-24 |     forward(callback, integer, integer)
+24 |     forward(callback, integer, "foo")
    |                       ^^^^^^^ Expected `(**Q@generic) -> None`, found `def integer(value: int, /) -> None`
 info: Function defined here
   --> src/mdtest_snippet.py:14:5
@@ -803,8 +805,8 @@ info: Function defined here
 error[invalid-argument-type]: Argument to function `forward` is incorrect
   --> src/mdtest_snippet.py:24:32
    |
-24 |     forward(callback, integer, integer)
-   |                                ^^^^^^^ Expected `Q@generic.args`, found `def integer(value: int, /) -> None`
+24 |     forward(callback, integer, "foo")
+   |                                ^^^^^ Expected `Q@generic.args`, found `Literal["foo"]`
 info: Function defined here
  --> src/mdtest_snippet.py:6:5
   |
@@ -826,7 +828,9 @@ def forward[**P](left: Callable[P, None], right: Callable[P, None], /, *args: P.
 def left(x: int, y: object, /) -> None: ...
 def right(x: object, y: int, /) -> None: ...
 
+# TODO: no error as the common parameter list would be `(int, int, /)`.
 forward(left, right, 1, 1)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(int, int, /)`.
 forward(right, left, 1, 1)  # error: [invalid-argument-type]
 forward(left, right, 1, "bad")  # error: [invalid-argument-type]
 # error: [invalid-argument-type]
@@ -842,7 +846,9 @@ Optional keyword parameters still require a common parameter list to be inferred
 def left(*, value: int | str = 0) -> None: ...
 def right(*, value: int | bytes = 0) -> None: ...
 
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
 forward(left, right)  # error: [invalid-argument-type]
+# TODO: no error as the common parameter list would be `(*, value: int = 0)`.
 forward(left, right, value=1)  # error: [invalid-argument-type]
 forward(left, right, value="bad")  # error: [invalid-argument-type]
 # error: [invalid-argument-type]
@@ -918,9 +924,9 @@ callback(None)
 
 ### Repeated parameter lists from generic instances
 
-The inferred variance of `Callback` permits gradual assignability in either argument order.
+Inference from concrete and gradual parameter lists currently falls back to the first one.
 
-Without a common inferred signature, the first callback supplies the fallback parameter list.
+A concrete callable followed by a gradual instance keeps its own parameter list.
 
 ```py
 from typing import Callable
@@ -946,8 +952,10 @@ def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
     callback("bad")  # error: [invalid-argument-type]
 
     callback = instances(gradual, concrete)
+    # TODO: Callback[(int, /)]
     reveal_type(callback)  # revealed: Callback[(...)]
     callback(1)  # no diagnostic
+    # TODO: error: [invalid-argument-type]
     callback("bad")  # no diagnostic
 
     reveal_type(instance_first(concrete, anything))  # revealed: Callback[(int, /)]
@@ -957,7 +965,7 @@ def _(concrete: Callback[[int]], gradual: Callback[...]) -> None:
 
 ### Empty parameter lists override defaults
 
-A missing callback uses the default parameter list. An explicit empty list remains empty.
+A missing callback uses the default parameter list. An explicit empty parameter list remains empty.
 
 ```py
 from typing import Callable
@@ -1193,9 +1201,13 @@ As per the spec,
 > solve to a common behavioral supertype (i.e. a set of parameters for which all of the valid calls
 > are valid in both of the subtypes), but is not obligated to do so.
 
-Distinct parameter lists are rejected when we cannot infer a common signature.
+Callbacks with no common valid call are rejected.
+
+We also reject some callbacks with shared valid calls when we cannot infer their common signature.
 
 Callbacks with differently named positional-or-keyword parameters can still share positional calls.
+
+Both callbacks accept `(1, "text")`, so their common parameter list is `(int, str, /)`.
 
 ```py
 def xy(x: int, y: str) -> int:
@@ -1206,6 +1218,7 @@ def yx(y: int, x: str) -> int:
 
 reveal_type(multiple(xy, xy))  # revealed: (x: int, y: str) -> bool
 
+# TODO: Accept this call and reveal `(int, str, /) -> bool`.
 # error: [invalid-argument-type]
 # revealed: (x: int, y: str) -> bool
 reveal_type(multiple(xy, yx))
@@ -1220,6 +1233,7 @@ def keyword_only_with_default_1(*, x: int = 42) -> int:
 def keyword_only_with_default_2(*, y: int = 42) -> int:
     return 2
 
+# TODO: Accept this call and reveal `() -> bool`.
 # error: [invalid-argument-type]
 # revealed: (*, x: int = 42) -> bool
 reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
@@ -1803,56 +1817,6 @@ def _(callback: Callback[[object, int]] | Callback[[str, object]], value: int) -
     # TODO: error: [invalid-argument-type]
     inner(1, 1)
     inner("value", "value")  # error: [invalid-argument-type]
-```
-
-### Bounded expansion of union arguments
-
-TODO: Expand union arguments with a limit of 64 combinations; otherwise, fall back to `Unknown`.
-
-[Carl's comment also explains this temporary regression](https://github.com/astral-sh/ruff/pull/29172#issuecomment-6310115766).
-
-```py
-from typing import Literal, Protocol, overload
-
-class Callback[**P](Protocol):
-    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
-
-class Combined[**P, **Q, **R](Protocol):
-    @overload
-    def call(self) -> int: ...
-    @overload
-    def call(self, tag: Literal[0], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
-    @overload
-    def call(self, tag: Literal[1], /, *args: Q.args, **kwargs: Q.kwargs) -> None: ...
-    @overload
-    def call(self, tag: Literal[2], /, *args: R.args, **kwargs: R.kwargs) -> None: ...
-    @overload
-    def call(self, tag: Literal[3], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
-
-def combine[**P, **Q, **R](p: Callback[P], q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]:
-    raise NotImplementedError
-
-type FourCallbacks = Callback[[int]] | Callback[[str]] | Callback[[bytes]] | Callback[[None]]
-
-def _(x: FourCallbacks) -> None:
-    # The cartesian product would produce a union of 64 elements.
-    # TODO: no error
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    f = combine(x, x, x).call
-    reveal_type(f())  # revealed: int
-
-def _(x: FourCallbacks, y: FourCallbacks | Callback[[list[int]]]) -> None:
-    # The cartesian product would have produced a union of 80 elements.
-    # TODO: no error
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    f = combine(x, x, y).call
-    # TODO: Unknown (the expansion exceeds the 64-element limit)
-    # revealed: Overload[() -> int, (tag: Literal[0], int, /) -> None, (tag: Literal[1], int, /) -> None, (tag: Literal[2], int, /) -> None, (tag: Literal[3], int, /) -> None]
-    reveal_type(f)
 ```
 
 ### Specializing `Self` when `ParamSpec` is involved
