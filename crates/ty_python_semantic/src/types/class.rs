@@ -2371,12 +2371,8 @@ impl<'db> ClassType<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        // Avoid inferring ordinary receiver assignments just to inspect the augmented bindings.
         let augmented_bindings = self
             .static_class_literal(db)
-            .filter(|(class, _)| {
-                ty_python_core::has_augmented_attribute_assignment(db, class.program_file(db))
-            })
             .map(|(class, _)| class.implicit_attribute_bindings(db, name, target_method_decorator))
             .filter(|implicit| member.is_undefined() == implicit.member.is_undefined())
             .and_then(|implicit| implicit.augmented_bindings);

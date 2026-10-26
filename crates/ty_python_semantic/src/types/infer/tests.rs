@@ -1360,41 +1360,6 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
-fn augmented_attribute_assignment_invalidates_member_lookup() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let model = "\
-class After:
-    def __iadd__(self, other: int) -> 'After':
-        return self
-class Before:
-    def __iadd__(self, other: int) -> After:
-        return After()
-class Model:
-    value = Before()
-    def update(self) -> None:
-        self.value
-";
-    db.write_files([
-        ("/src/model.py", model),
-        (
-            "/src/main.py",
-            "from typing_extensions import reveal_type\nfrom model import Model\nreveal_type(Model().value)",
-        ),
-    ])?;
-    assert_revealed_type(&db, "/src/main.py", "Before");
-
-    db.write_file(
-        "/src/model.py",
-        model.replace("self.value", "self.value += 1"),
-    )?;
-    assert_revealed_type(&db, "/src/main.py", "Before | After");
-
-    db.write_file("/src/model.py", model)?;
-    assert_revealed_type(&db, "/src/main.py", "Before");
-    Ok(())
-}
-
-#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\

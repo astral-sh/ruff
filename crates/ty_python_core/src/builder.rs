@@ -73,7 +73,7 @@ use crate::use_def::{
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
-    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, FileFeatures, LoopHeader, LoopHeaderId,
+    DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopHeaderId,
     NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
 };
 
@@ -259,7 +259,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// Per-scope exception contexts for nested `try` and `with` statements.
     exception_context_stack_manager: ExceptionContextStackManager,
 
-    features: FileFeatures,
+    /// Flags about the file's global scope
+    has_future_annotations: bool,
     /// Whether we are currently visiting an `if TYPE_CHECKING` block.
     in_type_checking_block: bool,
 
@@ -334,7 +335,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             active_boolean_test_scope: None,
             exception_context_stack_manager: ExceptionContextStackManager::default(),
 
-            features: FileFeatures::default(),
+            has_future_annotations: false,
             in_type_checking_block: false,
 
             scopes: IndexVec::new(),
@@ -3432,7 +3433,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
-            features: self.features,
+            has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: FrozenMap::from(self.enclosing_snapshots),
             semantic_syntax_errors,
             generator_functions: FrozenSet::from(self.generator_functions),
@@ -4252,7 +4253,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // imports here, we assume the user's intent was to apply the `__future__`
                     // import, so we still check using it (and will also emit a diagnostic about a
                     // miss-placed `__future__` import.)
-                    self.features.future_annotations |= !node.is_lazy
+                    self.has_future_annotations |= !node.is_lazy
                         && alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
@@ -4424,8 +4425,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 },
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
-
-                self.features.augmented_attribute_assignment |= target.is_attribute_expr();
 
                 // An augmented assignment loads its target before evaluating the right-hand side,
                 // but only defines the target after the operation succeeds.
@@ -5791,7 +5790,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn future_annotations_or_stub(&self) -> bool {
-        self.features.future_annotations
+        self.has_future_annotations
     }
 
     fn lazy_import_context(&self) -> Option<LazyImportContext> {
