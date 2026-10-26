@@ -5,12 +5,13 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::dedicated::django;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, KnownClass, Type,
+    TypeContext, TypeMapping, UnionType,
 };
 
 impl<'db> CallableBinding<'db> {
@@ -511,9 +512,18 @@ impl<'db> ConstructorBinding<'db> {
             };
             // end TODO
 
-            let Some(types) = types else {
+            let Some(mut types) = types else {
                 return;
             };
+            if let [write, read] = types.as_mut_slice()
+                && (write.is_none() || read.is_none())
+                && static_class_literal
+                    .is_some_and(|class| class.is_known(db, KnownClass::DjangoForeignKey))
+                && let Some(model) = django::foreign_key_model_type(db, env, overload)
+            {
+                write.get_or_insert(model);
+                read.get_or_insert(model);
+            }
             if let Some(previous) = &mut combined {
                 for (previous, inferred) in previous.iter_mut().zip(types) {
                     *previous = match (*previous, inferred) {
