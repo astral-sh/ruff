@@ -1868,6 +1868,25 @@ def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
     assert_type(identity(y), Not[A])
 ```
 
+### Negated recursive unions
+
+Negating a recursive union is equivalent to intersecting the negations of its members, including
+when the alias contains gradual types.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Intersection, Not
+
+type A = int | list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Intersection[Not[int], Not[list[tuple[Any, A]]]]):
+    assert_type(identity(x), Intersection[Not[int], Not[list[tuple[Any, A]]]])
+    assert_type(identity(y), Not[A])
+```
+
 ### Recursive invariant
 
 ```py
