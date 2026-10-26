@@ -110,6 +110,7 @@ impl Renderer for JunitRenderer<'_> {
 
 const fn severity_name(severity: Severity) -> &'static str {
     match severity {
+        Severity::Hint => "hint",
         Severity::Info => "info",
         Severity::Warning => "warning",
         Severity::Error => "error",

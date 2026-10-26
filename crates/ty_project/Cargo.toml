@@ -24,6 +24,7 @@ ruff_options_metadata = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_ranged_value = { workspace = true, features = ["get-size"] }
+ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }
@@ -54,6 +55,7 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
+similar = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
