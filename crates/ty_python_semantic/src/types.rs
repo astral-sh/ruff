@@ -3729,16 +3729,21 @@ impl<'db> Type<'db> {
         // joins previous results. Otherwise a provisional overload result can be retained even
         // after its input cycle resolves.
         let freeze_projections = cycle.iteration() >= crate::TAINTED_CYCLES - 1;
+        let frozen_origins = RefCell::new(FxHashSet::default());
         let mut current = self;
         if freeze_projections {
             let projections = RefCell::new(FxOrderSet::default());
             any_over_type_including_alias_arguments(db, env, self, |ty| {
                 if let Type::Divergent(divergent) = ty
-                    && divergent.projection(db).is_some()
+                    && (divergent.projection(db).is_some()
+                        || divergent.flags().contains(DivergentFlags::FROZEN))
                     && let Some(DivergentOrigin(id)) = divergent.origin(db)
                     && cycle.head_ids().any(|head| head == id)
                 {
-                    projections.borrow_mut().insert(ty);
+                    frozen_origins.borrow_mut().insert(id);
+                    if divergent.projection(db).is_some() {
+                        projections.borrow_mut().insert(ty);
+                    }
                 }
                 false
             });
@@ -3763,9 +3768,13 @@ impl<'db> Type<'db> {
                     .head_ids()
                     .any(|id| ty.same_divergent_marker(db, Type::divergent(id)))
             });
+        let frozen_origins = frozen_origins.into_inner();
         cycle.head_ids().fold(normalized, |ty, id| {
             let mut divergent = DivergentType::new(id);
-            if freeze_projections {
+            // Preserve a head's frozen state when normalization creates a replacement marker.
+            // Keep the ordinary cutoff for other heads: changing their marker identity can delay
+            // convergence.
+            if cycle.iteration() > crate::TAINTED_CYCLES || frozen_origins.contains(&id) {
                 divergent = divergent.with_flags(DivergentFlags::FROZEN);
             }
             let marker = Type::Divergent(divergent);
