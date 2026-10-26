@@ -26,7 +26,7 @@ fn is_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
 
 /// The type of a Django model field, and metadata extracted from the field construction.
 ///
-/// For example, the `isbn` field has type `CharField[str]` and `metadata.primary_key: true`:
+/// For example, `isbn` is a `CharField` with `metadata.primary_key` set to `true`.
 /// ```py
 /// class Book(models.Model):
 ///     isbn = CharField(max_length=13, primary_key=True)
