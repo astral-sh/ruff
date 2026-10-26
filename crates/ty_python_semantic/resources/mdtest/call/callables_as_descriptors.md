@@ -110,10 +110,10 @@ receiver (`__call__: Callable[[object], int]` or `__call__: Callable[..., int]`)
 descriptors. Other explicit callable annotations (`method: Callable[[object], int]`) do not act as
 method descriptors.
 
-For members declared in a generic class, `method: Callable[P, R]` and `method: T` never bind as a
-descriptor, regardless of how they are specialized. A generic attribute always describes a
-per-instance value, meaning it is not stored on the class and its descriptor protocol is not
-invoked.
+For members declared in a generic class, `method: Callable[P, R]` never binds as a method
+descriptor, regardless of how it is specialized. A function substituted for `method: T` also retains
+its full signature. This exception only affects function binding: explicit descriptor types
+substituted for `T` still invoke their descriptor protocol.
 
 Descriptor classification is shared by direct attribute access, implicit calls, and `super()`.
 

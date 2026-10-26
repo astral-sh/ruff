@@ -1585,7 +1585,7 @@ impl<'db> StaticClassLiteral<'db> {
             member
                 .inner
                 .qualifiers
-                .insert(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
+                .insert(TypeQualifiers::NO_FUNCTION_BINDING);
         }
         let member = member.map_type(|ty| {
             let ty = if is_dunder || is_inferred {

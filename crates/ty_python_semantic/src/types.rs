@@ -5051,17 +5051,35 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+        self.try_call_dunder_get_with_function_binding(db, env, instance, owner, true)
+    }
+
+    fn try_call_dunder_get_with_function_binding(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+        bind_functions: bool,
+    ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
             ty: Type<'db>,
             instance: Option<Type<'db>>,
             owner: Type<'db>,
+            bind_functions: bool,
         ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
             let env = &ProgramEnvironment::from_program(program);
             if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get(db, env, instance, owner);
+                return fallback.try_call_dunder_get_with_function_binding(
+                    db,
+                    env,
+                    instance,
+                    owner,
+                    bind_functions,
+                );
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
@@ -5079,7 +5097,13 @@ impl<'db> Type<'db> {
 
                 for alternative in union.elements(db) {
                     let result = alternative
-                        .try_call_dunder_get(db, env, instance, owner)
+                        .try_call_dunder_get_with_function_binding(
+                            db,
+                            env,
+                            instance,
+                            owner,
+                            bind_functions,
+                        )
                         .unwrap_or_else(|failure| {
                             error = error.or(Some(failure.context));
                             Some(failure.fallback())
@@ -5187,10 +5211,25 @@ impl<'db> Type<'db> {
             // returns the method itself; older versions have no descriptor slot on MethodType.
             return Ok(None);
         }
+        // A function substituted for a type variable keeps its full signature and identity.
+        // Explicit descriptors still invoke `__get__`; a concrete subclass can store them on
+        // the class even when the base declares the attribute as `value: T`.
+        if !bind_functions
+            && match self.resolve_type_alias(db) {
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|ty| ty.resolve_type_alias(db).function_like_kind(db).is_some()),
+                ty => ty.function_like_kind(db).is_some(),
+            }
+        {
+            return Ok(None);
+        }
         // Bind known callable descriptors outside the tracked lookup. Checking a protocol
         // receiver can recursively access this method; the lookup's `None` cycle value would
         // leave it unbound and falsely reject the protocol match.
-        if let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner)) {
+        if bind_functions
+            && let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner))
+        {
             return Ok(Some(DescriptorGetResult {
                 return_type,
                 kind: AttributeKind::NormalOrNonDataDescriptor,
@@ -5206,7 +5245,7 @@ impl<'db> Type<'db> {
             }));
         }
 
-        try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
+        try_call_dunder_get_inner(db, env.program(db), self, instance, owner, bind_functions)
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
@@ -5223,14 +5262,9 @@ impl<'db> Type<'db> {
         AttributeKind,
         Option<DescriptorGetCallContext<'db>>,
     ) {
-        // A bare type-variable annotation describes a stored value. Specialization can supply
-        // a function or another descriptor, but does not turn that value into a class descriptor.
-        if attribute
+        let bind_functions = !attribute
             .qualifiers
-            .contains(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE)
-        {
-            return (attribute, AttributeKind::NormalOrNonDataDescriptor, None);
-        }
+            .contains(TypeQualifiers::NO_FUNCTION_BINDING);
 
         // A `ClassVar[Callable[...]]` is assumed to describe a method on instance access.
         // Preserve the declared callable type elsewhere, including class-attribute writes.
@@ -5298,7 +5332,13 @@ impl<'db> Type<'db> {
                 let place = union
                     .map_with_boundness(db, env, |elem| {
                         let result = elem
-                            .try_call_dunder_get(db, env, instance, owner)
+                            .try_call_dunder_get_with_function_binding(
+                                db,
+                                env,
+                                instance,
+                                owner,
+                                bind_functions,
+                            )
                             .unwrap_or_else(|failure| {
                                 error = error.or(Some(failure.context));
                                 Some(failure.fallback())
@@ -5351,7 +5391,13 @@ impl<'db> Type<'db> {
                     intersection
                         .map_with_boundness(db, env, |elem| {
                             let ty = elem
-                                .try_call_dunder_get(db, env, instance, owner)
+                                .try_call_dunder_get_with_function_binding(
+                                    db,
+                                    env,
+                                    instance,
+                                    owner,
+                                    bind_functions,
+                                )
                                 .unwrap_or_else(|failure| {
                                     error = error.or(Some(failure.context));
                                     Some(failure.fallback())
@@ -5389,7 +5435,13 @@ impl<'db> Type<'db> {
             } => {
                 let mut error = None;
                 let result = attribute_ty
-                    .try_call_dunder_get(db, env, instance, owner)
+                    .try_call_dunder_get_with_function_binding(
+                        db,
+                        env,
+                        instance,
+                        owner,
+                        bind_functions,
+                    )
                     .unwrap_or_else(|failure| {
                         error = Some(failure.context);
                         Some(failure.fallback())
@@ -11690,10 +11742,9 @@ bitflags! {
         /// over module-level `__getattr__`, for compatibility with other type checkers.
         const FROM_MODULE_GETATTR = 1 << 7;
         /// A class-body attribute declared with a bare type variable, such as `value: T`,
-        /// optionally unioned with `None`. Treat its specialized value as instance storage rather
-        /// than invoking its descriptor protocol. This is a heuristic: the annotation does
-        /// not record whether the value is installed on the class or on each instance.
-        const GENERIC_INSTANCE_ATTRIBUTE = 1 << 8;
+        /// optionally unioned with `None`. Functions substituted for the type variable retain
+        /// their full signatures. Other descriptors still invoke their descriptor protocol.
+        const NO_FUNCTION_BINDING = 1 << 8;
     }
 }
 
@@ -11724,11 +11775,11 @@ impl TypeQualifiers {
     /// Returns `true` if this is a non-standard qualifier.
     ///
     /// Non-standard qualifiers are internal implementation details like
-    /// `IMPLICIT_INSTANCE_ATTRIBUTE`, `FROM_MODULE_GETATTR`, and `GENERIC_INSTANCE_ATTRIBUTE`.
+    /// `IMPLICIT_INSTANCE_ATTRIBUTE`, `FROM_MODULE_GETATTR`, and `NO_FUNCTION_BINDING`.
     pub fn is_non_standard(self) -> bool {
         const NON_STANDARD: TypeQualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE
             .union(TypeQualifiers::FROM_MODULE_GETATTR)
-            .union(TypeQualifiers::GENERIC_INSTANCE_ATTRIBUTE);
+            .union(TypeQualifiers::NO_FUNCTION_BINDING);
         self.intersects(NON_STANDARD)
     }
 }

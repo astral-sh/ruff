@@ -2379,6 +2379,51 @@ if optional.value is not None:
     optional.value("wrong")  # error: [invalid-argument-type]
 ```
 
+## Descriptors substituted for type variables
+
+A descriptor supplied as a type argument can be stored on a concrete subclass. Instance access
+retains both the descriptor result and the possibility of an instance value; `super()` only
+considers class storage.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        return 1
+
+class Base[T]:
+    value: T
+
+class Concrete(Base[Descriptor]):
+    value = Descriptor()  # ok
+
+def read(value: Base[Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: int | Descriptor
+
+reveal_type(Concrete().value)  # revealed: int | Descriptor
+
+class Child(Concrete):
+    def inspect(self) -> None:
+        reveal_type(super().value)  # revealed: int
+```
+
+A union substituted for the type variable preserves function types, including intersections, while
+invoking explicit descriptors:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+from ty_extensions._internal import TypeOf
+
+def f(value: str) -> str:
+    return value
+
+def check_mixed(value: Base[TypeOf[f] | Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: (def f(value: str) -> str) | int | Descriptor
+
+def check_intersection(value: Base[Intersection[TypeOf[f], Any] | Descriptor]) -> None:
+    reveal_type(value.value)  # revealed: ((def f(value: str) -> str) & Any) | int | Descriptor
+```
+
 ## Generic attributes unioned with descriptors
 
 A union containing an explicit descriptor still invokes that descriptor on instance access:
