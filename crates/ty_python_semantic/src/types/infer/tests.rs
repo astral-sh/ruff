@@ -1916,6 +1916,51 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn fixed_call_result_does_not_depend_on_its_argument() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented("src/argument.py", "value: str = 'oops'")?;
+    db.write_dedented(
+        "src/producer.py",
+        r#"
+        from argument import value
+
+        def label(number: int) -> str:
+            return str(number)
+
+        result = label(value)
+        "#,
+    )?;
+    db.write_dedented(
+        "src/consumer.py",
+        r#"
+        from typing_extensions import reveal_type
+        from producer import result
+
+        reveal_type(result)
+        "#,
+    )?;
+    let argument = system_path_to_file(&db, "src/argument.py")?;
+    let producer = system_path_to_file(&db, "src/producer.py")?;
+
+    assert_revealed_type(&db, "src/consumer.py", "str");
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        parsed_module,
+        program_file(&db, argument).python_file(&db),
+        &events,
+    );
+
+    let diagnostics = check_types(&db, program_file(&db, producer));
+    assert_eq!(diagnostics.len(), 1, "{diagnostics:#?}");
+    assert_eq!(diagnostics[0].id().as_str(), "invalid-argument-type");
+
+    db.write_dedented("src/argument.py", "value: int = 1")?;
+    assert_file_diagnostics(&db, "src/producer.py", &[]);
+    Ok(())
+}
+
 /// Inferring the result of a call-expression shouldn't need to re-run after
 /// a trivial change to the function's file (e.g. by adding a docstring to the function).
 #[test]

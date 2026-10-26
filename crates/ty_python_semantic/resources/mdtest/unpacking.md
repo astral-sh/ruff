@@ -46,11 +46,11 @@ Some decorators change the result of the call even when the function has a tuple
 from typing_extensions import dataclass_transform
 
 @dataclass_transform()
-def factory() -> tuple[int, str]:
+def factory(*, flag: bool) -> tuple[int, str]:
     return 1, ""
 
 def use_factory():
-    a, b = factory()  # error: [not-iterable]
+    a, b = factory(flag=True)  # error: [not-iterable]
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
 ```

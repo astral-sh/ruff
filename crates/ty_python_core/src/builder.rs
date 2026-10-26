@@ -4331,19 +4331,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(&node.value);
 
-                // Unpacking can use a function's fixed return type without inferring its arguments.
-                // In either case, infer the callee with the regular call-site scope and flags.
-                if self.scopes[self.current_scope()].kind() == ScopeKind::Function
-                    && node
-                        .targets
-                        .iter()
-                        .any(|target| target.is_tuple_expr() || target.is_list_expr())
-                    && let ast::Expr::Call(call) = node.value.as_ref()
-                    && call.func.is_name_expr()
-                {
-                    self.add_standalone_expression_impl(&call.func, ExpressionKind::Callee, None);
-                }
-
                 // Unannotated collection initializers must be standalone expressions to participate
                 // in full-scope bidirectional inference.
                 if node.targets.len() == 1 && is_collection_initializer(&node.value) {

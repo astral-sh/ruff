@@ -9,6 +9,33 @@ def get_int() -> int:
 reveal_type(get_int())  # revealed: int
 ```
 
+## Fixed return types
+
+A generic parameter can constrain a call's arguments without changing its result. The assignment
+still checks the argument and the target's declared type.
+
+```py
+from collections.abc import Callable
+from typing import Literal, TypeVar
+
+T = TypeVar("T")
+
+class Parser:
+    def status(self, items: list[T]) -> Literal["ok"] | None:
+        return "ok" if items else None
+
+def run(parser: Parser, callback: Callable[[int], str]):
+    status = parser.status([1])
+    reveal_type(status)  # revealed: Literal["ok"] | None
+
+    result = callback("bad")  # error: [invalid-argument-type]
+    reveal_type(result)  # revealed: str
+
+    count: int
+    count = callback(1)  # error: [invalid-assignment]
+    reveal_type(count)  # revealed: int
+```
+
 ## Gradual variadic parameters
 
 ```py

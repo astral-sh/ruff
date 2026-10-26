@@ -68,7 +68,7 @@ use crate::{Db, FxIndexSet};
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::expression::Expression;
+use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
@@ -277,6 +277,31 @@ pub(crate) fn infer_definition_types<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_definition(definition)
+}
+
+/// Return a call assignment's binding type without depending on its arguments. The defining
+/// statement still infers the arguments when collecting expression types and diagnostics.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn infer_fixed_call_binding<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Type<'db>> {
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return None;
+    };
+    if assignment.unpack().is_some() {
+        return None;
+    }
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let ast::Expr::Call(call) = assignment.value(&module) else {
+        return None;
+    };
+    if !assignment.target(&module).is_name_expr() {
+        return None;
+    }
+    let env = ProgramEnvironment::from_scope(definition.scope(db));
+    TypeInferenceBuilder::for_definition(db, &env, definition, &module)
+        .infer_call_assignment_binding(assignment, definition, call)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -604,20 +629,8 @@ pub(super) fn infer_expression_types_impl<'db>(
     )
     .entered();
 
-    let index = semantic_index(db, program_file);
-
     let env = ProgramEnvironment::from_file(program_file);
-
-    TypeInferenceBuilder::new(
-        db,
-        &env,
-        InferenceRegion::Expression(expression, tcx),
-        python_file.file(db),
-        program_file,
-        index,
-        &module,
-    )
-    .finish_expression()
+    TypeInferenceBuilder::for_expression(db, &env, expression, tcx, &module).finish_expression()
 }
 
 fn expression_cycle_initial<'db>(
@@ -632,7 +645,8 @@ fn expression_cycle_initial<'db>(
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
 ///
-/// This is a small helper around [`infer_expression_types()`] to reduce the boilerplate.
+/// When only a call's result is needed, its arguments can remain unevaluated until the
+/// enclosing statement is checked.
 /// Use [`infer_expression_type()`] if it isn't guaranteed that `expression` is in the same file to
 /// avoid cross-file query dependencies.
 pub(crate) fn infer_same_file_expression_type<'db>(
@@ -640,6 +654,18 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     expression: Expression<'db>,
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
+    if expression.kind(db) == ExpressionKind::Normal {
+        let program_file = expression.program_file(db);
+        let module = parsed_module(db, program_file.python_file(db)).load(db);
+        if let ast::Expr::Call(call) = expression.node_ref(db).node(&module) {
+            let env = ProgramEnvironment::from_file(program_file);
+            let mut builder =
+                TypeInferenceBuilder::for_expression(db, &env, expression, tcx, &module);
+            if let Some(ty) = builder.infer_call_return_type_without_arguments(call) {
+                return ty;
+            }
+        }
+    }
     let inference = infer_expression_types(db, expression, tcx);
     inference.expression_type(expression.node_ref(db))
 }
@@ -670,12 +696,8 @@ pub(crate) fn infer_expression_type<'db>(
     heap_size=ruff_memory_usage::heap_size
 )]
 fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>) -> Type<'db> {
-    let (expression, _) = input.into_inner(db);
-
-    // It's okay to call the "same file" version here because we're inside a salsa query.
-    let inference = infer_expression_types_impl(db, input);
-
-    inference.expression_type(expression.node_ref(db))
+    let (expression, tcx) = input.into_inner(db);
+    infer_same_file_expression_type(db, expression, tcx)
 }
 
 /// Infer all types for a [`Statement`].

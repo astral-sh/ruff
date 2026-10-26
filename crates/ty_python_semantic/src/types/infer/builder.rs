@@ -510,6 +510,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )
     }
 
+    pub(super) fn for_expression(
+        db: &'db dyn Db,
+        env: &'ast ProgramEnvironment<'db>,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
+        let file = expression.program_file(db);
+        Self::new(
+            db,
+            env,
+            InferenceRegion::Expression(expression, tcx),
+            file.file(db),
+            file,
+            semantic_index(db, file),
+            module,
+        )
+    }
+
     /// Creates a new builder for inferring types in a region.
     pub(super) fn new(
         db: &'db dyn Db,
@@ -3528,9 +3547,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let add = self.add_binding(target.into(), definition);
         let target_ty =
-            self.infer_assignment_definition_impl(assignment, definition, add.type_context());
+            self.infer_assignment_definition_impl(assignment, definition, add.type_context(), None);
         self.store_expression_type(target, target_ty);
         add.insert(self, target_ty);
+    }
+
+    pub(super) fn infer_call_assignment_binding(
+        &mut self,
+        assignment: &AssignmentDefinitionKind<'db>,
+        definition: Definition<'db>,
+        call: &ast::ExprCall,
+    ) -> Option<Type<'db>> {
+        let ty = self.infer_call_return_type_without_arguments(call)?;
+        let add = self.add_binding(assignment.target(self.module()).into(), definition);
+        let target_ty = self.infer_assignment_definition_impl(
+            assignment,
+            definition,
+            add.type_context(),
+            Some(ty),
+        );
+        Some(add.bound_type(self, target_ty))
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
@@ -3546,6 +3582,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
         tcx: TypeContext<'db>,
+        fixed_call_result: Option<Type<'db>>,
     ) -> Type<'db> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
@@ -3564,8 +3601,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
 
-                let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
-                {
+                let value_ty = if let Some(ty) = fixed_call_result {
+                    ty
+                } else if let Some(standalone_expression) = self.index.try_expression(value) {
                     let inference = infer_expression_types(self.db(), standalone_expression, tcx);
                     match assignment.owner() {
                         BindingsOwner::Definition => {
@@ -9266,6 +9304,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Some(constraint)
     }
 
+    /// Infer the callable in its usual call-site context, without consulting the arguments.
+    pub(super) fn infer_call_return_type_without_arguments(
+        &mut self,
+        call: &ast::ExprCall,
+    ) -> Option<Type<'db>> {
+        // The caller only requests a type. Full inference owns diagnostics for this call.
+        self.context.suppress_diagnostics();
+        self.context.defuse();
+        // Class bodies can give an ordinary field-specifier function special call semantics.
+        if call.arguments.is_empty()
+            || self
+                .index
+                .scope(self.scope().file_scope_id(self.db()))
+                .kind()
+                == ScopeKind::Class
+        {
+            return None;
+        }
+        let callee = self.infer_callee(&call.func);
+        callee.call_return_type_without_arguments(self.db(), self.program_environment())
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -13422,6 +13482,17 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         builder: &mut TypeInferenceBuilder<'db, 'ast>,
         inferred_ty: Type<'db>,
     ) -> Type<'db> {
+        let binding = self.binding;
+        let bound_ty = self.bound_type(builder, inferred_ty);
+        builder.bindings.insert(binding, bound_ty);
+        inferred_ty
+    }
+
+    fn bound_type(
+        self,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        inferred_ty: Type<'db>,
+    ) -> Type<'db> {
         let env = builder.program_environment();
         let declared_ty = self.declared_ty.unwrap_or(Type::unknown());
 
@@ -13551,9 +13622,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
-        builder.bindings.insert(self.binding, bound_ty);
-
-        inferred_ty
+        bound_ty
     }
 
     /// Arbitrary `__getitem__`/`__setitem__` methods on a class do not

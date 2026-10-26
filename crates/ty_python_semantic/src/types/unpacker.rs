@@ -12,9 +12,8 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 
 use crate::Db;
-use crate::types::call::infer_call_return_type_without_arguments;
 use crate::types::dict::dict_literal_key_value_types;
-use crate::types::infer::FrozenMap;
+use crate::types::infer::{FrozenMap, infer_same_file_expression_type};
 use crate::types::tuple::promotion::TupleSizePromotionConstraints;
 use crate::types::tuple::{
     ResizeTupleError, Tuple, TupleBuilder, TupleElement, TupleLength, TupleSpec,
@@ -93,23 +92,17 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             infer_expression_types(db, value.expression(), TypeContext::default())
         });
         let expression_type = |expression: &ast::Expr| inference.expression_type(expression);
+        let value_type =
+            infer_same_file_expression_type(db, value.expression(), TypeContext::default());
         let value_type = match value.kind() {
             UnpackKind::Assign => {
                 if self.context.in_stub() && value_expr.is_ellipsis_literal_expr() {
                     Type::unknown()
-                } else if let ast::Expr::Call(call) = value_expr
-                    && let Some(ty) = infer_call_return_type_without_arguments(&self.context, call)
-                    && ty.tuple_instance_spec(db, env).is_some()
-                {
-                    // In a loop such as `a, b = f(a)`, following the argument would lead
-                    // back to this assignment. The statement checks the full call separately.
-                    ty
                 } else {
-                    expression_type(value_expr)
+                    value_type
                 }
             }
             UnpackKind::Iterable { mode } => {
-                let value_type = expression_type(value_expr);
                 if !mode.is_async()
                     && let ast::Expr::Dict(dict) = value_expr
                     && let Some((keys, _)) =
@@ -130,19 +123,16 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         })
                 }
             }
-            UnpackKind::ContextManager { mode } => {
-                let value_type = expression_type(value_expr);
-                value_type
-                    .try_enter_with_mode(db, env, mode)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(
-                            &self.context,
-                            value_type,
-                            value.as_any_node_ref(self.db(), self.module()),
-                        );
-                        err.fallback_enter_type(db, env)
-                    })
-            }
+            UnpackKind::ContextManager { mode } => value_type
+                .try_enter_with_mode(db, env, mode)
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(
+                        &self.context,
+                        value_type,
+                        value.as_any_node_ref(self.db(), self.module()),
+                    );
+                    err.fallback_enter_type(db, env)
+                }),
         };
 
         self.unpack_inner(

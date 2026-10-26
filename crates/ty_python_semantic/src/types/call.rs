@@ -4,12 +4,10 @@ use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::function::OverloadLiteral;
-use crate::types::infer::infer_same_file_expression_type;
+use crate::types::visitor::any_over_type;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use crate::{Program, ProgramEnvironment};
 use ruff_python_ast as ast;
-use ty_python_core::scope::ScopeKind;
-use ty_python_core::semantic_index;
 
 mod ambiguous;
 mod arguments;
@@ -18,45 +16,6 @@ pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
 };
-
-/// Infers a call's return type when its arguments cannot affect the result. The caller
-/// must still check the full call to validate its arguments.
-pub(super) fn infer_call_return_type_without_arguments<'db>(
-    context: &InferContext<'db, '_>,
-    call: &ast::ExprCall,
-) -> Option<Type<'db>> {
-    let db = context.db();
-    call.func.as_name_expr()?;
-    let index = semantic_index(db, context.program_file());
-    // In a class body, even a plain function can act as a dataclass field specifier.
-    if index.scope(context.scope().file_scope_id(db)).kind() != ScopeKind::Function {
-        return None;
-    }
-    let callee = index.try_expression(&call.func)?;
-    let function = infer_same_file_expression_type(db, callee, TypeContext::default())
-        .as_function_literal()?;
-
-    let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
-        return None;
-    };
-    if function.known(db).is_some()
-        || function.file(db).is_stub(db)
-        || !implementation.decorators(db).is_empty()
-        || function.dataclass_transformer_params(db).is_some()
-        || !implementation.has_explicit_return_annotation(db)
-    {
-        return None;
-    }
-    let [signature] = function.signature(db).overloads.as_slice() else {
-        return None;
-    };
-    // A type guard, for example, binds its result to an argument even without a type variable.
-    let return_ty = signature.return_ty;
-    (signature.is_non_generic()
-        && return_ty.as_nominal_instance().is_some()
-        && !return_ty.has_typevar(db, context.program_environment()))
-    .then_some(return_ty)
-}
 
 /// The return type and deprecations retained from binary operator resolution.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -174,6 +133,59 @@ fn reflected_method_priority<'db>(
 }
 
 impl<'db> Type<'db> {
+    /// Returns the result of calling this type when binding the arguments cannot change it.
+    /// Checking the call still requires inferring its arguments against the parameters.
+    pub(super) fn call_return_type_without_arguments(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Self> {
+        let callable = match self {
+            Type::BoundMethod(method) => {
+                // The getter, setter, and deleter methods retain the supplied accessor.
+                if matches!(method.self_instance(db), Type::PropertyInstance(_)) {
+                    return None;
+                }
+                method.func(db)
+            }
+            _ => self,
+        };
+        let signatures = match callable {
+            Type::FunctionLiteral(function) => {
+                let ([], Some(implementation)) = function.overloads_and_implementation(db) else {
+                    return None;
+                };
+                if function.known(db).is_some()
+                    || !implementation.decorators(db).is_empty()
+                    || function.dataclass_transformer_params(db).is_some()
+                    || !implementation.has_explicit_return_annotation(db)
+                {
+                    return None;
+                }
+                function.signature(db)
+            }
+            Type::Callable(callable) if callable.is_regular(db) => callable.signatures(db),
+            _ => return None,
+        };
+        let [signature] = signatures.overloads.as_slice() else {
+            return None;
+        };
+        // Type guards record the narrowed argument. An alias can hide a type variable or a
+        // type guard, so leave aliases to ordinary binding rather than evaluating them here.
+        let ty = signature.return_ty;
+        let needs_binding = any_over_type(db, env, ty, false, |ty| {
+            matches!(
+                ty,
+                Type::TypeVar(_)
+                    | Type::TypeIs(_)
+                    | Type::TypeGuard(_)
+                    | Type::TypeAlias(_)
+                    | Type::Divergent(_)
+            )
+        });
+        (!needs_binding).then_some(ty)
+    }
+
     /// Return the result of dispatching a rich comparison method between two operands.
     ///
     /// A strict subclass on the right takes precedence over the normal method on the left.
